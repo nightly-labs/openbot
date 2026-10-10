@@ -8,6 +8,7 @@ import {
   DISCORD_ROUTE_TTL_SECONDS,
   type DiscordRouteGuild,
 } from "@openbot/contracts/signal-protocol/discord-route";
+import type { IngressRoute } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SLACK_ROUTE_AUDIENCE,
   SLACK_ROUTE_TEAMS_LIMIT,
@@ -1682,6 +1683,31 @@ export class RemoteControlPlane {
           return row?.app_id === team.appId && row.connected_at === team.linkedAt;
         })
         .map((team) => team.id);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** The host that a Slack workspace, Discord guild or Telegram chat is linked to, or null. */
+  readonly routeHost = Effect.fn("RemoteControlPlane.routeHost")(
+    function* (
+      this: RemoteControlPlane,
+      route: IngressRoute,
+    ): Effect.fn.Return<string | null, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      const statement =
+        route.platform === "slack"
+          ? dependencies.database
+              .prepare("SELECT host_id FROM slack_workspace_routes WHERE team_id = ? AND app_id = ?")
+              .bind(route.teamId, route.appId)
+          : route.platform === "discord"
+            ? dependencies.database
+                .prepare("SELECT host_id FROM discord_guild_routes WHERE guild_id = ?")
+                .bind(route.guildId)
+            : dependencies.database
+                .prepare("SELECT host_id FROM telegram_chat_routes WHERE bot_id = ? AND chat_id = ?")
+                .bind(route.botId, route.chatId);
+      const row = yield* remoteCall(() => statement.first<{ host_id: string }>());
+      return row?.host_id ?? null;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

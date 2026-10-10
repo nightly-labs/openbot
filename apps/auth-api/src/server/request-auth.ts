@@ -364,6 +364,6 @@ export function authErrorResponse(error: unknown): Response {
 }
 
 /** Starts background work in the active Worker invocation. */
-function schedule<E>(work: Effect.Effect<void, E>): void {
+export function schedule<E>(work: Effect.Effect<void, E>): void {
   waitUntil(runApiEffect(work));
 }

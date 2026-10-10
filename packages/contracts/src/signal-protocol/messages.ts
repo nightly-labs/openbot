@@ -68,6 +68,9 @@ export const SLACK_DELIVERY_RESPONSE_BYTES_LIMIT = 4 * 1024;
 // The largest generic webhook body Signal passes to a host. Signal does not inspect or retain it.
 export const WEBHOOK_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
 
+// The largest sealed `queued-delivery` frame: one delivery, encoded as base64url twice.
+export const QUEUED_DELIVERY_SEALED_LIMIT = 512 * 1024;
+
 // The Slack request that a delivery carries. Slack sends events as JSON and button presses as a form.
 export type SlackDeliveryKind = "events" | "interactivity";
 
@@ -143,6 +146,9 @@ export type SignalClientMessage =
       // `ingress` only, and optional: the Telegram route ticket (`./telegram-route.ts`) that names
       // the Telegram chats whose updates this socket receives.
       telegramRoute?: string;
+      // `ingress` only, and optional: the host's queue key (`./ingress-queue.ts`). With it, Signal
+      // keeps the events of a route for this host while the host starts.
+      queueKey?: string;
     }
   // An `ingress` socket's Bot API call, sent only to a Signal whose `ready` named the `telegram`
   // capability. Signal answers with one `telegram-call-result` of the same `requestId`.
@@ -165,6 +171,9 @@ export type SignalClientMessage =
       contentType?: "application/json" | "text/plain";
       body?: string;
     }
+  // An `ingress` socket handled one `queued-delivery`. Signal keeps a kept event until this comes, and
+  // sends it again on the host's next hello. Sent only to a Signal whose `ready` named `ingress-queue`.
+  | { type: "queued-delivery-ack"; version: SignalProtocolVersion; id: string }
   // An ingress socket's answer to one generic webhook delivery. Signal returns this status to the
   // public webhook caller only after the host has committed the event.
   | {
@@ -252,6 +261,10 @@ export type SignalServerMessage =
   // One Discord event of a guild routed to this `ingress` socket. Signal already acknowledged a button
   // press to Discord; nothing is answered.
   | { type: "discord-delivery"; version: SignalProtocolVersion; guildId: string; delivery: DiscordDelivery }
+  // One Slack, Discord or Telegram delivery that Signal kept while this host started, sealed to the
+  // host's queue key (`./ingress-queue.ts`). It needs no answer: Signal already answered the platform.
+  // `id` is the event's own: the host sends it back in `queued-delivery-ack`.
+  | { type: "queued-delivery"; version: SignalProtocolVersion; id: string; sealed: string }
   // One generic webhook request for a route linked to this host. The HMAC is checked by the host:
   // Signal forwards the exact body and the three signed header values without reading the body.
   | {

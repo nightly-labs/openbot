@@ -16,7 +16,9 @@ are the OpenBot Slack app, the OpenBot Discord bot and the OpenBot Telegram bot:
 7. ICE picks either a direct `p2p` path or `relay` through this coturn. Cloudflare is never on the data path.
 
 Signal has no database. It stores no tokens, SDP, ICE, file names or message contents. Room and presence
-data exist only in process memory.
+data exist only in process memory. The one exception is the queue of a hosted server that sleeps (see
+[Sleeping hosted servers](#sleeping-hosted-servers)): Signal keeps a Slack, Discord or Telegram event
+for it in memory, sealed to the host's key so that Signal cannot read it, for at most 10 minutes.
 
 A `resume token` is valid for 10 minutes. Signal keeps the issued token in a bounded in-memory cache.
 A normal reconnect validates that token locally. After a Signal restart the cache is empty, so the first
@@ -34,13 +36,15 @@ validation window.
 
 The OpenBot Slack app sends the events and button presses of every workspace to one request URL,
 `https://signal.openbot.run/v1/slack/events`. Signal checks Slack's signature with the app's signing
-secret, answers Slack's `url_verification` challenge, and reads only the app ID (`api_app_id`) and
-the workspace ID. `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`,
+secret, answers Slack's `url_verification` challenge, and reads only the app ID (`api_app_id`), the
+workspace ID, and the event's type, channel type, thread and bot ID (to know whether it addresses
+OpenBot, not its text). `SLACK_SIGNING_SECRET` is a comma-separated list of `<app ID>:<signing secret>`,
 because the production and development apps share Signal. A request must name the app whose secret
 signed it, so one app's secret cannot reach the other app's hosts; a malformed value turns off only
 the Slack route. Then Signal passes the exact request body to the `ingress` socket of the host that
 the app and workspace are linked to, and returns the host's answer, or 503 when no host holds the workspace or the
-host does not answer in 2.5 seconds. Slack then sends the request again.
+host does not answer in 2.5 seconds. Slack then sends the request again. For a hosted server that
+sleeps, Signal answers 200 instead (see [Sleeping hosted servers](#sleeping-hosted-servers)).
 
 An `ingress` socket names its workspaces with a Slack route ticket: an ES256 JWT with the audience
 `openbot-slack-route`, signed by the Worker with `SLACK_ROUTE_PRIVATE_JWK` (key id
@@ -117,7 +121,23 @@ An `ingress` socket names its chats with a Telegram route ticket: an ES256 JWT w
 accepts only the methods and parameters of `TelegramCallParams`, only for the chats routed to that
 socket, and returns only the reduced result. A host downloads a file from `/v1/telegram/files/<token>`
 and posts a document to `/v1/telegram/uploads/<token>`. These tokens are signed, expire after two
-minutes, and an upload token works once. Signal does not store or log an update or a file.
+minutes, and an upload token works once. Signal does not store or log an update or a file, except
+for the sealed queue of a hosted server that sleeps.
+
+## Sleeping hosted servers
+
+All messaging platforms share one path (`src/ingress-queue.ts`). For an event whose route has no
+`ingress` socket, Signal asks the account service (`/v2/remote/route-wake`, signed), at most once a
+minute for each route. An event that addresses OpenBot starts a hosted server that sleeps. Signal
+then keeps the event's delivery frame, sealed with the host's queue key (`queueKey` in the `ingress`
+hello) and the host ID, for at most 10 minutes, 64 events and 192 KB for each host. When the host's
+socket holds the route again, Signal sends each kept event in order as `queued-delivery`, and keeps it
+until the host sends `queued-delivery-ack`. While a host has kept events, Signal asks for its start
+again once a minute, because a start can fail after the account service answered. A host that
+sent no key gets nothing kept. A restart of Signal loses the queue and the keys. Signal names the
+`ingress-queue` capability in `ready` only when the account service answered `/v2/remote/route-wake`
+when Signal started: only then does a hosted server with a live connection sleep. Deploy the account
+service before Signal.
 
 ## Production requirements
 

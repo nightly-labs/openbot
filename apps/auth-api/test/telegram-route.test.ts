@@ -322,6 +322,24 @@ describe("Telegram chat routes", () => {
     const linked = await post(LinkRoute.options.server?.handlers, linkBody, signature(linkBody, WEBHOOK_SECRET));
     expect(linked.status).toBe(200);
     await expect(linked.json()).resolves.toMatchObject({ hostId: "host-1" });
+
+    // A route wake starts a server, so only Signal can ask for it, and only for a linked route.
+    const { Route: WakeRoute } = await import("../src/routes/v2/remote/route-wake");
+    const wake = (chatId: string) =>
+      JSON.stringify({ route: { platform: "telegram", botId: BOT_ID, chatId }, wake: true });
+    expect((await post(WakeRoute.options.server?.handlers, wake("-1001"), {})).status).toBe(401);
+    const known = await post(
+      WakeRoute.options.server?.handlers,
+      wake("-1001"),
+      signature(wake("-1001"), WEBHOOK_SECRET),
+    );
+    await expect(known.json()).resolves.toEqual({ hostId: "host-1", state: "not_hosted" });
+    const unknown = await post(
+      WakeRoute.options.server?.handlers,
+      wake("-1002"),
+      signature(wake("-1002"), WEBHOOK_SECRET),
+    );
+    await expect(unknown.json()).resolves.toEqual({ hostId: null, state: "not_hosted" });
   });
 });
 

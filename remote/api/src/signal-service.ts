@@ -1,6 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_ROUTE_TTL_SECONDS, type DiscordRouteGuild } from "@openbot/contracts/signal-protocol/discord-route";
+import {
+  INGRESS_QUEUE_CAPABILITY,
+  type IngressRoute,
+  isIngressQueueKey,
+  type QueuedSignalMessage,
+} from "@openbot/contracts/signal-protocol/ingress-queue";
 import { SLACK_ROUTE_TTL_SECONDS, type SlackRouteTeam } from "@openbot/contracts/signal-protocol/slack-route";
 import {
   TELEGRAM_CAPABILITY,
@@ -11,6 +17,7 @@ import {
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
 import { Context, Effect, Fiber, Layer, Result } from "effect";
+import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
   decodeSignalClientMessage,
@@ -142,6 +149,9 @@ export interface SignalMetrics {
   discordApiFailures: number;
   webhookDeliveries: number;
   webhookDeliveriesUnavailable: number;
+  // Slack, Discord and Telegram events kept for a hosted server that starts, and sent to it later.
+  queuedDeliveries: number;
+  queuedDeliveriesFlushed: number;
 }
 
 /** The result of the authorization of one Discord API call. */
@@ -152,6 +162,10 @@ export interface SignalServiceOptions {
   discord?: boolean;
   /** The Bot API and the file tokens. Without them, Telegram is off. */
   telegram?: SignalTelegram | null;
+  /** Finds and starts the host of a route with no socket. Without it, Signal keeps no event. */
+  routeWaker?: RouteWaker | null;
+  /** Runs the work that an event for an offline route starts, in the process's runtime. */
+  fork?: (work: Effect.Effect<unknown>) => void;
 }
 
 /** What the Discord Gateway knows of the bot's guilds. */
@@ -162,12 +176,17 @@ export interface DiscordMembership {
   left(guildId: string): void;
 }
 
-/** One signed Slack request for a workspace. Signal passes it on and keeps nothing of it. */
+/**
+ * One signed Slack request for a workspace. Signal passes it on. Only for a hosted server that starts
+ * does Signal keep it, sealed (`IngressQueue`).
+ */
 export interface SlackDelivery {
   kind: SlackDeliveryKind;
   retryNum: number | null;
   retryReason: string | null;
   body: Uint8Array;
+  /** The request addresses OpenBot: a mention, a direct message, a thread reply or a button press. */
+  wakes: boolean;
 }
 
 export interface SlackDeliveryResponse {
@@ -276,6 +295,8 @@ export class SignalService {
   readonly #discordEnabled: boolean;
   #discordMembership: DiscordMembership | null = null;
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
+  readonly #queue: IngressQueue;
+  readonly #fork: (work: Effect.Effect<unknown>) => void;
   readonly #deliveryLimits: IngressDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -311,6 +332,8 @@ export class SignalService {
     discordApiFailures: 0,
     webhookDeliveries: 0,
     webhookDeliveriesUnavailable: 0,
+    queuedDeliveries: 0,
+    queuedDeliveriesFlushed: 0,
   };
 
   readonly dependencies: Layer.Layer<SignalTokens>;
@@ -331,6 +354,8 @@ export class SignalService {
     this.#deliveryLimits = deliveryLimits;
     this.#discordEnabled = options.discord === true;
     this.#telegram = options.telegram ?? null;
+    this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
+    this.#queue = new IngressQueue(options.routeWaker ?? null, { fork: this.#fork });
   }
 
   /** The Bot API and the file tokens, or `null` when Telegram is off. */
@@ -344,6 +369,7 @@ export class SignalService {
     this.#connectionDropTimers.clear();
     this.#peerExpirationTimers.clear();
     for (const requestId of [...this.#pendingDeliveries.keys()]) this.#settleDelivery(requestId, null);
+    this.#queue.close();
   }
 
   connect(socket: SignalSocket): boolean {
@@ -407,6 +433,10 @@ export class SignalService {
       }
       if (message.type === "disconnect") {
         if (this.#ownsConnection(peer, message.connectionId)) this.#dropConnection(message.connectionId, socket.id);
+        return;
+      }
+      if (message.type === "queued-delivery-ack") {
+        if (peer.peer === "ingress") this.#queue.acknowledge(peer.claims.hostId, message.id);
         return;
       }
       if (message.type === "slack-delivery-result" || message.type === "webhook-delivery-result") {
@@ -573,16 +603,22 @@ export class SignalService {
 
   /**
    * Passes one normalized Discord event to the `ingress` socket of the guild's host. Nothing waits
-   * for an answer, and nothing is kept: with no socket for the guild, the event is dropped.
+   * for an answer. With no socket for the guild, a hosted server starts and gets the event later
+   * (`IngressQueue`); otherwise the event is dropped.
    */
   deliverDiscord(guildId: string, delivery: DiscordDelivery): boolean {
     const socketId = this.#discordGuilds.get(guildId);
     const ingress = socketId ? this.#peers.get(socketId) : undefined;
-    const message = ingress
-      ? encodeSignalServerMessage({ type: "discord-delivery", version: 1, guildId, delivery })
-      : null;
-    if (!ingress || !message || new TextEncoder().encode(message).byteLength > SIGNAL_MESSAGE_BYTES_LIMIT) {
+    const frame = { type: "discord-delivery", version: 1, guildId, delivery } as const;
+    const message = encodeSignalServerMessage(frame);
+    if (new TextEncoder().encode(message).byteLength > SIGNAL_MESSAGE_BYTES_LIMIT) {
       this.#metrics.discordDeliveriesUnavailable += 1;
+      return false;
+    }
+    if (!ingress) {
+      this.#metrics.discordDeliveriesUnavailable += 1;
+      // The removal of the bot is the account service's work, not the host's.
+      if (delivery.kind !== "removed") this.#fork(this.#keep({ platform: "discord", guildId }, guildId, true, frame));
       return false;
     }
     ingress.socket.send(message);
@@ -637,14 +673,14 @@ export class SignalService {
   /**
    * Passes one signed Slack request to the `ingress` socket of the workspace's host and waits for
    * its answer. It resolves 503 when no host holds the workspace, the host is too busy, or it does
-   * not answer in time: Slack then sends the request again, so nothing needs to be kept here.
+   * not answer in time: Slack then sends the request again. For a hosted server that sleeps it
+   * resolves 200, and keeps the request when it addresses OpenBot (`IngressQueue`).
    */
-  readonly deliverSlack = Effect.fn("Signal.deliverSlack")((appId: string, teamId: string, delivery: SlackDelivery) =>
-    this.#deliver(
-      "slack",
-      this.#slackTeams.get(slackRouteKey(appId, teamId)),
-      delivery.body,
-      (requestId, bodyBase64) => ({
+  readonly deliverSlack = Effect.fn("Signal.deliverSlack")((appId: string, teamId: string, delivery: SlackDelivery) => {
+    const route = slackRouteKey(appId, teamId);
+    const socketId = this.#slackTeams.get(route);
+    const frame = (requestId: string, bodyBase64: string) =>
+      ({
         type: "slack-delivery",
         version: 1,
         requestId,
@@ -653,8 +689,20 @@ export class SignalService {
         retryNum: delivery.retryNum,
         retryReason: delivery.retryReason,
         bodyBase64,
-      }),
-    ).pipe(
+      }) as const;
+    // A hosted server that sleeps: Slack gets 200, so it does not count a failure or send again.
+    if (!socketId || !this.#peers.has(socketId)) {
+      this.#undelivered("slack");
+      return this.#keep(
+        { platform: "slack", appId, teamId },
+        route,
+        delivery.wakes,
+        frame(randomIdentifier(), Buffer.from(delivery.body).toString("base64")),
+      ).pipe(
+        Effect.map((outcome): SlackDeliveryResponse => (outcome === "unavailable" ? UNAVAILABLE : { status: 200 })),
+      );
+    }
+    return this.#deliver("slack", socketId, delivery.body, frame).pipe(
       Effect.map(
         (result): SlackDeliveryResponse =>
           result?.type === "slack-delivery-result"
@@ -666,8 +714,8 @@ export class SignalService {
               }
             : UNAVAILABLE,
       ),
-    ),
-  );
+    );
+  });
 
   /** Whether an open `ingress` socket holds this webhook route. Signal checks it before it reads a body. */
   holdsWebhookRoute(routeId: string): boolean {
@@ -769,7 +817,8 @@ export class SignalService {
 
   /**
    * Passes one Telegram update to the `ingress` socket of the chat's host. Telegram does not wait for
-   * the host, so nothing comes back. Returns `false` when no socket holds the chat. `linked` marks the
+   * the host, so nothing comes back. Returns `false` when no socket holds the chat; then a hosted
+   * server starts for an update that `wakes` and gets it later (`IngressQueue`). `linked` marks the
    * `/start` update that the account service just linked, the only one a host links a chat on.
    */
   deliverTelegram(
@@ -778,11 +827,22 @@ export class SignalService {
     body: Uint8Array,
     callbackQueryId: string | null,
     linked = false,
+    wakes = false,
   ): boolean {
-    const socketId = this.#telegramChats.get(telegramRouteKey(botId, chatId));
+    const route = telegramRouteKey(botId, chatId);
+    const socketId = this.#telegramChats.get(route);
     const ingress = socketId ? this.#peers.get(socketId) : undefined;
     if (!ingress) {
       this.#metrics.telegramDeliveriesUnrouted += 1;
+      this.#fork(
+        this.#keep(
+          { platform: "telegram", botId, chatId },
+          route,
+          wakes && !linked,
+          { type: "telegram-delivery", version: 1, botId, chatId, bodyBase64: Buffer.from(body).toString("base64") },
+          callbackQueryId ? { botId, queryId: callbackQueryId } : null,
+        ),
+      );
       return false;
     }
     if (callbackQueryId) this.#rememberCallback(telegramRouteKey(botId, callbackQueryId), ingress.socket.id);
@@ -889,7 +949,12 @@ export class SignalService {
   );
 
   #capabilities(peer: AuthenticatedPeer["peer"]): { capabilities?: string[] } {
-    return peer === "ingress" && this.#telegram ? { capabilities: [TELEGRAM_CAPABILITY] } : {};
+    if (peer !== "ingress") return {};
+    const capabilities = [
+      ...(this.#telegram ? [TELEGRAM_CAPABILITY] : []),
+      ...(this.#queue.enabled ? [INGRESS_QUEUE_CAPABILITY] : []),
+    ];
+    return capabilities.length > 0 ? { capabilities } : {};
   }
 
   #settleDelivery(requestId: string, result: IngressDeliveryResult | null): void {
@@ -904,6 +969,56 @@ export class SignalService {
   #undelivered(kind: IngressDeliveryKind): null {
     this.#metrics[`${kind}DeliveriesUnavailable`] += 1;
     return null;
+  }
+
+  /** The one path of every messaging platform for an event whose route has no socket. */
+  readonly #keep = Effect.fn("Signal.keep")(function* (
+    this: SignalService,
+    route: IngressRoute,
+    key: string,
+    wakes: boolean,
+    message: QueuedSignalMessage,
+    telegramCallback: { botId: string; queryId: string } | null = null,
+  ) {
+    const outcome = yield* this.#queue.offline(
+      route,
+      queueRouteKey(route.platform, key),
+      wakes,
+      message,
+      telegramCallback,
+    );
+    if (outcome === "queued") this.#metrics.queuedDeliveries += 1;
+    // The host connected while Signal sealed this event, or an earlier event that the flush waited for.
+    const socketId =
+      route.platform === "slack"
+        ? this.#slackTeams.get(key)
+        : route.platform === "discord"
+          ? this.#discordGuilds.get(key)
+          : this.#telegramChats.get(key);
+    const peer = socketId ? this.#peers.get(socketId) : undefined;
+    if (peer) this.#flushQueue(peer);
+    return outcome;
+  });
+
+  /** Sends the kept events of the routes that this socket now holds. */
+  #flushQueue(peer: AuthenticatedPeer): void {
+    const socketId = peer.socket.id;
+    const held = new Set<string>();
+    for (const key of peer.slackTeams)
+      if (this.#slackTeams.get(key) === socketId) held.add(queueRouteKey("slack", key));
+    for (const key of peer.telegramChats)
+      if (this.#telegramChats.get(key) === socketId) held.add(queueRouteKey("telegram", key));
+    for (const key of peer.discordGuilds)
+      if (this.#discordGuilds.get(key) === socketId) held.add(queueRouteKey("discord", key));
+    for (const frame of this.#queue.take(peer.claims.hostId, socketId, (route) => held.has(route))) {
+      if (frame.telegramCallback)
+        this.#rememberCallback(
+          telegramRouteKey(frame.telegramCallback.botId, frame.telegramCallback.queryId),
+          peer.socket.id,
+        );
+      this.#metrics.queuedDeliveriesFlushed += 1;
+      this.#send(peer.socket, { type: "queued-delivery", version: 1, id: frame.id, sealed: frame.sealed });
+    }
   }
 
   metrics(): SignalMetrics {
@@ -1105,6 +1220,10 @@ export class SignalService {
             this.#discordSessions.set(peer.discordSession, socket.id);
             this.#send(socket, { type: "discord-session", version: 1, token, guilds: heldGuilds });
           }
+          // After `ready` and the Discord session, so the host can answer what it kept.
+          const queueKey = message.queueKey && isIngressQueueKey(message.queueKey) ? message.queueKey : null;
+          this.#queue.rememberKey(claims.hostId, queueKey);
+          if (queueKey) this.#flushQueue(peer);
           return;
         }
         if (message.peer === "host") {

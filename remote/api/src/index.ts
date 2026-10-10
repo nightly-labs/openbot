@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import { DiscordGateway } from "./discord-gateway";
+import type { RouteWake } from "./ingress-queue";
 import { SignalService } from "./signal-service";
 import { TelegramBotApi } from "./telegram";
 import {
@@ -27,6 +29,10 @@ const TelegramValidation = Schema.Struct({
 const TelegramLink = Schema.Struct({ hostId: Schema.String, linkedAt: Schema.Int });
 const DiscordValidation = Schema.Struct({ guilds: Schema.Array(Schema.String) });
 const WebhookValidation = Schema.Struct({ routes: Schema.Array(Schema.String) });
+const RouteWakeAnswer = Schema.Struct({
+  hostId: Schema.NullOr(Schema.String),
+  state: Schema.Literals(ROUTE_HOST_STATES),
+});
 
 class ControlPlane extends Context.Service<
   ControlPlane,
@@ -58,6 +64,10 @@ class ControlPlane extends Context.Service<
       routes: import("@openbot/contracts/signal-protocol/webhook-route").WebhookRoute[],
     ): Effect.Effect<string[], ControlPlaneError>;
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
+    // An account service without the route answers 404: no host starts and nothing is kept.
+    routeWake(route: IngressRoute, wake: boolean): Effect.Effect<RouteWake, ControlPlaneError>;
+    // False for an account service without `/v2/remote/route-wake`, or one that does not answer.
+    supportsRouteWake(): Effect.Effect<boolean>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
@@ -174,6 +184,29 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      routeWake: Effect.fn("ControlPlane.routeWake")((route, wake) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/route-wake", { route, wake }),
+          (response) =>
+            Effect.gen(function* () {
+              if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
+              if (!response.ok)
+                return yield* new ControlPlaneError({ message: "The account service did not answer the route wake." });
+              return yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+            }),
+          releaseResponse,
+        ),
+      ),
+      supportsRouteWake: Effect.fn("ControlPlane.supportsRouteWake")(() =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/route-wake", { route: { platform: "slack", appId: "A0", teamId: "T0" }, wake: false }),
+          (response) => Effect.succeed(response.ok),
+          releaseResponse,
+        ).pipe(Effect.catch(() => Effect.succeed(false))),
+      ),
       discordGuildRemoved: Effect.fn("ControlPlane.discordGuildRemoved")((guildId) =>
         Effect.acquireUseRelease(
           ask("/v2/remote/discord-route/removed", { guildId }),
@@ -271,6 +304,13 @@ const signal = new SignalService(
     telegram: config.telegram
       ? { bot: new TelegramBotApi(config.telegram), files: new TelegramFileTokens(config.sessionSecret) }
       : null,
+    // Only with an account service that has the route: else Signal does not say `ingress-queue`, and
+    // a hosted server with a live connection stays on. A failure keeps nothing: the platform gets the
+    // answer of an offline host, as before.
+    routeWaker: (await controlPlane.runPromise(controlPlaneService.supportsRouteWake()))
+      ? (route, wake) => controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null,
+    fork: (work) => void signalRuntime.runFork(work),
   },
 );
 const tlsPaths =

@@ -2,9 +2,11 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 import { decodeSignalServerMessage } from "@openbot/contracts/signal-protocol/decode";
 import { type DiscordApiRequest, decodeDiscordApiError } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
+import { INGRESS_QUEUE_CAPABILITY, openQueuedDelivery } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SIGNAL_PROTOCOL_VERSION,
   type SignalClientMessage,
+  type SignalServerMessage,
   SLACK_DELIVERY_RESPONSE_BYTES_LIMIT,
   type WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
@@ -15,7 +17,7 @@ import {
   type TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Context, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope } from "effect";
+import { Context, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
 import WebSocket from "ws";
 import {
   DiscordApiError,
@@ -28,6 +30,7 @@ import {
   TelegramCallError,
   type TelegramGateway,
 } from "../backend/messaging/messaging-types";
+import type { IngressQueueKey } from "./ingress-queue-key";
 import { type RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./telegram-files";
 
@@ -62,6 +65,11 @@ export interface SignalIngressOptions {
    * again later.
    */
   issueTelegramRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+  /**
+   * The lasting queue key of this host, or null. With it, Signal keeps the events of a hosted server
+   * that sleeps, sealed, and sends them when the socket connects.
+   */
+  queueKey?(): Effect.Effect<IngressQueueKey | null>;
 }
 
 class SignalIngressAccount extends Context.Service<
@@ -162,10 +170,24 @@ export class SignalIngress implements MessagingIngress {
   /** The HTTPS origin of the Signal of the open socket, for Telegram files. */
   #signalOrigin: string | null = null;
   readonly #telegramCalls = new Map<string, (answer: TelegramCallAnswer) => void>();
+  /** `null` until it is loaded, and when this host has none. */
+  #queueKey: IngressQueueKey | null = null;
+  readonly #queuedOrder = Semaphore.makeUnsafe(1);
+
+  readonly #loadQueueKey: Effect.Effect<IngressQueueKey | null>;
 
   constructor(options: SignalIngressOptions) {
     this.#options = options;
+    this.#loadQueueKey = Effect.runSync(Effect.cached(options.queueKey?.() ?? Effect.succeed(null)));
     this.#runtime = ManagedRuntime.make(SignalIngressAccount.layer(options));
+  }
+
+  /**
+   * Whether the last Signal said that it starts this host for a connector event and keeps the event,
+   * and this host sent it a queue key. Only then may a hosted server with a live connection sleep.
+   */
+  queueReady(): boolean {
+    return Boolean(this.#queueKey) && this.#capabilities.has(INGRESS_QUEUE_CAPABILITY);
   }
 
   acquire(platform: MessagingPlatform): () => void {
@@ -394,6 +416,9 @@ export class SignalIngress implements MessagingIngress {
       ...(webhookRoute === null ? {} : { webhookRoute }),
       ...(telegramRoute === null ? {} : { telegramRoute }),
     };
+    // Loaded once: two opens at the same time must not make two keys.
+    const queueKey = yield* this.#loadQueueKey;
+    this.#queueKey = queueKey;
     if (generation !== this.#generation || (this.#held() === 0 && this.#webhookHolders === 0)) return;
     this.#webhookMissing = webhooks && webhookRoute === null;
     this.#telegramMissing = telegram && telegramRoute === null;
@@ -409,10 +434,11 @@ export class SignalIngress implements MessagingIngress {
         peer: "ingress",
         token: bootstrap.ticket,
         ...routes,
+        ...(queueKey ? { queueKey: queueKey.publicKey } : {}),
       };
       socket.send(JSON.stringify(hello));
     });
-    socket.on("message", (data) => this.#run(this.#receive(socket, data.toString())));
+    socket.on("message", (data) => this.#run(this.#receive(socket, hostId, data.toString())));
     socket.on("pong", () => pongs.set(socket, true));
     socket.on("close", () => {
       if (socket !== this.#socket) return;
@@ -431,16 +457,51 @@ export class SignalIngress implements MessagingIngress {
   readonly #receive = Effect.fn("SignalIngress.receive")(function* (
     this: SignalIngress,
     socket: WebSocket,
+    hostId: string,
     text: string,
   ) {
-    if (this.#disposing || socket !== this.#socket) return;
+    if (this.#disposing) return;
     const decoded = yield* remoteDecode(() => decodeSignalServerMessage(JSON.parse(text))).pipe(Effect.result);
     if (Result.isFailure(decoded)) {
-      socket.close(1002);
+      if (socket === this.#socket) socket.close(1002);
       return;
     }
     const message = decoded.success;
-    if (!message || socket !== this.#socket) return;
+    if (!message) return;
+    if (message.type !== "queued-delivery") {
+      if (socket === this.#socket) yield* this.#dispatch(socket, message, false);
+      return;
+    }
+    // A delivery that Signal kept while this host started. Signal already answered the platform, so it
+    // is handled also when this socket closed meanwhile. The kept deliveries are handled one at a time,
+    // in the order that Signal sent them, and each is acknowledged so that Signal stops keeping it.
+    const { id, sealed } = message;
+    yield* this.#queuedOrder.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const key = this.#queueKey;
+        const opened = key
+          ? yield* Effect.tryPromise(() => openQueuedDelivery(key.privateKey, hostId, sealed)).pipe(
+              Effect.catch(() => Effect.succeed(null)),
+            )
+          : null;
+        if (opened) yield* this.#dispatch(socket, opened, true);
+        else logger.warn("A kept delivery from Signal could not be opened, and is dropped.");
+        // An acknowledgement that cannot be sent now is not needed: Signal sends the delivery again on
+        // the next hello, and the transports drop an event that they already handled.
+        const current = this.#socket;
+        if (current?.readyState !== WebSocket.OPEN || !this.#capabilities.has(INGRESS_QUEUE_CAPABILITY)) return;
+        const ack: SignalClientMessage = { type: "queued-delivery-ack", version: SIGNAL_PROTOCOL_VERSION, id };
+        current.send(JSON.stringify(ack));
+      }),
+    );
+  });
+
+  readonly #dispatch = Effect.fn("SignalIngress.dispatch")(function* (
+    this: SignalIngress,
+    socket: WebSocket,
+    message: Exclude<SignalServerMessage, { type: "queued-delivery" }>,
+    queued: boolean,
+  ) {
     if (message.type === "ready") {
       this.#capabilities = new Set(message.capabilities ?? []);
       this.#backoffMs = BACKOFF_START_MS;
@@ -473,7 +534,7 @@ export class SignalIngress implements MessagingIngress {
       // Discord gets no answer: Signal already acknowledged a button press.
       const handler = this.#handler;
       if (handler)
-        yield* handler(message.guildId, { platform: "discord", delivery: message.delivery }).pipe(
+        yield* handler(message.guildId, { platform: "discord", delivery: message.delivery, queued }).pipe(
           Effect.catch(() => Effect.void),
         );
       return;
@@ -491,6 +552,7 @@ export class SignalIngress implements MessagingIngress {
           botId: message.botId,
           body: Buffer.from(message.bodyBase64, "base64"),
           linked: message.linked === true,
+          queued,
         }).pipe(Effect.catch(() => Effect.void));
       return;
     }
@@ -523,9 +585,10 @@ export class SignalIngress implements MessagingIngress {
           kind: message.kind,
           retryNum: message.retryNum,
           body: Buffer.from(message.bodyBase64, "base64"),
+          queued,
         }).pipe(Effect.catch(() => Effect.succeed<IngressAnswer>({ status: 503 })))
       : { status: 503 };
-    if (socket.readyState !== WebSocket.OPEN) return;
+    if (queued || socket.readyState !== WebSocket.OPEN) return;
     const body =
       answer.contentType && answer.body !== undefined && answer.body.length <= SLACK_DELIVERY_RESPONSE_BYTES_LIMIT
         ? { contentType: answer.contentType, body: answer.body }

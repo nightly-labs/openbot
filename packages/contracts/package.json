@@ -43,6 +43,7 @@
     "./signal-protocol/decode": "./src/signal-protocol/decode.ts",
     "./signal-protocol/discord-api": "./src/signal-protocol/discord-api.ts",
     "./signal-protocol/discord-route": "./src/signal-protocol/discord-route.ts",
+    "./signal-protocol/ingress-queue": "./src/signal-protocol/ingress-queue.ts",
     "./signal-protocol/messages": "./src/signal-protocol/messages.ts",
     "./signal-protocol/slack-route": "./src/signal-protocol/slack-route.ts",
     "./signal-protocol/telegram-route": "./src/signal-protocol/telegram-route.ts",

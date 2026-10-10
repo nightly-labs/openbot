@@ -218,12 +218,15 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   no invitation. It joins each new public channel on `channel_created`. A private channel needs
   `/invite`.
 - **Deduplication.** An in-memory set drops a redelivered event at once; the mailbox idempotency key
-  covers a restart. Events that arrive while no socket is open are lost after Slack's retries.
+  covers a restart, and a kept event that Signal sends again. Events that arrive while no socket is
+  open are lost after Slack's retries, except for a hosted server that starts.
 - **Screen.** **Server settings → Connectors → Slack** on the computer that runs the agents shows
   each workspace and its orchestrator, and a two-step dialog connects the workspace and adds the
   orchestrator on the model the user picks (`messaging:*`). A remote server shows no Slack page,
-  because the install returns to the host's own browser. A live connection counts as use, so a
-  hosted server does not idle out. **Connectors → Discord** is the same page for Discord
+  because the install returns to the host's own browser. A live connection does not count as use:
+  a hosted server sleeps, and Signal starts it for the next message that addresses OpenBot and keeps
+  that message, sealed to the host, until the host connects
+  ([Connector events](../hosted-servers.md#connector-events)). **Connectors → Discord** is the same page for Discord
   (`SlackIntegrationPanel` with `platform="discord"`). **Connectors → Telegram** has its own page
   (`TelegramIntegrationPanel`), with one row per chat and one orchestrator for all chats.
 

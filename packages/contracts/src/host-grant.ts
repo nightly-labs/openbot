@@ -33,6 +33,23 @@ export async function createHostGrantKeyPair(): Promise<{ privateKey: CryptoKey;
   return { privateKey: pair.privateKey, publicKey: toBase64Url(raw) };
 }
 
+/**
+ * A key pair that the host keeps across restarts. `privateKey` is PKCS #8 in base64url: the host stores
+ * it encrypted and opens it with `importHostGrantPrivateKey`.
+ */
+export async function createStoredHostGrantKeyPair(): Promise<{ privateKey: string; publicKey: string }> {
+  const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
+  return { privateKey: toBase64Url(pkcs8), publicKey: toBase64Url(raw) };
+}
+
+export function importHostGrantPrivateKey(privateKey: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey("pkcs8", fromBase64Url(privateKey), { name: "ECDH", namedCurve: "P-256" }, false, [
+    "deriveBits",
+  ]);
+}
+
 export async function sealHostGrant(
   kind: HostGrantKind,
   hostPublicKey: string,

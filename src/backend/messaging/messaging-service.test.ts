@@ -266,7 +266,7 @@ afterEach(async () => {
  * A workspace that installed the OpenBot app, as `completeSlackWorkspace` leaves it, with `agent` as
  * its orchestrator unless `orchestrator` is false.
  */
-async function connected(options: { autoComplete?: boolean; orchestrator?: boolean } = {}) {
+async function connected(options: { autoComplete?: boolean; orchestrator?: boolean; start?: boolean } = {}) {
   const started = await startService(root, { provider: "codex", autoComplete: options.autoComplete ?? true });
   service = started.service;
   const agent: AgentSummary = await runCauseEffect(started.store.getOrCreate("slack-agent"));
@@ -303,8 +303,10 @@ async function connected(options: { autoComplete?: boolean; orchestrator?: boole
     appId: "A1",
     orchestratorAgentId: options.orchestrator === false ? null : agent.id,
   });
-  await runCauseEffect(messaging.start());
-  await waitFor(() => workspace()?.state === "connected");
+  if (options.start !== false) {
+    await runCauseEffect(messaging.start());
+    await waitFor(() => workspace()?.state === "connected");
+  }
   return { ...started, agent, credentials, events, overview: workspace() };
 }
 
@@ -361,6 +363,26 @@ describe.sequential("Slack messaging end to end", () => {
       [],
     );
     report.mention = { prompt: prompt.split("\n").slice(0, 3), reactions: reactions.length };
+  });
+
+  // A hosted server that Signal started gets the kept mention as soon as its socket opens, which can be
+  // before the connection has started. Nothing sends it again, so it must wait, not fail.
+  it("keeps a mention that Signal kept until the connection starts", async () => {
+    const { client } = await connected({ start: false });
+    const body = JSON.stringify({ type: "event_callback", api_app_id: "A1", ...slack.mention("hello", "50.000") });
+    const kept = runCauseEffect(
+      messaging?.deliver("T1", {
+        platform: "slack",
+        kind: "events",
+        retryNum: null,
+        body: Buffer.from(body),
+        queued: true,
+      }) ?? Effect.die("No messaging service."),
+    );
+    await runCauseEffect(messaging?.start() ?? Effect.void);
+    await expect(kept).resolves.toEqual({ status: 200 });
+    await waitFor(() => turnStarts(client).length === 1);
+    expect(promptOf(turnStarts(client)[0] ?? { params: {} })).toContain("hello");
   });
 
   it("runs a redelivered event once, and a reply without a mention only in a known thread", async () => {

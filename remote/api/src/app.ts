@@ -57,6 +57,17 @@ const slackRequestSchema = z.object({
   team_id: z.string().optional(),
   team: z.object({ id: z.string() }).nullish(),
   authorizations: z.array(z.object({ team_id: z.string() })).optional(),
+  // Only to know whether the event addresses OpenBot, when a hosted server sleeps. Not the text.
+  event: z
+    .object({
+      type: z.string().optional(),
+      channel_type: z.string().optional(),
+      thread_ts: z.string().optional(),
+      bot_id: z.string().optional(),
+      subtype: z.string().optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 // The only parts of a Telegram update that Signal reads: the chat, the callback query, and the text
@@ -190,6 +201,7 @@ export function createRemoteApiApp(
               retryNum: Number.isInteger(retryNum) && retryNum >= 0 && retryNum < 100 ? retryNum : null,
               retryReason: retryReason && SLACK_RETRY_REASON_PATTERN.test(retryReason) ? retryReason : null,
               body,
+              wakes: slack.wakes,
             }),
             { signal: request.signal },
           ),
@@ -291,7 +303,7 @@ export function createRemoteApiApp(
         const linked = update.linkCode
           ? await runtime.runPromise(signal.linkTelegramChat(botId, update.chatId, update.linkCode))
           : false;
-        signal.deliverTelegram(botId, update.chatId, body, update.callbackQueryId, linked);
+        signal.deliverTelegram(botId, update.chatId, body, update.callbackQueryId, linked, update.wakes);
         return emptyResponse(200);
       },
       { parse: "none" },
@@ -405,12 +417,13 @@ function slackDeliveryKind(contentType: string | null): SlackDeliveryKind | null
 /**
  * The only parts of a signed Slack request that Signal reads: the `url_verification` challenge, which
  * Signal answers itself, or the workspace ID that picks the host. Events carry it as `team_id`, and
- * button presses as `payload.team.id`.
+ * button presses as `payload.team.id`. `wakes`: a button press, a mention, a direct message or a
+ * thread reply from a person, which can start a hosted server that sleeps.
  */
 function slackRequest(
   kind: SlackDeliveryKind,
   body: Uint8Array,
-): { challenge: string } | { appId: string; teamId: string } | null {
+): { challenge: string } | { appId: string; teamId: string; wakes: boolean } | null {
   let value: unknown;
   try {
     const text = new TextDecoder().decode(body);
@@ -425,7 +438,18 @@ function slackRequest(
   }
   const teamId = parsed.data.team_id ?? parsed.data.team?.id ?? parsed.data.authorizations?.[0]?.team_id;
   const appId = parsed.data.api_app_id;
-  return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId) ? { appId, teamId } : null;
+  const event = parsed.data.event;
+  const wakes =
+    kind === "interactivity" ||
+    event?.type === "app_mention" ||
+    (event?.type === "message" &&
+      !event.bot_id &&
+      event.subtype !== "message_changed" &&
+      event.subtype !== "message_deleted" &&
+      (event.channel_type === "im" || event.thread_ts !== undefined));
+  return teamId && appId && SLACK_ID_PATTERN.test(teamId) && SLACK_ID_PATTERN.test(appId)
+    ? { appId, teamId, wakes }
+    : null;
 }
 
 function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 429 | 401 | 400 | 503 }): Response {
@@ -535,7 +559,7 @@ function limitStream(body: ReadableStream<Uint8Array>, limit: number): ReadableS
 
 function telegramUpdate(
   body: Uint8Array,
-): { chatId: string; callbackQueryId: string | null; linkCode: string | null } | null {
+): { chatId: string; callbackQueryId: string | null; linkCode: string | null; wakes: boolean } | null {
   let value: unknown;
   try {
     value = JSON.parse(new TextDecoder().decode(body));
@@ -557,6 +581,8 @@ function telegramUpdate(
     chatId,
     callbackQueryId: callbackQueryId.length > 0 && callbackQueryId.length <= 128 ? callbackQueryId : null,
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
+    // A message or a button press can start a hosted server that sleeps; a member change cannot.
+    wakes: update.message !== undefined || update.callback_query !== undefined,
   };
 }
 
@@ -594,6 +620,10 @@ export function prometheusMetrics(signal: SignalService): string {
     `openbot_remote_telegram_calls_total ${metrics.telegramCalls}`,
     "# TYPE openbot_remote_telegram_calls_refused_total counter",
     `openbot_remote_telegram_calls_refused_total ${metrics.telegramCallsRefused}`,
+    "# TYPE openbot_remote_queued_deliveries_total counter",
+    `openbot_remote_queued_deliveries_total ${metrics.queuedDeliveries}`,
+    "# TYPE openbot_remote_queued_deliveries_flushed_total counter",
+    `openbot_remote_queued_deliveries_flushed_total ${metrics.queuedDeliveriesFlushed}`,
     "# TYPE openbot_remote_discord_deliveries_total counter",
     `openbot_remote_discord_deliveries_total ${metrics.discordDeliveries}`,
     "# TYPE openbot_remote_discord_deliveries_unavailable_total counter",
