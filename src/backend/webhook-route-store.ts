@@ -140,6 +140,25 @@ export function hasWebhookReceipt(
   );
 }
 
+/**
+ * Whether a webhook request started this run. A Test run of a webhook routine has no receipt. The
+ * receipt goes after the retention period, and then the run reads as a Test run.
+ */
+export function isWebhookRun(
+  db: OpenBotDatabase["connection"],
+  ownerKind: EventRoutineOwner["kind"],
+  runId: string,
+): boolean {
+  return isDynamicRecord(
+    db
+      .prepare(
+        `SELECT 1 FROM projection_webhook_receipts
+         WHERE owner_kind = ? AND run_id = ? AND status = 'started'`,
+      )
+      .get(ownerKind, runId),
+  );
+}
+
 /** Records one verified request in the caller's transaction and drops receipts past retention. */
 export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): void {
   db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(receiptCutoff(receipt.receivedAt));

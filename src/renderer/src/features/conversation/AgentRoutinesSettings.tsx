@@ -747,7 +747,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   aria-describedby={props.port.ownerNoun === "channel" ? undefined : "agent-routine-no-update-hint"}
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
-                {/* A scheduled run of an agent routine that answers only the marker posts nothing. */}
+                {/* A scheduled or webhook run of an agent routine that answers only the marker posts nothing. */}
                 <Show when={props.port.ownerNoun !== "channel"}>
                   <Text id="agent-routine-no-update-hint" variant="caption" tone="muted">
                     {t("routine.settings.instructionNoUpdateHint")}

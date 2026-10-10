@@ -93,8 +93,8 @@ export interface TurnHooks {
    */
   requeueChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
   /**
-   * Whether this delivery is a routine run that may end without a message: a scheduled run whose
-   * agent answers only the no-update marker.
+   * Whether this delivery is a routine run that may end without a message: a scheduled or webhook
+   * run whose agent answers only the no-update marker.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
   /**
@@ -636,8 +636,8 @@ export class TurnLifecycle {
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
-    // Only a turn that ran nothing but scheduled routine runs: a person who wrote in the same turn,
-    // or who started a Test, script or webhook run, waits for the answer.
+    // Only a turn that ran nothing but scheduled or webhook routine runs: a person who wrote in the
+    // same turn, or who started a Test or script run, waits for the answer.
     const quiet =
       outcome === "completed" &&
       deliveries.length > 0 &&

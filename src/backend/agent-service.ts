@@ -733,7 +733,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         // A deleted routine takes its runs with it, so a run without a record counts as scheduled:
         // otherwise the import would bring back the answers that its quiet turns dropped.
-        quietRoutineDelivery: (deliveryId) => this.#routines.runForDelivery(deliveryId)?.kind !== "manual",
+        quietRoutineDelivery: (deliveryId) =>
+          this.#routines.runForDelivery(deliveryId) === null || this.#routines.quietRunForDelivery(deliveryId),
         executionThreads: () => [...this.channels.store.executionThreads(), ...this.messaging.store.executionThreads()],
         deliveryThreadId: (deliveryId) => {
           const assignment = this.channels.store.assignmentForDelivery(deliveryId);

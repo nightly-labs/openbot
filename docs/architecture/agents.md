@@ -35,16 +35,19 @@ are notices only and direct the person to OpenBot. Messages and routine runs sha
 
 ## Quiet routine runs
 
-A scheduled run of an agent routine can end without a message. The user asks for it in the routine
-task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing to the run prompt, and
-there is no setting or column. The marker is a fixed token, not a phrase, so the check does not
-depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). When a turn that
-ran only scheduled routine runs completes and every answer is the marker, the turn drops its answers,
-thinking and plan from the conversation, puts back the agent preview from before the run (the run
-start shows the task there; memory only, so after a restart the task stays), and its `turn-completed`
-event has `quiet: true`, which stops the desktop notification and the completion sound. The run
-marker and the run history stay. A marker inside a longer answer is a report and is shown. Test runs,
-and script or webhook runs, which are also manual runs, are never quiet.
+A scheduled run or a webhook run of an agent routine can end without a message. The user asks for it
+in the routine task ("if there is nothing new, answer `[[no-update]]`"); OpenBot adds nothing to the
+run prompt, and there is no setting or column. The marker is a fixed token, not a phrase, so the
+check does not depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`).
+When a turn that ran only scheduled or webhook routine runs completes and every answer is the
+marker, the turn drops its answers, thinking and plan from the conversation, puts back the agent
+preview from before the run (the run start shows the task there; memory only, so after a restart the
+task stays), and its `turn-completed` event has `quiet: true`, which stops the desktop notification
+and the completion sound. The run marker and the run history stay. A marker inside a longer answer
+is a report and is shown. A webhook run is a manual run with a `started` row in
+`projection_webhook_receipts`; no person reads its answer in the chat. Test runs, also of a webhook
+routine, and script runs are never quiet. A webhook receipt goes after 7 days, so a later history
+import keeps the answers of an older webhook run. Channel routines have no quiet runs.
 
 `quiet` reaches remote clients too. The released Team API event projects a fixed key list, so the
 current v6 adapter puts `quiet` beside the frozen `turn-completed` projection

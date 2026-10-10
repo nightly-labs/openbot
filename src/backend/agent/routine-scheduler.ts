@@ -206,11 +206,12 @@ export class RoutineScheduler implements RoutineDueSource {
 
   /**
    * Whether the run of this delivery may end without a message, when the agent answers only the
-   * no-update marker. Only a scheduled run: a Test run and a script or webhook run are started by
-   * someone who waits for the result.
+   * no-update marker. Only a scheduled run or a webhook run: no person reads the answer of a webhook
+   * run in the chat. A Test run and a script run are started by someone who waits for the result.
    */
   quietRunForDelivery(deliveryId: string): boolean {
-    return this.#routines.runForDelivery(deliveryId)?.kind === "scheduled";
+    const run = this.#routines.runForDelivery(deliveryId);
+    return run !== null && (run.kind === "scheduled" || this.#routines.startedByWebhook(run.id));
   }
 
   /**
