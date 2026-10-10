@@ -107,6 +107,13 @@ export class ChannelService {
   readonly #events = new Set<Fiber.Fiber<void>>();
   #stopped = false;
   readonly #wakeAgain = new Set<string>();
+  /**
+   * Channels whose pump left a queued task because its owner or normal work was busy. Only a turn
+   * that completes wakes every channel, so a delivery that ends without one - a start that fails, a
+   * cancel, a requeue - would leave such a task queued until the next command or a restart. Every
+   * one of those changes the mailbox, so the next queue change wakes these channels again.
+   */
+  readonly #waitingForAgents = new Set<string>();
   readonly #deletedChannels = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
   /** The active assignments last seen per channel, so turn traffic reports no new hold. */
@@ -216,6 +223,7 @@ export class ChannelService {
           yield* channelSync(() => this.store.delete(channelId));
           this.#pumps.delete(channelId);
           this.#wakeAgain.delete(channelId);
+          this.#waitingForAgents.delete(channelId);
           yield* this.#releaseHeldAgents();
           this.hooks.changed(channelId, channel.revision + 1);
         }).pipe(Effect.ensuring(Effect.sync(() => this.#deletedChannels.delete(channelId))));
@@ -846,7 +854,11 @@ export class ChannelService {
         yield* channelSync(() => this.#dropForLimit(channelId, task));
         continue;
       }
-      if (!task.ownerAgentId || this.hooks.busy(task.ownerAgentId) || this.hooks.normalBusy?.()) continue;
+      if (!task.ownerAgentId) continue;
+      if (this.hooks.busy(task.ownerAgentId) || this.hooks.normalBusy?.()) {
+        this.#waitingForAgents.add(channelId);
+        continue;
+      }
       if (
         !channel.members.some((member) => member.agentId === task.ownerAgentId) ||
         !this.hooks.agents().some((agent) => agent.id === task.ownerAgentId)
@@ -1445,6 +1457,11 @@ export class ChannelService {
       return true;
     }
     if (event.type === "turn-progress") return this.store.channelForThread(event.threadId) !== null;
+    if (event.type === "queue-changed") {
+      const waiting = [...this.#waitingForAgents];
+      this.#waitingForAgents.clear();
+      for (const channelId of waiting) this.#dispatchEvent(this.wake(channelId));
+    }
     return false;
   }
 
