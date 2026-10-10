@@ -87,7 +87,8 @@ The pure part (`resource-summary.ts`) keeps each day as sparse histograms with t
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
 current day and the last closed day; it is written at most every 15 minutes, at a day change and at
 shutdown, and a damaged file starts a new day. `HostAnalytics.checkResources()` sends the closed day
-as `system_resources` and clears it from the file before the send, so a crash cannot send it twice.
+as `system_resources` and marks it handled in the file before the send, so a crash cannot send it
+twice. The file keeps the handled day for the diagnostics export until a newer day replaces it.
 Nothing leaves the process with a PID, a command or a path: the summary keys are group names,
 provider ids and reason words, and the analytics allowlist checks each value again.
 

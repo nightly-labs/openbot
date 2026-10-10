@@ -100,6 +100,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #scope = Scope.makeUnsafe();
   #day: ResourceDay = emptyDay(localDay(new Date()));
   #previous: ResourceDay | null = null;
+  #previousHandled = false;
   #lastSample: ResourceSample | null = null;
   #lastSampleAt: number | null = null;
   #previousCpuSeconds: Map<number, number> | null = null;
@@ -161,14 +162,14 @@ export class ResourceMonitor implements AnalyticsResourceSource {
 
   previousDay(): { day: string; properties: ReturnType<typeof resourceEventProperties> } | null {
     const previous = this.#previous;
-    if (!previous || previous.samples === 0) return null;
+    if (!previous || previous.samples === 0 || this.#previousHandled) return null;
     return { day: previous.day, properties: resourceEventProperties(previous, this.#device) };
   }
 
   clearPreviousDay(day: string): Effect.Effect<void, AnalyticsOperationFailure> {
     return Effect.suspend(() => {
-      if (this.#previous?.day !== day) return Effect.void;
-      this.#previous = null;
+      if (this.#previous?.day !== day || this.#previousHandled) return Effect.void;
+      this.#previousHandled = true;
       return this.#persist().pipe(toAnalyticsOperationFailure);
     });
   }
@@ -261,13 +262,15 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       Option.getOrThrow(decodeResourceSummaryFile(value)),
     ).pipe(Effect.option);
     if (Option.isNone(saved)) return;
-    const { current, previous } = saved.value;
+    const { current, previous, previousHandled } = saved.value;
     if (current.day === this.#day.day) {
       this.#day = structuredClone(current);
-      this.#previous = previous ? structuredClone(previous) : null;
-    } else {
-      this.#previous = current.samples > 0 ? structuredClone(current) : previous ? structuredClone(previous) : null;
+    } else if (current.samples > 0) {
+      this.#previous = structuredClone(current);
+      return;
     }
+    this.#previous = previous ? structuredClone(previous) : null;
+    this.#previousHandled = previousHandled;
   });
 
   #persist(): Effect.Effect<void, AnalyticsOperationFailure> {
@@ -279,6 +282,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
             version: 1,
             current: this.#day,
             previous: this.#previous,
+            previousHandled: this.#previousHandled,
           });
         }),
       )
@@ -290,7 +294,10 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const today = localDay(now);
     let closedDay = false;
     if (this.#day.day !== today) {
-      if (this.#day.samples > 0) this.#previous = this.#day;
+      if (this.#day.samples > 0) {
+        this.#previous = this.#day;
+        this.#previousHandled = false;
+      }
       this.#day = emptyDay(today);
       closedDay = true;
     }

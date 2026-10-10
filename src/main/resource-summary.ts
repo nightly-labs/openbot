@@ -247,8 +247,10 @@ export interface ResourceDay {
 const ResourceSummaryFile = Schema.Struct({
   version: Schema.Literal(1),
   current: ResourceDaySchema,
-  /** The last closed day, until analytics sends it or a newer day replaces it. */
+  /** The last closed day, until a newer day replaces it. The diagnostics export reads it. */
   previous: Schema.NullOr(ResourceDaySchema),
+  /** Analytics sent or dropped `previous`, so it is not sent again. */
+  previousHandled: Schema.Boolean,
 });
 export const decodeResourceSummaryFile = Schema.decodeUnknownOption(ResourceSummaryFile);
 
