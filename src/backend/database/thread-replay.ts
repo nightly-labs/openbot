@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isAgentProvider } from "@openbot/contracts/ipc";
+import { isAgentProvider, isConversationMessageVisible } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { ConversationQueries } from "./conversation-queries";
 import type { DatabaseCore } from "./database-core";
@@ -128,6 +128,11 @@ export class ThreadReplay {
         };
         const message = appendedMessage ?? importedMessage;
         if (!message) continue;
+        // Imports cannot introduce local host provenance, including when the imported row is new.
+        if (importedMessage) {
+          delete importedMessage.visibilityEpoch;
+          delete importedMessage.visibilityKind;
+        }
         const index = latest.messages.findIndex((current) => current.id === message.id);
         const previousMessage = latest.messages[index];
         if (previousMessage && importedMessage) latest.messages[index] = mergeReplayedMessage(previousMessage, message);
@@ -411,7 +416,7 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
   const attachments = mergeReplayValues(existing.attachments, imported.attachments, (value) => value.id);
   const reactions = mergeReplayValues(existing.reactions, imported.reactions, (value) => JSON.stringify(value));
   const turnId = existing.turnId ?? imported.turnId;
-  return {
+  const merged = {
     ...existing,
     ...imported,
     id: existing.id,
@@ -424,11 +429,16 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
   };
+  if (!isConversationMessageVisible(existing) && isConversationMessageVisible(merged)) {
+    delete merged.visibilityEpoch;
+    delete merged.visibilityKind;
+  }
+  return merged;
 }
 
 function mergeReplayedLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
   const turnId = updated.turnId ?? existing.turnId;
-  return {
+  const merged = {
     ...existing,
     ...updated,
     id: existing.id,
@@ -436,6 +446,9 @@ function mergeReplayedLiveMessage(existing: ConversationMessage, updated: Conver
     createdAt: existing.createdAt,
     ...(turnId === undefined ? {} : { turnId }),
   };
+  if (updated.visibilityEpoch === undefined) delete merged.visibilityEpoch;
+  if (updated.visibilityKind === undefined) delete merged.visibilityKind;
+  return merged;
 }
 
 function mergeReplayValues<T>(

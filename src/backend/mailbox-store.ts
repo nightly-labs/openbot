@@ -47,12 +47,18 @@ import { StoredStateFailure, storedIO, storedSync, toStoredStateFailure } from "
 
 export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attachment-files";
 
+import type { ConversationReveal } from "./database/conversation-visibility";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { type HiddenMailboxDelivery, MailboxVisibility } from "./mailbox-visibility";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
+export interface MailboxVisibilityTransition {
+  recipientAgentId: string;
+  revealed(proof: ConversationReveal): void;
+}
 /**
  * The external conversation a message came from. Such a message runs in the execution thread of
  * that conversation, so the queue and the public chat do not show it, like channel work.
@@ -187,6 +193,7 @@ export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
+  readonly #visibility: MailboxVisibility;
   readonly #queueUpdates = new Set<string>();
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
@@ -196,6 +203,7 @@ export class MailboxStore {
     this.#statePath = join(userDataPath, "mailbox.json");
     this.#files = new AttachmentFiles({ userDataPath, sharedRoot });
     this.#database = database;
+    this.#visibility = new MailboxVisibility(database);
   }
 
   initialize = Effect.fn("MailboxStore.initialize")(function* (
@@ -1195,11 +1203,17 @@ export class MailboxStore {
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
     this: MailboxStore,
     deliveryId: string,
+    visibility?: MailboxVisibilityTransition,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       this.#assertQueueNotEditing(deliveryId);
+      const former = visibility ? this.#captureHiddenDelivery(deliveryId, visibility.recipientAgentId) : null;
       this.#clearSteerFallback(deliveryId);
-      yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
+      const changed = yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
+      if (changed && former && visibility) {
+        const proof = this.#visibility.complete(former, null);
+        if (proof) visibility.revealed(proof);
+      }
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
@@ -1602,15 +1616,21 @@ export class MailboxStore {
     this: MailboxStore,
     deliveryId: string,
     turnId: string,
+    visibility?: MailboxVisibilityTransition,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       this.#assertQueueNotEditing(deliveryId);
+      const former = visibility ? this.#captureHiddenDelivery(deliveryId, visibility.recipientAgentId) : null;
       this.#clearSteerFallback(deliveryId);
-      yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
+      const changed = yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
         status: "starting",
         turnId,
         error: null,
       });
+      if (changed && former && visibility) {
+        const proof = this.#visibility.complete(former, turnId);
+        if (proof) visibility.revealed(proof);
+      }
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
@@ -2074,18 +2094,64 @@ export class MailboxStore {
     };
   }
 
+  /** Captures one durable former row, never a first-seen cache or the mutable mailbox projection. */
+  #captureHiddenDelivery(deliveryId: string, recipientAgentId: string): HiddenMailboxDelivery | null {
+    return this.#visibility.capture(deliveryId, recipientAgentId, (record) => {
+      const message = JSON.parse(record.messageJson);
+      const delivery = JSON.parse(record.deliveryJson);
+      if (
+        !isStoredMessage(message) ||
+        !isStoredDelivery(delivery) ||
+        message.channelId ||
+        message.messaging ||
+        delivery.id !== deliveryId ||
+        delivery.messageId !== message.id ||
+        delivery.recipientAgentId !== recipientAgentId ||
+        delivery.status !== "queued"
+      )
+        return null;
+      const memoryDelivery = this.#state.deliveries.find((item) => item.id === deliveryId);
+      const memoryMessage = this.#state.messages.find((item) => item.id === message.id);
+      if (
+        JSON.stringify(memoryDelivery) !== record.deliveryJson ||
+        JSON.stringify(memoryMessage) !== record.messageJson
+      )
+        return null;
+      const former: ConversationMessage = {
+        id: delivery.id,
+        author: message.sender.kind === "agent" ? "agent" : "user",
+        text: message.text,
+        createdAt: message.createdAt,
+        status: "completed",
+        delivery: { id: delivery.id, status: delivery.status, position: null },
+        ...(message.sender.kind === "routine"
+          ? {
+              routine: {
+                routineId: message.sender.routineId,
+                runId: message.sender.runId,
+                name: message.sender.routineName,
+                scheduledFor: message.sender.scheduledFor,
+              },
+            }
+          : {}),
+      };
+      return former;
+    });
+  }
+
   #updateDeliveryEffect = Effect.fn("MailboxStore.updateDelivery")(function* (
     this: MailboxStore,
     id: string,
     allowed: QueueDeliveryStatus[],
     patch: Partial<StoredDelivery>,
-  ): Effect.fn.Return<void, StoredStateFailure> {
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
     try {
       const delivery = this.#state.deliveries.find((candidate) => candidate.id === id);
       if (!delivery) throw new Error(`Unknown delivery: ${id}`);
-      if (!allowed.includes(delivery.status)) return;
+      if (!allowed.includes(delivery.status)) return false;
       Object.assign(delivery, patch);
       this.#persist("delivery.updated");
+      return true;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }

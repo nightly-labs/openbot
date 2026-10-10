@@ -4,6 +4,11 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
+import {
+  type ConversationReveal,
+  ConversationVisibility,
+  type ConversationWriteSource,
+} from "./conversation-visibility";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
 import {
   databaseRow,
@@ -19,14 +24,56 @@ export interface ConversationWriterOptions {
   roster: AgentRoster;
 }
 
+type ConversationStreamingWrite = {
+  snapshot: ConversationSnapshot;
+  messageId: string;
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+};
+
+type ConversationAppendWrite = {
+  agentId: string;
+  threadId: string;
+  activeTurnId: string | null;
+  message: ConversationMessage;
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+};
+
+type ConversationChangesWrite = {
+  agentId: string;
+  threadId: string;
+  activeTurnId: string | null;
+  changedMessages: readonly ConversationMessage[];
+  source?: ConversationWriteSource;
+  liveMessageIds?: readonly string[];
+  reveals?: readonly ConversationReveal[];
+  removedMessageIds?: readonly string[];
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+};
+
+type ConversationHistoryWrite = {
+  agentId: string;
+  threadId: string;
+  activeTurnId?: string | null;
+  message: ConversationMessage;
+  eventType?: string;
+  detail?: unknown;
+  commandId?: string;
+};
+
 /**
  * The write side of a thread's conversation: a whole snapshot, one appended message, or one message
  * of a run of streamed text.
  *
  * Owns `projection_thread_messages` and `projection_thread_activities`, and compacts the thread
  * aggregate so the log keeps only the newest full snapshot and the streamed messages after it. Each
- * entry point runs inside a single dispatch, so a caller already in a transaction has these writes
- * pulled into it, and none of them opens a transaction of its own. The agent lookup and the thread
+ * entry point prepares visibility in a transaction and runs a single dispatch. A caller already
+ * in a transaction retains ownership of it. The agent lookup and the thread
  * projection row come from the roster. The class never imports the facade.
  *
  * Pick by how much is known to have changed, not by convenience: `persistConversation` costs as
@@ -36,13 +83,81 @@ export interface ConversationWriterOptions {
 export class ConversationWriter {
   readonly #core: DatabaseCore;
   readonly #roster: AgentRoster;
+  readonly #visibility: ConversationVisibility;
 
   constructor(options: ConversationWriterOptions) {
     this.#core = options.core;
     this.#roster = options.roster;
+    this.#visibility = new ConversationVisibility(options.core);
   }
 
   persistConversation(
+    snapshot: ConversationSnapshot,
+    eventType: string,
+    payload: unknown = {},
+    commandId = `conversation:${eventType}:${randomUUID()}`,
+    source: ConversationWriteSource = "preserve",
+  ): ConversationSnapshot {
+    if (!snapshot.threadId) return structuredClone(snapshot);
+    const threadId = snapshot.threadId;
+    return this.#visibility.transaction(() => {
+      const effectiveSource = this.#core.commandResult(commandId) === undefined ? source : "preserve";
+      const prepared = {
+        ...snapshot,
+        messages: this.#visibility.prepare(threadId, snapshot.messages, effectiveSource),
+      };
+      return this.#persistConversation(prepared, eventType, payload, commandId);
+    });
+  }
+
+  persistStreamingMessage(input: ConversationStreamingWrite): number {
+    return this.#visibility.transaction(() => {
+      const message = input.snapshot.messages.find((candidate) => candidate.id === input.messageId);
+      if (!input.snapshot.threadId || !message) return this.#persistStreamingMessage(input);
+      const prepared = this.#visibility.prepare(input.snapshot.threadId, [message], "live");
+      return this.#persistStreamingMessage({
+        ...input,
+        snapshot: {
+          ...input.snapshot,
+          messages: input.snapshot.messages.map((candidate) =>
+            candidate.id === message.id ? (prepared[0] ?? candidate) : candidate,
+          ),
+        },
+      });
+    });
+  }
+
+  appendConversationMessage(input: ConversationAppendWrite): number {
+    return this.#visibility.transaction(() => {
+      const prepared = this.#visibility.prepare(input.threadId, [input.message], "live");
+      return this.#appendConversationMessage({ ...input, message: prepared[0] ?? input.message });
+    });
+  }
+
+  persistConversationChanges(input: ConversationChangesWrite): number {
+    return this.#visibility.transaction(() =>
+      this.#persistConversationChanges({
+        ...input,
+        changedMessages: this.#visibility.prepare(
+          input.threadId,
+          input.changedMessages,
+          input.source ?? "live",
+          mergeLiveMessage,
+          input.liveMessageIds,
+          input.reveals,
+        ),
+      }),
+    );
+  }
+
+  upsertProviderHistoryMessage(input: ConversationHistoryWrite): number {
+    return this.#visibility.transaction(() => {
+      const prepared = this.#visibility.prepare(input.threadId, [input.message], "preserve", mergeImportedMessage);
+      return this.#upsertProviderHistoryMessage({ ...input, message: prepared[0] ?? input.message });
+    });
+  }
+
+  #persistConversation(
     snapshot: ConversationSnapshot,
     eventType: string,
     payload: unknown = {},
@@ -202,13 +317,7 @@ export class ConversationWriter {
    * Returns the new revision alone. Returning the snapshot would clone the whole history back to a
    * caller that only reads `revision` from it.
    */
-  persistStreamingMessage(input: {
-    snapshot: ConversationSnapshot;
-    messageId: string;
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  #persistStreamingMessage(input: ConversationStreamingWrite): number {
     const { snapshot, messageId } = input;
     const threadId = snapshot.threadId;
     // A thread is required to address a projection row, and the message has to be in the snapshot
@@ -216,7 +325,7 @@ export class ConversationWriter {
     // back to the whole-snapshot write rather than drop the text.
     const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
     if (!threadId || ordinal < 0) {
-      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
+      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId, "live").revision;
     }
     const message = snapshot.messages[ordinal];
     if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
@@ -278,15 +387,7 @@ export class ConversationWriter {
     ).revision;
   }
 
-  appendConversationMessage(input: {
-    agentId: string;
-    threadId: string;
-    activeTurnId: string | null;
-    message: ConversationMessage;
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  #appendConversationMessage(input: ConversationAppendWrite): number {
     const result = this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -380,16 +481,7 @@ export class ConversationWriter {
    * removes the explicit ids, so a bounded working snapshot can never delete an omitted durable
    * row. The event payload is also incremental, which keeps replay independent of the full chat.
    */
-  persistConversationChanges(input: {
-    agentId: string;
-    threadId: string;
-    activeTurnId: string | null;
-    changedMessages: readonly ConversationMessage[];
-    removedMessageIds?: readonly string[];
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  #persistConversationChanges(input: ConversationChangesWrite): number {
     const removedMessageIds = input.removedMessageIds ?? [];
     const result = this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
@@ -555,15 +647,7 @@ export class ConversationWriter {
    * text/status fields are refreshed. The event contains this one message, so replay has the same
    * non-destructive behavior without rebuilding a full conversation snapshot.
    */
-  upsertProviderHistoryMessage(input: {
-    agentId: string;
-    threadId: string;
-    activeTurnId?: string | null;
-    message: ConversationMessage;
-    eventType?: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  #upsertProviderHistoryMessage(input: ConversationHistoryWrite): number {
     const eventType = input.eventType ?? "provider-history.message-imported";
     const existingBeforeWrite = databaseRow(
       this.#core.connection
@@ -634,6 +718,8 @@ export class ConversationWriter {
           ? currentConversationMessage(JSON.parse(requiredStringColumn(existingRow, "message_json")))
           : null;
         const message = existing ? mergeImportedMessage(existing, input.message) : input.message;
+        if (input.message.visibilityEpoch === undefined) delete message.visibilityEpoch;
+        if (input.message.visibilityKind === undefined) delete message.visibilityKind;
         const ordinal = existingRow
           ? requiredNumberColumn(existingRow, "ordinal")
           : requiredNumberColumn(
@@ -741,7 +827,7 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
 
 function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMessage): ConversationMessage {
   const turnId = updated.turnId ?? existing.turnId;
-  return {
+  const merged = {
     ...existing,
     ...updated,
     id: existing.id,
@@ -749,6 +835,9 @@ function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMe
     createdAt: existing.createdAt,
     ...(turnId === undefined ? {} : { turnId }),
   };
+  if (updated.visibilityEpoch === undefined) delete merged.visibilityEpoch;
+  if (updated.visibilityKind === undefined) delete merged.visibilityKind;
+  return merged;
 }
 
 function mergeValues<T>(

@@ -10,6 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
+import type { ConversationReveal } from "../database/conversation-visibility";
 import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
@@ -229,8 +230,11 @@ export class QueueControls {
         throw new Error(REMOVED_ENDPOINT_MESSAGE);
       return { client, session, snapshot, context, turnId };
     });
-    yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
-    this.#mailboxSync.emitQueue(agent.id);
+    const reveals: ConversationReveal[] = [];
+    yield* this.#mailbox
+      .markSteering(input.deliveryId, turnId, { recipientAgentId: agent.id, revealed: (proof) => reveals.push(proof) })
+      .pipe(toQueueOperationFailed);
+    this.#mailboxSync.emitQueue(agent.id, [input.deliveryId], reveals);
     yield* client
       .request(
         "turn/steer",

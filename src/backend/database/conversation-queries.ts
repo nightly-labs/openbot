@@ -4,6 +4,8 @@ import type {
   ConversationFileSearchPage,
   ConversationFileSearchResult,
   ConversationMessage,
+  ConversationMessageOrder,
+  ConversationOrderProofRequest,
   ConversationPage,
   ConversationPageAnchor,
   ConversationSearchPage,
@@ -13,11 +15,18 @@ import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
+  orderConversationFragment,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  CONVERSATION_CACHE_BYTES_LIMIT,
+  CONVERSATION_CACHE_MESSAGE_LIMIT,
+  conversationVisibilityFloor,
+  retainConversationMessages,
+} from "./conversation-retention";
 import { COLLAPSE_WHITESPACE_FUNCTION, type DatabaseCore, LOWERCASE_FUNCTION } from "./database-core";
 import {
   databaseRow,
@@ -81,6 +90,57 @@ export class ConversationQueries {
       activeTurnId: thread?.active_turn_id ?? null,
       revision: thread?.last_event_sequence ?? 0,
       messages: sortConversationMessages(rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")))),
+    };
+  }
+
+  /** One statement gives exact row keys and their thread revision from the same SQLite snapshot. */
+  readConversationOrderProof(
+    agentId: string,
+    threadId: string | null,
+    request: ConversationOrderProofRequest,
+  ): ConversationPage {
+    if (threadId !== request.expectedThreadId) throw new Error("Conversation proof thread changed.");
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(`${ORDERED_THREAD_MESSAGES},
+      requested(request_id) AS (VALUES ${request.messageIds.map(() => "(?)").join(",")})
+      SELECT t.last_event_sequence AS revision, requested.request_id,
+        o.group_start, o.group_first, o.group_id, o.turn_rank, o.created_at, o.ordinal, o.message_id
+      FROM projection_threads t CROSS JOIN requested
+      LEFT JOIN ordered o ON o.message_id = requested.request_id
+      WHERE t.thread_id = ? AND t.agent_id = ?`)
+        .all(threadId, ...request.messageIds, threadId, agentId),
+    );
+    if (rows.length !== request.messageIds.length) throw new Error("Conversation proof thread is unavailable.");
+    const first = rows[0];
+    if (!first) throw new Error("Conversation proof thread is unavailable.");
+    const revision = requiredNumberColumn(first, "revision");
+    const entries = rows.map((row) => {
+      const id = requiredStringColumn(row, "request_id");
+      if (row.message_id === null) return { id, order: null };
+      const order: ConversationMessageOrder = {
+        id,
+        key: [
+          requiredStringColumn(row, "group_start"),
+          requiredNumberColumn(row, "group_first"),
+          requiredStringColumn(row, "group_id"),
+          requiredNumberColumn(row, "turn_rank"),
+          requiredStringColumn(row, "created_at"),
+          requiredNumberColumn(row, "ordinal"),
+          id,
+        ],
+      };
+      return { id, order };
+    });
+    return {
+      agentId,
+      threadId,
+      activeTurnId: null,
+      revision,
+      messages: [],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+      orderProof: { agentId, threadId, revision, entries },
     };
   }
 
@@ -290,6 +350,89 @@ export class ConversationQueries {
         )
       : { count: 0, oldestAt: null };
     const hasOlder = older.count > 0;
+    const visibilityFloor = conversationVisibilityFloor(messages);
+    const supplemental =
+      anchor.type !== "latest" || visibilityFloor === undefined
+        ? []
+        : databaseRows(
+            this.#core.connection
+              .prepare(`
+        SELECT message_json FROM projection_thread_messages
+        WHERE thread_id = ? AND last_event_sequence >= ?
+        AND (json_extract(message_json, '$.visibilityEpoch') > ?
+          OR (json_extract(message_json, '$.visibilityEpoch') = ? AND json_extract(message_json, '$.visibilityKind') = 'revealed'))
+        AND (json_type(message_json, '$.routine') = 'object'
+          OR COALESCE(json_extract(message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled'))
+        ${conversationMarkerSqlFilter(options.excludeRoutineEvents === true, options.excludeRoutineRunEvents === true, options.excludeHostedSiteEvents === true)}
+        ORDER BY json_extract(message_json, '$.visibilityEpoch') DESC, created_at DESC, ordinal DESC, message_id DESC
+        LIMIT ?
+      `)
+              .all(threadId, visibilityFloor, visibilityFloor, visibilityFloor, CONVERSATION_CACHE_MESSAGE_LIMIT),
+          )
+            .map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")))
+            .filter((message) => !messageIds.has(message.id));
+    const memberIds = [...new Set([...messages, ...supplemental].map((message) => message.id))];
+    const order: ConversationMessageOrder[] =
+      supplemental.length === 0
+        ? rows.map((row) => ({
+            id: requiredStringColumn(row, "message_id"),
+            key: pageKeyValues(conversationRowCursor(row)),
+          }))
+        : databaseRows(
+            this.#core.connection
+              .prepare(`${ORDERED_THREAD_MESSAGES}
+      SELECT ${ORDER_KEY_COLUMNS} FROM ordered
+      WHERE message_id IN (${memberIds.map(() => "?").join(", ")}) ORDER BY ${ORDER_KEY_COLUMNS}`)
+              .all(threadId, ...memberIds),
+          ).map((row) => ({
+            id: requiredStringColumn(row, "message_id"),
+            key: pageKeyValues(conversationRowCursor(row)),
+          }));
+    const retained = retainConversationMessages(
+      orderConversationFragment([...messages, ...supplemental], order),
+      thread?.active_turn_id ?? null,
+    );
+    const supplementalIds = new Set(supplemental.map((message) => message.id));
+    // The canonical page remains unchanged. Supplemental bodies also fit its transient read budget.
+    let pageBytes = Buffer.byteLength(JSON.stringify({ messages, references, order }), "utf8");
+    const windowMessages = retained.filter((message) => {
+      if (!supplementalIds.has(message.id)) return false;
+      const size = Buffer.byteLength(JSON.stringify(message), "utf8") + 1;
+      if (pageBytes + size > CONVERSATION_CACHE_BYTES_LIMIT) return false;
+      pageBytes += size;
+      return true;
+    });
+    const hydratedIds = new Set(windowMessages.map((message) => message.id));
+    const supplementalReferences = [
+      ...new Set(
+        windowMessages.flatMap((message) =>
+          message.replyToMessageId &&
+          !messageIds.has(message.replyToMessageId) &&
+          !hydratedIds.has(message.replyToMessageId) &&
+          !references[message.replyToMessageId]
+            ? [message.replyToMessageId]
+            : [],
+        ),
+      ),
+    ];
+    if (supplementalReferences.length > 0) {
+      const placeholders = supplementalReferences.map(() => "?").join(", ");
+      for (const row of databaseRows(
+        this.#core.connection
+          .prepare(`
+        SELECT message_id, message_json FROM projection_thread_messages
+        WHERE thread_id = ? AND message_id IN (${placeholders})
+        ${conversationMarkerSqlFilter(options.excludeRoutineEvents === true, options.excludeRoutineRunEvents === true, options.excludeHostedSiteEvents === true)}
+      `)
+          .all(threadId, ...supplementalReferences),
+      )) {
+        const json = requiredStringColumn(row, "message_json");
+        const size = Buffer.byteLength(json, "utf8") + 1;
+        if (pageBytes + size > CONVERSATION_CACHE_BYTES_LIMIT) continue;
+        references[requiredStringColumn(row, "message_id")] = decodeConversationMessageJson(json);
+        pageBytes += size;
+      }
+    }
     return {
       agentId,
       threadId,
@@ -297,6 +440,10 @@ export class ConversationQueries {
       revision: thread?.last_event_sequence ?? 0,
       messages,
       references,
+      messageOrder: order.filter((entry) => messageIds.has(entry.id) || hydratedIds.has(entry.id)),
+      ...(anchor.type === "latest"
+        ? { windowMembers: { messages: windowMessages, ...(visibilityFloor === undefined ? {} : { visibilityFloor }) } }
+        : {}),
       pageInfo: {
         hasOlder,
         olderCursor: hasOlder && first ? encodePageCursor(conversationRowCursor(first)) : null,

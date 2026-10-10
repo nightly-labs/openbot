@@ -1491,6 +1491,68 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it.each([false, true])(
+    "records a durable reveal for active steer with conversation row cached=%s",
+    async (cached) => {
+      const clients = new Map<AgentProvider, FakeAgentClient>();
+      const { store, mailbox } = stores(root);
+      service = createTestService({
+        store,
+        mailbox,
+        preferredProvider: "codex",
+        busyMessageMode: () => "queue",
+        clientFactory: (provider) => {
+          const client = new FakeAgentClient(provider, "CODEX_DONE", false);
+          clients.set(provider, client);
+          return client;
+        },
+      });
+      const events: AgentEvent[] = [];
+      service.on("event", (event) => events.push(event));
+      await runCauseEffect(service.initialize());
+      await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Start" }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const active = events.find((event) => event.type === "turn-started");
+      assert(active?.type === "turn-started");
+      const started = events
+        .flatMap((event) => (event.type === "conversation" ? event.snapshot.messages : []))
+        .find((message) => message.text === "Start" && message.visibilityKind === "revealed");
+      expect(started?.visibilityKind).toBe("revealed");
+      const receipt = cached
+        ? await runCauseEffect(service.sendMessage({ agentId: "chief", text: "Input" }))
+        : await runCauseEffect(
+            mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Input" }),
+          );
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const threadId = store.list().find((agent) => agent.id === "chief")?.threadId;
+      assert(threadId);
+      expect(store.database.readConversationMessages("chief", threadId, [id]).length).toBe(cached ? 1 : 0);
+      await runCauseEffect(
+        service.steerQueuedMessage({ agentId: "chief", deliveryId: id, expectedTurnId: active.turnId }),
+      );
+      const revealed = store.database.readConversationMessages("chief", threadId, [id])[0];
+      expect(revealed?.visibilityKind).toBe("revealed");
+      expect(revealed?.delivery?.status).toBe("running");
+      const epoch = revealed?.visibilityEpoch;
+      const client = clients.get("codex");
+      const external = store.activeProviderSession("chief")?.externalSessionId;
+      assert(client && external);
+      client.emit(
+        "notification",
+        notification("turn/completed", { threadId: external, turn: { id: active.turnId, status: "completed" } }),
+      );
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.every((delivery) => delivery.status === "completed"),
+      );
+      expect(store.database.readConversationMessages("chief", threadId, [id])[0]).toMatchObject({
+        visibilityEpoch: epoch,
+        visibilityKind: "revealed",
+        delivery: { status: "completed" },
+      });
+    },
+  );
+
   it("steers a queued delivery into the active turn and completes it with that turn", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

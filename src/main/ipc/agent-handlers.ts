@@ -360,13 +360,7 @@ export function agentIpcHandlers({
         local: (agentId) => runCauseEffect(host.readAgentConversation(agentId)),
         remote: (agentId, serverId) => runCauseEffect(remoteServers.readAgentConversation(agentId, serverId)),
       }),
-      readConversationPage: scopedHandler(parseReadConversationPage, {
-        local: (parsed) => runCauseEffect(host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit)),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
-            remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
-          ),
-      }),
+      readConversationPage: conversationPageIpcHandler(host, remoteServers),
       searchConversationMessages: scopedHandler(parseSearchConversationMessages, {
         local: (parsed) =>
           host.searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit),
@@ -547,4 +541,21 @@ export function agentIpcHandlers({
       }),
     },
   };
+}
+
+/** Local proof requests end here; a remote host must never receive their IDs or assertions. */
+export function conversationPageIpcHandler(
+  host: Pick<HostService, "readAgentConversationPage">,
+  remoteServers: Pick<RemoteServerManager, "readAgentConversationPage">,
+) {
+  return scopedHandler(parseReadConversationPage, {
+    local: (parsed) =>
+      runCauseEffect(host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, parsed.orderProof)),
+    remote: (parsed, serverId) => {
+      if (parsed.orderProof) throw new Error(sourceText("error.agent.conversationOrderLocalOnly"));
+      return runCauseEffect(
+        remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
+      );
+    },
+  });
 }

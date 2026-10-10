@@ -1,6 +1,8 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.agent", {
+  "error.agent.conversationOrderLocalOnly":
+    "This host cannot verify the order of loaded conversation history. Reload the conversation to continue.",
   // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",

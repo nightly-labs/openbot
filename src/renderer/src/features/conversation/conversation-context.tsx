@@ -1,10 +1,20 @@
 import type {
   AgentEvent,
   AgentRuntimeSnapshot,
+  ConversationMessage,
+  ConversationMessageOrder,
   ConversationPage,
   ConversationPageInfo,
   ConversationReadState,
   ConversationSnapshot,
+} from "@openbot/contracts/ipc";
+import {
+  CONVERSATION_ORDER_PROOF_BATCH_LIMIT,
+  compareConversationMessageOrder,
+  conversationPageMessages,
+  isConversationMessageVisible,
+  isConversationOrderProof,
+  LOCAL_SERVER_ID,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -24,6 +34,7 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
+import { useAuth } from "../account/account-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
 import { appendLatestRuntimeMessages } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
@@ -38,7 +49,13 @@ import {
   messagePromptRequestKey,
   promptRequestKey,
 } from "./conversation-keys";
-import { mergeConversationPage, windowedSnapshotMessages } from "./conversation-merge";
+import {
+  mergeConversationFragment,
+  mergeConversationPage,
+  oldestConversationMessageTime,
+  retainLatestConversationRows,
+  windowedSnapshotMessages,
+} from "./conversation-merge";
 import { conversationPort } from "./conversation-port";
 import {
   decideAgentAutoRead,
@@ -52,6 +69,47 @@ import type { SendMessageResult } from "./conversation-types";
 import { useDirectMessages } from "./direct-messages-context";
 
 const LATEST_PAGE_SIZE = 50;
+// An invalidated IPC call can still own a page until it settles. Keep its reservation across
+// scope disposal; a new owner must not exclude the old pending data from its temporary budget.
+interface ConversationOrderPlan {
+  agentId: string;
+  generation: number;
+}
+interface ConversationOrderCacheOwner {
+  retainedBytes: () => number;
+}
+interface ConversationOrderReservation {
+  cacheOwner: ConversationOrderCacheOwner;
+  bytes: number;
+}
+const pendingOrderReservations = new Map<ConversationOrderPlan, ConversationOrderReservation>();
+/** Preserve the incoming snapshot order and anchor omitted rows beside surviving old rows. */
+function mergeOmittedMessages(
+  previous: AgentMessage[],
+  incoming: AgentMessage[],
+  omitted: AgentMessage[],
+): AgentMessage[] {
+  const incomingIds = new Set(incoming.map((message) => message.id));
+  const omittedIds = new Set(omitted.map((message) => message.id));
+  const before = new Map<string, AgentMessage[]>();
+  const tail: AgentMessage[] = [];
+  let anchor: string | undefined;
+  for (const message of previous.toReversed()) {
+    if (incomingIds.has(message.id)) anchor = message.id;
+    else if (omittedIds.has(message.id)) {
+      if (anchor) {
+        const bucket = before.get(anchor) ?? [];
+        bucket.push(message);
+        before.set(anchor, bucket);
+      } else tail.push(message);
+    }
+  }
+  return [
+    ...incoming.flatMap((message) => [...(before.get(message.id)?.toReversed() ?? []), message]),
+    ...tail.toReversed(),
+  ];
+}
+
 /**
  * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
  * message and queued messages none, so a page needs more than a page of the thread.
@@ -60,7 +118,28 @@ const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
 
 function trimToLatestPage(conversation: ConversationState): void {
   if (conversation.messages.length <= LATEST_PAGE_SIZE) return;
-  conversation.messages = conversation.messages.slice(-LATEST_PAGE_SIZE);
+  const retained = retainLatestConversationRows(
+    conversation.messages.map((message) => ({
+      id: message.id,
+      ...conversation.visibilityMetadata?.[message.id],
+    })),
+    LATEST_PAGE_SIZE,
+    conversation.pageRevision,
+  );
+  const retainedIds = new Set(retained.map((message) => message.id));
+  conversation.messages = conversation.messages.filter((message) => retainedIds.has(message.id));
+  conversation.oldestLoadedMessageTime = oldestConversationMessageTime(conversation.messages);
+  conversation.rawMemberIds = conversation.messages.map((message) => message.id);
+  conversation.visibilityMetadata = Object.fromEntries(
+    Object.entries(conversation.visibilityMetadata ?? {}).filter(([id]) => retainedIds.has(id)),
+  );
+  const epochs = retained.flatMap((message) =>
+    message.visibilityEpoch === undefined ? [] : [message.visibilityEpoch],
+  );
+  // Trimming creates a smaller latest window. Keep its durable floor, including reveal ties,
+  // instead of treating the snapshot revision as the only membership boundary.
+  conversation.visibilityFloor = epochs.length > 0 ? Math.min(...epochs) : undefined;
+  conversation.pageRevision = conversation.revision;
   conversation.references = {};
   conversation.page = { hasOlder: true, olderCursor: null };
 }
@@ -73,6 +152,13 @@ interface ConversationState {
   revision?: number;
   page?: ConversationPageInfo;
   windowMode?: "latest" | "around";
+  /** Keep the page boundary when a snapshot removes or reorders its first visible row. */
+  oldestLoadedMessageTime?: number;
+  rawMemberIds?: string[];
+  visibilityFloor?: number;
+  pageRevision?: number;
+  threadId?: string | null;
+  visibilityMetadata?: Record<string, Pick<ConversationMessage, "visibilityEpoch" | "visibilityKind">>;
   references?: Record<string, AgentMessage>;
   olderLoading?: boolean;
   olderError?: string | null;
@@ -96,6 +182,11 @@ const Conversation = createSimpleContext({
   name: "Conversation",
   init: () => {
     const usage = useUsage();
+    const { centralAuth } = useAuth();
+    const accountIdentity = () => {
+      const state = centralAuth();
+      return state.status === "signed_in" ? state.user.id : null;
+    };
     const { appFocused } = usePlatform();
     const { activeServerId, activeServer } = useServers();
     const { agentChatsToMarkRead, agentChatsToRetryRead, autoReadAgentMessages } = useAgentReadTracking();
@@ -117,6 +208,7 @@ const Conversation = createSimpleContext({
       setUiErrors,
     } = useAgents();
     const {
+      activeTurns,
       completedTurnByAgent,
       pendingPrompts,
       setPendingPrompts,
@@ -154,6 +246,87 @@ const Conversation = createSimpleContext({
     const agentChatsRetriedOnOpen = new Set<string>();
     const conversationPageRequests = new Map<string, number>();
     const conversationReadOperations = new Map<string, Promise<void>>();
+    const orderGenerations = new Map<string, number>();
+    const pendingOrderBytes = new Map<ConversationOrderPlan, { agentId: string; bytes: number }>();
+    const orderCacheOwner: ConversationOrderCacheOwner = {
+      retainedBytes: () =>
+        Object.entries(conversations).reduce((total, [id, value]) => total + storedBytes(id, value), 0),
+    };
+    const cacheByteLimit = 8 * 1024 * 1024;
+    const totalCacheByteLimit = 64 * 1024 * 1024;
+    const encoder = new TextEncoder();
+
+    function invalidateOrder(agentId: string): number {
+      const generation = (orderGenerations.get(agentId) ?? 0) + 1;
+      orderGenerations.set(agentId, generation);
+      return generation;
+    }
+
+    function storedBytes(agentId: string, conversation: ConversationState): number {
+      const active = activeTurns()[agentId];
+      const activeIds = new Set(
+        conversation.messages
+          .filter((message) => active && (message.turnId === active || message.streaming))
+          .flatMap((message) => (message.itemIds?.length ? message.itemIds : [message.id])),
+      );
+      const bodies = [...rawAgentMessageBodies].filter(
+        ([key]) => key.startsWith(`${agentId}\0`) && !activeIds.has(key.slice(agentId.length + 1)),
+      );
+      return encoder.encode(
+        JSON.stringify({
+          bodies,
+          messages: conversation.messages.filter(
+            (message) => !(active && (message.turnId === active || message.streaming)),
+          ),
+          references: conversation.references,
+          visibilityMetadata: conversation.visibilityMetadata,
+          rawMemberIds: conversation.rawMemberIds,
+        }),
+      ).byteLength;
+    }
+
+    function pageBytes(page: ConversationPage): number {
+      const active = page.activeTurnId;
+      const counted = (message: ConversationMessage) =>
+        !(active && (message.turnId === active || message.status === "streaming"));
+      return encoder.encode(
+        JSON.stringify({
+          ...page,
+          messages: page.messages.filter(counted),
+          ...(page.windowMembers
+            ? { windowMembers: { ...page.windowMembers, messages: page.windowMembers.messages.filter(counted) } }
+            : {}),
+        }),
+      ).byteLength;
+    }
+
+    createEffect(
+      () => ({ agent: activeAgentId(), account: accountIdentity() }),
+      () => {
+        for (const id of new Set([...pendingOrderBytes.values()].map((plan) => plan.agentId))) invalidateOrder(id);
+      },
+    );
+
+    function reserveOrderBytes(token: ConversationOrderPlan, agentId: string, bytes: number): boolean {
+      const existing = conversations[agentId];
+      const ownPending = [...pendingOrderBytes].reduce(
+        (total, [key, plan]) => total + (key !== token && plan.agentId === agentId ? plan.bytes : 0),
+        0,
+      );
+      if (bytes + ownPending + (existing ? storedBytes(agentId, existing) : 0) > cacheByteLimit) return false;
+      const cached = untrack(orderCacheOwner.retainedBytes);
+      const retainedOwners = new Set<ConversationOrderCacheOwner>();
+      const pending = [...pendingOrderReservations].reduce((total, [key, value]) => {
+        if (value.cacheOwner !== orderCacheOwner) retainedOwners.add(value.cacheOwner);
+        return total + (key === token ? 0 : value.bytes);
+      }, 0);
+      // Read each still-live owner once at admission, not on each body update.
+      const retained = [...retainedOwners].reduce((total, owner) => total + untrack(owner.retainedBytes), 0);
+      if (cached + retained + pending + bytes > totalCacheByteLimit) return false;
+      pendingOrderBytes.set(token, { agentId, bytes });
+      pendingOrderReservations.set(token, { cacheOwner: orderCacheOwner, bytes });
+      return true;
+    }
 
     let conversationFrame: number | undefined;
 
@@ -182,6 +355,7 @@ const Conversation = createSimpleContext({
         if (!agentId) return;
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
+        invalidateOrder(agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
         conversationPageRequests.set(agentId, pageRequest);
         const server = untrack(activeServer);
@@ -192,12 +366,13 @@ const Conversation = createSimpleContext({
         });
         void conversationPort()
           .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
-          .then((page) => {
+          .then(async (page) => {
+            if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
+            const pageApplied = await applyConversationPage(page, "replace", "latest");
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
             updateConversation(agentId, (conversation) => {
               conversation.loading = false;
             });
-            const pageApplied = applyConversationPage(page, "replace", "latest");
             if (!pageApplied) {
               if (agentChatsToMarkRead.has(trackingKey)) {
                 if (!agentChatsRetriedOnOpen.has(agentId)) {
@@ -239,6 +414,7 @@ const Conversation = createSimpleContext({
     }
 
     function removeConversation(agentId: string): void {
+      invalidateOrder(agentId);
       setConversations((current) => {
         delete current[agentId];
       });
@@ -250,6 +426,7 @@ const Conversation = createSimpleContext({
 
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
       const agentIds = new Set(messages.map((message) => message.agentId));
+      for (const id of agentIds) invalidateOrder(id);
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
       setConversations((current) => {
@@ -301,16 +478,38 @@ const Conversation = createSimpleContext({
 
     function scheduleConversation(snapshot: ConversationSnapshot) {
       const agentId = snapshot.agentId;
+      if (
+        snapshot.window &&
+        conversations[agentId]?.threadId !== undefined &&
+        conversations[agentId]?.threadId !== snapshot.threadId
+      )
+        return;
       const appliedRevision = conversations[agentId]?.revision ?? -1;
       const pending = pendingConversationSnapshots.get(agentId);
       const pendingRevision = pending?.revision ?? -1;
       if (snapshot.revision < Math.max(appliedRevision, pendingRevision)) return;
+      invalidateOrder(agentId);
       for (const message of snapshot.messages) {
         const key = agentMessageKey(agentId, message.id);
         if (message.author !== "user" && message.status === "streaming") rawAgentMessageBodies.set(key, message.text);
         else rawAgentMessageBodies.delete(key);
       }
-      pendingConversationSnapshots.set(agentId, snapshot);
+      const removals =
+        pending?.threadId === snapshot.threadId && pending.window && snapshot.window
+          ? [...new Set([...pending.window.removedMessageIds, ...snapshot.window.removedMessageIds])].filter(
+              (id) =>
+                !snapshot.messages.some(
+                  (message) =>
+                    message.id === id &&
+                    message.visibilityEpoch !== undefined &&
+                    message.visibilityEpoch > pending.revision,
+                ),
+            )
+          : snapshot.window?.removedMessageIds;
+      pendingConversationSnapshots.set(
+        agentId,
+        removals === undefined ? snapshot : { ...snapshot, window: { removedMessageIds: removals } },
+      );
       if (conversationFrame !== undefined) return;
       conversationFrame = requestAnimationFrame(() => {
         conversationFrame = undefined;
@@ -439,6 +638,7 @@ const Conversation = createSimpleContext({
 
     function applyConversationDelta(event: Extract<AgentEvent, { type: "conversation-delta" }>) {
       if (event.revision <= (conversations[event.agentId]?.revision ?? -1)) return;
+      invalidateOrder(event.agentId);
       const pendingSnapshot = pendingConversationSnapshots.get(event.agentId);
       if (pendingSnapshot) {
         if (event.revision <= pendingSnapshot.revision) return;
@@ -509,7 +709,14 @@ const Conversation = createSimpleContext({
 
     function applyConversation(snapshot: ConversationSnapshot, markNewMessagesRead = false) {
       const agentId = snapshot.agentId;
+      if (
+        snapshot.window &&
+        conversations[agentId]?.threadId !== undefined &&
+        conversations[agentId]?.threadId !== snapshot.threadId
+      )
+        return;
       if (snapshot.revision < (conversations[agentId]?.revision ?? -1)) return;
+      invalidateOrder(agentId);
       const initialLoad = conversations[agentId]?.loaded !== true;
       const inactive = agentId !== activeAgentId();
       const windowMode = conversations[agentId]?.windowMode ?? "latest";
@@ -518,21 +725,55 @@ const Conversation = createSimpleContext({
       // older message, from a search, is not in the tail, so it keeps the whole snapshot.
       const sourceMessages =
         inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
-          ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
+          ? retainLatestConversationRows(
+              snapshot.messages.filter(isConversationMessageVisible),
+              INACTIVE_SNAPSHOT_TAIL,
+              conversations[agentId]?.pageRevision,
+            )
           : snapshot.messages;
       updateConversation(agentId, (conversation) => {
         conversation.revision = snapshot.revision;
         conversation.loaded = true;
         const previous = conversation.messages;
         const previousById = new Map(previous.map((message) => [message.id, message]));
-        const allMappedMessages = toAgentMessages(sourceMessages, snapshot.agentId);
-        const pageInfo = conversations[agentId]?.page;
+        const removedIds = new Set(snapshot.window?.removedMessageIds ?? []);
+        const selectedRaw = windowedSnapshotMessages(previous, sourceMessages, {
+          hasOlder: conversation.page?.hasOlder === true,
+          mode: windowMode,
+          oldestLoadedMessageTime: conversation.oldestLoadedMessageTime,
+          rawMemberIds: conversation.rawMemberIds,
+          visibilityFloor: conversation.visibilityFloor,
+          pageRevision: conversation.pageRevision,
+          authoritative: snapshot.window !== undefined,
+        });
+        const allMappedMessages = toAgentMessages(
+          selectedRaw.filter((message) => !removedIds.has(message.id)),
+          snapshot.agentId,
+        );
+        const rawIds = new Set(snapshot.messages.map((message) => message.id));
+        conversation.rawMemberIds = conversation.rawMemberIds?.filter((id) => !removedIds.has(id));
+        const omitted = snapshot.window
+          ? previous.filter((message) => !rawIds.has(message.id) && !removedIds.has(message.id))
+          : [];
         const mappedMessages = retainThinkingMessages(
           previous,
-          windowedSnapshotMessages(previous, allMappedMessages, {
-            hasOlder: pageInfo?.hasOlder === true,
-            mode: windowMode,
-          }),
+          mergeOmittedMessages(previous, allMappedMessages, omitted),
+        );
+        const retainedIds = new Set([
+          ...mappedMessages.map((message) => message.id),
+          ...(conversation.rawMemberIds ?? []),
+        ]);
+        const epochs = {
+          ...conversation.visibilityMetadata,
+          ...Object.fromEntries(
+            selectedRaw.map((message) => [
+              message.id,
+              { visibilityEpoch: message.visibilityEpoch, visibilityKind: message.visibilityKind },
+            ]),
+          ),
+        };
+        conversation.visibilityMetadata = Object.fromEntries(
+          Object.entries(epochs).filter(([id]) => retainedIds.has(id)),
         );
         const next = mappedMessages.map((mapped) => {
           const existing = previousById.get(mapped.id);
@@ -596,18 +837,113 @@ const Conversation = createSimpleContext({
       }
     }
 
-    function applyConversationPage(
+    async function applyConversationPage(
       page: ConversationPage,
       merge: "replace" | "older" | "latest",
       windowMode?: "latest" | "around",
-    ): boolean {
+    ): Promise<boolean> {
+      if (page.orderProof) return false;
+      const generation = invalidateOrder(page.agentId);
       if (page.revision < (conversations[page.agentId]?.revision ?? -1)) return false;
-      for (const message of page.messages) {
+      const rawMessages = windowMode === "around" ? page.messages : conversationPageMessages(page);
+      const current = conversations[page.agentId];
+      const serverId = activeServerId();
+      const currentMessages = current?.messages ?? [];
+      const mapped = toAgentMessages(rawMessages, page.agentId);
+      let provenOrder: Map<string, ConversationMessageOrder> | undefined;
+      // A normal page is an authoritative fragment, not a complete transcript. Cross-fragment
+      // tuples must all come from the target revision: full/stream writes can rewrite ordinals.
+      if (merge !== "replace" && page.messageOrder && currentMessages.length > 0) {
+        if (serverId !== LOCAL_SERVER_ID || !page.threadId || current?.threadId !== page.threadId) {
+          appendUiError(
+            page.agentId,
+            new Error(currentText().t("error.agent.conversationOrderLocalOnly")),
+            currentText().t("server.connection.conversationFailed"),
+            serverId,
+          );
+          return false;
+        }
+        const candidate = mergeConversationFragment(currentMessages, mapped, merge);
+        const ids = [
+          ...new Set(candidate.flatMap((message) => (message.itemIds?.length ? message.itemIds : [message.id]))),
+        ];
+        const activeAtStart = activeTurns()[page.agentId];
+        const accountAtStart = accountIdentity();
+        const isCurrent = () =>
+          accountIdentity() === accountAtStart &&
+          activeTurns()[page.agentId] === activeAtStart &&
+          scopeIsCurrent() &&
+          activeServerId() === serverId &&
+          orderGenerations.get(page.agentId) === generation &&
+          conversations[page.agentId]?.threadId === page.threadId &&
+          page.revision >= (conversations[page.agentId]?.revision ?? -1);
+        const token: ConversationOrderPlan = { agentId: page.agentId, generation };
+        const active = page.activeTurnId;
+        const bytesForPage =
+          pageBytes(page) +
+          encoder.encode(
+            JSON.stringify({
+              messages: mapped.filter((message) => !(active && (message.turnId === active || message.streaming))),
+              ids,
+            }),
+          ).byteLength;
+        let bytes = bytesForPage;
+        try {
+          if (!reserveOrderBytes(token, page.agentId, bytes))
+            throw new Error(currentText().t("chat.history.olderFailed"));
+          provenOrder = new Map();
+          for (let offset = 0; offset < ids.length; offset += CONVERSATION_ORDER_PROOF_BATCH_LIMIT) {
+            if (!isCurrent()) return false;
+            const messageIds = ids.slice(offset, offset + CONVERSATION_ORDER_PROOF_BATCH_LIMIT);
+            const reply = await conversationPort().agent.readConversationPage(
+              {
+                agentId: page.agentId,
+                orderProof: { expectedThreadId: page.threadId, expectedRevision: page.revision, messageIds },
+              },
+              serverId,
+            );
+            if (!isCurrent()) return false;
+            const proof = reply.orderProof;
+            if (
+              !isConversationOrderProof(proof) ||
+              proof.agentId !== page.agentId ||
+              proof.threadId !== page.threadId ||
+              proof.revision !== page.revision ||
+              reply.revision !== page.revision ||
+              reply.agentId !== page.agentId ||
+              reply.threadId !== page.threadId ||
+              reply.activeTurnId !== null ||
+              reply.readState !== undefined ||
+              reply.messageOrder !== undefined ||
+              reply.windowMembers !== undefined ||
+              reply.pageInfo.hasOlder !== false ||
+              reply.pageInfo.olderCursor !== null ||
+              reply.messages.length !== 0 ||
+              Object.keys(reply.references).length !== 0 ||
+              proof.entries.length !== messageIds.length ||
+              proof.entries.some((entry) => !messageIds.includes(entry.id) || !entry.order)
+            )
+              throw new Error(currentText().t("error.agent.conversationOrderLocalOnly"));
+            bytes += encoder.encode(JSON.stringify(reply)).byteLength;
+            if (!reserveOrderBytes(token, page.agentId, bytes))
+              throw new Error(currentText().t("chat.history.olderFailed"));
+            for (const entry of proof.entries) if (entry.order) provenOrder.set(entry.id, entry.order);
+          }
+        } catch (error) {
+          if (isCurrent())
+            appendUiError(page.agentId, error, currentText().t("server.connection.conversationFailed"), serverId);
+          return false;
+        } finally {
+          pendingOrderBytes.delete(token);
+          pendingOrderReservations.delete(token);
+        }
+        if (!isCurrent()) return false;
+      }
+      for (const message of rawMessages) {
         const key = agentMessageKey(page.agentId, message.id);
         if (message.author !== "user" && message.status === "streaming") rawAgentMessageBodies.set(key, message.text);
         else rawAgentMessageBodies.delete(key);
       }
-      const mapped = toAgentMessages(page.messages, page.agentId);
       updateConversation(page.agentId, (conversation) => {
         const currentMessages = conversation.messages;
         const currentById = new Map(currentMessages.map((message) => [message.id, message]));
@@ -617,7 +953,54 @@ const Conversation = createSimpleContext({
           if (!agentMessagesEqual(stored, message)) updateStored(stored, { ...message, animate: stored.animate });
           return stored;
         });
-        conversation.messages = mergeConversationPage(currentMessages, pageMessages, merge);
+        conversation.visibilityMetadata = {
+          ...(merge === "replace" ? {} : conversation.visibilityMetadata),
+          ...Object.fromEntries(
+            rawMessages.map((message) => [
+              message.id,
+              { visibilityEpoch: message.visibilityEpoch, visibilityKind: message.visibilityKind },
+            ]),
+          ),
+        };
+        const merged = page.messageOrder
+          ? mergeConversationFragment(currentMessages, pageMessages, merge)
+          : mergeConversationPage(currentMessages, pageMessages, merge);
+        if (provenOrder) {
+          const keys = provenOrder;
+          const firstKey = (message: AgentMessage) =>
+            (message.itemIds?.length ? message.itemIds : [message.id])
+              .flatMap((id) => {
+                const key = keys.get(id);
+                return key ? [key] : [];
+              })
+              .sort(compareConversationMessageOrder)[0];
+          merged.sort((left, right) => {
+            const a = firstKey(left),
+              b = firstKey(right);
+            return a && b ? compareConversationMessageOrder(a, b) : 0;
+          });
+        }
+        conversation.messages = merged;
+        const rawIds = rawMessages.map((message) => message.id);
+        conversation.rawMemberIds =
+          merge === "replace" ? rawIds : [...new Set([...(conversation.rawMemberIds ?? []), ...rawIds])];
+        const epochs = page.messages.flatMap((message) =>
+          message.visibilityEpoch === undefined || !isConversationMessageVisible(message)
+            ? []
+            : [message.visibilityEpoch],
+        );
+        const pageFloor = page.windowMembers?.visibilityFloor ?? (epochs.length > 0 ? Math.min(...epochs) : undefined);
+        if (merge === "replace") {
+          conversation.visibilityFloor = pageFloor;
+          conversation.pageRevision = page.revision;
+          conversation.threadId = page.threadId;
+        } else if (pageFloor !== undefined)
+          conversation.visibilityFloor = Math.min(conversation.visibilityFloor ?? pageFloor, pageFloor);
+        const pageTime = oldestConversationMessageTime(page.messages);
+        if (merge === "replace") conversation.oldestLoadedMessageTime = pageTime;
+        else if (pageTime !== undefined) {
+          conversation.oldestLoadedMessageTime = Math.min(conversation.oldestLoadedMessageTime ?? pageTime, pageTime);
+        }
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(
@@ -649,6 +1032,7 @@ const Conversation = createSimpleContext({
       if (!agentId || conversations[agentId]?.olderLoading) return;
       const pageInfo = conversations[agentId]?.page;
       if (!pageInfo?.hasOlder || !pageInfo.olderCursor) return;
+      invalidateOrder(agentId);
       const cursor = pageInfo.olderCursor;
       const conversationAtStart = conversations[agentId];
       const requestVersion = conversationPageRequests.get(agentId);
@@ -668,7 +1052,7 @@ const Conversation = createSimpleContext({
         });
         if (!requestIsCurrent()) return;
         if (conversations[agentId]?.page?.olderCursor !== cursor) return;
-        applyConversationPage(page, "older");
+        await applyConversationPage(page, "older");
       } catch (error) {
         if (!requestIsCurrent()) return;
         updateConversation(agentId, (conversation) => {
@@ -700,12 +1084,14 @@ const Conversation = createSimpleContext({
     }
 
     function pruneInactiveAgentHistory(agentId: string): void {
+      invalidateOrder(agentId);
       const messages = conversations[agentId]?.messages;
       if (!messages || messages.length <= LATEST_PAGE_SIZE) return;
       updateConversation(agentId, trimToLatestPage);
     }
 
     async function loadLatestAgentMessages(agentId: string): Promise<void> {
+      invalidateOrder(agentId);
       const request = (conversationPageRequests.get(agentId) ?? 0) + 1;
       conversationPageRequests.set(agentId, request);
       const page = await conversationPort().agent.readConversationPage({
@@ -714,10 +1100,11 @@ const Conversation = createSimpleContext({
         limit: 50,
       });
       if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== request) return;
-      applyConversationPage(page, "replace", "latest");
+      await applyConversationPage(page, "replace", "latest");
     }
 
     async function loadAgentMessagePage(agentId: string, messageId: string): Promise<ConversationPage | null> {
+      invalidateOrder(agentId);
       const request = (conversationPageRequests.get(agentId) ?? 0) + 1;
       conversationPageRequests.set(agentId, request);
       const page = await conversationPort().agent.readConversationPage({
@@ -729,8 +1116,8 @@ const Conversation = createSimpleContext({
       if (!page.messages.some((message) => message.id === messageId)) {
         throw new Error(currentText().t("chat.messageUnavailable"));
       }
-      applyConversationPage(page, "replace", "around");
-      return page;
+      const applied = await applyConversationPage(page, "replace", "around");
+      return applied && scopeIsCurrent() && conversationPageRequests.get(agentId) === request ? page : null;
     }
 
     function markReplyCompleted(agentId: string) {
@@ -928,9 +1315,15 @@ const Conversation = createSimpleContext({
       setPresentedPromptResolutions((current) => ({ ...current, [agentId]: requestKey }));
     }
 
-    // The scheduler holds a frame handle across the microtask boundary, so the
-    // provider owns cancelling it. Nothing else here needs teardown.
+    // Invalidate this owner and cancel its scheduled snapshot. Pending IPC reservations
+    // stay charged until those calls settle, including their retained cached bodies.
     onCleanup(() => {
+      if ([...pendingOrderReservations.values()].some((reservation) => reservation.cacheOwner === orderCacheOwner)) {
+        const retained = untrack(orderCacheOwner.retainedBytes);
+        orderCacheOwner.retainedBytes = () => retained;
+      }
+      orderGenerations.clear();
+      pendingOrderBytes.clear();
       if (conversationFrame !== undefined) cancelAnimationFrame(conversationFrame);
     });
 

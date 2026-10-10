@@ -23,6 +23,7 @@ import type {
   ConversationFileSearchPage,
   ConversationMessage,
   ConversationMessageSender,
+  ConversationOrderProofRequest,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -2501,9 +2502,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     anchor?: ConversationPageAnchor,
     limit?: number,
     options?: ConversationMarkerExclusions,
+    orderProof?: ConversationOrderProofRequest,
   ): Effect.Effect<ConversationPage, AgentLifecycleFailed> {
     return this.#reader
-      .readPageFor(agentId, memberId, anchor, limit, options)
+      .readPageFor(agentId, memberId, anchor, limit, options, orderProof)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "readConversationPageFor", cause: failure.cause }),

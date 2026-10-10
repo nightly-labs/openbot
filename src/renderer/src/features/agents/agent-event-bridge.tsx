@@ -11,6 +11,7 @@ import { playCompletionSoundForAgentEvent } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
+import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useBrowserTabs } from "../browser/browser-context";
@@ -45,12 +46,13 @@ import { agentsPort } from "./agents-port";
  * Conversation invalidations also cover read cursors changed on another device.
  */
 export function AgentEventBridge() {
+  const scopeIsCurrent = createScopeGuard();
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServerId } = useServers();
-  const { applyAccountUsage } = useAuth();
+  const { applyAccountUsage, signedInAccount } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents } = useAgents();
+  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, appendUiError } = useAgents();
   const { setConversationErrors } = useConversationController();
   const {
     applyRuntimeMessages,
@@ -124,13 +126,32 @@ export function AgentEventBridge() {
             (existingUnreadCount === 0 ||
               explicitlyOpenedAgentChatId() === event.page.agentId ||
               agentChatsToRetryRead.has(trackingKey));
-          const pageApplied = applyConversationPage(event.page, "latest", "latest");
+          const accountId = signedInAccount()?.id;
+          const serverId = activeServerId();
+          const pageApplication = applyConversationPage(event.page, "latest", "latest");
           const latestIncomingMessage = markNewMessagesRead
             ? latestIncomingConversationMessage(event.page.messages)
             : undefined;
-          if (pageApplied && latestIncomingMessage) {
-            autoMarkAgentMessageRead(event.page.agentId, latestIncomingMessage.id, existingUnreadCount === 0);
-          }
+          void pageApplication
+            .then((pageApplied) => {
+              if (
+                scopeIsCurrent() &&
+                signedInAccount()?.id === accountId &&
+                conversations[event.page.agentId]?.revision === event.page.revision &&
+                pageApplied &&
+                latestIncomingMessage
+              )
+                autoMarkAgentMessageRead(event.page.agentId, latestIncomingMessage.id, existingUnreadCount === 0);
+            })
+            .catch((error) => {
+              if (scopeIsCurrent() && signedInAccount()?.id === accountId && activeServerId() === serverId)
+                appendUiError(
+                  event.page.agentId,
+                  error,
+                  currentText().t("server.connection.conversationFailed"),
+                  serverId,
+                );
+            });
         }
         return;
       case "conversation-invalidated":

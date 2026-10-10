@@ -3,6 +3,7 @@ import {
   CONVERSATION_PLAN_ITEM_TYPE,
   hostedSiteConversationEvent,
   isContextResetMarker,
+  isConversationMessageVisible,
   marketplaceSuggestionEvent,
   parseConversationPlanText,
   routineConversationEvent,
@@ -131,7 +132,7 @@ export function toAgentMessages(messages: ConversationMessage[], ownerAgentId?: 
   const result: AgentMessage[] = [];
   const thinkingByTurn = new Map<string, AgentMessage>();
   for (const message of messages) {
-    if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
+    if (!isConversationMessageVisible(message)) {
       continue;
     }
     if (message.author !== "assistant" || message.itemType !== "commentary") {

@@ -24,6 +24,7 @@ import {
   isAvatarHue,
   isAvatarSeed,
   isBusyMessageMode,
+  isConversationOrderProofRequest,
   isMessageReaction,
   isReasoningEffort,
   isRoutineSchedule,
@@ -387,10 +388,13 @@ export function parseListChannelRoutineRuns(value: unknown): ListChannelRoutineR
 
 export function parseReadConversationPage(value: unknown): ReadConversationPageInput {
   if (!isObject(value)) throw new Error("Invalid conversation page request.");
+  if (value.orderProof !== undefined && !isConversationOrderProofRequest(value.orderProof))
+    throw new Error("Invalid conversation order proof request.");
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     anchor: parsePageAnchor(value.anchor),
     limit: parsePageLimit(value.limit),
+    ...(value.orderProof === undefined ? {} : { orderProof: value.orderProof }),
   };
 }
 

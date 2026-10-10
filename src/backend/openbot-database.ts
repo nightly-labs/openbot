@@ -5,6 +5,7 @@ import type {
   AgentSummary,
   ConversationFileSearchPage,
   ConversationMessage,
+  ConversationOrderProofRequest,
   ConversationPage,
   ConversationPageAnchor,
   ConversationSearchPage,
@@ -14,6 +15,7 @@ import type {
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { ConversationQueries } from "./database/conversation-queries";
+import type { ConversationReveal } from "./database/conversation-visibility";
 import { ConversationWriter } from "./database/conversation-writer";
 import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
 import {
@@ -210,6 +212,14 @@ export class OpenBotDatabase {
     return this.#conversations.readConversationRecoveryMessages(agentId, threadId, activeTurnId);
   }
 
+  readConversationOrderProof(
+    agentId: string,
+    threadId: string | null,
+    request: ConversationOrderProofRequest,
+  ): ConversationPage {
+    return this.#conversations.readConversationOrderProof(agentId, threadId, request);
+  }
+
   readConversationPage(
     agentId: string,
     threadId: string | null,
@@ -254,8 +264,9 @@ export class OpenBotDatabase {
     eventType: string,
     payload: unknown = {},
     commandId = `conversation:${eventType}:${randomUUID()}`,
+    source: "live" | "preserve" = "preserve",
   ): ConversationSnapshot {
-    return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
+    return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId, source);
   }
 
   /** Writes one message of a thread, for a caller that knows only that message changed. */
@@ -286,6 +297,9 @@ export class OpenBotDatabase {
     threadId: string;
     activeTurnId: string | null;
     changedMessages: readonly ConversationMessage[];
+    source?: "live" | "reconcile" | "preserve";
+    liveMessageIds?: readonly string[];
+    reveals?: readonly ConversationReveal[];
     removedMessageIds?: readonly string[];
     eventType: string;
     detail?: unknown;
@@ -391,8 +405,23 @@ export class OpenBotDatabase {
         detail: payload,
         commandId: `conversation:${eventType}:${randomUUID()}`,
       });
+      const persisted = this.readConversationMessages(
+        snapshot.agentId,
+        snapshot.threadId,
+        changedMessages.map((message) => message.id),
+      );
+      const epochs = new Map(persisted.map((message) => [message.id, message]));
+      const result = { ...structuredClone(snapshot), revision };
+      for (const message of result.messages) {
+        if (!epochs.has(message.id)) continue;
+        const authority = epochs.get(message.id);
+        if (authority?.visibilityEpoch === undefined) delete message.visibilityEpoch;
+        else message.visibilityEpoch = authority.visibilityEpoch;
+        if (authority?.visibilityKind === undefined) delete message.visibilityKind;
+        else message.visibilityKind = authority.visibilityKind;
+      }
       db.exec("COMMIT");
-      return { ...structuredClone(snapshot), revision };
+      return result;
     } catch (error) {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
@@ -524,6 +553,10 @@ export class OpenBotDatabase {
 
   readMailboxState(): unknown | null {
     return this.#mailbox.readMailboxState();
+  }
+
+  readMailboxDeliveryRecord(deliveryId: string, recipientAgentId: string) {
+    return this.#mailbox.readDeliveryRecord(deliveryId, recipientAgentId);
   }
 }
 

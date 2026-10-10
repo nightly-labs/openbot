@@ -4,6 +4,7 @@ import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
+import type { ConversationReveal } from "../database/conversation-visibility";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import type { MessagingThreads } from "../messaging/messaging-threads";
@@ -347,9 +348,16 @@ export class DrainScheduler {
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
+    const reveals: ConversationReveal[] = [];
     yield* Effect.gen({ self: this }, function* () {
-      for (const item of batch) yield* this.#mailbox.markStarting(item.delivery.id).pipe(toDeliveryStartFailed);
-      this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      for (const item of batch)
+        yield* this.#mailbox
+          .markStarting(item.delivery.id, {
+            recipientAgentId: delivery.recipientAgentId,
+            revealed: (proof) => reveals.push(proof),
+          })
+          .pipe(toDeliveryStartFailed);
+      this.#mailboxSync.emitQueue(delivery.recipientAgentId, [], reveals);
       yield* this.#mailbox.verifyDeliveryAttachments(delivery.id).pipe(toDeliveryStartFailed);
       // An answer whose attachment changed fails alone. The message that starts the turn still runs.
       const failedCompanions = new Set<string>();
@@ -460,7 +468,8 @@ export class DrainScheduler {
           status: "completed",
         });
       }
-      this.#conversation.emitConversation(snapshot);
+      this.#conversation.emitConversation(snapshot, undefined, undefined, { source: "live", reveals });
+      reveals.length = 0;
 
       const startTurn = (providerThreadId: string) =>
         Effect.gen({ self: this }, function* () {

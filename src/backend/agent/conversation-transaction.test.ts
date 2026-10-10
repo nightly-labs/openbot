@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ConversationMessage } from "@openbot/contracts/ipc";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
 import { AgentStore } from "../agent-store";
 import { runCauseEffect } from "../effect-boundary";
 import {
@@ -121,7 +121,11 @@ describe("conversation transactions", () => {
     // SQLite no longer agrees with, and the caller retrying a mutation that already applied.
     expect(threadRowCount()).toBe(threadRowsBefore + 1);
     expect(store.list().find((candidate) => candidate.id === AGENT_ID)?.threadId).toBeTruthy();
-    expect(runtime.snapshot(AGENT_ID)?.messages).toEqual([message]);
+    expect(runtime.snapshot(AGENT_ID)?.messages).toEqual([{ ...message, visibilityEpoch: expect.any(Number) }]);
+    const threadId = store.list().find((candidate) => candidate.id === AGENT_ID)?.threadId;
+    expect(runtime.snapshot(AGENT_ID)?.messages).toEqual(
+      store.database.readConversation(AGENT_ID, threadId ?? null).messages,
+    );
   });
 
   it("runs every post-commit effect after one of them throws", () => {
@@ -269,6 +273,205 @@ describe("conversation transactions", () => {
     const bounded = runtime.ensureSnapshot(AGENT_ID, threadId);
     expect(bounded.messages).toHaveLength(CONVERSATION_CACHE_MESSAGE_LIMIT);
     expect(store.database.readConversation(AGENT_ID, threadId).messages[0]?.text).toBe("cached-0");
+  });
+
+  it("restores a late-visible input in a cold bounded runtime without returning old prefix history", () => {
+    const threadId = store.ensureThreadIdNow(AGENT_ID);
+    const write = (messages: ConversationMessage[]) =>
+      store.database.persistConversationChanges({
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: null,
+        changedMessages: messages,
+        eventType: "test.cold-members",
+      });
+    const input: ConversationMessage = {
+      ...systemMessage("early-input"),
+      id: "early-input",
+      author: "user",
+      turnId: "turn-current",
+      createdAt: "2026-10-08T00:00:00.000Z",
+      delivery: { id: "early-input", status: "queued", position: 1 },
+    };
+    write([{ ...input, id: "old-prefix", delivery: undefined }, input]);
+    write(
+      Array.from({ length: 100 }, (_, index) => ({
+        ...systemMessage(`reply-${index}`),
+        author: "assistant",
+        turnId: "turn-current",
+        createdAt: "2026-10-08T00:00:02.000Z",
+      })),
+    );
+    write([{ ...input, delivery: { id: "early-input", status: "completed", position: null } }]);
+    const restored = runtime.ensureSnapshot(AGENT_ID, threadId);
+    expect(restored.messages).toHaveLength(CONVERSATION_CACHE_MESSAGE_LIMIT);
+    expect(restored.messages.some((message) => message.id === "early-input")).toBe(true);
+    expect(restored.messages.some((message) => message.id === "old-prefix")).toBe(false);
+    expect(Buffer.byteLength(JSON.stringify(restored))).toBeLessThan(CONVERSATION_CACHE_BYTES_LIMIT);
+    const early = restored.messages.find((message) => message.id === "early-input");
+    expect(early?.visibilityEpoch).toBeGreaterThan(0);
+    runtime.emitConversation(restored, "test.cold-published");
+    expect(runtime.snapshot(AGENT_ID)?.messages.find((message) => message.id === "early-input")).toBe(early);
+    expect(store.database.readConversation(AGENT_ID, threadId).messages).toHaveLength(102);
+  });
+
+  it("does not publish cache omissions as deletions after a committed transaction", () => {
+    const threadId = store.ensureThreadIdNow(AGENT_ID);
+    const initial = Array.from({ length: 100 }, (_, index) => systemMessage(`old-${index}`));
+    const persisted = store.database.persistConversation(
+      {
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: null,
+        revision: 0,
+        messages: initial,
+      },
+      "test.seed-cache",
+    );
+    const removed: string[][] = [];
+    runtime = new ConversationRuntime(
+      store,
+      (event) => {
+        if (event.type === "conversation") removed.push(event.snapshot.window?.removedMessageIds ?? []);
+      },
+      () => store.list(),
+    );
+    runtime.setSnapshot(AGENT_ID, persisted);
+    runtime.withConversationTransaction(AGENT_ID, ({ snapshot }) => {
+      const added = Array.from({ length: 20 }, (_, index) => systemMessage(`new-${index}`));
+      snapshot.messages.push(...added);
+      snapshot.revision = store.database.persistConversationChanges({
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: null,
+        changedMessages: added,
+        eventType: "test.grow-cache",
+      });
+      return { result: undefined, snapshot };
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages).toHaveLength(100);
+    expect(removed).toEqual([[]]);
+    expect(store.database.readConversation(AGENT_ID, threadId).messages).toHaveLength(120);
+  });
+
+  it("publishes a cancellation even when retention omits its early body", () => {
+    const threadId = store.ensureThreadIdNow(AGENT_ID);
+    const cancelled: string[][] = [];
+    runtime = new ConversationRuntime(
+      store,
+      (event) => {
+        if (event.type === "conversation") cancelled.push(event.snapshot.window?.removedMessageIds ?? []);
+      },
+      () => store.list(),
+    );
+    const input: ConversationMessage = {
+      ...systemMessage("input"),
+      id: "input",
+      author: "user",
+      createdAt: "2026-10-08T00:00:00.000Z",
+      delivery: { id: "input", status: "starting", position: null },
+    };
+    const replies = Array.from({ length: 100 }, (_, index) => ({
+      ...systemMessage(`reply-${index}`),
+      createdAt: "2026-10-08T00:00:02.000Z",
+    }));
+    const write = (messages: ConversationMessage[]) =>
+      store.database.persistConversationChanges({
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: null,
+        changedMessages: messages,
+        eventType: "test.cancel-cache",
+      });
+    write(replies);
+    write([input]);
+    runtime.ensureSnapshot(AGENT_ID, threadId);
+    runtime.withConversationTransaction(AGENT_ID, ({ snapshot }) => {
+      const message = snapshot.messages.find((message) => message.id === "input");
+      if (!message) throw new Error("The early input was not hydrated.");
+      message.delivery = { id: "input", status: "cancelled", position: null };
+      snapshot.revision = write([message]);
+      return { result: undefined, snapshot };
+    });
+    expect(cancelled.at(-1)).toContain("input");
+    expect(
+      store.database.readConversation(AGENT_ID, threadId).messages.find((message) => message.id === "input")?.delivery
+        ?.status,
+    ).toBe("cancelled");
+  });
+
+  it("keeps the ordinary chronological tail for same-epoch completed runtime history", () => {
+    const rows = Array.from({ length: 120 }, (_, index) => ({ ...systemMessage(`row-${index}`), visibilityEpoch: 10 }));
+    runtime.setSnapshot(AGENT_ID, {
+      agentId: AGENT_ID,
+      threadId: null,
+      activeTurnId: null,
+      revision: 20,
+      messages: rows,
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages.map((message) => message.id)).toEqual(
+      rows.slice(-100).map((message) => message.id),
+    );
+  });
+
+  it("bounds inactive streaming count and bytes using the completed-history budget", () => {
+    const rows = Array.from(
+      { length: 125 },
+      (_, index): ConversationMessage => ({ ...systemMessage(`stream-${index}`), status: "streaming" }),
+    );
+    runtime.setSnapshot(AGENT_ID, {
+      agentId: AGENT_ID,
+      threadId: null,
+      activeTurnId: null,
+      revision: 0,
+      messages: rows,
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages.map((message) => message.id)).toEqual(
+      rows.slice(-100).map((message) => message.id),
+    );
+    const large: ConversationMessage = {
+      ...systemMessage("large"),
+      text: "x".repeat(CONVERSATION_CACHE_BYTES_LIMIT),
+      status: "streaming",
+    };
+    runtime.setSnapshot(AGENT_ID, {
+      agentId: AGENT_ID,
+      threadId: null,
+      activeTurnId: null,
+      revision: 0,
+      messages: [large],
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages).toEqual([]);
+  });
+
+  it("preserves an active oversized response and bounds its completed neighbors and idle transition", () => {
+    const rows = Array.from({ length: 125 }, (_, index) => systemMessage(`completed-${index}`));
+    const large: ConversationMessage = {
+      ...systemMessage("active"),
+      text: "x".repeat(CONVERSATION_CACHE_BYTES_LIMIT),
+      status: "streaming",
+      turnId: "active",
+    };
+    runtime.setSnapshot(AGENT_ID, {
+      agentId: AGENT_ID,
+      threadId: null,
+      activeTurnId: "active",
+      revision: 0,
+      messages: [...rows, large],
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages.map((message) => message.id)).toEqual(
+      [...rows.slice(-100), large].map((message) => message.id),
+    );
+    runtime.setSnapshot(AGENT_ID, {
+      agentId: AGENT_ID,
+      threadId: null,
+      activeTurnId: null,
+      revision: 0,
+      messages: [...rows, large],
+    });
+    expect(runtime.snapshot(AGENT_ID)?.messages).not.toContainEqual(large);
+    expect(runtime.snapshot(AGENT_ID)?.messages.length).toBeLessThanOrEqual(100);
+    expect(Buffer.byteLength(JSON.stringify(runtime.snapshot(AGENT_ID)))).toBeLessThan(CONVERSATION_CACHE_BYTES_LIMIT);
   });
 
   it("does not retain an individual completed message larger than the cache budget", () => {
@@ -424,5 +627,64 @@ describe("conversation transactions", () => {
         .prepare("SELECT COUNT(*) AS count FROM projection_thread_messages WHERE thread_id = ?")
         .get(threadId),
     ).toEqual({ count: 0 });
+  });
+});
+
+describe("authoritative cold conversation fragments", () => {
+  it.each([false, true])("keeps a split turn's SQL order in cold runtime with supplemental=%s", (withSupplement) => {
+    const threadId = store.ensureThreadIdNow(AGENT_ID);
+    const at = (seconds: number) => new Date(Date.UTC(2026, 9, 8) + seconds * 1000).toISOString();
+    const row = (id: string, seconds: number, author: "user" | "assistant" = "assistant"): ConversationMessage => ({
+      id,
+      author,
+      text: id,
+      createdAt: at(seconds),
+      status: "completed",
+      turnId: "turn",
+    });
+    const reveal: ConversationMessage = {
+      ...row("other-turn-input", -20, "user"),
+      turnId: "other",
+      delivery: { id: "other-delivery", status: "queued", position: 1 },
+    };
+    const messages = [
+      row("initial-input", 0, "user"),
+      row("first-steer", 5, "user"),
+      ...Array.from({ length: 120 }, (_, index) => row(`reply-${index}`, index + 10)),
+      row("later-steer", 75.5, "user"),
+    ];
+    store.database.persistConversation(
+      {
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: "turn",
+        revision: 0,
+        messages: withSupplement ? [reveal, ...messages] : messages,
+      },
+      "test.seed",
+      {},
+      undefined,
+      "live",
+    );
+    assert(reveal.delivery);
+    if (withSupplement)
+      store.database.persistConversationChanges({
+        agentId: AGENT_ID,
+        threadId,
+        activeTurnId: "turn",
+        changedMessages: [{ ...reveal, delivery: { ...reveal.delivery, status: "completed", position: null } }],
+        eventType: "test.reveal",
+      });
+    const page = store.database.readConversationPage(AGENT_ID, threadId, { type: "latest" }, 100);
+    const canonical = page.messages.map((message) => message.id);
+    expect(canonical).not.toContain("first-steer");
+    const snapshot = runtime.ensureSnapshot(AGENT_ID, threadId);
+    expect(snapshot.messages.filter((message) => canonical.includes(message.id)).map((message) => message.id)).toEqual(
+      canonical,
+    );
+    expect(snapshot.messages.map((message) => message.id)).toEqual(
+      withSupplement ? [reveal.id, ...canonical] : canonical,
+    );
+    expect(store.database.readConversationPage(AGENT_ID, threadId, { type: "latest" }, 100)).toEqual(page);
   });
 });

@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
+import { conversationPageMessages } from "../database/conversation-retention";
 import { causeHelpers } from "../effect-boundary";
 import { LineTooLongError } from "../jsonl";
 import type { MailboxStore } from "../mailbox-store";
@@ -336,7 +337,7 @@ export class BootRecovery {
       threadId: page.threadId,
       activeTurnId: page.activeTurnId,
       revision: page.revision,
-      messages: page.messages,
+      messages: conversationPageMessages(page),
     };
     const live = this.#conversation.loadedSnapshot(agentId);
     const next = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;

@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
-import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
+import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+
+export interface MailboxDeliveryRecord {
+  messageJson: string;
+  deliveryJson: string;
+  revision: number;
+}
 
 interface MailboxProjectionAttachment {
   id: string;
@@ -291,6 +297,27 @@ export class MailboxProjection {
          SET attempts = attempts + 1, last_error = ? WHERE id = ?`,
       )
       .run(error.slice(0, 2_000), id);
+  }
+
+  /** Reads exactly one durable delivery and its message for an operation-scoped transition. */
+  readDeliveryRecord(deliveryId: string, recipientAgentId: string): MailboxDeliveryRecord | null {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(`
+      SELECT message.message_json, delivery.delivery_json, delivery.last_event_sequence
+      FROM projection_deliveries delivery
+      JOIN projection_mailbox_messages message ON message.message_id = delivery.message_id
+      WHERE delivery.delivery_id = ? AND delivery.recipient_agent_id = ?
+    `)
+        .get(deliveryId, recipientAgentId),
+    );
+    return row
+      ? {
+          messageJson: requiredStringColumn(row, "message_json"),
+          deliveryJson: requiredStringColumn(row, "delivery_json"),
+          revision: requiredNumberColumn(row, "last_event_sequence"),
+        }
+      : null;
   }
 
   readMailboxState(): unknown | null {

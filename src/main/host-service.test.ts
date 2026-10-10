@@ -45,6 +45,7 @@ async function createHostService(
   > = {},
   /** Supplied only by the screen recording cases, which need a runtime to hold an answer. */
   screenCaptureDenied?: () => boolean,
+  agentsOverride: Partial<HostOptions["agents"]> = {},
 ): Promise<{
   service: HostService;
   /** Reports an account exactly as `forwardCentralAuth` does, sign-out included. */
@@ -64,7 +65,12 @@ async function createHostService(
   const options: HostOptions = {
     appVersion: "0.4.0",
     store,
-    agents: { ...createAgents(), adoptConversationReads: unimplemented, searchConversationFiles: unimplemented },
+    agents: {
+      ...createAgents(),
+      adoptConversationReads: unimplemented,
+      searchConversationFiles: unimplemented,
+      ...agentsOverride,
+    },
     agentsReady: () => Effect.void,
     skills: { listInstalledForChatTags: unimplemented },
     sidebarLayout: {
@@ -584,4 +590,33 @@ describe("HostService account binding", () => {
     expect(identity.serverId).not.toBeNull();
     expect(service.getStatus().serverName).toBe("Studio Mac");
   });
+});
+
+it("keeps exact order proofs read-only at the account facade while normal pages retain unread adoption", async () => {
+  const adopt = vi.fn();
+  const read = vi.fn(() =>
+    Effect.succeed({
+      agentId: "chief",
+      threadId: "thread-chief",
+      revision: 5,
+      activeTurnId: null,
+      messages: [],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+    }),
+  );
+  const { service, signIn } = await createHostService({}, undefined, {
+    adoptConversationReads: adopt,
+    readConversationPageFor: read,
+  });
+  await signIn({ id: "proof-account", email: "proof@example.com", name: "Proof", avatarUrl: null });
+  await runCauseEffect(service.configure({ serverName: "Proof Host" }));
+  adopt.mockClear();
+  const proof = { expectedThreadId: "thread-chief", expectedRevision: 5, messageIds: ["reply"] };
+  await runCauseEffect(service.readAgentConversationPage("chief", undefined, undefined, proof));
+  expect(adopt).not.toHaveBeenCalled();
+  expect(read).toHaveBeenCalledWith("chief", "local-user:proof-account", { type: "latest" }, 50, undefined, proof);
+  await runCauseEffect(service.readAgentConversationPage("chief"));
+  expect(adopt).toHaveBeenCalledOnce();
+  expect(read.mock.calls).toHaveLength(2);
 });

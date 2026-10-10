@@ -1503,6 +1503,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
       }),
       readConversationPage: async (input) => {
+        if (input.orderProof) throw new Error(sourceText("error.agent.conversationOrderLocalOnly"));
         if (!input.anchor || input.anchor.type === "latest") {
           emit(latestConversationListeners, input.agentId);
         }
