@@ -116,6 +116,13 @@ export const messages = {
   "routine.history.ignored.eventType": "Yok sayıldı: başka olay türü",
   "routine.history.ignored.filter": "Yok sayıldı: filtreler eşleşmedi",
   "routine.history.ignored.inactive": "Yok sayıldı: rutin duraklatıldı",
+  "routine.history.skipped": { one: "Atlandı: OpenBot kapalıydı", other: "{count} atlandı: OpenBot kapalıydı" },
+  "routine.history.skippedMore": {
+    one: "{count} taneden fazla atlandı: OpenBot kapalıydı",
+    other: "{count} taneden fazla atlandı: OpenBot kapalıydı",
+  },
+  "routine.history.ranLate": "{time} saatinde geç çalıştı",
+  "routine.history.range": "{from} – {until}",
   "routine.history.activityFailed": "Webhook istekleri yüklenemedi.",
 
   "routine.runStatus.queued": "Kuyrukta",
@@ -251,6 +258,9 @@ export const messages = {
   "routine.settings.limitPolicy": "Hesap sınırındaysa",
   "routine.settings.limitPolicy.wait": "Bekle ve sıfırlamadan sonra çalıştır",
   "routine.settings.limitPolicy.skip": "Bu çalıştırmayı atla",
+  "routine.settings.missedPolicy": "Planlanan zamanda OpenBot kapalıysa",
+  "routine.settings.missedPolicy.skip": "Bu çalıştırmayı atla",
+  "routine.settings.missedPolicy.runOnce": "OpenBot açıldığında bir kez çalıştır",
   "routine.settings.discardTitle": "Değişiklikler atılsın mı?",
   "routine.settings.discardDescription": "Bu rutinde yaptığınız kaydedilmemiş değişiklikler kaybolacak.",
   "routine.settings.discardConfirm": "Değişiklikleri at",

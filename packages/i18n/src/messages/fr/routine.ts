@@ -115,6 +115,16 @@ export const messages = {
   "routine.history.ignored.eventType": "Ignorée : autre type d’événement",
   "routine.history.ignored.filter": "Ignorée : les filtres ne correspondent pas",
   "routine.history.ignored.inactive": "Ignorée : routine en pause",
+  "routine.history.skipped": {
+    one: "Non exécutée : OpenBot était fermé",
+    other: "{count} non exécutées : OpenBot était fermé",
+  },
+  "routine.history.skippedMore": {
+    one: "Plus de {count} non exécutée : OpenBot était fermé",
+    other: "Plus de {count} non exécutées : OpenBot était fermé",
+  },
+  "routine.history.ranLate": "Exécutée en retard à {time}",
+  "routine.history.range": "{from} – {until}",
   "routine.history.activityFailed": "Impossible de charger les requêtes du webhook.",
 
   "routine.runStatus.queued": "En file d’attente",
@@ -248,6 +258,9 @@ export const messages = {
   "routine.settings.limitPolicy": "Si le compte atteint sa limite",
   "routine.settings.limitPolicy.wait": "Attendre et exécuter après la réinitialisation",
   "routine.settings.limitPolicy.skip": "Ignorer cette exécution",
+  "routine.settings.missedPolicy": "Si OpenBot était fermé à l’heure prévue",
+  "routine.settings.missedPolicy.skip": "Ignorer cette exécution",
+  "routine.settings.missedPolicy.runOnce": "Exécuter une fois à l’ouverture d’OpenBot",
   "routine.settings.discardTitle": "Abandonner les modifications ?",
   "routine.settings.discardDescription": "Vos modifications non enregistrées de cette routine seront perdues.",
   "routine.settings.discardConfirm": "Abandonner les modifications",
