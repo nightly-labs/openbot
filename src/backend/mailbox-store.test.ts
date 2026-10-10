@@ -600,6 +600,31 @@ describe("MailboxStore", () => {
     });
   });
 
+  it("keeps both files when two attachment names differ only in case", async () => {
+    const first = join(root, "a", "Report.txt");
+    const second = join(root, "b", "report.txt");
+    await mkdir(join(root, "a"));
+    await mkdir(join(root, "b"));
+    await writeFile(first, "first");
+    await writeFile(second, "second");
+    const drafts = await runCauseEffect(store.prepareAttachments([first, second]));
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "user" },
+        recipientAgentIds: ["chief"],
+        text: "Compare these",
+        draftIds: drafts.map((draft) => draft.id),
+      }),
+    );
+
+    const managed = store.getDelivery(required(receipt.deliveries[0]).id)?.managedAttachments ?? [];
+    expect(managed.map((attachment) => attachment.name)).toEqual(["Report.txt", "report-2.txt"]);
+    await expect(Promise.all(managed.map((attachment) => readFile(attachment.path, "utf8")))).resolves.toEqual([
+      "first",
+      "second",
+    ]);
+  });
+
   it("rejects managed attachments after their contents change without changing size", async () => {
     const source = join(root, "mutable.txt");
     await writeFile(source, "original");
