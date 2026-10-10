@@ -434,7 +434,7 @@ describe.sequential("GrokAgentClient", () => {
     },
   );
 
-  it("sends a steer that the agent refused after the running prompt ends, in the same turn", async () => {
+  it("refuses steering without sending a second prompt or completing the running turn", async () => {
     process.env.OPENBOT_FAKE_GROK_MODE = "busy-steer";
     client = new GrokAgentClient(
       { executable, version: "1.0.5" },
@@ -462,18 +462,25 @@ describe.sequential("GrokAgentClient", () => {
         decodeTurnResponse,
       ),
     );
-    await runCauseEffect(
-      client.request(
-        "turn/steer",
-        { threadId: thread.id, expectedTurnId: "turn-1", input: [{ type: "text", text: "Also add tests" }] },
-        decodeRecordResponse,
+    await expect(
+      runCauseEffect(
+        client.request(
+          "turn/steer",
+          { threadId: thread.id, expectedTurnId: "turn-1", input: [{ type: "text", text: "Also add tests" }] },
+          decodeRecordResponse,
+        ),
       ),
+    ).rejects.toThrow(sourceText("error.backend.steerUnsupported"));
+    await expectLogged({ method: "session/prompt", text: "Build it" });
+    expect(notifications.some((notification) => notification.method === "turn/completed")).toBe(false);
+    await runCauseEffect(
+      client.request("turn/interrupt", { threadId: thread.id, turnId: "turn-1" }, decodeRecordResponse),
     );
     await waitFor(() => notifications.some((notification) => notification.method === "turn/completed"));
 
     const completed = notifications.filter((notification) => notification.method === "turn/completed");
     expect(completed.map((notification) => notification.params)).toEqual([
-      { threadId: thread.id, turn: { id: "turn-1", status: "completed" } },
+      { threadId: thread.id, turn: { id: "turn-1", status: "interrupted" } },
     ]);
     const prompts = (await readFile(logPath, "utf8"))
       .trim()
@@ -481,13 +488,12 @@ describe.sequential("GrokAgentClient", () => {
       .map((line) => JSON.parse(line))
       .filter((entry) => entry.method === "session/prompt")
       .map((entry) => entry.text);
-    expect(prompts).toEqual(["Build it", "Also add tests", "Also add tests"]);
+    expect(prompts).toEqual(["Build it"]);
     const history = await runCauseEffect(
       client.request("thread/read", { threadId: thread.id, includeTurns: true }, decodeThreadResponse),
     );
     expect(history.thread.turns?.[0]?.items).toEqual([
       expect.objectContaining({ phase: "final_answer", text: "First answer." }),
-      expect.objectContaining({ phase: "final_answer", text: "Reply to the steer." }),
     ]);
     expect(diagnostics.filter((message) => message.includes("ACP steer failed"))).toEqual([]);
   });
@@ -552,7 +558,7 @@ describe.sequential("GrokAgentClient", () => {
   });
 
   it.each(["grok", "opencode"] as const)(
-    "%s discovers models, streams, steers, asks, approves, cancels, and resumes",
+    "%s discovers models, streams, refuses steering, asks, approves, cancels, and resumes",
     async (provider) => {
       const createClient = () =>
         provider === "grok"
@@ -621,17 +627,21 @@ describe.sequential("GrokAgentClient", () => {
       expect(turn.turn.status).toBe("inProgress");
       await waitFor(() => requests.some((request) => request.method.includes("requestApproval")));
 
-      await runCauseEffect(
-        client.request(
-          "turn/steer",
-          {
-            threadId,
-            expectedTurnId: "turn-1",
-            input: [{ type: "text", text: "Also add tests" }],
-          },
-          decodeRecordResponse,
+      await expect(
+        runCauseEffect(
+          client.request(
+            "turn/steer",
+            {
+              threadId,
+              expectedTurnId: "turn-1",
+              input: [{ type: "text", text: "Also add tests" }],
+            },
+            decodeRecordResponse,
+          ),
         ),
-      );
+      ).rejects.toThrow(sourceText("error.backend.steerUnsupported"));
+      expect((await readLog()).filter((entry) => entry.method === "session/prompt")).toHaveLength(1);
+      expect(notifications.some((notification) => notification.method === "turn/completed")).toBe(false);
       const approval = requests.find((request) => request.method.includes("requestApproval"));
       if (!approval) throw new Error("The fake ACP permission request was not surfaced.");
       client.respond(approval.id, { decision: "accept" });
@@ -1228,8 +1238,6 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           ],
         },
       });
-    } else if (promptCounter === 2) {
-      write({ id: message.id, result: { stopReason: "end_turn" } });
     } else {
       pendingPrompt = { id: message.id, sessionId: message.params.sessionId };
     }
