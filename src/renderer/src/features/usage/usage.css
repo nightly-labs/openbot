@@ -188,6 +188,11 @@
   min-width: 0;
   overflow: hidden;
 }
+/* The pane makes no stacking context, so the dialog layer of the loading screen would paint over the
+ * menus that open from the sidebar. The screen covers only the pane, so one layer is sufficient. */
+.server-connection-workspace > .app-loading {
+  z-index: 1;
+}
 /* The panes were grid items of the frame and stretched to its height. In this column they grow to
  * fill it, so a short chat keeps its composer at the bottom. */
 .server-connection-content > * {
