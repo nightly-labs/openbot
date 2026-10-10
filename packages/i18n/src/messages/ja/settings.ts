@@ -160,6 +160,8 @@ export const messages = {
   "settings.mobileConnect.expired.description": "新しいコードを生成してスマートフォンを接続してください。",
   "settings.mobileConnect.qrLabel": "Mobile Connect サインイン用 QR コード",
   "settings.mobileConnect.scan.title": "スマートフォンで OpenBot を開いてください",
+  "settings.mobileConnect.copyConnectLink": "リンクをコピー",
+  "settings.mobileConnect.connectLinkCopied": "リンクをコピーしました",
   "settings.mobileConnect.scan.description": "「QR コードをスキャン」を選び、カメラをこのコードに向けてください。",
   "settings.mobileConnect.expiresIn": "残り {time}",
   "settings.mobileConnect.connected.title": "スマートフォンを接続しました",

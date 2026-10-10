@@ -176,6 +176,8 @@ export const messages = defineMessages("settings", {
   "settings.mobileConnect.expired.description": "Generate a new code to connect your phone.",
   "settings.mobileConnect.qrLabel": "Mobile Connect sign-in QR code",
   "settings.mobileConnect.scan.title": "Open OpenBot on your phone",
+  "settings.mobileConnect.copyConnectLink": "Copy link",
+  "settings.mobileConnect.connectLinkCopied": "Link copied",
   "settings.mobileConnect.scan.description": "Choose Scan QR code and point your camera at this code.",
   // {time} is a countdown such as 1:59.
   "settings.mobileConnect.expiresIn": "Expires in {time}",

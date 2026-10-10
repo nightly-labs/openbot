@@ -136,8 +136,12 @@ vi.mock("expo-camera", () => ({
   },
 }));
 // Sign-in imports native storage and artwork with no DOM implementation or injectable seam.
-vi.mock("@/features/auth/api/mobile-auth", () => ({ redeemMobileConnectUrl: vi.fn() }));
-vi.mock("@/features/auth/context/mobile-session-context", () => ({ useMobileSession: () => ({ connect: vi.fn() }) }));
+const signIn = vi.hoisted(() => ({ clipboard: "", redeem: vi.fn(), connect: vi.fn() }));
+vi.mock("@/features/auth/api/mobile-auth", () => ({ redeemMobileConnectUrl: signIn.redeem }));
+vi.mock("@/features/auth/context/mobile-session-context", () => ({
+  useMobileSession: () => ({ connect: signIn.connect }),
+}));
+vi.mock("expo-clipboard", () => ({ getStringAsync: async () => signIn.clipboard }));
 vi.mock("@/features/auth/components/app-logo", () => ({ AppLogo: () => null }));
 vi.mock("@/shared/components/splash-backdrop", () => ({ SplashWallpaper: () => null }));
 vi.mock("expo-router", () => ({ Stack: { Screen: () => null } }));
@@ -268,6 +272,21 @@ describe("scanner sheet lifecycle", () => {
       expect(screen.queryByText("2. Go to Settings → Mobile Connect.")).toBeNull();
       await act(() => root.render(null));
     }
+  });
+
+  it("signs in with a pasted connect link on a device without a camera", async () => {
+    const session = { apiUrl: "https://account.example" };
+    signIn.redeem.mockReset().mockResolvedValue(session);
+    signIn.connect.mockReset();
+    await act(() => root.render(<SignInScreen />));
+    signIn.clipboard = "";
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Paste connect link" })));
+    expect(screen.getByText("Copy the connect link on your computer first.")).toBeTruthy();
+    expect(signIn.redeem).not.toHaveBeenCalled();
+    signIn.clipboard = " openbot://mobile-connect?api=https%3A%2F%2Faccount.example&ticket=t ";
+    await act(() => fireEvent.click(screen.getByRole("button", { name: "Paste connect link" })));
+    expect(signIn.redeem).toHaveBeenCalledWith("openbot://mobile-connect?api=https%3A%2F%2Faccount.example&ticket=t");
+    expect(signIn.connect).toHaveBeenCalledWith(session);
   });
 
   it("permits the fallback fade when native logo measurement does not report", async () => {

@@ -1,5 +1,6 @@
+import * as Clipboard from "expo-clipboard";
 import { useIsFocused } from "expo-router/react-navigation";
-import { Accordion, Typography } from "heroui-native";
+import { Accordion, Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { type LucideIcon, X } from "lucide-react-native";
 import { useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
@@ -118,6 +119,26 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const bannerSpace = notice ? bannerHeight + BANNER_GAP : 0;
   const top = insets.top + bannerSpace;
   const contentTop = top + Math.max(32, (viewport.height - top - insets.bottom - closedHeight) / 2);
+  // Many e-ink readers have no camera, so the desktop's Mobile Connect link can also be pasted.
+  const [pasting, setPasting] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  async function pasteConnectLink() {
+    if (pasting) return;
+    setPasting(true);
+    setPasteError(null);
+    try {
+      const link = (await Clipboard.getStringAsync()).trim();
+      if (!link) throw new Error(t("mobile.auth.signIn.pasteEmpty"));
+      const session = await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem" }, () =>
+        redeemMobileConnectUrl(link),
+      );
+      connect(session);
+    } catch (error) {
+      setPasteError(error instanceof Error ? error.message : t("mobile.auth.error.invalidCode"));
+    } finally {
+      setPasting(false);
+    }
+  }
   const closeScanner = useCallback(() => {
     setOrigin(null);
   }, []);
@@ -209,6 +230,23 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
               <View ref={button} collapsable={false} style={{ width: buttonWidth, opacity: scannerOpen ? 0 : 1 }}>
                 <ScanQrButton width={buttonWidth} onPress={openScanner} />
               </View>
+              <View className="items-center gap-2 pt-3" style={{ width: buttonWidth }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={pasting || scannerOpen}
+                  onPress={() => void pasteConnectLink()}
+                >
+                  <Button.Label>
+                    {pasting ? t("mobile.auth.signIn.pasting") : t("mobile.auth.signIn.pasteLink")}
+                  </Button.Label>
+                </Button>
+                {pasteError ? (
+                  <Typography.Paragraph type="body-sm" align="center" className="text-danger-text">
+                    {pasteError}
+                  </Typography.Paragraph>
+                ) : null}
+              </View>
             </Animated.View>
           </View>
           <Animated.View style={actionsStyle} className="w-full">
@@ -227,6 +265,7 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
                     <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep1")}</Typography.Paragraph>
                     <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep2")}</Typography.Paragraph>
                     <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep3")}</Typography.Paragraph>
+                    <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpPaste")}</Typography.Paragraph>
                   </View>
                 </Accordion.Content>
               </Accordion.Item>
