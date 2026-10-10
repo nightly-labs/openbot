@@ -30,6 +30,148 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentMemories: staging, epochs and turn commitment", () => {
+  it.each([
+    "completed",
+    "essential-merge",
+    "failed",
+    "interrupted",
+    "target-edited",
+    "target-deleted",
+    "target-pinned",
+    "source-edited",
+    "source-pinned",
+  ])("commits a merge only while both entries are current and applies the survivor selection: %s", async (outcome) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const target = active.createMemory({ agentId: "chief", text: `Target ${"界".repeat(470)}` });
+    for (let index = 1; index < 5; index++)
+      active.createMemory({ agentId: "chief", text: `Kept ${index} ${"界".repeat(470)}` });
+    active.initializeMemorySelection("chief");
+    const source = active.createMemory({ agentId: "chief", text: "Merge this redundant note." });
+    if (outcome === "essential-merge") active.initializeMemorySelection("chief");
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Merge the two saved facts." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The memory merge turn did not start.");
+    const merged = await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      {
+        memoryId: source.id,
+        text: target.text,
+        inclusion: outcome === "essential-merge" ? "essential" : "searchable",
+      },
+      turnId,
+    );
+    expect(openBotToolPayload(merged.result)).toMatchObject({
+      status: "staged",
+      inclusion: outcome === "essential-merge" ? "essential" : "searchable",
+    });
+    const replacementText = `Replacement ${"界".repeat(470)}`;
+    if (outcome !== "essential-merge") {
+      const replacement = await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        { text: replacementText, inclusion: "essential" },
+        turnId,
+      );
+      expect(openBotToolPayload(replacement.result)).toMatchObject({ status: "staged", inclusion: "essential" });
+    }
+    if (outcome === "target-edited")
+      active.updateMemory({ agentId: "chief", memoryId: target.id, text: `${target.text} new` });
+    if (outcome === "target-deleted") active.deleteMemory({ agentId: "chief", memoryId: target.id });
+    if (outcome === "source-edited")
+      active.updateMemory({ agentId: "chief", memoryId: source.id, text: "Keep this corrected note." });
+    if (outcome === "target-pinned" || outcome === "source-pinned") {
+      const id = outcome === "target-pinned" ? target.id : source.id;
+      const selection = active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === id);
+      if (!selection) throw new Error("The merged selection is missing.");
+      active.setMemoryInclusion({
+        agentId: "chief",
+        changes: [{ memoryId: id, inclusion: "essential", expectedRevision: selection.revision }],
+      });
+    }
+    const beforeCommit = active.listMemories("chief");
+    const status = outcome === "failed" || outcome === "interrupted" ? outcome : "completed";
+    client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    const memories = active.listMemories("chief");
+    const mergedSuccessfully = outcome === "completed" || outcome === "essential-merge";
+    expect(memories.filter((entry) => entry.text !== replacementText)).toEqual(
+      beforeCommit.filter((entry) => !mergedSuccessfully || entry.id !== source.id),
+    );
+    const selections = active.getMemorySelection("chief");
+    if (outcome !== "target-deleted")
+      expect(selections.selections.find((entry) => entry.memoryId === target.id)?.inclusion).toBe(
+        outcome === "completed" ? "searchable" : "essential",
+      );
+    if (status === "completed" && outcome !== "essential-merge") {
+      const replacement = memories.find((entry) => entry.text === replacementText);
+      expect(replacement).toBeDefined();
+      expect(selections.selections.find((entry) => entry.memoryId === replacement?.id)?.inclusion).toBe(
+        outcome === "completed" || outcome === "target-deleted" ? "essential" : "searchable",
+      );
+    }
+    expect(selections.usedBytes).toBeLessThanOrEqual(selections.budgetBytes);
+  });
+
+  it.each(["saved", "pinned", "new"])(
+    "resolves duplicate text against this turn's planned writes: %s",
+    async (kind) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      service = active;
+      const events: AgentEvent[] = [];
+      active.on("event", (event) => events.push(event));
+      await runCauseEffect(active.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      const original = kind === "new" ? null : active.createMemory({ agentId: "chief", text: "Original fact." });
+      if (kind === "pinned" && original)
+        active.setMemoryInclusion({
+          agentId: "chief",
+          changes: [{ memoryId: original.id, inclusion: "essential", expectedRevision: 0 }],
+        });
+      await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Keep both facts." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The planned duplicate turn did not start.");
+      await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        original
+          ? { memoryId: original.id, text: "Corrected fact." }
+          : { text: "Original fact.", inclusion: "essential" },
+        turnId,
+      );
+      await callOpenBotTool(client, threadId, "remember", { text: "Original fact.", inclusion: "searchable" }, turnId);
+      client.emit(
+        "notification",
+        notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+      );
+      await waitFor(() => events.some((event) => event.type === "turn-completed"));
+      const memories = active.listMemories("chief");
+      expect(memories.map((entry) => entry.text).sort()).toEqual(
+        kind === "new" ? ["Original fact."] : ["Corrected fact.", "Original fact."],
+      );
+      const remembered = memories.find((entry) => entry.text === "Original fact.");
+      expect(
+        active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === remembered?.id)?.inclusion,
+      ).toBe("searchable");
+    },
+  );
+
   it.each(["edit", "delete"])("does not recreate a user-controlled duplicate after a concurrent %s", async (action) => {
     const { store, mailbox } = stores(root);
     const client = new FakeAgentClient("codex", "DONE", false);
@@ -493,6 +635,24 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     const owner = await callOpenBotTool(client, threadId, "remember", { text: "Builder owns the rollback." }, turnId);
     expect(openBotToolPayload(owner.result).status).toBe("staged");
 
+    // Repeated edits must release the old text in the projected count, as they do at commit.
+    await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { memoryId: kept.id, text: "Use Bun for all scripts." },
+      turnId,
+    );
+    await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { memoryId: kept.id, text: "Use Bun for project scripts." },
+      turnId,
+    );
+    const oldText = await callOpenBotTool(client, threadId, "remember", { text: "Use Bun for all scripts." }, turnId);
+    expect(paramsRecord(oldText.result)?.success).toBe(false);
+
     // Another turn of the same agent, such as a channel turn, commits apart. Its memory counts too.
     const otherTurn = await callOpenBotTool(
       client,
@@ -524,7 +684,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         .listMemories("chief")
         .map((memory) => memory.text)
         .sort(),
-    ).toEqual(["Builder owns the rollback.", "The release is on Monday.", "Use Bun for scripts."]);
+    ).toEqual(["Builder owns the rollback.", "The release is on Monday.", "Use Bun for project scripts."]);
     expect(events.filter((event) => event.type === "error")).toEqual([]);
   });
 });

@@ -44,7 +44,8 @@ type PendingMemoryMutation =
       sourceTurnId: string;
       expectedUpdatedAt?: string | null;
       expectedSelectionRevision?: number;
-      inclusion?: "essential" | "searchable";
+      duplicate?: { memoryId: string; expectedRevision: number };
+      inclusion: "essential" | "searchable";
     }
   | {
       callId: string;
@@ -241,28 +242,40 @@ export class AgentMemories {
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
       if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
-      const duplicate = !current ? this.#memories.list(senderAgentId).find((memory) => memory.text === text) : null;
-      const selectedId = current?.id ?? duplicate?.id;
-      const selection = selectedId ? this.#memories.getSelection(senderAgentId, selectedId) : null;
+      const planned = this.#plannedContext(senderAgentId, params.turnId, params.callId);
+      const duplicateEntry = [...planned.all].find(([key, memory]) => key !== memoryId && memory.text === text);
+      const duplicate = duplicateEntry?.[1];
+      const sourceSelection = current ? this.#memories.getSelection(senderAgentId, current.id) : null;
+      const duplicateSelection = duplicate ? this.#memories.getSelection(senderAgentId, duplicate.id) : null;
+      const selectedId = duplicate?.id ?? current?.id;
+      const selectedKey = duplicateEntry?.[0] ?? current?.id;
+      const selection = duplicateSelection ?? sourceSelection;
+      if (duplicate && sourceSelection?.userControlled)
+        return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
       if (selection?.userControlled && args.inclusion !== undefined && args.inclusion !== selection.inclusion)
         return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
-      if (duplicate && selection?.userControlled)
+      if (!current && duplicate && selection?.userControlled)
         return openBotToolResult({ status: "unchanged", memoryId: duplicate.id, inclusion: selection.inclusion });
-      const plannedEssentials = this.#plannedContext(senderAgentId, params.turnId, params.callId).essential;
+      const plannedEssentials = planned.essential;
       const intendedInclusion =
-        args.inclusion ?? (selectedId && plannedEssentials.has(selectedId) ? "essential" : "searchable");
+        args.inclusion ??
+        (selection?.userControlled
+          ? selection.inclusion
+          : selectedKey && plannedEssentials.has(selectedKey)
+            ? "essential"
+            : "searchable");
       let inclusion: "essential" | "searchable" = intendedInclusion;
       if (inclusion === "essential") {
-        const others = [...plannedEssentials.values()].filter(
-          (memory) => memory.id !== selectedId && (current || memory.text !== text),
-        );
+        const others = [...plannedEssentials]
+          .filter(([key, memory]) => key !== current?.id && key !== duplicateEntry?.[0] && memory.text !== text)
+          .map(([, memory]) => memory);
         const candidate = {
           id: selectedId ?? "00000000-0000-0000-0000-000000000000",
           text,
           origin: duplicate?.origin ?? ("automatic" as const),
         };
         if (essentialMemoryBytes([...others, candidate]) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) {
-          if (current && selection?.inclusion === "essential")
+          if (current && sourceSelection?.inclusion === "essential")
             return openBotToolFailure(sourceText("error.backend.memoryEssentialBudget"));
           inclusion = "searchable";
         }
@@ -281,27 +294,21 @@ export class AgentMemories {
           return openBotToolFailure(sourceText(key, { saved, limit }));
         }
       }
-      if (duplicate && selection) {
-        this.#stage(params.turnId, {
-          callId: params.callId,
-          type: "selection",
-          agentId: senderAgentId,
-          epoch: this.#epoch(senderAgentId),
-          changes: [{ memoryId: duplicate.id, inclusion, expectedRevision: selection.revision }],
-        });
-      } else
-        this.#stage(params.turnId, {
-          callId: params.callId,
-          type: "remember",
-          agentId: senderAgentId,
-          epoch: this.#epoch(senderAgentId),
-          ...(memoryId ? { memoryId } : {}),
-          text,
-          sourceTurnId: params.turnId,
-          ...(memoryId ? { expectedUpdatedAt: current?.updatedAt ?? null } : {}),
-          ...(current && selection ? { expectedSelectionRevision: selection.revision } : {}),
-          inclusion,
-        });
+      this.#stage(params.turnId, {
+        callId: params.callId,
+        type: "remember",
+        agentId: senderAgentId,
+        epoch: this.#epoch(senderAgentId),
+        ...(memoryId ? { memoryId } : {}),
+        text,
+        sourceTurnId: params.turnId,
+        ...(memoryId ? { expectedUpdatedAt: current?.updatedAt ?? null } : {}),
+        ...(sourceSelection ? { expectedSelectionRevision: sourceSelection.revision } : {}),
+        ...(duplicate && duplicateSelection
+          ? { duplicate: { memoryId: duplicate.id, expectedRevision: duplicateSelection.revision } }
+          : {}),
+        inclusion,
+      });
       return openBotToolResult({
         status: "staged",
         memoryId: memoryId ?? null,
@@ -347,6 +354,7 @@ export class AgentMemories {
     if (status !== "completed" || pending.length === 0) return;
 
     const affectedAgents = new Set<string>();
+    const createdMemories = new Set<string>();
     const ownRevisions = new Map<string, Map<number, number>>();
     const revisionAfterOwnChanges = (agentId: string, memoryId: string, revision: number): number => {
       const changes = ownRevisions.get(`${agentId}:${memoryId}`);
@@ -369,18 +377,33 @@ export class AgentMemories {
             "agent",
           );
         else if (mutation.type === "remember")
-          this.#commitRemember({
-            ...mutation,
-            ...(mutation.memoryId && mutation.expectedSelectionRevision !== undefined
-              ? {
-                  expectedSelectionRevision: revisionAfterOwnChanges(
-                    mutation.agentId,
-                    mutation.memoryId,
-                    mutation.expectedSelectionRevision,
-                  ),
-                }
-              : {}),
-          });
+          this.#commitRemember(
+            {
+              ...mutation,
+              ...(mutation.duplicate
+                ? {
+                    duplicate: {
+                      ...mutation.duplicate,
+                      expectedRevision: revisionAfterOwnChanges(
+                        mutation.agentId,
+                        mutation.duplicate.memoryId,
+                        mutation.duplicate.expectedRevision,
+                      ),
+                    },
+                  }
+                : {}),
+              ...(mutation.memoryId && mutation.expectedSelectionRevision !== undefined
+                ? {
+                    expectedSelectionRevision: revisionAfterOwnChanges(
+                      mutation.agentId,
+                      mutation.memoryId,
+                      mutation.expectedSelectionRevision,
+                    ),
+                  }
+                : {}),
+            },
+            createdMemories,
+          );
         else if (
           !this.#memories.getSelection(mutation.agentId, mutation.memoryId)?.userControlled &&
           this.#memories.getSelection(mutation.agentId, mutation.memoryId)?.revision ===
@@ -393,7 +416,11 @@ export class AgentMemories {
       }
       for (const selection of this.#memories.listSelections(mutation.agentId)) {
         const previous = previousSelections.find((entry) => entry.memoryId === selection.memoryId);
-        if (!previous || previous.revision === selection.revision) continue;
+        if (!previous) {
+          createdMemories.add(selection.memoryId);
+          continue;
+        }
+        if (previous.revision === selection.revision) continue;
         const key = `${mutation.agentId}:${selection.memoryId}`;
         const revisions = ownRevisions.get(key) ?? new Map<number, number>();
         revisions.set(previous.revision, selection.revision);
@@ -451,16 +478,28 @@ export class AgentMemories {
     });
   }
 
-  #commitRemember(mutation: Extract<PendingMemoryMutation, { type: "remember" }>): void {
+  #commitRemember(mutation: Extract<PendingMemoryMutation, { type: "remember" }>, createdMemories: Set<string>): void {
     this.#memories.withMemoryTransaction(() => {
+      const duplicate = this.#memories
+        .list(mutation.agentId)
+        .find((memory) => memory.id !== mutation.memoryId && memory.text === mutation.text);
+      const duplicateSelection = duplicate ? this.#memories.getSelection(mutation.agentId, duplicate.id) : null;
+      if (mutation.duplicate) {
+        if (
+          duplicate?.id !== mutation.duplicate.memoryId ||
+          duplicateSelection?.revision !== mutation.duplicate.expectedRevision
+        )
+          return;
+      } else if (duplicate && !createdMemories.has(duplicate.id)) return;
+      if (duplicateSelection?.userControlled && duplicateSelection.inclusion !== mutation.inclusion) return;
       if (mutation.memoryId) {
         const current = this.#memories.get(mutation.agentId, mutation.memoryId);
         const selection = this.#memories.getSelection(mutation.agentId, mutation.memoryId);
         if (
           !current ||
           !selection ||
-          current.updatedAt !== mutation.expectedUpdatedAt ||
-          selection.revision !== mutation.expectedSelectionRevision
+          selection.revision !== mutation.expectedSelectionRevision ||
+          (duplicate && selection.userControlled)
         )
           return;
         // An explicit move to searchable can make room for a longer corrected text.
@@ -477,17 +516,16 @@ export class AgentMemories {
         ...(mutation.memoryId ? { memoryId: mutation.memoryId } : {}),
         text: mutation.text,
         sourceTurnId: mutation.sourceTurnId,
-        ...(mutation.expectedUpdatedAt !== undefined ? { expectedUpdatedAt: mutation.expectedUpdatedAt } : {}),
       });
-      if (!memory || mutation.inclusion !== "essential") return;
+      if (!memory) return;
       const selection = this.#memories.getSelection(mutation.agentId, memory.id);
-      if (!selection || selection.inclusion === "essential" || selection.userControlled) return;
+      if (!selection || selection.inclusion === mutation.inclusion || selection.userControlled) return;
       const next = [...this.essentialFor(mutation.agentId), memory];
       // Another turn may have used the remaining budget. Keep the saved text searchable.
-      if (essentialMemoryBytes(next) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) return;
+      if (mutation.inclusion === "essential" && essentialMemoryBytes(next) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) return;
       this.#memories.setInclusions(
         mutation.agentId,
-        [{ memoryId: memory.id, inclusion: "essential", expectedRevision: selection.revision }],
+        [{ memoryId: memory.id, inclusion: mutation.inclusion, expectedRevision: selection.revision }],
         "agent",
       );
     });
@@ -553,7 +591,13 @@ export class AgentMemories {
         continue;
       }
       const current = memories.get(mutation.memoryId);
-      if (!current || (mutation.expectedUpdatedAt !== undefined && current.updatedAt !== mutation.expectedUpdatedAt))
+      if (
+        !current ||
+        changedElsewhere.has(mutation.memoryId) ||
+        (current.updatedAt !== null &&
+          mutation.expectedUpdatedAt !== undefined &&
+          current.updatedAt !== mutation.expectedUpdatedAt)
+      )
         continue;
       // An update to the text of another memory folds the two into one.
       if (same !== undefined && same !== mutation.memoryId) memories.delete(mutation.memoryId);
