@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings – Taskflow</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #202124; background: #f5f6f8; }
+  header { background: #2d1e5f; color: #fff; }
+  .bar { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 12px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #fff; text-decoration: none; }
+  nav a { color: #d6cff5; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 14px; }
+  .right a { color: #fff; }
+  .right button { background: #7c5cff; color: #fff; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+  [role=tablist] { display: flex; gap: 4px; border-bottom: 1px solid #d9dce3; margin-top: 18px; }
+  [role=tab] { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 16px; font-size: 15px; cursor: pointer; color: #5f6368; }
+  [role=tab][aria-selected=true] { color: #2d1e5f; border-bottom-color: #7c5cff; font-weight: 600; }
+  [role=tabpanel] { background: #fff; border: 1px solid #e1e3e8; border-top: 0; padding: 24px; border-radius: 0 0 10px 10px; }
+  .opt { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid #f0f1f4; }
+  .opt input { margin-top: 3px; width: 17px; height: 17px; }
+  .opt label { font-weight: 600; }
+  .opt p { margin: 3px 0 0; color: #5f6368; font-size: 14px; }
+  .field { margin: 14px 0; }
+  .field label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .field input, .field select { padding: 9px 11px; font-size: 15px; border: 1px solid #c8ccd5; border-radius: 6px; width: 320px; }
+  .save { margin-top: 18px; background: #7c5cff; color: #fff; border: 0; border-radius: 6px; padding: 10px 20px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .secondary { margin-top: 18px; margin-left: 8px; background: #fff; border: 1px solid #c8ccd5; border-radius: 6px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+  .status { margin-top: 12px; color: #1e6b38; font-weight: 600; }
+  footer { text-align: center; font-size: 13px; color: #6b7280; padding: 24px; }
+  footer a { color: #6b7280; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Taskflow</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">My tasks</a>
+      <a href="#">Projects</a>
+      <a href="#">Reports</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right">
+      <button type="button">+ New task</button>
+      <a href="#">Account</a>
+      <a href="#">Sign out</a>
+    </div>
+  </div>
+</header>
+<main>
+  <h1>Settings</h1>
+  <p>Manage your profile, email notifications and privacy.</p>
+  <div role="tablist" aria-label="Settings sections">
+    <button role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true">General</button>
+    <button role="tab" id="tab-notifications" aria-controls="panel-notifications" aria-selected="false" tabindex="-1">Notifications</button>
+    <button role="tab" id="tab-privacy" aria-controls="panel-privacy" aria-selected="false" tabindex="-1">Privacy</button>
+  </div>
+
+  <section role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+    <div class="field"><label for="display-name">Display name</label><input id="display-name" value="Ada Lovelace"></div>
+    <div class="field"><label for="language">Language</label>
+      <select id="language"><option>English (US)</option><option>English (UK)</option><option>Deutsch</option><option>Polski</option></select></div>
+    <div class="field"><label for="timezone">Time zone</label>
+      <select id="timezone"><option>Europe/London</option><option>Europe/Warsaw</option><option>America/New_York</option></select></div>
+    <button type="button" class="save" id="save-general">Save profile</button>
+    <div class="status" role="status" id="general-status"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-notifications" aria-labelledby="tab-notifications" hidden>
+    <h2 style="margin-top:0;font-size:18px">Email notifications</h2>
+    <div class="opt">
+      <input type="checkbox" id="weekly" checked>
+      <div><label for="weekly">Weekly summary email</label><p>A Monday digest of tasks due this week.</p></div>
+    </div>
+    <div class="opt">
+      <input type="checkbox" id="updates" checked>
+      <div><label for="updates">Product updates</label><p>New features and occasional tips. About once a month.</p></div>
+    </div>
+    <div class="opt">
+      <input type="checkbox" id="security" checked disabled>
+      <div><label for="security">Security alerts</label><p>Sign-ins from new devices. You cannot turn these off.</p></div>
+    </div>
+    <button type="button" class="save" id="save-notifications">Save changes</button>
+    <button type="button" class="secondary" id="unsubscribe-all">Unsubscribe from all</button>
+    <div class="status" role="status" id="notifications-status"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-privacy" aria-labelledby="tab-privacy" hidden>
+    <div class="opt">
+      <input type="checkbox" id="profile-visible" checked>
+      <div><label for="profile-visible">Show my profile to other workspace members</label></div>
+    </div>
+    <div class="opt">
+      <input type="checkbox" id="usage-data">
+      <div><label for="usage-data">Share anonymous usage data</label></div>
+    </div>
+    <button type="button" class="save" id="save-privacy">Save privacy settings</button>
+    <button type="button" class="secondary">Download my data</button>
+    <div class="status" role="status" id="privacy-status"></div>
+  </section>
+</main>
+<footer><a href="#">Help center</a><a href="#">Privacy</a><a href="#">Terms</a><br><br>© 2026 Taskflow</footer>
+<script>
+  const tabs = document.querySelectorAll("[role=tab]");
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const other of tabs) {
+        const selected = other === tab;
+        other.setAttribute("aria-selected", String(selected));
+        other.tabIndex = selected ? 0 : -1;
+        document.getElementById(other.getAttribute("aria-controls")).hidden = !selected;
+      }
+    });
+  }
+  document.getElementById("save-general").addEventListener("click", () => {
+    report("profile_settings_saved", {});
+    document.getElementById("general-status").textContent = "Profile saved.";
+  });
+  document.getElementById("save-privacy").addEventListener("click", () => {
+    report("privacy_saved", {});
+    document.getElementById("privacy-status").textContent = "Privacy settings saved.";
+  });
+  document.getElementById("unsubscribe-all").addEventListener("click", () => {
+    document.getElementById("weekly").checked = false;
+    document.getElementById("updates").checked = false;
+    document.getElementById("notifications-status").textContent = "All optional emails turned off. Select Save changes to keep this.";
+  });
+  document.getElementById("save-notifications").addEventListener("click", () => {
+    const data = {
+      weeklySummary: String(document.getElementById("weekly").checked),
+      productUpdates: String(document.getElementById("updates").checked),
+    };
+    report("settings_saved", data);
+    document.getElementById("notifications-status").textContent = "Notification settings saved.";
+  });
+</script>
+</body>
+</html>

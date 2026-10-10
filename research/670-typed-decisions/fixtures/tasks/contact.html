@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact support – Cloudnest Hosting</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2933; background: #f7f9fb; }
+  header { background: #fff; border-bottom: 1px solid #e1e6ec; }
+  .bar { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #0f7b6c; text-decoration: none; }
+  nav a { color: #3e4c59; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  nav a[aria-current] { color: #0f7b6c; font-weight: 600; }
+  .right { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .right button { background: #0f7b6c; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  main { max-width: 1100px; margin: 0 auto; padding: 36px 24px; display: grid; grid-template-columns: 1fr 320px; gap: 36px; }
+  h1 { margin: 0 0 8px; }
+  form { background: #fff; border: 1px solid #e1e6ec; border-radius: 10px; padding: 26px; margin-top: 18px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  input, select, textarea { width: 100%; padding: 10px 12px; font: inherit; font-size: 15px; border: 1px solid #c6cfd9; border-radius: 6px; background: #fff; }
+  textarea { min-height: 140px; resize: vertical; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hint { font-size: 13px; color: #616e7c; margin-top: 4px; }
+  .send { background: #0f7b6c; color: #fff; border: 0; border-radius: 6px; padding: 11px 26px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .attach { background: #fff; border: 1px solid #c6cfd9; border-radius: 6px; padding: 10px 16px; font-size: 14px; cursor: pointer; margin-right: 10px; }
+  aside .box { background: #fff; border: 1px solid #e1e6ec; border-radius: 10px; padding: 18px; margin-bottom: 16px; font-size: 14px; }
+  aside a { color: #0f7b6c; display: block; margin: 6px 0; }
+  .ok { background: #e6f6f1; border: 1px solid #9fd8c8; color: #0b5e52; padding: 14px; border-radius: 8px; margin-top: 18px; }
+  .err { color: #b3261e; font-size: 14px; margin-bottom: 12px; }
+  footer { border-top: 1px solid #e1e6ec; background: #fff; padding: 24px; text-align: center; font-size: 13px; color: #616e7c; }
+  footer a { color: #616e7c; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Cloudnest</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Products</a>
+      <a href="#">Pricing</a>
+      <a href="#">Docs</a>
+      <a href="#" aria-current="page">Support</a>
+    </nav>
+    <div class="right">
+      <a href="#">Log in</a>
+      <button type="button">Get started</button>
+    </div>
+  </div>
+</header>
+<main>
+  <section>
+    <h1>Contact support</h1>
+    <p>Our team answers within one business day. For outages, check the <a href="#">status page</a> first.</p>
+    <form id="contact-form" novalidate>
+      <div class="err" id="err" role="alert" hidden></div>
+      <div class="two">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input id="name" name="name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email">
+        </div>
+      </div>
+      <div class="two">
+        <div class="field">
+          <label for="topic">Topic</label>
+          <select id="topic" name="topic">
+            <option value="General">General</option>
+            <option value="Billing">Billing</option>
+            <option value="Technical">Technical</option>
+            <option value="Sales">Sales</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="account">Account ID (optional)</label>
+          <input id="account" name="account" placeholder="e.g. CN-104233">
+        </div>
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" placeholder="How can we help?"></textarea>
+        <div class="hint">Do not include passwords or card numbers.</div>
+      </div>
+      <button type="button" class="attach">Attach a file</button>
+      <button type="submit" class="send">Send</button>
+    </form>
+    <div id="ok" class="ok" role="status" hidden></div>
+  </section>
+  <aside>
+    <div class="box">
+      <h2 style="font-size:16px;margin-top:0">Quick answers</h2>
+      <a href="#">How do I update my card?</a>
+      <a href="#">Where can I download invoices?</a>
+      <a href="#">How do I point my domain to Cloudnest?</a>
+      <a href="#">Reset two-factor authentication</a>
+    </div>
+    <div class="box">
+      <h2 style="font-size:16px;margin-top:0">Other ways to reach us</h2>
+      <p>Phone (Mon–Fri, 9–17 CET): +44 20 7946 0000</p>
+      <a href="#">Open community forum</a>
+      <a href="#">Start live chat</a>
+    </div>
+  </aside>
+</main>
+<footer><a href="#">Status</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Careers</a><br><br>© 2026 Cloudnest Hosting Ltd.</footer>
+<script>
+  document.getElementById("contact-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = (id) => document.getElementById(id).value.trim();
+    const data = { name: value("name"), email: value("email"), topic: value("topic"), message: value("message") };
+    const err = document.getElementById("err");
+    const missing = [];
+    if (!data.name) missing.push("your name");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email)) missing.push("a valid email");
+    if (!data.message) missing.push("a message");
+    if (missing.length) {
+      err.hidden = false;
+      err.textContent = "Please enter " + missing.join(", ") + ".";
+      report("contact_invalid", { missing: missing.join(", ") });
+      return;
+    }
+    err.hidden = true;
+    report("contact", data);
+    document.getElementById("contact-form").hidden = true;
+    const ok = document.getElementById("ok");
+    ok.hidden = false;
+    ok.textContent = "Thanks, " + data.name + ". Your message was sent. Ticket #48213 – we will reply to " + data.email + ".";
+  });
+</script>
+</body>
+</html>

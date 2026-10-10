@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register: Local-first apps in practice – Stackwise webinars</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1c1f26; background: #f5f3ff; }
+  header { background: #fff; border-bottom: 1px solid #e4e0f5; }
+  .bar { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #5b3fd6; text-decoration: none; }
+  nav a { color: #4b4f5c; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  nav a[aria-current] { color: #5b3fd6; font-weight: 600; }
+  .right { margin-left: auto; display: flex; gap: 12px; font-size: 14px; align-items: center; }
+  .right button { background: #5b3fd6; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 24px; display: grid; grid-template-columns: 1fr 400px; gap: 34px; }
+  .event h1 { font-size: 30px; margin: 6px 0 12px; }
+  .pill { display: inline-block; background: #ede9fe; color: #5b3fd6; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 12px; }
+  .speakers { display: flex; gap: 16px; margin-top: 18px; }
+  .sp { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .sp span.a { width: 40px; height: 40px; border-radius: 50%; background: #c4b5fd; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .card { background: #fff; border: 1px solid #e4e0f5; border-radius: 12px; padding: 24px; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+  .req { color: #c0262d; }
+  input, select { width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid #cdc8e0; border-radius: 6px; background: #fff; }
+  input[aria-invalid=true] { border-color: #c0262d; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { font-size: 12px; color: #6b6f7c; margin-top: 4px; }
+  .fielderr { font-size: 13px; color: #c0262d; margin-top: 4px; }
+  .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; font-weight: 400; }
+  .check input { width: auto; margin-top: 3px; }
+  .submit { width: 100%; background: #5b3fd6; color: #fff; border: 0; border-radius: 6px; padding: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .alert { background: #fdecec; border: 1px solid #f3b9b9; color: #8c1d18; border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
+  .ok { background: #ecfdf3; border: 1px solid #a6e4bf; color: #146c3a; border-radius: 8px; padding: 14px; }
+  footer { text-align: center; font-size: 13px; color: #6b6f7c; padding: 24px; }
+  footer a { color: #6b6f7c; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Stackwise</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Products</a>
+      <a href="#" aria-current="page">Webinars</a>
+      <a href="#">Blog</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right"><a href="#">Sign in</a><button type="button">Book a demo</button></div>
+  </div>
+</header>
+<main>
+  <section class="event">
+    <span class="pill">Free live webinar</span>
+    <h1>Local-first apps in practice</h1>
+    <p><b>Thursday, October 1, 2026</b> · 17:00–18:00 CEST · Online</p>
+    <p>How to build apps that keep working offline, sync without conflicts, and keep user data on the device. With a live
+    Q&amp;A at the end. A recording will be sent to all registered attendees.</p>
+    <h2 style="font-size:18px">You will learn</h2>
+    <ul>
+      <li>When SQLite on the client is the right choice</li>
+      <li>How to design a sync protocol you can debug</li>
+      <li>How to explain sync conflicts to users</li>
+    </ul>
+    <div class="speakers">
+      <div class="sp"><span class="a" aria-hidden="true">JW</span><div><b>Jonas Weber</b><br>Driftwood Labs</div></div>
+      <div class="sp"><span class="a" aria-hidden="true">MK</span><div><b>Marta Kowalczyk</b><br>Stackwise</div></div>
+    </div>
+    <p style="margin-top:22px"><a href="#">Add to calendar</a> · <a href="#">See past webinars</a> · <a href="#">Share</a></p>
+  </section>
+  <section class="card" aria-labelledby="reg-title">
+    <h2 id="reg-title" style="margin-top:0">Register for Thursday's webinar</h2>
+    <p style="font-size:13px;color:#6b6f7c;margin-top:0">Fields marked <span class="req">*</span> are required.</p>
+    <form id="reg-form" novalidate>
+      <div class="alert" id="alert" role="alert" hidden></div>
+      <div class="two">
+        <div class="field"><label for="first">First name <span class="req" aria-hidden="true">*</span></label><input id="first" name="first" required autocomplete="given-name"></div>
+        <div class="field"><label for="last">Last name <span class="req" aria-hidden="true">*</span></label><input id="last" name="last" required autocomplete="family-name"></div>
+      </div>
+      <div class="field"><label for="email">Work email <span class="req" aria-hidden="true">*</span></label><input id="email" name="email" type="email" required autocomplete="email"></div>
+      <div class="field">
+        <label for="phone">Phone number <span class="req" aria-hidden="true">*</span></label>
+        <input id="phone" name="phone" type="tel" required autocomplete="tel" placeholder="+44 7700 900000" aria-describedby="phone-hint">
+        <div class="hint" id="phone-hint">We send an SMS reminder 15 minutes before the start.</div>
+      </div>
+      <div class="field"><label for="company">Company (optional)</label><input id="company" name="company" autocomplete="organization"></div>
+      <div class="field"><label for="role">Job role (optional)</label>
+        <select id="role" name="role"><option value="">Select…</option><option>Engineer</option><option>Engineering manager</option><option>Product manager</option><option>Designer</option><option>Other</option></select></div>
+      <div class="field"><label class="check"><input type="checkbox" id="marketing"> Send me news about future webinars.</label></div>
+      <button type="submit" class="submit">Register</button>
+    </form>
+    <div class="ok" id="ok" role="status" hidden></div>
+  </section>
+</main>
+<footer><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Contact</a><br><br>© 2026 Stackwise GmbH</footer>
+<script>
+  const FIELDS = { first: "First name", last: "Last name", email: "Work email", phone: "Phone number" };
+  const form = document.getElementById("reg-form");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const alert = document.getElementById("alert");
+    for (const el of form.querySelectorAll(".fielderr")) el.remove();
+    const missing = [];
+    for (const [id, label] of Object.entries(FIELDS)) {
+      const input = document.getElementById(id);
+      const ok = input.checkValidity() && input.value.trim() !== "";
+      input.setAttribute("aria-invalid", String(!ok));
+      if (!ok) {
+        missing.push(label);
+        const msg = document.createElement("div");
+        msg.className = "fielderr";
+        msg.id = id + "-error";
+        msg.textContent = label + " is required.";
+        input.insertAdjacentElement("afterend", msg);
+        input.setAttribute("aria-errormessage", msg.id);
+      }
+    }
+    if (missing.length) {
+      alert.hidden = false;
+      alert.textContent = "Please complete the required fields: " + missing.join(", ") + ".";
+      report("register_invalid", { missing: missing.join(", ") });
+      return;
+    }
+    alert.hidden = true;
+    const value = (id) => document.getElementById(id).value.trim();
+    const data = { firstName: value("first"), lastName: value("last"), email: value("email"), phone: value("phone"), company: value("company") };
+    report("register", data);
+    form.hidden = true;
+    const ok = document.getElementById("ok");
+    ok.hidden = false;
+    ok.textContent = "You're registered, " + data.firstName + "! We sent the joining link to " + data.email + ".";
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+== multilingual
+triage: I was charged twice for my plan this mon -> refund refund_requested 0.9621
+triage: Hi, where can I find your API documentat -> information refund_requested 0.0006
+risky: button "Pay $49.00"              object=0.929 text=0.874
+risky: link "Back to cart"              object=0.689 text=0.321
+risky: button "Delete this repository"  object=0.945 text=0.879
+risky: link "Blog"                      object=0.506 text=0.110
+latency:    16 state tokens  median    14.9 ms  max    20.4 ms
+latency:   128 state tokens  median    31.7 ms  max    46.6 ms
+latency:   384 state tokens  median    84.1 ms  max    95.5 ms
+latency:   900 state tokens  median   278.4 ms  max   341.7 ms
+== typed-decisions
+triage: I was charged twice for my plan this mon -> refund refund_requested 0.7301
+triage: Hi, where can I find your API documentat -> information refund_requested 0.0002
+risky: button "Pay $49.00"              object=0.551 text=0.553
+risky: link "Back to cart"              object=0.444 text=0.351
+risky: button "Delete this repository"  object=0.523 text=0.542
+risky: link "Blog"                      object=0.397 text=0.411
+latency:    16 state tokens  median    37.1 ms  max    95.7 ms
+latency:   128 state tokens  median   110.8 ms  max   157.5 ms
+latency:   384 state tokens  median   261.9 ms  max   420.1 ms
+latency:   900 state tokens  median   724.7 ms  max   898.4 ms

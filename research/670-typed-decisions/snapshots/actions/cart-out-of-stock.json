@@ -1,0 +1,277 @@
+{
+  "before": {
+    "title": "Ceramic mug – HomeGoods",
+    "url": "https://fixtures.test/action-cart.html?mode=oos",
+    "loading": false,
+    "text": "Home Products Pricing Blog Help Sign in Ceramic mug, 350 ml $14.00 Cart (0) Add to cart Privacy Terms Contact us © 2026 Example Inc.",
+    "elements": [
+      {
+        "role": "link",
+        "name": "Home",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Products",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Pricing",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Blog",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Help",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Sign in",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Cart (0)",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "button",
+        "name": "Add to cart",
+        "description": "",
+        "tag": "button",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Privacy",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Terms",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Contact us",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      }
+    ],
+    "focus": {
+      "role": null,
+      "name": ""
+    }
+  },
+  "after": {
+    "title": "Ceramic mug – HomeGoods",
+    "url": "https://fixtures.test/action-cart.html?mode=oos",
+    "loading": false,
+    "text": "Home Products Pricing Blog Help Sign in Ceramic mug, 350 ml $14.00 Cart (0) Add to cart Sorry, this item is out of stock. Privacy Terms Contact us © 2026 Example Inc.",
+    "elements": [
+      {
+        "role": "link",
+        "name": "Home",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Products",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Pricing",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Blog",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Help",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Sign in",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Cart (0)",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "button",
+        "name": "Add to cart",
+        "description": "",
+        "tag": "button",
+        "value": null,
+        "states": [
+          "focused:true"
+        ],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Privacy",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Terms",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      },
+      {
+        "role": "link",
+        "name": "Contact us",
+        "description": "",
+        "tag": "a",
+        "value": null,
+        "states": [],
+        "disabled": false,
+        "bounds": null,
+        "frame": null
+      }
+    ],
+    "focus": {
+      "role": null,
+      "name": "add"
+    }
+  },
+  "steps": [
+    {
+      "tool": "click",
+      "role": "button",
+      "name": "Add to cart"
+    }
+  ]
+}

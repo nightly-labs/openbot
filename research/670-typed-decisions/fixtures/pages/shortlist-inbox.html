@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><title>Inbox (12) – Mailbox</title></head><body>
+<div role="toolbar" aria-label="Mail actions"><button type="button">Compose</button><button type="button">Archive</button><button type="button">Mark as read</button><button type="button">Move to</button><button type="button">Refresh</button><label>Search mail <input type="search"></label></div>
+<main><h1>Inbox</h1><ul id="mail"></ul></main>
+<script>
+  const senders = ["Ana", "Ben", "Chloe", "Dev", "Eli", "Fay", "Gus", "Hana", "Ivo", "Jun"];
+  const subjects = ["Lunch on Friday?", "Invoice #4410", "Re: design review", "Your order has shipped", "Weekly report", "Flight confirmation", "Team offsite plan", "Password changed", "Meeting notes", "Welcome aboard"];
+  for (let i = 0; i < 30; i++) { const li = document.createElement("li"); const a = document.createElement("a"); a.href = "#"; a.textContent = senders[i % 10] + " — " + subjects[(i * 3) % 10] + " (" + (i + 1) + ")"; li.append(a); document.querySelector("#mail").append(li); }
+</script>
+<script src="site.js"></script></body></html>

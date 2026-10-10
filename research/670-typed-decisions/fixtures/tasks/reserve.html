@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book a table – Osteria Verde</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #2b2b2b; background: #fbf8f3; }
+  header { background: #243b2f; color: #fff; }
+  .bar { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 14px 24px; }
+  .logo { font-family: Georgia, serif; font-size: 23px; color: #f1e3c6; text-decoration: none; }
+  nav a { color: #dfe8e1; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  nav a[aria-current] { color: #f1e3c6; text-decoration: underline; }
+  .right { margin-left: auto; font-size: 14px; }
+  .right a { color: #fff; }
+  main { max-width: 1060px; margin: 0 auto; padding: 36px 24px; display: grid; grid-template-columns: 1fr 340px; gap: 36px; }
+  .card { background: #fff; border: 1px solid #e8e0d2; border-radius: 12px; padding: 26px; }
+  h1 { font-family: Georgia, serif; margin: 0 0 6px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 16px 0 6px; }
+  select, input { padding: 10px 12px; font-size: 15px; border: 1px solid #cfc6b5; border-radius: 6px; background: #fff; width: 100%; }
+  input[readonly] { cursor: pointer; }
+  .datewrap { position: relative; }
+  .calendar { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; background: #fff; border: 1px solid #cfc6b5; border-radius: 10px; padding: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.15); width: 320px; }
+  .cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .cal-head h2 { font-size: 16px; margin: 0; }
+  .cal-head button { background: none; border: 1px solid #ddd; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
+  table { border-collapse: collapse; width: 100%; }
+  th { font-size: 12px; color: #777; font-weight: 600; padding: 4px 0; }
+  td { text-align: center; padding: 2px; }
+  td button { width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; cursor: pointer; font-size: 14px; }
+  td button:hover:not(:disabled) { background: #eef3ef; }
+  td button:disabled { color: #c3c3c3; cursor: default; }
+  td button[aria-pressed=true] { background: #243b2f; color: #fff; }
+  .reserve { margin-top: 22px; width: 100%; background: #b5482d; color: #fff; border: 0; border-radius: 6px; padding: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .err { color: #a32020; margin-top: 12px; font-size: 14px; }
+  .ok { background: #eaf5ec; border: 1px solid #a9d3b1; padding: 14px; border-radius: 8px; margin-top: 16px; }
+  aside .card { margin-bottom: 16px; font-size: 14px; line-height: 1.6; }
+  aside a { color: #b5482d; }
+  footer { background: #243b2f; color: #cbd6ce; text-align: center; padding: 24px; font-size: 13px; }
+  footer a { color: #cbd6ce; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Osteria Verde</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Menu</a>
+      <a href="#">Wine list</a>
+      <a href="#" aria-current="page">Reservations</a>
+      <a href="#">Private dining</a>
+      <a href="#">Gift cards</a>
+    </nav>
+    <div class="right"><a href="#">Help</a></div>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <h1>Book a table</h1>
+    <p>Reservations are held for 15 minutes. For groups larger than 8, please call us.</p>
+    <form id="reserve-form" novalidate>
+      <label for="party">Party size</label>
+      <select id="party" name="party">
+        <option value="1">1 person</option>
+        <option value="2">2 people</option>
+        <option value="3">3 people</option>
+        <option value="4">4 people</option>
+        <option value="5">5 people</option>
+        <option value="6">6 people</option>
+        <option value="7">7 people</option>
+        <option value="8">8 people</option>
+      </select>
+      <label for="date">Date</label>
+      <div class="datewrap">
+        <input id="date" name="date" readonly placeholder="Select a date" aria-haspopup="dialog" aria-expanded="false" aria-controls="calendar">
+        <div class="calendar" id="calendar" role="dialog" aria-label="Choose a date" hidden>
+          <div class="cal-head">
+            <button type="button" id="prev" aria-label="Previous month">‹</button>
+            <h2 id="month-title" aria-live="polite"></h2>
+            <button type="button" id="next" aria-label="Next month">›</button>
+          </div>
+          <table role="grid" aria-labelledby="month-title">
+            <thead><tr><th scope="col" abbr="Monday">Mo</th><th scope="col" abbr="Tuesday">Tu</th><th scope="col" abbr="Wednesday">We</th><th scope="col" abbr="Thursday">Th</th><th scope="col" abbr="Friday">Fr</th><th scope="col" abbr="Saturday">Sa</th><th scope="col" abbr="Sunday">Su</th></tr></thead>
+            <tbody id="days"></tbody>
+          </table>
+        </div>
+      </div>
+      <button type="submit" class="reserve">Reserve</button>
+      <div class="err" id="err" role="alert" hidden></div>
+    </form>
+    <div class="ok" id="ok" role="status" hidden></div>
+  </section>
+  <aside>
+    <div class="card">
+      <h2 style="font-size:16px;margin-top:0">Opening hours</h2>
+      Tuesday–Sunday, 12:00–22:30<br>Closed on Mondays<br><br>
+      <b>Address:</b> 8 Mill Lane, Bristol BS1 4AA<br>
+      <a href="#">Get directions</a><br><a href="#">Call +44 117 496 0000</a>
+    </div>
+    <div class="card">
+      <h2 style="font-size:16px;margin-top:0">Good to know</h2>
+      We can adapt most dishes for gluten-free and vegan guests. <a href="#">Read our allergy policy</a>.
+      <br><br><button type="button" style="padding:8px 12px;border:1px solid #cfc6b5;background:#fff;border-radius:6px;cursor:pointer">Join the waiting list</button>
+    </div>
+  </aside>
+</main>
+<footer><a href="#">Careers</a><a href="#">Privacy</a><a href="#">Instagram</a><br><br>© 2026 Osteria Verde</footer>
+<script>
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const today = new Date(2026, 8, 23);
+  let view = { year: 2026, month: 8 };
+  let selected = null;
+  const input = document.getElementById("date");
+  const calendar = document.getElementById("calendar");
+  const pad = (n) => String(n).padStart(2, "0");
+  const iso = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const long = (d) => WEEKDAYS[d.getDay()] + ", " + MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+
+  function render() {
+    document.getElementById("month-title").textContent = MONTHS[view.month] + " " + view.year;
+    document.getElementById("prev").disabled = view.year === 2026 && view.month === 8;
+    const body = document.getElementById("days");
+    body.innerHTML = "";
+    const first = new Date(view.year, view.month, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const count = new Date(view.year, view.month + 1, 0).getDate();
+    let row = document.createElement("tr");
+    for (let i = 0; i < offset; i++) row.appendChild(document.createElement("td"));
+    for (let day = 1; day <= count; day++) {
+      const date = new Date(view.year, view.month, day);
+      const cell = document.createElement("td");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = String(day);
+      button.setAttribute("aria-label", long(date));
+      button.setAttribute("aria-pressed", String(selected !== null && iso(selected) === iso(date)));
+      button.disabled = date < today || date.getDay() === 1;
+      button.addEventListener("click", () => {
+        selected = date;
+        input.value = long(date);
+        close();
+      });
+      cell.appendChild(button);
+      row.appendChild(cell);
+      if (row.children.length === 7) { body.appendChild(row); row = document.createElement("tr"); }
+    }
+    if (row.children.length) body.appendChild(row);
+  }
+  function open() {
+    if (!calendar.hidden) return;
+    if (selected) view = { year: selected.getFullYear(), month: selected.getMonth() };
+    render();
+    calendar.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+  function close() {
+    calendar.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+  }
+  input.addEventListener("click", open);
+  input.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+  document.getElementById("prev").addEventListener("click", () => {
+    view.month -= 1; if (view.month < 0) { view.month = 11; view.year -= 1; } render();
+  });
+  document.getElementById("next").addEventListener("click", () => {
+    view.month += 1; if (view.month > 11) { view.month = 0; view.year += 1; } render();
+  });
+  document.addEventListener("click", (event) => {
+    if (!calendar.hidden && !calendar.contains(event.target) && event.target !== input) close();
+  });
+  document.getElementById("reserve-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const err = document.getElementById("err");
+    if (!selected) {
+      err.hidden = false;
+      err.textContent = "Please choose a date.";
+      return;
+    }
+    err.hidden = true;
+    const party = document.getElementById("party").value;
+    report("reserve", { date: iso(selected), party });
+    const ok = document.getElementById("ok");
+    ok.hidden = false;
+    ok.textContent = "Your table for " + document.getElementById("party").selectedOptions[0].textContent + " on " + long(selected) + " is requested. We will confirm by email.";
+  });
+</script>
+</body>
+</html>

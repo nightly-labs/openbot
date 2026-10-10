@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><title>Security check</title></head><body>
+<main><h1>Select all images with traffic lights</h1><p>Click verify once there are none left.</p>
+<div role="grid" aria-label="Image challenge"></div>
+<button type="button">Verify</button><button type="button" aria-label="Get a new challenge">⟳</button><button type="button" aria-label="Get an audio challenge">🎧</button></main>
+<script>
+  const grid = document.querySelector("[role=grid]");
+  for (let i = 1; i <= 9; i++) { const b = document.createElement("button"); b.type = "button"; b.textContent = "Image tile " + i; grid.append(b); }
+</script></body></html>

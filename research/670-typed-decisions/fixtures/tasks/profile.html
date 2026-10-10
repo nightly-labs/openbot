@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit profile – Tripmate</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1d2433; background: #f3f5f9; }
+  header { background: #fff; border-bottom: 1px solid #e0e4ec; }
+  .bar { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #e0533d; text-decoration: none; }
+  nav a { color: #465167; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 14px; font-size: 14px; align-items: center; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e0533d; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  main { max-width: 1060px; margin: 0 auto; padding: 32px 24px; display: grid; grid-template-columns: 220px 1fr; gap: 32px; }
+  aside a { display: block; padding: 8px 12px; border-radius: 6px; color: #465167; text-decoration: none; margin-bottom: 2px; }
+  aside a[aria-current] { background: #fff; color: #e0533d; font-weight: 600; }
+  .card { background: #fff; border: 1px solid #e0e4ec; border-radius: 12px; padding: 26px; }
+  h1 { margin: 0 0 18px; font-size: 24px; }
+  .field { margin-bottom: 18px; position: relative; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  input, textarea, select { width: 100%; padding: 10px 12px; font: inherit; font-size: 15px; border: 1px solid #c7cedb; border-radius: 6px; background: #fff; }
+  textarea { min-height: 90px; }
+  .hint { font-size: 13px; color: #6a7486; margin-top: 4px; }
+  [role=listbox] { position: absolute; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 4px; list-style: none; background: #fff; border: 1px solid #c7cedb; border-radius: 8px; box-shadow: 0 10px 24px rgba(0,0,0,.12); z-index: 5; max-height: 240px; overflow: auto; }
+  [role=option] { padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+  [role=option]:hover, [role=option][aria-selected=true] { background: #fdeeea; }
+  .empty { padding: 8px 10px; color: #6a7486; }
+  .actions { display: flex; gap: 10px; margin-top: 8px; }
+  .save { background: #e0533d; color: #fff; border: 0; border-radius: 6px; padding: 11px 24px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .cancel { background: #fff; border: 1px solid #c7cedb; border-radius: 6px; padding: 11px 18px; font-size: 15px; cursor: pointer; }
+  .status { margin-top: 14px; color: #1e6b38; font-weight: 600; }
+  footer { text-align: center; font-size: 13px; color: #6a7486; padding: 24px; }
+  footer a { color: #6a7486; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Tripmate</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Explore</a>
+      <a href="#">My trips</a>
+      <a href="#">Messages</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right"><a href="#">Account</a><span class="avatar" aria-hidden="true">A</span></div>
+  </div>
+</header>
+<main>
+  <aside aria-label="Account menu">
+    <a href="#" aria-current="page">Profile</a>
+    <a href="#">Login &amp; security</a>
+    <a href="#">Payments</a>
+    <a href="#">Notifications</a>
+    <a href="#">Privacy</a>
+  </aside>
+  <section class="card">
+    <h1>Edit profile</h1>
+    <form id="profile-form" autocomplete="off">
+      <div class="field"><label for="full-name">Full name</label><input id="full-name" value="Ada Lovelace"></div>
+      <div class="field">
+        <label for="city" id="city-label">City</label>
+        <input id="city" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="city-options" value="London, United Kingdom" placeholder="Start typing a city">
+        <ul role="listbox" id="city-options" aria-labelledby="city-label" hidden></ul>
+        <div class="hint">Start typing, then choose your city from the list.</div>
+      </div>
+      <div class="field"><label for="languages">Languages I speak</label><input id="languages" value="English, French"></div>
+      <div class="field"><label for="about">About me</label><textarea id="about">Mathematician. I like long train journeys and small museums.</textarea></div>
+      <div class="field"><label for="currency">Preferred currency</label>
+        <select id="currency"><option>GBP – British pound</option><option>EUR – Euro</option><option>PLN – Polish złoty</option><option>USD – US dollar</option></select></div>
+      <div class="actions">
+        <button type="submit" class="save">Save</button>
+        <button type="button" class="cancel">Cancel</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </form>
+  </section>
+</main>
+<footer><a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a><br><br>© 2026 Tripmate</footer>
+<script>
+  const CITIES = [
+    "Kraków, Poland", "Krakow, Missouri, USA", "Kraśnik, Poland", "Kroměříž, Czechia", "Krasnodar, Russia",
+    "Kragujevac, Serbia", "Kristiansand, Norway", "Krefeld, Germany", "Kalisz, Poland", "Katowice, Poland",
+    "London, United Kingdom", "Lisbon, Portugal", "Warsaw, Poland", "Wrocław, Poland", "Gdańsk, Poland",
+    "Poznań, Poland", "Prague, Czechia", "Vienna, Austria", "Berlin, Germany", "Paris, France",
+  ];
+  const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L").toLowerCase();
+  const input = document.getElementById("city");
+  const list = document.getElementById("city-options");
+  let chosen = "London, United Kingdom";
+  let active = -1;
+
+  function show(items) {
+    list.innerHTML = "";
+    active = -1;
+    if (!items.length) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "No matching cities";
+      list.appendChild(li);
+    }
+    items.forEach((label, index) => {
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.id = "city-option-" + index;
+      li.setAttribute("aria-selected", "false");
+      li.textContent = label;
+      li.addEventListener("mousedown", (event) => event.preventDefault());
+      li.addEventListener("click", () => pick(label));
+      list.appendChild(li);
+    });
+    list.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+  function hide() {
+    list.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+  }
+  function pick(label) {
+    chosen = label;
+    input.value = label;
+    hide();
+  }
+  input.addEventListener("input", () => {
+    chosen = null;
+    const q = fold(input.value.trim());
+    if (q.length < 2) { hide(); return; }
+    show(CITIES.filter((c) => fold(c).includes(q)).slice(0, 8));
+  });
+  input.addEventListener("keydown", (event) => {
+    const options = list.querySelectorAll("[role=option]");
+    if (list.hidden || !options.length) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      active = (active + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+      options.forEach((o, i) => o.setAttribute("aria-selected", String(i === active)));
+      input.setAttribute("aria-activedescendant", options[active].id);
+    } else if (event.key === "Enter" && active >= 0) {
+      event.preventDefault();
+      pick(options[active].textContent);
+    } else if (event.key === "Escape") {
+      hide();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target !== input && !list.contains(event.target)) hide();
+  });
+  document.getElementById("profile-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const city = chosen || input.value.trim();
+    report("profile_saved", { city, selectedFromList: chosen ? "true" : "false" });
+    document.getElementById("status").textContent = "Profile saved.";
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><title>Dashboard – Metrics</title></head><body>
+<main><h1>Dashboard</h1><p>Visitors today: 1,204 · Signups: 38</p><button type="button" id="open">Open settings</button></main>
+<script>
+  const mode = new URLSearchParams(location.search).get("mode");
+  document.querySelector("#open").onclick = () => {
+    if (mode === "broken") return;
+    const d = document.createElement("div"); d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Dashboard settings");
+    d.innerHTML = '<h2>Dashboard settings</h2><label>Refresh interval <select><option>1 minute</option><option>5 minutes</option></select></label><label><input type="checkbox"> Show signups</label><button type="button">Close</button>';
+    document.body.append(d);
+  };
+</script>
+<script src="site.js"></script></body></html>

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Computers &amp; tablets – Voltmart</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1d21; background: #f3f4f6; }
+  header { background: #111827; color: #fff; }
+  .bar { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 24px; }
+  .logo { font-weight: 800; font-size: 21px; color: #38bdf8; text-decoration: none; }
+  nav a { color: #d1d5db; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 240px 1fr; gap: 26px; }
+  aside { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px; align-self: start; }
+  fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+  legend { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  aside label { display: block; font-size: 14px; margin: 6px 0; }
+  .price input { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-top: 4px; }
+  .apply { width: 100%; background: #0284c7; color: #fff; border: 0; border-radius: 6px; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .clear { width: 100%; margin-top: 8px; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; padding: 9px; font-size: 14px; cursor: pointer; }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .top select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .prod { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; font-size: 14px; }
+  .prod svg { width: 100%; height: 90px; }
+  .prod a { color: #0f172a; font-weight: 600; text-decoration: none; }
+  .prod .p { font-size: 17px; font-weight: 700; margin: 6px 0; }
+  .muted { color: #6b7280; }
+  footer { text-align: center; font-size: 13px; color: #6b7280; padding: 24px; }
+  footer a { color: #6b7280; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Voltmart</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Computers</a>
+      <a href="#">Phones</a>
+      <a href="#">TV &amp; audio</a>
+      <a href="#">Deals</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right"><a href="#">Account</a><a href="#">Cart (0)</a></div>
+  </div>
+</header>
+<main>
+  <aside aria-label="Filters">
+    <form id="filters">
+      <fieldset>
+        <legend>Category</legend>
+        <label><input type="radio" name="category" value="all" checked> All</label>
+        <label><input type="radio" name="category" value="laptops"> Laptops</label>
+        <label><input type="radio" name="category" value="tablets"> Tablets</label>
+        <label><input type="radio" name="category" value="phones"> Phones</label>
+      </fieldset>
+      <fieldset>
+        <legend>RAM</legend>
+        <label><input type="checkbox" name="ram" value="8"> 8 GB</label>
+        <label><input type="checkbox" name="ram" value="16"> 16 GB</label>
+        <label><input type="checkbox" name="ram" value="32"> 32 GB</label>
+      </fieldset>
+      <fieldset class="price">
+        <legend>Price</legend>
+        <label for="max-price">Max price (PLN)</label>
+        <input id="max-price" type="number" min="0" step="100" placeholder="No limit">
+      </fieldset>
+      <button type="submit" class="apply">Apply filters</button>
+      <button type="button" class="clear" id="clear">Clear all</button>
+    </form>
+  </aside>
+  <section>
+    <div class="top">
+      <span id="count" class="muted" role="status"></span>
+      <span><label for="sort">Sort by </label>
+        <select id="sort" form="filters">
+          <option value="recommended">Recommended</option>
+          <option value="price-asc">Price: low to high</option>
+          <option value="price-desc">Price: high to low</option>
+          <option value="newest">Newest</option>
+        </select></span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+<footer><a href="#">Delivery</a><a href="#">Returns</a><a href="#">Stores</a><a href="#">Privacy</a><br><br>© 2026 Voltmart sp. z o.o.</footer>
+<script>
+  const ITEMS = [
+    { name: "Lumen Book 14", cat: "laptops", ram: 16, price: 2899, year: 2026 },
+    { name: "Lumen Book 14 Pro", cat: "laptops", ram: 32, price: 4299, year: 2026 },
+    { name: "Aero 13 Air", cat: "laptops", ram: 8, price: 2199, year: 2025 },
+    { name: "Aero 15 Studio", cat: "laptops", ram: 16, price: 3499, year: 2026 },
+    { name: "Vector 16 Gaming", cat: "laptops", ram: 16, price: 2749, year: 2025 },
+    { name: "Nimbus Chromebook", cat: "laptops", ram: 8, price: 1399, year: 2024 },
+    { name: "Slate Tab 11", cat: "tablets", ram: 8, price: 1799, year: 2026 },
+    { name: "Slate Tab 13 Pro", cat: "tablets", ram: 16, price: 2999, year: 2026 },
+    { name: "Pixelon 9", cat: "phones", ram: 16, price: 2599, year: 2026 },
+    { name: "Pixelon 9 Lite", cat: "phones", ram: 8, price: 1499, year: 2025 },
+    { name: "Orbis Fold", cat: "phones", ram: 16, price: 5999, year: 2026 },
+    { name: "Aero 14 Office", cat: "laptops", ram: 16, price: 2999, year: 2024 },
+  ];
+  function render(filter) {
+    let list = ITEMS.filter((i) =>
+      (filter.category === "all" || i.cat === filter.category) &&
+      (!filter.ram.length || filter.ram.includes(String(i.ram))) &&
+      (filter.maxPrice === "" || i.price <= Number(filter.maxPrice)));
+    if (filter.sort === "price-asc") list = list.slice().sort((a, b) => a.price - b.price);
+    if (filter.sort === "price-desc") list = list.slice().sort((a, b) => b.price - a.price);
+    if (filter.sort === "newest") list = list.slice().sort((a, b) => b.year - a.year);
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    for (const i of list) {
+      const el = document.createElement("article");
+      el.className = "prod";
+      el.innerHTML =
+        '<svg viewBox="0 0 200 90" aria-hidden="true"><rect x="40" y="10" width="120" height="66" rx="6" fill="#cbd5e1"/></svg>' +
+        '<a href="#">' + i.name + '</a><div class="muted">' + i.ram + ' GB RAM</div>' +
+        '<div class="p">' + i.price.toLocaleString("pl-PL") + ' PLN</div>';
+      grid.appendChild(el);
+    }
+    document.getElementById("count").textContent = list.length + " products";
+  }
+  function current() {
+    return {
+      category: document.querySelector("input[name=category]:checked").value,
+      ram: [...document.querySelectorAll("input[name=ram]:checked")].map((c) => c.value).sort((a, b) => Number(a) - Number(b)),
+      maxPrice: document.getElementById("max-price").value.trim(),
+      sort: document.getElementById("sort").value,
+    };
+  }
+  render({ category: "all", ram: [], maxPrice: "", sort: "recommended" });
+  function apply() {
+    const filter = current();
+    report("filters", { category: filter.category, ram: filter.ram.join(","), maxPrice: filter.maxPrice, sort: filter.sort });
+    render(filter);
+  }
+  document.getElementById("filters").addEventListener("submit", (event) => {
+    event.preventDefault();
+    apply();
+  });
+  // Like many shops, changing the sort order applies the current filters at once.
+  document.getElementById("sort").addEventListener("change", apply);
+  document.getElementById("clear").addEventListener("click", () => {
+    document.getElementById("filters").reset();
+    document.getElementById("sort").value = "recommended";
+    render(current());
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><title>Search – Recipes</title></head><body>
+<main><h1>Recipe search</h1><form role="search" id="form"><label>Search recipes <input type="search" name="q"></label></form><div id="out" role="status"></div></main>
+<script>
+  const mode = new URLSearchParams(location.search).get("mode");
+  document.querySelector("#form").onsubmit = (event) => {
+    event.preventDefault();
+    const q = document.querySelector("[name=q]").value;
+    const out = document.querySelector("#out");
+    if (mode === "error") { out.textContent = "Something went wrong while searching. Please try again."; return; }
+    out.innerHTML = "<h2>3 results for “" + q + "”</h2><ul><li><a href='#'>Classic lentil soup</a></li><li><a href='#'>Spicy red lentil dal</a></li><li><a href='#'>Lentil and spinach stew</a></li></ul>";
+  };
+</script>
+<script src="site.js"></script></body></html>

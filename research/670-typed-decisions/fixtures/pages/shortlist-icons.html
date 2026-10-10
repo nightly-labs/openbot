@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><title>Photo editor</title></head><body>
+<div role="toolbar" aria-label="Editor tools" id="tools"></div><main><h1>Untitled photo</h1><p>Drop an image here to start editing.</p></main>
+<script>
+  const tools = [["Undo", "↶"], ["Redo", "↷"], ["Crop", "⧉"], ["Rotate", "⟳"], ["Flip", "⇋"], ["Brightness", "☀"], ["Contrast", "◐"], ["Filters", "✦"], ["Text", "T"], ["Draw", "✎"], ["Eraser", "⌫"], ["Zoom in", "+"], ["Zoom out", "−"], ["Search", "🔍"], ["Download", "⤓"], ["Share", "⤴"], ["Help", "?"], ["Settings", "⚙"], ["Layers", "☰"], ["History", "🕘"]];
+  for (const [label, icon] of tools) { const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-label", label); b.textContent = icon; document.querySelector("#tools").append(b); }
+</script>
+<script src="site.js"></script></body></html>
