@@ -1302,10 +1302,13 @@ describe.sequential("AgentService: queue", () => {
     expect(service.listQueue("worker").deliveries).toEqual([
       expect.objectContaining({ text: "Report sent.", replyToMessageId: null }),
     ]);
-    const page = await runCauseEffect(service.readConversationPageFor("worker", "user", { type: "latest" }, 50));
-    expect(page.messages).toContainEqual(
-      expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
-    );
+    // The conversation write can follow the queue entry. Wait for it.
+    await vi.waitFor(async () => {
+      const page = await runCauseEffect(agentService.readConversationPageFor("worker", "user", { type: "latest" }, 50));
+      expect(page.messages).toContainEqual(
+        expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
+      );
+    });
   });
 
   it("lets an agent stop the turn its own message started and drops its queued follow-up", async () => {
