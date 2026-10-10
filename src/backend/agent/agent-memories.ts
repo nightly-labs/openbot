@@ -466,7 +466,7 @@ export class AgentMemories {
         ...(mutation.memoryId ? { memoryId: mutation.memoryId } : {}),
         text: mutation.text,
         sourceTurnId: mutation.sourceTurnId,
-        expectedUpdatedAt: mutation.expectedUpdatedAt,
+        ...(mutation.expectedUpdatedAt !== undefined ? { expectedUpdatedAt: mutation.expectedUpdatedAt } : {}),
       });
       if (!memory || mutation.inclusion !== "essential") return;
       const selection = this.#memories.getSelection(mutation.agentId, memory.id);

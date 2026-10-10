@@ -71,7 +71,7 @@ describe("agent memory pages", () => {
               [TEAM_PROTOCOL_VERSION_HEADER]: "3",
               [TEAM_CAPABILITIES_HEADER]: AGENT_MEMORIES_CAPABILITY,
             },
-            body: body === undefined ? undefined : JSON.stringify(body),
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
           });
           expect(response.status).toBe(200);
           const result = decodeTeamProtocolV2Json(await response.json());
