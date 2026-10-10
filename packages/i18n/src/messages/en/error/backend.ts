@@ -66,6 +66,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelAssigneeUnavailable": "The assigned agent is unavailable.",
   "error.backend.channelAssignmentChanged": "This channel assignment has changed.",
   "error.backend.channelMemberRequired": "Select an available member of this channel.",
+  "error.backend.memoryEssentialBudget":
+    "The essential memories exceed the prompt limit. Set an entry to search when needed, then try again.",
+  "error.backend.memorySelectionConflict": "The memory changed. Reload it and try again.",
+  "error.backend.memorySelectionUserControlled": "The user controls this memory selection. Keep the user's choice.",
+  "error.backend.memorySearchQuery": "Enter one or more search words, up to 256 characters.",
+  "error.backend.memoryOperationFailed": "The memory operation failed. Try again.",
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
   "error.backend.channelMemoryLimit": "A channel can have up to {limit} memories.",

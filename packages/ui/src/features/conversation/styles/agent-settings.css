@@ -611,6 +611,16 @@
   gap: var(--openbot-space-1);
 }
 
+.agent-memory-inclusion-actions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-1);
+}
+
 .agent-memory-list {
   min-height: 0;
   display: grid;

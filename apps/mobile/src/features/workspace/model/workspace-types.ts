@@ -6,6 +6,7 @@ import type {
   AgentAnalyticsInput,
   AgentHostSettings,
   AgentMemory,
+  AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
   AgentProviderId,
@@ -30,6 +31,7 @@ import type {
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
+  SetAgentMemoryInclusionInput,
   SetEnabledSkillInput,
   SharedTable,
   SidebarLayoutAction,
@@ -217,6 +219,11 @@ export interface MobileWorkspaceContextValue {
   rotateEventRoutineSecret: (input: EventRoutineRef, serverId: string) => Promise<WebhookSecret>;
   listEventActivity: (input: ListEventActivityInput, serverId: string) => Promise<EventActivity[]>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
+  loadAgentMemorySelection: (agentId: string, serverId: string) => Promise<AgentMemorySelectionState | null>;
+  setAgentMemoryInclusion: (
+    input: SetAgentMemoryInclusionInput,
+    serverId: string,
+  ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   /** Every routine of the server, of agents and channels, with its runs in the range. */

@@ -30,6 +30,113 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentMemories: staging, epochs and turn commitment", () => {
+  it("recalls committed facts without exposing another agent or uncommitted changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("research"));
+    const own = active.createMemory({ agentId: "chief", text: "The telescope project uses amber labels." });
+    active.createMemory({ agentId: "research", text: "The telescope project uses private violet labels." });
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Find the telescope label color." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The recall turn did not start.");
+    expect(JSON.stringify(client.requests.find((request) => request.method === "thread/start")?.params)).not.toContain(
+      own.text,
+    );
+    const recalled = await callOpenBotTool(client, threadId, "search_memories", { query: "telescope" }, turnId);
+    expect(openBotToolPayload(recalled.result).memories).toEqual([
+      expect.objectContaining({ id: own.id, text: own.text, inclusion: "searchable" }),
+    ]);
+    await callOpenBotTool(client, threadId, "remember", { text: "The lighthouse project uses green labels." }, turnId);
+    const pending = await callOpenBotTool(client, threadId, "search_memories", { query: "lighthouse" }, turnId);
+    expect(openBotToolPayload(pending.result).memories).toEqual([]);
+    const revision = active.getMemorySelection("chief").selections[0]?.revision;
+    if (revision === undefined) throw new Error("The selection is missing.");
+    await callOpenBotTool(
+      client,
+      threadId,
+      "set_memory_inclusion",
+      { changes: [{ memoryId: own.id, inclusion: "essential", expectedRevision: revision }] },
+      turnId,
+    );
+    const corrected = "The telescope project uses orange labels.";
+    await callOpenBotTool(client, threadId, "remember", { memoryId: own.id, text: corrected }, turnId);
+    expect(active.getMemorySelection("chief").selections[0]?.inclusion).toBe("searchable");
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === own.id)?.inclusion).toBe(
+      "essential",
+    );
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Continue." }));
+    await waitFor(() => client.requests.some((request) => request.method === "thread/resume"));
+    const resumed = JSON.stringify(client.requests.findLast((request) => request.method === "thread/resume")?.params);
+    expect(resumed).toContain(corrected);
+    expect(resumed).not.toContain("The lighthouse project uses green labels.");
+  });
+
+  it.each(["failed", "completed"])(
+    "preserves user choices and applies no partial selection after a %s turn",
+    async (status) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      service = active;
+      const events: AgentEvent[] = [];
+      active.on("event", (event) => events.push(event));
+      await runCauseEffect(active.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      const first = active.createMemory({ agentId: "chief", text: "First saved fact." });
+      const second = active.createMemory({ agentId: "chief", text: "Second saved fact." });
+      await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Review memory selection." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The selection turn did not start.");
+      const selections = active.getMemorySelection("chief").selections;
+      const changes = selections.map((selection) => ({
+        memoryId: selection.memoryId,
+        inclusion: "essential",
+        expectedRevision: selection.revision,
+      }));
+      const staged = await callOpenBotTool(client, threadId, "set_memory_inclusion", { changes }, turnId);
+      expect(openBotToolPayload(staged.result).status).toBe("staged");
+      const stagedForget = await callOpenBotTool(client, threadId, "forget_memory", { memoryId: second.id }, turnId);
+      expect(openBotToolPayload(stagedForget.result).status).toBe("staged");
+      const secondRevision = selections.find((selection) => selection.memoryId === second.id)?.revision;
+      if (secondRevision === undefined) throw new Error("The second selection is missing.");
+      active.setMemoryInclusion({
+        agentId: "chief",
+        changes: [{ memoryId: second.id, inclusion: "searchable", expectedRevision: secondRevision }],
+      });
+      const refusedForget = await callOpenBotTool(client, threadId, "forget_memory", { memoryId: second.id }, turnId);
+      expect(refusedForget.result).toMatchObject({ success: false });
+      client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
+      await waitFor(() => events.some((event) => event.type === "turn-completed"));
+      expect(active.getMemorySelection("chief").selections).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ memoryId: first.id, inclusion: "searchable", userControlled: false }),
+          expect.objectContaining({ memoryId: second.id, inclusion: "searchable", userControlled: true }),
+        ]),
+      );
+      expect(
+        active
+          .listMemories("chief")
+          .map((memory) => memory.text)
+          .sort(),
+      ).toEqual([first.text, second.text].sort());
+    },
+  );
+
   it("commits an automatic memory only after a successful turn and refreshes the next turn context", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -66,7 +173,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         callId: "remember-call",
         namespace: "openbot",
         tool: "remember",
-        arguments: { text: "The user prefers concise status updates." },
+        arguments: { text: "The user prefers concise status updates.", inclusion: "essential" },
       },
     });
     await waitFor(() => client.responses.some((response) => response.id === "remember-request"));
@@ -263,7 +370,9 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     const turnId = events.find((event) => event.type === "turn-started")?.turnId;
     if (!client || !threadId || !turnId) throw new Error("The memory cap turn did not start.");
     const startRequest = client.requests.find((request) => request.method === "thread/start");
-    expect(JSON.stringify(startRequest?.params)).toContain('<agent_memories count=\\"2\\" limit=\\"3\\">');
+    expect(JSON.stringify(startRequest?.params)).toContain(
+      "You have 2 saved memories; 2 additional entries are available through search. The storage limit is 3.",
+    );
     const owner = await callOpenBotTool(client, threadId, "remember", { text: "Builder owns the rollback." }, turnId);
     expect(openBotToolPayload(owner.result).status).toBe("staged");
 

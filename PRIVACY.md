@@ -365,6 +365,12 @@ Billing is off, and Stripe receives nothing, when the account service has no Str
 
 ## Data stored on the OpenBot computer
 
+Saved agent memories, their inclusion settings, and their full-text search index stay in the local
+SQLite database. Essential memories enter the agent's provider instructions within a fixed size
+limit. Other saved memories reach the provider only when the agent retrieves them with a memory
+tool. Search runs locally and does not use an external search or embedding service. Memory content
+is not included in analytics; provider output uses the application's secret redaction.
+
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
 - `~/OpenBot/Shared` contains managed transfers shared between agents, and

@@ -80,6 +80,8 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     listModels: unimplemented,
     listAgents: () => [],
     sidebarChatIds: unimplemented,
+    getMemorySelection: unimplemented,
+    setMemoryInclusion: unimplemented,
     listMemories: unimplemented,
     createMemory: unimplemented,
     updateMemory: unimplemented,

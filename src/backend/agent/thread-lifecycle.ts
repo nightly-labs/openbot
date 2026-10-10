@@ -689,9 +689,13 @@ export class ThreadLifecycle {
     return developerInstructions(
       agent,
       this.#store.sharedRoot,
-      this.#memories.listFor(agent.id),
+      this.#memories.essentialFor(agent.id),
       this.#store.automationRoot,
-      { passwordVault: this.#passwordVaultConnected(), memoryLimit: this.#memories.limit() },
+      {
+        passwordVault: this.#passwordVaultConnected(),
+        memoryLimit: this.#memories.limit(),
+        storedMemoryCount: this.#memories.listFor(agent.id).length,
+      },
     );
   }
 

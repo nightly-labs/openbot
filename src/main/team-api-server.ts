@@ -84,6 +84,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
+import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
 import { StoredStateFailure } from "../backend/stored-state-effects";
@@ -116,6 +117,7 @@ import {
 import { routeAgentAdmin, routeAgentHostSettings } from "./team-api/route-agent-admin";
 import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
+import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
@@ -701,6 +703,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
       if ((await this.#routeEvents(context)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
@@ -722,7 +725,8 @@ export class TeamApiServer {
         error instanceof RemoteScreenError ||
         error instanceof TeamStoreError ||
         error instanceof McpServerError ||
-        error instanceof AnalyticsInputError;
+        error instanceof AnalyticsInputError ||
+        error instanceof AgentMemorySelectionError;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError ? error.status : expected ? 400 : 500;
       const message = expected ? error.message : sourceText("error.team.requestFailed");

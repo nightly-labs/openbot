@@ -8,6 +8,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
+import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
   createAgentToolSchema,
   listModelsToolSchema,
@@ -245,13 +246,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
     },
   },
+  ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {
     name: "remember",
     description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or consolidate an existing memory. The change commits only if the current turn completes.",
+      "Stage one short, durable memory for this agent. Use memoryId to correct or consolidate an existing memory. New entries are searchable unless inclusion is essential. Essential requests that do not fit stay searchable. The change commits only if the current turn completes.",
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
+      inclusion: z.enum(["essential", "searchable"]).optional(),
     },
   },
   {

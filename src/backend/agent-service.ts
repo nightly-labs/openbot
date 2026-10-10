@@ -7,6 +7,7 @@ import type {
   AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
+  AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
   AgentRuntimeSnapshot,
@@ -63,6 +64,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SendMessageInput,
+  SetAgentMemoryInclusionInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
   SharedTable,
@@ -1137,6 +1139,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listMemories(agentId: string): AgentMemory[] {
     return this.#memories.list(agentId);
+  }
+
+  getMemorySelection(agentId: string): AgentMemorySelectionState {
+    return this.#memories.selectionState(agentId);
+  }
+
+  setMemoryInclusion(input: SetAgentMemoryInclusionInput): AgentMemorySelectionState {
+    return this.#memories.setInclusions(input);
+  }
+
+  initializeMemorySelection(agentId: string): void {
+    this.#memories.initializeSelection(agentId);
   }
 
   /** How many memories one agent can hold now. */

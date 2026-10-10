@@ -25,6 +25,7 @@ import {
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -59,7 +60,15 @@ import {
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
-import { clearAgentContext, type TeamApiRequest, TeamRequestError } from "@openbot/team-client/team-api-requests";
+import {
+  type AgentMemoriesRequest,
+  clearAgentContext,
+  readAgentMemories,
+  readAgentMemorySelection,
+  setAgentMemoryInclusion,
+  type TeamApiRequest,
+  TeamRequestError,
+} from "@openbot/team-client/team-api-requests";
 import type { QueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
 import * as Crypto from "expo-crypto";
@@ -90,6 +99,8 @@ type HostRequestActions = Pick<
   | "testAgentRoutine"
   | "loadAgentModels"
   | "loadAgentMemories"
+  | "loadAgentMemorySelection"
+  | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
@@ -173,6 +184,13 @@ export function createHostRequestActions({
     if (!capabilities.get(serverId)?.includes(EVENTS_CAPABILITY))
       throw new Error(currentText().t("mobile.agent.record.eventsUnsupported"));
     return teamApi(serverId);
+  }
+  function memoryRequest(serverId: string): AgentMemoriesRequest<TeamRequestError> {
+    return (method, path, decode, body) =>
+      Effect.tryPromise({
+        try: () => request(method, path, decode, body, serverId),
+        catch: (cause) => new TeamRequestError({ cause }),
+      });
   }
   return {
     listEventRoutines: (owner, serverId) => runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner })),
@@ -259,21 +277,33 @@ export function createHostRequestActions({
         undefined,
         serverId,
       ),
+    loadAgentMemorySelection: (agentId, serverId) =>
+      runTeamRequest(
+        readAgentMemorySelection(
+          memoryRequest(serverId),
+          agentId,
+          capabilities.get(serverId)?.includes(AGENT_MEMORIES_CAPABILITY) ?? false,
+        ),
+      ),
+    setAgentMemoryInclusion: async (input, serverId) => {
+      const key = ["agent-info", ...queryScope, serverId, input.agentId, "memory-selection"];
+      try {
+        const state = await runTeamRequest(setAgentMemoryInclusion(memoryRequest(serverId), input));
+        queryClient.setQueryData(key, state);
+        return state;
+      } catch (cause) {
+        // A concurrent update can reject this revision. Refresh it before the next attempt.
+        void queryClient.invalidateQueries({ queryKey: key });
+        throw cause;
+      }
+    },
     loadAgentMemories: (agentId, serverId) =>
-      request(
-        "GET",
-        TEAM_API_ROUTES.agent.memories(agentId),
-        (value) => {
-          if (
-            !Array.isArray(value) ||
-            !value.every(isAgentMemory) ||
-            value.some((memory) => memory.agentId !== agentId)
-          )
-            throw new Error("The host returned invalid memories.");
-          return value;
-        },
-        undefined,
-        serverId,
+      runTeamRequest(
+        readAgentMemories(
+          memoryRequest(serverId),
+          agentId,
+          capabilities.get(serverId)?.includes(AGENT_MEMORIES_CAPABILITY) ?? false,
+        ),
       ),
     loadAgentRoutines: (agentId, serverId) =>
       request(

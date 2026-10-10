@@ -614,7 +614,7 @@ export class OpenBotToolRouter {
     );
     if (flowResult) return flowResult;
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId);
+    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcp);
     if (memoryResult) return memoryResult;
 
     const tableResult = yield* handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
