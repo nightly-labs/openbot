@@ -280,17 +280,18 @@ export class OpenBotToolRouter {
               return;
             }
             const tool = request.params.tool;
-            // The calling agent can correct a profile request, so it gets the reason as a failed tool result.
-            const profileFailure = (error: unknown) =>
+            // The calling agent can correct a profile request or an attachment path, so it gets the reason as a
+            // failed tool result. Codex replaces a JSON-RPC error with "dynamic tool request failed" (#1728).
+            const correctableFailure = (error: unknown) =>
               Effect.sync(() => {
                 const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
-                if (!(error instanceof z.ZodError)) logger.warn("A profile tool failed.", { tool, error: message });
+                if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
-            const profileTool = PROFILE_TOOL_NAMES.has(tool);
+            const correctable = PROFILE_TOOL_NAMES.has(tool) || tool === "attach_files_to_response";
             const response = this.#handleOpenBotTool(request.params).pipe(
-              Effect.catch((failure) => (profileTool ? profileFailure(failure.cause) : Effect.fail(failure))),
-              Effect.catchDefect((defect) => (profileTool ? profileFailure(defect) : Effect.die(defect))),
+              Effect.catch((failure) => (correctable ? correctableFailure(failure.cause) : Effect.fail(failure))),
+              Effect.catchDefect((defect) => (correctable ? correctableFailure(defect) : Effect.die(defect))),
               Effect.tap((result) => Effect.sync(() => client.respond(request.id, result))),
             );
             // Both store a file and then add the message that names it.
