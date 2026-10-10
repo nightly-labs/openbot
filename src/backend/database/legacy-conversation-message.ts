@@ -16,6 +16,9 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
  * before the rename is one of these.
  *
  * Only key names and the `kind` discriminant move. Message text is never touched.
+ *
+ * Released builds also stored an agent's blank `replyToMessageId` as `""`. The guard rejects it, because
+ * an id is never empty, so it fails the read in the same way. It refers to no message and reads as `null`.
  */
 const LEGACY_MESSAGE_KEYS: Readonly<Record<string, string>> = {
   botId: "agentId",
@@ -45,7 +48,12 @@ function toCurrentKeys(value: unknown): JsonValue {
       // A message holding both spellings is one the current build wrote beside a released leftover; the
       // spelling the app writes today wins.
       if (current !== key && value[current] !== undefined) continue;
-      result[current] = key === "kind" && entry === "bot" ? "agent" : toCurrentKeys(entry);
+      result[current] =
+        key === "kind" && entry === "bot"
+          ? "agent"
+          : key === "replyToMessageId" && entry === ""
+            ? null
+            : toCurrentKeys(entry);
     }
     return result;
   }

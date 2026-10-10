@@ -974,6 +974,51 @@ describe("MailboxStore", () => {
     ).toEqual({ "Kraków turned rainy.": false, "Which city next?": undefined });
   });
 
+  // A blank reply id refers to no message. Kept as `""`, it failed every read of the conversations
+  // that showed the message, for the sender and for the recipient.
+  it("stores a blank reply id as no reply, also from a released mailbox", async () => {
+    const receipt = await runCauseEffect(
+      store.enqueue({
+        sender: { kind: "agent", agentId: "weather" },
+        recipientAgentIds: ["researcher"],
+        text: "Done.",
+        replyToMessageId: "",
+      }),
+    );
+    expect(store.conversationMessages("weather")).toEqual([
+      expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
+    ]);
+
+    const userData = join(root, "blank-reply-user-data");
+    await mkdir(userData, { recursive: true });
+    await writeFile(
+      join(userData, "mailbox.json"),
+      JSON.stringify({
+        version: 3,
+        messages: [
+          {
+            id: receipt.messageId,
+            sender: { kind: "agent", agentId: "weather" },
+            text: "Done.",
+            attachments: [],
+            replyToMessageId: "",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        deliveries: [],
+        drafts: [],
+        pausedAgentIds: [],
+        idempotency: {},
+        reactions: [],
+      }),
+    );
+    const imported = new MailboxStore(userData, join(root, "Blank Reply Shared"));
+    await runCauseEffect(imported.initialize());
+    expect(imported.conversationMessages("weather")).toEqual([
+      expect.objectContaining({ exchange: expect.objectContaining({ replyToMessageId: null }) }),
+    ]);
+  });
+
   it("rejects directories and oversized recipient lists", async () => {
     const directory = join(root, "folder");
     await mkdir(directory);
