@@ -44,7 +44,7 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  grid-template-rows: minmax(430px, 1fr) auto;
+  grid-template-rows: minmax(min-content, 1fr) auto;
   overflow-y: auto;
 }
 
@@ -336,10 +336,6 @@
 }
 
 @media (max-width: 800px) {
-  .first-agent-setup-content {
-    grid-template-rows: minmax(410px, 1fr) auto;
-  }
-
   .first-agent-editor {
     width: min(400px, calc(100% - 32px));
     padding-block: var(--openbot-space-4);
