@@ -106,7 +106,8 @@ docker run -d --name openbot --restart unless-stopped \
 docker exec -it openbot openbot login
 ```
 
-See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits.
+See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits. For Amazon ECS,
+see [AWS ECS](docs/aws-ecs.md).
 
 > [!IMPORTANT]
 > Windows releases are signed by `SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ`. Older

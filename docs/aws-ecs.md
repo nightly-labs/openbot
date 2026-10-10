@@ -14,22 +14,33 @@ set a seccomp profile: `dockerSecurityOptions` accepts only `no-new-privileges`,
 `label:` and `credentialspec:`. So the Docker daemon of the instance uses the profile for each
 container. Do not put other tasks on this instance.
 
-Give the instance a second EBS volume for `/data`, with `DeleteOnTermination` set to `false`. In the
-user data, mount it, give it to the user of the image, and set the daemon options before ECS starts
-a task:
+Make the instance from a launch template with these settings:
+
+- A second EBS volume for `/data`, with the device name `/dev/sdf` and `DeleteOnTermination` set to
+  `false`. To move the data to a new instance, make a snapshot of the old volume and put it in this
+  mapping.
+- IMDSv2 only (`HttpTokens` `required`) with a hop limit of 1 (`HttpPutResponseHopLimit`). Agents
+  have full access in the container. In `bridge` mode, a hop limit of 1 stops them from reading the
+  credentials of the instance role from the instance metadata.
+
+In the user data, mount the volume, give it to the user of the image, and set the daemon options
+before ECS starts a task. Use the version of the image in the task definition:
 
 ```sh
 #!/bin/bash
 set -euo pipefail
-# The data volume. Replace the device with the one of your instance.
-blkid /dev/nvme1n1 || mkfs -t xfs /dev/nvme1n1
+version=<version>
+device=/dev/sdf
+# The data volume. mkfs runs only on a volume with no file system.
+blkid "$device" || mkfs -t xfs "$device"
 mkdir -p /srv/openbot-data
-echo '/dev/nvme1n1 /srv/openbot-data xfs defaults,nofail 0 2' >>/etc/fstab
+echo "UUID=$(blkid -s UUID -o value "$device") /srv/openbot-data xfs defaults,nofail 0 2" >>/etc/fstab
 mount /srv/openbot-data
 chown 1000:1000 /srv/openbot-data
-# The seccomp profile of the image, and no-new-privileges, for each container.
+# The seccomp profile of that image version, and no-new-privileges, for each container.
+[ ! -e /etc/docker/daemon.json ] || { echo "Add the two keys to /etc/docker/daemon.json." >&2; exit 1; }
 curl -fsSL -o /etc/docker/openbot-seccomp.json \
-  https://raw.githubusercontent.com/nightly-labs/openbot/main/docker/seccomp.json
+  "https://raw.githubusercontent.com/nightly-labs/openbot/v$version/docker/seccomp.json"
 cat >/etc/docker/daemon.json <<'EOF'
 { "seccomp-profile": "/etc/docker/openbot-seccomp.json", "no-new-privileges": true }
 EOF
@@ -37,11 +48,8 @@ systemctl restart docker
 echo ECS_CLUSTER=openbot >>/etc/ecs/ecs.config
 ```
 
-`mkfs` runs only on a volume with no file system. Use the device name of your instance. If the
-instance has an `/etc/docker/daemon.json`, add the two keys to it.
-
-The data stays on the volume when the instance stops or restarts. If you replace the instance,
-attach the old data volume to the new instance before the service starts a task.
+The user data runs only on the first start of an instance. When you change the image version, get
+the profile of that version again.
 
 ## Task definition
 
@@ -114,7 +122,8 @@ aws ecs execute-command --cluster openbot --task <task ID> --container openbot \
   --interactive --command "openbot login"
 ```
 
-`openbot status` and the other commands of [Docker](docker.md#commands) work in the same way.
+`openbot status`, `logout` and `name` work in the same way. The log is in the CloudWatch log group
+`/ecs/openbot`, not in `openbot logs`.
 
 ## Network
 
@@ -147,5 +156,6 @@ Do not turn off the sandbox to use Fargate. Use EC2, or a [hosted server](hosted
 
 This setup was not tested on AWS. Not confirmed: the user data on the ECS-optimized Amazon Linux 2023
 AMI, a user namespace on that AMI with the profile of the image, the start of the image on Fargate,
-and the user that ECS Exec uses. From its script, the `openbot` command works as root and as the
+the user that ECS Exec uses, the `/dev/sdf` link to the NVMe device, and the effect of
+`no-new-privileges` in `daemon.json` on the ECS agent and ECS Exec. From its script, the `openbot` command works as root and as the
 user of the image.
