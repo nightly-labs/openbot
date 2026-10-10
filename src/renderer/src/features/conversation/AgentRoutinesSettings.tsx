@@ -7,7 +7,9 @@ import {
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_LIMIT_POLICIES,
+  ROUTINE_MISSED_POLICIES,
   type RoutineLimitPolicy,
+  type RoutineMissedPolicy,
   type RoutineRunFields,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
@@ -78,6 +80,7 @@ interface RoutineDraft {
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
+  missedPolicy: RoutineMissedPolicy;
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
@@ -92,6 +95,11 @@ const LIMIT_POLICY_LABELS = {
   wait: "routine.settings.limitPolicy.wait",
   skip: "routine.settings.limitPolicy.skip",
 } as const satisfies Record<RoutineLimitPolicy, AppTextKey>;
+
+const MISSED_POLICY_LABELS = {
+  skip: "routine.settings.missedPolicy.skip",
+  "run-once": "routine.settings.missedPolicy.runOnce",
+} as const satisfies Record<RoutineMissedPolicy, AppTextKey>;
 
 const NEW_ROUTINE_SCHEDULE: RoutineScheduleDraft = { kind: "daily", days: ROUTINE_EVERY_DAY, time: "09:00" };
 
@@ -248,6 +256,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         active: current.active === base.active ? routine.active : current.active,
         limitPolicy:
           current.limitPolicy === (base.limitPolicy ?? "wait") ? (routine.limitPolicy ?? "wait") : current.limitPolicy,
+        missedPolicy:
+          current.missedPolicy === (base.missedPolicy ?? "skip")
+            ? (routine.missedPolicy ?? "skip")
+            : current.missedPolicy,
         ...(triggerEdited || scheduleEdited || webhookEdited ? {} : triggerDraftOf(routine)),
       };
     });
@@ -265,6 +277,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       instruction: routine.instruction,
       active: routine.active,
       limitPolicy: routine.limitPolicy ?? "wait",
+      missedPolicy: routine.missedPolicy ?? "skip",
       ...triggerDraftOf(routine),
     });
     resetWebhookState();
@@ -286,6 +299,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       schedule: routineScheduleFromDraft(NEW_ROUTINE_SCHEDULE),
       scheduleDraft: NEW_ROUTINE_SCHEDULE,
       limitPolicy: "wait",
+      missedPolicy: "skip",
       triggerKind: "schedule",
       eventType: "",
       eventFilters: [],
@@ -397,6 +411,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         schedule: current.schedule,
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
+        missedPolicy: current.missedPolicy,
       });
       const saved = result.routine;
       setRoutines((items) => {
@@ -770,6 +785,28 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     <SelectTrigger aria-labelledby="agent-routine-limit-policy-label">
                       <SelectValue<RoutineLimitPolicy>>
                         {(state) => t(LIMIT_POLICY_LABELS[state.selectedOption()])}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent />
+                  </Select>
+                </div>
+              </Show>
+              <Show when={props.port.missedPolicy && current().triggerKind === "schedule"}>
+                <div class="settings-field">
+                  <span id="agent-routine-missed-policy-label">{t("routine.settings.missedPolicy")}</span>
+                  <Select<RoutineMissedPolicy>
+                    options={[...ROUTINE_MISSED_POLICIES]}
+                    value={current().missedPolicy}
+                    onChange={(missedPolicy) => {
+                      if (missedPolicy) changeDraft((value) => ({ ...value, missedPolicy }));
+                    }}
+                    itemComponent={(item) => (
+                      <SelectItem item={item.item}>{t(MISSED_POLICY_LABELS[item.item.rawValue])}</SelectItem>
+                    )}
+                  >
+                    <SelectTrigger aria-labelledby="agent-routine-missed-policy-label">
+                      <SelectValue<RoutineMissedPolicy>>
+                        {(state) => t(MISSED_POLICY_LABELS[state.selectedOption()])}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent />

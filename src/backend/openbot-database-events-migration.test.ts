@@ -114,7 +114,7 @@ describe("OpenBot webhook routine migration", () => {
     expect(migratedRoutines.getRecord("chief", routine.id)?.trigger).toMatchObject({ kind: "webhook", url: null });
     expect(migratedRoutines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining({ id: run.id })]);
     expect(migrated.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 32,
+      version: 33,
     });
     expect(migrated.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(migrated.connection.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -164,7 +164,7 @@ describe("OpenBot webhook routine migration", () => {
       instruction: routine.instruction,
     });
     expect(retried.connection.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({
-      version: 32,
+      version: 33,
     });
     expect(retried.connection.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
     expect(retried.connection.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -192,7 +192,7 @@ function removeWebhookSchema(database: DatabaseSync): void {
     DROP TRIGGER agent_memory_delete;
     DROP TABLE agent_memory_search;
     DROP TABLE agent_memory_selections;
-    DELETE FROM schema_migrations WHERE version IN (30, 31, 32);
+    DELETE FROM schema_migrations WHERE version IN (30, 31, 32, 33);
   `);
 }
 

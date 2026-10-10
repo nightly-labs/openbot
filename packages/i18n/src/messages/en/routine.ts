@@ -115,6 +115,13 @@ export const messages = defineMessages("routine", {
   "routine.history.ignored.eventType": "Ignored: other event type",
   "routine.history.ignored.filter": "Ignored: filters did not match",
   "routine.history.ignored.inactive": "Ignored: routine paused",
+  "routine.history.skipped": { one: "Skipped: OpenBot was closed", other: "{count} skipped: OpenBot was closed" },
+  "routine.history.skippedMore": {
+    one: "More than {count} skipped: OpenBot was closed",
+    other: "More than {count} skipped: OpenBot was closed",
+  },
+  "routine.history.ranLate": "Ran late at {time}",
+  "routine.history.range": "{from} – {until}",
   "routine.history.activityFailed": "Could not load the webhook requests.",
 
   "routine.runStatus.queued": "Queued",
@@ -247,6 +254,9 @@ export const messages = defineMessages("routine", {
   "routine.settings.limitPolicy": "If the account is at its limit",
   "routine.settings.limitPolicy.wait": "Wait and run after the reset",
   "routine.settings.limitPolicy.skip": "Skip this run",
+  "routine.settings.missedPolicy": "If OpenBot was closed at the scheduled time",
+  "routine.settings.missedPolicy.skip": "Skip this run",
+  "routine.settings.missedPolicy.runOnce": "Run once when OpenBot opens",
   "routine.settings.discardTitle": "Discard changes?",
   "routine.settings.discardDescription": "Your unsaved changes to this routine will be lost.",
   "routine.settings.discardConfirm": "Discard changes",

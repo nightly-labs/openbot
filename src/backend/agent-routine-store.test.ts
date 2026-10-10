@@ -3,6 +3,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ROUTINE_MISSED_COUNT_LIMIT } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentRoutineStore } from "./agent-routine-store";
 import { AgentStore } from "./agent-store";
@@ -80,7 +81,120 @@ describe("AgentRoutineStore", () => {
     );
     routines.skipMissed(new Date("2026-08-25T12:07:00.000Z"));
     expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T12:15:00.000Z");
+    const skipped = {
+      kind: "scheduled",
+      status: "cancelled",
+      deliveryId: null,
+      scheduledFor: "2026-08-25T10:15:00.000Z",
+      missed: { count: 8, until: "2026-08-25T12:00:00.000Z" },
+    };
+    expect(routines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining(skipped)]);
+    expect(routines.pendingRuns()).toEqual([]);
+    // A second start finds nothing missed and records nothing.
+    routines.skipMissed(new Date("2026-08-25T12:10:00.000Z"));
+    expect(routines.listRuns("chief", routine.id, 10)).toEqual([expect.objectContaining(skipped)]);
+    database.close();
+  });
+
+  it("runs the newest missed time once and records the others when the routine asks", async () => {
+    const { database, routines } = await setup();
+    const now = new Date("2026-08-25T12:07:00.000Z");
+    const routine = routines.create(
+      {
+        agentId: "chief",
+        name: "Quarter hour",
+        instruction: "Run the check.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+        missedPolicy: "run-once",
+      },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    routines.skipMissed(now);
+    expect(routines.get("chief", routine.id)).toMatchObject({
+      missedPolicy: "run-once",
+      trigger: { nextRunAt: "2026-08-25T12:00:00.000Z" },
+    });
+    expect(routines.due(now).map((due) => due.nextRunAt)).toEqual(["2026-08-25T12:00:00.000Z"]);
+    expect(routines.listRuns("chief", routine.id, 10)).toEqual([
+      expect.objectContaining({
+        status: "cancelled",
+        scheduledFor: "2026-08-25T10:15:00.000Z",
+        missed: { count: 7, until: "2026-08-25T11:45:00.000Z" },
+      }),
+    ]);
+    database.close();
+  });
+
+  it("records nothing when a routine set to run once missed one time", async () => {
+    const { database, routines } = await setup();
+    const routine = routines.create(
+      {
+        agentId: "chief",
+        name: "Quarter hour",
+        instruction: "Run the check.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+        missedPolicy: "run-once",
+      },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    routines.skipMissed(new Date("2026-08-25T10:20:00.000Z"));
+    expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T10:15:00.000Z");
     expect(routines.listRuns("chief", routine.id, 10)).toEqual([]);
+    database.close();
+  });
+
+  // A crash after the run was made and before the trigger moved leaves a due time that already ran.
+  it("does not record a missed time that already has its run", async () => {
+    const { database, routines } = await setup();
+    const routine = routines.create(
+      {
+        agentId: "chief",
+        name: "Quarter hour",
+        instruction: "Run the check.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+      },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    const ran = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-08-25T10:15:00.000Z");
+    routines.skipMissed(new Date("2026-08-25T10:50:00.000Z"));
+    expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T11:00:00.000Z");
+    expect(routines.listRuns("chief", routine.id, 10)).toEqual([
+      expect.objectContaining({
+        scheduledFor: "2026-08-25T10:30:00.000Z",
+        missed: { count: 2, until: "2026-08-25T10:45:00.000Z" },
+      }),
+      expect.objectContaining({ id: ran.id }),
+    ]);
+    database.close();
+  });
+
+  it("stops counting a long closure at the limit and still finds the newest time", async () => {
+    const { database, routines } = await setup();
+    const now = new Date("2026-09-04T10:02:00.000Z");
+    const schedule = { kind: "interval", amount: 5, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" } as const;
+    const fields = { agentId: "chief", instruction: "Run the check.", active: true, timezone: "UTC", schedule };
+    const skip = routines.create({ ...fields, name: "Skip" }, new Date("2026-08-25T10:00:00.000Z"));
+    const once = routines.create(
+      { ...fields, name: "Once", missedPolicy: "run-once" },
+      new Date("2026-08-25T10:00:00.000Z"),
+    );
+    routines.skipMissed(now);
+    expect(routines.get("chief", skip.id)?.trigger.nextRunAt).toBe("2026-09-04T10:05:00.000Z");
+    expect(routines.listRuns("chief", skip.id, 10)[0]?.missed).toEqual({
+      count: ROUTINE_MISSED_COUNT_LIMIT + 1,
+      until: "2026-09-04T10:00:00.000Z",
+    });
+    expect(routines.get("chief", once.id)?.trigger.nextRunAt).toBe("2026-09-04T10:00:00.000Z");
+    expect(routines.listRuns("chief", once.id, 10)[0]?.missed).toEqual({
+      count: ROUTINE_MISSED_COUNT_LIMIT + 1,
+      until: "2026-09-04T09:55:00.000Z",
+    });
     database.close();
   });
 
@@ -311,7 +425,15 @@ describe("ChannelRoutineStore", () => {
     );
     routines.skipMissed(new Date("2026-08-25T12:07:00.000Z"));
     expect(routines.get("channel-1", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T12:15:00.000Z");
-    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([]);
+    expect(routines.listRuns("channel-1", routine.id, 10)).toEqual([
+      expect.objectContaining({
+        status: "cancelled",
+        requestMessageId: null,
+        scheduledFor: "2026-08-25T10:15:00.000Z",
+        missed: { count: 8, until: "2026-08-25T12:00:00.000Z" },
+      }),
+    ]);
+    expect(routines.pendingRuns()).toEqual([]);
     database.close();
   });
 

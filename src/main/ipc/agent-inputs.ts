@@ -40,8 +40,10 @@ import {
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
   ROUTINE_LIMIT_POLICIES,
+  ROUTINE_MISSED_POLICIES,
   type RoutineCalendarInput,
   type RoutineLimitPolicy,
+  type RoutineMissedPolicy,
   type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
@@ -233,6 +235,7 @@ export function parseCreateRoutine(value: unknown): CreateRoutineInput {
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
+    ...optionalMissedPolicy(value.missedPolicy),
   };
 }
 
@@ -251,7 +254,7 @@ export function parseUpdateRoutine(value: unknown): UpdateRoutineInput {
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }
@@ -260,6 +263,12 @@ function optionalLimitPolicy(value: unknown): { limitPolicy?: RoutineLimitPolicy
   if (value === undefined) return {};
   if (!isOneOf(ROUTINE_LIMIT_POLICIES, value)) throw new Error("Invalid routine limit policy.");
   return { limitPolicy: value };
+}
+
+function optionalMissedPolicy(value: unknown): { missedPolicy?: RoutineMissedPolicy } {
+  if (value === undefined) return {};
+  if (!isOneOf(ROUTINE_MISSED_POLICIES, value)) throw new Error("Invalid routine missed-run policy.");
+  return { missedPolicy: value };
 }
 
 export function parseDeleteRoutine(value: unknown): DeleteRoutineInput {
@@ -342,6 +351,7 @@ export function parseCreateChannelRoutine(value: unknown): CreateChannelRoutineI
     timezone: requireString(value.timezone, "timezone", 128),
     schedule: parseRoutineSchedule(value.schedule),
     ...optionalLimitPolicy(value.limitPolicy),
+    ...optionalMissedPolicy(value.missedPolicy),
   };
 }
 
@@ -360,7 +370,7 @@ export function parseUpdateChannelRoutine(value: unknown): UpdateChannelRoutineI
     parsed.active = value.active;
   }
   if (value.schedule !== undefined) parsed.schedule = parseRoutineSchedule(value.schedule);
-  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy));
+  Object.assign(parsed, optionalLimitPolicy(value.limitPolicy), optionalMissedPolicy(value.missedPolicy));
   if (Object.keys(parsed).length === 2) throw new Error("A routine update is required.");
   return parsed;
 }

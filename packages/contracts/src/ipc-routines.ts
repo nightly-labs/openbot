@@ -117,6 +117,13 @@ export const ROUTINE_LIMIT_POLICIES = ["wait", "skip"] as const;
 export type RoutineLimitPolicy = (typeof ROUTINE_LIMIT_POLICIES)[number];
 
 /**
+ * What a routine does with the occurrences that came due while OpenBot was closed: `skip` records
+ * them and drops them, `run-once` runs the newest one when OpenBot opens and records the others.
+ */
+export const ROUTINE_MISSED_POLICIES = ["skip", "run-once"] as const;
+export type RoutineMissedPolicy = (typeof ROUTINE_MISSED_POLICIES)[number];
+
+/**
  * The part of a routine that does not name its owner. One store and one settings panel serve both
  * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
  * shapes exactly.
@@ -130,6 +137,8 @@ export interface RoutineFields {
   trigger: RoutineTrigger;
   /** Absent from a host that does not store it: the released Team API projects a fixed key list. */
   limitPolicy?: RoutineLimitPolicy;
+  /** Absent from a host that does not store it, for the same reason as `limitPolicy`. */
+  missedPolicy?: RoutineMissedPolicy;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,6 +157,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     isString(value.timezone) &&
     isRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
+    (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -166,6 +176,18 @@ export type RoutineRunStatus =
   | "interrupted"
   | "cancelled";
 
+/** The largest count a missed-run record names exactly. A larger count means "more than this". */
+export const ROUTINE_MISSED_COUNT_LIMIT = 999;
+
+/**
+ * The occurrences that one `cancelled` run stands for: they came due while OpenBot was closed, and
+ * none of them ran. `until` is the last of them, or null for one occurrence at `scheduledFor`.
+ */
+export interface RoutineMissedRuns {
+  count: number;
+  until: string | null;
+}
+
 /** A run without its owner and without the handle that names the work it started. */
 export interface RoutineRunFields {
   id: string;
@@ -177,6 +199,8 @@ export interface RoutineRunFields {
   instruction: string;
   status: RoutineRunStatus;
   error: string | null;
+  /** Set only on a run that records missed occurrences. A host that does not store it leaves it out. */
+  missed?: RoutineMissedRuns;
   createdAt: string;
   updatedAt: string;
 }
@@ -201,8 +225,18 @@ export function isRoutineRunFields(value: unknown): value is RoutineRunFields {
       value.status,
     ) &&
     (value.error === null || isString(value.error)) &&
+    (value.missed === undefined || isRoutineMissedRuns(value.missed)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
+  );
+}
+
+function isRoutineMissedRuns(value: unknown): value is RoutineMissedRuns {
+  return (
+    isDynamicRecord(value) &&
+    Number.isSafeInteger(value.count) &&
+    Number(value.count) >= 1 &&
+    (value.until === null || isString(value.until))
   );
 }
 
@@ -224,6 +258,8 @@ export interface CreateRoutineInput {
   schedule: RoutineSchedule;
   /** `wait` when absent. */
   limitPolicy?: RoutineLimitPolicy;
+  /** `skip` when absent. */
+  missedPolicy?: RoutineMissedPolicy;
 }
 
 export interface UpdateRoutineInput {
@@ -234,6 +270,7 @@ export interface UpdateRoutineInput {
   active?: boolean;
   schedule?: RoutineSchedule;
   limitPolicy?: RoutineLimitPolicy;
+  missedPolicy?: RoutineMissedPolicy;
 }
 
 export interface DeleteRoutineInput {

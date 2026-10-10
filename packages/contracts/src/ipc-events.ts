@@ -1,5 +1,11 @@
-import { isRoutineSchedule, type RoutineLimitPolicy, type RoutineSchedule } from "./ipc-routines";
-import { isDynamicRecord, isNumber, isString } from "./runtime-values";
+import {
+  isRoutineSchedule,
+  ROUTINE_MISSED_POLICIES,
+  type RoutineLimitPolicy,
+  type RoutineMissedPolicy,
+  type RoutineSchedule,
+} from "./ipc-routines";
+import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /** JSON values accepted from a webhook request. */
 export type EventJsonValue =
@@ -59,6 +65,7 @@ export interface EventRoutine {
   timezone: string;
   trigger: EventRoutineTrigger;
   limitPolicy?: RoutineLimitPolicy;
+  missedPolicy?: RoutineMissedPolicy;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +79,7 @@ export interface SaveEventRoutineInput {
   timezone: string;
   trigger: EventRoutineTriggerInput;
   limitPolicy?: RoutineLimitPolicy;
+  missedPolicy?: RoutineMissedPolicy;
 }
 
 /** `secret` is set only when this save made a new webhook trigger. The host does not show it again. */
@@ -216,6 +224,7 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     isString(value.timezone) &&
     isEventRoutineTrigger(value.trigger) &&
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
+    (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );

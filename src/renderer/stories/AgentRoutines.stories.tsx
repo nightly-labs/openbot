@@ -55,7 +55,7 @@ const fullPanelRuns: RoutineRun[] = [
   storyRun("run-yesterday", "failed", "scheduled", 28),
 ];
 
-function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[] }) {
+function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[]; localHost?: boolean }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({ routines: { chief: props.routines ?? storyRoutines } });
   window.openbot = mock.api;
@@ -66,7 +66,12 @@ function RoutinesStory(props: { routines?: Routine[]; runs?: RoutineRun[] }) {
   });
   return (
     <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
-      <AgentRoutinesSettings port={agentRoutinesPort("chief")} onCountChange={fn()} onBack={fn()} onClose={fn()} />
+      <AgentRoutinesSettings
+        port={agentRoutinesPort("chief", false, props.localHost === true)}
+        onCountChange={fn()}
+        onBack={fn()}
+        onClose={fn()}
+      />
     </main>
   );
 }
@@ -218,9 +223,43 @@ export const RunHistoryStatuses: Story = {
         deliveryId: `delivery-${status}`,
         status,
         error: status === "failed" ? "Example failure" : null,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(Date.now() - index * 3_600_000).toISOString(),
         updatedAt: new Date().toISOString(),
       }))}
+    />
+  ),
+};
+
+/**
+ * OpenBot was closed for five occurrences of an hourly routine set to run once when OpenBot opens.
+ * It ran the newest one late and recorded the four before it as skipped. Yesterday it skipped one.
+ * The times are on the hour.
+ */
+export const MissedRuns: Story = {
+  render: () => (
+    <RoutinesStory
+      localHost
+      routines={[
+        {
+          ...morningBrief,
+          missedPolicy: "run-once",
+          trigger: { ...morningBrief.trigger, schedule: { kind: "hourly", minute: 0 } },
+        },
+        weeklyPlanning,
+      ]}
+      runs={[
+        { ...storyRun("run-late", "succeeded", "scheduled", 1), createdAt: hoursAgo(0.5) },
+        {
+          ...storyRun("run-skipped", "cancelled", "scheduled", 5),
+          deliveryId: null,
+          missed: { count: 4, until: hoursAgo(2) },
+        },
+        {
+          ...storyRun("run-skipped-yesterday", "cancelled", "scheduled", 30),
+          deliveryId: null,
+          missed: { count: 1, until: null },
+        },
+      ]}
     />
   ),
 };
@@ -234,8 +273,15 @@ export const FullSidePanel: Story = {
   parameters: { layout: "fullscreen" },
 };
 
-function storyRun(id: string, status: RoutineRun["status"], kind: RoutineRun["kind"], hoursAgo: number): RoutineRun {
-  const scheduledFor = new Date(Date.now() - hoursAgo * 3_600_000).toISOString();
+/** Counted back from the start of this hour, so an hourly run in a story falls on its schedule. */
+function hoursAgo(hours: number): string {
+  const hour = new Date();
+  hour.setMinutes(0, 0, 0);
+  return new Date(hour.getTime() - hours * 3_600_000).toISOString();
+}
+
+function storyRun(id: string, status: RoutineRun["status"], kind: RoutineRun["kind"], hours: number): RoutineRun {
+  const scheduledFor = hoursAgo(hours);
   return {
     id,
     routineId: morningBrief.id,
