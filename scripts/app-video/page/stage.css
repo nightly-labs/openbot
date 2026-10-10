@@ -1,0 +1,283 @@
+@import "@fontsource-variable/inter";
+@import "@openbot/brand/tokens.css";
+@import "@openbot/brand/logo.css";
+
+/* The colors are brand tokens, except the macOS traffic lights. */
+:root {
+  --video-black: var(--openbot-bg-notch);
+  --video-white: var(--openbot-text-primary);
+  --video-lilac: var(--openbot-logo-production);
+  --video-cyan: var(--openbot-accent-text);
+  --video-grid: var(--openbot-hero-grid-line);
+  --video-shadow: var(--openbot-shadow-dynamic-island);
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--video-black);
+}
+
+#stage {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--video-black);
+  color: var(--video-white);
+  font-family: var(--openbot-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.blob {
+  position: absolute;
+  width: 1300px;
+  height: 900px;
+  border-radius: 50%;
+  filter: blur(140px);
+}
+
+.blob-lilac {
+  left: -180px;
+  top: -320px;
+  background: color-mix(in srgb, var(--video-lilac) 34%, transparent);
+}
+
+.blob-cyan {
+  right: -260px;
+  bottom: -420px;
+  background: color-mix(in srgb, var(--video-cyan) 22%, transparent);
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, var(--video-grid) 1px, var(--openbot-transparent) 1px),
+    linear-gradient(180deg, var(--video-grid) 1px, var(--openbot-transparent) 1px);
+  background-size: 80px 80px;
+  background-position: center;
+  mask-image: radial-gradient(55% 60% at 50% 45%, var(--openbot-mask-solid) 20%, var(--openbot-transparent) 100%);
+}
+
+/* The window rises in 3D, then the camera moves the window inside it. */
+.rise {
+  position: absolute;
+  inset: 0;
+  perspective: 1800px;
+  transform-origin: 50% 100%;
+}
+
+.window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1440px;
+  height: 900px;
+  overflow: hidden;
+  border-radius: 14px;
+  transform-origin: 0 0;
+  background: var(--openbot-bg-canvas);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--video-white) 12%, transparent),
+    0 50px 140px var(--video-shadow);
+}
+
+.window iframe {
+  display: block;
+  border: 0;
+}
+
+/* Where macOS draws them: `trafficLightPosition` { x: 12, y: 13 }, 12 px wide, 8 px apart. */
+.traffic-lights {
+  position: absolute;
+  top: 13px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.traffic-lights span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+
+.traffic-lights span:nth-child(2) {
+  background: #febc2e;
+}
+
+.traffic-lights span:nth-child(3) {
+  background: #28c840;
+}
+
+.intro {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.headline {
+  position: absolute;
+  top: 520px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 104px;
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.word {
+  display: inline-block;
+  opacity: 0;
+}
+
+.logo-mount {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 200px;
+  transform-origin: 50% 50%;
+}
+
+.logo-mount .logo {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 46px;
+}
+
+.logo-halo {
+  position: absolute;
+  inset: -140px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--video-lilac) 45%, transparent),
+    var(--openbot-transparent)
+  );
+  pointer-events: none;
+}
+
+.outro {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.outro > div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  opacity: 0;
+}
+
+.outro .name {
+  top: 520px;
+  font-size: 112px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+.outro .tagline {
+  top: 676px;
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--video-white) 72%, transparent);
+}
+
+.outro .url {
+  top: 770px;
+  left: 50%;
+  right: auto;
+  margin-left: -150px;
+  width: 300px;
+  padding: 14px 0;
+  border-radius: 999px;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--openbot-logo-eye);
+  background: var(--video-lilac);
+}
+
+.caption {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  padding: 20px 40px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 50px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--video-white);
+  background: color-mix(in srgb, var(--video-black) 62%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--video-white) 14%, transparent),
+    0 24px 60px var(--video-shadow);
+  backdrop-filter: blur(24px) saturate(1.4);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.caption[data-place="bottom"] {
+  top: auto;
+  bottom: 54px;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  overflow: visible;
+  transform-origin: 6px 3.5px;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 6px var(--video-shadow));
+}
+
+.cursor path {
+  fill: var(--openbot-mask-solid);
+  stroke: var(--video-white);
+  stroke-width: 1.6px;
+  stroke-linejoin: round;
+}
+
+.click-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 3px solid var(--video-lilac);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fade {
+  position: absolute;
+  inset: 0;
+  background: var(--video-black);
+  opacity: 0;
+  pointer-events: none;
+}

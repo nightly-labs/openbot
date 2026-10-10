@@ -15,5 +15,6 @@
     "src/preload/**/*.ts",
     "packages/contracts/src/**/*.ts",
     "packages/logging/src/**/*.ts"
-  ]
+  ],
+  "exclude": ["scripts/app-video/page/**"]
 }

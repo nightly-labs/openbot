@@ -12,6 +12,8 @@
     "src/renderer/**/*.tsx",
     "packages/contracts/src/**/*.ts",
     "packages/ui/src/**/*.ts",
-    "packages/ui/src/**/*.tsx"
+    "packages/ui/src/**/*.tsx",
+    "scripts/app-video/page/**/*.ts",
+    "scripts/app-video/page/**/*.tsx"
   ]
 }
