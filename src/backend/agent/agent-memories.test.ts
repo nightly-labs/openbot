@@ -30,6 +30,47 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentMemories: staging, epochs and turn commitment", () => {
+  it.each(["edit", "delete"])("does not recreate a user-controlled duplicate after a concurrent %s", async (action) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const original = active.createMemory({ agentId: "chief", text: "The launch code is amber." });
+    active.setMemoryInclusion({
+      agentId: "chief",
+      changes: [{ memoryId: original.id, inclusion: "essential", expectedRevision: 0 }],
+    });
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Remember the launch code." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The user-controlled duplicate turn did not start.");
+    const duplicate = await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { text: original.text, inclusion: "essential" },
+      turnId,
+    );
+    expect(duplicate.result).toMatchObject({ success: true });
+    if (action === "edit")
+      active.updateMemory({ agentId: "chief", memoryId: original.id, text: "The launch code is violet." });
+    else active.deleteMemory({ agentId: "chief", memoryId: original.id });
+    const saved = active.listMemories("chief");
+    const selection = active.getMemorySelection("chief");
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(active.listMemories("chief")).toEqual(saved);
+    expect(active.getMemorySelection("chief")).toEqual(selection);
+  });
+
   it.each(["completed", "failed", "interrupted", "edited", "pinned"])(
     "applies duplicate selection without changing saved data or overriding newer choices: %s",
     async (outcome) => {

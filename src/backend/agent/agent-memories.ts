@@ -246,6 +246,8 @@ export class AgentMemories {
       const selection = selectedId ? this.#memories.getSelection(senderAgentId, selectedId) : null;
       if (selection?.userControlled && args.inclusion !== undefined && args.inclusion !== selection.inclusion)
         return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
+      if (duplicate && selection?.userControlled)
+        return openBotToolResult({ status: "unchanged", memoryId: duplicate.id, inclusion: selection.inclusion });
       const plannedEssentials = this.#plannedContext(senderAgentId, params.turnId, params.callId).essential;
       const intendedInclusion =
         args.inclusion ?? (selectedId && plannedEssentials.has(selectedId) ? "essential" : "searchable");
@@ -279,7 +281,7 @@ export class AgentMemories {
           return openBotToolFailure(sourceText(key, { saved, limit }));
         }
       }
-      if (duplicate && selection && !selection.userControlled) {
+      if (duplicate && selection) {
         this.#stage(params.turnId, {
           callId: params.callId,
           type: "selection",
