@@ -29,7 +29,7 @@ const DIRECT_NAMES = new Set([
 ]);
 
 // Names keep the complete, stable catalog below 4,000 characters without schema duplication.
-export const INITIAL_TOOL_CATALOG = BUILTIN_TOOL_CATALOG.map((tool) => tool.name).join(", ");
+const INITIAL_TOOL_CATALOG = BUILTIN_TOOL_CATALOG.map((tool) => tool.name).join(", ");
 const qualifiedName = z.string().trim().min(1).max(160);
 const searchShape = {
   queries: z.array(z.string().trim().min(1).max(200)).min(1).max(10),

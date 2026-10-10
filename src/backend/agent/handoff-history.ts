@@ -4,7 +4,7 @@ import { redactText } from "@openbot/logging";
 import type { OpenBotDatabase } from "../openbot-database";
 import { HANDOFF_END, HANDOFF_START, renderHandoffMessage } from "./delivery-content";
 
-export const HANDOFF_CHARACTERS = 32_000;
+const HANDOFF_CHARACTERS = 32_000;
 const OLDER_CHARACTERS = 4_000;
 const STEPS_CHARACTERS = 2_000;
 const HEADER_CHARACTERS = 2_000;
@@ -12,7 +12,7 @@ const RECENT_CHARACTERS = 24_000;
 type HistoryRow = ReturnType<OpenBotDatabase["readAgentHistory"]>["messages"][number];
 
 /** Cuts redacted text at both ends, so a large request keeps its final instructions. */
-export function historyExcerpt(text: string, limit: number): string {
+function historyExcerpt(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const marker = "\n[... omitted; use history_read with this messageId ...]\n";
   if (limit <= marker.length) return text.slice(0, Math.max(0, limit));

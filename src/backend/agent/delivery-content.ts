@@ -305,27 +305,3 @@ export function renderHandoffMessage(
   const body = displayMessageReferences(message.text, message.attachments ?? [], agentNames);
   return [`[${message.createdAt}] ${message.author}${sender}:`, body, attachmentMetadata].filter(Boolean).join("\n");
 }
-
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
-
-export function summarizeOldMessages(
-  messages: ConversationSnapshot["messages"],
-  tokenBudget: number,
-  agentNames: ReadonlyMap<string, string>,
-): string {
-  const maximumCharacters = Math.max(4_000, tokenBudget * 4);
-  const lines = messages.map((message) => {
-    const normalized = displayMessageReferences(message.text, message.attachments ?? [], agentNames)
-      .replace(/\s+/g, " ")
-      .trim();
-    const excerpt = normalized.length > 600 ? `${normalized.slice(0, 597)}...` : normalized;
-    const attachments = (message.attachments ?? []).map((item) => item.name).join(", ");
-    return `- ${message.author}${message.senderAgentId ? ` (${message.senderAgentId})` : ""}: ${excerpt}${attachments ? ` [attachments: ${attachments}]` : ""}`;
-  });
-  const summary = [`Summary of ${messages.length} older user-visible messages:`, ...lines].join("\n");
-  return summary.length > maximumCharacters
-    ? `${summary.slice(0, maximumCharacters - 56)}\n[Summary shortened to fit the handoff budget.]`
-    : summary;
-}
