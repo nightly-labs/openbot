@@ -130,6 +130,10 @@ export type SignalClientMessage =
       // A remote ticket on the first connect, a resume token on every reconnect after it.
       token: string;
       multiplex?: boolean;
+      // `client` only, and optional: when the host is offline, keep this socket open and send
+      // `host-waiting` instead of the `host_unavailable` error. An older Signal ignores it and fails
+      // the hello as before.
+      waitForHost?: boolean;
       // `ingress` only: the Slack route ticket (`./slack-route.ts`) that names the Slack workspaces
       // whose requests this socket receives.
       slackRoute?: string;
@@ -191,6 +195,10 @@ export type SignalServerMessage =
       // older Signal sends none.
       capabilities?: string[];
     }
+  // Answers a client hello with `waitForHost` while its host is offline. The socket stays open, and
+  // Signal sends `ready` on it when the host connects. `resumeToken` lets the client renew the socket
+  // without a new ticket.
+  | { type: "host-waiting"; version: SignalProtocolVersion; resumeToken: string }
   // A client attached to a multiplexing host. `resumed` distinguishes a reconnect of a session the
   // host already has from a new one it must set up from scratch.
   | {

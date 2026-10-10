@@ -271,7 +271,9 @@ export function createWebWorkspace(
         if (disposed || update.hostId !== hostId) return;
         if (recoveryBlocked && update.state === "offline" && !update.code) return;
         // A host that announced a restart comes back by itself; a wake is only for a stopped server.
-        const unavailable = update.state === "offline" && !update.code && !state.hostRestart;
+        // Signal holds a `hostOffline` attempt, so it can wake a sleeping server but needs no retry.
+        const unavailable =
+          (update.state === "offline" || update.hostOffline === true) && !update.code && !state.hostRestart;
         setState((draft) => {
           if (update.state !== "online") draft.status = update.state;
           if (update.state !== "online")
@@ -324,7 +326,7 @@ export function createWebWorkspace(
         if (unavailable) {
           const current = generation;
           void hostLifecycle.hostUnavailable(update.hostId, connectionPromise?.opened ?? false).then((retry) => {
-            if (retry && !disposed && current === generation) recover();
+            if (retry && !update.hostOffline && !disposed && current === generation) recover();
           });
         } else if (state.hostRestart && update.state === "offline") recover();
         if (update.state === "online" && update.resync && !connectionPromise) recover();

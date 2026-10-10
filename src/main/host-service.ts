@@ -344,7 +344,8 @@ export class HostService extends EventEmitter<HostEvents> {
                 });
               return yield* issueTicket(hostId);
             }),
-          onSignalRecoveryFailure: (error) => {
+          onSignalRecoveryFailure: (error, reason) => {
+            logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
             this.#setStatus({
               phase: "error",
               apiOnline: false,

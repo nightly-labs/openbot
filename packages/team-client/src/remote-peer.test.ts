@@ -1,5 +1,6 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { SignalClientMessage } from "@openbot/contracts/signal-protocol/messages";
 import {
   decodeTeamProtocolV2FileChunk,
   decodeTeamProtocolV2FileControlFrame,
@@ -1011,6 +1012,30 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  it("waits on Signal for an offline host without the connect deadline or a new ticket", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const network = await setupNetwork({ waitForHost: true, hostOffline: () => true });
+    const connecting = network.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(network.updates.at(-1)).toMatchObject({ state: "connecting", hostOffline: true });
+    // Past the 30-second deadline. The waiting socket is renewed with its resume token.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(network.sockets).toHaveLength(2);
+    expect(network.hellos.at(-1)).toMatchObject({ token: "resume-waiting", waitForHost: true });
+    // The host connects: Signal sends `ready` on the waiting socket.
+    network.socket().receive({
+      type: "ready",
+      version: 1,
+      connectionId: "connection-host-back",
+      resumeToken: "resume",
+      iceServers: [{ urls: "stun:localhost" }],
+    });
+    await expect(connecting).resolves.toMatchObject({ ok: true });
+    expect(network.bootstraps()).toBe(1);
+    expect(network.updates.some((update) => update.state === "offline")).toBe(false);
+    await network.runtime.dispose();
+  });
+
   it("suspends Signal reconnects in the background and resumes healthy data channels without a new ticket", async () => {
     // Fake only timers: network and cryptographic callbacks still run as ordinary microtasks.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -1133,6 +1158,9 @@ async function setupNetwork(
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
     refuseHello?: () => boolean;
+    /** Signal holds a hello with `waitForHost` while this returns true. */
+    hostOffline?: () => boolean;
+    waitForHost?: boolean;
     beforeResponse?: () => Promise<void>;
     responseBody?: TeamProtocolV2Json;
     responseFile?: TeamProtocolV2Json;
@@ -1140,6 +1168,7 @@ async function setupNetwork(
 ) {
   const host = await runTeamEffect(createEd25519Identity(() => new Uint8Array(32).fill(7)));
   const sockets: TestSocket[] = [];
+  const hellos: Extract<SignalClientMessage, { type: "hello" }>[] = [];
   const connections: TestConnection[] = [];
   const updates: RemoteTeamConnectionUpdate[] = [];
   const uploadProgress: RemoteUploadProgress[] = [];
@@ -1177,6 +1206,11 @@ async function setupNetwork(
     send(data: string) {
       if (this.halfOpen) return;
       const message = JSON.parse(data);
+      if (message.type === "hello") hellos.push(message);
+      if (message.type === "hello" && message.waitForHost === true && options.hostOffline?.()) {
+        queueMicrotask(() => this.receive({ type: "host-waiting", version: 1, resumeToken: "resume-waiting" }));
+        return;
+      }
       if (message.type === "hello" && options.refuseHello?.()) {
         queueMicrotask(() => this.close(1008));
         return;
@@ -1330,40 +1364,44 @@ async function setupNetwork(
 
   vi.stubGlobal("WebSocket", TestSocket);
   vi.stubGlobal("RTCPeerConnection", TestConnection);
-  const runtime = createRemoteTeamPeer({
-    current: {
-      getBootstrap: async (hostId, _clientPublicKey, existingSessionId) => {
-        await options.beforeBootstrap?.(hostId);
-        currentHostId = hostId;
-        bootstrapCount += 1;
-        keptSessions.push(existingSessionId);
-        currentSessionId = existingSessionId ?? `session-${bootstrapCount}`;
-        return {
-          sessionId: currentSessionId,
-          signalUrl: "wss://signal",
-          ticket: "ticket",
-        };
-      },
-      endSession: options.endSession ?? (async () => {}),
-      onUploadProgress: async (progress) => {
-        uploadProgress.push(progress);
-      },
-      onAccountProfileChanged: options.onAccountProfileChanged,
-      onAccountServersChanged: options.onAccountServersChanged,
-      onNetworkRestored: options.onNetworkRestored,
-      onHostStreamData: options.onHostStreamData,
-      onTeamEvent: options.onTeamEvent ?? (async () => {}),
-      onConnectionUpdate: async (update) => {
-        updates.push(update);
-        if (update.state === "offline") callbacks.onOffline();
-        if (update.resync) callbacks.onReset();
+  const runtime = createRemoteTeamPeer(
+    {
+      current: {
+        getBootstrap: async (hostId, _clientPublicKey, existingSessionId) => {
+          await options.beforeBootstrap?.(hostId);
+          currentHostId = hostId;
+          bootstrapCount += 1;
+          keptSessions.push(existingSessionId);
+          currentSessionId = existingSessionId ?? `session-${bootstrapCount}`;
+          return {
+            sessionId: currentSessionId,
+            signalUrl: "wss://signal",
+            ticket: "ticket",
+          };
+        },
+        endSession: options.endSession ?? (async () => {}),
+        onUploadProgress: async (progress) => {
+          uploadProgress.push(progress);
+        },
+        onAccountProfileChanged: options.onAccountProfileChanged,
+        onAccountServersChanged: options.onAccountServersChanged,
+        onNetworkRestored: options.onNetworkRestored,
+        onHostStreamData: options.onHostStreamData,
+        onTeamEvent: options.onTeamEvent ?? (async () => {}),
+        onConnectionUpdate: async (update) => {
+          updates.push(update);
+          if (update.state === "offline") callbacks.onOffline();
+          if (update.resync) callbacks.onReset();
+        },
       },
     },
-  });
+    { waitForHost: options.waitForHost === true },
+  );
   return {
     runtime,
     slowRequest,
     sockets,
+    hellos,
     connections,
     updates,
     uploadProgress,

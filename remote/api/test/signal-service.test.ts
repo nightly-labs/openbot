@@ -39,6 +39,37 @@ describe("SignalService", () => {
     expect(client.closed).toBe(false);
   });
 
+  it("holds a client for an offline host until the host connects", async () => {
+    const service = new SignalService(fakeTokens(), 2);
+    const refused = socket("refused");
+    await hello(service, refused, "second-client-ticket", "client");
+    expect(refused.messages.at(-1)).toContain('"code":"host_unavailable"');
+    expect(refused.closeCode).toBe(1013);
+
+    const waiting = socket("waiting");
+    await hello(service, waiting, "client-ticket", "client", { waitForHost: true });
+    expect(JSON.parse(waiting.messages.at(-1) ?? "{}")).toEqual({
+      type: "host-waiting",
+      version: 1,
+      resumeToken: "resume-client",
+    });
+    // A renewal with the resume token replaces the waiting socket and holds no second quota slot.
+    const renewed = socket("renewed");
+    await hello(service, renewed, "resume-client", "client", { waitForHost: true });
+    expect(waiting.closed).toBe(true);
+    expect(renewed.messages.at(-1)).toContain('"type":"host-waiting"');
+    await runSignal(service, service.disconnect(waiting));
+
+    const host = socket("host");
+    await hello(service, host, "host-ticket", "host");
+    const ready = JSON.parse(renewed.messages.at(-1) ?? "{}");
+    expect(ready).toMatchObject({ type: "ready", resumeToken: "resume-client" });
+    expect(host.messages.at(-1)).toContain('"type":"peer-ready"');
+    expect(host.messages.at(-1)).toContain(ready.connectionId);
+    expect(renewed.closed).toBe(false);
+    expect(service.metrics().activePeerConnections).toBe(1);
+  });
+
   it("admits concurrent replacements at the quota after token signing completes", async () => {
     const tokens = fakeTokens();
     const service = new SignalService(tokens, 1);
@@ -369,10 +400,50 @@ describe("SignalService", () => {
     const old = socket("host-old");
     await hello(service, old, "resume-host", "host");
     expect(replacement.closed).toBe(false);
+    const moved = JSON.parse(client.messages.at(-1) ?? "{}");
+    expect(moved.type).toBe("ready");
 
+    // The replacement did not resume, so it has no peer for the client's connection.
     await runSignal(service, service.disconnect(old));
+    expect(JSON.parse(client.messages.at(-1) ?? "{}")).toEqual({
+      type: "disconnect",
+      version: 1,
+      connectionId: moved.connectionId,
+    });
+    const reconnected = socket("client-reconnected");
+    await hello(service, reconnected, "fresh-client-ticket", "client");
+    expect(reconnected.messages.at(-1)).toContain('"type":"ready"');
     expect(replacement.messages.at(-1)).toContain('"type":"peer-ready"');
     expect(service.metrics().activePeerConnections).toBe(1);
+  });
+
+  it("tells a connected client to connect again when a host that did not resume takes it", async () => {
+    const service = new SignalService(fakeTokens(), 8);
+    const stopped = socket("host-stopped");
+    await hello(service, stopped, "host-ticket", "host");
+    const client = socket("client");
+    await hello(service, client, "client-ticket", "client");
+    const first = JSON.parse(client.messages.at(-1) ?? "{}").connectionId;
+
+    // The host restarted while its old socket stayed open. The new host makes a new peer
+    // connection, so a silent `ready` would leave the client on its dead path.
+    const restarted = socket("host-restarted");
+    await hello(service, restarted, "stale-host-ticket", "host");
+    expect(JSON.parse(client.messages.at(-1) ?? "{}")).toEqual({ type: "disconnect", version: 1, connectionId: first });
+    expect(restarted.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(false);
+
+    const again = socket("client-again");
+    await hello(service, again, "fresh-client-ticket", "client");
+    const second = JSON.parse(again.messages.at(-1) ?? "{}").connectionId;
+    expect(restarted.messages.at(-1)).toContain(second);
+
+    // The same when the old socket closed before the new host said hello.
+    await runSignal(service, service.disconnect(stopped));
+    await runSignal(service, service.disconnect(restarted));
+    const current = socket("host-current");
+    await hello(service, current, "current-host-ticket", "host");
+    expect(JSON.parse(again.messages.at(-1) ?? "{}")).toEqual({ type: "disconnect", version: 1, connectionId: second });
+    expect(service.metrics().activePeerConnections).toBe(0);
   });
 
   it("limits the open sockets of one host and closes the oldest with a code that lets it reconnect", async () => {
@@ -700,13 +771,26 @@ function deferred() {
   return { promise, resolve: () => open() };
 }
 
-async function hello(service: SignalService, target: SignalSocket, token: string, peer: "host" | "client") {
+async function hello(
+  service: SignalService,
+  target: SignalSocket,
+  token: string,
+  peer: "host" | "client",
+  extra: { waitForHost?: boolean } = {},
+) {
   service.connect(target);
   await runSignal(
     service,
     service.receive(
       target,
-      JSON.stringify({ type: "hello", version: 1, peer, token, ...(peer === "host" ? { multiplex: true } : {}) }),
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer,
+        token,
+        ...(peer === "host" ? { multiplex: true } : {}),
+        ...extra,
+      }),
     ),
   );
 }

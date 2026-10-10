@@ -32,6 +32,8 @@ interface MainBridgeMessage {
   path?: "p2p" | "relay";
   code?: string;
   message?: string;
+  /** On `peer-error` and `signal-closed`: this peer does not connect its Signal socket again. */
+  terminal?: boolean;
   connectionId?: string | null;
   sessionId?: string;
   userId?: string;
@@ -308,6 +310,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("close", (event) => {
     if (state.socket !== socket) return;
     state.socket = null;
+    // Main logs a host's own socket that Signal or the network closed, so the journal shows why the
+    // host left Signal. A socket this peer closed follows an error that main already logged.
+    if (state.role === "host" && !state.closed)
+      post({ type: "signal-closed", peerId: state.id, code: String(event.code), terminal: event.code === 4000 });
     if (event.code === 4000) {
       disconnect(state.id);
       post({ type: "peer-disconnected", peerId: state.id });
@@ -322,8 +328,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
   // Signal sends Slack, Discord, webhook and Telegram messages only to the main process's `ingress`
-  // socket, never to this peer.
+  // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
+  // peer does not send.
   if (
+    message.type === "host-waiting" ||
     message.type === "slack-delivery" ||
     message.type === "discord-session" ||
     message.type === "discord-delivery" ||
@@ -346,22 +354,23 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       signalRetryAt = Date.now() + 60_000;
       state.socket?.close();
     }
+    // Signal sends `permission_denied` to a host for a relayed frame whose connection it already
+    // removed, such as a late ICE candidate after a phone reconnected. That connection is gone; the
+    // host registration that serves every other device is not.
+    const staleRelay = message.code === "permission_denied" && state.role === "host";
+    const terminal =
+      message.code === "session_revoked" ||
+      message.code === "authentication_required" ||
+      (message.code === "permission_denied" && !staleRelay) ||
+      message.code === "host_busy";
     post({
       type: "peer-error",
       peerId: state.id,
       code: message.code,
       message: message.message,
+      terminal,
     });
-    // Signal sends `permission_denied` to a host for a relayed frame whose connection it already
-    // removed, such as a late ICE candidate after a phone reconnected. That connection is gone; the
-    // host registration that serves every other device is not.
-    const staleRelay = message.code === "permission_denied" && state.role === "host";
-    if (
-      message.code === "session_revoked" ||
-      message.code === "authentication_required" ||
-      (message.code === "permission_denied" && !staleRelay) ||
-      message.code === "host_busy"
-    ) {
+    if (terminal) {
       disconnect(state.id);
       post({ type: "peer-disconnected", peerId: state.id });
     }
@@ -884,6 +893,7 @@ function failSignalProtocol(state: PeerState, error: unknown): void {
     peerId: state.id,
     code: "protocol_error",
     message: error instanceof Error ? error.message : sourceText("error.remote.signalFrameUnreadable"),
+    terminal: true,
   });
   disconnect(state.id);
   post({ type: "peer-disconnected", peerId: state.id });

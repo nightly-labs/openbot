@@ -17,6 +17,8 @@ interface TeamWebRtcBridgeEvents {
   signalReady: [peerId: string];
   /** The Signal socket of a peer opened. Only the connection trace reads it. */
   signalOpen: [peerId: string];
+  /** A host's own Signal socket closed. `terminal`: the peer does not connect it again. */
+  signalClosed: [peerId: string, code: string, terminal: boolean];
   incoming: [
     peerId: string,
     connection: {
@@ -33,7 +35,7 @@ interface TeamWebRtcBridgeEvents {
   disconnected: [peerId: string];
   data: [peerId: string, channel: TeamWebRtcChannel, data: string | ArrayBuffer];
   path: [peerId: string, path: "p2p" | "relay"];
-  error: [peerId: string, code: string, message: string];
+  error: [peerId: string, code: string, message: string, terminal?: boolean];
   iceServers: [peerId: string, servers: RemoteDesktopIceServer[]];
 }
 
@@ -64,6 +66,7 @@ const bridgeMessageSchema = z
     path: z.enum(["p2p", "relay"]).optional(),
     code: z.string().optional(),
     message: z.string().optional(),
+    terminal: z.boolean().optional(),
     connectionId: z.string().optional(),
     sessionId: z.string().optional(),
     userId: z.string().optional(),
@@ -327,6 +330,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "account-servers-changed") this.emit("accountServersChanged", message.peerId);
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
     else if (message.type === "signal-open") this.emit("signalOpen", message.peerId);
+    else if (message.type === "signal-closed" && message.code)
+      this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)
       this.emit("connected", message.peerId, {
         localFingerprint: message.localFingerprint,
@@ -345,6 +350,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         message.peerId,
         message.code ?? "webrtc_error",
         message.message ?? sourceText("error.remote.webRtcFailed"),
+        message.terminal === true,
       );
   }
 }
