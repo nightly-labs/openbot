@@ -71,7 +71,7 @@ export function settleQuietRoutineTurn(
 }
 
 /** An answer that is text alone: no file, image or question. */
-function isTextAnswer(message: ConversationMessage): boolean {
+export function isTextAnswer(message: ConversationMessage): boolean {
   return (
     !isWorkNote(message) &&
     message.itemType !== "question_prompt" &&

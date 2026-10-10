@@ -251,6 +251,7 @@ export class TurnLifecycle {
     this.#turnErrors.clear();
     this.#limitedTurns.clear();
     this.#runningTurns.clear();
+    this.#noUpdateTurns.clear();
     this.#refusedRetries.clear();
     this.#lastEventAt.clear();
     this.#itemTurns.clear();

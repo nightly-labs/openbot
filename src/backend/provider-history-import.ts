@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { AgentProviderId, ConversationMessage } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { isImageGenerationItem } from "./agent/image-generation";
-import { isNoUpdateAnswer, isNoUpdateToolCall } from "./agent/routine-quiet-runs";
+import { isNoUpdateAnswer, isNoUpdateToolCall, isTextAnswer } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
 import type { DeliveryContext } from "./mailbox-store";
@@ -260,12 +260,13 @@ function importCompletedTurn(
 /**
  * How a turn that a scheduled routine run started answered: `quiet` when each answer is only the
  * no-update marker, or the agent called the no-update tool and generated no image, so the turn
- * completion dropped all of them with the turn's thinking, `answered`
- * for any other such turn, and `none` for a turn that no scheduled routine run started. A Test,
- * script or webhook run keeps its answers, as the turn completion does. Decided from the staged
- * items alone, one bounded page at a time, so it needs no stored state.
+ * completion dropped all of them with the turn's thinking; `image` when the agent called the tool
+ * and generated an image, so the completion dropped only the text answers; `answered` for any
+ * other such turn, and `none` for a turn that no scheduled routine run started. A Test, script or
+ * webhook run keeps its answers, as the turn completion does. Decided from the staged items alone,
+ * one bounded page at a time, so it needs no stored state.
  */
-type RoutineTurnAnswers = "none" | "answered" | "quiet";
+type RoutineTurnAnswers = "none" | "answered" | "image" | "quiet";
 
 function routineTurnAnswers(
   input: ProviderHistoryImportInput,
@@ -302,8 +303,8 @@ function routineTurnAnswers(
       afterIndex = last.itemIndex;
     }
     if (!routine) return "none";
-    if (imageGenerated) return "answered";
-    return noUpdateCalled || (markers > 0 && !reported) ? "quiet" : "answered";
+    if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
+    return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
 }
 
@@ -311,6 +312,7 @@ function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {
   return (message: ConversationMessage): boolean => {
     if (message.author !== "assistant") return true;
     if (routine === "quiet") return false;
+    if (routine === "image") return !isTextAnswer(message);
     return message.itemType === "commentary" || !isNoUpdateAnswer(message.text);
   };
 }
