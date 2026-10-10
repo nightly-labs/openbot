@@ -157,8 +157,10 @@ export function formatUsageResetIn(
   text: UsageText = currentText(),
 ): string | null {
   if (resetsAt === null) return null;
-  const totalMinutes = Math.max(1, Math.ceil((resetsAt * 1_000 - nowMs) / 60_000));
-  if (!Number.isFinite(totalMinutes)) return null;
+  const remainingMs = resetsAt * 1_000 - nowMs;
+  // A past reset means the reading is stale until the next refresh; show no countdown.
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
+  const totalMinutes = Math.ceil(remainingMs / 60_000);
   const days = Math.floor(totalMinutes / 1_440);
   const hours = Math.floor((totalMinutes % 1_440) / 60);
   const minutes = totalMinutes % 60;
