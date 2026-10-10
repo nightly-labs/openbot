@@ -71,7 +71,7 @@ export const MarkdownShort: Story = {
   args: { preview: MARKDOWN_SHORT_PREVIEW },
 };
 
-/** A plain text file in a monospace block that keeps its spacing and scrolls sideways. */
+/** A plain text file in a monospace block that keeps its spacing and scrolls sideways. The wrap button wraps long lines. */
 export const Text: Story = {
   args: { preview: TEXT_PREVIEW },
 };

@@ -6,7 +6,7 @@ import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 
 import { MediaFilePreview } from "./MediaFilePreview";
 
@@ -59,7 +59,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   // first. Two frames guarantee that paint before the open state applies.
   const [revealed, setRevealed] = createSignal(false);
   const [rawSource, setRawSource] = createSignal(false);
-  const [wrapLines, setWrapLines] = createSignal(props.readWrapLines());
+  const [wrapLines, setWrapLines] = createSignal(untrack(() => props.readWrapLines()));
   let currentPreviewUrl: string | null = null;
   const file = () => (props.directory ? null : props.preview);
   const previewKind = () => file()?.previewKind;
@@ -302,9 +302,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             </Show>
           )}
         </Show>
-        <Show when={previewKind() === "markdown" && rawSource()}>
-          <pre class={{ "file-preview-text": true, "file-preview-text-wrap": wrapLines() }}>{text().value}</pre>
-        </Show>
         <Show when={previewKind() === "markdown" && !rawSource()}>
           <MarkdownFilePreview
             class="file-preview-markdown"
@@ -323,9 +320,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={!rawSource() && pageUrl()}>
           {(url) => <ChatVisual fill src={url()} title={title()} onOpenLink={props.onOpenLink} />}
         </Show>
-        <Show when={previewKind() === "text" && (rawSource() || !pageUrl())}>
+        <Show when={showsSourceText()}>
           <pre class={{ "file-preview-text": true, "file-preview-text-wrap": wrapLines() }}>{text().value}</pre>
-          <Show when={text().truncated}>
+          <Show when={previewKind() === "text" && text().truncated}>
             <p class="file-preview-truncated">{t("preview.truncated", { limit: format.number(TEXT_LIMIT) })}</p>
           </Show>
         </Show>
