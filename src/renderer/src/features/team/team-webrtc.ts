@@ -59,6 +59,7 @@ interface PeerState {
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
   reconnectAttempt: number;
+  signalRetryAt: number;
   reconnectTimer: number | null;
   turnRefreshTimer: number | null;
   /** When the credentials of the current path must be renewed. */
@@ -154,6 +155,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         channels: {},
         payloadDecoders: {},
         reconnectAttempt: 0,
+        signalRetryAt: 0,
         reconnectTimer: null,
         turnRefreshTimer: null,
         turnRefreshDueAt: 0,
@@ -253,10 +255,14 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
     prepared?.close(1000, "Peer stopped");
     return;
   }
+  if (Date.now() < state.signalRetryAt) {
+    prepared?.close(1000, "Signal retry pending");
+    scheduleSignalReconnect(state);
+    return;
+  }
   const socket = prepared ?? new WebSocket(state.signalUrl);
   state.socket = socket;
   const sendHello = () => {
-    state.reconnectAttempt = 0;
     const hello: SignalClientMessage = {
       type: "hello",
       version: SIGNAL_PROTOCOL_VERSION,
@@ -299,6 +305,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       post({ type: "peer-disconnected", peerId: state.id });
       return;
     }
+    if (event.code === 1008) state.signalRetryAt = Date.now() + 60_000;
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());
@@ -327,6 +334,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "error") {
+    if (message.code === "rate_limited") {
+      state.signalRetryAt = Date.now() + 60_000;
+      state.socket?.close();
+    }
     post({
       type: "peer-error",
       peerId: state.id,
@@ -349,6 +360,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     return;
   }
   if (message.type === "ready") {
+    state.reconnectAttempt = 0;
     // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
     // path is still connected keeps the path. A TURN refresh still restarts ICE, so a relayed path
     // moves to the new credentials.
@@ -778,7 +790,6 @@ function replaceSignal(state: PeerState): void {
   if (state.closed) return;
   if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
   state.reconnectTimer = null;
-  state.reconnectAttempt = 0;
   state.restartIceOnReady = true;
   const socket = state.socket;
   state.socket = null;
@@ -788,7 +799,7 @@ function replaceSignal(state: PeerState): void {
 
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
-  const delay = Math.min(30_000, 500 * 2 ** state.reconnectAttempt++);
+  const delay = Math.max(state.signalRetryAt - Date.now(), Math.min(30_000, 500 * 2 ** state.reconnectAttempt++));
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;
     connectSignal(state);

@@ -292,6 +292,8 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   let active = true;
   let peer: PeerState | null = null;
+  // Keep the rate-limit wait when recovery replaces a peer or the app returns to the foreground.
+  let signalRetryAt = 0;
   let generation = 0;
   const pendingRequests = new Map<string, PendingRequest>();
   const files = createRemoteFileSender(
@@ -651,12 +653,15 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
 
   function openSignal(state: PeerState, actions: ActionsRef): void {
     if (!active || state.closed || peer !== state || state.socket) return;
+    if (Date.now() < signalRetryAt) {
+      scheduleReconnect(state, actions);
+      return;
+    }
     const socket = new WebSocket(state.signalUrl);
     state.socket = socket;
     state.signalReady = false;
     socket.onopen = () => {
       if (state.closed || peer !== state || state.socket !== socket) return;
-      state.reconnectAttempt = 0;
       diagnose(state, "signal-open");
       const hello: SignalClientMessage = {
         type: "hello",
@@ -702,6 +707,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       state.socket = null;
       state.signalReady = false;
       if (state.closed || peer !== state) return;
+      if (event?.code === 1008) signalRetryAt = Date.now() + 60_000;
       diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
       scheduleReconnect(state, actions);
     };
@@ -724,11 +730,17 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
         return;
       }
       if (message.type === "error") {
+        if (message.code === "rate_limited") {
+          signalRetryAt = Date.now() + 60_000;
+          state.socket?.close();
+          return;
+        }
         if (message.code === "session_revoked")
           return yield* failPeerEffect(state, new Error(message.message), actions, "session_revoked");
         return yield* new RemotePeerError({ message: message.message });
       }
       if (message.type === "ready") {
+        state.reconnectAttempt = 0;
         // The host replaces a connection after 10 ICE restarts, so a socket that comes back while the
         // path is still online, such as on a return to the foreground, keeps the path. A TURN refresh
         // still restarts ICE, so a relayed path moves to the new credentials.
@@ -1335,8 +1347,10 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     // A signaling-only interruption can resume inside Signal's grace window while
     // the data channels stay online. A peer that recovers its ICE path needs Signal
     // for the restart. The recovery owner replaces dead peers.
-    const delay =
-      isPeerOnline(state) || canRecoverPeer(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000;
+    const delay = Math.max(
+      signalRetryAt - Date.now(),
+      isPeerOnline(state) || canRecoverPeer(state) ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) : 60_000,
+    );
     diagnose(state, "signal-retry", `in ${delay} ms`);
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;

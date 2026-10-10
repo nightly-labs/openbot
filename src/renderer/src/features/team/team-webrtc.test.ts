@@ -488,3 +488,65 @@ function requiredBinaryFrame(frames: Array<string | ArrayBuffer>, index: number)
   if (!(frame instanceof ArrayBuffer)) throw new Error("Expected a binary WebRTC frame.");
   return frame;
 }
+
+it("increases Signal retries until ready accepts the hello", async () => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const latest = () => {
+    const socket = SignalSocket.instances.at(-1);
+    if (!socket) throw new Error("No Signal socket");
+    socket.dispatchEvent(new Event("open"));
+    return socket;
+  };
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(2);
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(3);
+  latest().message({ type: "ready", version: 1, connectionId: null, resumeToken: "resume", iceServers: [] });
+  await vi.waitFor(() => expect(posted("signal-ready")).toHaveLength(1));
+  latest().dispatchEvent(new Event("close"));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(SignalSocket.instances).toHaveLength(4);
+  await command({ type: "close", peerId: "all" });
+});
+
+it.each(["error", "close"])("waits a full Signal rate window after %s", async (kind) => {
+  vi.useFakeTimers();
+  const { command, posted } = await startBridge();
+  await command({
+    type: "connect",
+    peerId: "host",
+    peer: "host",
+    signalUrl: "wss://signal.test",
+    token: "test",
+    iceTransportPolicy: "all",
+  });
+  const socket = SignalSocket.instances[0];
+  if (!socket) throw new Error("No Signal socket");
+  socket.dispatchEvent(new Event("open"));
+  if (kind === "error") {
+    socket.message({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+    await vi.waitFor(() => expect(posted("peer-error")).toHaveLength(1));
+    socket.dispatchEvent(new Event("close"));
+  } else {
+    socket.dispatchEvent(Object.assign(new Event("close"), { code: 1008 }));
+  }
+  await command({ type: "restart-ice", peerId: "host" });
+  await vi.advanceTimersByTimeAsync(59_000);
+  expect(SignalSocket.instances).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(SignalSocket.instances).toHaveLength(2);
+  await command({ type: "close", peerId: "all" });
+});

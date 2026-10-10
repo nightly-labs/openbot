@@ -945,6 +945,27 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  it.each(["error", "close"])("keeps the peer and waits after a Signal rate-limit %s", async (kind) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const network = await setupNetwork();
+    await network.connect();
+    const socket = network.socket();
+    if (kind === "error") {
+      socket.receive({ type: "error", version: 1, code: "rate_limited", message: "Too many signal messages." });
+      await vi.waitFor(() => expect(socket.readyState).toBe(3));
+    } else socket.close(1008);
+    network.runtime.setActive(false);
+    network.runtime.setActive(true);
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(network.sockets).toHaveLength(1);
+    expect(network.updates.filter((update) => update.state === "offline")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(network.sockets).toHaveLength(2);
+    expect(network.bootstraps()).toBe(1);
+    expect(network.connections).toHaveLength(1);
+    await network.runtime.dispose();
+  });
+
   it("suspends Signal reconnects in the background and resumes healthy data channels without a new ticket", async () => {
     // Fake only timers: network and cryptographic callbacks still run as ordinary microtasks.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -1098,7 +1119,7 @@ async function setupNetwork(
     readyState = 1;
     halfOpen = false;
     onopen: (() => void) | null = null;
-    onclose: (() => void) | null = null;
+    onclose: ((event?: { code: number }) => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
     constructor() {
       sockets.push(this);
@@ -1132,9 +1153,9 @@ async function setupNetwork(
           });
         });
     }
-    close() {
+    close(code?: number) {
       this.readyState = 3;
-      this.onclose?.();
+      this.onclose?.(code === undefined ? undefined : { code });
     }
   }
 
