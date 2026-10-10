@@ -41,7 +41,7 @@ export interface SettingsModalProps {
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
-  onOpenWhatsNew?: () => void;
+  onOpenWhatsNew?: (() => void) | undefined;
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;

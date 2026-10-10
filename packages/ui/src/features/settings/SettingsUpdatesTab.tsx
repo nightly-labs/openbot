@@ -37,7 +37,7 @@ const UPDATE_TRACK_LABELS = { Stable: "settings.updates.track.stable" } as const
 
 interface SettingsUpdatesTabProps {
   store: SettingsUpdatesStore;
-  onOpenWhatsNew?: () => void;
+  onOpenWhatsNew?: (() => void) | undefined;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   /** The dialog element the Select popover portals into, captured when this tab was created. */
