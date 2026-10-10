@@ -227,6 +227,9 @@ const UNAVAILABLE = { status: 503 } as const;
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
 const SIGNAL_RECONNECT_GRACE_MILLISECONDS = 30_000;
+// The older sockets of a host stay registered. This limits them, because host sockets are not in the
+// account's connection limit.
+const MAXIMUM_SOCKETS_PER_HOST = 4;
 const INITIAL_TICKET_TTL_MILLISECONDS = 3 * 60_000;
 const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
@@ -1025,9 +1028,11 @@ export class SignalService {
         // A reconnect replaces the old client even when its host has disconnected and the peer has
         // no connection record. Admission and replacement must have no asynchronous gap.
         const replaced = message.peer === "client" ? this.#clientForSession(claims) : null;
+        // Only clients count. Host tickets carry the owner's account, so its own devices must not keep
+        // its server from registering.
         if (
-          message.peer !== "ingress" &&
-          this.#userConnectionCount(claims.userId, replaced?.socket.id) >= this.#maximumConnectionsPerUser
+          message.peer === "client" &&
+          this.#userClientCount(claims.userId, replaced?.socket.id) >= this.#maximumConnectionsPerUser
         ) {
           this.#fail(socket, "rate_limited", "Too many active remote connections.", 1008);
           return;
@@ -1108,7 +1113,22 @@ export class SignalService {
           return;
         }
         if (message.peer === "host") {
+          // A host that changed network or restarted can leave its old socket open until the idle
+          // timeout. `#restoreWaitingClients` moves the clients of the older sockets here. The older
+          // sockets stay registered and are not closed: a host treats code 4000 as final, and when
+          // two instances overlap, the other one takes the clients again when this socket closes.
+          for (const socketId of this.#hosts.get(claims.hostId) ?? []) this.#releaseHostClients(socketId);
           const hostSockets = this.#hosts.get(claims.hostId) ?? new Set<string>();
+          // Close the oldest sockets with a code that lets a live host connect again.
+          for (const socketId of [...hostSockets].slice(
+            0,
+            Math.max(0, hostSockets.size - MAXIMUM_SOCKETS_PER_HOST + 1),
+          )) {
+            hostSockets.delete(socketId);
+            this.#peers.delete(socketId);
+            this.#clearPeerExpiration(socketId);
+            this.#sockets.get(socketId)?.close(1013, "Host has too many Signal connections.");
+          }
           hostSockets.add(socket.id);
           this.#hosts.set(claims.hostId, hostSockets);
           this.#send(socket, {
@@ -1176,9 +1196,8 @@ export class SignalService {
   );
 
   /**
-   * The host socket that said hello last. A host that stops with no close, such as a hosted server
-   * that its provider stops, keeps its old socket until the idle timeout. Its new socket is the one
-   * that answers.
+   * The host socket that said hello last. A new host hello takes the clients of the older sockets of
+   * its host, such as the socket of a hosted server that its provider stopped with no close.
    */
   #currentHost(hostId: string): AuthenticatedPeer | null {
     let current: AuthenticatedPeer | null = null;
@@ -1266,6 +1285,17 @@ export class SignalService {
     peer.socket.close(4000, "Remote session resumed");
   }
 
+  #releaseHostClients(hostSocketId: string): void {
+    for (const connection of [...this.#connections.values()]) {
+      if (connection.host.id !== hostSocketId) continue;
+      this.#clearConnectionDrop(connection.id);
+      this.#connections.delete(connection.id);
+      const clientPeer = this.#peers.get(connection.client.id);
+      if (clientPeer) clientPeer.connectionId = null;
+    }
+    this.#metrics.activePeerConnections = this.#connections.size;
+  }
+
   #dropConnection(connectionId: string, sourceSocketId: string): void {
     const connection = this.#connections.get(connectionId);
     if (!connection) return;
@@ -1328,10 +1358,10 @@ export class SignalService {
     return Boolean(connection && (connection.client.id === peer.socket.id || connection.host.id === peer.socket.id));
   }
 
-  #userConnectionCount(userId: string, exceptSocketId?: string): number {
+  #userClientCount(userId: string, exceptSocketId?: string): number {
     let total = 0;
     for (const peer of this.#peers.values()) {
-      if (peer.peer !== "ingress" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
+      if (peer.peer === "client" && peer.claims.userId === userId && peer.socket.id !== exceptSocketId) total += 1;
     }
     return total;
   }

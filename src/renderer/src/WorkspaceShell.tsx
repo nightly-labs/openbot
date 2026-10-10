@@ -1,5 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { ServerConnectionNotice, ServerPanelLoadNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { useText } from "@openbot/ui/text";
 import { createMemo, Loading, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
@@ -48,6 +49,7 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  */
 export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   const platform = usePlatform();
+  const { sourceText } = useText();
   const scope = useServerScope();
   const settings = useSettings();
   const channels = useChannels();
@@ -82,8 +84,14 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
-  // The transport failure comes first: a workspace load fails when the transport fails.
-  const connectionFailure = () => activeServer()?.issue ?? (scope.connection.failed ? scope.connection.failure : null);
+  // The transport failure comes first: a workspace load fails when the transport fails. Signal and
+  // the host send English source text, so show the issue in the reader's language. The scope failure
+  // is already translated.
+  const connectionFailure = () => {
+    const issue = activeServer()?.issue;
+    if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
+    return scope.connection.failed ? scope.connection.failure : null;
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
