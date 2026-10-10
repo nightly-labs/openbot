@@ -231,9 +231,19 @@ it("routes two phones independently and disconnects or resumes only the addresse
   await vi.waitFor(() => expect(posted("incoming-peer")).toHaveLength(3));
   expect(posted("incoming-peer").at(-1)?.peerId).toBe(second?.peerId);
   expect(PeerConnection.instances).toHaveLength(2);
-  await command({ type: "disconnect-peer", peerId: first?.peerId });
+  const desktop = channels[0]?.at(-1);
+  if (!desktop) throw new Error("The first peer needs a desktop channel.");
+  rtc1.connectionState = "connected";
+  desktop.readyState = "closed";
+  signal.send.mockClear();
+  desktop.onclose?.();
+  desktop.onclose?.();
   expect(rtc1.close).toHaveBeenCalledOnce();
   expect(rtc2.close).not.toHaveBeenCalled();
+  expect(signal.close).not.toHaveBeenCalled();
+  expect(signal.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+    { type: "disconnect", version: 1, connectionId: "connection-1" },
+  ]);
   await command({ type: "send", peerId: second?.peerId, channel: "rpc", data: "still-connected" });
   expect(channels[1]?.[0]?.send).toHaveBeenCalledExactlyOnceWith("still-connected");
   expect(posted("peer-disconnected").map((message) => message.peerId)).toEqual([first?.peerId]);

@@ -102,6 +102,10 @@ export function createRemoteBrowserView(
     disconnect();
     if (current) yield* release(current);
   });
+  const fail = Effect.fn("RemoteBrowserView.fail")(function* (target: View) {
+    if (view === target) disconnect(sourceText("error.backend.browserViewFailed"));
+    yield* release(target).pipe(Effect.catch(() => Effect.void));
+  });
   const open = Effect.fn("RemoteBrowserView.open")(function* (
     tabId: string,
     frame: (frame: BrowserViewFrame) => void,
@@ -144,11 +148,9 @@ export function createRemoteBrowserView(
         path: path.pathname + path.search,
       }),
     ).pipe(
-      Effect.catch((error) => {
-        if (view === next) disconnect();
-        return release(next).pipe(
-          Effect.catch(() => Effect.void),
-          Effect.andThen(Effect.fail(error)),
+      Effect.catch(() => {
+        return fail(next).pipe(
+          Effect.andThen(Effect.fail(new BrowserViewError({ message: sourceText("error.backend.browserViewFailed") }))),
         );
       }),
     );
@@ -159,6 +161,14 @@ export function createRemoteBrowserView(
       if (!wire) return;
       yield* sendFrame(
         encodeRemoteDesktopSignalControl({ type: "text", streamId: next.streamId, data: encodeBrowserViewInput(wire) }),
+      ).pipe(
+        Effect.catch(() =>
+          fail(next).pipe(
+            Effect.andThen(
+              Effect.fail(new BrowserViewError({ message: sourceText("error.backend.browserViewFailed") })),
+            ),
+          ),
+        ),
       );
     });
     return {
@@ -206,7 +216,7 @@ export function createRemoteBrowserView(
             current.frame(decodeBrowserViewFrame(binary.bytes));
         }
       } catch {
-        void runTeamEffect(close()).catch(() => undefined);
+        void runTeamEffect(fail(current)).catch(() => undefined);
       }
     },
     open,

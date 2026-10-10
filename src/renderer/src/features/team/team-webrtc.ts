@@ -632,11 +632,10 @@ function bindDataChannel(
       code: "data_channel_error",
       message: sourceText("error.remote.dataChannelFailed", { kind }),
     });
-  // The host can close the connection while this computer sleeps. The path can still read
-  // `connected` and Signal does not tell this end, but the channels close. Without this, main reads
-  // the host as connected and each request fails on a closed channel.
+  // Either end can lose a channel while the path still reads `connected`. Release that peer so
+  // the client can connect again. A host child closes only its own peer, not the shared Signal socket.
   channel.onclose = () => {
-    if (state.closed || state.role !== "client" || state.channels[kind] !== channel) return;
+    if (state.closed || state.channels[kind] !== channel) return;
     dropConnection(state);
   };
 }
