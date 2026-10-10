@@ -214,6 +214,9 @@ client can edit text on a new host without changing inclusion. Storage choices r
 256, and 512. Lowering the setting never deletes existing entries.
 
 Only essential memories enter startup instructions, in a block limited to 8,192 UTF-8 bytes.
+Claude gets that block with a user turn instead: the full block in the first turn and after a
+compaction, and only the change after a memory edit. A memory change then keeps the cached
+system prompt and does not restart the Claude query. A profile change still restarts it.
 Saved memories stay on the host in SQLite. Agents can use bounded local search and ID-paged
 listing to recall other entries. FTS5 uses `unicode61` and BM25. Queries match any literal term;
 equal scores use the newest update, then the memory ID. Search returns at most 10 entries,
