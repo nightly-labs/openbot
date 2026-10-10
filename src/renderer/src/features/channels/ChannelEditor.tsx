@@ -25,8 +25,9 @@ import { useChannels } from "./channels-context";
 import { matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
 interface ChannelEditorProps {
-  memoryCount: number;
-  routineCount: number;
+  /** `null` until the host answers. A read that failed leaves it null, so the row shows no count. */
+  memoryCount: number | null;
+  routineCount: number | null;
   onOpenMemories: () => void;
   onOpenRoutines: () => void;
 }
@@ -325,12 +326,16 @@ export function ChannelEditor(props: ChannelEditorProps) {
       <SettingsLinkGroup>
         <SettingsLinkRow
           label={t("channel.settings.memories")}
-          value={t("channel.settings.memoryCount", { count: props.memoryCount })}
+          value={
+            props.memoryCount === null ? undefined : t("channel.settings.memoryCount", { count: props.memoryCount })
+          }
           onClick={props.onOpenMemories}
         />
         <SettingsLinkRow
           label={t("channel.settings.routines")}
-          value={t("channel.settings.routineCount", { count: props.routineCount })}
+          value={
+            props.routineCount === null ? undefined : t("channel.settings.routineCount", { count: props.routineCount })
+          }
           onClick={props.onOpenRoutines}
         />
       </SettingsLinkGroup>
