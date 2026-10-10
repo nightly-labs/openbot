@@ -96,7 +96,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         label={title()}
         title={title()}
         detail={detail()}
-        reference={props.reference}
+        reference={props.reference ?? null}
         actions={actions()}
       />
     </Show>
