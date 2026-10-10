@@ -939,3 +939,27 @@ index 2de0aa7c76c766b076336b82e1d916366eb2d517..98d5f56053478b18d1120a3bd40d6b3c
  	const { DomCollectionProvider } = createDomCollection({
  		items,
  		onItemsChange: setItems
+diff --git a/dist/dropdown-menu/BMbSJJfZ.js b/dist/dropdown-menu/BMbSJJfZ.js
+--- a/dist/dropdown-menu/BMbSJJfZ.js
++++ b/dist/dropdown-menu/BMbSJJfZ.js
+@@ -15,7 +15,7 @@
+ 	let hasInteractedOutside = false;
+ 	const onCloseAutoFocus = (e) => {
+ 		props.onCloseAutoFocus?.(e);
+-		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
++		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
+ 		hasInteractedOutside = false;
+ 		e.preventDefault();
+ 	};
+diff --git a/dist/dropdown-menu/enw8HTeV.jsx b/dist/dropdown-menu/enw8HTeV.jsx
+--- a/dist/dropdown-menu/enw8HTeV.jsx
++++ b/dist/dropdown-menu/enw8HTeV.jsx
+@@ -14,7 +14,7 @@
+ 	let hasInteractedOutside = false;
+ 	const onCloseAutoFocus = (e) => {
+ 		props.onCloseAutoFocus?.(e);
+-		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
++		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
+ 		hasInteractedOutside = false;
+ 		e.preventDefault();
+ 	};

@@ -133,16 +133,19 @@ export class ChannelService {
 
   /**
    * `beforeApply` changes the command when its turn in the queue comes, immediately before it is
-   * applied. A caller that completes a command from the stored channel must do it there: the
+   * applied, or returns null to drop it. A caller that completes a command from the stored channel must do it there: the
    * channel it reads before the call can be older than the commands that still wait in the queue.
    */
   readonly command = Effect.fn("ChannelService.command")(
     (
       command: ChannelCommand,
       actor: { id: string; name: string },
-      beforeApply: (command: ChannelCommand) => ChannelCommand = (queued) => queued,
+      beforeApply: (command: ChannelCommand) => ChannelCommand | null = (queued) => queued,
     ) => {
-      const operation = Effect.suspend(() => this.apply(beforeApply(command), actor));
+      const operation = Effect.suspend(() => {
+        const next = beforeApply(command);
+        return next ? this.apply(next, actor) : channelSync(() => this.store.get(command.channelId));
+      });
       return command.type === "stop" || command.type === "archive"
         ? operation
         : this.#serialize(command.channelId, operation);
@@ -334,77 +337,94 @@ export class ChannelService {
               messageId: id,
               text: command.text,
               draftIds: command.attachmentDraftIds,
+              assertOpen: () => {
+                if (this.store.get(channel.id).archived) throw new Error(sourceText("error.backend.channelArchived"));
+              },
             })
             .pipe(Effect.mapError(channelFailure))
         : null;
-      const current = committed ? yield* channelSync(() => this.store.get(channel.id)) : channel;
-      if (current.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
-      const text = committed?.text ?? command.text;
-      const messages = yield* channelSync(() => this.store.messages(current.id));
-      const referenced = command.replyToMessageId
-        ? messages.find((message) => message.id === command.replyToMessageId)
-        : undefined;
-      if (command.replyToMessageId && !referenced)
-        return yield* channelFailure(new Error(sourceText("error.backend.channelReferenceUnavailable")));
-      const allTasks = yield* channelSync(() => this.store.tasks(current.id));
-      const open = allTasks.filter((task) => !terminal(task));
-      const previous = referenced?.taskId
-        ? allTasks.find((task) => task.id === referenced.taskId)
-        : open.length === 1 &&
-            /^(?:also|instead|actually|please change|change that|correction|continue|yes|no|use that|make it)\b/iu.test(
-              text.trim(),
-            )
-          ? open[0]
+      // Once the drafts are consumed, every refusal below must give them back.
+      const stored = yield* Effect.gen({ self: this }, function* () {
+        const current = committed ? yield* channelSync(() => this.store.get(channel.id)) : channel;
+        if (current.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
+        const text = committed?.text ?? command.text;
+        const messages = yield* channelSync(() => this.store.messages(current.id));
+        const referenced = command.replyToMessageId
+          ? messages.find((message) => message.id === command.replyToMessageId)
           : undefined;
-      // A reply to a member is addressed to that member. The arm above only catches a reply that
-      // carries a task; a plain progress note and the lead's own dispatch carry none, and those
-      // used to fall through to a full routing turn to rediscover the author the reply names.
-      const repliedMember =
-        !previous && referenced && !referenced.taskId && referenced.author.kind === "agent"
-          ? this.eligibleMembers(current).find((agentId) => agentId === referenced.author.id)
-          : undefined;
-      const task = previous
-        ? {
-            ...previous,
-            instruction: text,
-            dependencies: [],
-            requestMessageId: id,
-            sourceMessageIds: [...previous.sourceMessageIds.slice(-30), id],
-            revision: previous.revision + 1,
-            state: "queued" as const,
-            error: null,
-            ownerAgentId: command.recipientAgentId ?? previous.ownerAgentId,
-          }
-        : this.newTask(current.id, id, text, command.recipientAgentId ?? repliedMember ?? null);
-      const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
-      message.message.replyToMessageId = command.replyToMessageId;
-      if (committed) message.message.attachments = committed.attachments;
-      const affected = previous ? descendants(allTasks, previous.id) : [];
-      const stopped = affected
-        .filter((item) => item.id !== task.id)
-        .map(
-          (item): ChannelTask => ({
-            ...item,
-            revision: item.revision + 1,
-            state: "paused",
-            error: "The parent request changed.",
-          }),
+        if (command.replyToMessageId && !referenced)
+          return yield* channelFailure(new Error(sourceText("error.backend.channelReferenceUnavailable")));
+        const allTasks = yield* channelSync(() => this.store.tasks(current.id));
+        const open = allTasks.filter((task) => !terminal(task));
+        const previous = referenced?.taskId
+          ? allTasks.find((task) => task.id === referenced.taskId)
+          : open.length === 1 &&
+              /^(?:also|instead|actually|please change|change that|correction|continue|yes|no|use that|make it)\b/iu.test(
+                text.trim(),
+              )
+            ? open[0]
+            : undefined;
+        // A reply to a member is addressed to that member. The arm above only catches a reply that
+        // carries a task; a plain progress note and the lead's own dispatch carry none, and those
+        // used to fall through to a full routing turn to rediscover the author the reply names.
+        const repliedMember =
+          !previous && referenced && !referenced.taskId && referenced.author.kind === "agent"
+            ? this.eligibleMembers(current).find((agentId) => agentId === referenced.author.id)
+            : undefined;
+        const task = previous
+          ? {
+              ...previous,
+              instruction: text,
+              dependencies: [],
+              requestMessageId: id,
+              sourceMessageIds: [...previous.sourceMessageIds.slice(-30), id],
+              revision: previous.revision + 1,
+              state: "queued" as const,
+              error: null,
+              ownerAgentId: command.recipientAgentId ?? previous.ownerAgentId,
+            }
+          : this.newTask(current.id, id, text, command.recipientAgentId ?? repliedMember ?? null);
+        const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
+        message.message.replyToMessageId = command.replyToMessageId;
+        if (committed) message.message.attachments = committed.attachments;
+        const affected = previous ? descendants(allTasks, previous.id) : [];
+        const stopped = affected
+          .filter((item) => item.id !== task.id)
+          .map(
+            (item): ChannelTask => ({
+              ...item,
+              revision: item.revision + 1,
+              state: "paused",
+              error: "The parent request changed.",
+            }),
+          );
+        const result = yield* channelSync(() =>
+          this.store.update(
+            current,
+            {
+              messages: [
+                ...messages
+                  .filter((entry) => entry.taskId === previous?.id && entry.author.kind === "agent")
+                  .map((entry) => ({ ...entry, superseded: true })),
+                message,
+              ],
+              tasks: [...stopped, task],
+            },
+            operationId,
+          ),
         );
-      const result = yield* channelSync(() =>
-        this.store.update(
-          current,
-          {
-            messages: [
-              ...messages
-                .filter((entry) => entry.taskId === previous?.id && entry.author.kind === "agent")
-                .map((entry) => ({ ...entry, superseded: true })),
-              message,
-            ],
-            tasks: [...stopped, task],
-          },
-          operationId,
+        return { current, previous, affected, task, message, result };
+      }).pipe(
+        Effect.onExit((exit) =>
+          committed
+            ? Exit.isSuccess(exit)
+              ? committed.accept
+              : // A failed restore keeps the request committed in memory and on disk alike; report it.
+                committed.revert.pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))))
+            : Effect.void,
         ),
       );
+      const { current, previous, affected, task, message, result } = stored;
       this.publish(current.id);
       if (previous) {
         yield* this.interruptTasks(
@@ -865,6 +885,7 @@ export class ChannelService {
         taskId: task.id,
         agentId: task.ownerAgentId,
         taskRevision: task.revision,
+        requestMessageId: task.requestMessageId,
         resources: [...task.resources],
         deliveryId: null,
         turnId: null,
@@ -936,11 +957,29 @@ export class ChannelService {
               this.mailbox.cancel(assignment.agentId, delivery.id).pipe(Effect.mapError(channelFailure)),
             ),
           );
+          // The enqueue consumed the drafts even though the task moved on. Keep their saved copies
+          // on the request, as the success path does, or a later dispatch would ask for drafts
+          // that are gone.
+          const context = this.mailbox.getDelivery(delivery.id);
           channelResult(
             yield* Effect.result(
               channelSync(() =>
                 this.store.update(this.store.get(channelId), {
                   assignments: [{ ...assignment, state: "interrupted" }],
+                  tasks: latest ? [{ ...latest, attachmentDraftIds: [] }] : [],
+                  messages:
+                    committing && request && context
+                      ? [
+                          {
+                            ...request,
+                            message: {
+                              ...request.message,
+                              text: context.delivery.text,
+                              attachments: context.delivery.attachments,
+                            },
+                          },
+                        ]
+                      : [],
                 }),
               ),
             ),
@@ -978,12 +1017,56 @@ export class ChannelService {
         this.publish(channelId);
         this.hooks.schedule(assignment.agentId);
       } catch {
-        yield* channelSync(() =>
-          this.store.update(this.store.get(channelId), {
+        // The enqueue may have succeeded before a later step failed: a failed assignment must not
+        // leave its delivery in the queue.
+        const deliveryId = assignment.deliveryId;
+        if (deliveryId && this.mailbox.getDelivery(deliveryId)?.delivery.status === "queued") {
+          const cancelled = yield* Effect.result(
+            channelSync(() => this.mailbox.cancelNow(assignment.agentId, deliveryId)),
+          );
+          // The delivery then stays queued, possibly behind normal messages, so keeping its
+          // reservation could hold that queue forever. The assignment fails below as usual, and
+          // `prepare` refuses the delivery when it comes up, because its task is no longer queued
+          // at this revision: it ends without a turn.
+          if (Result.isFailure(cancelled)) this.hooks.error(cancelled.failure.cause);
+        }
+        yield* channelSync(() => {
+          // A stop or reassign that landed during the awaits above is newer: keep it.
+          const latest = this.store.tasks(channelId).find((item) => item.id === task.id);
+          const current = latest?.revision === task.revision && latest.state === "queued";
+          // A delivery means the enqueue consumed the drafts. Keep their saved copies on the
+          // request, as the success path does, or Resume would ask for drafts that are gone.
+          const context = deliveryId ? this.mailbox.getDelivery(deliveryId) : null;
+          const consumed = context ? { attachmentDraftIds: [] } : {};
+          return this.store.update(this.store.get(channelId), {
             assignments: [{ ...assignment, state: "failed" }],
-            tasks: [{ ...task, state: "failed", error: "Could not queue this assignment. Resume to try again." }],
-          }),
-        );
+            tasks: current
+              ? [
+                  {
+                    ...latest,
+                    ...consumed,
+                    state: "failed",
+                    error: "Could not queue this assignment. Resume to try again.",
+                  },
+                ]
+              : latest && context
+                ? [{ ...latest, attachmentDraftIds: [] }]
+                : [],
+            messages:
+              committing && request && context
+                ? [
+                    {
+                      ...request,
+                      message: {
+                        ...request.message,
+                        text: context.delivery.text,
+                        attachments: context.delivery.attachments,
+                      },
+                    },
+                  ]
+                : [],
+          });
+        });
         this.publish(channelId);
         yield* this.#releaseHeldAgents();
       }
@@ -1981,6 +2064,91 @@ export class ChannelService {
   clearMemories(channelId: string): void {
     this.store.get(channelId);
     if (this.memories.clear(channelId) > 0) this.hooks.memoriesChanged?.(channelId);
+  }
+
+  /**
+   * A routine that is deleted takes the requests it posted with it when no member has started any
+   * task of them yet, as an agent routine's queued delivery does. Work that already ran keeps its
+   * Stop control. An assignment is created before its delivery is queued, so "assigned" is not
+   * "started": only a turn, or a delivery that left the queue, shows that a member worked on it.
+   */
+  withdrawRequests(channelId: string, requests: ReadonlySet<string>): void {
+    const assignments = this.store.assignments(channelId);
+    // Every assignment counts, not only the active ones: a request that ran, was stopped and was
+    // resumed is queued again, and only its earlier, ended assignment shows that it started.
+    const tasks = this.store.tasks(channelId).filter((task) => requests.has(task.requestMessageId));
+    const requestOf = new Map(tasks.map((task) => [task.id, task.requestMessageId]));
+    const ran = (item: ChannelAssignment) => {
+      if (item.turnId || item.state === "running" || item.state === "completed") return true;
+      if (item.deliveryId === null) return false;
+      const status = this.mailbox.getDelivery(item.deliveryId)?.delivery.status;
+      return status !== undefined && status !== "queued" && status !== "cancelled";
+    };
+    const started = (item: ChannelAssignment) => {
+      // A task reused for a newer request keeps the assignments of the older one; they show that
+      // the older request ran, not this one. An assignment stored without its request counts.
+      if (item.requestMessageId !== null && item.requestMessageId !== requestOf.get(item.taskId)) return false;
+      return ran(item);
+    };
+    const held = new Set(assignments.filter(started).map((item) => item.taskId));
+    // A task that delegates gives its children its request id and waits for them: once any task of
+    // a request has started, the whole request stays. An assignment that stored its request proves
+    // that start even after a newer request reused its task.
+    // An assignment from before requests were stored proves only that its task ran. When a newer
+    // request reused that task, its children may still belong to this request: keep them.
+    const parentOf = new Map(this.store.tasks(channelId).map((task) => [task.id, task.parentTaskId]));
+    const legacyRan = new Set(
+      assignments.filter((item) => item.requestMessageId === null && ran(item)).map((item) => item.taskId),
+    );
+    const underLegacyRun = (task: ChannelTask) => {
+      const seen = new Set<string>();
+      for (let id = task.parentTaskId; id && !seen.has(id); id = parentOf.get(id) ?? null) {
+        if (legacyRan.has(id)) return true;
+        seen.add(id);
+      }
+      return false;
+    };
+    const begun = new Set([
+      ...tasks
+        .filter(
+          (task) =>
+            held.has(task.id) || (task.state !== "queued" && task.state !== "cancelled") || underLegacyRun(task),
+        )
+        .map((task) => task.requestMessageId),
+      ...assignments.flatMap((item) =>
+        item.requestMessageId !== null && requests.has(item.requestMessageId) && ran(item)
+          ? [item.requestMessageId]
+          : [],
+      ),
+    ]);
+    const pending = tasks.filter((task) => task.state === "queued" && !begun.has(task.requestMessageId));
+    if (!pending.length) return;
+    const pendingIds = new Set(pending.map((task) => task.id));
+    // An assignment still being queued has no delivery yet: the dispatcher sees the cancelled task
+    // after the enqueue and withdraws the delivery itself.
+    const withdrawn = assignments.filter(
+      (item) =>
+        activeAssignment(item) &&
+        pendingIds.has(item.taskId) &&
+        item.deliveryId !== null &&
+        // An older request's turn may still run on a reused task while the router stops it; that
+        // delivery is not this request's queued work.
+        (item.requestMessageId === null || item.requestMessageId === requestOf.get(item.taskId)),
+    );
+    for (const item of withdrawn) {
+      // A retry after a failed channel write finds the delivery cancelled already.
+      if (item.deliveryId && this.mailbox.getDelivery(item.deliveryId)?.delivery.status !== "cancelled") {
+        this.mailbox.cancelNow(item.agentId, item.deliveryId);
+      }
+    }
+    this.store.update(this.store.get(channelId), {
+      assignments: withdrawn.map((item) => ({ ...item, state: "interrupted" as const })),
+      tasks: pending.map((task) => ({ ...task, state: "cancelled", revision: task.revision + 1 })),
+    });
+    for (const item of withdrawn) this.resolveAssignmentTerminal(item.id);
+    this.publish(channelId);
+    // The withdrawn assignments reserved the host; let the agents queued behind them drain.
+    if (withdrawn.length) for (const agent of this.hooks.agents()) this.hooks.schedule(agent.id);
   }
 
   private publish(channelId: string): void {

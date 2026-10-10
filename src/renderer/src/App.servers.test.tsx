@@ -889,6 +889,45 @@ describe("OpenBot connected desktop shell", () => {
     },
   );
 
+  it("keeps the Remote Control viewer when another server changes", async () => {
+    const remote = {
+      ...testServer("remote-1", true),
+      kind: "remote" as const,
+      state: "online" as const,
+      remoteDesktopAvailable: true,
+      role: "owner" as const,
+    };
+    const other = { ...testServer("remote-2", false), kind: "remote" as const, state: "online" as const };
+    vi.mocked(window.openbot.servers.list).mockResolvedValueOnce([remote, other]);
+    vi.mocked(window.openbot.remoteDesktop.connect).mockResolvedValueOnce({
+      status: "connected",
+      session: {
+        id: "desktop-1",
+        serverId: "remote-1",
+        viewerUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/v1/remote-screen/sessions/desktop-1/viewer",
+        viewerGrant: "viewer-grant",
+        displays: [],
+        selectedDisplayId: null,
+        phase: "connecting",
+        transport: "unknown",
+        errorCode: null,
+        message: "Connecting…",
+        createdAt: "2026-08-18T12:00:00.000Z",
+        grantExpiresAt: "2026-08-18T12:01:00.000Z",
+      },
+    });
+    render(() => <App />);
+    await screen.findByRole("heading", { name: "Chief" });
+    await fireEvent.click(screen.getByRole("button", { name: "Open remote control" }));
+    const viewer = await screen.findByTitle("Sunshine remote desktop");
+
+    // The viewer grant works once, so a new frame for the same session would show "Remote access expired".
+    emitServers?.([{ ...remote }, { ...other, state: "offline" }]);
+
+    await waitFor(() => expect(screen.getByTitle("Sunshine remote desktop")).toBe(viewer));
+    expect(window.openbot.remoteDesktop.connect).toHaveBeenCalledTimes(1);
+  });
+
   it("disconnects a hidden Remote Control session when the server changes", async () => {
     const servers = [
       {

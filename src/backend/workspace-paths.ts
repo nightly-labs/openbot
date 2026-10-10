@@ -94,7 +94,10 @@ function counterpartWorkspaceRoot(workspacePath: string, agentId: string): strin
 
 export function isWithin(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);
-  return relativePath !== "" && !relativePath.startsWith("..") && !isAbsolute(relativePath);
+  // `..notes.md` is a child; only `..` itself or a `../` prefix leaves the root.
+  return (
+    relativePath !== "" && relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath)
+  );
 }
 
 function decodePath(value: string): string {

@@ -72,7 +72,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
             <ContextMenu.Portal>
               <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.section.actions")}>
                 <Show when={custom()}>
-                  <ContextMenu.Item onSelect={() => startRenameSection(headerProps.sectionId)}>
+                  <ContextMenu.Item onSelectAfterClose={() => startRenameSection(headerProps.sectionId)}>
                     <Pencil class="agent-context-icon size-4" aria-hidden="true" />
                     <span>{t("common.rename")}</span>
                   </ContextMenu.Item>
