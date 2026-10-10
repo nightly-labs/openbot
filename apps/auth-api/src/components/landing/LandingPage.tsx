@@ -10,6 +10,7 @@ import { HeroDownloadSelector } from "./HeroDownloadSelector";
 import { LandingAppPreview } from "./LandingAppPreview";
 import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
+import { LandingStatement } from "./LandingStatement";
 import { PricingSection } from "./PricingSection";
 import { SiteHeader } from "./SiteHeader";
 
@@ -100,6 +101,7 @@ export function LandingPage() {
 
           <LandingAppPreview />
         </section>
+        <LandingStatement />
         <FeaturesSection />
         <PricingSection />
         <FaqSection />

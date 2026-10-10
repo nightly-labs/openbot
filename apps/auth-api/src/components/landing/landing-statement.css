@@ -1,0 +1,187 @@
+.landing-statement {
+  --statement-swap-duration: 250ms;
+  --statement-hover-duration: 320ms;
+  --statement-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  width: min(100%, 1280px);
+  margin-inline: auto;
+  padding: clamp(48px, 7vw, 100px) clamp(20px, 4vw, 48px) clamp(72px, 9vw, 128px);
+  text-align: center;
+}
+
+.landing-statement-text {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: clamp(32px, 5vw, 72px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.65;
+  text-wrap: balance;
+}
+
+.landing-statement-term {
+  white-space: nowrap;
+}
+
+.landing-statement .landing-statement-label {
+  height: auto;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  padding: 0.04em 0.28em 0.08em 0.08em;
+  border-radius: 999px;
+  background: var(--openbot-bg-control-active);
+  line-height: 1.12;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.landing-statement-motion {
+  width: 1.35em;
+  height: 1.35em;
+  position: absolute;
+  top: calc(50% - 0.675em);
+  left: 0;
+  transition: transform var(--statement-hover-duration) var(--statement-ease);
+}
+
+.landing-statement .landing-statement-label:focus-visible {
+  outline: 2px solid var(--openbot-text-primary);
+  outline-offset: 4px;
+}
+
+.landing-statement-choices {
+  display: inline-block;
+  position: relative;
+  vertical-align: baseline;
+  transition: width 300ms var(--statement-ease);
+}
+
+.landing-statement-choice {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  padding-left: 1.35em;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(0.16em) scale(0.96);
+  filter: blur(2px);
+  pointer-events: none;
+  transition:
+    opacity var(--statement-swap-duration) ease-in-out,
+    transform var(--statement-swap-duration) var(--statement-ease),
+    filter var(--statement-swap-duration) ease-in-out;
+}
+
+.landing-statement-choice[data-active="true"] {
+  position: relative;
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+.landing-statement-provider {
+  display: grid;
+  place-items: center;
+  width: 90%;
+  height: 90%;
+  margin: 5%;
+  padding: 12%;
+  color: #242424;
+  background: #fff;
+  border-radius: 28%;
+  transform: rotate(-9deg);
+  box-shadow: 0 2px 2px rgb(0 0 0 / 18%);
+}
+
+.landing-statement-provider > svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (hover: hover) {
+  .landing-statement-label:hover .landing-statement-motion {
+    transform: translateY(-0.07em) rotate(6deg) scale(1.08);
+  }
+}
+
+.landing-statement-label:focus-visible .landing-statement-motion {
+  transform: translateY(-0.07em) rotate(6deg) scale(1.08);
+}
+
+.landing-statement-label:active .landing-statement-motion {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-statement-choices,
+  .landing-statement-choice,
+  .landing-statement-motion {
+    transition: none;
+  }
+
+  .landing-statement .landing-statement-choice,
+  .landing-statement .landing-statement-motion {
+    transform: none;
+    filter: none;
+  }
+}
+
+.landing-statement-sticker {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 2px 1px rgb(0 0 0 / 18%));
+  transform: rotate(-8deg);
+}
+
+.landing-statement-sticker-models,
+.landing-statement-sticker-build,
+.landing-statement-sticker-desktop {
+  transform: rotate(10deg);
+}
+
+.landing-statement[data-revealed="true"] .landing-statement-text {
+  animation: statement-reveal 500ms var(--statement-ease) both;
+}
+
+@keyframes statement-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.landing-statement .landing-statement-playback {
+  margin-top: 24px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.landing-statement .landing-statement-playback:focus-visible {
+  outline: 2px solid var(--openbot-text-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-statement[data-revealed="true"] .landing-statement-text {
+    animation: none;
+  }
+}

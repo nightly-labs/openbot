@@ -19,6 +19,7 @@ import { messages as dialog } from "./dialog";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
 import { messages as island } from "./island";
+import { messages as landing } from "./landing";
 import { messages as marketplace } from "./marketplace";
 import { messages as mcp } from "./mcp";
 import { messages as memory } from "./memory";
@@ -84,6 +85,7 @@ export const en = {
   ...preview,
   ...browser,
   ...marketplace,
+  ...landing,
   ...plugin,
   ...customProvider,
   ...update,
