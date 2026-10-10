@@ -1,0 +1,18 @@
+[
+  {
+    "provider": "pi",
+    "id": "anthropic/claude-sonnet-5-5",
+    "name": "Claude Sonnet 5.5",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["medium"]
+  },
+  {
+    "provider": "muse",
+    "id": "muse-1",
+    "name": "Muse 1",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["medium"]
+  }
+]

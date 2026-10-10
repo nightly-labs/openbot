@@ -1,0 +1,12 @@
+{
+  "phase": "ready",
+  "cliVersion": null,
+  "auth": { "kind": "pi", "email": null },
+  "providers": [
+    { "id": "pi", "state": "available", "version": "0.70.2", "message": null },
+    { "id": "muse", "state": "sign-in-required", "version": "1.4.4", "message": null }
+  ],
+  "capabilities": { "chat": "ready", "browser": "ready", "computerUse": "unavailable" },
+  "message": null,
+  "fullAccess": true
+}

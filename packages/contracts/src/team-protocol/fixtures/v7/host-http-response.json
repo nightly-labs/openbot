@@ -1,0 +1,36 @@
+[
+  {
+    "id": "agent-pi",
+    "provider": "pi",
+    "name": "Pi helper",
+    "title": "Builder",
+    "description": "Writes the code.",
+    "notifications": true,
+    "model": "anthropic/claude-sonnet-5-5",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-pi",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "builder",
+    "avatarHue": 215,
+    "avatarUrl": null
+  },
+  {
+    "id": "agent-muse",
+    "provider": "muse",
+    "name": "Muse",
+    "title": "Reviewer",
+    "description": "",
+    "notifications": true,
+    "model": "muse-1",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-muse",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "reviewer",
+    "avatarHue": null,
+    "avatarUrl": null
+  }
+]
