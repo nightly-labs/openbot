@@ -37,6 +37,7 @@ const UPDATE_TRACK_LABELS = { Stable: "settings.updates.track.stable" } as const
 
 interface SettingsUpdatesTabProps {
   store: SettingsUpdatesStore;
+  onOpenWhatsNew?: () => void;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   /** The dialog element the Select popover portals into, captured when this tab was created. */
@@ -117,6 +118,11 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </AlertActions>
           </Alert>
         )}
+      </Show>
+      <Show when={props.onOpenWhatsNew}>
+        <Button type="button" variant="outline" size="sm" onClick={() => props.onOpenWhatsNew?.()}>
+          {t("update.whatsNew.title")}
+        </Button>
       </Show>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row settings-modal-update-track-row">

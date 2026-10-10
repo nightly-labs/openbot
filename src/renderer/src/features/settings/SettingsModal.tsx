@@ -41,6 +41,7 @@ export interface SettingsModalProps {
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
+  onOpenWhatsNew?: () => void;
   onCancelScheduledRestart?: () => Promise<void>;
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
@@ -252,6 +253,7 @@ export function SettingsModal(props: SettingsModalProps) {
         <Tabs.Content value="updates" class="settings-modal-tab-panel" data-tab="updates">
           <SettingsUpdatesTab
             store={updates}
+            onOpenWhatsNew={props.onOpenWhatsNew}
             value={props.value}
             onUpdateSetting={updateSetting}
             selectMount={modalElement}

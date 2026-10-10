@@ -42,6 +42,7 @@ import type { HostProviderSettings } from "./features/settings/ProviderSettingsS
 import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
+import { useWhatsNew } from "./features/updates/whats-new-context";
 import { useGlobalSearchSources } from "./global-search-sources";
 import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
@@ -654,6 +655,7 @@ function AppSettings(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const updates = useUpdates();
+  const whatsNew = useWhatsNew();
   const { setAddServerOpen } = useServers();
   const {
     appSettingsOpen,
@@ -679,6 +681,14 @@ function AppSettings(props: AccountProps) {
         builtInDisplayGeometry={builtInDisplayGeometry()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
+        onOpenWhatsNew={
+          whatsNew.state.version
+            ? () => {
+                setAppSettingsOpen(false);
+                whatsNew.reopen();
+              }
+            : undefined
+        }
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}

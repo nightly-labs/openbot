@@ -397,6 +397,36 @@ group, a placeholder such as `TODO`, or a heading with no real date. These steps
   `no-changelog` label. Use the label when a user sees no change.
 - `bun run release:preflight` and the tag workflow check the section of the `package.json` version.
 
+### Post-update notes
+
+The desktop dialog uses edited excerpts of the published `CHANGELOG.md` in
+`src/renderer/src/features/updates/whats-new-releases.json`. Before publishing a desktop release,
+add its version, date, and selected notes there. Keep earlier entries for users who skip releases.
+Use short, plain sentences that explain what the user can do. Put required upgrade steps in
+`notices`. Use `added`, `changed`, and `fixed` for the other entries. Do not copy commit messages,
+developer setup, internal paths, credentials, or unpublished plans. Review this text with the
+release notes before tagging. A release can have no dialog entry when it has nothing to show.
+
+The app bundles this text and loads it when needed, so reading it does not send data or require
+network access. The full changelog button opens the existing public page. Changing the bundled
+text requires a new app release. Missing entries do not cause a network fallback.
+
+The installed desktop version comes from `AppInfo`, not an available update or a remote server.
+In development, `AppInfo` uses `package.json`; Electron otherwise reports its own version.
+The local app profile keeps the highest consumed version in `openbot:whats-new-version`. On the
+first launch of this feature, an existing `openbot:analytics-app-version` can supply the previous
+version; the dialog does not enable analytics. A profile with no previous version gets a silent
+baseline, so onboarding is not covered by release notes. Stable `x.y.z` releases participate;
+unknown versions and prerelease builds do not advance the marker. Downgrades do not lower it.
+The marker is saved before automatic display, including a load error; Settings > Updates can
+open the notes again. Empty updates are consumed without opening. If the marker cannot be saved,
+automatic display is disabled; manual opening still works.
+
+Mobile has its own store version and `apps/mobile/CHANGELOG.md`. It must use a native screen and
+its own local marker when post-update notes are added there. Desktop notes must not use a mobile
+version or the version of a connected server. This desktop feature does not change mobile,
+public web, Signal, database schemas, or Team API contracts.
+
 ## Publish a version
 
 Start from a clean, up-to-date `main` branch. For the first release, `package.json` and

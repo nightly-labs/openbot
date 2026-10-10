@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, shell } from "electron";
+import { version as developmentVersion } from "../../../package.json";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { MailboxStore } from "../../backend/mailbox-store";
@@ -118,7 +119,9 @@ export function appIpcHandlers({
         if (platform !== "darwin" && platform !== "win32" && platform !== "linux") {
           throw new Error(`Unsupported desktop platform: ${platform}`);
         }
-        return { name: app.getName(), version: app.getVersion(), platform, variant: appVariant };
+        // electron-vite starts a script, so Electron reports its own version in development.
+        const version = app.isPackaged ? app.getVersion() : developmentVersion;
+        return { name: app.getName(), version, platform, variant: appVariant };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
       getAnalyticsPreference: handler(() => Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile))),

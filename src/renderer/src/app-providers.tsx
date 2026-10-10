@@ -34,6 +34,7 @@ import { SidebarProvider } from "./features/sidebar/sidebar-context";
 import { PresenceProvider } from "./features/team/team-context";
 import { notifyTeamTyping } from "./features/team/team-typing";
 import { UpdatesProvider } from "./features/updates/updates-context";
+import { WhatsNewProvider } from "./features/updates/whats-new-context";
 import { UsageProvider } from "./features/usage/usage-context";
 import { I18nProvider } from "./i18n-context";
 import { LayoutProvider } from "./layout";
@@ -93,40 +94,42 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
       <I18nProvider>
         <AuthProvider>
           <SetupProvider>
-            <SettingsProvider>
-              <LayoutProvider>
-                <UpdatesProvider>
-                  <CustomProvidersProvider>
-                    <CustomAgentsProvider>
-                      <ProviderDetectionProvider>
-                        <ServersProvider>
-                          <DynamicIslandProvider>
-                            <ServerSettingsProvider>
-                              <RemoteDesktopProvider>
-                                <ServerSwitchProvider>
-                                  <AnsweredPromptsProvider>
-                                    <UiErrorsProvider>
-                                      <UsageProvider>
-                                        <AgentReadTrackingProvider>
-                                          <AppBootstrap />
-                                          <ServerScopeBoundary stableConversation={stableConversation}>
-                                            {props.children}
-                                          </ServerScopeBoundary>
-                                        </AgentReadTrackingProvider>
-                                      </UsageProvider>
-                                    </UiErrorsProvider>
-                                  </AnsweredPromptsProvider>
-                                </ServerSwitchProvider>
-                              </RemoteDesktopProvider>
-                            </ServerSettingsProvider>
-                          </DynamicIslandProvider>
-                        </ServersProvider>
-                      </ProviderDetectionProvider>
-                    </CustomAgentsProvider>
-                  </CustomProvidersProvider>
-                </UpdatesProvider>
-              </LayoutProvider>
-            </SettingsProvider>
+            <WhatsNewProvider>
+              <SettingsProvider>
+                <LayoutProvider>
+                  <UpdatesProvider>
+                    <CustomProvidersProvider>
+                      <CustomAgentsProvider>
+                        <ProviderDetectionProvider>
+                          <ServersProvider>
+                            <DynamicIslandProvider>
+                              <ServerSettingsProvider>
+                                <RemoteDesktopProvider>
+                                  <ServerSwitchProvider>
+                                    <AnsweredPromptsProvider>
+                                      <UiErrorsProvider>
+                                        <UsageProvider>
+                                          <AgentReadTrackingProvider>
+                                            <AppBootstrap />
+                                            <ServerScopeBoundary stableConversation={stableConversation}>
+                                              {props.children}
+                                            </ServerScopeBoundary>
+                                          </AgentReadTrackingProvider>
+                                        </UsageProvider>
+                                      </UiErrorsProvider>
+                                    </AnsweredPromptsProvider>
+                                  </ServerSwitchProvider>
+                                </RemoteDesktopProvider>
+                              </ServerSettingsProvider>
+                            </DynamicIslandProvider>
+                          </ServersProvider>
+                        </ProviderDetectionProvider>
+                      </CustomAgentsProvider>
+                    </CustomProvidersProvider>
+                  </UpdatesProvider>
+                </LayoutProvider>
+              </SettingsProvider>
+            </WhatsNewProvider>
           </SetupProvider>
         </AuthProvider>
       </I18nProvider>
