@@ -229,6 +229,7 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
 // host return the expanded list; older hosts ignore the marker and retain all old features.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
     capability !== ACP_REGISTRY_CAPABILITY &&
     capability !== PROVIDERS_V5_CAPABILITY,
@@ -242,6 +243,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
   return capabilities.filter(
     (capability) =>
       capability !== "local-providers-v3" &&
+      capability !== AGENT_MEMORIES_CAPABILITY &&
       capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
       capability !== ACP_REGISTRY_CAPABILITY &&
       capability !== PROVIDERS_V5_CAPABILITY,
