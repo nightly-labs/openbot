@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   AgentSummary,
   ConversationFileSearchPage,
+  ConversationOrderProofRequest,
   ConversationPageAnchor,
   ConversationReadState,
   ConversationSearchPage,
@@ -83,7 +84,15 @@ export class ConversationReader {
     anchor: ConversationPageAnchor = { type: "latest" },
     limit = 50,
     options: ConversationMarkerExclusions = {},
+    orderProof?: ConversationOrderProofRequest,
   ) {
+    if (orderProof)
+      return yield* readerStep(() => {
+        // Roster membership selects the readable thread. Do not call existing(), which creates a workspace.
+        const agent = this.#store.list().find((agent) => agent.id === agentId);
+        if (!agent) throw new Error("Conversation proof agent is unavailable.");
+        return this.#store.database.readConversationOrderProof(agentId, agent.threadId, orderProof);
+      });
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);

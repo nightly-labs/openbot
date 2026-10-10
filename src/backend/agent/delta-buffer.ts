@@ -79,6 +79,7 @@ export class DeltaBuffer {
         bytes: Buffer.byteLength(pending.text, "utf8"),
       },
     });
+    this.#conversation.refreshVisibility(snapshot, [pending.messageId]);
     this.#hooks.emit({
       type: "conversation-delta",
       agentId: pending.agentId,

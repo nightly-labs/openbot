@@ -7,6 +7,7 @@
 import {
   type ConversationFileSearchPage,
   type ConversationMessage,
+  type ConversationMessageOrder,
   type ConversationPage,
   type ConversationReadState,
   type ConversationSearchPage,
@@ -15,7 +16,10 @@ import {
   type FilePreview,
   isAttachmentSummary,
   isConversationMessage,
+  isConversationMessageOrder,
+  isConversationOrderProof,
   isConversationReadState,
+  isConversationWindowMembers,
   isConversationWithReadState,
   isFilePreviewKind,
   isQueuedMessageReceipt,
@@ -63,13 +67,61 @@ export function decodeConversationPageFromMain(value: unknown): ConversationPage
   if (!isDynamicRecord(value) || !isString(value.agentId) || !Array.isArray(value.messages)) {
     throw new Error("Invalid conversation page response.");
   }
+  if (value.orderProof !== undefined) {
+    const proof = value.orderProof;
+    const info = decodeRecord(value.pageInfo, "conversation proof info");
+    if (
+      !isConversationOrderProof(proof) ||
+      proof.agentId !== value.agentId ||
+      proof.threadId !== value.threadId ||
+      proof.revision !== value.revision ||
+      value.activeTurnId !== null ||
+      value.messages.length !== 0 ||
+      !isDynamicRecord(value.references) ||
+      Object.keys(value.references).length !== 0 ||
+      info.hasOlder !== false ||
+      info.olderCursor !== null ||
+      value.readState !== undefined ||
+      value.windowMembers !== undefined ||
+      value.messageOrder !== undefined
+    )
+      throw new Error("Invalid conversation order proof response.");
+    return {
+      agentId: proof.agentId,
+      threadId: proof.threadId,
+      activeTurnId: null,
+      revision: proof.revision,
+      messages: [],
+      references: {},
+      pageInfo: { hasOlder: false, olderCursor: null },
+      orderProof: proof,
+    };
+  }
   const pageInfo = decodeRecord(value.pageInfo, "conversation page info");
+  if (value.windowMembers !== undefined && !isConversationWindowMembers(value.windowMembers))
+    throw new Error("Invalid conversation page window.");
+  const messages = decodeConversationMessages(value.messages);
+  let messageOrder: ConversationMessageOrder[] | undefined;
+  if (value.messageOrder !== undefined) {
+    const members = new Set([...messages, ...(value.windowMembers?.messages ?? [])].map((message) => message.id));
+    const ordered = value.messageOrder;
+    if (
+      !Array.isArray(ordered) ||
+      ordered.length > 200 ||
+      !ordered.every(isConversationMessageOrder) ||
+      new Set(ordered.map((entry) => entry.id)).size !== ordered.length
+    )
+      throw new Error("Invalid conversation page order.");
+    if (ordered.length !== members.size || ordered.some((entry) => !members.has(entry.id)))
+      throw new Error("Invalid conversation page order.");
+    messageOrder = ordered;
+  }
   return {
     agentId: value.agentId,
     threadId: nullableString(value, "threadId"),
     activeTurnId: nullableString(value, "activeTurnId"),
     revision: requiredNumber(value, "revision"),
-    messages: decodeConversationMessages(value.messages),
+    messages,
     references: decodeConversationReferencesFromMain(value.references),
     pageInfo: {
       hasOlder: requiredBoolean(pageInfo, "hasOlder"),
@@ -77,6 +129,8 @@ export function decodeConversationPageFromMain(value: unknown): ConversationPage
       ...optionalHistoryExtent(pageInfo),
     },
     ...(value.readState === undefined ? {} : { readState: decodeReadState(value.readState) }),
+    ...(value.windowMembers === undefined ? {} : { windowMembers: value.windowMembers }),
+    ...(messageOrder === undefined ? {} : { messageOrder }),
   };
 }
 

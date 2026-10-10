@@ -9,6 +9,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
+import { conversationPageMessages } from "../database/conversation-retention";
+import type { ConversationReveal } from "../database/conversation-visibility";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -88,10 +90,17 @@ export class MailboxSync {
     const indexes = new Map(snapshot.messages.map((message, index) => [message.id, index]));
     for (const mailboxMessage of incomingMailboxMessages) {
       const index = indexes.get(mailboxMessage.id);
-      if (index !== undefined) snapshot.messages[index] = mailboxMessage;
+      const next = { ...mailboxMessage };
+      delete next.visibilityEpoch;
+      delete next.visibilityKind;
+      const kind = index === undefined ? undefined : snapshot.messages[index]?.visibilityKind;
+      if (kind !== undefined) next.visibilityKind = kind;
+      const epoch = index === undefined ? undefined : snapshot.messages[index]?.visibilityEpoch;
+      if (epoch !== undefined) next.visibilityEpoch = epoch;
+      if (index !== undefined) snapshot.messages[index] = next;
       else {
         indexes.set(mailboxMessage.id, snapshot.messages.length);
-        snapshot.messages.push(mailboxMessage);
+        snapshot.messages.push(next);
       }
     }
     const reactions = this.#mailbox.reactionsFor(snapshot.agentId);
@@ -110,7 +119,7 @@ export class MailboxSync {
       threadId: page.threadId,
       activeTurnId: page.activeTurnId,
       revision: page.revision,
-      messages: page.messages,
+      messages: conversationPageMessages(page),
     };
     const previousMessageIds = new Set(persisted.messages.map((message) => message.id));
     const previousSignature = conversationContentSignature(persisted);
@@ -125,6 +134,7 @@ export class MailboxSync {
       threadId: agent.threadId,
       activeTurnId: persisted.activeTurnId,
       changedMessages: persisted.messages,
+      source: "reconcile",
       removedMessageIds: [...previousMessageIds].filter(
         (messageId) => !persisted.messages.some((message) => message.id === messageId),
       ),
@@ -155,7 +165,11 @@ export class MailboxSync {
     return hold ? { ...queue, hold } : queue;
   }
 
-  emitQueue(agentId: string): void {
+  emitQueue(
+    agentId: string,
+    liveMessageIds: readonly string[] = [],
+    reveals: readonly ConversationReveal[] = [],
+  ): void {
     const queue = this.queueSnapshot(agentId);
     let routinesChanged = false;
     for (const delivery of queue.deliveries) {
@@ -169,7 +183,12 @@ export class MailboxSync {
       if (!snapshot) continue;
       const previousSignature = conversationContentSignature(snapshot);
       this.syncMailboxMessages(snapshot);
-      if (conversationContentSignature(snapshot) !== previousSignature) this.#conversation.emitConversation(snapshot);
+      if (conversationContentSignature(snapshot) !== previousSignature)
+        this.#conversation.emitConversation(snapshot, "conversation.snapshot-updated", undefined, {
+          source: "reconcile",
+          liveMessageIds,
+          reveals,
+        });
       else if (!this.#conversation.hasPublishedConversation(affectedAgentId))
         this.#conversation.publishConversation(snapshot);
     }

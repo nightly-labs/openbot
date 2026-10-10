@@ -1,11 +1,25 @@
 import { createHash } from "node:crypto";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { isConversationMessageVisible } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
+import {
+  CONVERSATION_CACHE_TOTAL_BYTES_LIMIT,
+  conversationPageMessages,
+  isActiveConversationMessage as isActiveMessage,
+  retainConversationMessages,
+} from "../database/conversation-retention";
+import type { ConversationReveal } from "../database/conversation-visibility";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
+
+export {
+  CONVERSATION_CACHE_BYTES_LIMIT,
+  CONVERSATION_CACHE_MESSAGE_LIMIT,
+  CONVERSATION_CACHE_TOTAL_BYTES_LIMIT,
+} from "../database/conversation-retention";
 
 interface TransactionScope {
   readonly rollback: (() => void)[];
@@ -18,15 +32,6 @@ interface TransactionScope {
  * opened. A chat that goes is read again from the database when it is next needed, the same as a
  * chat that was not opened since the app started.
  */
-/** The most recent completed messages retained in the process for one conversation. */
-export const CONVERSATION_CACHE_MESSAGE_LIMIT = 100;
-
-/** The maximum serialized size retained for one completed conversation. */
-export const CONVERSATION_CACHE_BYTES_LIMIT = 8 * 1024 * 1024;
-
-/** The maximum serialized size retained by all completed conversation caches. */
-export const CONVERSATION_CACHE_TOTAL_BYTES_LIMIT = 64 * 1024 * 1024;
-
 /** Only the caller that opened the transaction holds a scope, so a nested call finds the owner's. */
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
@@ -364,7 +369,13 @@ export class ConversationRuntime {
 
   #trimCompletedCache(cached: CachedSnapshot): boolean {
     const activeTurnId = cached.snapshot.activeTurnId;
-    const index = cached.snapshot.messages.findIndex((message) => !isActiveMessage(message, activeTurnId));
+    let index = -1;
+    for (const [candidateIndex, message] of cached.snapshot.messages.entries()) {
+      if (isActiveMessage(message, activeTurnId)) continue;
+      if (index < 0 || (message.visibilityEpoch ?? 0) < (cached.snapshot.messages[index]?.visibilityEpoch ?? 0)) {
+        index = candidateIndex;
+      }
+    }
     if (index < 0) return false;
     const [removed] = cached.snapshot.messages.splice(index, 1);
     if (!removed) return false;
@@ -441,7 +452,7 @@ export class ConversationRuntime {
         threadId: page.threadId,
         activeTurnId: page.activeTurnId,
         revision: page.revision,
-        messages: page.messages,
+        messages: conversationPageMessages(page),
       });
     }
   }
@@ -467,7 +478,7 @@ export class ConversationRuntime {
           threadId: page.threadId,
           activeTurnId: page.activeTurnId,
           revision: page.revision,
-          messages: page.messages,
+          messages: conversationPageMessages(page),
         });
         return this.#executionSnapshots.get(publicId) ?? execution;
       }
@@ -483,7 +494,7 @@ export class ConversationRuntime {
       threadId: page.threadId ?? publicThreadId,
       activeTurnId: page.activeTurnId,
       revision: page.revision,
-      messages: page.messages,
+      messages: conversationPageMessages(page),
     };
     if (publicId && this.#executionSnapshots.has(publicId)) {
       this.#setExecutionSnapshot(publicId, snapshot);
@@ -515,10 +526,16 @@ export class ConversationRuntime {
       activeTurnId: snapshot.activeTurnId,
       messageCount: snapshot.messages.length,
     },
+    provenance: {
+      source: "live" | "reconcile" | "preserve";
+      liveMessageIds?: readonly string[];
+      reveals?: readonly ConversationReveal[];
+    } = { source: "live" },
   ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
+    let removedMessageIds: string[] = [];
     if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
       this.#retainPublishedSnapshot(snapshot);
       return;
@@ -526,7 +543,7 @@ export class ConversationRuntime {
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
       const changedMessages = this.#changedMessages(snapshot);
-      const removedMessageIds = this.#removedMessageIds(snapshot);
+      removedMessageIds = this.#removedMessageIds(snapshot);
       if (
         !cached ||
         changedMessages.length > 0 ||
@@ -538,13 +555,18 @@ export class ConversationRuntime {
           threadId: snapshot.threadId,
           activeTurnId: snapshot.activeTurnId,
           changedMessages,
+          ...provenance,
           removedMessageIds,
           eventType,
           detail,
         });
+        this.refreshVisibility(
+          snapshot,
+          changedMessages.map((message) => message.id),
+        );
       }
     }
-    this.publishConversation(snapshot, signature);
+    this.publishConversation(snapshot, conversationContentSignature(snapshot), removedMessageIds);
     this.#retainPublishedSnapshot(snapshot);
   }
 
@@ -581,10 +603,37 @@ export class ConversationRuntime {
     );
   }
 
-  publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
+  publishConversation(
+    snapshot: ConversationSnapshot,
+    signature = conversationContentSignature(snapshot),
+    removedMessageIds: string[] = [],
+  ): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
-    this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+    const hiddenIds = snapshot.messages
+      .filter((message) => !isConversationMessageVisible(message))
+      .map((message) => message.id);
+    this.#emit({
+      type: "conversation",
+      snapshot: {
+        ...structuredClone(snapshot),
+        window: { removedMessageIds: [...new Set([...removedMessageIds, ...hiddenIds])] },
+      },
+    });
+  }
+
+  /** Read only the persisted rows affected by a write; never scan history on a streaming flush. */
+  refreshVisibility(snapshot: ConversationSnapshot, messageIds: readonly string[]): void {
+    const persisted = this.#store.database.readConversationMessages(snapshot.agentId, snapshot.threadId, messageIds);
+    const epochs = new Map(persisted.map((message) => [message.id, message]));
+    for (const message of snapshot.messages) {
+      if (!epochs.has(message.id)) continue;
+      const authority = epochs.get(message.id);
+      if (authority?.visibilityEpoch === undefined) delete message.visibilityEpoch;
+      else message.visibilityEpoch = authority.visibilityEpoch;
+      if (authority?.visibilityKind === undefined) delete message.visibilityKind;
+      else message.visibilityKind = authority.visibilityKind;
+    }
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {
@@ -722,8 +771,21 @@ export class ConversationRuntime {
       restorePreviousState,
       () => {
         if (!published) return;
+        this.refreshVisibility(
+          published,
+          published.messages.map((message) => message.id),
+        );
+        const ids = new Set(published.messages.map((message) => message.id));
+        const hiddenIds = published.messages
+          .filter((message) => !isConversationMessageVisible(message))
+          .map((message) => message.id);
         this.#keepSnapshot(agentId, published);
-        this.publishConversation(published);
+        this.publishConversation(published, conversationContentSignature(published), [
+          ...hiddenIds,
+          ...(previousSnapshotState?.messages ?? [])
+            .filter((message) => !ids.has(message.id))
+            .map((message) => message.id),
+        ]);
       },
     );
   }
@@ -740,13 +802,14 @@ function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnap
     ? snapshot.messages.filter((message) => isActiveMessage(message, snapshot.activeTurnId))
     : [];
   const allCompletedMessages = snapshot.messages.filter((message) => !activeMessages.includes(message));
-  const completedMessages = allCompletedMessages.slice(-CONVERSATION_CACHE_MESSAGE_LIMIT);
-  const completedSnapshot = { ...snapshot, messages: completedMessages };
-  let completedBytes = conversationSnapshotBytes(completedSnapshot);
-  while (completedMessages.length > 0 && completedBytes > CONVERSATION_CACHE_BYTES_LIMIT) {
-    completedMessages.shift();
-    completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
-  }
+  const retainedMessages = retainConversationMessages(
+    snapshot.messages,
+    snapshot.activeTurnId,
+    conversationSnapshotBytes({ ...snapshot, messages: [] }),
+  );
+  const activeIds = new Set(activeMessages.map((message) => message.id));
+  const completedMessages = retainedMessages.filter((message) => !activeIds.has(message.id));
+  const completedBytes = conversationSnapshotBytes({ ...snapshot, messages: completedMessages });
   const retainedAllMessages =
     completedMessages.length === allCompletedMessages.length &&
     completedMessages.length + activeMessages.length === snapshot.messages.length;
@@ -774,10 +837,6 @@ function boundedConversationSnapshot(snapshot: ConversationSnapshot): CachedSnap
   };
 }
 
-function isActiveMessage(message: ConversationMessage, activeTurnId: string | null): boolean {
-  return activeTurnId !== null && (message.turnId === activeTurnId || message.status === "streaming");
-}
-
 function completedCacheBytes(snapshot: ConversationSnapshot): number {
   return conversationSnapshotBytes({
     ...snapshot,
@@ -791,13 +850,14 @@ function pageSnapshot(page: {
   activeTurnId: string | null;
   revision: number;
   messages: ConversationMessage[];
+  windowMembers?: { messages: ConversationMessage[] };
 }): ConversationSnapshot {
   return {
     agentId: page.agentId,
     threadId: page.threadId,
     activeTurnId: page.activeTurnId,
     revision: page.revision,
-    messages: page.messages,
+    messages: conversationPageMessages(page),
   };
 }
 

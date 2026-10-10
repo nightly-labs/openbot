@@ -180,6 +180,13 @@ export function conversationMessageSender(id: string, name: string): Conversatio
 }
 
 export interface ConversationMessage {
+  /**
+   * Local host watermark for the latest hidden-to-visible cycle. This is a transactional
+   * revision lower bound, not an event id. Released Team API projections omit it.
+   */
+  visibilityEpoch?: number;
+  /** Local provenance for this visibility cycle; released projections omit it. */
+  visibilityKind?: "created" | "revealed";
   id: string;
   turnId?: string;
   author: ConversationMessageAuthor;
@@ -215,6 +222,11 @@ export function isConversationMessage(value: unknown): value is ConversationMess
   const status = value.status;
   return (
     isIdentifier(value.id) &&
+    (value.visibilityEpoch === undefined ||
+      (isNumber(value.visibilityEpoch) && Number.isSafeInteger(value.visibilityEpoch) && value.visibilityEpoch > 0)) &&
+    (value.visibilityKind === undefined ||
+      (value.visibilityEpoch !== undefined &&
+        (value.visibilityKind === "created" || value.visibilityKind === "revealed"))) &&
     isString(value.text) &&
     isBoundedString(value.createdAt, 160) &&
     (author === "user" || author === "assistant" || author === "agent" || author === "system") &&
@@ -253,12 +265,31 @@ export function isConversationMessage(value: unknown): value is ConversationMess
   );
 }
 
+/** Queue and cancellation projection; routine cards remain visible in both states. */
+export function isConversationMessageVisible(message: ConversationMessage): boolean {
+  return (
+    message.routine !== undefined || (message.delivery?.status !== "queued" && message.delivery?.status !== "cancelled")
+  );
+}
+
 function isConversationDelivery(value: unknown): boolean {
   return (
     isDynamicRecord(value) &&
     isIdentifier(value.id) &&
     isOneOf(QUEUE_DELIVERY_STATUSES, value.status) &&
     (value.position === null || (isNumber(value.position) && Number.isInteger(value.position) && value.position >= 1))
+  );
+}
+
+/** A visibility cohort alone does not admit ordinary history before a page boundary. */
+export function isConversationVisibilityAfter(
+  message: { visibilityEpoch?: number; visibilityKind?: ConversationMessage["visibilityKind"] },
+  floor: number | undefined,
+): boolean {
+  return (
+    floor !== undefined &&
+    message.visibilityEpoch !== undefined &&
+    (message.visibilityEpoch > floor || (message.visibilityEpoch === floor && message.visibilityKind === "revealed"))
   );
 }
 

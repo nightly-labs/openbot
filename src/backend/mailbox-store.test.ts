@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachmentFiles } from "./attachment-files";
+import type { ConversationReveal } from "./database/conversation-visibility";
 import { runCauseEffect } from "./effect-boundary";
 import { MailboxStore } from "./mailbox-store";
 import { OpenBotDatabase } from "./openbot-database";
@@ -1677,3 +1678,112 @@ function required<T>(value: T | null | undefined): T {
   if (value === null || value === undefined) throw new Error("Expected a value.");
   return value;
 }
+
+describe("durable mailbox visibility transitions", () => {
+  async function fixture() {
+    const database = new OpenBotDatabase(join(root, "user-data"));
+    await runCauseEffect(database.initialize());
+    const mailbox = new MailboxStore(join(root, "user-data"), join(root, "Shared"), database);
+    await runCauseEffect(mailbox.initialize());
+    const enqueue = async () =>
+      required(
+        (
+          await runCauseEffect(
+            mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Input" }),
+          )
+        ).deliveries[0],
+      ).id;
+    return { database, mailbox, enqueue };
+  }
+
+  it("captures a durable reveal only for a successful exact start or steer", async () => {
+    const { database, mailbox, enqueue } = await fixture();
+    const wholeMailbox = vi.spyOn(database, "readMailboxState");
+    const prepared = vi.spyOn(database.connection, "prepare");
+    const proofs: ConversationReveal[] = [];
+    const visibility = { recipientAgentId: "chief", revealed: (proof: ConversationReveal) => proofs.push(proof) };
+    const start = await enqueue();
+    await runCauseEffect(mailbox.markStarting(start, visibility));
+    expect(proofs).toHaveLength(1);
+    expect(proofs[0]?.former.delivery?.status).toBe("queued");
+    expect(proofs[0]?.current).toEqual(database.readMailboxDeliveryRecord(start, "chief"));
+    await runCauseEffect(mailbox.markStarting(start, visibility));
+    expect(proofs).toHaveLength(1);
+    const steer = await enqueue();
+    await runCauseEffect(mailbox.markSteering(steer, "turn", visibility));
+    expect(proofs).toHaveLength(2);
+    await runCauseEffect(mailbox.markSteering(steer, "turn", visibility));
+    expect(proofs).toHaveLength(2);
+    const wrong = await enqueue();
+    await runCauseEffect(mailbox.markStarting(wrong, { ...visibility, recipientAgentId: "other" }));
+    const cancelled = await enqueue();
+    await runCauseEffect(mailbox.cancel("chief", cancelled));
+    await runCauseEffect(mailbox.markStarting(cancelled, visibility));
+    await expect(runCauseEffect(mailbox.markStarting("missing", visibility))).rejects.toThrow("Unknown delivery");
+    const editing = await enqueue();
+    mailbox.beginQueueEdit("chief", editing, "edit");
+    await expect(runCauseEffect(mailbox.markSteering(editing, "turn", visibility))).rejects.toThrow();
+    expect(proofs).toHaveLength(2);
+    expect(wholeMailbox).not.toHaveBeenCalled();
+    const query = prepared.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("delivery.last_event_sequence"));
+    assert(query);
+    prepared.mockRestore();
+    wholeMailbox.mockRestore();
+    const plan = database.connection.prepare(`EXPLAIN QUERY PLAN ${query}`).all(start, "chief");
+    const artifacts = ".openbot-build/visible-message-window";
+    await mkdir(artifacts, { recursive: true });
+    await writeFile(
+      join(artifacts, "mailbox-query-plan.json"),
+      JSON.stringify({ wholeMailboxReads: 0, plan }, null, 2),
+    );
+    database.close();
+  });
+
+  it("rejects durable and memory divergence after a failed persistence and admits only the restored retry", async () => {
+    const { database, mailbox, enqueue } = await fixture();
+    const id = await enqueue();
+    const proofs: ConversationReveal[] = [];
+    const visibility = { recipientAgentId: "chief", revealed: (proof: ConversationReveal) => proofs.push(proof) };
+    const before = database.readMailboxDeliveryRecord(id, "chief");
+    const persist = vi.spyOn(database, "replaceMailboxState").mockImplementationOnce(() => {
+      throw new Error("Persistence failed");
+    });
+    await expect(runCauseEffect(mailbox.markStarting(id, visibility))).rejects.toThrow("Persistence failed");
+    expect(database.readMailboxDeliveryRecord(id, "chief")).toEqual(before);
+    expect(mailbox.getDelivery(id)?.delivery.status).toBe("starting");
+    persist.mockRestore();
+    await runCauseEffect(mailbox.markStarting(id, visibility));
+    expect(proofs).toEqual([]);
+    mailbox.restorePersistedState();
+    await runCauseEffect(mailbox.markSteering(id, "retry", visibility));
+    expect(proofs).toHaveLength(1);
+    expect(proofs[0]?.former.delivery?.status).toBe("queued");
+    database.close();
+  });
+
+  it("does not invent a reveal for already-visible routine queued rows", async () => {
+    const { database, mailbox } = await fixture();
+    const receipt = await runCauseEffect(
+      mailbox.enqueue({
+        sender: {
+          kind: "routine",
+          routineId: "r",
+          runId: "run",
+          routineName: "Routine",
+          scheduledFor: "2026-10-08T00:00:00.000Z",
+        },
+        recipientAgentIds: ["chief"],
+        text: "Routine",
+      }),
+    );
+    const proofs: ConversationReveal[] = [];
+    await runCauseEffect(
+      mailbox.markStarting(required(receipt.deliveries[0]).id, {
+        recipientAgentId: "chief",
+        revealed: (proof) => proofs.push(proof),
+      }),
+    );
+    expect(proofs).toEqual([]);
+    database.close();
+  });
+});

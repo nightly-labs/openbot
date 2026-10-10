@@ -1,25 +1,33 @@
 // @vitest-environment node
 
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, AgentSummary, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import {
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
+  isConversationVisibilityAfter,
   routineConversationEventItemType,
   routineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { afterEach, assert, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { AgentRoutineStore } from "./agent-routine-store";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
 import { ConversationReadStore } from "./conversation-read-store";
+import {
+  CONVERSATION_CACHE_BYTES_LIMIT,
+  CONVERSATION_CACHE_MESSAGE_LIMIT,
+  retainConversationMessages,
+} from "./database/conversation-retention";
+import type { ConversationReveal } from "./database/conversation-visibility";
 import { runCauseEffect } from "./effect-boundary";
+import { MailboxStore } from "./mailbox-store";
 import { OpenBotDatabase } from "./openbot-database";
 
 const roots: string[] = [];
@@ -3857,6 +3865,568 @@ function downgradeReactionsToV7(database: DatabaseSync): void {
       VALUES (7, '2026-08-20T10:00:00.000Z');
   `);
 }
+describe("conversation visibility epochs", () => {
+  async function fixture() {
+    const database = await createDatabase();
+    const agent = testAgent();
+    database.replaceAgents("visibility-seed", [agent], "agents.updated");
+    database.persistConversation(
+      { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages: [] },
+      "visibility.seed",
+    );
+    const write = (message: ConversationMessage, commandId?: string) =>
+      database.persistConversationChanges({
+        agentId: agent.id,
+        threadId: agent.threadId ?? "",
+        activeTurnId: null,
+        changedMessages: [message],
+        eventType: "visibility.live",
+        ...(commandId ? { commandId } : {}),
+      });
+    const read = (id = "input") => {
+      const message = database.readConversation(agent.id, agent.threadId).messages.find((message) => message.id === id);
+      assert(message);
+      return message;
+    };
+    return { database, agent, write, read };
+  }
+  const input = (status: "queued" | "starting" | "running" | "completed" | "cancelled"): ConversationMessage => ({
+    id: "input",
+    author: "user",
+    text: "Input",
+    status: "completed",
+    createdAt: "2026-10-08T00:00:00.000Z",
+    delivery: { id: "delivery", status, position: status === "queued" ? 1 : null },
+  });
+
+  it("assigns only live visibility cycles and preserves epochs through visible updates", async () => {
+    const { database, agent, write, read } = await fixture();
+    const pending = { ...input("queued"), visibilityEpoch: 999999, visibilityKind: "revealed" as const };
+    write(pending);
+    expect(read().visibilityEpoch).toBeUndefined();
+    expect(read().visibilityKind).toBeUndefined();
+    expect(pending.visibilityEpoch).toBe(999999);
+    const before = database.readConversation(agent.id, agent.threadId).revision;
+    write(input("starting"));
+    const first = read().visibilityEpoch;
+    expect(first).toBe(before + 1);
+    expect(read().visibilityKind).toBe("revealed");
+    write({ ...input("running"), text: "Updated", visibilityEpoch: 999999 });
+    write({ ...input("completed"), reaction: "❤️" });
+    expect(read().visibilityEpoch).toBe(first);
+    expect(read().visibilityKind).toBe("revealed");
+    write(input("queued"));
+    const secondBefore = database.readConversation(agent.id, agent.threadId).revision;
+    write(input("starting"));
+    expect(read().visibilityEpoch).toBe(secondBefore + 1);
+    expect(read().visibilityEpoch).toBeGreaterThan(first ?? 0);
+    write(input("cancelled"));
+    expect(read().delivery?.status).toBe("cancelled");
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [],
+      removedMessageIds: ["input"],
+      eventType: "visibility.remove",
+    });
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual([]);
+    database.close();
+  });
+
+  it("does not stamp legacy visible rows or trust provider history markers", async () => {
+    const { database, agent, write, read } = await fixture();
+    database.upsertProviderHistoryMessage({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      message: { ...input("completed"), visibilityEpoch: 999999 },
+    });
+    write({ ...input("completed"), text: "Live edit" });
+    expect(read().visibilityEpoch).toBeUndefined();
+    write({
+      ...input("queued"),
+      id: "routine",
+      routine: { routineId: "routine", runId: "run", name: "Routine", scheduledFor: "2026-10-08" },
+    });
+    expect(read("routine").visibilityEpoch).toBeTypeOf("number");
+    expect(read("routine").visibilityKind).toBe("created");
+    write({ ...input("starting"), id: "incoming", author: "agent" });
+    expect(read("incoming").visibilityEpoch).toBeTypeOf("number");
+    expect(
+      database.rebuildThreadProjection(agent.threadId ?? "").messages.find((message) => message.id === "input")
+        ?.visibilityEpoch,
+    ).toBeUndefined();
+    database.close();
+  });
+
+  it("preserves durable epochs through history, whole snapshots, streaming prune, replay and reopen", async () => {
+    const { database, agent, write, read } = await fixture();
+    write(input("queued"));
+    write(input("starting"));
+    const epoch = read().visibilityEpoch;
+    database.upsertProviderHistoryMessage({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      message: { ...input("completed"), visibilityEpoch: 999999 },
+    });
+    expect(read().visibilityEpoch).toBe(epoch);
+    const snapshot = database.readConversation(agent.id, agent.threadId);
+    const returned = database.persistConversation(
+      { ...snapshot, messages: snapshot.messages.map((message) => ({ ...message, visibilityEpoch: 999999 })) },
+      "visibility.full",
+    );
+    expect(returned.messages[0]?.visibilityEpoch).toBe(epoch);
+    expect(returned.messages[0]?.visibilityKind).toBe("revealed");
+    const stream = {
+      ...snapshot,
+      messages: [{ ...read(), text: "Stream", status: "streaming" as const, visibilityEpoch: 999999 }],
+    };
+    database.persistStreamingMessage({ snapshot: stream, messageId: "input", eventType: "visibility.stream" });
+    database.persistStreamingMessage({
+      snapshot: {
+        ...stream,
+        messages: [{ ...read(), text: "Final", status: "completed" }],
+      },
+      messageId: "input",
+      eventType: "visibility.stream",
+    });
+    expect(read().visibilityEpoch).toBe(epoch);
+    const before = database.readConversation(agent.id, agent.threadId);
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual(before.messages);
+    database.persistConversation(before, "visibility.compacted");
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual(before.messages);
+    const root = database.userDataPath;
+    database.close();
+    const reopened = new OpenBotDatabase(root);
+    await runCauseEffect(reopened.initialize());
+    expect(reopened.readConversation(agent.id, agent.threadId).messages).toEqual(before.messages);
+    reopened.close();
+  });
+
+  it("keeps lower-bound allocation and input clones consistent through failure, nested rollback and receipts", async () => {
+    const { database, agent, write, read } = await fixture();
+    const original = input("queued");
+    write(original);
+    const before = database.readConversation(agent.id, agent.threadId);
+    const eventsBefore = eventCount(database);
+    expect(() =>
+      database.persistConversationChanges({
+        agentId: "missing",
+        threadId: agent.threadId ?? "",
+        activeTurnId: null,
+        changedMessages: [input("starting")],
+        eventType: "visibility.fail",
+      }),
+    ).toThrow();
+    expect(database.connection.isTransaction).toBe(false);
+    expect(eventCount(database)).toBe(eventsBefore);
+    expect(database.readConversation(agent.id, agent.threadId)).toEqual(before);
+    database.connection.exec("BEGIN IMMEDIATE");
+    write(input("starting"));
+    expect(database.connection.isTransaction).toBe(true);
+    expect(read().visibilityEpoch).toBe(before.revision + 1);
+    database.connection.exec("ROLLBACK");
+    expect(database.readConversation(agent.id, agent.threadId)).toEqual(before);
+    const started = input("starting");
+    const revision = write(started, "visibility-retry");
+    const authoritative = read();
+    const count = eventCount(database);
+    expect(write(input("queued"), "visibility-retry")).toBe(revision);
+    expect(eventCount(database)).toBe(count);
+    expect(read()).toEqual(authoritative);
+    expect(started.visibilityEpoch).toBeUndefined();
+    expect(original.visibilityEpoch).toBeUndefined();
+    database.close();
+  });
+  it("hydrates late-visible cold members without changing canonical pages or the shared retention budget", async () => {
+    const { database, agent, write } = await fixture();
+    write({ ...input("completed"), id: "old-prefix", turnId: "current", createdAt: "2026-10-08T00:00:02.000Z" });
+    write(input("queued"));
+    const replies = Array.from(
+      { length: 100 },
+      (_, index): ConversationMessage => ({
+        id: `reply-${index}`,
+        author: "assistant",
+        text: "Reply",
+        status: "completed",
+        createdAt: "2026-10-08T00:00:02.000Z",
+        turnId: "current",
+      }),
+    );
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: replies,
+      eventType: "visibility.replies",
+    });
+    const canonical = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    write({ ...input("starting"), turnId: "current" });
+    write({ ...input("completed"), turnId: "current" });
+    const afterReveal = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    const root = database.userDataPath;
+    database.close();
+    const reopened = new OpenBotDatabase(root);
+    await runCauseEffect(reopened.initialize());
+    const cold = reopened.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    expect(cold.messages).toEqual(canonical.messages);
+    expect(cold.pageInfo).toEqual(afterReveal.pageInfo);
+    expect(cold.pageInfo.olderCount).toBe(canonical.pageInfo.olderCount);
+    expect(cold.windowMembers?.messages.map((message) => message.id)).toEqual(["input"]);
+    expect(cold.windowMembers?.messages.map((message) => message.id)).not.toContain("old-prefix");
+    const combined = [...(cold.windowMembers?.messages ?? []), ...cold.messages];
+    const retained = retainConversationMessages(combined, null);
+    expect(retained).toHaveLength(CONVERSATION_CACHE_MESSAGE_LIMIT);
+    expect(retained.some((message) => message.id === "input")).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(retained))).toBeLessThan(CONVERSATION_CACHE_BYTES_LIMIT);
+    expect(
+      reopened.readConversationPage(agent.id, agent.threadId, { type: "around", messageId: "old-prefix" }, 50)
+        .windowMembers,
+    ).toBeUndefined();
+    const cursor = cold.pageInfo.olderCursor;
+    assert(cursor);
+    expect(
+      reopened
+        .readConversationPage(agent.id, agent.threadId, { type: "before", cursor }, 50)
+        .messages.map((message) => message.id),
+    ).toEqual(["input", "old-prefix"]);
+    reopened.close();
+  });
+
+  it("does not hydrate ordinary same-epoch history outside the upstream bounded cold page", async () => {
+    const { database, agent } = await fixture();
+    const prefix = { ...input("completed"), id: "old-prefix", turnId: "current" };
+    const replies = Array.from(
+      { length: 120 },
+      (_, index): ConversationMessage => ({
+        id: `reply-${index}`,
+        author: "assistant",
+        text: "Reply",
+        status: "completed",
+        turnId: "current",
+        createdAt: "2026-10-08T00:00:02.000Z",
+      }),
+    );
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [prefix, ...replies],
+      eventType: "visibility.same-batch",
+    });
+    const half = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 50);
+    expect(half.messages).toHaveLength(100);
+    expect(half.messages[0]?.id).toBe("reply-20");
+    expect(half.windowMembers?.messages).toEqual([]);
+    database.close();
+  });
+
+  it("hydrates an early queued reveal beside a new reply from the same visibility write", async () => {
+    const { database, agent, write } = await fixture();
+    write(input("queued"));
+    const replies = Array.from(
+      { length: 120 },
+      (_, index): ConversationMessage => ({
+        id: `reply-${index}`,
+        author: "assistant",
+        text: "Reply",
+        status: "completed",
+        turnId: "current",
+        createdAt: "2026-10-08T00:00:02.000Z",
+      }),
+    );
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [{ ...input("completed"), turnId: "current" }, ...replies],
+      eventType: "visibility.same-batch-reveal",
+    });
+    const page = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 50);
+    expect(
+      new Set([...page.messages, ...(page.windowMembers?.messages ?? [])].map((message) => message.visibilityEpoch))
+        .size,
+    ).toBe(1);
+    expect(page.windowMembers?.messages.map((message) => message.id)).toEqual(["input"]);
+    expect(page.windowMembers?.messages[0]?.visibilityKind).toBe("revealed");
+    const root = database.userDataPath;
+    database.close();
+    const reopened = new OpenBotDatabase(root);
+    await runCauseEffect(reopened.initialize());
+    expect(reopened.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 50)).toEqual(page);
+    reopened.close();
+  });
+
+  it("does not reuse an old cycle after a preserve-only transition and can explicitly write a live full snapshot", async () => {
+    const { database, agent, write, read } = await fixture();
+    write(input("starting"));
+    const first = read().visibilityEpoch;
+    write(input("queued"));
+    database.upsertProviderHistoryMessage({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      message: { ...input("completed"), visibilityEpoch: 999999 },
+    });
+    expect(read().visibilityEpoch).toBeUndefined();
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages[0]?.visibilityEpoch).toBeUndefined();
+    write(input("queued"));
+    const before = database.readConversation(agent.id, agent.threadId);
+    const full = database.persistConversation(
+      { ...before, messages: [input("starting")] },
+      "visibility.live-full",
+      {},
+      "visibility-live-full",
+      "live",
+    );
+    expect(full.messages[0]?.visibilityEpoch).toBe(before.revision + 1);
+    expect(full.messages[0]?.visibilityEpoch).toBeGreaterThan(first ?? 0);
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual(full.messages);
+    const generated = { ...input("completed"), id: "generated", visibilityEpoch: 999999 };
+    const paired = database.persistConversationChangesAndMailbox(
+      { ...full, messages: [...full.messages, generated] },
+      [generated],
+      "visibility.generated",
+      {},
+      {
+        messages: [],
+        deliveries: [],
+        drafts: [],
+        generatedAttachments: [],
+        pausedAgentIds: [],
+        idempotency: {},
+        reactions: [],
+      },
+      "visibility.mailbox-generated",
+    );
+    expect(paired.messages.find((message) => message.id === "generated")?.visibilityEpoch).toBe(full.revision + 1);
+    expect(paired.messages).toEqual(database.readConversation(agent.id, agent.threadId).messages);
+    expect(generated.visibilityEpoch).toBe(999999);
+    const mailboxBefore = database.readMailboxState();
+    const eventsBefore = eventCount(database);
+    const readRows = vi.spyOn(database, "readConversationMessages").mockImplementationOnce(() => {
+      throw new Error("Authority read failed");
+    });
+    expect(() =>
+      database.persistConversationChangesAndMailbox(
+        { ...paired, messages: [input("starting")] },
+        [input("starting")],
+        "visibility.paired-failure",
+        {},
+        {
+          messages: [],
+          deliveries: [],
+          drafts: [],
+          generatedAttachments: [],
+          pausedAgentIds: [],
+          idempotency: {},
+          reactions: [],
+        },
+        "visibility.mailbox-failure",
+      ),
+    ).toThrow("Authority read failed");
+    readRows.mockRestore();
+    expect(database.connection.isTransaction).toBe(false);
+    expect(database.readConversation(agent.id, agent.threadId).messages).toEqual(paired.messages);
+    expect(database.readMailboxState()).toEqual(mailboxBefore);
+    expect(eventCount(database)).toBe(eventsBefore);
+    database.close();
+  });
+
+  it("keeps recovered historical rows unknown while recording durable hidden-to-visible reconciliation", async () => {
+    const { database, agent, write, read } = await fixture();
+    write(input("queued"));
+    const before = database.readConversation(agent.id, agent.threadId).revision;
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [input("completed"), { ...input("completed"), id: "old-mailbox", visibilityEpoch: 999999 }],
+      source: "reconcile",
+      eventType: "conversation.mailbox-reconciled",
+    });
+    expect(read().visibilityEpoch).toBe(before + 1);
+    expect(read("old-mailbox").visibilityEpoch).toBeUndefined();
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [
+        { ...input("starting"), id: "accepted-live" },
+        { ...input("completed"), id: "unobserved-history" },
+      ],
+      source: "reconcile",
+      liveMessageIds: ["accepted-live"],
+      eventType: "visibility.accepted-handoff",
+    });
+    expect(read("accepted-live").visibilityEpoch).toBeGreaterThan(before);
+    expect(read("unobserved-history").visibilityEpoch).toBeUndefined();
+    write(input("queued"));
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      activeTurnId: null,
+      changedMessages: [input("completed")],
+      source: "preserve",
+      eventType: "visibility.recovery-preserved",
+    });
+    expect(read().visibilityEpoch).toBeUndefined();
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual(
+      database.readConversation(agent.id, agent.threadId).messages,
+    );
+    database.close();
+  });
+
+  it("uses a durable mailbox reveal only without a conversation preimage and with a current operation receipt", async () => {
+    const { database, agent } = await fixture();
+    const mailbox = new MailboxStore(database.userDataPath, join(database.userDataPath, "Shared"), database);
+    await runCauseEffect(mailbox.initialize());
+    async function transition() {
+      const receipt = await runCauseEffect(
+        mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agent.id], text: "Input" }),
+      );
+      const id = receipt.deliveries[0]?.id;
+      assert(id);
+      const proofs: ConversationReveal[] = [];
+      await runCauseEffect(
+        mailbox.markSteering(id, "turn", { recipientAgentId: agent.id, revealed: (proof) => proofs.push(proof) }),
+      );
+      const message = mailbox.conversationMessages(agent.id).find((message) => message.id === id);
+      assert(message);
+      const proof = proofs[0];
+      assert(proof);
+      return { id, message, proof };
+    }
+    function writeProof(message: ConversationMessage, proof: ConversationReveal) {
+      database.persistConversationChanges({
+        agentId: agent.id,
+        threadId: agent.threadId ?? "",
+        activeTurnId: null,
+        changedMessages: [message],
+        source: "reconcile",
+        reveals: [proof],
+        eventType: "visibility.mailbox-proof",
+      });
+      return database.readConversationMessages(agent.id, agent.threadId, [message.id])[0];
+    }
+    const valid = await transition();
+    expect(writeProof(valid.message, valid.proof)?.visibilityKind).toBe("revealed");
+    const wrong = await transition();
+    expect(writeProof(wrong.message, { ...wrong.proof, recipientAgentId: "other" })?.visibilityEpoch).toBeUndefined();
+    const missing = await transition();
+    expect(
+      writeProof(missing.message, { ...missing.proof, current: { ...missing.proof.current, revision: -1 } })
+        ?.visibilityKind,
+    ).toBeUndefined();
+    const stale = await transition();
+    await runCauseEffect(mailbox.markRunning(stale.id, "turn"));
+    expect(writeProof(stale.message, stale.proof)?.visibilityKind).toBeUndefined();
+    const mismatched = await transition();
+    assert(mismatched.message.delivery);
+    expect(
+      writeProof({ ...mismatched.message, delivery: { ...mismatched.message.delivery, id: "other" } }, mismatched.proof)
+        ?.visibilityKind,
+    ).toBeUndefined();
+    const existing = await transition();
+    database.upsertProviderHistoryMessage({
+      agentId: agent.id,
+      threadId: agent.threadId ?? "",
+      message: existing.message,
+    });
+    expect(writeProof(existing.message, existing.proof)?.visibilityEpoch).toBeUndefined();
+    expect(database.rebuildThreadProjection(agent.threadId ?? "").messages).toEqual(
+      database.readConversation(agent.id, agent.threadId).messages,
+    );
+    database.close();
+  });
+
+  it("keeps the SQL boundary predicate in parity with the shared visibility comparator", async () => {
+    const { database } = await fixture();
+    for (const epoch of [undefined, 9, 10, 11]) {
+      for (const kind of [undefined, "created", "revealed"] as const) {
+        const message = { visibilityEpoch: epoch, visibilityKind: kind };
+        const row = database.connection
+          .prepare(
+            "SELECT (json_extract(?, '$.visibilityEpoch') > ? OR (json_extract(?, '$.visibilityEpoch') = ? AND json_extract(?, '$.visibilityKind') = 'revealed')) AS admitted",
+          )
+          .get(JSON.stringify(message), 10, JSON.stringify(message), 10, JSON.stringify(message));
+        assert(isDynamicRecord(row));
+        expect(Boolean(row.admitted)).toBe(isConversationVisibilityAfter(message, 10));
+      }
+    }
+    database.close();
+  });
+
+  it("bounds supplemental bodies and records a long-history query plan without hot-path scans", async () => {
+    const { database, agent, write } = await fixture();
+    const history = Array.from(
+      { length: 5000 },
+      (_, index): ConversationMessage => ({
+        id: `history-${index}`,
+        author: "assistant",
+        text: "History".repeat(32),
+        status: "completed",
+        createdAt: new Date(Date.UTC(2026, 9, 8) + index / 4).toISOString(),
+      }),
+    );
+    database.persistConversation(
+      { agentId: agent.id, threadId: agent.threadId, activeTurnId: null, revision: 0, messages: history },
+      "visibility.history",
+    );
+    write(input("queued"));
+    write({
+      id: "reply",
+      author: "assistant",
+      text: "Reply",
+      createdAt: "2026-10-08T00:00:02.000Z",
+      status: "completed",
+    });
+    write(input("starting"));
+    const prepare = vi.spyOn(database.connection, "prepare");
+    const started = performance.now();
+    const cold = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 50);
+    const durationMs = performance.now() - started;
+    const query = prepare.mock.calls
+      .map(([sql]) => sql)
+      .find((sql) => sql.includes("ORDER BY json_extract(message_json, '$.visibilityEpoch')"));
+    const boundaryQueries = prepare.mock.calls.length;
+    prepare.mockRestore();
+    assert(query);
+    const floor = cold.windowMembers?.visibilityFloor;
+    assert(floor);
+    const plan = database.connection
+      .prepare(`EXPLAIN QUERY PLAN ${query}`)
+      .all(agent.threadId, floor, floor, floor, 100);
+    expect(cold.windowMembers?.messages.map((message) => message.id)).toEqual(["input"]);
+    const hot = vi.spyOn(database.connection, "prepare");
+    write({ ...input("running"), text: "Updated" });
+    expect(
+      hot.mock.calls.some(([sql]) => sql.includes("ORDER BY json_extract(message_json, '$.visibilityEpoch')")),
+    ).toBe(false);
+    hot.mockRestore();
+    const oversized = { ...input("starting"), id: "large", text: "x".repeat(CONVERSATION_CACHE_BYTES_LIMIT) };
+    write(oversized);
+    const bounded = database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 50);
+    expect(bounded.windowMembers?.messages.some((message) => message.id === "large")).toBe(false);
+    const artifact = resolve(".openbot-build/visibility-upstream/query-cost.json");
+    await mkdir(resolve(".openbot-build/visibility-upstream"), { recursive: true });
+    await writeFile(
+      artifact,
+      JSON.stringify(
+        {
+          historyRows: 5000,
+          durationMs,
+          boundaryQueries,
+          plan,
+          supplementalIds: cold.windowMembers?.messages.map((message) => message.id),
+          hotPathSupplementQueries: 0,
+        },
+        null,
+        2,
+      ),
+    );
+    database.close();
+  });
+});
 
 async function createDatabase(): Promise<OpenBotDatabase> {
   const root = await mkdtemp(join(tmpdir(), "openbot-db-"));

@@ -7,6 +7,7 @@ import type {
   CentralAuthUser,
   ConfigureHostInput,
   ConversationMessageSender,
+  ConversationOrderProofRequest,
   ConversationPageAnchor,
   CreateTeamInviteInput,
   DirectConversationPage,
@@ -918,9 +919,19 @@ export class HostService extends EventEmitter<HostEvents> {
     );
   }
 
-  readAgentConversationPage(agentId: string, anchor: ConversationPageAnchor = { type: "latest" }, limit = 50) {
-    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
-      Effect.flatMap((readerId) => this.#options.agents.readConversationPageFor(agentId, readerId, anchor, limit)),
+  readAgentConversationPage(
+    agentId: string,
+    anchor: ConversationPageAnchor = { type: "latest" },
+    limit = 50,
+    orderProof?: ConversationOrderProofRequest,
+  ) {
+    // Proofs need the same signed-in caller check, but no unread-state adoption.
+    return remoteDecode(() =>
+      orderProof ? `local-user:${this.#options.getSignedInUser().id}` : this.#currentAgentReaderId(),
+    ).pipe(
+      Effect.flatMap((readerId) =>
+        this.#options.agents.readConversationPageFor(agentId, readerId, anchor, limit, undefined, orderProof),
+      ),
     );
   }
 
