@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/diagram";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "diagram.view.label": "Diagrama {name}",
   "diagram.board.label": "Canvas de {name}",
