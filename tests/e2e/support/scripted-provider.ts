@@ -1,14 +1,17 @@
 #!/usr/bin/env bun
-// A real provider subprocess. Only model decisions are scripted; OpenBot owns every tool effect.
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { watch } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { redactText } from "@openbot/logging";
 import { z } from "zod";
 import { scenarioSchema } from "./scenario";
 
+// A real provider subprocess. Model decisions are scripted; tools use real app and MCP endpoints.
 const request = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   method: z.string().optional(),
@@ -24,6 +27,9 @@ const state = z.object({
   turns: z.array(z.object({ id: z.string(), status: z.string(), items: z.array(z.json()) })),
 });
 const threads = new Map<string, z.infer<typeof state>>();
+// Provider launch configuration can contain credentials. Keep it out of saved thread fixtures.
+const mcpByThread = new Map<string, Record<string, Json>>();
+const mcpConfig = z.object({ mcp_servers: z.record(z.string(), z.json()).default({}) });
 const pending = new Map<string, { resolve: (value: Json) => void; reject: (error: Error) => void }>();
 const interrupted = new Set<string>();
 const holds = new Map<string, AbortController>();
@@ -84,7 +90,8 @@ async function run(threadId: string, turnId: string, text: string, uploads: { na
   send({ method: "item/agentMessage/delta", params: { ...base, itemId, delta: "Working on the test task." } });
   try {
     const assignment = text.split("Current assignment:\n").at(-1) ?? text;
-    const marker = /E2E_SCENARIO:([A-Za-z0-9+/=]+)/u.exec(assignment)?.[1];
+    // A refreshed provider session can include earlier chat messages before the current input.
+    const marker = [...assignment.matchAll(/E2E_SCENARIO:([A-Za-z0-9+/=]+)/gu)].at(-1)?.[1];
     let scenario = marker
       ? scenarioSchema.parse(JSON.parse(Buffer.from(marker, "base64").toString("utf8")))
       : scenarioSchema.parse({ reply: "Task received." });
@@ -128,6 +135,46 @@ async function run(threadId: string, turnId: string, text: string, uploads: { na
           step.name,
         );
         if (step.save) saved.set(step.save, value);
+      } else if (step.kind === "mcp") {
+        const config = z
+          .object({
+            enabled: z.boolean().default(true),
+            url: z.string().optional(),
+            http_headers: z.record(z.string(), z.string()).default({}),
+            command: z.string().optional(),
+            args: z.array(z.string()).default([]),
+            env: z.record(z.string(), z.string()).default({}),
+          })
+          .optional()
+          .parse(mcpByThread.get(threadId)?.[step.server]);
+        if (!config?.enabled) saved.set(step.save, `MCP unavailable: ${step.value}`);
+        else {
+          const client = new Client({ name: "release-provider", version: "1.0.0" });
+          try {
+            const transport = config.url
+              ? new StreamableHTTPClientTransport(new URL(config.url), {
+                  requestInit: { headers: config.http_headers },
+                })
+              : new StdioClientTransport({
+                  command: z.string().parse(config.command),
+                  args: config.args,
+                  env: config.env,
+                  stderr: "ignore",
+                });
+            await client.connect(transport);
+            const result = await client.callTool({ name: "record", arguments: { value: step.value } });
+            const content = z
+              .object({
+                isError: z.boolean().optional(),
+                content: z.array(z.object({ type: z.literal("text"), text: z.string() })),
+              })
+              .parse(result);
+            if (content.isError) throw new Error("The custom MCP tool failed.");
+            saved.set(step.save, content.content.map((item) => item.text).join("\n"));
+          } finally {
+            await client.close();
+          }
+        }
       } else if (step.kind === "write") {
         const path = resolve(current.cwd, step.name);
         if (!path.startsWith(`${resolve(current.cwd)}${sep}`)) throw new Error("Fixture file leaves the workspace.");
@@ -281,12 +328,21 @@ async function handle(raw: string) {
       break;
     case "thread/start": {
       const id = randomUUID();
-      threads.set(id, { id, cwd: z.string().optional().parse(p.cwd) ?? stateRoot, assignedTasks: [], turns: [] });
+      threads.set(id, {
+        id,
+        cwd: z.string().optional().parse(p.cwd) ?? stateRoot,
+        assignedTasks: [],
+        turns: [],
+      });
+      mcpByThread.set(id, mcpConfig.parse(p.config ?? {}).mcp_servers);
       save(id);
       result = { thread: thread(id) };
       break;
     }
     case "thread/resume":
+      mcpByThread.set(z.string().parse(p.threadId), mcpConfig.parse(p.config ?? {}).mcp_servers);
+      result = { thread: thread(z.string().parse(p.threadId)) };
+      break;
     case "thread/read":
       result = { thread: thread(z.string().parse(p.threadId)) };
       break;

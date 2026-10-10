@@ -1,5 +1,8 @@
 ### Added
 
+- Require every tested real provider to discover and call custom HTTP and STDIO MCP tools, with server receipts and chat results.
+- Check custom HTTP and STDIO MCP connections, failed connection recovery, tool use, disable/re-enable, and removal in local and host modes.
+
 - Require Grok and Gemini agent creation, delegation, browser, file preview, and interactive HTML checks in local and host modes.
 
 - Add release checks for chat, routines, file previews, browser control, and agent delegation in local and remote-host modes.

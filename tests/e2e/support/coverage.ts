@@ -21,6 +21,8 @@ export const scriptedCases = [
   "ui-create",
   "conversation-isolation",
   "history",
+  "mcp-http",
+  "mcp-stdio",
 ] as const;
 export const hostCases = ["host-isolation", "host-reconnect", "host-revoke"] as const;
 export const liveCases = [
@@ -29,6 +31,11 @@ export const liveCases = [
   "live-opencode",
   "live-grok",
   "live-gemini",
+  "live-mcp-codex",
+  "live-mcp-claude",
+  "live-mcp-opencode",
+  "live-mcp-grok",
+  "live-mcp-gemini",
   "live-group",
   "live-switch",
 ] as const;

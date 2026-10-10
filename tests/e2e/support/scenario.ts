@@ -12,6 +12,7 @@ export const scenarioSchema = z.object({
     .array(
       z.discriminatedUnion("kind", [
         tool,
+        z.object({ kind: z.literal("mcp"), server: z.string(), value: z.string(), save: z.string() }),
         z.object({ kind: z.literal("write"), name: z.string(), base64: z.string(), append: z.boolean().optional() }),
         z.object({ kind: z.literal("read-upload"), name: z.string(), save: z.string() }),
         z.object({ kind: z.literal("hold"), key: z.string() }),

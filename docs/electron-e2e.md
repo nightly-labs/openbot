@@ -27,6 +27,8 @@ not measure a network between two physical computers, TURN relay operation, or h
 | Browser | Agent opens a real local page, fills a form, submits it, and checks the result; user opens the live page, reloads it, and returns control |
 | User decisions | Accept/deny a command request and answer an agent question |
 | Real providers | Codex, Claude, OpenCode, Grok, and Gemini each create a child, delegate browser work, receive its reply, and generate an attached file and interactive HTML |
+| Real-provider MCP | Codex, Claude, OpenCode, Grok, and Gemini each discover and call custom HTTP and STDIO tools; one receipt per transport and both tool results in chat |
+| Custom MCP | HTTP headers and STDIO arguments/environment; failed connection and retry, tool discovery, save/reload, one real agent tool receipt, disable/re-enable, removal, and host configuration isolation |
 | Mixed providers | Codex assigns Claude, Claude assigns OpenCode, and results return through the group task chain |
 
 Assertions check saved messages, task owners and parent links, unique replies, exact file bytes,
@@ -36,14 +38,19 @@ Approval cases disable auto-approval for their test agent and check the exact pr
 the fixture performs a real workspace receipt write only after acceptance and checks that denial leaves no file. PDF coverage checks opening/reopening the
 viewer and exact downloaded bytes; it does not inspect Chromium's native PDF rendering.
 
-There are 22 scripted scenarios and seven live scenarios per mode, plus three host-only scenarios:
-61 required macOS cases. Linux runs the 47 scripted cases. The scripted CLI implements the Codex subprocess protocol.
+There are 24 scripted scenarios and 12 live scenarios per mode, plus three host-only scenarios:
+75 required macOS cases. Linux runs the 51 scripted cases. The scripted CLI implements the Codex subprocess protocol.
 It scripts model decisions; the app still executes tools, stores messages, schedules routines,
 transfers files, and controls the embedded browser. Authentication and agent seed data use
 supported application APIs. Host setup creates and accepts its invitation directly through the
 local account API; production invitation links deliberately reject plain HTTP account origins.
 The session token stays inside the Electron main process. The tested actions use UI controls. Native file dialogs are directed
 to private test paths. Tests do not change IPC trust checks or disable the Electron sandbox.
+
+Custom MCP cases use private local servers. Model decisions use the scripted provider, which
+connects with the MCP SDK using the configuration the app sends to it. This checks configuration
+delivery and real tool effects. Separate live cases check both transports with each real provider
+CLI in local and host modes. OAuth sign-in is not covered.
 
 The PDF test checks that its preview opens and its downloaded bytes match. It does not inspect
 the native PDF viewer's rendered text. File fixtures are small and synthetic. The suite does not
@@ -130,6 +137,11 @@ env -u ELECTRON_RUN_AS_NODE bun run test:e2e --grep='delegate delivers' --worker
 # Required real-provider cases only; uses provider quota.
 env -u ELECTRON_RUN_AS_NODE bun run test:e2e:live
 
+# One real provider's MCP case, in both modes, without other provider prerequisites.
+OPENBOT_E2E_PROVIDER=codex env -u ELECTRON_RUN_AS_NODE bun run test:e2e:live --grep='live-mcp-codex ' --workers=1
+# Use claude, opencode, grok, or antigravity for the other providers (Gemini case: live-mcp-gemini).
+# OPENBOT_E2E_PROVIDER is rejected outside the live suite, including release runs.
+
 # Discover tests without starting apps or services.
 OPENBOT_E2E_SUITE=release bun run test:e2e --list --reporter=list
 ```
@@ -142,7 +154,7 @@ CI uses three Playwright workers on macOS and two on Linux. Each worker owns its
 workspaces. Tests reuse the worker's app and use separate agents, group IDs, files, and browser
 case IDs. Tests wait for state and events. Retries are disabled. The release reporter fails for
 any missing, skipped, failed, or interrupted required case, or a test phase over ten minutes.
-The Linux job sets `OPENBOT_E2E_SUITE=scripted-release` to require all 47 scripted cases without
+The Linux job sets `OPENBOT_E2E_SUITE=scripted-release` to require all 51 scripted cases without
 requiring live providers. Ordinary `test:e2e` runs still permit selection of individual cases.
 Dependency install, build, Chromium install, visual comparisons, provider preflight, and shared service startup are outside that budget.
 Worker app startup and teardown are inside it. This budget still needs measurement on the Mac mini.
