@@ -43,6 +43,9 @@ export function SidebarSectionEditor() {
         title={editor()?.error ?? undefined}
         disabled={editor()?.saving === true}
         onKeyDown={(event) => {
+          // The browser owns the key that commits an IME composition. Safari sends it
+          // after `compositionend` without `isComposing`; keyCode 229 marks it.
+          if (event.isComposing || event.keyCode === 229) return;
           if (event.key === "Enter") {
             event.preventDefault();
             void saveSectionEditor();
