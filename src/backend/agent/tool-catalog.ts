@@ -81,6 +81,17 @@ export const VISIBLE_DYNAMIC_TOOLS = [
   },
 ];
 
+/**
+ * Claude names a bridge call `mcp__openbot__tool_call`. Readers of its items get the name of the tool it
+ * calls, in the form Claude gives a direct tool. A name outside the catalog is model text and stays out.
+ */
+export function claudeBridgedToolName(name: string, input: unknown): string {
+  if (name !== "mcp__openbot__tool_call" || typeof input !== "object" || input === null || !("name" in input))
+    return name;
+  const entry = BUILTIN_TOOL_CATALOG.find((tool) => tool.name === input.name);
+  return entry ? `mcp__${entry.namespace}__${entry.tool}` : name;
+}
+
 function words(text: string): string[] {
   return text
     .toLowerCase()

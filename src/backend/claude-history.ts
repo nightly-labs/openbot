@@ -5,6 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect } from "effect";
+import { claudeBridgedToolName } from "./agent/tool-catalog";
 import {
   isClaudeCompactionSummary,
   isClaudeInterruptMarker,
@@ -984,7 +985,7 @@ function messageToolCalls(message: unknown): Array<{ id: string; name: string }>
   return message.content.filter(isRecord).flatMap((block) => {
     const id = getString(block, "id");
     const name = getString(block, "name");
-    return block.type === "tool_use" && id && name ? [{ id, name }] : [];
+    return block.type === "tool_use" && id && name ? [{ id, name: claudeBridgedToolName(name, block.input) }] : [];
   });
 }
 

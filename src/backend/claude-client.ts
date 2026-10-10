@@ -29,7 +29,7 @@ import {
   startClaudePlanTurn,
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
-import { VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
+import { claudeBridgedToolName, VISIBLE_TOOL_DEFINITIONS } from "./agent/tool-catalog";
 import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { type ClaudeHistoryOptions, claudeHistoryFromMessages, claudeHistoryReader } from "./claude-history";
@@ -1014,8 +1014,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (toolCalls.length > 0) this.#flushNarration(runtime);
       for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
-        turn.toolCalls.set(toolCall.id, toolCall.name);
-        this.#emitToolCall(runtime, toolCall.id, toolCall.name, false, toolCall.input);
+        const name = claudeBridgedToolName(toolCall.name, toolCall.input);
+        turn.toolCalls.set(toolCall.id, name);
+        this.#emitToolCall(runtime, toolCall.id, name, false, toolCall.input);
         const plan = foldClaudePlanCall(runtime.plan, toolCall);
         if (plan) this.#emitPlan(runtime, plan);
       }
