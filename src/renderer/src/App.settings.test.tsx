@@ -235,7 +235,9 @@ describe("OpenBot connected desktop shell", () => {
     const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 59% left" });
     await fireEvent.click(usageButton);
     const usageDialog = screen.getByRole("dialog", { name: "Usage" });
-    expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, 59% left/ })).toBeInTheDocument();
+    expect(
+      within(usageDialog).getByRole("listitem", { name: /ChatGPT, 5-hour 72% left.*Weekly 59% left/ }),
+    ).toBeInTheDocument();
     await fireEvent.click(within(usageDialog).getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(2));
     await fireEvent.keyDown(usageDialog, { key: "Escape" });
@@ -302,7 +304,9 @@ describe("OpenBot connected desktop shell", () => {
     expect(vi.mocked(window.openbot.agent.getUsage).mock.calls[0]).toEqual([]);
     const accountDialog = screen.getByRole("dialog", { name: "Account actions" });
     expect(within(accountDialog).getByRole("heading", { name: "Usage" })).toBeInTheDocument();
-    expect(within(accountDialog).getByRole("listitem", { name: /ChatGPT, 59% left/ })).toBeInTheDocument();
+    expect(
+      within(accountDialog).getByRole("listitem", { name: /ChatGPT, 5-hour 72% left.*Weekly 59% left/ }),
+    ).toBeInTheDocument();
   });
 
   it("lists each connected provider in the usage popover", async () => {
@@ -326,8 +330,10 @@ describe("OpenBot connected desktop shell", () => {
     const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 85% left" });
     await fireEvent.click(usageButton);
     const usageDialog = screen.getByRole("dialog", { name: "Usage" });
-    expect(within(usageDialog).getByRole("listitem", { name: /Claude, 0% left/ })).toBeInTheDocument();
-    expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, 85% left/ })).toBeInTheDocument();
+    expect(
+      within(usageDialog).getByRole("listitem", { name: /Claude, 5-hour 0% left.*Weekly 60% left/ }),
+    ).toBeInTheDocument();
+    expect(within(usageDialog).getByRole("listitem", { name: /ChatGPT, Weekly 85% left/ })).toBeInTheDocument();
   });
 
   it("keeps host-wide usage when an earlier request finishes late", async () => {
