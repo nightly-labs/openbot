@@ -1166,8 +1166,9 @@ if (!hasSingleInstanceLock) {
     .catch((error) => {
       // A quit during the start, such as `docker stop`, closes the window that is still loading.
       // The quit is already running: an error box would block it, and the shutdown deadline with it.
-      if (isQuitting) {
-        logger.info("The quit stopped the start:", toLogValue(error));
+      // Not `isQuitting`: a Windows session end that another app cancels also sets it, and then no quit runs.
+      if (shutdownStarted) {
+        logger.warn("The quit stopped the start:", toLogValue(error));
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
