@@ -9,6 +9,7 @@ import {
 import { createEffect, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 
 function draftFromSuggestion(suggestion: FirstAgentSuggestion): FirstAgentDraft {
   return {
@@ -93,5 +94,20 @@ export const Submitting: Story = {
 };
 
 export const SmallWindow: Story = {
+  parameters: { viewport: { defaultViewport: "firstAgentSmall" } },
+};
+
+export const LongPrompt: Story = {
+  args: {
+    value: {
+      ...DEFAULT_FIRST_AGENT_DRAFT,
+      purpose: Array.from(
+        { length: 10 },
+        (_, index) => `Task ${index + 1}: Help me organize my notes, errands, and plans for the week.`,
+      ).join("\n"),
+    },
+    modelOptions: STORY_MODELS,
+    agentStatus: STORY_AGENT_STATUS,
+  },
   parameters: { viewport: { defaultViewport: "firstAgentSmall" } },
 };
