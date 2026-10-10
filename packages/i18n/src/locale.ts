@@ -1,7 +1,7 @@
 import type { AppLanguage } from "@openbot/contracts/app-language";
 
 /** The languages a catalog exists for. `"system"` resolves to one of these; it is never one itself. */
-export const TRANSLATED_LOCALES = ["en", "de", "es", "fr", "ja", "pl", "pt", "ru", "tr"] as const;
+export const TRANSLATED_LOCALES = ["en", "de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"] as const;
 
 export type TranslatedLocale = (typeof TRANSLATED_LOCALES)[number];
 
