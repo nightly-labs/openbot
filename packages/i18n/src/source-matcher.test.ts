@@ -27,6 +27,7 @@ const localizer = createSourceLocalizer({
         other: "{count} fichiers sont trop volumineux.",
       },
     },
+    it: {},
     ja: {},
     pl: {},
     pt: {},

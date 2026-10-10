@@ -36,6 +36,7 @@ const FLAG_REGION: Record<TranslatedLocale, string> = {
   de: "DE",
   es: "ES",
   fr: "FR",
+  it: "IT",
   ja: "JP",
   pl: "PL",
   pt: "BR",

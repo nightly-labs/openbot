@@ -4,6 +4,7 @@ import { source as de } from "./messages/de/source";
 import { source as en } from "./messages/en/source";
 import { source as es } from "./messages/es/source";
 import { source as fr } from "./messages/fr/source";
+import { source as it } from "./messages/it/source";
 import { source as ja } from "./messages/ja/source";
 import { source as pl } from "./messages/pl/source";
 import { source as pt } from "./messages/pt/source";
@@ -26,7 +27,7 @@ export type { TranslatedLocale } from "./locale";
  */
 export type SourceMessages = typeof en;
 
-const catalogs = { en, de, es, fr, ja, pl, pt, ru, tr } as const;
+const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr } as const;
 
 /** The English text for a source key. Write it where the code threw a literal before. */
 export const sourceText: Translate<SourceMessages> = createTranslate({

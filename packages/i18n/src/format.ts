@@ -4,6 +4,7 @@ import { messages as de } from "./messages/de/format";
 import { messages as en } from "./messages/en/format";
 import { messages as es } from "./messages/es/format";
 import { messages as fr } from "./messages/fr/format";
+import { messages as it } from "./messages/it/format";
 import { messages as ja } from "./messages/ja/format";
 import { messages as pl } from "./messages/pl/format";
 import { messages as pt } from "./messages/pt/format";
@@ -37,7 +38,7 @@ export interface AppFormat {
   fileSize: (bytes: number) => string;
 }
 
-const catalogs = { en, de, es, fr, ja, pl, pt, ru, tr } as const;
+const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 

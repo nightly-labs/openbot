@@ -24,6 +24,12 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
+  // CLDR Italian: one for 1; many for nonzero integer multiples of one million.
+  it: (count) => {
+    const absolute = Math.abs(count);
+    if (absolute === 1) return "one";
+    return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
+  },
   // Japanese has one form for every count.
   ja: () => "other",
   // CLDR Polish: one for 1; few for 2–4, 22–24…; many for 0, 5–21, 25–31…; other for fractions.
