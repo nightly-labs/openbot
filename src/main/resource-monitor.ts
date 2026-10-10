@@ -45,7 +45,7 @@ import { appendRotatingLines, type TraceFile } from "./trace-file";
 
 const SAMPLE_INTERVAL_MS = 60_000;
 const PERSIST_INTERVAL_MS = 15 * 60_000;
-export const RESOURCE_SUMMARY_FILE = "openbot-resource-summary-v1.json";
+const RESOURCE_SUMMARY_FILE = "openbot-resource-summary-v1.json";
 const SAMPLES_FILE = "resources.ndjson";
 const MAX_SAMPLES_BYTES = 1024 * 1024;
 const PS_TIMEOUT_MS = 5_000;

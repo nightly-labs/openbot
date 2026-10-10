@@ -7,7 +7,7 @@ import { Schema } from "effect";
  * path never reaches a day, a file or an event.
  */
 
-export const PROCESS_GROUPS = [
+const PROCESS_GROUPS = [
   "main",
   "window",
   "browser_tab",
@@ -18,11 +18,11 @@ export const PROCESS_GROUPS = [
 ] as const;
 export type ProcessGroup = (typeof PROCESS_GROUPS)[number];
 
-export const RESOURCE_PROVIDERS = [...AGENT_PROVIDERS, "other"] as const;
+const RESOURCE_PROVIDERS = [...AGENT_PROVIDERS, "other"] as const;
 export type ResourceProvider = (typeof RESOURCE_PROVIDERS)[number];
 
 /** Electron's `reason` values, with `clean-exit` left out: it is not a failure. */
-export const GONE_REASONS = ["crashed", "oom", "killed", "abnormal_exit", "launch_failed", "other"] as const;
+const GONE_REASONS = ["crashed", "oom", "killed", "abnormal_exit", "launch_failed", "other"] as const;
 export type GoneReason = (typeof GONE_REASONS)[number];
 
 /** A statement slower than this counts as slow. */
@@ -74,7 +74,7 @@ export const RESOURCE_PROPERTY_NAMES = [
   "provider_tree_supported",
   "sample_count",
 ] as const;
-export type ResourcePropertyName = (typeof RESOURCE_PROPERTY_NAMES)[number];
+type ResourcePropertyName = (typeof RESOURCE_PROPERTY_NAMES)[number];
 export type ResourceProperties = Partial<Record<ResourcePropertyName, string | number | boolean>>;
 
 export interface DeviceClass {
@@ -124,7 +124,7 @@ export function parsePsOutput(text: string): OsProcess[] {
 }
 
 /** macOS writes `[mm:]ss.cc` or `hh:mm:ss`; procps writes `[dd-]hh:mm:ss`. */
-export function parseCpuTime(text: string): number | null {
+function parseCpuTime(text: string): number | null {
   const [days, clock] = text.includes("-") ? text.split("-", 2) : ["0", text];
   const parts = (clock ?? "").split(":");
   if (parts.length === 0 || parts.length > 3) return null;
@@ -260,7 +260,7 @@ export function emptyDay(day: string): ResourceDay {
  * Two significant digits: exact below 100, then steps of 10, 100 and so on. This keeps a day's
  * histogram to a few hundred keys a metric, whatever the range.
  */
-export function quantize(value: number): number {
+function quantize(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   if (value < 100) return Math.round(value);
   const step = 10 ** (Math.floor(Math.log10(value)) - 1);
@@ -285,7 +285,7 @@ export function addCount(day: ResourceDay, counter: string, amount = 1): void {
   day.counters[counter] = (day.counters[counter] ?? 0) + amount;
 }
 
-export function percentile(day: ResourceDay, metric: string, fraction: number): number | undefined {
+function percentile(day: ResourceDay, metric: string, fraction: number): number | undefined {
   const histogram = day.histograms[metric];
   if (!histogram) return undefined;
   const entries = Object.entries(histogram)
