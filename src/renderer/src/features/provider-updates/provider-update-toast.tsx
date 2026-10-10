@@ -177,7 +177,7 @@ function samePresentation(a: ProviderUpdatePresentation, b: ProviderUpdatePresen
 
 /** The notification open for one provider, and the three things about it that still move. */
 interface LiveProviderUpdateToast {
-  present: (presentation: ProviderUpdatePresentation) => void;
+  present: (update: ProviderUpdate) => void;
   setAct: (act: () => void) => void;
   setOffer: (version: string | null) => void;
 }
@@ -224,14 +224,17 @@ function releaseProviderUpdateToast(provider: AgentProviderId): void {
  * only notifies the properties something has already read, and on an empty Toaster there are none
  * yet. So the parts are built here and handed back, and the caller raises the notification.
  */
-function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresentation): LiveProviderUpdateToast {
+function liveToast(provider: AgentProviderId, update: ProviderUpdate): LiveProviderUpdateToast {
   const open = liveToasts.get(provider);
   if (open) return open;
 
   const parts = createRoot((dispose) => {
-    // Main pushes one snapshot for every percent of every download, and each one is presented again
-    // for every update in flight. A presentation that says what is on screen already changes nothing.
-    const [current, setCurrent] = createSignal(presentation, { equals: samePresentation });
+    // The text is made here, not by the caller, so a language change while the toast is open
+    // translates it again. Main pushes one snapshot for every percent of every download, and each
+    // one is presented again for every update in flight. A presentation that says what is on screen
+    // already changes nothing.
+    const [latest, setLatest] = createSignal(update);
+    const current = createMemo(() => presentProviderUpdate(latest()), { equals: samePresentation });
     // What changes the height of the toast: the lines it shows, not the percentage on one of them.
     // "Setting up" keeps the title of the download before it and loses the percentage, so the words
     // of the title alone are not enough.
@@ -248,9 +251,10 @@ function liveToast(provider: AgentProviderId, presentation: ProviderUpdatePresen
     let offered: string | null = null;
 
     const live: LiveProviderUpdateToast = {
-      present: (next) => {
+      present: (nextUpdate) => {
         const previous = untrack(current);
-        setCurrent(next);
+        const next = presentProviderUpdate(nextUpdate);
+        setLatest(nextUpdate);
         // A retry closes the old failure, so the next one opens at its first lines. A retry that
         // fails before it starts goes from one failure to the next, so new words close it too.
         if (!next.failed || next.detail !== previous.detail) setExpanded(false);
@@ -330,8 +334,8 @@ export function showProviderUpdateToast(update: ProviderUpdate, onUpdate: () => 
   if (timer !== undefined) window.clearTimeout(timer);
   dismissTimers.delete(update.provider);
   const presentation = presentProviderUpdate(update);
-  const live = liveToast(update.provider, presentation);
-  live.present(presentation);
+  const live = liveToast(update.provider, update);
+  live.present(update);
   live.setAct(onUpdate);
   live.setOffer(presentation.updatable ? update.availableVersion : null);
 }
@@ -362,7 +366,7 @@ export function reportProviderUpdateToast(update: ProviderUpdate, onRetry: () =>
   const live = liveToasts.get(update.provider);
   if (!live) return;
   const presentation = presentProviderUpdate(update);
-  live.present(presentation);
+  live.present(update);
   live.setAct(onRetry);
   live.setOffer(presentation.updatable ? update.availableVersion : null);
 
