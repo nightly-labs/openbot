@@ -6,6 +6,37 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-10
+
+### Added
+
+- Polish interface. Choose Polski in Settings > General > Language, or keep System default on a
+  computer that uses Polish. The web client uses it too.
+- A computer that has not signed in to OpenBot now opens on a language wheel, before sign-in. Turn it with the arrow
+  keys, the scroll wheel, a drag or the arrow buttons; the screen changes to each language as you
+  turn it. Continue saves the language. The wheel shows one time on each computer.
+- The diagnostics export now has the memory and CPU use of OpenBot and of each provider's
+  processes, the app's responsiveness, database statement times and crash counts, for today and
+  the previous day.
+- With analytics on, OpenBot sends one daily summary of its memory and CPU use, by computer class
+  and provider. It does not send process names, command lines or paths.
+- Added a guide to run the Docker image as an AWS ECS service on EC2, with the seccomp profile, the
+  data volume, ECS Exec sign-in and CloudWatch logs. AWS Fargate is not supported: it cannot keep
+  the Electron sandbox on. See `docs/aws-ecs.md`.
+
+### Changed
+
+- The Docker image now works when `/dev/shm` is smaller than 1 GiB, for example on Kubernetes:
+  Chromium then keeps its shared memory in `/tmp`. Before, Chromium could run out of shared memory.
+
+### Fixed
+
+- Completed the Brazilian Portuguese catalog: the 643 keys that showed English text — agent and
+  provider settings, routines, webhooks, the routine canvas, billing, server states, the mobile app
+  and the Marketplace — are now translated. `bun run i18n:check` reports pt at 6,676 of 6,676 keys.
+- A server that gets a stop signal while its window loads now quits. Before, it showed a "failed to
+  start" box on its virtual display, and the box blocked the quit until the process was killed.
+
 ## [0.35.2] - 2026-10-10
 
 ### Fixed

@@ -1,5 +1,23 @@
 [
   {
+    "version": "0.36.0",
+    "date": "2026-10-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "OpenBot is now available in Polish. Choose Polski in Settings > General > Language.",
+          "With analytics on, OpenBot sends one daily summary of its memory and CPU use. It does not send process names, command lines or paths."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": ["All of the Brazilian Portuguese interface is translated."]
+      }
+    ]
+  },
+  {
     "version": "0.35.2",
     "date": "2026-10-10",
     "notices": [],
