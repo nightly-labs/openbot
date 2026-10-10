@@ -703,6 +703,37 @@ describe("OpenBotDatabase", () => {
       "conversation.acp-order",
     );
 
+    // A queued message gets its conversation time when it is steered (#1746). Live writes and
+    // event replay must both replace the original queue time before SQL pages are read.
+    const steer = messages.find((item) => item.id === "steer");
+    if (!steer || !agent.threadId) throw new Error("The steered message needs a thread.");
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: "steered",
+      changedMessages: [{ ...steer, createdAt: at(2_000), delivery: { id: "steer", status: "queued", position: 1 } }],
+      eventType: "queue.message-added",
+    });
+    database.persistConversationChanges({
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: null,
+      changedMessages: [{ ...steer, delivery: { id: "steer", status: "completed", position: null } }],
+      eventType: "queue.message-steered",
+    });
+    expect(
+      database.readConversation(agent.id, agent.threadId).messages.find((item) => item.id === "steer")?.createdAt,
+    ).toBe(at(2_010));
+    database.upsertProviderHistoryMessage({
+      agentId: agent.id,
+      threadId: agent.threadId,
+      activeTurnId: null,
+      message: { ...steer, createdAt: at(2_000) },
+    });
+    database.rebuildThreadProjection(agent.threadId);
+    expect(
+      database.readConversation(agent.id, agent.threadId).messages.find((item) => item.id === "steer")?.createdAt,
+    ).toBe(at(2_010));
     expect(database.readConversation(agent.id, agent.threadId).messages.map(({ id }) => id)).toEqual(expected);
     expect(expected.indexOf("turn-1-question")).toBeGreaterThan(expected.indexOf("turn-0-answer"));
     expect(expected.indexOf("steer")).toBeGreaterThan(expected.indexOf("steered-thought"));
