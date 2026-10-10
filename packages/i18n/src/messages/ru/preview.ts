@@ -11,6 +11,7 @@ export const messages = {
   "preview.panel.back": "Назад",
   "preview.panel.rawMarkdown": "Показать исходный Markdown",
   "preview.panel.rawHtml": "Показать исходный HTML",
+  "preview.panel.wrapLines": "Переносить длинные строки",
   "preview.folder.empty": "Эта папка пуста.",
   "preview.folder.truncated": "Показаны только первые {limit} элементов.",
   "preview.truncated": "Просмотр обрезан после {limit} символов.",
