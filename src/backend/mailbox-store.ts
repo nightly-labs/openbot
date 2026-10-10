@@ -111,6 +111,8 @@ interface StoredDelivery {
   turnId: string | null;
   error: string | null;
   createdAt: string;
+  /** Time this delivery joined a running turn. The mailbox keeps the original send time. */
+  steeredAt?: string;
   /** Sent to steer the running turn, and waiting in the queue instead. Shown only while queued. */
   steerFallback?: QueueSteerFallback;
 }
@@ -700,7 +702,10 @@ export class MailboxStore {
         if (isActiveDelivery(delivery)) active = true;
       }
       if (!relevant) continue;
-      if (!active && options.fromCreatedAt && message.createdAt < options.fromCreatedAt) continue;
+      const conversationTime = ownMessage
+        ? message.createdAt
+        : (deliveries.find((delivery) => delivery.recipientAgentId === agentId)?.steeredAt ?? message.createdAt);
+      if (!active && options.fromCreatedAt && conversationTime < options.fromCreatedAt) continue;
       if (!active && completedCount >= limit) continue;
       selectedStoredMessages.push(message);
       if (!active) completedCount += 1;
@@ -791,7 +796,7 @@ export class MailboxStore {
                   scheduledFor: message.sender.scheduledFor,
                 }
               : undefined,
-          createdAt: message.createdAt,
+          createdAt: storedDelivery.steeredAt ?? message.createdAt,
           status: delivery.status === "failed" ? "failed" : "completed",
           itemType:
             message.sender.kind === "agent"
@@ -1609,6 +1614,7 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], {
         status: "starting",
         turnId,
+        steeredAt: new Date().toISOString(),
         error: null,
       });
     } catch (cause) {
@@ -1632,6 +1638,7 @@ export class MailboxStore {
         return;
       }
       Object.assign(delivery, { status: "queued", turnId: null, error: null });
+      delete delivery.steeredAt;
       this.#persist("delivery.updated");
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -1655,6 +1662,7 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["starting"], {
         status: "queued",
         turnId: null,
+        steeredAt: undefined,
         error: null,
       });
     } catch (cause) {
@@ -1672,6 +1680,7 @@ export class MailboxStore {
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
         status: "queued",
         turnId: null,
+        steeredAt: undefined,
         error: null,
       });
     } catch (cause) {
@@ -2028,7 +2037,13 @@ export class MailboxStore {
     positions = this.#queuedPositions(),
     message = this.#requireMessage(delivery.messageId),
   ): QueueDelivery {
-    const { editId: _editId, finishedEditOutcomes: _finishedEditOutcomes, steerFallback, ...publicDelivery } = delivery;
+    const {
+      editId: _editId,
+      finishedEditOutcomes: _finishedEditOutcomes,
+      steeredAt: _steeredAt,
+      steerFallback,
+      ...publicDelivery
+    } = delivery;
     return {
       ...publicDelivery,
       ...(steerFallback && delivery.status === "queued" ? { steerFallback } : {}),
@@ -2363,6 +2378,7 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
     (isString(value.turnId) || value.turnId === null) &&
     (isString(value.error) || value.error === null) &&
     isString(value.createdAt) &&
+    (value.steeredAt === undefined || (isString(value.steeredAt) && Number.isFinite(Date.parse(value.steeredAt)))) &&
     (value.steerFallback === undefined || isOneOf(QUEUE_STEER_FALLBACKS, value.steerFallback))
   );
 }
