@@ -1155,6 +1155,7 @@ export function createConversationViewScope(props: ConversationProps) {
     dropActive,
     editQueuedMessage,
     editingDeliveryId: currentEditingDeliveryId,
+    cancelQueuedMessageEdit,
     editingPendingSave,
     expandedEmojiMessageId,
     scrollFades,

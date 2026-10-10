@@ -2,6 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/composer";
 
 export const messages = {
+  "composer.queueEdit.body":
+    "Вы редактируете сообщение в очереди. Сохраните или отмените правку, чтобы разрешить его выполнение.",
+  "composer.queueEdit.cancel": "Отменить правку",
   "composer.notice.dismiss": "Скрыть ошибку",
   "composer.signIn.title": "Нужен вход",
   "composer.signIn.body": "Войдите в {provider}, чтобы отправлять сообщения.",

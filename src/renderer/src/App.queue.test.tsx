@@ -584,7 +584,7 @@ describe("OpenBot connected desktop shell", () => {
     );
   });
 
-  it("keeps foreground starts out of Queue and hides waiting work between turns", async () => {
+  it("keeps foreground starts out of Queue and shows waiting work between turns", async () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
     const firstStarting = queuedDelivery("delivery-starting", "Current work", null, { status: "starting" });
@@ -641,7 +641,8 @@ describe("OpenBot connected desktop shell", () => {
         ],
       },
     });
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Message queue" })).not.toBeInTheDocument());
+    await screen.findByRole("group", { name: "Queued message 1: Next work" });
+    expect(screen.getByRole("button", { name: "Delete queued message 1" })).toBeEnabled();
 
     const secondStarting = { ...second, status: "starting" as const, position: null, turnId: "turn-next" };
     emitAgentEvent?.({
@@ -1302,7 +1303,7 @@ describe("queue edit", () => {
     // Save confirms the hold with the same identity first, so the second hold is calls[3].
     const secondBegin = vi.mocked(window.openbot.agent.editQueuedMessage).mock.calls[3]?.[0];
     assert(secondBegin);
-    await fireEvent.keyDown(document, { key: "Escape" });
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel edit" }));
     await waitFor(() =>
       expect(window.openbot.agent.editQueuedMessage).toHaveBeenCalledWith(
         { agentId: "chief", deliveryId: delivery.id, editId: secondBegin.editId, action: "cancel" },

@@ -2,6 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/composer";
 
 export const messages = {
+  "composer.queueEdit.body":
+    "Você está editando uma mensagem na fila. Salve ou cancele a edição para permitir a execução.",
+  "composer.queueEdit.cancel": "Cancelar edição",
   "composer.notice.dismiss": "Dispensar erro",
   "composer.signIn.title": "É necessário entrar",
   "composer.signIn.body": "Entre em {provider} para enviar mensagens.",

@@ -23,6 +23,7 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import {
+  ComposerNotice,
   ComposerSignInNotice,
   ComposerUpdateNotice,
   ComposerUsageLimitNotice,
@@ -56,6 +57,7 @@ export function ConversationComposer() {
     installedSkillsLoadFailed,
     mcpServers,
     editQueuedMessage,
+    cancelQueuedMessageEdit,
     editingDeliveryId,
     editingPendingSave,
     openAttachmentPicker,
@@ -246,6 +248,22 @@ export function ConversationComposer() {
             </Show>
           </div>
         </div>
+        <Show when={editingDeliveryId()}>
+          <ComposerNotice
+            body={t("composer.queueEdit.body")}
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                disabled={submitting() || attachmentBusy()}
+                onClick={() => void cancelQueuedMessageEdit()}
+              >
+                {t("composer.queueEdit.cancel")}
+              </Button>
+            }
+          />
+        </Show>
         <Show when={replyTarget()}>
           {(message) => (
             <div class="composer-reply-preview">
