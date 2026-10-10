@@ -183,6 +183,8 @@ import { RemoteSessionCache } from "./remote-session-cache";
 import { RemoteSessionReusePreferenceStore } from "./remote-session-reuse-preference-store";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { ResourceMonitor } from "./resource-monitor";
+import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
@@ -266,6 +268,8 @@ const PACKAGED_BUNDLE_IDENTIFIER = "app.openbot.desktop";
 const DEVELOPMENT_BUNDLE_IDENTIFIER = "com.github.Electron";
 
 const TEARDOWN_ORDER = {
+  // First, so a process that the teardown ends does not count as a crash.
+  resourceMonitor: 9,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -421,6 +425,7 @@ export interface ApplicationServices {
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
   trace: TraceFile;
+  resourceMonitor: ResourceMonitor;
   teamStore: TeamStore;
   /**
    * The account state this function read part-way through, and bound the local host to. The
@@ -1074,9 +1079,14 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.onePasswordConnector, "the 1Password connection", () =>
     runCauseEffect(onePasswordConnector.dispose()),
   );
+  // Read by the resource monitor, which starts after the analytics that needs the services.
+  const statementTimings = new StatementTimings();
   const tables = new AgentTables({
     sharedRoot: store.sharedRoot,
-    supervisor: new AgentDatabaseSupervisor({ spawnHost: spawnAgentDatabaseHost }),
+    supervisor: new AgentDatabaseSupervisor({
+      spawnHost: spawnAgentDatabaseHost,
+      onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+    }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
   // panel's "Check again" has to see it.
@@ -1782,10 +1792,23 @@ export async function createApplicationServices({
             surface: "desktop_host",
             app_version: app.getVersion(),
             platform: analyticsPlatform,
-            event_schema_version: 7,
+            event_schema_version: 8,
           },
         )
       : undefined;
+  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
+  teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
+  const resourceMonitor = new ResourceMonitor({
+    userDataPath: app.getPath("userData"),
+    server: hostedServer !== null || serverModeEnvironment !== null,
+    trace,
+    statementTimings,
+    tabProcessIds: () => browser.tabProcessIds(),
+  });
+  teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
+    Effect.runPromise(resourceMonitor.close()),
+  );
+  service.on("event", (event) => resourceMonitor.observeAgentEvent(event));
   const analytics = new HostAnalytics({
     ...(failureReports ? { reports: failureReports } : {}),
     enabled: app.isPackaged && appVariant === "production",
@@ -1828,14 +1851,14 @@ export async function createApplicationServices({
         computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
       }),
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
+    resources: resourceMonitor,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
-  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
-  teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => Effect.runPromise(trace.close()));
+  resourceMonitor.start(() => analytics.checkResources());
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
@@ -2235,6 +2258,7 @@ export async function createApplicationServices({
     computerUsePermissionHelp,
     analytics,
     trace,
+    resourceMonitor,
     teamStore,
     appliedAccount: signedInState,
     centralAuthInitialization,

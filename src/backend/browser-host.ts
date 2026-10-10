@@ -521,6 +521,14 @@ export class BrowserHost {
       .map((tab) => toPublicTab(tab));
   }
 
+  /** The renderer process of each open tab, so the resource monitor can count tabs apart from windows. */
+  tabProcessIds(): number[] {
+    return [...this.#tabs.values()]
+      .filter((tab) => !tab.closing && !tab.contents.isDestroyed())
+      .map((tab) => tab.contents.getOSProcessId())
+      .filter((pid) => pid > 0);
+  }
+
   get activeTabId(): string | null {
     return this.#activeTabId;
   }

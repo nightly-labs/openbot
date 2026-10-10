@@ -344,6 +344,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     super();
     this.#transport = new AcpConnection({
+      provider: options.provider,
       cli,
       argv: options.argv,
       env: options.env,

@@ -187,6 +187,13 @@ The local host also records how the agents are used:
 - **Setup.** At most once a day, the host sends counts of agents, enabled routines, custom MCP
   servers, local skills and community skills; the slugs of enabled catalog plugins and of curated
   skills and agents; the providers in use; and whether Computer Use is enabled.
+- **Resource use.** At most once a day, the host sends a summary of the previous day: the memory and
+  CPU use of OpenBot's process groups (main, windows, browser tabs, GPU, the database and voice
+  processes) and of each provider's CLI and its child processes, by provider id; the main process
+  responsiveness; agent database statement times and counts; counts of processes that stopped
+  unexpectedly, by reason; and the computer's memory and processor class, architecture, and whether
+  it is a server. Memory is rounded to 50 MB. Process IDs, program names, command lines and paths
+  are not sent. A day that ends while analytics is off is not sent.
 - **Agent source.** Turn events say whether the agent came from a curated listing, a community
   listing, or neither, and name only a curated listing. Marketplace events name only a curated
   skill, agent or catalog plugin.
@@ -450,6 +457,12 @@ is not included in analytics; provider output uses the application's secret reda
   and the outcome word. A connection step does not name the server. The failure's error text goes only to the redacted log. The trace holds no payloads,
   messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
   is kept to two files of 2 MB each and is never sent.
+- `~/Library/Application Support/OpenBot/logs/resources.ndjson` holds one line a minute: the memory
+  and CPU use of each OpenBot process group and provider id, the main process delay, the number of
+  agent database statements, active turns and browser tabs. It holds no process IDs, program names,
+  command lines or paths. It is kept to two files of 1 MB each and is never sent.
+  `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of
+  today and of the previous day for the daily analytics summary and the diagnostics export.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
@@ -733,8 +746,9 @@ and managed message attachments. It intentionally excludes CLI credentials, brow
 agent workspace files.
 
 The diagnostics export contains application and CLI versions, capability states, aggregate queue
-counts, and a summary of the local trace: counts, outcomes, and durations for each IPC channel,
-turn origin, and failure origin. It contains no conversations, visited URLs, account email, file
+counts, a summary of the local trace: counts, outcomes, and durations for each IPC channel,
+turn origin, and failure origin, and the resource summary: the last sample and the memory, CPU,
+responsiveness, database statement and crash figures of today and the previous day. It contains no conversations, visited URLs, account email, file
 contents, or local file paths.
 
 ## Delete local data

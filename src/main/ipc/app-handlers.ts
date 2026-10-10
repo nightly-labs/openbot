@@ -66,6 +66,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
 };
 
 import { runCauseEffect } from "../../backend/effect-boundary";
+import type { ResourceMonitor } from "../resource-monitor";
 import type { TraceFile } from "../trace-file";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
@@ -88,6 +89,7 @@ export interface AppIpcDependencies {
   getMainWindow: () => BrowserWindow | null;
   setAnalyticsTrackingEnabled: (enabled: boolean) => void;
   trace: TraceFile;
+  resources: ResourceMonitor;
 }
 
 export function appIpcHandlers({
@@ -109,6 +111,7 @@ export function appIpcHandlers({
   getMainWindow,
   setAnalyticsTrackingEnabled,
   trace,
+  resources,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
   const analyticsPreferenceWrites = Semaphore.makeUnsafe(1);
@@ -194,6 +197,7 @@ export function appIpcHandlers({
             browser,
             updater,
             trace,
+            resources,
             parentWindow: getMainWindow(),
             translate: language.translate,
           }),

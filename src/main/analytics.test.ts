@@ -22,6 +22,15 @@ import {
   sanitizeHostEvent,
 } from "./analytics";
 import { catalogPluginSlug, loadCatalogPluginServers } from "./analytics-plugin-catalog";
+import {
+  deviceClass,
+  emptyDay,
+  METRIC,
+  parsePsOutput,
+  providerTrees,
+  recordValue,
+  resourceEventProperties,
+} from "./resource-summary";
 
 const AGENT: AgentSummary = {
   id: "chief",
@@ -93,7 +102,7 @@ describe("host analytics", () => {
     );
 
     expect(client.setGlobalProperties).toHaveBeenCalledWith(
-      expect.objectContaining({ event_schema_version: 7, surface: "desktop_host" }),
+      expect.objectContaining({ event_schema_version: 8, surface: "desktop_host" }),
     );
 
     analytics.handleAgentEvent({
@@ -1100,5 +1109,103 @@ describe("usage analytics", () => {
     await vi.waitFor(() => expect(store.written).toHaveLength(1));
 
     expect(tracked("system_inventory")).toEqual([]);
+  });
+});
+
+describe("resource analytics", () => {
+  const PRIVATE_PID = 987_654;
+
+  // A provider CLI that OpenBot started, an MCP server under it, and a tool of the user's own.
+  function closedDay() {
+    const processes = parsePsOutput(
+      [
+        `  ${PRIVATE_PID}   100  204800   0:12.50 /Users/private-person/.local/bin/codex`,
+        `  987655 ${PRIVATE_PID}   51200   0:01.00 /Users/private-person/mcp/secret-server --token abc`,
+        "  987656   100  102400   1:00.00 /Applications/Private Tool.app/Contents/MacOS/private-tool",
+      ].join("\n"),
+    );
+    const day = emptyDay("2026-10-09");
+    const { usage } = providerTrees({
+      processes,
+      rootPid: 100,
+      excludedPids: new Set(),
+      registry: new Map([[PRIVATE_PID, "codex"]]),
+      previousCpuSeconds: new Map([[PRIVATE_PID, 6.5]]),
+      elapsedSeconds: 60,
+    });
+    for (const tree of usage) {
+      recordValue(day, METRIC.providerRss(tree.provider), tree.rssMb);
+      if (tree.cpuPct !== null) recordValue(day, METRIC.providerCpu(tree.provider), tree.cpuPct);
+    }
+    recordValue(day, METRIC.rss("total"), 1_234);
+    day.samples = 1;
+    const device = deviceClass({ totalMemoryBytes: 16 * 1024 ** 3, cpuCount: 10, arch: "arm64", server: false });
+    return resourceEventProperties(day, device);
+  }
+
+  function resourceSource() {
+    const cleared: string[] = [];
+    // Keys that no summary makes, to prove that the allowlist and the value checks stop them.
+    const properties = {
+      ...closedDay(),
+      comm: "/Users/private-person/.local/bin/codex",
+      pid: PRIVATE_PID,
+      provider_private_rss_mb_p95: 100,
+      ram_class: "/Users/private-person",
+      total_rss_mb_max: "/Users/private-person",
+    };
+    return {
+      cleared,
+      source: {
+        previousDay: () => (cleared.length ? null : { day: "2026-10-09", properties }),
+        clearPreviousDay: (day: string) =>
+          Effect.sync(() => {
+            cleared.push(day);
+          }),
+      },
+    };
+  }
+
+  it("sends the closed day once, with only coarse numbers and closed-set names", async () => {
+    const { source, cleared } = resourceSource();
+    const { analytics, tracked } = usageAnalytics({ resources: source });
+    analytics.flushPending();
+    await vi.waitFor(() => expect(tracked("system_resources")).toHaveLength(1));
+    analytics.checkResources();
+    analytics.handleAgentEvent({ type: "turn-started", agentId: AGENT.id, threadId: "thread", turnId: "turn" });
+
+    expect(cleared).toEqual(["2026-10-09"]);
+    const [event] = tracked("system_resources");
+    expect(event).toMatchObject({
+      provider_codex_rss_mb_p95: 250,
+      // 6 s of the CLI and 1 s of its new MCP child in 60 s.
+      provider_codex_cpu_pct_p95: 12,
+      provider_other_rss_mb_p95: 100,
+      // Two significant digits, then 50 MB steps.
+      total_rss_mb_p95: 1_200,
+      cpu_class: "le12",
+      arch: "arm64",
+      host_kind: "desktop",
+      sample_count: 1,
+    });
+    expect(event).not.toHaveProperty("comm");
+    expect(event).not.toHaveProperty("pid");
+    expect(event).not.toHaveProperty("provider_private_rss_mb_p95");
+    expect(event).not.toHaveProperty("total_rss_mb_max");
+    expect(event).not.toHaveProperty("ram_class");
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain("private");
+    expect(serialized).not.toContain(String(PRIVATE_PID));
+  });
+
+  it("drops a day that closes while analytics is off, so it is never sent later", async () => {
+    const { source, cleared } = resourceSource();
+    const { analytics, tracked } = usageAnalytics({ resources: source, trackingEnabled: false });
+    analytics.checkResources();
+    await vi.waitFor(() => expect(cleared).toEqual(["2026-10-09"]));
+    analytics.setTrackingEnabled(true);
+    analytics.flushPending();
+
+    expect(tracked("system_resources")).toEqual([]);
   });
 });

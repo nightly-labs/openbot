@@ -18,14 +18,14 @@ Every event has these low-cardinality properties:
 
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, or `account_api`;
 - `environment`: currently `production` only;
-- `event_schema_version`: the integer schema generation of that surface: currently `7` on `desktop`
-  and `desktop_host`, `8` on `landing`, `9` on `account_api`, `2` on `mobile`, and `1` on `web`;
+- `event_schema_version`: the integer schema generation of that surface: currently `7` on `desktop`,
+  `8` on `desktop_host` and `landing`, `9` on `account_api`, `2` on `mobile`, and `1` on `web`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
 Each surface counts its own generations, so a report filters by `surface` and that surface's current
-generation. Desktop and host generation 7 adds safe error causes and durable failure delivery. Generation 6 added the usage events below (`system_tool_used`,
+generation. Host generation 8 adds `system_resources`. Desktop and host generation 7 adds safe error causes and durable failure delivery. Generation 6 added the usage events below (`system_tool_used`,
 `system_site_visited`, `system_routine_run`, `system_inventory`), `agent_source` and `agent_listing`
 on host turn and input events, and `plugin` entities and `listing_slug` on `marketplace_action`.
 
@@ -89,6 +89,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `system_site_visited` | Which websites do users and agents work on? | A browser tab reached a new registrable domain. `actor` is `user` or `agent`; only the eTLD+1 is sent, and IP addresses, single-label names and names with no public suffix are dropped. An intranet host under a public domain is sent as that domain |
 | `system_routine_run` | Do routine runs succeed, and which schedules are used? | A routine run that this host saw running reached `succeeded`, `failed`, `needs-attention`, `interrupted`, or `cancelled` |
 | `system_inventory` | What have accounts set up? | At most once per local day: counts of agents, enabled routines, custom MCP servers, local and community skills, and the slugs of catalog plugins, curated skills and curated agents |
+| `system_resources` | How much CPU and memory does OpenBot use, by computer class and provider? | At most once per local day, the summary of the last closed local day that has samples. A sample is taken once a minute while the computer is awake. Memory in MB rounded to 50 and CPU percent as integers, as the 95th percentile of the samples (`_p95`) or the largest sample (`_max`), for all processes (`total_`), each process group (`main`, `window`, `browser_tab`, `gpu`, `database_host`, `voice_host`, `utility_other`) and the process tree of each provider id (`provider_<id>_`, `provider_other_` for any other child process). `main_loop_delay_ms_p95` is the 95th percentile of each minute's p99 main event-loop delay; `_max` is the longest delay. `db_request_ms_*`, `db_request_count` and `db_slow_request_count` (over 100 ms) time agent database statements. `renderer_gone_count`, `child_gone_count` and `gone_<reason>_count` count processes that ended for a reason other than a clean exit, except in the minute before a quit; `killed` includes a database host that OpenBot ends at a statement deadline. The peak active turns, browser tabs and provider processes; `ram_class`, `cpu_class`, `arch`, `host_kind` (`desktop` or `server`), `provider_tree_supported` (false on Windows, or when `ps` failed), and `sample_count`. A day that closes while analytics is off is dropped, never sent later |
 | `agent_input_action` | Can users resolve prompts and approvals? | Response IPC completed |
 | `queue_action` | Can users control queued work? | Queue operation completed |
 | `routine_action` | Are routines adopted and reliable? | Routine operation completed; `duration_ms` measures execution time |

@@ -479,6 +479,7 @@ function registerIpcHandlers({
   analytics,
   storageUsage,
   trace,
+  resourceMonitor,
   routineFlows,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -508,6 +509,7 @@ function registerIpcHandlers({
       getMainWindow,
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
       trace,
+      resources: resourceMonitor,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...computerUseIpcHandlers({

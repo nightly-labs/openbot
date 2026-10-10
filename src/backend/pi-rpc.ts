@@ -11,6 +11,7 @@ import {
   providerFailure,
   toProviderClientOperationError,
 } from "./provider-client-effects";
+import { registerProviderProcess } from "./provider-processes";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 
@@ -36,6 +37,7 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
       detached: process.platform !== "win32",
     });
     this.#child = child;
+    registerProviderProcess(child, "pi");
     const decoder = new StringDecoder("utf8");
     let buffered = "";
     const diagnostics = createDiagnosticStream({ redact: this.redact, emit: (line) => this.emit("diagnostic", line) });

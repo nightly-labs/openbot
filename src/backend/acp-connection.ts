@@ -12,6 +12,7 @@ import {
   providerFailure,
   providerSync,
 } from "./provider-client-effects";
+import { registerProviderProcess } from "./provider-processes";
 import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 
@@ -21,6 +22,8 @@ interface ProcessEnd {
   detail: string | null;
 }
 export interface AcpConnectionOptions {
+  /** The provider id, or a custom agent id. Only the resource monitor reads it. */
+  provider: string;
   cli: AgentCliInfo;
   argv: readonly string[];
   env: Record<string, string>;
@@ -66,6 +69,7 @@ export class AcpConnection {
       windowsHide: true,
     });
     this.#process = child;
+    registerProviderProcess(child, this.options.provider);
     // The SDK holds a line until its newline with no limit. At the limit the connection closes with
     // the error, so each open request fails with it, and the process ends.
     const stdout = child.stdout.pipe(
