@@ -37,12 +37,9 @@ const searchShape = {
   limit: z.number().int().min(1).max(10).optional(),
 };
 const describeShape = { names: z.array(qualifiedName).min(1).max(10) };
-// Claude's bundled schema converter does not support the current Zod record processor.
-// An object catchall has the same JSON value contract and works at both MCP boundaries.
-const jsonValue: z.ZodType<z.infer<ReturnType<typeof z.json>>> = z.lazy(() =>
-  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValue), z.object({}).catchall(jsonValue)]),
-);
-const callShape = { name: qualifiedName, arguments: z.object({}).catchall(jsonValue) };
+// Claude's bundled schema converter does not support the current Zod record processor, and Muse
+// rejects recursive schemas. Arguments arrive as JSON, and the target tool validates them.
+const callShape = { name: qualifiedName, arguments: z.object({}).catchall(z.unknown()) };
 const searchSchema = z.strictObject(searchShape);
 const describeSchema = z.strictObject(describeShape);
 const callSchema = z.strictObject(callShape);
