@@ -19,7 +19,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 
 import { MediaFilePreview } from "./MediaFilePreview";
 
@@ -81,6 +81,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const [rawSource, setRawSource] = createSignal(false);
   const [wrapLines, setWrapLines] = createSignal(untrack(() => props.readWrapLines()));
   let currentPreviewUrl: string | null = null;
+  let revealFrame: number | undefined;
   const file = () => (props.directory ? null : props.preview);
   const previewKind = () => file()?.previewKind;
   const pageUrl = () => (previewKind() === "text" ? props.pageUrl : null) ?? null;
@@ -130,17 +131,17 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       setPreviewUrl(url);
     },
   );
-  onCleanup(() => {
+  onSettled(() => () => {
     if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+    if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
   });
 
   const revealPanel = () => {
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
+    revealFrame = requestAnimationFrame(() => {
+      revealFrame = requestAnimationFrame(() => {
         setRevealed(true);
       });
     });
-    onCleanup(() => cancelAnimationFrame(frame));
   };
 
   const toggleWrapLines = () => {

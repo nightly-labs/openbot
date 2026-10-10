@@ -17,6 +17,7 @@ export interface ConversationPort {
     | "listTables"
     | "markConversationRead"
     | "readConversationPage"
+    | "releaseFilePreview"
     | "searchConversationMessages"
     | "sendMessage"
   >;
@@ -40,6 +41,14 @@ export interface ConversationPort {
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function conversationPort(): ConversationPort {
   return window.openbot;
+}
+
+/** Cleanup can run after IPC shuts down; process shutdown also frees these in-memory pages. */
+export function releaseFilePreviewPage(pageUrl: string | undefined): void {
+  if (!pageUrl) return;
+  void conversationPort()
+    .agent.releaseFilePreview(pageUrl)
+    .catch(() => undefined);
 }
 
 /** The tables every agent shares. The web client reaches them on the host through the Team API. */

@@ -21,6 +21,7 @@ import {
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
+import { releaseFilePreviewPage } from "./conversation-port";
 import type {
   ComposerDraft,
   ConversationProps,
@@ -351,7 +352,7 @@ export function createStableConversationState(
  * Created inside the keyed scope in `app-providers.tsx`, so a server switch
  * discards all of it by unmounting rather than by a list of setters.
  */
-export function createServerConversationState() {
+export function createServerConversationState(releasePage = releaseFilePreviewPage) {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [attachmentBusy, setAttachmentBusy] = createSignal(false);
   const [submitting, setSubmitting] = createSignal(false);
@@ -363,7 +364,17 @@ export function createServerConversationState() {
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
   const [browserAddress, setBrowserAddress] = createSignal("https://www.google.com");
   const [browserAddressEditing, setBrowserAddressEditing] = createSignal(false);
-  const [sidebarFilePreview, setSidebarFilePreview] = createSignal<SidebarFilePreview | null>(null);
+  const [sidebarFilePreview, writeSidebarFilePreview] = createSignal<SidebarFilePreview | null>(null);
+  // The accepted preview outlives its lazy view. Keep its page with the server-owned state,
+  // including when it changes twice before Solid settles or the user visits another conversation.
+  let previewPageUrl: string | undefined;
+  const setSidebarFilePreview = (preview: SidebarFilePreview | null) => {
+    const nextPageUrl = preview?.preview?.pageUrl;
+    if (previewPageUrl !== nextPageUrl) releasePage(previewPageUrl);
+    previewPageUrl = nextPageUrl;
+    writeSidebarFilePreview(preview);
+  };
+  onCleanup(() => releasePage(previewPageUrl));
   const [openReactionMessageId, setOpenReactionMessageId] = createSignal<string | null>(null);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
   const [expandedEmojiMessageId, setExpandedEmojiMessageId] = createSignal<string | null>(null);

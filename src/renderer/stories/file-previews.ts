@@ -1,5 +1,6 @@
 import type { FilePreview } from "@openbot/contracts/ipc";
 import { strToU8, zipSync } from "fflate";
+import { INLINE_SVG_CHART } from "./chat-visual-fixtures";
 
 /**
  * File previews for the Storybook stories of the file preview panel. The panel takes
@@ -184,6 +185,8 @@ export const XLSX_PREVIEW: FilePreview = {
   bytes: buildXlsx(),
 };
 
+const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
+
 /** A kind that the panel cannot show. The user opens the file externally. */
 export const UNSUPPORTED_PREVIEW: FilePreview = {
   name: "archive.zip",
@@ -203,6 +206,7 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   PDF_PREVIEW,
   AUDIO_PREVIEW,
   XLSX_PREVIEW,
+  HTML_PREVIEW,
 ];
 
 /** Find the preview for a file path, as the main process does for a file link in a message. */

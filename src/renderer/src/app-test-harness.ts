@@ -976,6 +976,7 @@ export function installOpenbotStub(): void {
         previewKind: "markdown",
         bytes: new TextEncoder().encode("# Preview"),
       }),
+      releaseFilePreview: vi.fn(async () => undefined),
       previewWorkspaceFile: vi.fn().mockResolvedValue({
         name: "preview.md",
         size: 9,
