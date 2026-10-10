@@ -923,6 +923,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
   }
 
+  /** Whether the agent advertises `additionalDirectories`. Grok refuses them on `session/resume` (#1729). */
+  get #acceptsAdditionalDirectories(): boolean {
+    return this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
+  }
+
   readonly #startThread = Effect.fn("AcpAgentClient.startThread")(function* (
     this: AcpAgentClient,
     params: unknown,
@@ -1021,7 +1026,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                         connection.resumeSession({
                           sessionId: requestedThreadId,
                           cwd,
-                          additionalDirectories,
+                          ...(this.#acceptsAdditionalDirectories ? { additionalDirectories } : {}),
                           mcpServers,
                         } satisfies ResumeSessionRequest),
                       )
