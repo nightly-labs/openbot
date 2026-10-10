@@ -428,6 +428,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const selection = readEditorSelection(editor);
     if (!selection || selection.anchor !== selection.focus) return null;
     const beforeCaret = editorText(editor).slice(0, selection.focus);
+    /*
+     * A `/` after a space or at the start opens the skills like `$`. The query stops at the next `/`, so
+     * a path such as `/Users/me` matches no skill, and "and/or" has no space before the `/`.
+     */
+    const slash = beforeCaret.match(/(?:^|\s)\/([^@$/\n￼]{0,60})$/u);
+    if (slash) {
+      const query = slash[1] ?? "";
+      return { query, start: beforeCaret.length - query.length - 1, end: beforeCaret.length, trigger: "$" };
+    }
     const match = beforeCaret.match(/(?:^|\s)([@$])([^@$\n\uFFFC]{0,60})$/u);
     if (!match) return null;
     const trigger = match[1] === "$" ? "$" : "@";

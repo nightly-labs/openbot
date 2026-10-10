@@ -154,6 +154,37 @@ describe("ComposerEditor", () => {
     expect(screen.getByLabelText("MCP server Aave")).toBeInTheDocument();
   });
 
+  it("opens the skill picker from a slash at the start of the message", async () => {
+    const { editor, onValueChange } = renderComposer([], "", [], [], [mcpServer()]);
+
+    await typeQuery(editor, "/Aa");
+    await screen.findByRole("listbox", { name: "Insert skill or MCP server" });
+    await fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => expect(onValueChange).toHaveBeenCalledWith("@[Aave](mcp:mcp-aave) "));
+  });
+
+  it("opens the skill picker from a slash after a space in a sentence", async () => {
+    const { editor, onValueChange } = renderComposer([], "", [], [], [mcpServer()]);
+
+    await typeQuery(editor, "check this with /Aa");
+    await screen.findByRole("listbox", { name: "Insert skill or MCP server" });
+    await fireEvent.keyDown(editor, { key: "Enter" });
+
+    await waitFor(() => expect(onValueChange).toHaveBeenCalledWith("check this with @[Aave](mcp:mcp-aave) "));
+  });
+
+  it("keeps the picker closed for a slash inside a word or a path", async () => {
+    const { editor } = renderComposer([], "", [], [], [mcpServer()]);
+
+    await typeQuery(editor, "use and/Aa");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    await typeQuery(editor, "/Users/Aa");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    await typeQuery(editor, "open /tmp/Aa");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
   it("withholds a server the host has turned off", async () => {
     const { editor } = renderComposer([], "", [], [], [mcpServer({ enabled: false })]);
 
