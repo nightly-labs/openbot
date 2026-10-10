@@ -140,8 +140,8 @@ export class AgentDatabaseSupervisor {
     if (!pending || pending.request.id !== response.id) return;
     this.#clearDeadline();
     this.#inFlight = null;
-    this.#reportSettled();
     pending.settle(response);
+    this.#reportSettled();
     this.#pump();
   }
 
@@ -158,8 +158,10 @@ export class AgentDatabaseSupervisor {
 
     const pending = this.#inFlight;
     this.#inFlight = null;
-    if (pending) this.#reportSettled();
-    pending?.settle(failed("internal", message));
+    if (pending) {
+      pending.settle(failed("internal", message));
+      this.#reportSettled();
+    }
     this.#pump();
   }
 

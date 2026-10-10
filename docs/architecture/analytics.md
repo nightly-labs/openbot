@@ -72,10 +72,14 @@ tabs from windows. On macOS and Linux one `ps` call lists all processes. The des
 process that are not Electron processes form the provider trees: a PID that a spawn site registered
 in `src/backend/provider-processes.ts` names its provider, its children inherit it, an unregistered
 `claude`, `codex`, `opencode` or `grok` executable names itself, and every other process is `other`.
-Windows reports `provider_tree_supported: false`. The main event loop uses `monitorEventLoopDelay`.
+Windows reports `provider_tree_supported: false`. A sample with a failed `ps` records no total. CPU
+comes from the change in each process's CPU time between two listings, so a command that starts
+and ends between two samples, such as a short tool run, is not counted. The main event loop uses
+`monitorEventLoopDelay`, less its 20 ms timer interval.
 Database time comes from `AgentDatabaseSupervisor`, from the send of a statement to its answer or to
 the end of the host; the host process is not changed. Renderer and child process exits other than a
-clean exit are counted and written to the trace as `crash` spans at the next sample. An exit in the
+clean exit are counted and written to the trace as `crash` spans at the next sample. A utility
+process with the reason `killed` is not counted: OpenBot stops these processes itself. An exit in the
 last minute before a quit is not counted: a stop signal can end the child processes before the
 main process starts its teardown.
 

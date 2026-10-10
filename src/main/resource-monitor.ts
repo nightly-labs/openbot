@@ -52,6 +52,8 @@ const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_PENDING_GONE = 1_000;
+/** The histogram's timer interval. Each recorded delay includes it, so it is subtracted. */
+const LOOP_RESOLUTION_MS = 20;
 // The `serviceName` that `agent-database-host-process.ts` and `voice-transcription-host-process.ts`
 // give `utilityProcess.fork`. Electron reports it as the metric's `name`.
 const UTILITY_GROUPS = new Map<string, ProcessGroup>([
@@ -91,7 +93,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #summaryPath: string;
   readonly #samplesFile: { directory: string; path: string; maxBytes: number };
   readonly #device: DeviceClass;
-  readonly #loop = monitorEventLoopDelay({ resolution: 20 });
+  readonly #loop = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
   readonly #activeTurns = new Set<string>();
   readonly #writes = Semaphore.makeUnsafe(1);
   /** The load and the samples. `close` waits for them. */
@@ -103,13 +105,15 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #previousCpuSeconds: Map<number, number> | null = null;
   /**
    * Process exits since the last sample. A stop signal can end the child processes before the main
-   * process starts its teardown, so an exit counts only when the app is still running a minute later.
+   * process starts its teardown, so an exit counts only when the app still runs at the next sample.
    */
   #gone: { kind: "renderer" | "child"; reason: GoneReason }[] = [];
   #persistedAt = 0;
   #timer: NodeJS.Timeout | null = null;
   #sampling = false;
   #closed = false;
+  /** False until the saved days are read, so a quit before that does not overwrite them. */
+  #loaded = false;
   #onDayClosed: () => void = () => {};
 
   constructor(options: ResourceMonitorOptions) {
@@ -138,6 +142,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       this.#load().pipe(
         Effect.andThen(
           Effect.sync(() => {
+            this.#loaded = true;
             this.#schedule();
             this.#onDayClosed();
           }),
@@ -190,7 +195,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     powerMonitor.off("resume", this.#resume);
     this.#loop.disable();
     yield* Scope.close(this.#scope, Exit.void);
-    yield* this.#persist().pipe(Effect.ignore);
+    if (this.#loaded) yield* this.#persist().pipe(Effect.ignore);
   });
 
   #fork(effect: Effect.Effect<void, unknown>): void {
@@ -198,7 +203,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   }
 
   #schedule(): void {
-    if (this.#closed || this.#timer) return;
+    if (this.#closed || this.#timer || !this.#loaded) return;
     this.#timer = setInterval(() => {
       if (this.#sampling) return;
       this.#sampling = true;
@@ -231,7 +236,11 @@ export class ResourceMonitor implements AnalyticsResourceSource {
 
   readonly #rendererGone = (_event: Event, _contents: WebContents, details: RenderProcessGoneDetails) =>
     this.#recordGone("renderer", details.reason);
-  readonly #childGone = (_event: Event, details: Details) => this.#recordGone("child", details.reason);
+  // OpenBot starts and stops its utility processes itself, such as the voice host after idle time.
+  readonly #childGone = (_event: Event, details: Details) => {
+    if (details.type === "Utility" && details.reason === "killed") return;
+    this.#recordGone("child", details.reason);
+  };
 
   #recordGone(kind: "renderer" | "child", reason: string): void {
     const known = goneReason(reason);
@@ -302,6 +311,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     }
 
     let providerTreeSupported = process.platform !== "win32";
+    // A failed `ps` gives a total with no providers in it, which is too low.
+    const totalKnown = () => providerTreeSupported || process.platform === "win32";
     let trees: ProviderTreeUsage[] = [];
     if (providerTreeSupported) {
       const listed = yield* listProcesses.pipe(Effect.option);
@@ -331,14 +342,14 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       if (tree.cpuPct !== null) recordValue(day, METRIC.providerCpu(tree.provider), tree.cpuPct);
     }
     const totalRss = sum(rss.values()) + sum(trees.map((tree) => tree.rssMb));
-    recordValue(day, METRIC.rss("total"), totalRss);
+    if (totalKnown()) recordValue(day, METRIC.rss("total"), totalRss);
     const treeCpu = trees.every((tree) => tree.cpuPct !== null) ? sum(trees.map((tree) => tree.cpuPct ?? 0)) : null;
     const totalCpu = measured && treeCpu !== null ? sum(cpu.values()) + treeCpu : null;
-    if (totalCpu !== null) recordValue(day, METRIC.cpu("total"), totalCpu);
+    if (totalCpu !== null && totalKnown()) recordValue(day, METRIC.cpu("total"), totalCpu);
 
     // Each window's p99, so one long task shows in the peak and not in every percentile.
     const mainLoopMs =
-      this.#loop.count > 0 ? { p99: this.#loop.percentile(99) / 1e6, max: this.#loop.max / 1e6 } : null;
+      this.#loop.count > 0 ? { p99: loopDelayMs(this.#loop.percentile(99)), max: loopDelayMs(this.#loop.max) } : null;
     this.#loop.reset();
     if (mainLoopMs) {
       recordValue(day, METRIC.mainLoop, mainLoopMs.p99);
@@ -404,6 +415,10 @@ function processGroup(metric: ProcessMetric, tabPids: ReadonlySet<number>): Proc
 }
 
 /** All processes, for the provider trees. The output stays in memory: it holds executable paths. */
+function loopDelayMs(nanoseconds: number): number {
+  return Math.max(0, nanoseconds / 1e6 - LOOP_RESOLUTION_MS);
+}
+
 const listProcesses = Effect.callback<{ text: string; pid: number | undefined }, AnalyticsOperationFailure>(
   (resume) => {
     const child = execFile(
