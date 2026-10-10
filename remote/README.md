@@ -175,7 +175,8 @@ a second session receives `host_busy` without interrupting the first.
 account. Each open desktop, phone, or browser keeps a socket for each saved host. A reconnect of the
 same session does not count its old socket. Host sockets do not count, and the limit never refuses a
 host. A host hello moves the clients of the older sockets of the same host to the new socket. The older
-sockets stay open; when the new socket closes, the last remaining one takes the clients. Change the value
+sockets stay open; when the new socket closes, the last remaining one takes the clients. A host keeps at
+most 4 sockets: a fifth hello closes the oldest with code 1013, and that host can connect again. Change the value
 on the Signal server: a desktop environment does not change it.
 This also applies when the old client socket waits for its host to reconnect. Token signing finishes
 before Signal admits the new socket, so concurrent reconnects do not hold extra account slots.

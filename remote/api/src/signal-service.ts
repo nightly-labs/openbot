@@ -227,6 +227,9 @@ const UNAVAILABLE = { status: 503 } as const;
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
 const SIGNAL_RECONNECT_GRACE_MILLISECONDS = 30_000;
+// The older sockets of a host stay registered. This limits them, because host sockets are not in the
+// account's connection limit.
+const MAXIMUM_SOCKETS_PER_HOST = 4;
 const INITIAL_TICKET_TTL_MILLISECONDS = 3 * 60_000;
 const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
@@ -1116,6 +1119,16 @@ export class SignalService {
           // two instances overlap, the other one takes the clients again when this socket closes.
           for (const socketId of this.#hosts.get(claims.hostId) ?? []) this.#releaseHostClients(socketId);
           const hostSockets = this.#hosts.get(claims.hostId) ?? new Set<string>();
+          // Close the oldest sockets with a code that lets a live host connect again.
+          for (const socketId of [...hostSockets].slice(
+            0,
+            Math.max(0, hostSockets.size - MAXIMUM_SOCKETS_PER_HOST + 1),
+          )) {
+            hostSockets.delete(socketId);
+            this.#peers.delete(socketId);
+            this.#clearPeerExpiration(socketId);
+            this.#sockets.get(socketId)?.close(1013, "Host has too many Signal connections.");
+          }
           hostSockets.add(socket.id);
           this.#hosts.set(claims.hostId, hostSockets);
           this.#send(socket, {

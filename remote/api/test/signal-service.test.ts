@@ -375,6 +375,20 @@ describe("SignalService", () => {
     expect(service.metrics().activePeerConnections).toBe(1);
   });
 
+  it("limits the open sockets of one host and closes the oldest with a code that lets it reconnect", async () => {
+    const service = new SignalService(fakeTokens(), 8);
+    const oldest = socket("host-0");
+    await hello(service, oldest, "host-ticket", "host");
+    const newer = ["host-1", "host-2", "host-3", "host-4"].map((id) => socket(id));
+    for (const host of newer) await hello(service, host, "resume-host", "host");
+
+    expect(oldest.closeCode).toBe(1013);
+    expect(newer.map((host) => host.closed)).toEqual([false, false, false, false]);
+    const client = socket("client");
+    await hello(service, client, "client-ticket", "client");
+    expect(newer.at(-1)?.messages.at(-1)).toContain('"type":"peer-ready"');
+  });
+
   it("does not let the owner's devices keep its host from registering", async () => {
     // One client socket per account. Host tickets carry the owner's account too.
     const service = new SignalService(fakeTokens(), 1);
@@ -656,6 +670,7 @@ function fakeTokens() {
 interface TestSignalSocket extends SignalSocket {
   messages: string[];
   closed: boolean;
+  closeCode?: number;
 }
 
 function socket(id: string, ip = `192.0.2.${id.length}`): TestSignalSocket {
@@ -668,8 +683,9 @@ function socket(id: string, ip = `192.0.2.${id.length}`): TestSignalSocket {
     send: (message) => {
       messages.push(message);
     },
-    close: () => {
+    close: (code) => {
       target.closed = true;
+      target.closeCode = code;
     },
   };
   return target;
