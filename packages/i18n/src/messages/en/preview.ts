@@ -3,6 +3,7 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("preview", {
   "preview.panel.label": "File preview",
   "preview.panel.resize": "Resize file preview",
+  "preview.panel.copy": "Copy file text",
   "preview.panel.openExternally": "Open file externally",
   "preview.panel.download": "Download file",
   "preview.panel.reveal": "Show file in Finder",

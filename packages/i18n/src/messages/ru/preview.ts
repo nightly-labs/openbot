@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "Просмотр файла",
   "preview.panel.resize": "Изменить размер просмотра файла",
+  "preview.panel.copy": "Копировать текст файла",
   "preview.panel.openExternally": "Открыть файл во внешней программе",
   "preview.panel.download": "Скачать файл",
   "preview.panel.reveal": "Показать файл в Finder",

@@ -191,6 +191,14 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     if (!access.webhook && this.#routines.getRecord(channelId, input.routineId)?.trigger.kind === "webhook") {
       throw new Error(sourceText("error.backend.routineGone"));
     }
+    // A request the routine posted and no member has started yet leaves with the routine, as an
+    // agent routine's queued delivery does. Work that already runs keeps its Stop control. An
+    // assignment is created before its delivery is queued, so "assigned" is not "started": only a
+    // delivery that left the queue holds the task.
+    this.#channels.withdrawRequests(
+      channelId,
+      new Set(this.#routines.activeRuns(channelId, input.routineId).flatMap((run) => run.requestMessageId ?? [])),
+    );
     this.#routines.delete(channelId, input.routineId);
     this.#changed(input.channelId);
   }
@@ -393,9 +401,19 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
             origin: { kind: "routine", routineId: run.routineId, routineName: run.routineName, runId: run.id },
           },
           this.#actor(run),
+          // The request waits behind earlier channel commands; a routine deleted meanwhile posts nothing.
+          (queued) => (this.#routines.getRecord(run.channelId, run.routineId) ? queued : null),
         )
         .pipe(toChannelRoutineFailed),
     );
+    if (!this.#routines.getRecord(run.channelId, run.routineId)) {
+      // Deleted while the request was being applied: withdraw what it created, as deletion does.
+      yield* channelRoutineStep(() => {
+        this.#channels.withdrawRequests(run.channelId, new Set([requestMessageId]));
+        this.#changed(run.channelId);
+      });
+      return run;
+    }
     if (Result.isFailure(issued)) {
       const error = issued.failure.cause;
       return yield* channelRoutineStep(() => {

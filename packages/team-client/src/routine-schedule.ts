@@ -36,7 +36,7 @@ interface CronSpec {
 /** A routine request the caller can correct. Other errors are faults. */
 export class RoutineInputError extends Error {}
 
-export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
+export function validateStoredRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
   if (!isRoutineSchedule(schedule)) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
   validateTimezone(timezone);
   if (schedule.kind === "interval") {
@@ -55,26 +55,48 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
     }
   }
   if (schedule.kind !== "custom") return;
-  const spec = parseCron(schedule.expression);
+  if (hasRunsTooClose(parseCron(schedule.expression), timezone)) {
+    throw new RoutineInputError(
+      sourceText("error.backend.routineCronTooOften", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
+    );
+  }
+}
+
+function hasRunsTooClose(spec: CronSpec, timezone: string): boolean {
   const reference = new Date("2026-01-01T00:00:00.000Z");
   let previous = nextCronOccurrence(spec, timezone, reference);
   for (let index = 0; index < 200; index += 1) {
     const next = nextCronOccurrence(spec, timezone, previous);
-    if (next.getTime() - previous.getTime() < MINIMUM_INTERVAL_MS) {
-      throw new RoutineInputError(
-        sourceText("error.backend.routineCronTooOften", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
-      );
-    }
+    if (next.getTime() - previous.getTime() < MINIMUM_INTERVAL_MS) return true;
     previous = next;
+  }
+  return false;
+}
+
+/**
+ * The check for a schedule being saved. Steps restart at each hour or day, so "every 59 minutes"
+ * also runs at :59 and then :00. A stored schedule is read through `validateStoredRoutineSchedule`:
+ * an older version accepted such a schedule, and rejecting it on read would stop every routine from loading.
+ */
+export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
+  validateStoredRoutineSchedule(schedule, timezone);
+  if (
+    schedule.kind === "advanced" &&
+    schedule.time.kind === "every" &&
+    hasRunsTooClose(scheduleCronSpec(schedule), timezone)
+  ) {
+    throw new RoutineInputError(
+      sourceText("error.backend.routineIntervalTooShortFixed", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
+    );
   }
 }
 
 export function nextRoutineOccurrence(schedule: RoutineSchedule, timezone: string, after: Date): Date {
-  validateRoutineSchedule(schedule, timezone);
+  validateStoredRoutineSchedule(schedule, timezone);
   return nextValidRoutineOccurrence(schedule, timezone, after);
 }
 
-/** For a schedule that `validateRoutineSchedule` accepted: a custom one costs 200 searches to validate. */
+/** For a schedule that `validateStoredRoutineSchedule` accepted: a custom one costs 200 searches to validate. */
 export function nextValidRoutineOccurrence(schedule: RoutineSchedule, timezone: string, after: Date): Date {
   if (schedule.kind === "interval") {
     const duration = intervalMilliseconds(schedule.amount, schedule.unit);
