@@ -12,6 +12,23 @@ export const messages = defineMessages("update", {
   "update.managedByHost": "Managed by host",
   "update.upToDate": "Up to date",
 
+  "update.screen.ready": "Update ready",
+  "update.screen.readyBody":
+    "Restart to finish the update. Restart now stops active work. Choose Install when idle to wait for active work to finish.",
+  "update.screen.restartingBody":
+    "OpenBot is preparing to close and install the update. This can take several minutes. Closing this screen does not cancel the restart.",
+  "update.screen.failed": "The update did not install",
+  "update.screen.failedBody":
+    "OpenBot could not finish the restart. Services may have stopped. Quit OpenBot, then open it again before you continue. Check for updates to try again.",
+  "update.screen.interrupted": "The update was interrupted",
+  "update.screen.interruptedBody":
+    "OpenBot did not start on the expected version. You can continue to use this version. Check for updates to try again.",
+  "update.screen.successBody": "OpenBot {version} is installed.",
+  "update.screen.currentVersion": "Current: {version}",
+  "update.screen.targetVersion": "Update: {version}",
+  "update.screen.later": "Later",
+  "update.screen.actionFailed": "The restart could not start. Try again.",
+
   // The provider CLI update notification.
   "update.provider.update": "Update",
   "update.provider.upToDate": "{name} is up to date",

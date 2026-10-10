@@ -7,6 +7,7 @@ import { useSetupProviderProps } from "./features/onboarding/setup-provider-prop
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
 import { StartupSplash } from "./features/startup/StartupSplash";
+import { DesktopUpdateScreen } from "./features/updates/DesktopUpdateScreen";
 import { AccountLogin, FirstRunFlow, InitialSetup } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
@@ -112,6 +113,9 @@ export function AppAccessGate() {
             </Show>
           )}
         </Show>
+      </Show>
+      <Show when={!splashShown()}>
+        <DesktopUpdateScreen />
       </Show>
       <Show when={splashShown()}>
         {/* Before `appInfo` loads, the build's own mode picks the logo colour. */}

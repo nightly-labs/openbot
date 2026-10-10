@@ -678,7 +678,7 @@ function AppSettings(props: AccountProps) {
         appInfo={platform.appInfo()}
         builtInDisplayGeometry={builtInDisplayGeometry()}
         updateStatus={updates.status()}
-        onUpdateAction={updates.runAction}
+        onUpdateAction={updates.openAction}
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}

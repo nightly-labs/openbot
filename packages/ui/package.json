@@ -250,6 +250,8 @@
     "./features/team/TeamPersonAvatar": "./src/features/team/TeamPersonAvatar.tsx",
     "./features/updates/restart-reasons": "./src/features/updates/restart-reasons.ts",
     "./features/updates/update-status": "./src/features/updates/update-status.ts",
+    "./features/updates/UpdateReadyScreen": "./src/features/updates/UpdateReadyScreen.tsx",
+    "./features/updates/update-ready.css": "./src/features/updates/update-ready.css",
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",
     "./features/updates/whats-new.css": "./src/features/updates/whats-new.css",

@@ -1,11 +1,12 @@
 import type { UpdateStatus } from "@openbot/contracts/ipc";
-import { createSignal, flush, onSettled } from "solid-js";
+import type { UpdateReadyPhase } from "@openbot/ui/features/updates/UpdateReadyScreen";
+import { createSignal, createStore, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { createIdleRestartToast } from "./idle-restart-toast";
 import { createScheduledUpdateToast } from "./scheduled-update-toast";
-import { updatesPort } from "./updates-port";
+import { readUpdateAttempt, updatesPort, writeUpdateAttempt } from "./updates-port";
 
 /**
  * The updater, as the renderer sees it: one status main pushes, and one button
@@ -20,13 +21,86 @@ const Updates = createSimpleContext({
   init: () => {
     const [status, setStatus] = createSignal<UpdateStatus>(FALLBACK_UPDATE_STATUS);
 
+    const [screen, setScreen] = createStore<{
+      open: boolean;
+      outcome: UpdateReadyPhase | null;
+      target: string | null;
+    }>({ open: false, outcome: null, target: null });
+    let receivedStatus = false;
+    let shownVersion: string | null = null;
+
+    function receiveStatus(next: UpdateStatus): void {
+      if (!receivedStatus && !next.managedByHost) {
+        const target = readUpdateAttempt();
+        if (target && next.phase !== "installing") {
+          setScreen((draft) => {
+            draft.open = true;
+            draft.target = target;
+            draft.outcome = next.currentVersion === target ? "success" : "interrupted";
+          });
+          writeUpdateAttempt(null);
+          receivedStatus = true;
+          if (next.phase === "ready") shownVersion = next.availableVersion;
+          setStatus(next);
+          return;
+        }
+      }
+      receivedStatus = true;
+      if (next.managedByHost) {
+        setScreen((draft) => {
+          draft.open = false;
+          draft.outcome = null;
+        });
+      } else if (next.phase === "installing" || next.errorCode === "install_failed") {
+        if (next.phase === "installing" && next.availableVersion) writeUpdateAttempt(next.availableVersion);
+        if (status().phase !== next.phase || status().errorCode !== next.errorCode) {
+          setScreen((draft) => {
+            draft.open = true;
+            draft.outcome = null;
+          });
+        }
+      } else if (next.phase === "ready" && next.availableVersion !== shownVersion) {
+        shownVersion = next.availableVersion;
+        setScreen((draft) => {
+          draft.open = true;
+        });
+      } else if (next.phase !== "ready" && screen.outcome === null) {
+        setScreen((draft) => {
+          draft.open = false;
+        });
+      }
+      setStatus(next);
+    }
+
+    function dismissScreen(): void {
+      setScreen((draft) => {
+        draft.open = false;
+        draft.outcome = null;
+      });
+    }
+
+    async function openAction(): Promise<void> {
+      const current = status();
+      if (current.managedByHost) return;
+      if (current.phase === "ready" || current.phase === "installing" || current.errorCode === "install_failed") {
+        setScreen((draft) => {
+          draft.open = true;
+          draft.outcome = null;
+        });
+        return;
+      }
+      await runAction();
+    }
+
     onSettled(() => {
       const unsubscribe = updatesPort().update.onEvent((next) => {
-        flush(() => setStatus(next));
+        flush(() => receiveStatus(next));
       });
       void updatesPort()
         .update.getStatus()
-        .then(setStatus)
+        .then((next) => {
+          if (!receivedStatus) receiveStatus(next);
+        })
         .catch(() => undefined);
       return unsubscribe;
     });
@@ -64,7 +138,7 @@ const Updates = createSimpleContext({
           : ("check" as const);
       try {
         const next = action === "download" ? await updatesPort().update.download() : await updatesPort().update.check();
-        setStatus(next);
+        receiveStatus(next);
         const succeeded =
           action === "download"
             ? next.phase === "downloading" || next.phase === "ready"
@@ -105,7 +179,16 @@ const Updates = createSimpleContext({
 
     createIdleRestartToast({ status, cancel: cancelIdleRestart });
 
-    return { status, runAction, cancelScheduledRestart, restartWhenIdle, cancelIdleRestart };
+    return {
+      status,
+      screen,
+      dismissScreen,
+      openAction,
+      runAction,
+      cancelScheduledRestart,
+      restartWhenIdle,
+      cancelIdleRestart,
+    };
   },
 });
 
