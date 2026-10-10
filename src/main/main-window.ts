@@ -348,6 +348,9 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
       webSecurity: true,
     },
   });
+  // Chromium shares zoom per origin. The main window zoom would shrink this fixed-size window's
+  // viewport and move the shared avatar out of the expanded panel.
+  window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
     if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
