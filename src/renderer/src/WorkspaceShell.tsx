@@ -228,8 +228,9 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <Show when={agentSetupOpen() && !serverOnboardingOpen()}>
         <WorkspaceAgentSetup />
       </Show>
-      <Show when={activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()} keyed>
-        {(member) => <WorkspaceDirectConversation member={member} />}
+      {/* Keyed by id: each presence snapshot is a new member object, and remounting would clear the draft. */}
+      <Show when={activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()?.id} keyed>
+        <Show when={activeDirectMember()}>{(member) => <WorkspaceDirectConversation member={member()} />}</Show>
       </Show>
       <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember() && layout.sidebarView() !== "routines"}>
         <WorkspaceConversation account={props.account} />
