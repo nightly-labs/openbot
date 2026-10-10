@@ -224,6 +224,31 @@ it.each(["Escape", "outside"])("keeps editor cancellation on %s", async (dismiss
   expect(onMutateLayout).not.toHaveBeenCalled();
 });
 
+it("leaves Enter and Escape to an IME composition in the section name", async () => {
+  const { onMutateLayout } = renderSidebar({
+    layout: {
+      revision: 1,
+      sections: [{ id: "research", name: "Research" }],
+      order: ["people", "unassigned", "research"],
+      agentAssignments: {},
+      agentOrder: [],
+    },
+  });
+  const trigger = screen.getByRole("button", { name: "Research" });
+  trigger.focus();
+  await fireEvent.contextMenu(trigger);
+  const item = await screen.findByRole("menuitem", { name: "Rename" });
+  const schedule = controlCloseSchedule();
+  await fireEvent.pointerUp(item, { button: 0 });
+  await finishClose(schedule);
+  const editor = screen.getByRole("textbox", { name: "Rename section" });
+  await fireEvent.input(editor, { target: { value: "しごと" } });
+  await fireEvent.keyDown(editor, { key: "Enter", isComposing: true });
+  await fireEvent.keyDown(editor, { key: "Escape", keyCode: 229 });
+  expect(editor).toBeInTheDocument();
+  expect(onMutateLayout).not.toHaveBeenCalled();
+});
+
 it("keeps a saving editor on blur and submits Enter only once", async () => {
   let complete: (() => void) | undefined;
   const onMutateLayout = vi.fn(
