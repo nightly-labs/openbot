@@ -63,11 +63,7 @@ export function AccountUsageDetails(props: {
         <ul class="account-usage-providers" aria-label={t("account.usage.providers")}>
           <For each={props.rows}>
             {(row) => (
-              <li
-                class="account-usage-provider"
-                data-usage-tone={row.tone}
-                aria-label={accountUsageRowLabel(row, text, props.loading)}
-              >
+              <li class="account-usage-provider" aria-label={accountUsageRowLabel(row, text, props.loading)}>
                 <ProviderLogo provider={row.provider} class="account-usage-provider-logo" />
                 <Show
                   when={row.windows.length > 0}

@@ -3410,14 +3410,6 @@ textarea {
   white-space: nowrap;
 }
 
-.account-usage-provider[data-usage-tone="warning"] .account-usage-provider-remaining {
-  color: var(--openbot-warning);
-}
-
-.account-usage-provider[data-usage-tone="critical"] .account-usage-provider-remaining {
-  color: var(--openbot-danger);
-}
-
 .account-usage-windows,
 .account-usage-window {
   display: grid;
