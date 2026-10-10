@@ -43,6 +43,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "8b66d2a108340a79e398bedc19efc7dad2914b0addf17c76ee9fc50b72b09c1b",
     },
     {
+      slug: "cobrain",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "039484cf64fa35ef8f5ef9a04630166337d1f63b840f4c7552c2612c22edac20",
+    },
+    {
       slug: "figma",
       version: "1.1.0",
       featured: true,
@@ -282,6 +288,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.notion.so",
     privacyPolicyUrl: "https://www.notion.so/privacy",
     termsUrl: "https://www.notion.so/terms",
+    skills: [],
+  },
+  cobrain: {
+    slug: "cobrain",
+    name: "Cobrain",
+    tagline: "Shared memory for your AI agents",
+    description:
+      "Cobrain is a Markdown memory that every AI you connect can read and write. Agents load the context of a client or project before working, search past notes and decisions, and save what they learn so the next thread starts where the last one ended. Each user signs in to their own Cobrain account.",
+    category: "productivity",
+    creatorName: "cobrain.space",
+    iconUrl: "https://cobrain.space/apple-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-start-session", text: "Load my Cobrain context for this project before we start." },
+      { id: "prompt-search-decision", text: "Search my Cobrain notes for what we decided about pricing." },
+      { id: "prompt-save-note", text: "Save a note in Cobrain with what we did today and what is left." },
+    ],
+    apps: [
+      {
+        id: "app-cobrain-mcp",
+        name: "Cobrain",
+        description: "Read, search and write notes in your Cobrain brain over one MCP server.",
+        iconUrl: "https://cobrain.space/apple-icon.png",
+        server: {
+          name: "cobrain",
+          transport: "http",
+          url: "https://cobrain.space/mcp",
+          auth: [{ id: "cobrain-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://cobrain.space",
+    privacyPolicyUrl: "https://cobrain.space/privacy",
+    termsUrl: "https://cobrain.space/terms",
     skills: [],
   },
   figma: {
