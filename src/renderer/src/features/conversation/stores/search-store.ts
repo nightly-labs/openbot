@@ -46,6 +46,8 @@ export function createSearchStore(deps: SearchStoreDeps) {
       const queryChanged = query !== lastChatSearchQuery;
       lastChatSearchQuery = query;
       if (!open || !query.trim()) {
+        // A response for an earlier query must not reopen a hit after close or a cleared query.
+        chatSearchRequest += 1;
         deps.setChatSearchMatches([]);
         if (remoteMessageIds.length > 0) deps.setChatSearchMessageIds([]);
         deps.setChatSearchTotal(0);
@@ -125,6 +127,7 @@ export function createSearchStore(deps: SearchStoreDeps) {
   );
 
   onCleanup(() => {
+    chatSearchRequest += 1;
     if (chatSearchFrame !== undefined) cancelAnimationFrame(chatSearchFrame);
     if (chatSearchTimer !== undefined) clearTimeout(chatSearchTimer);
     clearChatSearchHighlights();
@@ -142,6 +145,7 @@ export function createSearchStore(deps: SearchStoreDeps) {
   }
 
   function closeChatSearch(restoreFocus = true): void {
+    chatSearchRequest += 1;
     deps.setChatSearchOpen(false);
     deps.setChatSearchQuery("");
     deps.setChatSearchMatches([]);

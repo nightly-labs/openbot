@@ -357,11 +357,12 @@ export class RoutineScheduler implements RoutineDueSource {
       Effect.sync(() => this.#deletionAgents.add(input.agentId)),
       () =>
         Effect.gen({ self: this }, function* () {
-          const activeRuns = yield* this.#interruptRunsBeforeDeletionEffect(
+          const interruptedRuns = yield* this.#interruptRunsBeforeDeletionEffect(
             input.agentId,
             this.#routines.activeRuns(input.agentId, input.routineId),
           );
           yield* routineStep(() => {
+            const activeRuns = this.#runsToCancelOnDeletion(input.agentId, input.routineId, interruptedRuns);
             if (options.recordConversationEvent === false || routine.trigger.kind !== "schedule") {
               withDatabaseTransaction(
                 this.#store.database,
@@ -374,6 +375,7 @@ export class RoutineScheduler implements RoutineDueSource {
                     }
                     this.#routines.updateRunStatus(run.id, "cancelled");
                   }
+                  this.#cancelQueuedRoutineDeliveries(input.agentId, input.routineId);
                   this.#routines.delete(input.agentId, input.routineId);
                 },
                 // Deliberately narrower than the conversation variants: this branch records no
@@ -398,6 +400,7 @@ export class RoutineScheduler implements RoutineDueSource {
                       }
                       transitionMessages.push(this.#appendRunTransition(snapshot, run, "cancelled").message);
                     }
+                    this.#cancelQueuedRoutineDeliveries(input.agentId, input.routineId);
                     return transitionMessages;
                   },
                   onRollback: () => this.#mailbox.restorePersistedState(),
@@ -843,7 +846,18 @@ export class RoutineScheduler implements RoutineDueSource {
       const deliveryId = receipt.deliveries[0]?.id;
       if (!deliveryId)
         return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine delivery.") });
-      const queued = yield* routineStep(() => this.#routines.attachDelivery(run.id, deliveryId));
+      const queued = yield* routineStep(() => {
+        try {
+          return this.#routines.attachDelivery(run.id, deliveryId);
+        } catch (error) {
+          // The routine was deleted while the delivery was created: cancel it with its run.
+          if (this.#mailbox.getDelivery(deliveryId)?.delivery.status === "queued")
+            this.#mailbox.cancelNow(agent.id, deliveryId);
+          if (!this.#routines.getRecord(run.agentId, run.routineId))
+            throw new RoutineInputError(sourceText("error.backend.routineGone"));
+          throw error;
+        }
+      });
       const snapshot = yield* routineStep(() => {
         const current = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
         this.#hooks.syncMailboxMessages(current);
@@ -873,12 +887,43 @@ export class RoutineScheduler implements RoutineDueSource {
       Effect.tapError((failure) =>
         routineStep(() => {
           const error = failure.cause;
-          this.#transitionRunWithConversation(run, "failed", error instanceof Error ? error.message : String(error));
+          // A deleted routine took its run with it: there is no run left to mark failed.
+          if (this.#routines.getRecord(run.agentId, run.routineId))
+            this.#transitionRunWithConversation(run, "failed", error instanceof Error ? error.message : String(error));
           this.stateChanged(run.agentId);
         }),
       ),
     );
   }, Effect.uninterruptible);
+
+  /**
+   * Waiting for an interrupt yields, so another run of the routine can attach its delivery in the
+   * meantime. Read the runs again: a run that only now holds a queued delivery must be cancelled
+   * with it, and a run seen without a delivery must be cancelled by the delivery it holds now.
+   */
+  #runsToCancelOnDeletion(agentId: string, routineId: string, interruptedRuns: RoutineRun[]): RoutineRun[] {
+    const current = new Map(this.#routines.activeRuns(agentId, routineId).map((run) => [run.id, run]));
+    const runs = interruptedRuns.map((run) => current.get(run.id) ?? run);
+    const known = new Set(runs.map((run) => run.id));
+    for (const run of current.values()) {
+      if (known.has(run.id)) continue;
+      const status = run.deliveryId ? this.#mailbox.getDelivery(run.deliveryId)?.delivery.status : undefined;
+      if (!run.deliveryId || status === "queued") runs.push(run);
+    }
+    return runs;
+  }
+
+  /**
+   * A run attaches its delivery only after the enqueue returns, so a delivery can sit in the queue
+   * before any run row points to it. The delivery names its routine: cancel it by that name, or the
+   * drain that follows the deletion would start the deleted routine's instruction.
+   */
+  #cancelQueuedRoutineDeliveries(agentId: string, routineId: string): void {
+    for (const deliveryId of this.#mailbox.queuedDeliveryIds(agentId)) {
+      const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
+      if (sender?.kind === "routine" && sender.routineId === routineId) this.#mailbox.cancelNow(agentId, deliveryId);
+    }
+  }
 
   readonly #interruptRunsBeforeDeletionEffect = Effect.fn("RoutineScheduler.interruptRunsBeforeDeletion")(function* (
     this: RoutineScheduler,

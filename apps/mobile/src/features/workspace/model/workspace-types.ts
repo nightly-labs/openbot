@@ -286,8 +286,8 @@ export interface MobileWorkspaceContextValue {
   deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   /** Searches message text in the server's agent chats, one page from `cursor` or from the newest match. */
   searchMessages: (query: string, serverId: string, cursor?: string) => Promise<ConversationSearchPage>;
-  loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
-  loadOlderMessages: (agentId: string) => Promise<void>;
+  loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
+  loadOlderMessages: (agentId: string, serverId?: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
   sendMessage: (
     agentId: string,
@@ -307,7 +307,7 @@ export interface MobileWorkspaceContextValue {
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hideAgent: (agentId: string) => void;
   unhideAgent: (agentId: string) => void;
-  markAgentRead: (agentId: string, throughMessageId?: string) => void;
+  markAgentRead: (agentId: string, throughMessageId?: string, serverId?: string) => void;
   markAgentUnread: (agentId: string) => void;
   /** Marks every unread chat of the active server read. It rejects when a chat stays unread. */
   markAllRead: () => Promise<void>;

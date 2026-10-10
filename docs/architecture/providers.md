@@ -215,6 +215,18 @@ instead of waiting for a usage notice. `GEMINI_REQUEST_FAILURES` in `src/backend
 names a rate limit or quota, an unavailable model, and a service failure from Google's status
 text. Antigravity does not document these texts.
 
+Antigravity 1.3.0 keeps `session/prompt` open until its harness reports
+`STATE_FULLY_IDLE`. A background task can thus keep a turn open after answer text
+arrives. The adapter streams that text at once. A later tool or thought changes
+the same message to commentary. It does not use a quiet period or a usage update
+as proof that the turn ended.
+
+Stop sends `session/cancel`, ends the local turn, and saves unfinished tool calls
+as interrupted. Before the next message, `session/resume` rebuilds the harness
+with the same session ID and saved history. A failed restore keeps that session
+available for another attempt. This does not change Antigravity's task database
+or provide early turn completion while its background tasks continue to run.
+
 Team API v1–v4 do not know `antigravity`. The host hides Gemini agents, models, status, and
 sign-in state from peers on those versions, and the `providers-v1` routes omit it. Team API v5
 carries Gemini, and the `providers-v2` runtime routes let an owner or admin download or cancel the
