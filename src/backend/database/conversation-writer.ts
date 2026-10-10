@@ -746,7 +746,8 @@ function mergeLiveMessage(existing: ConversationMessage, updated: ConversationMe
     ...updated,
     id: existing.id,
     author: existing.author,
-    createdAt: existing.createdAt,
+    // Mailbox updates can move a queued message to the time it joined a running turn.
+    createdAt: updated.delivery ? updated.createdAt : existing.createdAt,
     ...(turnId === undefined ? {} : { turnId }),
   };
 }

@@ -812,7 +812,8 @@ function receiveDiscordSignIn(link: Extract<DeepLink, { kind: "discord-guild" }>
  * which is what makes a forged or replayed link inert - so an unknown one raises no window either.
  */
 function receiveMcpAuthorizationCode(state: string, code: string): void {
-  if (!services?.mcpOAuth.receiveAuthorizationCode(state, code)) return;
+  const elsewhere = services?.mcpOAuth.openedElsewhere(state) ?? false;
+  if (!services?.mcpOAuth.receiveAuthorizationCode(state, code) || elsewhere) return;
   const window = windowHolder.current;
   if (window && !window.isDestroyed()) showMainWindow(window);
 }

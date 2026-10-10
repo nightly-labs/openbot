@@ -1076,14 +1076,15 @@ describe("Team API protocol 7 negotiation", () => {
     };
     const old = await read("6");
     const current = await read("7");
-    expect(TEAM_CURRENT_CAPABILITIES).toHaveLength(66);
-    expect(legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES)).toHaveLength(62);
+    expect(TEAM_CURRENT_CAPABILITIES).toHaveLength(68);
+    expect(legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES)).toHaveLength(63);
     // This fixture omits optional services. Their capabilities must not be advertised.
     expect(old.capabilities).toEqual(legacyTeamCapabilities(current.capabilities));
-    expect(old.capabilities.length).toBeLessThanOrEqual(62);
-    expect(current.capabilities.length).toBeLessThanOrEqual(66);
+    expect(old.capabilities.length).toBeLessThanOrEqual(63);
+    expect(current.capabilities.length).toBeLessThanOrEqual(68);
     expect(old.capabilities).not.toContain("local-providers-v3");
     expect(old.capabilities).not.toContain("agent-session-settings-v1");
+    expect(old.capabilities).not.toContain("agent-memories-v1");
     expect(current.capabilities).toContain("local-providers-v3");
     expect(current.capabilities).toContain("agent-session-settings-v1");
   });

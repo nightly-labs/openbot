@@ -25,6 +25,7 @@ import {
   type AgentTemplatePreview,
   type AgentTemplatePublication,
   assertStorageUsageScope,
+  type CancelMcpSignInInput,
   type ClearStorageInput,
   type CustomProviderResult,
   type CustomProviderSummary,
@@ -40,6 +41,8 @@ import {
   decodeHostUpdateStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
+  decodeMcpSignInStates,
+  decodeMcpSignInStatus,
   decodeMcpTestResult,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
@@ -57,6 +60,8 @@ import {
   isAgentStatus,
   isSharedTable,
   type McpServerConfig,
+  type McpSignInState,
+  type McpSignInStatus,
   type McpTestResult,
   type ProviderCodeLoginStart,
   type ProviderRuntimeSnapshot,
@@ -68,6 +73,7 @@ import {
   type SetMcpServerEnabledInput,
   type SetProviderApiKeyInput,
   type SharedTable,
+  type SignOutMcpServerInput,
   type SubmitProviderCodeLoginInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
@@ -101,6 +107,7 @@ import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
@@ -424,6 +431,43 @@ export function testMcpServer(
 ): Effect.Effect<McpTestResult, TeamAdminRequestError> {
   return adminCall(() => request("POST", MCP_ROUTES.test, decodeMcpTestResult, { config: mcpConfig(input.config) }));
 }
+/** The host opens the sign-in page in its own browser and answers at once; `mcpSignInStatus` follows it. */
+export function startMcpSignIn(
+  request: TeamApiRequest,
+  input: TestMcpServerInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MCP_SIGN_IN_ROUTES.start, ignoreResponse, { config: mcpConfig(input.config) }),
+  );
+}
+
+export function mcpSignInStatus(
+  request: TeamApiRequest,
+  input: CancelMcpSignInInput,
+): Effect.Effect<McpSignInStatus, TeamAdminRequestError> {
+  return adminCall(() => request("POST", MCP_SIGN_IN_ROUTES.status, decodeMcpSignInStatus, { url: input.url }));
+}
+
+export function cancelMcpSignIn(
+  request: TeamApiRequest,
+  input: CancelMcpSignInInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", MCP_SIGN_IN_ROUTES.cancel, ignoreResponse, { url: input.url }));
+}
+
+export function signOutMcpServer(
+  request: TeamApiRequest,
+  input: SignOutMcpServerInput,
+): Effect.Effect<McpSignInState[], TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MCP_SIGN_IN_ROUTES.signOut, decodeMcpSignInStates, { mcpServerId: input.mcpServerId }),
+  );
+}
+
+export function listMcpSignIns(request: TeamApiRequest): Effect.Effect<McpSignInState[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", MCP_SIGN_IN_ROUTES.list, decodeMcpSignInStates, {}));
+}
+
 export const getStorageUsage = Effect.fn("TeamAdmin.getStorageUsage")(function* (
   request: TeamApiRequest,
   input: GetStorageUsageInput,

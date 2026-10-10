@@ -7,6 +7,7 @@ import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
+import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
@@ -27,6 +28,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
@@ -67,6 +69,7 @@ export {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_MEMORIES_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
@@ -80,6 +83,7 @@ export {
   HOSTED_SITES_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  MCP_SIGN_IN_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_SIGN_IN_V3_CAPABILITY,
@@ -128,6 +132,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MCP_SERVERS_CAPABILITY,
   STORAGE_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
+  AGENT_MEMORIES_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   ACP_REGISTRY_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
@@ -155,6 +160,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
+  MCP_SIGN_IN_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -223,6 +229,7 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
 // host return the expanded list; older hosts ignore the marker and retain all old features.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
     capability !== ACP_REGISTRY_CAPABILITY &&
     capability !== PROVIDERS_V5_CAPABILITY,
@@ -236,6 +243,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
   return capabilities.filter(
     (capability) =>
       capability !== "local-providers-v3" &&
+      capability !== AGENT_MEMORIES_CAPABILITY &&
       capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
       capability !== ACP_REGISTRY_CAPABILITY &&
       capability !== PROVIDERS_V5_CAPABILITY,

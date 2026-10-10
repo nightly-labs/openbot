@@ -14,6 +14,52 @@ import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import { RemoteViewerProxy } from "./remote-viewer-proxy";
 
 describe("RemoteViewerProxy", () => {
+  it.each([1006, 1005, 1000, undefined])("preserves the result of tunneled close %s", async (code) => {
+    const transport = new FakeTransport();
+    const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
+    const url = new URL(await runCauseEffect(proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/stream")));
+    url.protocol = "ws:";
+    const opened = once(transport, "streamOpened");
+    const socket = new WebSocket(url);
+    await once(socket, "open");
+    const [streamId] = await opened;
+    const closed = once(socket, "close");
+    transport.emit(
+      "desktopData",
+      "host-1",
+      encodeRemoteDesktopSignalControl({ type: "close", streamId, ...(code === undefined ? {} : { code }) }),
+    );
+    const [actual] = await closed;
+    expect(actual).toBe(code === 1006 ? 1011 : 1000);
+    await runCauseEffect(proxy.stop());
+  });
+
+  it("ends only the disconnected host's view and permits reopening", async () => {
+    const transport = new FakeTransport();
+    const proxy = new RemoteViewerProxy({ transport, fetchResource: () => Effect.sync(() => new Response()) });
+    const open = async (hostId: string) => {
+      const url = new URL(await runCauseEffect(proxy.viewerUrl(hostId, "/v1/remote-screen/sessions/session-1/stream")));
+      url.protocol = "ws:";
+      const socket = new WebSocket(url);
+      await once(socket, "open");
+      return socket;
+    };
+    const first = await open("host-1");
+    const other = await open("host-2");
+    const closed = once(first, "close");
+    transport.emit("disconnected", "host-1");
+    const [code, reason] = await closed;
+    expect(code).toBe(1011);
+    expect(reason.toString()).toBe("The WebRTC host disconnected.");
+    expect(other.readyState).toBe(WebSocket.OPEN);
+    const reopened = await open("host-1");
+    expect(reopened.readyState).toBe(WebSocket.OPEN);
+    reopened.close();
+    other.close();
+    await runCauseEffect(proxy.stop());
+    expect(transport.listenerCount("disconnected")).toBe(0);
+  });
+
   it("serves viewer resources on loopback and bridges Moonlight signal frames without Base64", async () => {
     const transport = new FakeTransport();
     const proxy = new RemoteViewerProxy({
@@ -100,6 +146,7 @@ class FakeTransport extends EventEmitter {
       if (isString(data)) {
         const control = decodeRemoteDesktopSignalControl(data);
         if (control.type === "open") {
+          this.emit("streamOpened", control.streamId);
           queueMicrotask(() =>
             this.emit(
               "desktopData",

@@ -49,6 +49,33 @@ function renderPicker(
 }
 
 describe("ProviderPicker", () => {
+  it.each([
+    ["sign-in-required", "Not connected"],
+    ["error", "Unavailable"],
+    ["outdated", "Update required"],
+    ["not-started", "Runtime installed"],
+    ["available", "Connected"],
+  ] as const)("keeps %s separate from an installed Gemini runtime", (state, label) => {
+    const connect = vi.fn();
+    const { view } = renderPicker(
+      [{ id: "antigravity", name: "Gemini", state, runtimeStatus: runtime({}) }],
+      vi.fn(),
+      connect,
+    );
+    expect(view.getByText(label)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: state === "available" ? "Reconnect Gemini" : "Connect Gemini" }));
+    expect(connect).toHaveBeenCalledWith("antigravity");
+  });
+
+  it("explains host sign-in when a remote Gemini runtime has no supported sign-in action", () => {
+    const { view } = renderPicker([
+      { id: "antigravity", name: "Gemini", state: "sign-in-required", runtimeStatus: runtime({}) },
+    ]);
+    expect(view.getByText("Not connected")).toBeTruthy();
+    expect(view.getByRole("status").textContent).toContain("Google sign-in needs a browser on that host.");
+    expect(view.queryByRole("button", { name: "Connect Gemini" })).toBeNull();
+  });
+
   it("sends a user to no install page for OpenCode, and falls back to Sign in with no runtime", () => {
     const { view, onSignInProvider } = renderPicker([claude, openCode]);
 

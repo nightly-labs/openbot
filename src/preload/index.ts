@@ -17,6 +17,7 @@ import {
   decodeChannelSummaries,
   decodeHostUpdateStatus,
   decodeMcpServerConfigs,
+  decodeMcpSignInPage,
   decodeMcpSignInStates,
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
@@ -61,6 +62,8 @@ import {
   decodeHostAnalyticsFromMain,
   decodeMemories,
   decodeMemory,
+  decodeMemorySelection,
+  decodeOptionalMemorySelection,
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeRoutine,
@@ -737,6 +740,8 @@ const openbotApi: OpenBotDesktopApi = {
   agent: {
     ...agentGroup,
     ...bridgeGroup(IPC_ENDPOINTS.agentMemories, {
+      getMemorySelection: decodeOptionalMemorySelection,
+      setMemoryInclusion: decodeMemorySelection,
       listMemories: decodeMemories,
       createMemory: decodeMemory,
       updateMemory: decodeMemory,
@@ -779,6 +784,7 @@ const openbotApi: OpenBotDesktopApi = {
       setMcpServerEnabled: decodeMcpServerConfigs,
       testMcpServer: decodeMcpTestResult,
       signInMcpServer: decodeMcpTestResult,
+      mcpSignInPage: decodeMcpSignInPage,
       cancelMcpSignIn: decodeVoid,
       signOutMcpServer: decodeMcpSignInStates,
       listMcpSignIns: decodeMcpSignInStates,

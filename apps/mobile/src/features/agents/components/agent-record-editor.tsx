@@ -2,6 +2,7 @@ import { Host, Switch } from "@expo/ui";
 import { eventFilterDraftsValid, eventFiltersFromDrafts } from "@openbot/contracts/event-filter-value";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AgentMemorySelectionState,
   type CreateRoutineInput,
   type EventRoutine,
   type EventRoutineTriggerInput,
@@ -25,10 +26,11 @@ import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import { Check } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
-import { useUniwind } from "uniwind";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useCSSVariable, useUniwind } from "uniwind";
+import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -98,30 +100,37 @@ export function MemoryEditor({
   agent,
   memory,
   available,
+  selection,
+  selectionAvailable = true,
   port,
 }: {
   agent: Pick<MobileAgent, "id" | "serverId">;
   memory?: MemoryEntry;
   available: boolean;
+  selection?: AgentMemorySelectionState | null;
+  selectionAvailable?: boolean;
   port?: {
     save(text: string, id?: string): Promise<void>;
     delete(id: string): Promise<void>;
     queryKey: QueryKey;
   };
 }) {
-  const { t } = useText();
+  const { t, format } = useText();
   const workspace = useMobileWorkspace();
   const action = useRecordAction(port?.queryKey);
+  const inclusion = useRecordAction();
+  const selected = selection?.selections.find((entry) => entry.memoryId === memory?.id);
+  const accent = String(useCSSVariable("--openbot-accent"));
   const [editedText, setEditedText] = useState<string | undefined>();
   const text = editedText ?? memory?.text ?? "";
   const [savedText, setSavedText] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const dirty = text.trim() !== (memory ? memory.text : (savedText ?? ""));
-  useRecordDraftGuard(dirty && !finished, action.pending);
+  useRecordDraftGuard(dirty && !finished, action.pending || inclusion.pending);
   useEffect(() => {
     if (finished) router.back();
   }, [finished]);
-  const disabled = !available || action.pending || (!memory && savedText !== null);
+  const disabled = !available || action.pending || inclusion.pending || (!memory && savedText !== null);
   return (
     <View className="gap-5">
       <SheetFormField
@@ -151,6 +160,84 @@ export function MemoryEditor({
           )
         }
       />
+      {!port && selection ? (
+        <SettingsNote>
+          {t("mobile.agent.info.memory.inclusion.explanation")}{" "}
+          {t("mobile.agent.info.memory.inclusion.capacity", {
+            used: format.fileSize(selection.usedBytes),
+            total: format.fileSize(selection.budgetBytes),
+          })}
+        </SettingsNote>
+      ) : null}
+      {!port && selected ? (
+        <SettingsSection
+          title={t("mobile.agent.info.memory.inclusion.label")}
+          footer={t(
+            selected.userControlled
+              ? "mobile.agent.info.memory.inclusion.userControlled"
+              : "mobile.agent.info.memory.inclusion.agentControlled",
+          )}
+        >
+          {(["essential", "searchable", "automatic"] as const).map((choice) => (
+            <SettingsRow
+              key={choice}
+              supportingText={
+                choice === "automatic"
+                  ? t(
+                      selected.inclusion === "essential"
+                        ? "mobile.agent.info.memory.inclusion.essential"
+                        : "mobile.agent.info.memory.inclusion.searchable",
+                    )
+                  : undefined
+              }
+              disclosure={false}
+              checked={
+                choice === "automatic"
+                  ? !selected.userControlled
+                  : selected.userControlled && selected.inclusion === choice
+              }
+              trailing={
+                (
+                  choice === "automatic"
+                    ? !selected.userControlled
+                    : selected.userControlled && selected.inclusion === choice
+                ) ? (
+                  <Check size={18} color={accent} strokeWidth={2} />
+                ) : null
+              }
+              disabled={disabled || !selectionAvailable}
+              onPress={() =>
+                void inclusion.run(async () => {
+                  await workspace.setAgentMemoryInclusion(
+                    {
+                      agentId: agent.id,
+                      changes: [
+                        { memoryId: selected.memoryId, inclusion: choice, expectedRevision: selected.revision },
+                      ],
+                    },
+                    agent.serverId,
+                  );
+                })
+              }
+            >
+              <Typography.Paragraph>
+                {t(
+                  choice === "essential"
+                    ? "mobile.agent.info.memory.inclusion.essential"
+                    : choice === "searchable"
+                      ? "mobile.agent.info.memory.inclusion.searchable"
+                      : "mobile.agent.info.memory.inclusion.automatic",
+                )}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ))}
+        </SettingsSection>
+      ) : null}
+      {inclusion.error ? (
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+          {inclusion.error}
+        </Typography.Paragraph>
+      ) : null}
       {memory ? (
         <SettingsSection>
           <SettingsRow

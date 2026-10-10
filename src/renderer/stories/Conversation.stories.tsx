@@ -1439,6 +1439,16 @@ export const BrowserTakeover: Story = {
   render: (storyArgs) => <MockedConversation args={storyArgs} takeoverStateGallery />,
 };
 
+/** The message box and its queue stay under a browser takeover too. */
+export const QueuedDuringBrowserTakeover: Story = {
+  ...BrowserTakeover,
+  name: "Queued during browser takeover",
+  args: {
+    ...BrowserTakeover.args,
+    queue: { ...queue, deliveries: [queuedDelivery, { ...runningDelivery, turnId: "turn-takeover" }] },
+  },
+};
+
 export const PromptQuestionsInChat: Story = {
   name: "Prompt questions in chat",
   args: {
@@ -1449,6 +1459,29 @@ export const PromptQuestionsInChat: Story = {
 
 export const Queued: Story = {
   args: { queue },
+};
+
+/**
+ * An approval stands at the end of the chat, and the message box and its queue stay under it, so a
+ * message sent while the agent works stays in view (#1745).
+ */
+export const QueuedDuringApproval: Story = {
+  args: {
+    activeTurnId: "turn-active",
+    queue,
+    approval: {
+      requestId: "queued-approval",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-active",
+      kind: "command",
+      command: "bun run release:notes",
+      cwd: null,
+      reason: null,
+      grantRoot: null,
+      permissions: null,
+    },
+  },
 };
 
 /**

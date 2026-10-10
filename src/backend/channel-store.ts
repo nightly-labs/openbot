@@ -35,6 +35,12 @@ export interface ChannelAssignment {
   agentId: string;
   taskRevision: number;
   /**
+   * The request the task served when this assignment started. A task can be reused for a newer
+   * request, so its id alone does not tie an assignment to the request it worked on. Null for an
+   * assignment written before this was stored.
+   */
+  requestMessageId: string | null;
+  /**
    * The resources this assignment holds, copied from the task when the assignment starts. A task
    * record can change owner and resources while its previous owner still runs, so the task is not
    * a safe place to read a live reservation from.
@@ -815,6 +821,7 @@ function decodeAssignment(value: unknown): ChannelAssignment {
     taskId: value.taskId,
     agentId: value.agentId,
     taskRevision: value.taskRevision,
+    requestMessageId: isString(value.requestMessageId) ? value.requestMessageId : null,
     // An assignment written before resources were stored reads as a host reservation, which
     // conflicts with every other task. That holds the channel until the assignment ends, rather
     // than letting a second agent take a resource this one may still use.

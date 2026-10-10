@@ -74,6 +74,11 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 Voice prompts are not available on Linux. Remote desktop works on Linux x64 in an X11 session,
 such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.
 
+For Gemini sign-in, install a desktop browser and `xdg-utils`. Open the sign-in page in a
+desktop session on the same host or VM. Google sends the callback to that host through
+`127.0.0.1`; a server with no desktop cannot complete this sign-in. See
+[Gemini setup](docs/architecture/providers.md#gemini).
+
 #### Linux server with no screen
 
 To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with
@@ -150,8 +155,11 @@ OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot
 `antigravity` command on your search path, because the Antigravity editor installs a command with
 that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
 `bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
-`bin/`. When that path is set, OpenBot uses only it. Gemini agents stay on this computer: team
-members do not see them.
+`bin/`. Keep `localharness_external` beside the server. When that path is set, OpenBot uses
+only it. Connect remains available in the host's local Settings > Providers screen. Remote
+settings cannot perform Google sign-in; use a browser on the host. See
+[Gemini setup and download recovery](docs/architecture/providers.md#gemini) for the required
+layout, the reported IPv6 download failure, and checks that do not change host networking.
 
 Cursor uses a Cursor plan or a Cursor API key. OpenBot downloads and pins the Cursor CLI
 (`cursor-agent`) when you select Download on the Cursor row in More providers, and starts it with

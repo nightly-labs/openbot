@@ -23,6 +23,7 @@ import {
 } from "./features/connectors/onepassword-connector";
 import { createSlackConnector } from "./features/connectors/slack-connector";
 import { createTelegramConnector } from "./features/connectors/telegram-connector";
+import { conversationPort } from "./features/conversation/conversation-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
@@ -32,7 +33,7 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
-import { serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
+import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
@@ -41,6 +42,7 @@ import type { HostProviderSettings } from "./features/settings/ProviderSettingsS
 import { useSettings } from "./features/settings/settings-context";
 import { useSidebar } from "./features/sidebar/sidebar-context";
 import { useUpdates } from "./features/updates/updates-context";
+import { useWhatsNew } from "./features/updates/whats-new-context";
 import { useGlobalSearchSources } from "./global-search-sources";
 import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
@@ -338,6 +340,7 @@ function ServerSettings(props: {
     serverSettingsMcp,
     serverSettingsMcpError,
     serverSettingsMcpSignIns,
+    serverSettingsMcpSignInPages,
     signInMcpServer,
     cancelMcpSignIn,
     signOutMcpServer,
@@ -559,11 +562,21 @@ function ServerSettings(props: {
           onRemoveMcpServer={removeMcpServer}
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
-          // A sign-in opens this computer's browser, so only this computer's server offers one.
+          // A sign-in opens the browser of the computer that runs the server. A remote host's page
+          // shows here through the live view, which streams the active server only.
           mcpSignIn={
-            server().kind === "local"
+            server().kind === "local" || remoteMcpSignIn(server())
               ? {
                   signedIn: serverSettingsMcpSignIns(),
+                  remote:
+                    server().kind === "remote"
+                      ? {
+                          hostName: server().name,
+                          runtime: conversationPort().browser,
+                          clipboard: serverSupportsCapability(server(), "browser-view-clipboard"),
+                          pages: serverSettingsMcpSignInPages(),
+                        }
+                      : undefined,
                   start: signInMcpServer,
                   cancel: cancelMcpSignIn,
                   signOut: signOutMcpServer,
@@ -642,6 +655,7 @@ function AppSettings(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const updates = useUpdates();
+  const whatsNew = useWhatsNew();
   const { setAddServerOpen } = useServers();
   const {
     appSettingsOpen,
@@ -667,6 +681,14 @@ function AppSettings(props: AccountProps) {
         builtInDisplayGeometry={builtInDisplayGeometry()}
         updateStatus={updates.status()}
         onUpdateAction={updates.runAction}
+        onOpenWhatsNew={
+          whatsNew.state.version
+            ? () => {
+                setAppSettingsOpen(false);
+                whatsNew.reopen();
+              }
+            : undefined
+        }
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}
@@ -742,24 +764,27 @@ function RemoteDesktop() {
   } = useRemoteDesktop();
 
   return (
-    <Show when={!platform.landingPreview && remoteDesktopWorkspaceServer()} keyed>
-      {(server) => (
-        <Loading>
-          <RemoteDesktopWorkspace
-            visible={remoteDesktopWorkspaceVisible()}
-            platform={platform.appInfo()?.platform ?? "darwin"}
-            server={server}
-            session={remoteDesktopWorkspaceSession()}
-            connecting={remoteDesktopConnectingServerId() === server.id}
-            connectionError={remoteDesktopConnectionError()}
-            connectionErrorCode={remoteDesktopConnectionErrorCode()}
-            onHide={hideRemoteDesktopWorkspace}
-            onDisconnect={() => disconnectRemoteDesktopWorkspace()}
-            onRetry={retryRemoteDesktopWorkspace}
-            onSelectDisplay={selectRemoteDesktopDisplay}
-          />
-        </Loading>
-      )}
+    // Keyed by id: each server list update is a new object, and a new viewer frame cannot reuse the one-time grant.
+    <Show when={!platform.landingPreview && remoteDesktopWorkspaceServer()?.id} keyed>
+      <Show when={remoteDesktopWorkspaceServer()}>
+        {(server) => (
+          <Loading>
+            <RemoteDesktopWorkspace
+              visible={remoteDesktopWorkspaceVisible()}
+              platform={platform.appInfo()?.platform ?? "darwin"}
+              server={server()}
+              session={remoteDesktopWorkspaceSession()}
+              connecting={remoteDesktopConnectingServerId() === server().id}
+              connectionError={remoteDesktopConnectionError()}
+              connectionErrorCode={remoteDesktopConnectionErrorCode()}
+              onHide={hideRemoteDesktopWorkspace}
+              onDisconnect={() => disconnectRemoteDesktopWorkspace()}
+              onRetry={retryRemoteDesktopWorkspace}
+              onSelectDisplay={selectRemoteDesktopDisplay}
+            />
+          </Loading>
+        )}
+      </Show>
     </Show>
   );
 }

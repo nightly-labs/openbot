@@ -65,6 +65,7 @@ export interface AgentImportAgents {
   createRoutine(input: CreateRoutineInput, options?: { recordConversationEvent?: boolean }): unknown;
   createMemory(input: { agentId: string; text: string }): unknown;
   memoryLimit(): number;
+  initializeMemorySelection(agentId: string): void;
   setAvatar(agentId: string, image: AvatarImageInput | null): ReturnType<AgentService["setAvatar"]>;
   deleteAgent(agentId: string): ReturnType<AgentService["deleteAgent"]>;
   channels: { command(command: ChannelCommand, actor: ChannelActor): ReturnType<ChannelService["command"]> };
@@ -592,6 +593,7 @@ export class AgentImportService {
               warnings.push(sourceText("error.import.memoryLimit", { name: source.name, limit: memoryLimit }));
             for (const text of source.memories.slice(0, memoryLimit))
               this.agents.createMemory({ agentId: agent.id, text });
+            this.agents.initializeMemorySelection(agent.id);
             const avatar = staged.avatars.get(source.key);
             if (avatar)
               agent = yield* this.agents

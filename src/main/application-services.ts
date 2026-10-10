@@ -157,6 +157,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ManagedSkillService } from "./managed-skill-service";
+import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
@@ -276,6 +277,8 @@ const TEARDOWN_ORDER = {
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
+  // Before the browser, so no sign-in opens a tab while it stops.
+  mcpHostSignIns: 29,
   browser: 30,
   browserPictureInPicture: 40,
   browserView: 45,
@@ -1015,7 +1018,9 @@ export async function createApplicationServices({
   const mcpOAuthRedirect = await startMcpOAuthRedirectServer({
     language,
     deliver: (state, code) => {
+      const elsewhere = mcpOAuthAuthority?.openedElsewhere(state) ?? false;
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code)) return false;
+      if (elsewhere) return true;
       const current = windows.getMainWindow();
       if (current && !current.isDestroyed()) showMainWindow(current);
       return true;
@@ -1604,6 +1609,10 @@ export async function createApplicationServices({
     undefined,
     join(app.getPath("userData"), "agent-import-uploads"),
   );
+  const mcpHostSignIns = new McpHostSignIns({ service, browser });
+  teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
+    Effect.runPromise(mcpHostSignIns.close()),
+  );
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -1619,6 +1628,8 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // Present, so the host advertises `mcp-sign-in-v1`. The routes are admin-only.
+    mcpSignIns: mcpHostSignIns,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
     // Present, so the host advertises `hosted-sites-v1`. Members list; only admins delete.

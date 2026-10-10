@@ -1,13 +1,14 @@
 import type {
   AgentEvent,
   AgentMemory,
+  AgentMemorySelectionState,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   UpdateAgentMemoryInput,
 } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import type { Mock } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AnalyticsEventName, type DesktopAnalyticsEvents, desktopAnalytics } from "../../analytics";
 import { createMockOpenBot, type MockOpenBotControls } from "../../preview/mock-openbot";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
@@ -79,6 +80,7 @@ beforeEach(() => {
 
   activeMock = createMockOpenBot();
   activeMock.api.agent.listMemories = listMemories;
+  activeMock.api.agent.getMemorySelection = vi.fn(async () => null);
   activeMock.api.agent.createMemory = createMemory;
   activeMock.api.agent.updateMemory = updateMemory;
   activeMock.api.agent.deleteMemory = deleteMemory;
@@ -91,6 +93,58 @@ beforeEach(() => {
 });
 
 describe("AgentMemoriesModal", () => {
+  it("sets and releases a user choice without changing the memory text", async () => {
+    memoryState = [{ ...firstMemory }];
+    let state: AgentMemorySelectionState = {
+      selections: [{ memoryId: firstMemory.id, inclusion: "searchable", userControlled: false, revision: 1 }],
+      usedBytes: 0,
+      budgetBytes: 8192,
+    };
+    window.openbot.agent.getMemorySelection = vi.fn(async () => state);
+    const saveSelection = vi.fn<typeof window.openbot.agent.setMemoryInclusion>(async ({ changes }) => {
+      const change = changes[0];
+      const previous = state.selections[0];
+      assert(change && previous);
+      state = {
+        ...state,
+        selections: [
+          {
+            ...previous,
+            inclusion: change.inclusion === "automatic" ? previous.inclusion : change.inclusion,
+            userControlled: change.inclusion !== "automatic",
+            revision: previous.revision + 1,
+          },
+        ],
+      };
+      return state;
+    });
+    window.openbot.agent.setMemoryInclusion = saveSelection;
+    render(() => (
+      <AgentMemoriesModal
+        port={agentMemoriesPort("chief", "Chief", 64)}
+        open
+        onOpenChange={vi.fn()}
+        onCountChange={vi.fn()}
+      />
+    ));
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit memory: Uses metric units." }));
+    await fireEvent.click(screen.getByRole("button", { name: "Always included" }));
+    expect(await screen.findByRole("button", { name: "Always included", pressed: true })).toBeEnabled();
+    await fireEvent.click(screen.getByRole("button", { name: "Let the agent decide" }));
+    expect(await screen.findByRole("button", { name: "Let the agent decide", pressed: true })).toBeEnabled();
+    expect(state.selections[0]).toEqual({
+      memoryId: firstMemory.id,
+      inclusion: "essential",
+      userControlled: false,
+      revision: 3,
+    });
+    expect(saveSelection).toHaveBeenLastCalledWith({
+      agentId: "chief",
+      changes: [{ memoryId: firstMemory.id, inclusion: "automatic", expectedRevision: 2 }],
+    });
+    expect(updateMemory).not.toHaveBeenCalled();
+  });
+
   it("shows the empty state, adds a memory, and refreshes after a memory event", async () => {
     const onCountChange = vi.fn();
     render(() => (

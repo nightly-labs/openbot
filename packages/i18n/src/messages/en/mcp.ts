@@ -24,6 +24,7 @@ export const messages = defineMessages("mcp", {
     "Sign in to your {name} account. OpenBot gets the tools that account can reach, and no password.",
   "mcp.signIn.waiting": "Waiting for the browser…",
   "mcp.signIn.continue": "Continue to {name}",
+  "mcp.signIn.pageDescription": "This page is open in the browser on {host}. Sign in here.",
   "mcp.server.loadFailed": "The MCP servers could not load.",
   "mcp.test.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mcp.status.testing": "Testing…",
@@ -109,5 +110,9 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.signInWaiting": {
     one: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minute.",
     other: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minutes.",
+  },
+  "mcp.panel.signInWaitingOn": {
+    one: "Opening the sign-in page on {host}. OpenBot stops waiting after {count} minute.",
+    other: "Opening the sign-in page on {host}. OpenBot stops waiting after {count} minutes.",
   },
 });

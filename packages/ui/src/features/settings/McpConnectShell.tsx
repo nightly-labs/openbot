@@ -133,21 +133,31 @@ export interface McpConnectShellProps extends Pick<McpConnectBaseProps, "open" |
   /** The submit. */
   action: JSX.Element;
   onSubmit: () => void;
+  /** Widens the dialog for a page drawn inside it. */
+  wide?: boolean | undefined;
+  /** Lets the user close the dialog while it waits, and stops the wait first. Without it, the wait keeps the dialog open. */
+  onCancelBusy?: (() => void) | undefined;
 }
 
 /** The parts both dialogs show: the two ends of the connection, the header, the failure, the button. */
 export function McpConnectShell(props: McpConnectShellProps) {
   const { t } = useText();
+  const close = () => {
+    if (!props.busy()) return props.onCancel();
+    if (!props.onCancelBusy) return;
+    props.onCancelBusy();
+    props.onCancel();
+  };
   return (
     <Dialog.Root
       open={props.open}
       onOpenChange={(open) => {
-        if (!open && !props.busy()) props.onCancel();
+        if (!open) close();
       }}
     >
       <Dialog.Portal>
         <Dialog.Overlay class="mcp-connect-backdrop">
-          <Dialog.Content class="mcp-connect-dialog" as="section">
+          <Dialog.Content class="mcp-connect-dialog" data-page={props.wide ? "" : undefined} as="section">
             <header class="mcp-connect-header">
               {/* The two ends of the connection, side by side: this computer, and the app. It is the
                   one picture the dialog needs, and it says what is about to be joined. */}
@@ -200,8 +210,8 @@ export function McpConnectShell(props: McpConnectShellProps) {
               class="mcp-connect-close"
               label={t("mcp.connect.close", { name: props.subject.name })}
               variant="ghost"
-              disabled={props.busy()}
-              onClick={props.onCancel}
+              disabled={props.busy() && !props.onCancelBusy}
+              onClick={close}
             >
               <X />
             </IconButton>

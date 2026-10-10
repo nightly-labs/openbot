@@ -97,7 +97,7 @@ export function SidebarNav() {
                 </ContextMenu.Item>
               </Show>
               <Show when={layoutMutable()}>
-                <ContextMenu.Item onSelect={() => startCreateSection()}>
+                <ContextMenu.Item onSelectAfterClose={() => startCreateSection()}>
                   <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
                   <span>{t("sidebar.new.section")}</span>
                 </ContextMenu.Item>

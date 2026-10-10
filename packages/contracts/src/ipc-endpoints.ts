@@ -51,8 +51,10 @@ import type { AgentImportPreview, AgentImportResult, ApplyAgentImportInput } fro
 import type {
   AgentMemory,
   AgentMemoryLimitPreference,
+  AgentMemorySelectionState,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
+  SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
 import type {
@@ -895,6 +897,10 @@ export const IPC_ENDPOINTS = {
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
   },
   agentMemories: {
+    getMemorySelection: scopedRequest<string, AgentMemorySelectionState | null>()("agent:get-memory-selection"),
+    setMemoryInclusion: scopedRequest<SetAgentMemoryInclusionInput, AgentMemorySelectionState>()(
+      "agent:set-memory-inclusion",
+    ),
     listMemories: scopedRequest<string, AgentMemory[]>()("agent:list-memories"),
     createMemory: scopedRequest<CreateAgentMemoryInput, AgentMemory>()("agent:create-memory"),
     updateMemory: scopedRequest<UpdateAgentMemoryInput, AgentMemory>()("agent:update-memory"),
@@ -1073,9 +1079,10 @@ export const IPC_ENDPOINTS = {
     // A test connects once and reports what it found. Nothing is stored, and no agent uses it.
     testMcpServer: scopedRequest<TestMcpServerInput, McpTestResult, "required">()("servers:mcp:test"),
     // A test never opens a browser; a sign-in does, and answers once the browser came back and the
-    // server took the token. These four act on the computer that runs OpenBot only: nobody sits in
-    // front of a remote host's browser.
+    // server took the token. On a remote server the page opens in the host's browser, and the panel
+    // shows that tab: `mcpSignInPage` names it while the sign-in waits.
     signInMcpServer: scopedRequest<TestMcpServerInput, McpTestResult, "required">()("servers:mcp:sign-in"),
+    mcpSignInPage: scopedRequest<CancelMcpSignInInput, string | null, "required">()("servers:mcp:sign-in-page"),
     cancelMcpSignIn: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:cancel-sign-in"),
     signOutMcpServer: scopedRequest<SignOutMcpServerInput, McpSignInState[], "required">()("servers:mcp:sign-out"),
     listMcpSignIns: scopedQuery<McpSignInState[], "required">()("servers:mcp:list-sign-ins"),

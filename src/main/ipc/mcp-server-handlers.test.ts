@@ -12,6 +12,7 @@ import {
   type McpServerConfig,
   type McpTestResult,
 } from "@openbot/contracts/ipc";
+import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { describe, expect, it, vi } from "vitest";
 import { NO_MCP_TOOL_RUNTIMES } from "../../backend/mcp-provider-shapes";
 import { ProviderRuntimeFailure } from "../provider-runtime-effects";
@@ -68,7 +69,11 @@ function httpConfig(): McpServerConfig {
   };
 }
 
-function setup(options: { ensureToolRuntimesReady?: () => Effect.Effect<void, ProviderRuntimeFailure> }): {
+function setup(options: {
+  ensureToolRuntimesReady?: () => Effect.Effect<void, ProviderRuntimeFailure>;
+  /** Whether the host advertises `mcp-sign-in-v1`. */
+  signIn?: boolean;
+}): {
   ensureToolRuntimesReady: ReturnType<typeof vi.fn>;
   testMcpServer: ReturnType<typeof vi.fn>;
   remoteCalls: RemoteRequestInit[];
@@ -91,7 +96,8 @@ function setup(options: { ensureToolRuntimesReady?: () => Effect.Effect<void, Pr
   };
   const remoteCalls: RemoteRequestInit[] = [];
   const remoteServers = {
-    supportsCapability: () => true,
+    supportsCapability: (_serverId: string, capability: string) =>
+      options.signIn !== false || capability !== MCP_SIGN_IN_CAPABILITY,
     // Generic like the manager: the host answers what the codec below decodes.
     request: <T>(
       _serverId: string,
@@ -156,9 +162,9 @@ describe("mcpServerIpcHandlers test", () => {
     expect(testMcpServer).toHaveBeenCalledWith(expect.anything(), { storedCredentials: true, signInPlace: "here" });
   });
 
-  it("refuses a sign-in for a remote server without asking the host", async () => {
-    // Nobody sits in front of the host's browser, and the Team API has no sign-in route.
-    const { remoteCalls, signInRemote } = setup({});
+  it("refuses a sign-in for a host without mcp-sign-in-v1 without asking it", async () => {
+    // Such a host has no sign-in route, so the reason is stated before any request.
+    const { remoteCalls, signInRemote } = setup({ signIn: false });
 
     await expect(signInRemote(httpConfig())).rejects.toThrow(
       "Sign-in to an MCP server works only in OpenBot on the host computer.",

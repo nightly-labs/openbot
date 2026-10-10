@@ -23,7 +23,7 @@ import type { AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@op
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, type Fiber, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import {
   AcpConfiguration,
   type AcpModel,
@@ -120,10 +120,9 @@ interface AcpTurn {
   toolKinds: Map<string, string>;
   /** The latest durable shape of each tool call until ACP reports its terminal status. */
   toolItems: Map<string, ThreadItem>;
-  /** Steered prompts that the agent refused while this turn ran; sent when the running prompt ends. */
-  deferredPrompts: ContentBlock[][];
-  /** The user stopped the turn, so no deferred prompt is sent. */
+  /** The user stopped the turn. */
   stopped: boolean;
+  completing: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
 }
 
@@ -135,6 +134,8 @@ interface AcpThread {
   currentModelId: string | null;
   mcp: LocalMcpSession;
   activeTurn: AcpTurn | null;
+  /** Antigravity cancel can leave its stream open. Reload this same session before new input. */
+  needsResume: boolean;
   dynamicTools: DynamicToolNamespace[];
   workspaceRoots: string[];
   /** Whether the session got the Computer Use server. Its MCP servers are fixed when it opens. */
@@ -641,9 +642,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         error instanceof RequestError &&
         (method === "turn/start" ||
           method === "turn/steer" ||
-          ((method === "thread/start" || method === "thread/resume") &&
-            isRecord(error.data) &&
-            typeof error.data.details === "string"))
+          ((method === "thread/start" || method === "thread/resume") && failureDetail(error) !== null))
       ) {
         // Keep the protocol error type: details alone must never authorize session replacement.
         return yield* providerFailure(
@@ -778,21 +777,36 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return yield* providerSync(() => decoder({ thread: { id: threadId, turns: [] } }));
       }
       case "turn/start": {
-        const response = yield* this.#startTurnEffect(params, false);
+        const response = yield* this.#startTurnEffect(params);
         return yield* providerSync(() => decoder(response));
       }
-      case "turn/steer": {
-        const response = yield* this.#startTurnEffect(params, true);
-        return yield* providerSync(() => decoder(response));
-      }
+      case "turn/steer":
+        // A second ACP prompt can cancel the active turn. Keep deferred input in the mailbox.
+        return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
         // A closed idle session has no turn to stop.
         if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
         const thread = yield* providerSync(() => this.#requireThread(threadId));
-        // A stop also stops the steers that wait for the running prompt, if that prompt ends anyway.
-        if (thread.activeTurn) thread.activeTurn.stopped = true;
-        (yield* providerSync(() => this.#requireConnection())).cancel({ sessionId: thread.id });
+        const turn = thread.activeTurn;
+        const requestedTurnId = getString(params, "turnId");
+        if (!turn || (requestedTurnId !== null && requestedTurnId !== turn.id))
+          return yield* providerSync(() => decoder({}));
+        turn.stopped = true;
+        const cancel = providerCall(() => this.#requireConnection().cancel({ sessionId: thread.id }));
+        if (this.provider === "antigravity") {
+          // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then
+          // rebuild the harness through session/resume before accepting another prompt.
+          thread.needsResume = true;
+          yield* cancel.pipe(
+            Effect.ensuring(
+              Effect.gen({ self: this }, function* () {
+                if (turn.task) yield* Fiber.interrupt(turn.task);
+                yield* this.#completeTurn(thread, turn, "interrupted", null);
+              }),
+            ),
+          );
+        } else yield* cancel;
         return yield* providerSync(() => decoder({}));
       }
       case "thread/compact/start":
@@ -923,6 +937,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
   }
 
+  /** Whether the agent advertises `additionalDirectories`. Grok refuses them on `session/resume` (#1729). */
+  get #acceptsAdditionalDirectories(): boolean {
+    return this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
+  }
+
   readonly #startThread = Effect.fn("AcpAgentClient.startThread")(function* (
     this: AcpAgentClient,
     params: unknown,
@@ -933,15 +952,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const requestedThreadId = getString(params, "threadId");
     if (!resume || !requestedThreadId) return yield* this.#openThread(params, false);
     const held = this.#threads.get(requestedThreadId);
+    const recovering = held && !held.activeTurn && held.needsResume;
     // The MCP servers are fixed when a session opens, so a changed Computer Use switch loads the
     // session again. A session with a turn keeps its servers until a later resume.
-    if (held && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
+    if (held && !recovering && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
       yield* this.#threads.close(held).pipe(toProviderClientOperationError);
     }
     // A thread this client already holds takes the caller's settings even though no session is
     // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
     // the turn that follows must not run on the settings of whoever loaded the session first.
-    else if (held) {
+    else if (held && !recovering) {
       held.developerInstructions = getString(params, "developerInstructions") ?? held.developerInstructions;
       yield* this.#configuration.applyConfig(
         held,
@@ -959,6 +979,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const completion = Deferred.makeUnsafe<{ thread: { id: string } }, ProviderClientOperationError>();
     this.#startingThreads.set(requestedThreadId, completion);
     const exit = yield* Effect.exit(this.#openThread(params, true));
+    // session/resume closes the old Antigravity harness and restores its saved trajectory.
+    // Keep its bridge until the replacement succeeds, so a failure can be retried in this session.
+    if (recovering && Exit.isSuccess(exit)) held.mcp.close();
     yield* Deferred.done(completion, exit);
     if (this.#startingThreads.get(requestedThreadId) === completion) this.#startingThreads.delete(requestedThreadId);
     return yield* exit;
@@ -1021,7 +1044,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                         connection.resumeSession({
                           sessionId: requestedThreadId,
                           cwd,
-                          additionalDirectories,
+                          ...(this.#acceptsAdditionalDirectories ? { additionalDirectories } : {}),
                           mcpServers,
                         } satisfies ResumeSessionRequest),
                       )
@@ -1055,6 +1078,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId,
               mcp,
               activeTurn: null,
+              needsResume: false,
               dynamicTools,
               workspaceRoots: additionalDirectories,
               computerUse,
@@ -1062,7 +1086,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               idleSince: 0,
             };
             threadRef = thread;
-            this.#threads.add(thread);
             providerResult(
               yield* Effect.result(
                 this.#configuration.applyConfig(
@@ -1073,6 +1096,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 ),
               ),
             );
+            this.#threads.add(thread);
             retained = true;
             return { thread: { id } };
           } catch (error) {
@@ -1375,11 +1399,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #startTurnEffect = Effect.fn("AcpAgentClient.startTurn")(function* (
     this: AcpAgentClient,
     params: unknown,
-    steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
     const threadId = yield* providerSync(() => requiredString(params, "threadId"));
     return yield* this.#threads
-      .startTurn(threadId, () => this.#openTurn(threadId, params, steer))
+      .startTurn(threadId, () => this.#openTurn(threadId, params))
       .pipe(toProviderClientOperationError);
   });
 
@@ -1387,71 +1410,56 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     threadId: string,
     params: unknown,
-    steer: boolean,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
-    const thread = yield* providerSync(() => this.#requireThread(threadId));
-    if (!steer && thread.activeTurn)
-      return yield* providerFailure(new Error("The ACP thread already has an active turn."));
-    if (steer && !thread.activeTurn)
-      return yield* providerFailure(new Error("The ACP thread has no active turn to steer."));
+    let thread = yield* providerSync(() => this.#requireThread(threadId));
+    if (thread.needsResume && !thread.activeTurn) {
+      yield* this.#startThread(
+        {
+          threadId,
+          cwd: thread.cwd,
+          developerInstructions: thread.developerInstructions,
+          dynamicTools: thread.dynamicTools,
+          runtimeWorkspaceRoots: thread.workspaceRoots,
+          computerUse: thread.computerUse,
+          model: thread.currentModelId,
+        },
+        true,
+      );
+      thread = yield* providerSync(() => this.#requireThread(threadId));
+    }
+    if (thread.activeTurn) return yield* providerFailure(new Error("The ACP thread already has an active turn."));
     yield* this.#configuration.applyConfig(
       thread,
       getString(params, "model"),
       getString(params, "effort"),
       this.#models,
     );
-    if (!steer) {
-      const overrides = getRecord(params, "sessionSettings");
-      for (const [configId, value] of Object.entries(overrides ?? {})) {
-        if (typeof value !== "boolean" && typeof value !== "string")
-          return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
-        const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
-        // A provider update can remove an option or choice. Keep the saved override in the
-        // store and report the effective value for correction, without blocking the prompt.
-        const available =
-          option?.type === "boolean"
-            ? typeof value === "boolean"
-            : option?.type === "select" &&
-              typeof value === "string" &&
-              option.options.some((choice) => choice.value === value);
-        if (available && option?.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
-      }
+    const overrides = getRecord(params, "sessionSettings");
+    for (const [configId, value] of Object.entries(overrides ?? {})) {
+      if (typeof value !== "boolean" && typeof value !== "string")
+        return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
+      const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
+      // A provider update can remove an option or choice. Keep the saved override in the
+      // store and report the effective value for correction, without blocking the prompt.
+      const available =
+        option?.type === "boolean"
+          ? typeof value === "boolean"
+          : option?.type === "select" &&
+            typeof value === "string" &&
+            option.options.some((choice) => choice.value === value);
+      if (available && option?.currentValue !== value) yield* this.#configuration.set(thread, configId, value);
     }
     this.#publishSessionSettings(thread);
-    const activeTurn = thread.activeTurn;
-    const turnId = steer && activeTurn ? activeTurn.id : (getString(params, "clientUserMessageId") ?? randomUUID());
+    const turnId = getString(params, "clientUserMessageId") ?? randomUUID();
     const blocks = yield* promptBlocksEffect(params);
-    if (!steer && thread.developerInstructions) {
+    if (thread.developerInstructions) {
       blocks.unshift({
         type: "text",
         text: `<openbot-developer-instructions>\n${thread.developerInstructions}\n</openbot-developer-instructions>`,
       });
     }
     yield* providerSync(() => this.#requireServedModel(thread));
-    if (steer) {
-      // A steered message can want an answer, so an empty turn is again a failure to report.
-      if (activeTurn) activeTurn.answerOptional = false;
-      // ACP has no steer request, and an agent can refuse a second prompt while one runs. The turn
-      // then sends the refused prompt after the running one ends, so the message is not lost.
-      const connection = yield* providerSync(() => this.#requireConnection());
-      yield* Effect.forkIn(
-        providerCall(() => connection.prompt({ sessionId: thread.id, prompt: blocks })).pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => {
-              if (activeTurn && thread.activeTurn === activeTurn) {
-                activeTurn.deferredPrompts.push(blocks);
-                return;
-              }
-              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
-            }),
-          ),
-        ),
-        this.#scope,
-        { startImmediately: true },
-      );
-      return { turn: { id: turnId, status: "inProgress" }, turnId };
-    }
     const currentSecond = Date.now() / 1_000;
     const startedAt = Math.max(currentSecond, this.#lastTurnStartedAt + 0.001);
     this.#lastTurnStartedAt = startedAt;
@@ -1471,8 +1479,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolNames: new Map(),
       toolKinds: new Map(),
       toolItems: new Map(),
-      deferredPrompts: [],
       stopped: false,
+      completing: false,
       task: null,
     };
     thread.activeTurn = turn;
@@ -1503,39 +1511,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     prompt: ContentBlock[],
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
-      let response = providerResult(
+      const response = providerResult(
         yield* Effect.result(providerCall(() => this.#requireConnection().prompt({ sessionId: thread.id, prompt }))),
       );
-      for (;;) {
-        if (response.usage)
-          this.emit("notification", {
-            method: "openbot/usage",
-            params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
-          });
-        const deferred = response.stopReason === "end_turn" && !turn.stopped ? turn.deferredPrompts.shift() : undefined;
-        if (!deferred) break;
-        // The reply to the earlier prompt is complete; the refused steer gets its own reply.
-        this.#completeThought(thread, turn);
-        this.#completeMessage(thread, turn, "final_answer");
-        const answered = turn.receivedOutput;
-        turn.receivedOutput = false;
-        const next = yield* providerCall(() =>
-          this.#requireConnection().prompt({ sessionId: thread.id, prompt: deferred }),
-        ).pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => {
-              // The agent refused the steer again, so the earlier reply ends the turn.
-              this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(failure.cause)}`));
-              return null;
-            }),
-          ),
-        );
-        if (!next) {
-          turn.receivedOutput = answered;
-          break;
-        }
-        response = next;
-      }
+      if (thread.activeTurn !== turn || turn.completing) return;
+      if (response.usage)
+        this.emit("notification", {
+          method: "openbot/usage",
+          params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
+        });
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
       // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
       // to answer ends empty on purpose, and an error there costs no answer the user waits for.
@@ -1554,14 +1538,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       const status =
-        response.stopReason === "cancelled"
+        turn.stopped || response.stopReason === "cancelled"
           ? "interrupted"
           : response.stopReason === "end_turn"
             ? "completed"
             : "failed";
       yield* this.#completeTurn(thread, turn, status, status === "failed" ? response.stopReason : null);
     } catch (error) {
-      yield* this.#completeTurn(thread, turn, "failed", error);
+      yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : error);
     }
   });
 
@@ -1580,7 +1564,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const turn = thread.activeTurn;
-    if (!turn) return;
+    if (!turn || turn.completing) return;
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       // A harness reports a dropped stream as answer text, and then sends the retried answer (#1471).
       // The report gets its own muted item, so it is not joined to the answer around it. When no
@@ -1598,6 +1582,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (update.content.text.trim()) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
+      }
+      // Antigravity keeps session/prompt open while background tasks run. Its text must not
+      // wait for that response. A later tool/thought boundary can still classify it as commentary.
+      if (this.provider === "antigravity" && update.content.text) {
+        if (!turn.text)
+          this.emit("notification", {
+            method: "item/started",
+            params: {
+              threadId: thread.id,
+              turnId: turn.id,
+              item: { id: turn.itemId, type: "agentMessage", phase: "final_answer" },
+            },
+          });
+        this.emit("notification", {
+          method: "item/agentMessage/delta",
+          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: update.content.text },
+        });
       }
       turn.text += update.content.text;
       return;
@@ -1653,8 +1654,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  // ACP cannot identify final text while streaming. Buffer unclassified text privately,
-  // publishing commentary at a later step boundary or an answer when the prompt finishes.
+  // ACP cannot identify final text while streaming. A later step boundary assigns its phase.
+  // Antigravity also publishes provisional answer text because its prompt can wait on background work.
   #completeMessage(thread: AcpThread, turn: AcpTurn, phase: "commentary" | "final_answer"): void {
     if (phase === "final_answer") {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
@@ -1712,14 +1713,26 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     status: string,
     error: unknown,
   ) {
-    if (thread.activeTurn !== turn) return;
+    if (thread.activeTurn !== turn || turn.completing) return;
+    turn.completing = true;
     // A prompt can have run tools. Never replay it. Drop the handle before publishing completion
     // so only new input can reload the session, including input already waiting in the queue.
     if (status === "failed" && isSessionNotFound(error, thread.id, this.provider)) {
       this.#forgetMissingSession(thread.id);
     }
     this.#completeThought(thread, turn);
-    for (const item of turn.toolItems.values()) turn.messages.push(item);
+    for (const item of turn.toolItems.values()) {
+      // A stopped stream cannot provide another tool result. Preserve its last output without
+      // reporting successful execution. A normal completion can leave background tasks active.
+      const interrupted = this.provider === "antigravity" && status !== "completed";
+      const settled = interrupted ? { ...item, status: status === "failed" ? "failed" : "interrupted" } : item;
+      turn.messages.push(settled);
+      if (interrupted)
+        this.emit("notification", {
+          method: "item/completed",
+          params: { threadId: thread.id, turnId: turn.id, item: settled },
+        });
+    }
     turn.toolItems.clear();
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
@@ -1771,7 +1784,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
-  });
+  }, Effect.uninterruptible);
 
   /**
    * OpenCode retries a rate limit or a provider failure by itself. When it stops, it fails the prompt
@@ -2019,15 +2032,21 @@ function isSessionNotFound(error: unknown, sessionId: string, provider: AgentPro
 }
 
 /**
- * The text of a failed turn. When a handler in an ACP agent throws, the SDK answers `Internal error`
- * and puts the thrown message in `data.details`, which `String(error)` leaves out (#1193).
+ * The agent's explanation of a protocol error, which `String(error)` leaves out. When a handler in
+ * an ACP agent throws, the SDK puts the thrown message in `data.details` (#1193). Grok sends a string
+ * `data`, such as "session/resume does not support additionalDirectories" (#1729), or `data.detail`.
  */
+function failureDetail(error: RequestError): string | null {
+  const data = error.data;
+  const detail = typeof data === "string" ? data : isRecord(data) ? (data.details ?? data.detail) : undefined;
+  return typeof detail === "string" && detail ? detail : null;
+}
+
+/** The text of a failed request, with the agent's explanation. */
 function failureText(error: unknown): string {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return String(error);
-  const details = error.data.details;
-  return typeof details === "string" && details && !error.message.includes(details)
-    ? `${String(error)}: ${details}`
-    : String(error);
+  if (!(error instanceof RequestError)) return String(error);
+  const detail = failureDetail(error);
+  return detail && !error.message.includes(detail) ? `${String(error)}: ${detail}` : String(error);
 }
 
 /**

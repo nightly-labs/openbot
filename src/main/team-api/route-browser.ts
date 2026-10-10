@@ -5,7 +5,7 @@
 // all is the browser host's decision, made the same way for a local caller.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { isBoolean } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -24,14 +24,28 @@ export async function routeBrowser(
   { browser, browserView }: BrowserRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, member, sessionId, json, empty } = context;
+  // A private tab holds an administrator's MCP sign-in (`mcp-sign-in-v1`). A member could watch the
+  // password, or finish the sign-in with their own account, so to a member that tab does not exist.
+  const hidden = (tabId: string) => member.role === "member" && browser.isPrivate(tabId);
+  const tabId = (body: DynamicRecord) => {
+    const id = stringField(body, "tabId");
+    if (hidden(id)) throw new HttpError(404, sourceText("error.backend.browserTabNotFound"));
+    return id;
+  };
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.tabs) {
-    return json(200, browser.listTabs());
+    return json(
+      200,
+      browser.listTabs().filter((tab) => !hidden(tab.id)),
+    );
   }
   // Behind `browser-navigation`. A client without it reads the tab list and has to guess which tab
   // is active until the first `browser-changed` event arrives.
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.display) {
-    return json(200, browser.getDisplayState());
+    const display = browser.getDisplayState();
+    const tabs = display.tabs.filter((tab) => !hidden(tab.id));
+    const activeTabId = tabs.some((tab) => tab.id === display.activeTabId) ? display.activeTabId : null;
+    return json(200, { tabs, activeTabId });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.control) {
     return json(200, browser.getControlState());
@@ -54,7 +68,7 @@ export async function routeBrowser(
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.activate) {
     const body = await readJson(request);
-    await runCauseEffect(browser.activate(stringField(body, "tabId")));
+    await runCauseEffect(browser.activate(tabId(body)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.navigate) {
@@ -63,31 +77,29 @@ export async function routeBrowser(
     if (direction !== "back" && direction !== "forward") {
       throw new HttpError(400, "Invalid browser navigation direction.");
     }
-    await runCauseEffect(browser.navigate(stringField(body, "tabId"), direction));
+    await runCauseEffect(browser.navigate(tabId(body), direction));
     return empty(204);
   }
   // Behind `browser-navigation`: the released navigate route carries a direction only, so a client
   // without it opens a new tab for an address instead of moving the one the user is looking at.
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.load) {
     const body = await readJson(request);
-    await runCauseEffect(
-      browser.loadUrl(stringField(body, "tabId"), stringField(body, "url", false, INPUT_LIMITS.browserUrl)),
-    );
+    await runCauseEffect(browser.loadUrl(tabId(body), stringField(body, "url", false, INPUT_LIMITS.browserUrl)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.reload) {
     const body = await readJson(request);
-    await runCauseEffect(browser.reload(stringField(body, "tabId")));
+    await runCauseEffect(browser.reload(tabId(body)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.close) {
     const body = await readJson(request);
-    await runCauseEffect(browser.close(stringField(body, "tabId")));
+    await runCauseEffect(browser.close(tabId(body)));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.preview) {
     const body = await readJson(request);
-    return json(200, await runCauseEffect(browser.capturePreview(stringField(body, "tabId"))));
+    return json(200, await runCauseEffect(browser.capturePreview(tabId(body))));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.visible) {
     const body = await readJson(request);
@@ -112,7 +124,7 @@ export async function routeBrowser(
       browserView.createSession({
         memberId: member.id,
         teamSessionId: sessionId,
-        tabId: stringField(body, "tabId"),
+        tabId: tabId(body),
       }),
     );
   }

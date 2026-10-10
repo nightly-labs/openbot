@@ -7,6 +7,7 @@ import { useSetupProviderProps } from "./features/onboarding/setup-provider-prop
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
 import { StartupSplash } from "./features/startup/StartupSplash";
+import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
 import { AccountLogin, FirstRunFlow, InitialSetup } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { WorkspaceShell } from "./WorkspaceShell";
@@ -113,6 +114,13 @@ export function AppAccessGate() {
           )}
         </Show>
       </Show>
+      <WhatsNewOverlay
+        ready={
+          !splashShown() &&
+          !!auth.visibleSignedInAccount() &&
+          (setup.setupState()?.completed === true || !scope.connection.hasContent)
+        }
+      />
       <Show when={splashShown()}>
         {/* Before `appInfo` loads, the build's own mode picks the logo colour. */}
         <StartupSplash

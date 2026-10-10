@@ -237,6 +237,32 @@ export function decodeMcpSignInStates(value: unknown): McpSignInState[] {
   return value;
 }
 
+/**
+ * A sign-in that a joined server runs in its own browser (`mcp-sign-in-v1`): the host tab with the
+ * page while it is open, and how it ended, in the shape of a test. Both are `null` while the host
+ * looks for the page.
+ */
+export interface McpSignInStatus {
+  tabId: string | null;
+  result: McpTestResult | null;
+}
+
+export function decodeMcpSignInStatus(value: unknown): McpSignInStatus {
+  if (
+    !isDynamicRecord(value) ||
+    (value.tabId !== null && !isBounded(value.tabId, INPUT_LIMITS.identifier)) ||
+    (value.result !== null && !isMcpTestResult(value.result))
+  )
+    throw new Error("Invalid MCP server response.");
+  return { tabId: value.tabId, result: value.result };
+}
+
+/** The host tab that shows a remote sign-in page, or `null` while there is none. */
+export function decodeMcpSignInPage(value: unknown): string | null {
+  if (value !== null && !isBounded(value, INPUT_LIMITS.identifier)) throw new Error("Invalid MCP server response.");
+  return value;
+}
+
 function isMcpSignInState(value: unknown): value is McpSignInState {
   return isDynamicRecord(value) && isBounded(value.mcpServerId, INPUT_LIMITS.identifier) && isBoolean(value.signedIn);
 }

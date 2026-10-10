@@ -4,6 +4,7 @@ import type { messages as source } from "../en/preview";
 export const messages = {
   "preview.panel.label": "Prévia do arquivo",
   "preview.panel.resize": "Redimensionar prévia do arquivo",
+  "preview.panel.copy": "Copiar texto do arquivo",
   "preview.panel.openExternally": "Abrir arquivo externamente",
   "preview.panel.download": "Baixar arquivo",
   "preview.panel.reveal": "Mostrar arquivo no Finder",
@@ -11,6 +12,7 @@ export const messages = {
   "preview.panel.back": "Voltar",
   "preview.panel.rawMarkdown": "Mostrar código Markdown",
   "preview.panel.rawHtml": "Mostrar código HTML",
+  "preview.panel.wrapLines": "Quebrar linhas longas",
   "preview.folder.empty": "Esta pasta está vazia.",
   "preview.folder.truncated": "Somente os primeiros {limit} itens são mostrados.",
   "preview.truncated": "Prévia truncada após {limit} caracteres.",

@@ -109,4 +109,5 @@ export { default as UserRound } from "lucide-solid/icons/user-round";
 export { default as UsersRound } from "lucide-solid/icons/users-round";
 export { default as Webhook } from "lucide-solid/icons/webhook";
 export { default as Workflow } from "lucide-solid/icons/workflow";
+export { default as WrapText } from "lucide-solid/icons/wrap-text";
 export { default as X } from "lucide-solid/icons/x";

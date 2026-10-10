@@ -56,7 +56,7 @@ export function SidebarMoveToSubmenu(menuProps: { chatId: string }) {
               <span>{t("sidebar.section.unassigned")}</span>
             </ContextMenu.Item>
             <ContextMenu.Separator />
-            <ContextMenu.Item onSelect={() => startCreateSection(menuProps.chatId)}>
+            <ContextMenu.Item onSelectAfterClose={() => startCreateSection(menuProps.chatId)}>
               <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
               <span>{t("sidebar.new.section")}</span>
             </ContextMenu.Item>

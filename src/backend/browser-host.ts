@@ -335,7 +335,9 @@ export class BrowserHost {
         maxAggregateBytes: options.recordingMaxAggregateBytes,
       },
     );
-    this.#configureSession();
+    // Service workers read the process fallback instead of the session, so it changes too.
+    app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
+    this.#configureSession(this.#session);
     this.#idleTabSweep = setInterval(() => {
       void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
         logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
@@ -499,6 +501,20 @@ export class BrowserHost {
     this.#controls.clear();
   }
 
+  /** Whether `openPrivate` opened this tab, or a popup of one: it holds a sign-in that is not for every member. */
+  isPrivate(tabId: string): boolean {
+    return Boolean(this.#tabs.get(tabId)?.privateSession);
+  }
+
+  /** The newest open tab of the private session that `openPrivate` opened as `tabId`: a sign-in popup while it is open. */
+  privateTab(tabId: string): string | null {
+    const privateSession = this.#tabs.get(tabId)?.privateSession;
+    if (!privateSession) return null;
+    return (
+      [...this.#tabs.values()].findLast((tab) => tab.privateSession === privateSession && !tab.closing)?.id ?? null
+    );
+  }
+
   listTabs(): BrowserTab[] {
     return [...this.#tabs.values()]
       .filter((tab) => !tab.closing && !tab.contents.isDestroyed())
@@ -542,6 +558,31 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
+    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus);
+  }).bind(this);
+
+  /**
+   * Opens a sign-in page that a member watches in a live view, in a session of its own. The page
+   * gets no cookie of the shared browser and leaves none there, the tab is not saved, and no agent
+   * owns it, so no agent tool can reach it.
+   */
+  readonly openPrivate = Effect.fn("BrowserHost.openPrivate")(function* (
+    this: BrowserHost,
+    url: string,
+  ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
+    const privateSession = session.fromPartition(`openbot-private-${randomUUID()}`, { cache: false });
+    this.#configureSession(privateSession);
+    return yield* this.#open(url, null, null, false, privateSession);
+  }).bind(this);
+
+  readonly #open = Effect.fn("BrowserHost.openTab")(function* (
+    this: BrowserHost,
+    url: string,
+    ownerThreadId: string | null,
+    ownerAgentId: string | null,
+    focus: boolean,
+    privateSession?: Session,
+  ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       return yield* browserFailure(
         new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs })),
@@ -551,7 +592,15 @@ export class BrowserHost {
     if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
-    const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerAgentId);
+    const tab = this.#createTab(
+      randomUUID(),
+      normalizedUrl,
+      ownerThreadId,
+      ownerAgentId,
+      defaultBrowserEnvironment(),
+      undefined,
+      privateSession,
+    );
 
     this.#tabs.set(tab.id, tab);
     this.#bindTabEvents(tab);
@@ -672,8 +721,10 @@ export class BrowserHost {
     const closedIndex = tabIds.indexOf(tabId);
     this.#unmountView(tab.view);
     this.#tabs.delete(tabId);
+    // A popup that a private page opened without an opener is not its child, but it holds the same sign-in.
+    const signInSession = tab.popup ? undefined : tab.privateSession;
     const childDrains = [...this.#tabs.values()]
-      .filter((child) => child.openerTabId === tabId)
+      .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
 
@@ -705,6 +756,9 @@ export class BrowserHost {
         yield* browserSync(() => {
           if (!tab.contents.isDestroyed()) tab.contents.close();
         });
+        const privateSession = tab.privateSession;
+        if (privateSession && ![...this.#tabs.values()].some((other) => other.privateSession === privateSession))
+          yield* browserCall(() => privateSession.clearStorageData()).pipe(Effect.ignore);
         if (Exit.isFailure(discarded)) return yield* Effect.failCause(discarded.cause);
       }),
       this.#scope,
@@ -1673,9 +1727,10 @@ export class BrowserHost {
     ownerAgentId: string | null,
     environment: BrowserEnvironment = defaultBrowserEnvironment(),
     popupOptions?: BrowserWindowConstructorOptions,
+    privateSession?: Session,
   ): BrowserHostTab {
     if (this.#destroying) throw new Error("BrowserHost is shutting down.");
-    const view = this.#createView(popupOptions);
+    const view = this.#createView(popupOptions, privateSession ?? this.#session);
     this.#mountView(view);
     const diagnostics = new BrowserDiagnostics();
     const queue = Deferred.makeUnsafe<void>();
@@ -1685,6 +1740,7 @@ export class BrowserHost {
       view,
       contents: view.webContents,
       popup: popupOptions !== undefined,
+      ...(privateSession ? { privateSession } : {}),
       requestedUrl,
       ownerThreadId,
       ownerAgentId,
@@ -1705,13 +1761,13 @@ export class BrowserHost {
     };
   }
 
-  #createView(popupOptions?: BrowserWindowConstructorOptions): WebContentsView {
+  #createView(popupOptions: BrowserWindowConstructorOptions | undefined, tabSession: Session): WebContentsView {
     const view = new WebContentsView({
       ...(popupOptions?.webContents ? { webContents: popupOptions.webContents } : {}),
       webPreferences: {
         ...popupOptions?.webPreferences,
 
-        session: this.#session,
+        session: tabSession,
         ...BROWSER_WEB_PREFERENCES,
       },
     });
@@ -1720,18 +1776,18 @@ export class BrowserHost {
     return view;
   }
 
-  #configureSession(): void {
+  #configureSession(target: Session): void {
     // Use the installed Chromium identity for pages, frames and workers.
     // The request policy keeps the Google account compatibility exception.
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
-    this.#session.setUserAgent(sessionBrowserUserAgent(this.#session.getUserAgent()), preferredBrowserLanguageCodes());
-    this.#session.webRequest.onBeforeSendHeaders((details, callback) => {
+    target.setUserAgent(sessionBrowserUserAgent(target.getUserAgent()), preferredBrowserLanguageCodes());
+    target.webRequest.onBeforeSendHeaders((details, callback) => {
       callback({
         requestHeaders: browserRequestHeaders(details.url, details.requestHeaders),
       });
     });
-    this.#session.webRequest.onCompleted((details) => {
+    target.webRequest.onCompleted((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       if (!tab || tab.secret) return;
       tab.diagnostics.add({
@@ -1744,7 +1800,7 @@ export class BrowserHost {
       });
       if (details.statusCode >= 400) this.#emitChanged();
     });
-    this.#session.webRequest.onErrorOccurred((details) => {
+    target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       if (!tab || tab.secret) return;
       tab.diagnostics.add({
@@ -1756,11 +1812,11 @@ export class BrowserHost {
       });
       this.#emitChanged();
     });
-    this.#session.setPermissionRequestHandler((_webContents, permission, callback) =>
+    target.setPermissionRequestHandler((_webContents, permission, callback) =>
       callback(isAllowedBrowserPermission(permission)),
     );
-    this.#session.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
-    this.#session.on("will-download", (event, item, contents) => {
+    target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
+    target.on("will-download", (event, item, contents) => {
       if ([...this.#tabs.values()].some((tab) => tab.secret && tab.contents === contents)) {
         event.preventDefault();
         return;
@@ -1990,7 +2046,7 @@ export class BrowserHost {
         // The host owns cleanup. Electron otherwise destroys children on opener reload too.
         outlivesOpener: true,
         overrideBrowserWindowOptions: {
-          webPreferences: { ...BROWSER_WEB_PREFERENCES, session: this.#session },
+          webPreferences: { ...BROWSER_WEB_PREFERENCES, session: tab.privateSession ?? this.#session },
         },
         createWindow: (options) => {
           if (popup) return popup.contents;
@@ -2001,6 +2057,7 @@ export class BrowserHost {
             tab.ownerAgentId,
             structuredClone(tab.environment),
             options,
+            tab.privateSession,
           );
           // Chromium exposes no opener for noopener/noreferrer requests.
           if (options.webContents?.opener) {
@@ -2361,18 +2418,19 @@ export class BrowserHost {
   }
 
   readonly #persistState = Effect.fn("BrowserHost.persistState")(function* (this: BrowserHost) {
+    const saved = [...this.#tabs.values()].filter(
+      (tab) => !tab.closing && !tab.contents.isDestroyed() && !tab.privateSession,
+    );
     const state: StoredBrowserStateV2 = {
       version: 2,
-      activeTabId: this.#activeTabId,
-      tabs: [...this.#tabs.values()]
-        .filter((tab) => !tab.closing && !tab.contents.isDestroyed())
-        .map((tab) => ({
-          id: tab.id,
-          url: tab.secret?.origin ?? persistentBrowserUrl(currentTabUrl(tab), { popup: tab.popup }),
-          ownerThreadId: tab.ownerThreadId,
-          ownerAgentId: tab.ownerAgentId,
-          environment: tab.environment,
-        })),
+      activeTabId: saved.some((tab) => tab.id === this.#activeTabId) ? this.#activeTabId : (saved[0]?.id ?? null),
+      tabs: saved.map((tab) => ({
+        id: tab.id,
+        url: tab.secret?.origin ?? persistentBrowserUrl(currentTabUrl(tab), { popup: tab.popup }),
+        ownerThreadId: tab.ownerThreadId,
+        ownerAgentId: tab.ownerAgentId,
+        environment: tab.environment,
+      })),
     };
     yield* this.#persistLock.withPermit(
       writeJsonFileAtomically(this.#statePath, state).pipe(Effect.mapError((error) => browserFailure(error.cause))),

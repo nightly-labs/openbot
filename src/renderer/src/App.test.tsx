@@ -32,6 +32,7 @@ import { useServers } from "./features/servers/servers-context";
 import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "./features/sidebar/sidebar-sections-storage";
 import { useLayout } from "./layout";
+import { SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { useProviders } from "./providers";
 
@@ -499,6 +500,8 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("loads shared sidebar sections and connects section actions to the desktop API", async () => {
+    // This narrow selection can finish before the shell's background settings preload.
+    await SettingsModal.preload();
     const sectionId = "11111111-1111-4111-8111-111111111111";
     const layout = {
       revision: 3,

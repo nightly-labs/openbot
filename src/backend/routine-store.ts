@@ -16,6 +16,7 @@ import {
   normalizeRoutineSchedule,
   RoutineInputError,
   validateRoutineSchedule,
+  validateStoredRoutineSchedule,
 } from "@openbot/team-client/routine-schedule";
 import {
   databaseRows,
@@ -216,7 +217,7 @@ export class RoutineStore {
   }
 
   protected createRoutine(ownerId: string, input: RoutineInputFields, now = new Date()): OwnedRoutine {
-    this.#validateInput(input.name, input.instruction, input.timezone, input.schedule);
+    this.#validateInput(input.name, input.instruction, input.timezone, input.schedule, null);
     this.#assertBelowLimit(ownerId);
     const routineId = randomUUID();
     const createdAt = now.toISOString();
@@ -263,7 +264,7 @@ export class RoutineStore {
     const name = input.name ?? current.name;
     const instruction = input.instruction ?? current.instruction;
     const schedule = normalizeRoutineSchedule(input.schedule ?? current.trigger.schedule, now);
-    this.#validateInput(name, instruction, current.timezone, schedule);
+    this.#validateInput(name, instruction, current.timezone, schedule, current.trigger.schedule);
     const active = input.active ?? current.active;
     const limitPolicy = input.limitPolicy ?? current.limitPolicy ?? "wait";
     const reactivating = !current.active && active;
@@ -334,7 +335,8 @@ export class RoutineStore {
     let schedule: RoutineSchedule | null = null;
     if (trigger.kind === "schedule") {
       schedule = normalizeRoutineSchedule(trigger.schedule, now);
-      validateRoutineSchedule(schedule, input.timezone);
+      const stored = current?.trigger.kind === "schedule" ? current.trigger.schedule : null;
+      this.#validateSchedule(schedule, input.timezone, stored);
     } else {
       validateWebhookTrigger(trigger.eventType, trigger.filters);
     }
@@ -944,9 +946,22 @@ export class RoutineStore {
     );
   }
 
-  #validateInput(name: string, instruction: string, timezone: string, schedule: RoutineSchedule): void {
+  #validateInput(
+    name: string,
+    instruction: string,
+    timezone: string,
+    schedule: RoutineSchedule,
+    stored: RoutineSchedule | null,
+  ): void {
     this.#validateFields(name, instruction);
-    validateRoutineSchedule(schedule, timezone);
+    this.#validateSchedule(schedule, timezone, stored);
+  }
+
+  /** A new or changed schedule gets the full check; an unchanged one stays editable, as an older version stored it. */
+  #validateSchedule(schedule: RoutineSchedule, timezone: string, stored: RoutineSchedule | null): void {
+    if (stored && JSON.stringify(stored) === JSON.stringify(schedule))
+      validateStoredRoutineSchedule(schedule, timezone);
+    else validateRoutineSchedule(schedule, timezone);
   }
 
   #validateFields(name: string, instruction: string): void {

@@ -15,6 +15,7 @@ import {
   callOpenBotTool,
   createTestService,
   expectOpenBotToolError,
+  expectOpenBotToolFailure,
   FakeAgentClient,
   firstInputText,
   inputRecords,
@@ -622,7 +623,7 @@ describe.sequential("AgentService: routines", () => {
 
     const outsidePath = join(root, "outside.png");
     await writeFile(outsidePath, screenshot);
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "attach_files_to_response",
@@ -632,7 +633,7 @@ describe.sequential("AgentService: routines", () => {
     );
     const linkedPath = join(store.sharedRoot, "linked-outside.png");
     await symlink(outsidePath, linkedPath);
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "attach_files_to_response",
@@ -640,7 +641,7 @@ describe.sequential("AgentService: routines", () => {
       "inside this agent's workspace or the OpenBot shared directory",
       turnId,
     );
-    await expectOpenBotToolError(
+    await expectOpenBotToolFailure(
       client,
       threadId,
       "attach_files_to_response",
@@ -883,7 +884,7 @@ describe.sequential("AgentService: routines", () => {
       turnId,
       callId,
     );
-    expect(failed.error?.message).toContain("conversation write failed");
+    expect(openBotToolPayload(failed.result).error).toContain("conversation write failed");
     expect((await runCauseEffect(service.readConversation("chief"))).messages).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ itemType: "agent_attachment", turnId })]),
     );

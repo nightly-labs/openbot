@@ -225,6 +225,12 @@ function handle(message) {
     return;
   }
   if (message.method === "session/resume") {
+    // Grok's answer: it does not advertise additionalDirectories and refuses them on resume.
+    if (message.params.additionalDirectories?.length) {
+      write({ jsonrpc: "2.0", id: message.id, error: { code: -32602, message: "Invalid params",
+        data: "session/resume does not support additionalDirectories" } });
+      return;
+    }
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -246,6 +252,7 @@ function handle(message) {
     }
   }
   if (message.method === "session/prompt") {
+    if (process.env.OPENBOT_FAKE_ACP_HOLD_PROMPT === "1") return;
     if (process.env.OPENBOT_FAKE_ACP_PROMPT_TOOL) {
       write({
         jsonrpc: "2.0",
@@ -665,6 +672,60 @@ describe("OpenCode ACP environment", () => {
     const reported = error.withDetail((text) => text).message;
     expect(reported).toMatch(/^OpenCode stopped before it answered \(exit code 3\)\. Error: config key /u);
     expect(reported).not.toContain("sk-live-secret");
+  });
+
+  it("rejects direct ACP steering without dispatching a second prompt or ending the active turn", async () => {
+    const fake = await createFakeOpencodeAgent("system");
+    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_LOG", fake.promptLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_HOLD_PROMPT", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const completed = vi.fn();
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed();
+    });
+    const { thread } = await runCauseEffect(
+      client.request("thread/start", { cwd: fake.directory }, decodeThreadResponse),
+    );
+    await runCauseEffect(
+      client.request(
+        "turn/start",
+        {
+          threadId: thread.id,
+          clientUserMessageId: "original",
+          input: [{ type: "inputText", text: "Hold" }],
+        },
+        decodeRecordResponse,
+      ),
+    );
+    await vi.waitFor(async () => expect(await fake.readPrompts()).toHaveLength(1));
+    await expect(
+      runCauseEffect(
+        client.request(
+          "turn/steer",
+          {
+            threadId: thread.id,
+            expectedTurnId: "original",
+            clientUserMessageId: "queued",
+            input: [{ type: "inputText", text: "Follow up" }],
+          },
+          decodeRecordResponse,
+        ),
+      ),
+    ).rejects.toThrow(sourceText("error.backend.steerUnsupported"));
+    expect(await fake.readPrompts()).toHaveLength(1);
+    expect(completed).not.toHaveBeenCalled();
+    await expect(
+      runCauseEffect(
+        client.request(
+          "turn/start",
+          {
+            threadId: thread.id,
+            input: [{ type: "inputText", text: "Another" }],
+          },
+          decodeRecordResponse,
+        ),
+      ),
+    ).rejects.toThrow("The ACP thread already has an active turn.");
   });
 
   it("refuses the prompt when the endpoint was removed while the turn was prepared", async () => {
@@ -1205,7 +1266,11 @@ describe("OpenCode ACP session loading", () => {
 
     await expect(
       runCauseEffect(
-        client.request("thread/resume", { threadId: "ses_resume_only", cwd: fake.directory }, decodeRecordResponse),
+        client.request(
+          "thread/resume",
+          { threadId: "ses_resume_only", cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+          decodeRecordResponse,
+        ),
       ),
     ).resolves.toEqual(expect.any(Object));
     expect(client.canReleaseProcess?.()).toBe(true);

@@ -7,6 +7,7 @@ import type {
   AgentAnalyticsInput,
   AgentEvent,
   AgentMemory,
+  AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
   AgentRuntimeSnapshot,
@@ -65,6 +66,7 @@ import type {
   SaveAgentProfileResult,
   SaveMcpServerInput,
   SendMessageInput,
+  SetAgentMemoryInclusionInput,
   SetAgentSessionSettingInput,
   SetMcpServerEnabledInput,
   SetMessageReactionInput,
@@ -164,6 +166,7 @@ import type { ProviderSession } from "./database/provider-sessions";
 import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
+import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
 import { MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
 import type { PasswordVault } from "./password-vault";
@@ -1173,6 +1176,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#memories.list(agentId);
   }
 
+  getMemorySelection(agentId: string): AgentMemorySelectionState {
+    return this.#memories.selectionState(agentId);
+  }
+
+  setMemoryInclusion(input: SetAgentMemoryInclusionInput): AgentMemorySelectionState {
+    return this.#memories.setInclusions(input);
+  }
+
+  initializeMemorySelection(agentId: string): void {
+    this.#memories.initializeSelection(agentId);
+  }
+
   /** How many memories one agent can hold now. */
   memoryLimit(): number {
     return this.#memories.limit();
@@ -1437,9 +1452,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  signInMcpServer(input: TestMcpServerInput): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
+  signInMcpServer(
+    input: TestMcpServerInput,
+    open?: McpSignInOpener,
+  ): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
     return this.#mcp
-      .signIn(input)
+      .signIn(input, open)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
       );
@@ -2793,8 +2811,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ) || delivery.delivery.attachments.map((item) => item.name).join(", "),
       )
       .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "update message preview", cause: failure.cause }),
+        // The message is already queued: a failed preview write must not leave it without a drain,
+        // and a retry with the same id returns the stored receipt without one.
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#emitError("message_preview_failed", failure.cause, agent.id)),
         ),
       );
     // A turn the user stopped is ending, and a message steered into it would end with it.
@@ -2928,6 +2948,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];
     if (mayStop && (!snapshot || !mayStop())) return false;
+    // A Stop for a turn that already ended must not reach the next turn: ACP and Claude stop the
+    // running turn, whatever `turnId` says. A channel thread is not in these snapshots.
+    if (!executionThreadId && !snapshot) return false;
     const targetThreadId = executionThreadId ?? snapshot?.threadId;
     const session = targetThreadId
       ? this.#store.database.activeProviderSession(targetThreadId, agent.provider)

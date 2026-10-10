@@ -938,6 +938,7 @@ export class ProviderRuntime implements ProviderPort {
               env: { ...signIn.env },
               methodId: signIn.methodId,
               timeoutMs: signIn.timeoutMs,
+              ...(provider === "antigravity" && process.platform === "linux" ? { openGoogleSignIn: openExternal } : {}),
             }),
           )
           .pipe(toProviderOperationFailed);

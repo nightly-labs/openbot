@@ -30,6 +30,372 @@ afterEach(async () => {
 });
 
 describe.sequential("AgentMemories: staging, epochs and turn commitment", () => {
+  it.each([
+    "completed",
+    "essential-merge",
+    "failed",
+    "interrupted",
+    "target-edited",
+    "target-deleted",
+    "target-pinned",
+    "source-edited",
+    "source-pinned",
+  ])("commits a merge only while both entries are current and applies the survivor selection: %s", async (outcome) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const target = active.createMemory({ agentId: "chief", text: `Target ${"界".repeat(470)}` });
+    for (let index = 1; index < 5; index++)
+      active.createMemory({ agentId: "chief", text: `Kept ${index} ${"界".repeat(470)}` });
+    active.initializeMemorySelection("chief");
+    const source = active.createMemory({ agentId: "chief", text: "Merge this redundant note." });
+    if (outcome === "essential-merge") active.initializeMemorySelection("chief");
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Merge the two saved facts." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The memory merge turn did not start.");
+    const merged = await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      {
+        memoryId: source.id,
+        text: target.text,
+        inclusion: outcome === "essential-merge" ? "essential" : "searchable",
+      },
+      turnId,
+    );
+    expect(openBotToolPayload(merged.result)).toMatchObject({
+      status: "staged",
+      inclusion: outcome === "essential-merge" ? "essential" : "searchable",
+    });
+    const replacementText = `Replacement ${"界".repeat(470)}`;
+    if (outcome !== "essential-merge") {
+      const replacement = await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        { text: replacementText, inclusion: "essential" },
+        turnId,
+      );
+      expect(openBotToolPayload(replacement.result)).toMatchObject({ status: "staged", inclusion: "essential" });
+    }
+    if (outcome === "target-edited")
+      active.updateMemory({ agentId: "chief", memoryId: target.id, text: `${target.text} new` });
+    if (outcome === "target-deleted") active.deleteMemory({ agentId: "chief", memoryId: target.id });
+    if (outcome === "source-edited")
+      active.updateMemory({ agentId: "chief", memoryId: source.id, text: "Keep this corrected note." });
+    if (outcome === "target-pinned" || outcome === "source-pinned") {
+      const id = outcome === "target-pinned" ? target.id : source.id;
+      const selection = active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === id);
+      if (!selection) throw new Error("The merged selection is missing.");
+      active.setMemoryInclusion({
+        agentId: "chief",
+        changes: [{ memoryId: id, inclusion: "essential", expectedRevision: selection.revision }],
+      });
+    }
+    const beforeCommit = active.listMemories("chief");
+    const status = outcome === "failed" || outcome === "interrupted" ? outcome : "completed";
+    client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    const memories = active.listMemories("chief");
+    const mergedSuccessfully = outcome === "completed" || outcome === "essential-merge";
+    expect(memories.filter((entry) => entry.text !== replacementText)).toEqual(
+      beforeCommit.filter((entry) => !mergedSuccessfully || entry.id !== source.id),
+    );
+    const selections = active.getMemorySelection("chief");
+    if (outcome !== "target-deleted")
+      expect(selections.selections.find((entry) => entry.memoryId === target.id)?.inclusion).toBe(
+        outcome === "completed" ? "searchable" : "essential",
+      );
+    if (status === "completed" && outcome !== "essential-merge") {
+      const replacement = memories.find((entry) => entry.text === replacementText);
+      expect(replacement).toBeDefined();
+      expect(selections.selections.find((entry) => entry.memoryId === replacement?.id)?.inclusion).toBe(
+        outcome === "completed" || outcome === "target-deleted" ? "essential" : "searchable",
+      );
+    }
+    expect(selections.usedBytes).toBeLessThanOrEqual(selections.budgetBytes);
+  });
+
+  it.each(["saved", "pinned", "new"])(
+    "resolves duplicate text against this turn's planned writes: %s",
+    async (kind) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      service = active;
+      const events: AgentEvent[] = [];
+      active.on("event", (event) => events.push(event));
+      await runCauseEffect(active.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      const original = kind === "new" ? null : active.createMemory({ agentId: "chief", text: "Original fact." });
+      if (kind === "pinned" && original)
+        active.setMemoryInclusion({
+          agentId: "chief",
+          changes: [{ memoryId: original.id, inclusion: "essential", expectedRevision: 0 }],
+        });
+      await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Keep both facts." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The planned duplicate turn did not start.");
+      await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        original
+          ? { memoryId: original.id, text: "Corrected fact." }
+          : { text: "Original fact.", inclusion: "essential" },
+        turnId,
+      );
+      await callOpenBotTool(client, threadId, "remember", { text: "Original fact.", inclusion: "searchable" }, turnId);
+      client.emit(
+        "notification",
+        notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+      );
+      await waitFor(() => events.some((event) => event.type === "turn-completed"));
+      const memories = active.listMemories("chief");
+      expect(memories.map((entry) => entry.text).sort()).toEqual(
+        kind === "new" ? ["Original fact."] : ["Corrected fact.", "Original fact."],
+      );
+      const remembered = memories.find((entry) => entry.text === "Original fact.");
+      expect(
+        active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === remembered?.id)?.inclusion,
+      ).toBe("searchable");
+    },
+  );
+
+  it.each(["edit", "delete"])("does not recreate a user-controlled duplicate after a concurrent %s", async (action) => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    const original = active.createMemory({ agentId: "chief", text: "The launch code is amber." });
+    active.setMemoryInclusion({
+      agentId: "chief",
+      changes: [{ memoryId: original.id, inclusion: "essential", expectedRevision: 0 }],
+    });
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Remember the launch code." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The user-controlled duplicate turn did not start.");
+    const duplicate = await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { text: original.text, inclusion: "essential" },
+      turnId,
+    );
+    expect(duplicate.result).toMatchObject({ success: true });
+    if (action === "edit")
+      active.updateMemory({ agentId: "chief", memoryId: original.id, text: "The launch code is violet." });
+    else active.deleteMemory({ agentId: "chief", memoryId: original.id });
+    const saved = active.listMemories("chief");
+    const selection = active.getMemorySelection("chief");
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(active.listMemories("chief")).toEqual(saved);
+    expect(active.getMemorySelection("chief")).toEqual(selection);
+  });
+
+  it.each(["completed", "failed", "interrupted", "edited", "pinned"])(
+    "applies duplicate selection without changing saved data or overriding newer choices: %s",
+    async (outcome) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      service = active;
+      const events: AgentEvent[] = [];
+      active.on("event", (event) => events.push(event));
+      await runCauseEffect(active.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      const original = active.createMemory({ agentId: "chief", text: `Fact 0 ${"界".repeat(470)}` });
+      for (let index = 1; index < 5; index++)
+        active.createMemory({ agentId: "chief", text: `Fact ${index} ${"界".repeat(470)}` });
+      active.initializeMemorySelection("chief");
+      expect(active.getMemorySelection("chief").selections.every((entry) => entry.inclusion === "essential")).toBe(
+        true,
+      );
+      await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Replace one essential fact." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The duplicate selection turn did not start.");
+      const duplicate = await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        { text: original.text, inclusion: "searchable" },
+        turnId,
+      );
+      expect(openBotToolPayload(duplicate.result)).toMatchObject({ status: "staged", inclusion: "searchable" });
+      const replacementText = `Replacement ${"界".repeat(470)}`;
+      const replacement = await callOpenBotTool(
+        client,
+        threadId,
+        "remember",
+        { text: replacementText, inclusion: "essential" },
+        turnId,
+      );
+      expect(openBotToolPayload(replacement.result)).toMatchObject({ status: "staged", inclusion: "essential" });
+      expect(active.listMemories("chief")).toHaveLength(5);
+      expect(active.getMemorySelection("chief").selections.every((entry) => entry.inclusion === "essential")).toBe(
+        true,
+      );
+      if (outcome === "edited")
+        active.updateMemory({ agentId: "chief", memoryId: original.id, text: `${original.text} new` });
+      if (outcome === "pinned") {
+        const selection = active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === original.id);
+        if (!selection) throw new Error("The duplicate selection is missing.");
+        active.setMemoryInclusion({
+          agentId: "chief",
+          changes: [{ memoryId: original.id, inclusion: "essential", expectedRevision: selection.revision }],
+        });
+      }
+      const beforeCommit = active.listMemories("chief");
+      const status = outcome === "failed" || outcome === "interrupted" ? outcome : "completed";
+      client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
+      await waitFor(() => events.some((event) => event.type === "turn-completed"));
+      const memories = active.listMemories("chief");
+      expect(memories.filter((entry) => entry.text !== replacementText)).toEqual(beforeCommit);
+      const selection = active.getMemorySelection("chief");
+      expect(selection.selections.find((entry) => entry.memoryId === original.id)).toMatchObject({
+        inclusion: outcome === "completed" ? "searchable" : "essential",
+        userControlled: outcome === "pinned",
+      });
+      if (status === "completed") {
+        const saved = memories.find((entry) => entry.text === replacementText);
+        expect(memories).toHaveLength(6);
+        expect(selection.selections.find((entry) => entry.memoryId === saved?.id)?.inclusion).toBe(
+          outcome === "completed" ? "essential" : "searchable",
+        );
+      } else expect(memories).toHaveLength(5);
+      expect(selection.usedBytes).toBeLessThanOrEqual(selection.budgetBytes);
+    },
+  );
+
+  it("recalls committed facts without exposing another agent or uncommitted changes", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex", "DONE", false);
+    const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    service = active;
+    const events: AgentEvent[] = [];
+    active.on("event", (event) => events.push(event));
+    await runCauseEffect(active.initialize());
+    await runCauseEffect(store.getOrCreate("chief"));
+    await runCauseEffect(store.getOrCreate("research"));
+    const own = active.createMemory({ agentId: "chief", text: "The telescope project uses amber labels." });
+    active.createMemory({ agentId: "research", text: "The telescope project uses private violet labels." });
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Find the telescope label color." }));
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!threadId || !turnId) throw new Error("The recall turn did not start.");
+    expect(JSON.stringify(client.requests.find((request) => request.method === "thread/start")?.params)).not.toContain(
+      own.text,
+    );
+    const recalled = await callOpenBotTool(client, threadId, "search_memories", { query: "telescope" }, turnId);
+    expect(openBotToolPayload(recalled.result).memories).toEqual([
+      expect.objectContaining({ id: own.id, text: own.text, inclusion: "searchable" }),
+    ]);
+    await callOpenBotTool(client, threadId, "remember", { text: "The lighthouse project uses green labels." }, turnId);
+    const pending = await callOpenBotTool(client, threadId, "search_memories", { query: "lighthouse" }, turnId);
+    expect(openBotToolPayload(pending.result).memories).toEqual([]);
+    const revision = active.getMemorySelection("chief").selections[0]?.revision;
+    if (revision === undefined) throw new Error("The selection is missing.");
+    await callOpenBotTool(
+      client,
+      threadId,
+      "set_memory_inclusion",
+      { changes: [{ memoryId: own.id, inclusion: "essential", expectedRevision: revision }] },
+      turnId,
+    );
+    const corrected = "The telescope project uses orange labels.";
+    await callOpenBotTool(client, threadId, "remember", { memoryId: own.id, text: corrected }, turnId);
+    expect(active.getMemorySelection("chief").selections[0]?.inclusion).toBe("searchable");
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
+    );
+    await waitFor(() => events.some((event) => event.type === "turn-completed"));
+    expect(active.getMemorySelection("chief").selections.find((entry) => entry.memoryId === own.id)?.inclusion).toBe(
+      "essential",
+    );
+    await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Continue." }));
+    await waitFor(() => client.requests.some((request) => request.method === "thread/resume"));
+    const resumed = JSON.stringify(client.requests.findLast((request) => request.method === "thread/resume")?.params);
+    expect(resumed).toContain(corrected);
+    expect(resumed).not.toContain("The lighthouse project uses green labels.");
+  });
+
+  it.each(["failed", "completed"])(
+    "preserves user choices and applies no partial selection after a %s turn",
+    async (status) => {
+      const { store, mailbox } = stores(root);
+      const client = new FakeAgentClient("codex", "DONE", false);
+      const active = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+      service = active;
+      const events: AgentEvent[] = [];
+      active.on("event", (event) => events.push(event));
+      await runCauseEffect(active.initialize());
+      await runCauseEffect(store.getOrCreate("chief"));
+      const first = active.createMemory({ agentId: "chief", text: "First saved fact." });
+      const second = active.createMemory({ agentId: "chief", text: "Second saved fact." });
+      await runCauseEffect(active.sendMessage({ agentId: "chief", text: "Review memory selection." }));
+      await waitFor(() => events.some((event) => event.type === "turn-started"));
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+      if (!threadId || !turnId) throw new Error("The selection turn did not start.");
+      const selections = active.getMemorySelection("chief").selections;
+      const changes = selections.map((selection) => ({
+        memoryId: selection.memoryId,
+        inclusion: "essential",
+        expectedRevision: selection.revision,
+      }));
+      const staged = await callOpenBotTool(client, threadId, "set_memory_inclusion", { changes }, turnId);
+      expect(openBotToolPayload(staged.result).status).toBe("staged");
+      const stagedForget = await callOpenBotTool(client, threadId, "forget_memory", { memoryId: second.id }, turnId);
+      expect(openBotToolPayload(stagedForget.result).status).toBe("staged");
+      const secondRevision = selections.find((selection) => selection.memoryId === second.id)?.revision;
+      if (secondRevision === undefined) throw new Error("The second selection is missing.");
+      active.setMemoryInclusion({
+        agentId: "chief",
+        changes: [{ memoryId: second.id, inclusion: "searchable", expectedRevision: secondRevision }],
+      });
+      const refusedForget = await callOpenBotTool(client, threadId, "forget_memory", { memoryId: second.id }, turnId);
+      expect(refusedForget.result).toMatchObject({ success: false });
+      client.emit("notification", notification("turn/completed", { threadId, turn: { id: turnId, status } }));
+      await waitFor(() => events.some((event) => event.type === "turn-completed"));
+      expect(active.getMemorySelection("chief").selections).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ memoryId: first.id, inclusion: "searchable", userControlled: false }),
+          expect.objectContaining({ memoryId: second.id, inclusion: "searchable", userControlled: true }),
+        ]),
+      );
+      expect(
+        active
+          .listMemories("chief")
+          .map((memory) => memory.text)
+          .sort(),
+      ).toEqual([first.text, second.text].sort());
+    },
+  );
+
   it("commits an automatic memory only after a successful turn and refreshes the next turn context", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
@@ -66,7 +432,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         callId: "remember-call",
         namespace: "openbot",
         tool: "remember",
-        arguments: { text: "The user prefers concise status updates." },
+        arguments: { text: "The user prefers concise status updates.", inclusion: "essential" },
       },
     });
     await waitFor(() => client.responses.some((response) => response.id === "remember-request"));
@@ -263,9 +629,29 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
     const turnId = events.find((event) => event.type === "turn-started")?.turnId;
     if (!client || !threadId || !turnId) throw new Error("The memory cap turn did not start.");
     const startRequest = client.requests.find((request) => request.method === "thread/start");
-    expect(JSON.stringify(startRequest?.params)).toContain('<agent_memories count=\\"2\\" limit=\\"3\\">');
+    expect(JSON.stringify(startRequest?.params)).toContain(
+      "You have 2 saved memories; 2 additional entries are available through search. The storage limit is 3.",
+    );
     const owner = await callOpenBotTool(client, threadId, "remember", { text: "Builder owns the rollback." }, turnId);
     expect(openBotToolPayload(owner.result).status).toBe("staged");
+
+    // Repeated edits must release the old text in the projected count, as they do at commit.
+    await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { memoryId: kept.id, text: "Use Bun for all scripts." },
+      turnId,
+    );
+    await callOpenBotTool(
+      client,
+      threadId,
+      "remember",
+      { memoryId: kept.id, text: "Use Bun for project scripts." },
+      turnId,
+    );
+    const oldText = await callOpenBotTool(client, threadId, "remember", { text: "Use Bun for all scripts." }, turnId);
+    expect(paramsRecord(oldText.result)?.success).toBe(false);
 
     // Another turn of the same agent, such as a channel turn, commits apart. Its memory counts too.
     const otherTurn = await callOpenBotTool(
@@ -298,7 +684,7 @@ describe.sequential("AgentMemories: staging, epochs and turn commitment", () => 
         .listMemories("chief")
         .map((memory) => memory.text)
         .sort(),
-    ).toEqual(["Builder owns the rollback.", "The release is on Monday.", "Use Bun for scripts."]);
+    ).toEqual(["Builder owns the rollback.", "The release is on Monday.", "Use Bun for project scripts."]);
     expect(events.filter((event) => event.type === "error")).toEqual([]);
   });
 });

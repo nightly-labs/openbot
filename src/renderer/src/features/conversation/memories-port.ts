@@ -4,7 +4,12 @@
 // words of copy are not. They live here, so `AgentMemoriesModal` names no owner at all.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { MemoryEntry, OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type {
+  AgentMemorySelectionState,
+  MemoryEntry,
+  OpenBotDesktopApi,
+  SetAgentMemoryInclusionInput,
+} from "@openbot/contracts/ipc";
 
 export interface MemoriesPort {
   ownerId: string;
@@ -15,6 +20,10 @@ export interface MemoriesPort {
   /** Null when another computer holds the cap: its host refuses a memory past it. */
   limit: number | null;
   list: () => Promise<MemoryEntry[]>;
+  selection?: {
+    read: () => Promise<AgentMemorySelectionState | null>;
+    set: (changes: SetAgentMemoryInclusionInput["changes"]) => Promise<AgentMemorySelectionState>;
+  };
   create: (text: string) => Promise<void>;
   update: (memoryId: string, text: string) => Promise<void>;
   remove: (memoryId: string) => Promise<void>;
@@ -30,6 +39,10 @@ export function agentMemoriesPort(agentId: string, agentName: string, limit: num
     ownerNoun: "agent",
     limit,
     list: () => window.openbot.agent.listMemories(agentId),
+    selection: {
+      read: () => window.openbot.agent.getMemorySelection(agentId),
+      set: (changes) => window.openbot.agent.setMemoryInclusion({ agentId, changes }),
+    },
     create: async (text) => {
       await window.openbot.agent.createMemory({ agentId, text });
     },

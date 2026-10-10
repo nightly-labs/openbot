@@ -49,6 +49,14 @@ currency, the amount that Stripe reports, the server size, the start reason and 
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 
+The account service also records a return from Checkout without payment and later payment
+recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
+currency, and dated exchange rate. Daily totals contain recurring revenue, overdue recurring
+revenue, paid accounts, paid servers, and scheduled cancellations. These totals have no account ID.
+The service stores payment facts and a delivery ledger in D1 to prevent duplicate revenue events.
+It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
+An account deletion clears its profile reference and stops pending account event delivery.
+
 ## Local scripts
 
 Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user
@@ -373,6 +381,12 @@ customer, invoices and payment records under its own policy, also after the subs
 Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
 
 ## Data stored on the OpenBot computer
+
+Saved agent memories, their inclusion settings, and their full-text search index stay in the local
+SQLite database. Essential memories enter the agent's provider instructions within a fixed size
+limit. Other saved memories reach the provider only when the agent retrieves them with a memory
+tool. Search runs locally and does not use an external search or embedding service. Memory content
+is not included in analytics; provider output uses the application's secret redaction.
 
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
