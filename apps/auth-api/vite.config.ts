@@ -28,6 +28,7 @@ export default defineConfig(({ command }) => {
       port: readApiPort(process.env.OPENBOT_API_PORT),
       strictPort: true,
       allowedHosts: [".openbot.localhost"],
+      watch: { ignored: ["**/dist/**", "**/.wrangler/**", "**/.git/**", "**/coverage/**"] },
     },
     plugins: [
       developmentLanGuard(),

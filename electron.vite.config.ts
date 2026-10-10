@@ -37,7 +37,9 @@ export default defineConfig({
     resolve: {
       dedupe: ["solid-js", "@solidjs/web"],
     },
-    server: rendererPort ? { port: rendererPort, strictPort: true } : undefined,
+    server: rendererPort
+      ? { port: rendererPort, strictPort: true, watch: { ignored: devWatchIgnored() } }
+      : { watch: { ignored: devWatchIgnored() } },
     build: {
       rollupOptions: {
         input: {
@@ -50,6 +52,12 @@ export default defineConfig({
     },
   },
 });
+
+function devWatchIgnored(): string[] {
+  // Build output lives inside the watched root. Without this, each rebuild
+  // writes into out-dev-*/dist and the watcher starts another rebuild.
+  return ["**/out-dev-*/**", "**/out/**", "**/dist/**", "**/.git/**", "**/coverage/**"];
+}
 
 function readRendererPort(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
