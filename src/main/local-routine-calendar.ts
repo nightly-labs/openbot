@@ -28,11 +28,13 @@ export function localRoutineCalendarSource(service: AgentService): RoutineCalend
       Effect.sync(() =>
         owner.kind === "agent" ? service.listRoutines(owner.agentId) : service.listChannelRoutines(owner.channelId),
       ),
+    // A skipped-run record is not a run, so the calendar leaves it out.
     runs: (owner, routineId, limit) =>
       Effect.sync(() =>
-        owner.kind === "agent"
+        (owner.kind === "agent"
           ? service.listRoutineRuns({ agentId: owner.agentId, routineId, limit })
-          : service.listChannelRoutineRuns({ channelId: owner.channelId, routineId, limit }),
+          : service.listChannelRoutineRuns({ channelId: owner.channelId, routineId, limit })
+        ).filter((run) => !run.missed),
       ),
   };
 }

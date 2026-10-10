@@ -725,9 +725,9 @@ export class RoutineStore {
         continue;
       }
       // A crash after a run was made and before its trigger moved leaves that occurrence due. It ran.
-      const first = this.#hasScheduledRun(trigger.id, trigger.nextRunAt)
-        ? nextRoutineOccurrence(trigger.schedule, routine.timezone, new Date(due))
-        : new Date(due);
+      // The scheduler can make that run at a later, collapsed occurrence, so the newest run counts.
+      const ran = this.#latestScheduledRun(trigger.id, trigger.nextRunAt);
+      const first = ran ? nextRoutineOccurrence(trigger.schedule, routine.timezone, new Date(ran)) : new Date(due);
       if (first.getTime() > now.getTime()) {
         this.advanceTrigger(routine.id, trigger.id, first.toISOString());
         continue;
@@ -735,7 +735,7 @@ export class RoutineStore {
       const missed = missedOccurrences(trigger.schedule, routine.timezone, first, now);
       if (routine.missedPolicy === "run-once") {
         if (!missed.previous) continue;
-        const count = missed.count > ROUTINE_MISSED_COUNT_LIMIT ? missed.count : missed.count - 1;
+        const count = missed.truncated ? missed.count : missed.count - 1;
         this.#recordMissed(routine, { first, until: missed.previous, count }, missed.last);
       } else {
         this.#recordMissed(routine, { first, until: missed.last, count: missed.count }, missed.next);
@@ -743,12 +743,15 @@ export class RoutineStore {
     }
   }
 
-  #hasScheduledRun(triggerId: string, scheduledFor: string): boolean {
-    return isDynamicRecord(
-      this.database.connection
-        .prepare(`SELECT 1 AS found FROM ${this.tables.runTable} WHERE trigger_id = ? AND scheduled_for = ?`)
-        .get(triggerId, scheduledFor),
-    );
+  /** The newest scheduled run of the trigger at or after `from`. */
+  #latestScheduledRun(triggerId: string, from: string): string | null {
+    const row = this.database.connection
+      .prepare(
+        `SELECT MAX(scheduled_for) AS scheduled_for FROM ${this.tables.runTable}
+         WHERE trigger_id = ? AND run_kind = 'scheduled' AND scheduled_for >= ?`,
+      )
+      .get(triggerId, from);
+    return isDynamicRecord(row) && typeof row.scheduled_for === "string" ? row.scheduled_for : null;
   }
 
   /**
@@ -1109,6 +1112,8 @@ const MISSED_WINDOWS_MS = [HOUR_MS, 24 * HOUR_MS, 32 * 24 * HOUR_MS, 400 * 24 * 
 interface MissedOccurrences {
   /** Exact up to the limit, then `MISSED_WALK_LIMIT`. */
   count: number;
+  /** The walk stopped at the limit, so `count` is a lower bound. */
+  truncated: boolean;
   last: Date;
   previous: Date | null;
   next: Date;
@@ -1132,7 +1137,7 @@ function missedOccurrences(schedule: RoutineSchedule, timezone: string, first: D
     count += 1;
     next = step(last);
   }
-  if (next.getTime() > now.getTime()) return { count, last, previous, next };
+  if (next.getTime() > now.getTime()) return { count, truncated: false, last, previous, next };
   for (const window of MISSED_WINDOWS_MS) {
     const start = Math.max(last.getTime(), now.getTime() - window);
     let newest: Date | null = start === last.getTime() ? last : null;
@@ -1143,7 +1148,7 @@ function missedOccurrences(schedule: RoutineSchedule, timezone: string, first: D
       newest = cursor;
       cursor = step(cursor);
     }
-    if (newest && before) return { count, last: newest, previous: before, next: cursor };
+    if (newest && before) return { count, truncated: true, last: newest, previous: before, next: cursor };
   }
   throw new Error("The missed routine occurrences could not be found.");
 }

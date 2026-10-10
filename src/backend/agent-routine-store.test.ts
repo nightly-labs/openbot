@@ -164,13 +164,18 @@ describe("AgentRoutineStore", () => {
     const ran = routines.createRun(routine, routine.trigger.id, "scheduled", "2026-08-25T10:15:00.000Z");
     routines.skipMissed(new Date("2026-08-25T10:50:00.000Z"));
     expect(routines.get("chief", routine.id)?.trigger.nextRunAt).toBe("2026-08-25T11:00:00.000Z");
-    expect(routines.listRuns("chief", routine.id, 10)).toEqual([
-      expect.objectContaining({
-        scheduledFor: "2026-08-25T10:30:00.000Z",
-        missed: { count: 2, until: "2026-08-25T10:45:00.000Z" },
-      }),
-      expect.objectContaining({ id: ran.id }),
-    ]);
+    // Both rows have the same creation time, so the list order is not fixed.
+    const runs = routines.listRuns("chief", routine.id, 10);
+    expect(runs).toHaveLength(2);
+    expect(runs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scheduledFor: "2026-08-25T10:30:00.000Z",
+          missed: { count: 2, until: "2026-08-25T10:45:00.000Z" },
+        }),
+        expect.objectContaining({ id: ran.id }),
+      ]),
+    );
     database.close();
   });
 

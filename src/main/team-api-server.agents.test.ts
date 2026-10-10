@@ -928,7 +928,11 @@ describe("TeamApiServer agents", () => {
         updateRoutine,
         deleteRoutine,
         testRoutine: vi.fn(() => Effect.sync(() => run)),
-        listRoutineRuns: vi.fn(() => [run]),
+        // A released client would read a skipped-run record as a run that a person cancelled.
+        listRoutineRuns: vi.fn(() => [
+          run,
+          { ...run, id: "run-missed", status: "cancelled" as const, missed: { count: 3, until: null } },
+        ]),
       }),
     });
 

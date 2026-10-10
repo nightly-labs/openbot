@@ -148,7 +148,11 @@ async function routeChannelSettings(
     case CHANNEL_ROUTES.routineTest:
       return json(201, await runCauseEffect(agents.testChannelRoutine(parseTestChannelRoutine(body))));
     default:
-      return json(200, agents.listChannelRoutineRuns(parseListChannelRoutineRuns(body)));
+      // Released clients read a skipped-run record as a run that a person cancelled, so it stays local.
+      return json(
+        200,
+        agents.listChannelRoutineRuns(parseListChannelRoutineRuns(body)).filter((run) => !run.missed),
+      );
   }
 }
 
