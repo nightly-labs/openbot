@@ -26,6 +26,16 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
   // Japanese has one form for every count.
   ja: () => "other",
+  // CLDR Polish: one for 1; few for 2–4, 22–24…; many for 0, 5–21, 25–31…; other for fractions.
+  pl: (count) => {
+    const absolute = Math.abs(count);
+    if (!Number.isInteger(absolute)) return "other";
+    if (absolute === 1) return "one";
+    const lastDigit = absolute % 10;
+    const lastTwo = absolute % 100;
+    if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) return "few";
+    return "many";
+  },
   // CLDR Portuguese: one for integer parts 0 and 1; many for nonzero multiples of one million.
   pt: (count) => {
     const absolute = Math.abs(count);

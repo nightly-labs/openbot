@@ -28,6 +28,7 @@ const localizer = createSourceLocalizer({
       },
     },
     ja: {},
+    pl: {},
     pt: {},
     ru: {},
     tr: {},

@@ -7,7 +7,7 @@
  * The identifiers are BCP 47 tags and cross the IPC boundary as written. Add a language, never
  * rename a tag: a renamed tag reads back as an unknown language on the next launch.
  */
-export const APP_LANGUAGES = ["system", "en", "de", "es", "fr", "ja", "pt", "ru", "tr"] as const;
+export const APP_LANGUAGES = ["system", "en", "de", "es", "fr", "ja", "pl", "pt", "ru", "tr"] as const;
 
 export type AppLanguage = (typeof APP_LANGUAGES)[number];
 

@@ -5,6 +5,7 @@ import { type AppMessages, en } from "./messages/en/index";
 import { es } from "./messages/es/index";
 import { fr } from "./messages/fr/index";
 import { ja } from "./messages/ja/index";
+import { pl } from "./messages/pl/index";
 import { pt } from "./messages/pt/index";
 import { ru } from "./messages/ru/index";
 import { tr } from "./messages/tr/index";
@@ -23,9 +24,9 @@ export {
 } from "./message";
 export type { AppMessages } from "./messages/en/index";
 export { localizeSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "./source-text";
-export { de, en, es, fr, ja, pt, ru, tr };
+export { de, en, es, fr, ja, pl, pt, ru, tr };
 
-const catalogs = { en, de, es, fr, ja, pt, ru, tr } as const;
+const catalogs = { en, de, es, fr, ja, pl, pt, ru, tr } as const;
 
 /** The desktop translator: every key of the desktop catalog, including shared and source keys. */
 export type AppTranslate = Translate<AppMessages>;

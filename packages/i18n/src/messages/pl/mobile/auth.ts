@@ -1,0 +1,60 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/auth";
+
+export const messages = {
+  "mobile.auth.logo.animate": "Animuj logo OpenBot",
+  "mobile.auth.logo.animateHint": "Logo puszcza oko",
+  "mobile.auth.scanQrCode": "Zeskanuj kod QR",
+  "mobile.auth.closeScanner": "Zamknij skaner",
+  "mobile.auth.scanner.connectFailed": "Nie udało się połączyć",
+  "mobile.auth.scanner.codeFailed": "Nie udało się użyć tego kodu",
+  "mobile.auth.scanner.scanAgain": "Skanuj ponownie",
+  "mobile.auth.scanner.connecting": "Łączenie telefonu…",
+  "mobile.auth.scanner.readingInvitation": "Odczytywanie zaproszenia…",
+  "mobile.auth.scanner.scanDesktop": "Zeskanuj kod z komputera",
+  "mobile.auth.scanner.scanInvitation": "Zeskanuj kod zaproszenia",
+  "mobile.auth.scanner.verifying": "Weryfikowanie kodu jednorazowego.",
+  "mobile.auth.scanner.checkingServer": "Sprawdzanie tożsamości serwera.",
+  "mobile.auth.scanner.keepCentered": "Trzymaj kod QR na środku ramki.",
+  "mobile.auth.scanner.connectFallback": "Nie udało się połączyć tego telefonu.",
+  "mobile.auth.scanner.cameraFailed": "Nie udało się uruchomić aparatu. Spróbuj ponownie.",
+  "mobile.auth.camera.title": "Wymagany dostęp do aparatu",
+  "mobile.auth.camera.pairingReason":
+    "OpenBot używa aparatu tylko do zeskanowania jednorazowego kodu QR z aplikacji na komputer.",
+  "mobile.auth.camera.invitationReason": "OpenBot używa aparatu tylko do zeskanowania kodu QR zaproszenia.",
+  "mobile.auth.camera.blocked":
+    "Dostęp do aparatu jest zablokowany. Włącz go dla OpenBot w ustawieniach urządzenia, a potem wróć tutaj, aby zeskanować kod.",
+  "mobile.auth.camera.allow": "Zezwól na dostęp do aparatu",
+  "mobile.auth.camera.openSettings": "Otwórz ustawienia",
+  "mobile.auth.signIn.title": "Twoi agenci, wszędzie.",
+  "mobile.auth.signIn.subtitle": "Połącz się z OpenBot na swoim komputerze.",
+  "mobile.auth.signIn.helpTitle": "Gdzie jest kod QR?",
+  "mobile.auth.signIn.helpStep1": "1. Otwórz OpenBot na komputerze.",
+  "mobile.auth.signIn.helpStep2": "2. Otwórz Ustawienia → Mobile Connect.",
+  "mobile.auth.signIn.helpStep3": "3. Wybierz „Wygeneruj kod QR”, a potem zeskanuj go tutaj.",
+  "mobile.auth.error.sessionEnded": "Sesja się zakończyła. Zeskanuj nowy kod z OpenBot na komputerze.",
+  "mobile.auth.error.connectionInProgress": "Trwa inne połączenie. Poczekaj, aż się zakończy.",
+  "mobile.auth.error.invalidCode": "To nie jest prawidłowy kod OpenBot Mobile Connect.",
+  "mobile.auth.error.codeOutdated": "Wygeneruj nowy kod Mobile Connect w zaktualizowanej aplikacji na komputer.",
+  "mobile.auth.error.alreadySignedIn": "To urządzenie jest już zalogowane. Wyloguj się, zanim połączysz inne konto.",
+  "mobile.auth.error.desktopUnreachable":
+    "Nie udało się połączyć z komputerem. Trzymaj oba urządzenia w tej samej sieci Wi-Fi i zezwól na dostęp do sieci lokalnej.",
+  "mobile.auth.error.accountServiceUnreachable":
+    "Nie udało się połączyć z usługą kont. Sprawdź połączenie i spróbuj ponownie.",
+  "mobile.auth.error.codeExpired": "Ten kod Mobile Connect jest nieprawidłowy lub wygasł.",
+  "mobile.auth.error.revokePreviousFailed":
+    "Nie udało się unieważnić poprzedniej sesji mobilnej. Sprawdź połączenie i zeskanuj ponownie.",
+  "mobile.auth.error.verifyFailed": "Nie udało się zweryfikować tej sesji mobilnej.",
+  "mobile.auth.error.sessionsLoadFailed": "Nie udało się wczytać sesji konta. Spróbuj ponownie.",
+  "mobile.auth.error.useSignOut": "Użyj opcji „Wyloguj się”, aby odłączyć to urządzenie.",
+  "mobile.auth.error.desktopSession": "Sesji na komputerze nie można odłączyć z telefonu.",
+  "mobile.auth.error.disconnectFailed": "Nie udało się odłączyć tej sesji. Odśwież i spróbuj ponownie.",
+  "mobile.auth.error.nameLength": "Wpisz nazwę wyświetlaną o długości od 3 do 20 znaków.",
+  "mobile.auth.error.photoTooLarge": "Wybierz zdjęcie mniejsze niż 512 KB.",
+  "mobile.auth.error.photoInvalid": "Wybrane zdjęcie jest nieprawidłowe. Wybierz inny obraz.",
+  "mobile.auth.error.tooManyChanges": "Za dużo zmian. Poczekaj chwilę i spróbuj ponownie.",
+  "mobile.auth.error.photoConflict": "Zdjęcie zmieniło się na innym urządzeniu. Spróbuj ponownie.",
+  "mobile.auth.error.profileSaveFailed": "Nie udało się zapisać profilu. Sprawdź połączenie i spróbuj ponownie.",
+  "mobile.auth.error.signOutUnconfirmed":
+    "Nie udało się potwierdzić wylogowania. Sprawdź połączenie i spróbuj ponownie.",
+} as const satisfies PartialTranslation<typeof source>;
