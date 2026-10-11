@@ -4,6 +4,7 @@ import {
   ComposerUsageLimitNotice,
 } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
+import { createSignal, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
@@ -59,25 +60,32 @@ export const SigningIn: Story = {
   ),
 };
 
-/**
- * The plan window is spent. There is no button: only time or another model gives the user more
- * quota, so the card spends its width on the reset moment instead.
- */
+/** A spent plan notice can be dismissed without changing the provider's quota reading. */
 export const UsageLimitReached: Story = {
-  render: () => (
-    <ComposerStack>
-      <ComposerUsageLimitNotice provider="codex" resetsAt={USAGE_RESETS_AT} />
-    </ComposerStack>
-  ),
+  render: () => {
+    const [dismissed, setDismissed] = createSignal(false);
+    return (
+      <ComposerStack>
+        <Show when={!dismissed()}>
+          <ComposerUsageLimitNotice provider="codex" resetsAt={USAGE_RESETS_AT} onDismiss={() => setDismissed(true)} />
+        </Show>
+      </ComposerStack>
+    );
+  },
 };
 
 /** Some providers report a spent window with no reset time, so the card names the way out instead. */
 export const UsageLimitWithoutReset: Story = {
-  render: () => (
-    <ComposerStack>
-      <ComposerUsageLimitNotice provider="claude" resetsAt={null} />
-    </ComposerStack>
-  ),
+  render: () => {
+    const [dismissed, setDismissed] = createSignal(false);
+    return (
+      <ComposerStack>
+        <Show when={!dismissed()}>
+          <ComposerUsageLimitNotice provider="claude" resetsAt={null} onDismiss={() => setDismissed(true)} />
+        </Show>
+      </ComposerStack>
+    );
+  },
 };
 
 export const UpdateRequired: Story = {

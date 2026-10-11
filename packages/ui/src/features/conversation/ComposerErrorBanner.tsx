@@ -10,8 +10,8 @@ import { ComposerNotice } from "./ComposerNotice";
  * target chat's error and dismissing one never clears another. There is no auto-dismiss: the error
  * stands for its chat until the user closes it or a send succeeds.
  *
- * `ComposerSignInNotice` and `ComposerUsageLimitNotice` carry no dismiss because they name a block
- * the user cannot act past. Every other error banner uses this component.
+ * Sign-in and usage notices have their own components. Dismissing a usage reading does not clear
+ * a provider error here.
  */
 export function ComposerErrorBanner(props: {
   message: string;

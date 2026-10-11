@@ -33,7 +33,7 @@ import { CloseIcon, StopIcon } from "@openbot/ui/features/conversation/Conversat
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import { VoiceRecordingMorph } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
@@ -41,6 +41,7 @@ import { voiceButtonLabel, voiceSupported } from "./voice-status";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
 const [dismissedCompactions, setDismissedCompactions] = createSignal<Record<string, string>>({});
+const [dismissedUsageLimits, setDismissedUsageLimits] = createStore<Record<string, string>>({});
 
 /** @internal Stable HMR boundary for conversation composer. */
 export function ConversationComposer() {
@@ -138,21 +139,59 @@ export function ConversationComposer() {
   const [now, setNow] = createSignal(Date.now());
   /**
    * The first plan window that is spent and has not ended yet. `usedPercent` is what the provider
-   * reports, so it can pass 100 slightly; anything at or over the line refuses the next turn.
+   * reports, so it can pass 100 slightly. A spent plan does not say whether paid credits remain.
    */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
-    if (!provider || signInRequired() || !accountUsageCoversModel(provider, props.agent?.model)) return null;
+    if (!provider) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
       if (limit.id !== provider) continue;
-      for (const plan of [limit.primary, limit.secondary]) {
+      for (const window of ["primary", "secondary"] as const) {
+        const plan = limit[window];
         if (!plan || plan.usedPercent < 100) continue;
         if (plan.resetsAt !== null && plan.resetsAt * 1_000 <= now()) continue;
-        return { provider, resetsAt: plan.resetsAt };
+        return {
+          provider,
+          resetsAt: plan.resetsAt,
+          key: JSON.stringify([window, plan.windowDurationMins, plan.resetsAt]),
+        };
       }
     }
     return null;
   });
+  const usageNoticeScope = () =>
+    JSON.stringify([
+      currentChatConversationKey(),
+      props.agent?.provider,
+      props.agentStatus.providers?.find((status) => status.id === props.agent?.provider)?.email,
+    ]);
+  const usageNotice = () => {
+    const spent = usageExhausted();
+    return spent &&
+      !signInRequired() &&
+      accountUsageCoversModel(spent.provider, props.agent?.model) &&
+      dismissedUsageLimits[usageNoticeScope()] !== spent.key
+      ? spent
+      : null;
+  };
+  // Retain dismissal across navigation and identical readings. A recovered window can warn again,
+  // including providers that report no reset time. A pending usage load is not recovery.
+  createEffect(
+    () => ({
+      key: usageNoticeScope(),
+      spent: usageExhausted(),
+      loaded: props.accountUsage?.limits.some(
+        (limit) => limit.id === props.agent?.provider && (limit.primary !== null || limit.secondary !== null),
+      ),
+    }),
+    ({ key, spent, loaded }) => {
+      if (loaded && !spent) {
+        setDismissedUsageLimits((state) => {
+          delete state[key];
+        });
+      }
+    },
+  );
   // The card has to leave on its own. Nothing else reads usage again until the next turn, and the
   // user waiting for the reset is the one least likely to send one.
   createEffect(
@@ -339,11 +378,19 @@ export function ConversationComposer() {
           />
         )}
       </Show>
-      <Show when={usageExhausted()}>
+      <Show when={usageNotice()}>
         {(spent) => (
           <ComposerUsageLimitNotice
             provider={spent().provider}
             resetsAt={spent().resetsAt}
+            onDismiss={() => {
+              const key = usageNoticeScope();
+              const window = spent().key;
+              setDismissedUsageLimits((state) => {
+                state[key] = window;
+              });
+              setComposerFocusRequest((current) => current + 1);
+            }}
             onShown={() =>
               reportNotification({
                 operation: "turn",
