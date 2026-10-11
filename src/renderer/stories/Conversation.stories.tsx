@@ -1124,16 +1124,16 @@ export const ProviderSignInRequired: Story = {
   },
 };
 
-/** The real composer with the plan window spent: the card states the reset and offers no button. */
+/** The real composer with a spent plan window and a dismissible notice. */
 export const UsageLimitReached: Story = {
   name: "Usage limit reached",
   args: {
     accountUsage: {
       limits: [
         {
-          id: "codex-primary",
-          primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: Date.UTC(2026, 8, 21, 9, 0) / 1_000 },
-          secondary: { usedPercent: 62, windowDurationMins: 10_080, resetsAt: Date.UTC(2026, 8, 26, 9, 0) / 1_000 },
+          id: "codex",
+          primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: Math.floor(Date.now() / 1_000) + 3_600 },
+          secondary: null,
         },
       ],
     },

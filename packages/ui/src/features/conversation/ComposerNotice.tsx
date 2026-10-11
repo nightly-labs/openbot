@@ -10,12 +10,11 @@ import { CloseIcon } from "./ConversationIcons";
  * The shared slab every composer notice uses: a warning-toned card in the queue's shape, above the
  * input and under the queue, because the user reads that column top to bottom before they send.
  *
- * `tone` is the only difference between the states. It is `danger` when the user cannot send at all
- * and the wait is not in their hands, and `warning` when one press puts the state right.
+ * `tone` is `danger` for errors and spent plan windows, and `warning` for account setup notices.
  *
  * `onDismiss` decides the rest. A notice the user can clear gets the close button, Escape, and
  * `role="alert"`, because a state the user did not ask for has to announce itself. The states they
- * walked into - a signed-out provider, a spent plan window - stay until they are resolved, so they
+ * walked into, such as a signed-out provider, stay until they are resolved, so they
  * only report. `title` is optional: a failure the provider already stated in a sentence gains
  * nothing from a label that repeats the word "error" above it.
  */
@@ -210,16 +209,14 @@ function formatUsageReset(resetsAt: number | null | undefined, format: AppFormat
 }
 
 /**
- * The plan limit, used up: the provider accepts no more turns on this model until its window resets.
- *
- * It carries no button on purpose. Nothing the user presses here gives them more quota - only time
- * does, or a different model, and the model picker under this notice already does that. So the card
- * says when the limit resets instead, which is the one fact the user needs to plan around it.
+ * A spent plan window can coexist with paid credits. Dismissing the notice only hides the reading;
+ * the provider still decides whether to accept the next turn.
  */
 export function ComposerUsageLimitNotice(props: {
   provider: AgentProviderId;
   resetsAt?: number | null;
   onShown?: () => void;
+  onDismiss: () => void;
 }) {
   const { t, format } = useText();
   createEffect(
@@ -234,5 +231,7 @@ export function ComposerUsageLimitNotice(props: {
       ? t("composer.usageLimit.resets", { provider, reset })
       : t("composer.usageLimit.selectModel", { provider });
   };
-  return <ComposerNotice tone="danger" title={t("composer.usageLimit.title")} body={body()} />;
+  return (
+    <ComposerNotice tone="danger" title={t("composer.usageLimit.title")} body={body()} onDismiss={props.onDismiss} />
+  );
 }
