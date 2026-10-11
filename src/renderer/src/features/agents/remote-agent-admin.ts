@@ -8,7 +8,7 @@ import type {
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { serverCanAdminister } from "../servers/server-capabilities";
 import { type AgentsPort, agentsPort } from "./agents-port";
 
@@ -80,11 +80,16 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
-  const key = () => {
+  const key = createMemo(() => {
     const current = target();
-    if (current?.server.kind !== "remote" || !serverCanAdministerAgents(current.server)) return null;
+    if (
+      current?.server.kind !== "remote" ||
+      current.server.state !== "online" ||
+      !serverCanAdministerAgents(current.server)
+    )
+      return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
 
   function accept(requestKey: string, settings: AgentAdminSettings): void {
     if (key() !== requestKey) return;

@@ -345,6 +345,10 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run test:changed` | Run, on one worker, only the desktop and mobile test files that import a file changed since `origin/main`, including staged, unstaged and untracked files. It stops with an error when `origin/main` is missing. A change to a vitest config, a setup file or `package.json` selects no test. See [docs/development-checks.md](docs/development-checks.md#focused-tests). |
 | `bun run test:related -- <source>...` | Run, on one worker, only the test files that import the named source files. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
+| `bun run test:e2e` | Run scripted Electron UI tests in local and host modes against the current build. See [runner setup and coverage](docs/electron-e2e.md). |
+| `bun run test:e2e:live` | Run required Codex, Claude, and OpenCode UI workflows with dedicated provider accounts. |
+| `bun run test:e2e:release` | Build the app, install pinned Chromium, then run required Electron and visual tests. The functional test budget is ten minutes. |
+| `bun run test:visual` | Compare six core Storybook screens with reviewed macOS visual baselines. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |
 | `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary in a checkout; an installed application runs only the driver it was released with. |

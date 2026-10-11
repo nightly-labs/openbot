@@ -1,0 +1,116 @@
+name: Electron release UI tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One suite owns the Mac mini at a time. Never cancel a release test halfway through cleanup.
+concurrency:
+  group: openbot-release-e2e
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require trusted source and runner configuration
+        id: source
+        env:
+          RUNNER_LABELS: ${{ vars.OPENBOT_E2E_RUNNER }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor HEAD origin/main
+          test -n "$RUNNER_LABELS" || { echo 'Set OPENBOT_E2E_RUNNER to the Mac mini runner labels.' >&2; exit 1; }
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: authorize
+    runs-on: ${{ fromJSON(vars.OPENBOT_E2E_RUNNER || '["self-hosted", "openbot-e2e-unconfigured"]') }}
+    timeout-minutes: 30
+    env:
+      OPENBOT_E2E_CODEX_MODEL: ${{ vars.OPENBOT_E2E_CODEX_MODEL }}
+      OPENBOT_E2E_CLAUDE_MODEL: ${{ vars.OPENBOT_E2E_CLAUDE_MODEL }}
+      OPENBOT_E2E_OPENCODE_MODEL: ${{ vars.OPENBOT_E2E_OPENCODE_MODEL }}
+      OPENBOT_E2E_GROK_MODEL: ${{ vars.OPENBOT_E2E_GROK_MODEL }}
+      OPENBOT_E2E_ANTIGRAVITY_MODEL: ${{ vars.OPENBOT_E2E_ANTIGRAVITY_MODEL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - name: Check runner prerequisites
+        run: |
+          test "$(uname -s)" = Darwin
+          node --version
+      - name: Build and run functional and visual release checks
+        run: bun run test:e2e:release
+      - name: Stop any remaining test processes
+        if: always()
+        run: bun tests/e2e/support/cleanup.ts
+      - name: Upload safe test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: electron-e2e-macos
+          path: |
+            .openbot-build/e2e/report
+            .openbot-build/visual/report
+            .openbot-build/visual/results.json
+            .openbot-build/visual/coverage.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux:
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - name: Install display and retain the Electron sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2t64
+          E2E_ELECTRON=$(realpath node_modules/electron/dist/electron)
+          sudo chown root:root "$(dirname "$E2E_ELECTRON")/chrome-sandbox"
+          sudo chmod 4755 "$(dirname "$E2E_ELECTRON")/chrome-sandbox"
+          sudo tee /etc/apparmor.d/openbot-e2e >/dev/null <<PROFILE
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile openbot-e2e "$E2E_ELECTRON" flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/openbot-e2e
+      - name: Build once
+        run: bun run build
+      - name: Run local and host scripted workflows
+        env:
+          OPENBOT_E2E_SUITE: scripted-release
+        run: xvfb-run -a env -u ELECTRON_RUN_AS_NODE bun run test:e2e
+      - name: Stop any remaining test processes
+        if: always()
+        run: bun tests/e2e/support/cleanup.ts
+      - name: Upload safe test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: electron-e2e-linux
+          path: .openbot-build/e2e/report
+          if-no-files-found: warn
+          retention-days: 14

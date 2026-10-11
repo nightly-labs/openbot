@@ -28,6 +28,15 @@ first-install fallback. To stop a broken upstream release, add its version to th
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
 blocked version is no longer offered, but it stays on the computers that already installed it.
 
+## Electron UI release gate
+
+Release publication also requires the [Electron UI suite](electron-e2e.md). Configure its dedicated
+Mac mini runner, provider logins, pinned runtime paths, and model variables before the next tag.
+The macOS job checks local and host workflows with scripted decisions and real Codex, Claude, and
+OpenCode agents. Linux runs the scripted workflows. Missing coverage, failed tests, or a macOS
+test phase over ten minutes blocks publication. The workflow can also run manually on a commit
+already on `main` before a tag is made.
+
 ## One-time GitHub setup
 
 Create the `release` environment in `nightly-labs/openbot`, then add these environment secrets:

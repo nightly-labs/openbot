@@ -9,6 +9,8 @@
     "vitest.config.ts",
     "knip.config.ts",
     "scripts/**/*.ts",
+    "tests/e2e/**/*.ts",
+    "tests/visual/**/*.ts",
     "tools/vitest/**/*.ts",
     "src/backend/**/*.ts",
     "src/main/**/*.ts",

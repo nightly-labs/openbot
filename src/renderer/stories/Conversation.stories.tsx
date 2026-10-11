@@ -1400,6 +1400,11 @@ export const StreamingMarkdownInChat: Story = {
   render: (storyArgs) => <StreamingMarkdownConversation args={storyArgs} />,
 };
 
+export const StreamingSnapshot: Story = {
+  name: "Streaming snapshot",
+  args: { messages: streamingMarkdownMessages(2), activeTurnId: "streaming-snapshot" },
+};
+
 export const ComparisonTableInChat: Story = {
   name: "Comparison table in chat",
   args: {
