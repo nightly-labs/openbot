@@ -1046,6 +1046,24 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
+  // Signal sends an `error` frame before its 1008 close. Only `rate_limited` starts the rate wait.
+  it("does not start the rate wait when a close comes before a queued authentication refusal", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const network = await setupNetwork();
+    await network.connect();
+    const socket = network.socket();
+    socket.receive({
+      type: "error",
+      version: 1,
+      code: "authentication_required",
+      message: "The remote session expired.",
+    });
+    socket.close(1008);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(network.sockets).toHaveLength(2);
+    await network.runtime.dispose();
+  });
+
   it("still times out an active connection attempt after 30 seconds", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     const offered = deferred();

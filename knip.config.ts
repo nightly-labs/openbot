@@ -54,8 +54,12 @@ const config: KnipConfig = {
         // Each file in scripts/ is a command that package.json, CI or another script runs.
         "scripts/**/*.ts",
         "tools/**/*.ts",
+        // Playwright loads these by path, and starts the seed and provider in child processes.
+        "tests/e2e/**/*.spec.ts",
+        "tests/e2e/support/{seed,scripted-provider,services,reporter,cleanup}.ts",
       ],
-      project: ["src/**/*.{ts,tsx,css}", "scripts/**/*.ts", "tools/**/*.ts"],
+      project: ["src/**/*.{ts,tsx,css}", "scripts/**/*.ts", "tools/**/*.ts", "tests/e2e/**/*.ts"],
+      playwright: { config: ["tests/e2e/playwright.config.ts"] },
       ignoreDependencies: [
         // `packages/ui` declares and imports these. The root copies date from before the UI moved to
         // that package; removing them changes what electron-builder packs, so it needs a package check.

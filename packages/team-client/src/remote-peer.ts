@@ -747,24 +747,28 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       };
       socket.send(JSON.stringify(hello));
     };
+    let refusal: string | null = null;
     socket.onmessage = (event) => {
       if (!isString(event.data)) return;
-      const data = event.data;
+      let message: SignalServerMessage | null = null;
+      let malformed: { error: unknown } | null = null;
+      try {
+        message = decodeSignalServerMessage(JSON.parse(event.data));
+      } catch (error) {
+        malformed = { error };
+      }
+      // Read the refusal now: the close that follows it can come before the queued frame is handled.
+      if (message?.type === "error") refusal = message.code;
       void runPeerEffect(
         state.signalLock.withPermit(
           Effect.gen(function* () {
             // A frame still queued from a socket that `renewSignal` replaced belongs to a removed connection.
             if (state.closed || peer !== state || state.socket !== socket) return;
-            let message: SignalServerMessage | null;
-            try {
-              message = decodeSignalServerMessage(JSON.parse(data));
-            } catch (error) {
-              // Where the two ends stop agreeing about the wire, and the service would send the same
-              // bytes to the reconnect this would otherwise ask for. `protocol_error` is what lets a
-              // consumer stop instead: every other failure here is a connection that a retry can fix,
-              // and a caller cannot tell them apart from an `offline` update alone.
-              return yield* failPeerEffect(state, error, actions, "protocol_error");
-            }
+            // Where the two ends stop agreeing about the wire, and the service would send the same
+            // bytes to the reconnect this would otherwise ask for. `protocol_error` is what lets a
+            // consumer stop instead: every other failure here is a connection that a retry can fix,
+            // and a caller cannot tell them apart from an `offline` update alone.
+            if (malformed) return yield* failPeerEffect(state, malformed.error, actions, "protocol_error");
             // A frame type this build does not know is a newer Signal service, not a broken connection.
             if (message) yield* handleSignal(state, message, actions);
           }),
@@ -786,7 +790,11 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       state.hostWaitTimer = null;
       if (state.closed || peer !== state) return;
       if (event) state.lastSignalClose = event.code;
-      if (event?.code === 1008) signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
+      // Signal sends an `error` frame before it closes a refused socket with 1008. Only `rate_limited`,
+      // or a 1008 without a frame, starts the rate wait. A revoked or expired session, such as after
+      // the owner removes a member, connects again at once with a new ticket.
+      if (event?.code === 1008 && (refusal === null || refusal === "rate_limited"))
+        signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
       diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
       scheduleReconnect(state, actions);
     };

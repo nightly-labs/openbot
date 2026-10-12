@@ -103,6 +103,13 @@ jobs:
           jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null
 
+  electron-e2e:
+    if: github.event_name == 'push'
+    needs: validate
+    uses: ./.github/workflows/electron-e2e.yml
+    permissions:
+      contents: read
+
   host-signing:
     name: Check Host signing keychain
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
@@ -927,7 +934,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [validate, macos, windows, linux, docker]
+    needs: [validate, electron-e2e, macos, windows, linux, docker]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10

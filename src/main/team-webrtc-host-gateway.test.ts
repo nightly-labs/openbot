@@ -66,6 +66,55 @@ class FakeBridge extends TeamWebRtcBridge {
 }
 
 describe("TeamWebRtcHostGateway", () => {
+  it("does not count Signal's rate wait against the host connection deadline", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-webrtc-host-rate-"));
+    directories.push(directory);
+    class RateLimitedBridge extends FakeBridge {
+      override readonly connect = (input: {
+        peerId: string;
+        signalUrl: string;
+        token: string;
+        peer: "host" | "client";
+      }) =>
+        Effect.sync(() => {
+          this.connections.push(input);
+          // The bridge connects again by itself after Signal's 60-second rate window.
+          this.emit("error", input.peerId, "rate_limited", "Too many remote connections from this address.");
+        });
+    }
+    const bridge = new RateLimitedBridge();
+    const store = new TeamStore(join(directory, "team.json"));
+    await runCauseEffect(store.initialize());
+    const gateway = new TeamWebRtcHostGateway({
+      bridge,
+      store,
+      appVersion: "1.0.0",
+      transferDirectory: join(directory, "transfers"),
+    });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    try {
+      let settled = false;
+      const started = runCauseEffect(
+        gateway.start({
+          hostId: "host-1",
+          signalUrl: "wss://signal.example.test/v1/signal",
+          ticket: "initial",
+          localApiPort: 0,
+        }),
+      ).finally(() => {
+        settled = true;
+      });
+      await vi.waitFor(() => expect(bridge.connections).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(80_000);
+      expect(settled).toBe(false);
+      bridge.emit("signalReady", "host-1");
+      await expect(started).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+    await runCauseEffect(gateway.dispose());
+  });
+
   it("isolates devices' RPCs, live subscriptions and revocation while preserving authenticated reconnects", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-webrtc-host-gateway-"));
     directories.push(directory);

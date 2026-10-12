@@ -229,18 +229,20 @@ function prepareSignal(peerId: string, signalUrl: string): void {
   const drop = () => {
     if (preparedSignals.get(peerId) === prepared) dropPreparedSignal(peerId);
   };
+  let refusal: string | null = null;
   socket.addEventListener("open", () => post({ type: "signal-open", peerId }), { signal: listeners.signal });
   socket.addEventListener(
     "message",
-    () => {
+    (event) => {
       prepared.refused = true;
+      refusal = signalErrorCode(event.data);
     },
     { signal: listeners.signal },
   );
   socket.addEventListener(
     "close",
     (event) => {
-      if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
+      if (isRateLimitClose(event.code, refusal)) signalRetryAt = Date.now() + 60_000;
       drop();
     },
     { signal: listeners.signal },
@@ -269,6 +271,30 @@ function dropPreparedSignal(peerId: string): void {
   takePreparedSignal(peerId, "")?.close(1000, "Peer stopped");
 }
 
+/** The code of a Signal `error` frame, or null for any other frame. */
+function signalErrorCode(data: unknown): string | null {
+  if (!isString(data)) return null;
+  try {
+    const message = decodeSignalServerMessage(JSON.parse(data));
+    return message?.type === "error" ? message.code : null;
+  } catch {
+    return null;
+  }
+}
+
+// Signal sends an `error` frame before it closes a refused socket with 1008. Only `rate_limited`, or
+// a 1008 without a frame, starts the rate wait. A revoked or expired session, such as after the owner
+// removes a member, connects again at once with a new ticket from main.
+function isRateLimitClose(code: number, refusal: string | null): boolean {
+  return code === 1008 && (refusal === null || refusal === "rate_limited");
+}
+
+// Main gives a host's Signal connection 30 seconds to become ready. It does not count the rate wait
+// when it knows of it; a `rate_limited` frame from Signal already tells it.
+function reportSignalRateWait(state: PeerState): void {
+  if (state.role === "host") post({ type: "peer-error", peerId: state.id, code: "rate_limited", terminal: false });
+}
+
 function connectSignal(state: PeerState, prepared: WebSocket | null = null): void {
   if (state.closed || state.socket) {
     prepared?.close(1000, "Peer stopped");
@@ -276,6 +302,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   }
   if (Date.now() < signalRetryAt) {
     prepared?.close(1000, "Signal retry pending");
+    reportSignalRateWait(state);
     scheduleSignalReconnect(state);
     return;
   }
@@ -298,17 +325,22 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       post({ type: "signal-open", peerId: state.id });
       sendHello();
     });
+  let refusal: string | null = null;
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
+    let message: SignalServerMessage | null = null;
+    let malformed = false;
+    try {
+      message = decodeSignalServerMessage(JSON.parse(event.data));
+    } catch {
+      malformed = true;
+    }
+    // Read the refusal now: the close that follows it can come before the queued frame is handled.
+    if (message?.type === "error") refusal = message.code;
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
-        let message: SignalServerMessage | null;
-        try {
-          message = decodeSignalServerMessage(JSON.parse(event.data));
-        } catch {
-          return failSignalProtocol(state);
-        }
+        if (malformed) return failSignalProtocol(state);
         // A frame type this build does not know is a newer Signal service, not a broken connection.
         if (message) await handleSignal(state, message);
       })
@@ -328,7 +360,10 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       post({ type: "peer-disconnected", peerId: state.id });
       return;
     }
-    if (event.code === 1008) signalRetryAt = Date.now() + 60_000;
+    if (isRateLimitClose(event.code, refusal)) {
+      signalRetryAt = Date.now() + 60_000;
+      if (refusal === null && !state.closed) reportSignalRateWait(state);
+    }
     if (!state.closed) scheduleSignalReconnect(state);
   });
   socket.addEventListener("error", () => socket.close());

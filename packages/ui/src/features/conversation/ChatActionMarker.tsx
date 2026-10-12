@@ -603,26 +603,28 @@ function AgentTarget(props: {
             </span>
             <span>{t("chat.marker.agentCount", { count: recipients().length })}</span>
           </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="chat-action-agent-menu">
-            <For each={recipients()}>
-              {(delivery) => {
-                const agent = () => props.agents.find((candidate) => candidate.id === delivery.agentId);
-                return (
-                  <DropdownMenu.Item
-                    class="chat-action-agent-menu-item"
-                    disabled={!agent()}
-                    onSelect={() => props.onSelectAgent(delivery.agentId)}
-                  >
-                    <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
-                    <span class="chat-action-agent-menu-name">
-                      {agent()?.name ?? t("chat.marker.unavailableAgent")}
-                    </span>
-                    <span class="chat-action-agent-menu-status">{deliveryStatusLabel(delivery.status, t)}</span>
-                  </DropdownMenu.Item>
-                );
-              }}
-            </For>
-          </DropdownMenu.Content>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="chat-action-agent-menu">
+              <For each={recipients()}>
+                {(delivery) => {
+                  const agent = () => props.agents.find((candidate) => candidate.id === delivery.agentId);
+                  return (
+                    <DropdownMenu.Item
+                      class="chat-action-agent-menu-item"
+                      disabled={!agent()}
+                      onSelect={() => props.onSelectAgent(delivery.agentId)}
+                    >
+                      <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
+                      <span class="chat-action-agent-menu-name">
+                        {agent()?.name ?? t("chat.marker.unavailableAgent")}
+                      </span>
+                      <span class="chat-action-agent-menu-status">{deliveryStatusLabel(delivery.status, t)}</span>
+                    </DropdownMenu.Item>
+                  );
+                }}
+              </For>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </Show>
     </Show>

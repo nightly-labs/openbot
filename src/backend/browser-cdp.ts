@@ -1758,16 +1758,31 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        if (this.#contents.isLoading()) yield* waitForLoading(this.#contents, timeoutMs);
-        yield* waitForDomQuietAcrossTargets(send, this.#snapshotTargets(), Math.min(timeoutMs, 1_500)).pipe(
-          Effect.catch((failure) =>
-            browserSync(() => {
-              const error = failure.cause;
-              if (error instanceof Error && error.message === "DOM did not become quiet.") return;
-              throw error;
-            }),
-          ),
-        );
+        const deadline = Date.now() + timeoutMs;
+        while (true) {
+          yield* waitForLoading(this.#contents, Math.max(1, deadline - Date.now()));
+          const generation = this.#navigationGeneration;
+          const settled = yield* waitForDomQuietAcrossTargets(
+            send,
+            this.#snapshotTargets(),
+            Math.min(deadline - Date.now(), 1_500),
+          ).pipe(
+            Effect.catch((failure) =>
+              browserSync(() => {
+                const error = failure.cause;
+                if (error instanceof Error && error.message === "DOM did not become quiet.") return;
+                throw error;
+              }),
+            ),
+            Effect.exit,
+          );
+          if (Exit.isSuccess(settled)) return;
+          // A submitted form can replace the document after the initial loading check.
+          // Observe the new document within the same deadline; never dispatch the input again.
+          if (generation !== this.#navigationGeneration && !this.#contents.isDestroyed() && Date.now() < deadline)
+            continue;
+          return yield* Effect.failCause(settled.cause);
+        }
       }),
     );
   });

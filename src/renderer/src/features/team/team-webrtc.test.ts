@@ -655,9 +655,43 @@ it("keeps the Signal rate wait when main replaces an initial peer", async () => 
   await command({ type: "disconnect", peerId: "host" });
   await command({ type: "prepare-signal", peerId: "host", signalUrl: connect.signalUrl });
   await command(connect);
+  // Main does not count the wait against the host's connection deadline.
+  expect(posted("peer-error")).toEqual([
+    expect.objectContaining({ code: "rate_limited" }),
+    expect.objectContaining({ code: "rate_limited" }),
+  ]);
   await vi.advanceTimersByTimeAsync(59_000);
   expect(SignalSocket.instances).toHaveLength(1);
   await vi.advanceTimersByTimeAsync(1_000);
   expect(SignalSocket.instances).toHaveLength(2);
   await command({ type: "close", peerId: "all" });
 });
+
+it.each(["session_revoked", "authentication_required"])(
+  "connects a host again at once after Signal refuses with %s",
+  async (code) => {
+    vi.useFakeTimers();
+    const { command, posted } = await startBridge();
+    const connect = {
+      type: "connect",
+      peerId: "host",
+      peer: "host",
+      signalUrl: "wss://signal.test",
+      token: "test",
+      iceTransportPolicy: "all",
+    } as const;
+    await command(connect);
+    const socket = SignalSocket.instances[0];
+    if (!socket) throw new Error("No Signal socket");
+    socket.dispatchEvent(new Event("open"));
+    // Signal closes every socket of a host with an older epoch after the owner removes a member.
+    socket.message({ type: "error", version: 1, code, message: "Remote access was revoked." });
+    await vi.waitFor(() => expect(posted("peer-disconnected")).toHaveLength(1));
+    socket.dispatchEvent(Object.assign(new Event("close"), { code: 1008 }));
+    // Main connects the host again with a new ticket.
+    await command(connect);
+    expect(SignalSocket.instances).toHaveLength(2);
+    expect(posted("peer-error")).toEqual([expect.objectContaining({ code })]);
+    await command({ type: "close", peerId: "all" });
+  },
+);

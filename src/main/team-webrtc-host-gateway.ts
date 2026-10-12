@@ -12,6 +12,9 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
 }
 
 const logger = createOpenBotLogger("team-webrtc-host");
+const SIGNAL_CONNECT_TIMEOUT_MS = 30_000;
+// After a `rate_limited` refusal the bridge waits Signal's rate window before its next socket.
+const SIGNAL_RATE_WAIT_MS = 60_000;
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -31,13 +34,29 @@ class HostSignal extends Context.Service<
         disconnect: (peerId) => bridge.disconnect(peerId),
         connect: Effect.fn("HostSignal.connect")(function* (peerId: string, signalUrl: string, token: string) {
           const ready = Deferred.makeUnsafe<void, RemoteWorkflowError>();
+          // The deadline measures an active attempt, not the rate wait: the bridge connects again by
+          // itself after that wait, and a failure here would leave the host in `error`.
+          let deadline = Date.now() + SIGNAL_CONNECT_TIMEOUT_MS;
           const onReady = (id: string) => {
             if (id === peerId) Deferred.doneUnsafe(ready, Effect.void);
           };
-          const onError = (id: string, _code: string, message: string) => {
-            if (id === peerId)
-              Deferred.doneUnsafe(ready, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
+          const onError = (id: string, code: string, message: string) => {
+            if (id !== peerId) return;
+            if (code === "rate_limited") deadline = Date.now() + SIGNAL_RATE_WAIT_MS + SIGNAL_CONNECT_TIMEOUT_MS;
+            else Deferred.doneUnsafe(ready, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
           };
+          const awaitReady = (): Effect.Effect<void, RemoteWorkflowError> =>
+            Deferred.await(ready).pipe(
+              Effect.timeoutOrElse({
+                duration: Math.max(0, deadline - Date.now()),
+                orElse: () =>
+                  Date.now() < deadline
+                    ? awaitReady()
+                    : Effect.fail(
+                        new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.signalTimeout")) }),
+                      ),
+              }),
+            );
           return yield* Effect.acquireUseRelease(
             Effect.sync(() => {
               // Local Signal can answer before the bridge command resolves.
@@ -57,15 +76,7 @@ class HostSignal extends Context.Service<
                 );
                 pendingConnections.add(connecting);
                 connecting.addObserver(() => pendingConnections.delete(connecting));
-                yield* Deferred.await(ready).pipe(
-                  Effect.timeoutOrElse({
-                    duration: "30 seconds",
-                    orElse: () =>
-                      Effect.fail(
-                        new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.signalTimeout")) }),
-                      ),
-                  }),
-                );
+                yield* awaitReady();
               }),
             () =>
               Effect.sync(() => {
