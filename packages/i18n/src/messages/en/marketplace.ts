@@ -241,6 +241,21 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.composio.prompt.handoff": "Post a summary of this pull request to our team channel.",
   "marketplace.plugin.composio.prompt.apps": "Which apps and actions can you use through Composio?",
 
+  "marketplace.plugin.cafecitoBeans.tagline": "Publisher research and coverage",
+  "marketplace.plugin.cafecitoBeans.description":
+    "Discover publisher articles across news, reports, research, and official statements; explore stories, sources, related coverage, and mentions with Beans MCP. Search news and blogs, earnings and financial reports, lawsuits, enforcement actions, contracts, official statements, press releases, research papers, technical documentation, whitepapers, podcasts, and sites. Compare stories across publishers, check publication dates, and cite publisher links. Coverage and update timing vary by source. Use your Cafecito API key to connect to the hosted, read-only MCP server.",
+  "marketplace.plugin.cafecitoBeans.app":
+    "Read-only article search, stories, trends, source details, related coverage, and mentions, through the hosted Beans MCP server with a Cafecito API key.",
+  "marketplace.plugin.cafecitoBeans.prompt.research":
+    "What have publishers reported about battery storage this week? Show sources, dates, and links.",
+  "marketplace.plugin.cafecitoBeans.prompt.trends":
+    "Which articles are trending about climate policy, and which are only the latest?",
+  "marketplace.plugin.cafecitoBeans.prompt.story":
+    "Find a story about semiconductor exports and show which publishers covered it.",
+  "marketplace.plugin.cafecitoBeans.prompt.earnings": "Show recent earnings reports from this publisher.",
+  "marketplace.plugin.cafecitoBeans.prompt.legal":
+    "Find lawsuits and official statements about this company since the start of the month.",
+
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.installMenu.install": "Install",
   "marketplace.skill.installMenu.installNamed": "Install {name}",
