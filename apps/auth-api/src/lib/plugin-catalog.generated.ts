@@ -16,7 +16,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-10-13T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -113,6 +113,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "f3833ad73221b264a3611761dadaadfd978832c8431106ce92e6a7a45ee9b49c",
+    },
+    {
+      slug: "cafecito-beans",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "0bb5e287e2afe0fea5cd216039aea6ac92bb2c79be68ffe6df7dcfaefd1843b1",
     },
   ],
 };
@@ -806,6 +812,66 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://composio.dev",
     privacyPolicyUrl: "https://composio.dev/privacy-policy",
     termsUrl: "https://composio.dev/terms-of-service",
+    skills: [],
+  },
+  "cafecito-beans": {
+    slug: "cafecito-beans",
+    name: "Cafecito Beans",
+    tagline: "Publisher research and coverage",
+    description:
+      "Discover publisher articles across news, reports, research, and official statements; explore stories, sources, related coverage, and mentions with Beans MCP. Search news and blogs, earnings and financial reports, lawsuits, enforcement actions, contracts, official statements, press releases, research papers, technical documentation, whitepapers, podcasts, and sites. Compare stories across publishers, check publication dates, and cite publisher links. Coverage and update timing vary by source. Use your Cafecito API key to connect to the hosted, read-only MCP server.",
+    category: "research",
+    creatorName: "Cafecito",
+    iconUrl: "https://cafecito.tech/images/beans.png",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-research",
+        text: "What have publishers reported about battery storage this week? Show sources, dates, and links.",
+      },
+      { id: "prompt-trends", text: "Which articles are trending about climate policy, and which are only the latest?" },
+      { id: "prompt-story", text: "Find a story about semiconductor exports and show which publishers covered it." },
+      { id: "prompt-earnings", text: "Show recent earnings reports from this publisher." },
+      {
+        id: "prompt-legal",
+        text: "Find lawsuits and official statements about this company since the start of the month.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-cafecito-beans-mcp",
+        name: "Cafecito Beans",
+        description:
+          "Read-only article search, stories, trends, source details, related coverage, and mentions, through the hosted Beans MCP server with a Cafecito API key.",
+        iconUrl: "https://cafecito.tech/images/beans.png",
+        server: {
+          name: "cafecito-beans",
+          transport: "http",
+          url: "https://api.cafecito.tech/beans/mcp",
+          auth: [
+            {
+              id: "cafecito-api-key",
+              kind: "key",
+              label: "Cafecito API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Cafecito API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "Enter only the key from Cafecito API Keys. Do not include Bearer.",
+                },
+              ],
+              docsUrl: "https://developer.cafecito.tech/settings/api-keys",
+              docsLabel: "Get a Cafecito API key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://developer.cafecito.tech/products/beans",
+    privacyPolicyUrl: "https://cafecito.tech/docs/privacy-policy/",
+    termsUrl: "https://cafecito.tech/docs/terms-of-use/",
     skills: [],
   },
 };

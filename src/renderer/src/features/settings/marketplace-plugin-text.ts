@@ -197,6 +197,20 @@ const PLUGIN_TEXT = {
       "prompt-apps": "marketplace.plugin.composio.prompt.apps",
     },
   },
+  "cafecito-beans": {
+    tagline: "marketplace.plugin.cafecitoBeans.tagline",
+    description: "marketplace.plugin.cafecitoBeans.description",
+    apps: {
+      "app-cafecito-beans-mcp": "marketplace.plugin.cafecitoBeans.app",
+    },
+    prompts: {
+      "prompt-research": "marketplace.plugin.cafecitoBeans.prompt.research",
+      "prompt-trends": "marketplace.plugin.cafecitoBeans.prompt.trends",
+      "prompt-story": "marketplace.plugin.cafecitoBeans.prompt.story",
+      "prompt-earnings": "marketplace.plugin.cafecitoBeans.prompt.earnings",
+      "prompt-legal": "marketplace.plugin.cafecitoBeans.prompt.legal",
+    },
+  },
 } as const satisfies Record<string, PluginTextKeys>;
 
 const english = translateFor("en");

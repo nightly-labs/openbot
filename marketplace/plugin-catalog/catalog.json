@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "v1",
-  "updatedAt": "2026-09-30T00:00:00.000Z",
+  "updatedAt": "2026-10-13T00:00:00.000Z",
   "order": [
     "aave",
     "canva",
@@ -18,7 +18,8 @@
     "firecrawl",
     "brave-search",
     "resend",
-    "composio"
+    "composio",
+    "cafecito-beans"
   ],
   "featured": ["aave", "canva", "notion", "figma"]
 }
