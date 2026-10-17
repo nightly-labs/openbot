@@ -49,6 +49,8 @@ const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
 const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
 // The multipart fields and boundaries around one file.
 const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
+// An account event is one small JSON object.
+const AUTH_EVENT_BODY_BYTES_LIMIT = 64 * 1024;
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
@@ -134,7 +136,12 @@ export function createRemoteApiApp(
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
       const signature = request.headers.get("OpenBot-Signature") ?? "";
-      const body = await request.text();
+      const bytes = await readBody(request, AUTH_EVENT_BODY_BYTES_LIMIT);
+      if (!bytes) {
+        set.status = 413;
+        return { error: { code: "event_too_large", message: "The auth event is too large." } };
+      }
+      const body = new TextDecoder().decode(bytes);
       if (!verifyWebhookSignature(body, timestamp, signature, config.authWebhookSecret)) {
         set.status = 401;
         return { error: { code: "invalid_signature", message: "The auth event signature is invalid." } };
@@ -169,8 +176,8 @@ export function createRemoteApiApp(
         }
         const kind = slackDeliveryKind(request.headers.get("content-type"));
         if (!kind) return slackResponse({ status: 415 });
-        const body = new Uint8Array(await request.arrayBuffer());
-        if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
+        const body = await readBounded(request, SLACK_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return slackResponse({ status: 413 });
         const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
         const signature = request.headers.get("x-slack-signature") ?? "";
         const signer = config.slackSigningSecrets.find(({ secret }) =>

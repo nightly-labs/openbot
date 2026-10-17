@@ -9,8 +9,8 @@ import {
   hostedSiteErrorResponse,
   json,
   requestHostedSiteService,
-  requestSourceIp,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 export const Route = createFileRoute("/v1/sites/reports")({
   server: {

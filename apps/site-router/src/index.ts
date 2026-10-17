@@ -257,11 +257,13 @@ function requestPath(pathname: string): string | null {
  * the browser resolves the relative links of a directory page one level up without the slash.
  */
 function resolveFile(route: HostedSiteRouteManifest, path: string): HostedSiteRouteFile | "directory" | null {
-  if (!path) return route.files["index.html"] ?? null;
-  const file = route.files[path] ?? (path.endsWith("/") ? route.files[`${path}index.html`] : undefined);
+  // Own keys only: `/constructor` must not find a member of `Object.prototype`.
+  const fileAt = (key: string) => (Object.hasOwn(route.files, key) ? route.files[key] : undefined);
+  if (!path) return fileAt("index.html") ?? null;
+  const file = fileAt(path) ?? (path.endsWith("/") ? fileAt(`${path}index.html`) : undefined);
   if (file) return file;
-  if (!path.endsWith("/") && route.files[`${path}/index.html`]) return "directory";
-  return route.spaFallback ? (route.files["index.html"] ?? null) : null;
+  if (!path.endsWith("/") && fileAt(`${path}/index.html`)) return "directory";
+  return route.spaFallback ? (fileAt("index.html") ?? null) : null;
 }
 
 const readRouteManifest = Effect.fn("SiteRouter.readRouteManifest")(function* (object: R2ObjectBody) {

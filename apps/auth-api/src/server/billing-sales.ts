@@ -901,8 +901,14 @@ function validCheckout(input: BillingSalesCheckout): boolean {
 function validReturnUrl(value: string): boolean {
   if (!value || value.length > 1024 || hasControlCharacter(value)) return false;
   if (!value.startsWith("/")) return false;
+  // `//host/app` and `/\host/app` start with a slash but resolve to another origin.
   const parsed = new URL(value, "https://openbot.invalid");
-  return (parsed.pathname === "/app" || parsed.pathname === "/billing/return") && !parsed.username && !parsed.password;
+  return (
+    parsed.origin === "https://openbot.invalid" &&
+    (parsed.pathname === "/app" || parsed.pathname === "/billing/return") &&
+    !parsed.username &&
+    !parsed.password
+  );
 }
 
 function stripeEventTimestamp(event: StripeEvent, fallback: number): number | null {

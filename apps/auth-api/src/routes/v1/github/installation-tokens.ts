@@ -8,8 +8,8 @@ import {
   githubInstallationTokensErrorResponse,
   json,
   requestGitHubInstallationTokens,
-  requestSourceIp,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 /**
  * Installation tokens of the OpenBot GitHub App, so that GitHub shows an agent's work as

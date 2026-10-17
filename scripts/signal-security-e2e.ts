@@ -1,7 +1,7 @@
 // Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the remote and route tickets, the generic webhook headers, the hello deadline, the reuse of
+// events, the body limits, the remote and route tickets, the generic webhook headers, the hello deadline, the reuse of
 // TURN credentials, and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
 import { type ChildProcess, spawn } from "node:child_process";
@@ -528,6 +528,37 @@ try {
     const answer = await valid.text();
     expect(valid.status === 200 && answer === "e2e-challenge", `valid: ${valid.status} ${answer}`);
     return "bad 401, stale 401, unknown secret 401, other app 401, valid challenge 200";
+  });
+
+  // A body with no declared length: Signal must stop at its limit, so it answers before the body ends.
+  await check("A Slack request or an account event with a body that does not end gets 413", async () => {
+    const endless = () => {
+      const chunk = new Uint8Array(16 * 1024).fill(0x20);
+      let sent = 0;
+      return new ReadableStream<Uint8Array>({
+        pull(controller) {
+          // Past 1 MiB the stream sends nothing more and does not end.
+          if (sent >= 1024 * 1024) return new Promise<void>(() => {});
+          sent += chunk.byteLength;
+          controller.enqueue(chunk);
+        },
+      });
+    };
+    const post = (path: string, headers: Record<string, string>) =>
+      withDeadline(fetch(`${base}${path}`, { method: "POST", headers, body: endless() }), path);
+    const event = await post("/internal/auth-events", {
+      "Content-Type": "application/json",
+      "OpenBot-Timestamp": nowSeconds(),
+      "OpenBot-Signature": "v1=bad",
+    });
+    const slack = await post(SLACK_EVENTS_PATH, {
+      "Content-Type": "application/json",
+      "X-Slack-Request-Timestamp": nowSeconds(),
+      "X-Slack-Signature": "v0=bad",
+    });
+    expect(event.status === 413, `account event: ${event.status}`);
+    expect(slack.status === 413, `Slack: ${slack.status}`);
+    return "account event 413, Slack 413";
   });
 
   // 5. Remote tickets: a host connects only with a current ticket that the account service signed.

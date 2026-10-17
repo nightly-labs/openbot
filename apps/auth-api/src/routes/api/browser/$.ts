@@ -11,9 +11,9 @@ import {
   requestHostedSiteService,
   requestRemoteControlPlane,
   requestRemoteSignalUrl,
-  requestSourceIp,
   requestTeamInviteEmailDelivery,
 } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 function handle({ request }: { request: Request }) {
   return handleBrowserApi(request, {

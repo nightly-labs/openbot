@@ -228,7 +228,8 @@ agent workspaces, conversations, attachments, browser data, and team data are st
 ## Data stored by the central account service
 
 The account service runs on Cloudflare Workers. It uses Cloudflare D1 for structured records and
-Cloudflare R2 for account avatar files.
+Cloudflare R2 for files: account avatars, host logos, published hosted site files, marketplace skill
+bundles and icons, and the images of published agent templates.
 
 The service stores:
 
@@ -267,6 +268,13 @@ The service stores:
   each subscription the Stripe subscription ID, plan, billing period, currency, price, status, period end,
   and whether it ends at the period end. The service also keeps the ID, type and receive time of each
   Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
+- hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
+  times, and for each deployment the file list, sizes and content types. The published site files
+  are in R2. Anyone can read a published site. Deleting a site removes its files.
+- marketplace skills: the owner account ID, name, description, category, review state, version
+  records, install counts, and the skill bundle and icon in R2.
+- reports about a hosted site: the hostname, the reason, the optional details text, a keyed hash of
+  the source address (of its /64 for IPv6) for each day, the review state and the creation time.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop

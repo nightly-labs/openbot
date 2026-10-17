@@ -374,12 +374,6 @@ export function requestRemoteSignalUrl(): string {
   return value;
 }
 
-export function requestSourceIp(request: Request): string {
-  return (
-    request.headers.get("CF-Connecting-IP") ?? request.headers.get("X-Forwarded-For")?.split(",")[0] ?? "127.0.0.1"
-  );
-}
-
 export function bearerToken(request: Request): string | null {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
