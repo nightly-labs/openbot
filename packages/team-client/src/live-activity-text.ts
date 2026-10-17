@@ -100,10 +100,10 @@ function inlineText(source: string): string {
 function inlineMarks(text: string): string {
   return text
     .replace(/<br\s*\/?>/giu, " ")
+    .replace(/<(https?:\/\/[^>]+)>/gu, "$1")
     .replace(/<\/?[A-Za-z][^>]*>/gu, "")
     .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/<(https?:\/\/[^>]+)>/gu, "$1")
     .replace(/__(?=\S)(.+?)(?<=\S)__/gu, "**$1**");
 }
 
