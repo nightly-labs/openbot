@@ -10,8 +10,9 @@ import { source as pl } from "./messages/pl/source";
 import { source as pt } from "./messages/pt/source";
 import { source as ru } from "./messages/ru/source";
 import { source as tr } from "./messages/tr/source";
+import { source as zh } from "./messages/zh/source";
 
-const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr } as const;
+const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr, zh } as const;
 
 /** The source catalog of `locale`, or `undefined` while it is not loaded. See `app-catalogs.ts`. */
 export function sourceTranslation(locale: TranslatedLocale): PartialTranslation<typeof en> | undefined {

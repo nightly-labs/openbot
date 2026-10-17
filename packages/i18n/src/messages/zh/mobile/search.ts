@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/search";
+
+export const messages = {
+  "mobile.search.clear": "清除搜索",
+  "mobile.search.filter.label": "筛选结果",
+  "mobile.search.filter.all": "全部",
+  "mobile.search.filter.agents": "助手",
+  "mobile.search.filter.messages": "消息",
+  "mobile.search.filter.files": "文件",
+  "mobile.search.filter.routines": "自动化任务",
+  "mobile.search.filter.settings": "设置",
+  "mobile.search.clearFilter": "清除筛选",
+  "mobile.search.seeAll": "查看全部",
+  "mobile.search.seeAllLabel": "查看全部{section}",
+  "mobile.search.emptyTitle": "没有匹配的结果",
+  "mobile.search.emptyBody": "换个搜索词试试。",
+  "mobile.search.hintTitle": "搜索消息",
+  "mobile.search.hintBody": "输入消息中的某个词即可搜索助手对话。",
+  "mobile.search.loading": "正在搜索…",
+  "mobile.search.failedTitle": "无法加载全部结果",
+  "mobile.search.errorBody": "请检查与这台电脑的连接后重试。",
+  "mobile.search.retry": "重试",
+  "mobile.search.showMore": "显示更多消息",
+  "mobile.search.showMoreFiles": "显示更多文件",
+  "mobile.search.youWrote": "你：{text}",
+  "mobile.search.authorText": "{author}：{text}",
+  "mobile.search.fileDetail": "{name} · {size}",
+  "mobile.search.routinePaused": "已暂停",
+} as const satisfies PartialTranslation<typeof source>;

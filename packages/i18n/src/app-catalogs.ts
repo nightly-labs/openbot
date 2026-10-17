@@ -10,8 +10,9 @@ import { pl } from "./messages/pl/index";
 import { pt } from "./messages/pt/index";
 import { ru } from "./messages/ru/index";
 import { tr } from "./messages/tr/index";
+import { zh } from "./messages/zh/index";
 
-const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr } as const;
+const catalogs = { en, de, es, fr, it, ja, pl, pt, ru, tr, zh } as const;
 
 /**
  * The desktop catalog of `locale`, or `undefined` while it is not loaded.
