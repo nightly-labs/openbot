@@ -1,3 +1,32 @@
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+
+/**
+ * Codex can finish a credential-store fallback while the provider keeps working. The JSON record
+ * has a `secure_error` field even when its value is `none`, so a keyword search reads it as an
+ * error. Keep only this completed, non-error fallback in the log. Failed storage operations and
+ * authentication replies still use the normal failure paths.
+ */
+export function isCodexCredentialFallbackDiagnostic(message: string): boolean {
+  try {
+    const record = JSON.parse(message);
+    if (!isDynamicRecord(record)) return false;
+    if (!("target" in record) || record.target !== "codex_otel::auth_storage") return false;
+    if (!("level" in record) || !["TRACE", "DEBUG", "INFO", "WARN"].includes(String(record.level))) return false;
+    if (!("fields" in record) || typeof record.fields !== "object" || record.fields === null) return false;
+    const fields = record.fields;
+    return (
+      "message" in fields &&
+      fields.message === "credential storage file fallback completed" &&
+      "secure_error" in fields &&
+      fields.secure_error === "none" &&
+      "outcome" in fields &&
+      (fields.outcome === "success" || fields.outcome === "not_found")
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
  *

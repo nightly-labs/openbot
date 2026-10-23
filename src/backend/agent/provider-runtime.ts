@@ -77,6 +77,7 @@ import {
   isAcpHandlerDiagnostic,
   isBackgroundRefreshDiagnostic,
   isBundledSandboxFallbackDiagnostic,
+  isCodexCredentialFallbackDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSubsystemDiagnostic,
@@ -3197,6 +3198,10 @@ export class ProviderRuntime implements ProviderPort {
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
       const message = shortenDiagnostic(this.#redactMcp(raw));
+      if (client.provider === "codex" && isCodexCredentialFallbackDiagnostic(raw)) {
+        logger.info("Codex completed a credential storage fallback.", { provider: client.provider, message });
+        return;
+      }
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
