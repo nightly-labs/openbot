@@ -187,6 +187,20 @@ function formatExcelNumber(value: string, format: string, date1904: boolean, num
   return /"[^"]*%[^"]*"|\\%/u.test(format.replace(/^"[^"]*"/u, "")) ? `${formatted}%` : formatted;
 }
 
+function spreadsheetText(element: Element | undefined): string {
+  let text = "";
+  for (const child of Array.from(element?.children ?? [])) {
+    if (child.localName === "t") {
+      text += child.textContent ?? "";
+    } else if (child.localName === "r") {
+      for (const runChild of Array.from(child.children)) {
+        if (runChild.localName === "t") text += runChild.textContent ?? "";
+      }
+    }
+  }
+  return text;
+}
+
 function cellValue(
   cell: Element,
   sharedStrings: string[],
@@ -195,7 +209,7 @@ function cellValue(
   numbers: AppFormat,
 ): string {
   const type = cell.getAttribute("t");
-  if (type === "inlineStr") return cell.getElementsByTagNameNS("*", "is")[0]?.textContent ?? "";
+  if (type === "inlineStr") return spreadsheetText(cell.getElementsByTagNameNS("*", "is")[0]);
   const valueElement = cell.getElementsByTagNameNS("*", "v")[0];
   if (!valueElement) return "";
   const value = valueElement.textContent ?? "";
@@ -272,7 +286,7 @@ export function parseSpreadsheet(bytes: Uint8Array, numbers: AppFormat = createF
   const sharedStrings = files["xl/sharedStrings.xml"]
     ? Array.from(
         xmlDocument(files["xl/sharedStrings.xml"], "xl/sharedStrings.xml").getElementsByTagNameNS("*", "si"),
-        (item) => item.textContent ?? "",
+        spreadsheetText,
       )
     : [];
   const numberFormats = parseNumberFormats(files["xl/styles.xml"]);
