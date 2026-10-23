@@ -98,7 +98,7 @@ export interface ServerSettingsModalProps {
    * The license of the signed-in account. When the owner invites a person to a full license, the
    * Members section first asks to add a user to it. Absent on surfaces with no account license.
    */
-  license?: Pick<LicenseCalls, "getState" | "setUsers"> | undefined;
+  license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;

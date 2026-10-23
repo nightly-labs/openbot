@@ -1,7 +1,9 @@
 // The commercial license of the account.
 
 import {
+  type LicenseCheckoutRequest,
   parseLicenseCheckoutRequest,
+  parseLicensePlanRequest,
   parseLicenseRenewalRequest,
   parseLicenseUsersRequest,
 } from "@openbot/contracts/license";
@@ -14,11 +16,14 @@ export function licenseIpcHandlers({ license }: { license: LicenseDesktopService
   return {
     license: {
       getState: handler(() => runCauseEffect(license.getState())),
-      openCheckout: payloadHandler(validRequest(parseLicenseCheckoutRequest), (request) =>
+      openCheckout: payloadHandler(validRequest<LicenseCheckoutRequest>(parseLicenseCheckoutRequest), (request) =>
         runCauseEffect(license.openCheckout(request)),
       ),
       setUsers: payloadHandler(validRequest(parseLicenseUsersRequest), (request) =>
         runCauseEffect(license.setUsers(request)),
+      ),
+      changePlan: payloadHandler(validRequest(parseLicensePlanRequest), (request) =>
+        runCauseEffect(license.changePlan(request)),
       ),
       setRenewal: payloadHandler(validRequest(parseLicenseRenewalRequest), (request) =>
         runCauseEffect(license.setRenewal(request)),

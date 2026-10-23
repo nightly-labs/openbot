@@ -88,6 +88,12 @@ export const messages = {
   "server.add.billing.monthly": "Помесячно",
   "server.add.billing.yearly": "Ежегодно",
   "server.add.billing.save": "Скидка {percent}%",
+  "server.add.use.label": "Использование",
+  "server.add.use.personal": "Личное",
+  "server.add.use.work": "Рабочее",
+  "server.add.license.people": "Сотрудники",
+  "server.add.license.bundle": "Комплект −{price}",
+  "server.add.license.summary": "Сервер + {license}",
   "server.add.billedMonthly": "Оплата каждый месяц",
   "server.add.billedYearly": "{price} при оплате за год",
   "server.add.yearlySaving": "Экономия {amount}",
@@ -399,8 +405,13 @@ export const messages = {
   "server.invite.showQr": "Показать QR-код приглашения",
   "server.invite.permaHint":
     "Не истекает и может использоваться много раз. Присоединиться может любой, у кого есть эта ссылка; отзовите её, чтобы отключить.",
-  "server.invite.full":
-    "На этом сервере максимальное число участников: {limit}. Удалите участника, чтобы пригласить нового человека.",
+  "server.invite.full": {
+    one: "На этом сервере максимальное число участников: {count}. Удалите участника, чтобы пригласить нового человека.",
+    few: "На этом сервере максимальное число участников: {count}. Удалите участника, чтобы пригласить нового человека.",
+    many: "На этом сервере максимальное число участников: {count}. Удалите участника, чтобы пригласить нового человека.",
+    other:
+      "На этом сервере максимальное число участников: {count}. Удалите участника, чтобы пригласить нового человека.",
+  },
   "server.invite.qrLabel": "QR-код приглашения",
   "server.invite.qrDescription": "Отсканируйте этот код в OpenBot Mobile, чтобы присоединиться к серверу.",
   "server.invite.accepted": "Приглашение принято",

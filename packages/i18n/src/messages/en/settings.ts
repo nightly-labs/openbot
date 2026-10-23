@@ -449,6 +449,9 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.startsOnUse": "Starts when you use it",
   // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "Up to {count} member", other: "Up to {count} members" },
+  // Work at a company needs a commercial license. With a Starter server, the 1-user license costs less.
+  "settings.hostedServers.plan.license.starter": "Work license: {price} / month",
+  "settings.hostedServers.plan.license.team": "Work needs a Team license",
   // The speed of a plan compared with Starter. {factor} is a number, such as 2.
   "settings.hostedServers.plan.speed.base": "Base speed",
   "settings.hostedServers.plan.speed.faster": "{factor}× faster",

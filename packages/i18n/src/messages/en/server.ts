@@ -86,6 +86,16 @@ export const messages = defineMessages("server", {
   "server.add.billing.monthly": "Monthly",
   "server.add.billing.yearly": "Yearly",
   "server.add.billing.save": "Save {percent}%",
+  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
+  "server.add.use.label": "Use",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Work",
+  // The row under the plans that sets the users of the license. It is disabled for personal use.
+  "server.add.license.people": "People at work",
+  // On each plan that the people fit, for work. {price} is the discount for one month, such as "€20".
+  "server.add.license.bundle": "Bundle −{price}",
+  // The plan summary for work. {license} is the license line, such as "Team license, 5 members".
+  "server.add.license.summary": "Server and {license}",
   "server.add.billedMonthly": "Billed monthly",
   "server.add.billedYearly": "{price} billed yearly",
   // {amount} is a formatted amount, such as "€120". It follows the yearly price.
@@ -435,7 +445,10 @@ export const messages = defineMessages("server", {
   "server.invite.showQr": "Show invitation QR code",
   "server.invite.permaHint":
     "Never expires and can be used many times. Anyone with this link can join; revoke it to disable.",
-  "server.invite.full": "This server has the maximum of {limit} members. Remove a member to invite a new person.",
+  "server.invite.full": {
+    one: "This server has the maximum of {count} member. Remove a member to invite a new person.",
+    other: "This server has the maximum of {count} members. Remove a member to invite a new person.",
+  },
   "server.invite.qrLabel": "Invitation QR code",
   "server.invite.qrDescription": "Scan this code in OpenBot Mobile to join this server.",
   "server.invite.accepted": "Invitation accepted",

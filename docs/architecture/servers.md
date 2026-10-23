@@ -517,12 +517,55 @@ another place.
 ### Commercial license
 
 The license is a second Stripe product next to the server plans
-(`packages/contracts/src/license.ts`). One account has at most one open license. It is one monthly
-subscription with the lookup key `openbot_license_month` and a graduated price: the base covers 5
-users, then each extra user, up to 25. The amounts are in `LICENSE_PRICES` (EUR is the base
-currency; USD and PLN are `currency_options`). `stripe-bootstrap.ts` creates the price. The
-subscription quantity is the number of users.
+(`packages/contracts/src/license.ts`). One account has at most one open license. Its subscription
+quantity is the number of users. There are two tiers, Starter and Team. Each tier has a monthly and a
+yearly price, and each of these has a bundle price for an account that pays for a hosted server. That
+gives 8 Stripe prices (`LICENSE_PLANS`):
 
+| Plan | Lookup key | Month (EUR) | Year (EUR) | Users |
+| --- | --- | --- | --- | --- |
+| Starter | `openbot_license_starter_{month,year}` | 30 | 324 | 1 |
+| Starter bundle | `openbot_license_starter_bundle_{month,year}` | 20 | 204 | 1 |
+| Team | `openbot_license_{month,year}` | 100 for 5 users, + 15 for each extra user | 1080, + 162 | 5–25 |
+| Team bundle | `openbot_license_bundle_{month,year}` | 80, + 15 | 840, + 162 | 5–25 |
+
+A year is 12 months less 10% (`LICENSE_YEAR_DISCOUNT_PERCENT`). The bundle discount
+(`LICENSE_BUNDLE_DISCOUNT`: 10 a month for Starter, 20 for Team) comes off after it. The amounts are
+in `LICENSE_PLAN_PRICES` (EUR is the base currency; USD and PLN are `currency_options` with their own
+amounts). Team prices are graduated; the 1-user prices are flat. `stripe-bootstrap.ts` creates each
+price with the metadata `openbot_license_tier`, `openbot_license_interval` and
+`openbot_license_bundle`, and `licensePlanFromPrice` reads them. A price with no metadata is Team monthly: the license from before
+the tiers used the same lookup key. The license terms allow 3 devices for each user
+(`LICENSE_DEVICES_PER_USER`); the app shows this and does not count devices.
+
+- A checkout names `tier: "starter" | "team"` and `interval`. A request with no tier is Team monthly,
+  as an app before the tiers sends. The Worker sells the bundle price when the account pays for any
+  hosted server plan (`accountHasServerPlan`: active, trialing, or past due in the grace period). The
+  `licenses` row stores `bundle`. After each server plan sync, `LicenseService.alignBundlePrice` moves
+  an open license to the price of its tier and interval with the bundle that the account now has, with
+  `proration: none`, so the change starts at the next renewal. It logs a Stripe failure and does not
+  fail the sync.
+- A server create can order a license (`license: {tier, users}` in `POST /v2/hosting/servers`). The
+  Worker refuses a Team license on a Starter server, and more Team users than the server plan has
+  members (400 `invalid_hosted_server_request`). An account with an open license gets 409
+  `license_exists`. Fewer users than the people in use get 409
+  `license_users_in_use`, as a license checkout does. One Checkout page then has 2 line items: the server price, and the license bundle
+  price for the same interval and currency, with the users as its quantity. The customer pays one
+  invoice. On the first sync of the paid subscription, `LicenseService.splitOrder` makes a license
+  subscription with the metadata `openbot_order_subscription` (the server subscription), anchored at
+  the server period end with `proration_behavior=none`, so its first invoice is 0. Then it deletes the
+  license item from the server subscription, also with no proration. Each later sync runs the split
+  again until it is done, and the metadata stops a second license subscription. The sales ledger
+  divides the order invoice into a server fact and a license fact, and ignores the 0 invoice of the
+  split. The Checkout session metadata keeps the order, so "Open the payment page again" makes a page
+  with the same license, unless the account has a license by then.
+- The 1-user tier refuses `POST /v1/me/license/users` with 409 `license_one_user`.
+  `POST /v1/me/license/plan` sells upgrades only: Starter to Team monthly or yearly, and
+  Team monthly to yearly. It bills the difference now (`always_invoice`,
+  `payment_behavior=error_if_incomplete`). Any other change is 409 `license_plan_change`: to go down,
+  the owner cancels at the period end and buys again.
+- The `licenses` table stores `tier`, `billing_interval` and `bundle` (migration `0040`). NULL is Team
+  monthly.
 - Users are people, not servers or computers: the owner, plus each distinct account that is an
   active member (`remote_memberships`) of a server that the owner owns. AI agents and chat-app
   participants do not count.
@@ -536,24 +579,31 @@ subscription quantity is the number of users.
   The billing webhook gives a subscription with the license lookup key to `LicenseService.sync` and
   writes nothing to `billing_subscriptions`. A Worker before the license sees an unknown plan and
   skips the event, so an old Worker keeps working.
-- Routes: `GET /v1/me/license`, and `POST /v1/me/license/checkout`, `/users` and `/renewal`. The
+- Routes: `GET /v1/me/license`, and `POST /v1/me/license/checkout`, `/users`, `/plan` and `/renewal`. The
   state is `available: false` only when the Worker has no billing, and the app then shows nothing.
   When Stripe has no active license price (it is archived to pause sales), checkout returns 503
   `license_unavailable`, and the app shows a toast with the sales address. An app on a Worker
   without these routes gets 404 and also shows nothing.
 - A Stripe customer pays in one currency, so a new license uses the currency of the account's open
-  subscriptions. Checkout cannot buy fewer users than are in use. An increase is charged at once
+  subscriptions, and a server checkout in another currency gets 409 `billing_currency`. Add server
+  opens in that currency and does not let the user change it. Checkout cannot buy fewer users than are in use. An increase is charged at once
   (`always_invoice`). A decrease starts at the next invoice and cannot go below the users in use or
   below 5. The subscription metadata `openbot_paid_users` and `openbot_paid_period_end` keep the
   users paid in the current period, so an increase after a decrease charges only the users above
   that number.
-- Checkout keeps one open license page for each account. After it makes a page, it closes the
-  older license pages of the customer, so two requests at the same time return the same page. It
-  then reads the customer's subscriptions in Stripe, not only D1, so a license paid before its
-  webhook stops the new page with `license_exists`. A second open license can still come from the
+- Checkout keeps one open page that sells a license for each account: a license page, or a server
+  order page with a license. After it makes a page, it closes the older pages of the customer that
+  sell a license, so two requests at the same time return the same page. When a newer page sells a
+  license, the new page closes with `license_exists`. It then reads the customer's subscriptions in
+  Stripe, not only D1, so a license paid before its webhook, or a paid order before its split, stops
+  the new page with `license_exists`. A second open license can still come from the
   Stripe Dashboard; `sync` logs a warning, and a person refunds it.
+- Refunds are by email only; the app and the Worker have no refund action. A customer emails
+  licenses@openbot.run within 24 hours of the first payment for a refund less a €3 / $3.60 /
+  13.20 zł fee, once per account. There are no refunds for later changes.
 - When the owner of a full license creates an invite, the members section asks to add 1 user and
-  shows the extra price, then adds the user and creates the invite. At 25 users it shows "Contact
+  shows the extra price, then adds the user and creates the invite. A 1-user license changes to Team
+  monthly for 5 users in place of the added user. At 25 users it shows "Contact
   us" and creates no invite. Admins get no step; the join tells the person that the license is full.
 - Desktop calls the `license` IPC group; the web client calls the browser routes. Both render
   `@openbot/ui/features/billing/LicenseSection` in the license slot of `BillingPanel`.

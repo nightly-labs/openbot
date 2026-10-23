@@ -468,7 +468,13 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
-import type { LicenseCheckoutRequest, LicenseRenewalRequest, LicenseState, LicenseUsersRequest } from "./license";
+import type {
+  LicenseCheckoutRequest,
+  LicensePlanRequest,
+  LicenseRenewalRequest,
+  LicenseState,
+  LicenseUsersRequest,
+} from "./license";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
@@ -1080,6 +1086,7 @@ export const IPC_ENDPOINTS = {
     getState: request<undefined, LicenseState>()("license:get-state"),
     openCheckout: request<LicenseCheckoutRequest, void>()("license:open-checkout"),
     setUsers: request<LicenseUsersRequest, LicenseState>()("license:set-users"),
+    changePlan: request<LicensePlanRequest, LicenseState>()("license:change-plan"),
     setRenewal: request<LicenseRenewalRequest, LicenseState>()("license:set-renewal"),
   },
   // OpenBot servers that the account server runs for this account. `wake` also works for a server

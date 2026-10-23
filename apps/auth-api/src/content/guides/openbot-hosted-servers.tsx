@@ -33,9 +33,8 @@ export function OpenBotHostedServers() {
         server runs—not in the number of agents you can create.
       </p>
       <p>
-        Starter supports up to three team members, with 12 GB of storage and base speed. It could suit a small,
-        founder-led company where two or three people share an OpenBot workspace for research, routine admin, or client
-        work.
+        Starter is for one person, with 12 GB of storage and base speed. It could suit a founder or a freelancer who
+        wants agents to keep working on research, routine admin, or client work while the laptop is closed.
       </p>
       <p>
         Standard supports up to 10 members, with 50 GB of storage and twice the speed of Starter. Think of a small
@@ -47,6 +46,11 @@ export function OpenBotHostedServers() {
         or heavier workloads, especially those involving more browser-based work.
       </p>
       <p>You can pay monthly or yearly. The yearly option saves 20%.</p>
+      <p>
+        Work at a company also needs a commercial license. A Starter license for one user costs €30 a month, and a Team
+        license costs €100 a month for five users and €15 for each extra user. With a hosted server, the license costs
+        €10 (Starter) or €20 (Team) less each month, and you can buy both with one payment.
+      </p>
       <ArticleImage
         src={pricing}
         alt="OpenBot hosted server pricing with Starter, Standard, and Pro plans. The yearly billing option is selected, showing member limits, storage, and speed for each plan."

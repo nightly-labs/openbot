@@ -88,6 +88,12 @@ export const messages = {
   "server.add.billing.monthly": "Mensuel",
   "server.add.billing.yearly": "Annuel",
   "server.add.billing.save": "Économisez {percent} %",
+  "server.add.use.label": "Usage",
+  "server.add.use.personal": "Personnel",
+  "server.add.use.work": "Professionnel",
+  "server.add.license.people": "Personnes au travail",
+  "server.add.license.bundle": "Pack −{price}",
+  "server.add.license.summary": "Serveur + {license}",
   "server.add.billedMonthly": "Facturé mensuellement",
   "server.add.billedYearly": "{price} facturés par an",
   "server.add.yearlySaving": "Économisez {amount}",
@@ -387,8 +393,10 @@ export const messages = {
   "server.invite.showQr": "Afficher le code QR de l’invitation",
   "server.invite.permaHint":
     "N’expire jamais et peut être utilisé plusieurs fois. Toute personne ayant ce lien peut rejoindre le serveur ; révoquez-le pour le désactiver.",
-  "server.invite.full":
-    "Ce serveur a atteint la limite de {limit} membres. Retirez un membre pour inviter une nouvelle personne.",
+  "server.invite.full": {
+    one: "Ce serveur a atteint la limite de {count} membre. Retirez un membre pour inviter une nouvelle personne.",
+    other: "Ce serveur a atteint la limite de {count} membres. Retirez un membre pour inviter une nouvelle personne.",
+  },
   "server.invite.qrLabel": "Code QR de l’invitation",
   "server.invite.qrDescription": "Scannez ce code dans OpenBot Mobile pour rejoindre ce serveur.",
   "server.invite.accepted": "Invitation acceptée",

@@ -1,5 +1,6 @@
 import {
   type LicenseCheckoutRequest,
+  type LicensePlanRequest,
   type LicenseRenewalRequest,
   type LicenseState,
   type LicenseUsersRequest,
@@ -37,6 +38,10 @@ export class LicenseDesktopService {
     return postLicense("/v1/me/license/users", request).pipe(Effect.provide(this.#platform));
   }
 
+  changePlan(request: LicensePlanRequest): Effect.Effect<LicenseState, AccountServiceFailure> {
+    return postLicense("/v1/me/license/plan", request).pipe(Effect.provide(this.#platform));
+  }
+
   setRenewal(request: LicenseRenewalRequest): Effect.Effect<LicenseState, AccountServiceFailure> {
     return postLicense("/v1/me/license/renewal", request).pipe(Effect.provide(this.#platform));
   }
@@ -55,13 +60,15 @@ const openLicenseCheckout = Effect.fn("LicenseDesktop.openCheckout")(function* (
 
 const postLicense = Effect.fn("LicenseDesktop.post")(function* (
   path: string,
-  request: LicenseUsersRequest | LicenseRenewalRequest,
+  request: LicenseUsersRequest | LicensePlanRequest | LicenseRenewalRequest,
 ) {
   const platform = yield* AccountServicePlatform;
   return yield* platform.request(path, jsonPost(request), decodeLicenseState);
 });
 
-function jsonPost(body: LicenseCheckoutRequest | LicenseUsersRequest | LicenseRenewalRequest): RequestInit {
+function jsonPost(
+  body: LicenseCheckoutRequest | LicenseUsersRequest | LicensePlanRequest | LicenseRenewalRequest,
+): RequestInit {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 

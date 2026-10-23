@@ -444,6 +444,8 @@ export const messages = {
     one: "Hasta {count} miembro",
     other: "Hasta {count} miembros",
   },
+  "settings.hostedServers.plan.license.starter": "Licencia de empresa: {price} / mes",
+  "settings.hostedServers.plan.license.team": "El trabajo necesita una licencia Team",
   "settings.hostedServers.plan.speed.base": "Velocidad base",
   "settings.hostedServers.plan.speed.faster": "{factor}× más rápido",
   "settings.hostedServers.plan.starter.name": "Starter",

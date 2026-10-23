@@ -437,6 +437,8 @@ export const messages = {
     one: "{count} üyeye kadar",
     other: "{count} üyeye kadar",
   },
+  "settings.hostedServers.plan.license.starter": "İş lisansı: {price} / ay",
+  "settings.hostedServers.plan.license.team": "İş için Team lisansı gerekir",
   "settings.hostedServers.plan.speed.base": "Temel hız",
   "settings.hostedServers.plan.speed.faster": "{factor} kat daha hızlı",
   "settings.hostedServers.plan.starter.name": "Starter",

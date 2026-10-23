@@ -213,6 +213,7 @@ function AddServer() {
       open={addServerOpen()}
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
+      license={appPort().license}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {

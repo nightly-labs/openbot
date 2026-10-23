@@ -1,3 +1,9 @@
+import {
+  LICENSE_INCLUDED_USERS,
+  LICENSE_MAX_USERS,
+  type LicenseOrder,
+  licenseOrderFor,
+} from "@openbot/contracts/license";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -26,11 +32,15 @@ import {
   HostedBillingSwitch,
   type HostedCurrency,
   HostedCurrencySelect,
+  HostedLicensePeople,
   type HostedServerBilling,
   type HostedServerPlan,
   type HostedServerPlanId,
   HostedServerPlans,
+  HostedUseSwitch,
+  hostedLongestOrderPrice,
   hostedPriceLength,
+  hostedWorkYearlyDiscountPercent,
   hostedYearlyDiscountPercent,
 } from "./HostedServerPricing";
 
@@ -44,6 +54,8 @@ export interface CreateHostedServerInput {
   plan: HostedServerPlanId;
   billing: HostedServerBilling;
   currency: HostedCurrency;
+  /** The license to buy with the server, for work use. The server and the license have one payment. */
+  license?: LicenseOrder | undefined;
 }
 
 export interface CreatedHostedServer {
@@ -57,9 +69,11 @@ interface AddServerDialogProps {
   recommendedPlan: HostedServerPlanId;
   /**
    * The currency to show first, from the user's country when the consumer knows it. Without it,
-   * the dialog guesses from the time zone. The user can change it.
+   * the dialog guesses from the time zone. The user can change it, unless `currencyLocked` is set.
    */
   currency?: HostedCurrency | undefined;
+  /** True when the account pays its open plans in `currency`. A Stripe customer pays in one currency. */
+  currencyLocked?: boolean | undefined;
   /** Null until the consumer has a server to report on. */
   setupStatus: HostedServerSetupStatus | null;
   /**
@@ -92,6 +106,12 @@ interface AddServerDialogProps {
   onCurrencyChange?: ((currency: HostedCurrency) => void) | undefined;
   /** Tells the consumer that the user chose another billing period. */
   onBillingChange?: ((billing: HostedServerBilling) => void) | undefined;
+  /**
+   * Set when the account has no license. The dialog then lets the user choose personal or work use, and
+   * for work use it sells a license with the server. `used` is the number of people who use the account's
+   * servers now.
+   */
+  licenseOffer?: { used: number } | undefined;
 }
 
 type Step = "pricing" | "progress";
@@ -153,8 +173,29 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [rendered, setRendered] = createSignal(true);
   const [opened, setOpened] = createSignal(false);
   const [closing, setClosing] = createSignal(false);
+  const [work, setWork] = createSignal(false);
+  /** A license cannot have fewer users than the people who use the account's servers now. */
+  const minPeople = () => Math.min(LICENSE_MAX_USERS, Math.max(1, props.licenseOffer?.used ?? 1));
+  const [people, setPeople] = createSignal(Math.max(LICENSE_INCLUDED_USERS, untrack(minPeople)));
+  /** The people that the plans price a license for: 0 is personal use, the server alone. */
+  const planPeople = () => (props.licenseOffer ? (work() ? people() : 0) : undefined);
+  const longestPrice = () =>
+    props.licenseOffer ? hostedLongestOrderPrice(props.plans, currency(), format) : undefined;
+  const recommended = () =>
+    (work() && props.plans.find((plan) => plan.memberLimit >= people())?.id) || props.recommendedPlan;
+  const discountPercent = () =>
+    work()
+      ? hostedWorkYearlyDiscountPercent(props.plans, currency())
+      : hostedYearlyDiscountPercent(props.plans, currency());
   // Characters over the 10 that fit in a column at 760 px. The pricing step gets wider for each one.
-  const extraPriceChars = () => Math.max(0, hostedPriceLength(props.plans, currency(), format) - 10);
+  // With a license, the longest old and new prices share the line.
+  const extraPriceChars = () => {
+    const longest = longestPrice();
+    const length = longest
+      ? longest.was.length + longest.now.length + 2
+      : hostedPriceLength(props.plans, currency(), format);
+    return Math.max(0, length - 10);
+  };
   let stepHeading: HTMLElement | undefined;
   let pricing: HTMLDivElement | undefined;
   let progressLogo: HTMLDivElement | undefined;
@@ -214,7 +255,8 @@ export function AddServerDialog(props: AddServerDialogProps) {
     setPendingPlan(plan);
     setCreateError(null);
     try {
-      setCreated(await props.onCreate({ plan, billing: billing(), currency: currency() }));
+      const license = props.licenseOffer && work() ? licenseOrderFor(people()) : undefined;
+      setCreated(await props.onCreate({ plan, billing: billing(), currency: currency(), license }));
       setStep("progress");
       focusHeading();
     } catch (cause) {
@@ -306,19 +348,22 @@ export function AddServerDialog(props: AddServerDialogProps) {
                       </Text>
                     </header>
 
-                    <div class="add-server-bar">
+                    <div class="add-server-bar" data-license={props.licenseOffer ? "" : undefined}>
+                      <Show when={props.licenseOffer}>
+                        <HostedUseSwitch work={work()} onChange={setWork} disabled={creating()} />
+                      </Show>
                       <HostedCurrencySelect
                         currency={currency()}
                         onChange={(next) => {
                           setCurrency(next);
                           props.onCurrencyChange?.(next);
                         }}
-                        disabled={creating()}
+                        disabled={creating() || props.currencyLocked === true}
                         mount={pricing}
                       />
                       <HostedBillingSwitch
                         billing={billing()}
-                        discountPercent={hostedYearlyDiscountPercent(props.plans, currency())}
+                        discountPercent={discountPercent()}
                         onChange={(next) => {
                           setBilling(next);
                           props.onBillingChange?.(next);
@@ -350,15 +395,27 @@ export function AddServerDialog(props: AddServerDialogProps) {
                       )}
                     </Show>
 
-                    <HostedServerPlans
-                      plans={props.plans}
-                      billing={billing()}
-                      currency={currency()}
-                      recommended={props.recommendedPlan}
-                      pendingPlan={pendingPlan()}
-                      disabled={props.serverLimit != null}
-                      onChoose={(plan) => void create(plan)}
-                    />
+                    <div class="add-server-plans">
+                      <HostedServerPlans
+                        plans={props.plans}
+                        billing={billing()}
+                        currency={currency()}
+                        recommended={recommended()}
+                        pendingPlan={pendingPlan()}
+                        disabled={props.serverLimit != null}
+                        people={planPeople()}
+                        longestPrice={longestPrice()}
+                        onChoose={(plan) => void create(plan)}
+                      />
+                      <Show when={props.licenseOffer}>
+                        <HostedLicensePeople
+                          value={people()}
+                          min={minPeople()}
+                          disabled={!work() || creating() || props.serverLimit != null}
+                          onChange={setPeople}
+                        />
+                      </Show>
+                    </div>
 
                     <Show when={props.onJoinWithInvite}>
                       {(onJoinWithInvite) => (

@@ -11,6 +11,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { LICENSE_METADATA, LICENSE_METADATA_KIND, licenseLookupKey } from "@openbot/contracts/license";
 import { Effect, Exit, Schema } from "effect";
 import { captureBillingSnapshot } from "../src/server/billing-snapshots";
 
@@ -140,8 +141,12 @@ function stripeSubscription(
   };
 }
 
-/** The license price has graduated tiers, so Stripe sends no `unit_amount` (`scripts/stripe-bootstrap.ts`). */
+/**
+ * The Team monthly license Price. It has graduated tiers, so Stripe sends no `unit_amount`, and its lookup key
+ * and metadata name the plan (`scripts/stripe-bootstrap.ts`).
+ */
 function stripeLicenseSubscription(id: string, currency: string, users: number) {
+  const plan = { tier: "team", interval: "month", bundle: false } as const;
   return {
     id,
     status: "active",
@@ -150,7 +155,18 @@ function stripeLicenseSubscription(id: string, currency: string, users: number) 
     items: {
       data: [
         {
-          price: { currency, unit_amount: null, billing_scheme: "tiered", recurring: { interval: "month" } },
+          price: {
+            lookup_key: licenseLookupKey(plan),
+            metadata: {
+              [LICENSE_METADATA.kind]: LICENSE_METADATA_KIND,
+              [LICENSE_METADATA.tier]: plan.tier,
+              [LICENSE_METADATA.interval]: plan.interval,
+            },
+            currency,
+            unit_amount: null,
+            billing_scheme: "tiered",
+            recurring: { interval: plan.interval },
+          },
           quantity: users,
         },
       ],

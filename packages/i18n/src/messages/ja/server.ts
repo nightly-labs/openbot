@@ -87,6 +87,12 @@ export const messages = {
   "server.add.billing.monthly": "月払い",
   "server.add.billing.yearly": "年払い",
   "server.add.billing.save": "{percent}% お得",
+  "server.add.use.label": "用途",
+  "server.add.use.personal": "個人",
+  "server.add.use.work": "業務",
+  "server.add.license.people": "業務で使う人数",
+  "server.add.license.bundle": "セット −{price}",
+  "server.add.license.summary": "サーバーと {license}",
   "server.add.billedMonthly": "毎月請求",
   "server.add.billedYearly": "年額 {price} を請求",
   "server.add.yearlySaving": "{amount} お得",
@@ -379,8 +385,9 @@ export const messages = {
   "server.invite.showQr": "招待の QR コードを表示",
   "server.invite.permaHint":
     "期限切れにならず、何度でも使用できます。このリンクを持つすべてのユーザーが参加できます。無効にするには取り消してください。",
-  "server.invite.full":
-    "このサーバーのメンバーは上限の {limit} 人です。新しい人を招待するには、メンバーを削除してください。",
+  "server.invite.full": {
+    other: "このサーバーのメンバーは上限の {count} 人です。新しい人を招待するには、メンバーを削除してください。",
+  },
   "server.invite.qrLabel": "招待の QR コード",
   "server.invite.qrDescription": "OpenBot Mobile でこのコードをスキャンすると、このサーバーに参加できます。",
   "server.invite.accepted": "招待が承諾されました",

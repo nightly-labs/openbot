@@ -57,6 +57,7 @@ export function createWebLicenseCalls(
       navigate(url);
     },
     setUsers: (users) => state("v1/me/license/users", JSON.stringify(users)),
+    changePlan: (plan) => state("v1/me/license/plan", JSON.stringify(plan)),
     setRenewal: (renewal) => state("v1/me/license/renewal", JSON.stringify(renewal)),
   };
 }
@@ -89,3 +90,8 @@ function errorMessage(value: unknown): string {
 
 /** The Customer Portal returns to `/app?billing=portal`. */
 export const WEB_APP_BILLING_PARAM = "billing";
+
+/** The pricing page sends `/app?start=server` or `/app?start=license`. */
+export const WEB_APP_START_PARAM = "start";
+/** What a pricing page button opens: the add server dialog or Billing, where the license is. */
+export type WebAppStart = "server" | "license";

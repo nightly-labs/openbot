@@ -18,7 +18,7 @@ import { configureWebReports, reportNotification } from "../../error-reports";
 import { StaticI18nProvider } from "../../i18n-context";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAppearancePreference } from "./web-appearance-preference";
-import { WEB_APP_BILLING_PARAM } from "./web-billing";
+import { WEB_APP_BILLING_PARAM, WEB_APP_START_PARAM, type WebAppStart } from "./web-billing";
 import type { WebRuntimeFactory } from "./web-client-context";
 import { takeHostingReturn } from "./web-hosted-servers";
 import { createWebLanguagePreference } from "./web-language-preference";
@@ -99,6 +99,16 @@ function takeBillingReturn(): BillingReturn | null {
   return kind === "license" || kind === "portal" ? { outcome, kind } : { outcome };
 }
 
+/** What a `/app?start=<server|license>` link from the pricing page opens. The query is removed after it is read. */
+function takeStartLink(): WebAppStart | null {
+  const url = new URL(window.location.href);
+  const start = url.searchParams.get(WEB_APP_START_PARAM);
+  if (start === null) return null;
+  url.searchParams.delete(WEB_APP_START_PARAM);
+  window.history.replaceState(window.history.state, "", url);
+  return start === "server" || start === "license" ? start : null;
+}
+
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   // This component renders the text provider, so it reads the text of the last provider that rendered.
   const text = currentText();
@@ -133,6 +143,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
+  const [startLink, setStartLink] = createSignal(takeStartLink());
   const initialBillingReturn = takeBillingReturn();
   const initialHostingReturn = takeHostingReturn();
   const [billingReturn, setBillingReturn] = createSignal(initialBillingReturn !== null);
@@ -398,6 +409,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                   onInviteClose={() => setInviteUrl(null)}
                   pluginSlug={pluginSlug()}
                   onPluginSlugConsumed={() => setPluginSlug(null)}
+                  start={startLink()}
+                  onStartConsumed={() => setStartLink(null)}
                   billingReturn={billingReturn()}
                   onBillingReturnConsumed={() => setBillingReturn(false)}
                   hostingReturn={hostingReturn()}

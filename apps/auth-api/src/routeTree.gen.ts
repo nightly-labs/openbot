@@ -16,6 +16,7 @@ import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -98,6 +99,7 @@ import { Route as V1MeBillingIndexRouteImport } from './routes/v1/me/billing/ind
 import { Route as V1MeBillingPortalRouteImport } from './routes/v1/me/billing/portal'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
 import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/checkout'
+import { Route as V1MeLicensePlanRouteImport } from './routes/v1/me/license/plan'
 import { Route as V1MeLicenseRenewalRouteImport } from './routes/v1/me/license/renewal'
 import { Route as V1MeLicenseUsersRouteImport } from './routes/v1/me/license/users'
 import { Route as V1MobileAuthDevicesSessionIdRouteImport } from './routes/v1/mobile-auth/devices/$sessionId'
@@ -197,6 +199,11 @@ const JoinRoute = JoinRouteImport.update({
 const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   id: '/llms.txt',
   path: '/llms.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
@@ -617,6 +624,11 @@ const V1MeLicenseCheckoutRoute = V1MeLicenseCheckoutRouteImport.update({
   path: '/license/checkout',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MeLicensePlanRoute = V1MeLicensePlanRouteImport.update({
+  id: '/license/plan',
+  path: '/license/plan',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeLicenseRenewalRoute = V1MeLicenseRenewalRouteImport.update({
   id: '/license/renewal',
   path: '/license/renewal',
@@ -998,6 +1010,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pricing': typeof PricingRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1077,6 +1090,7 @@ export interface FileRoutesByFullPath {
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
+  '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
@@ -1154,6 +1168,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pricing': typeof PricingRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1233,6 +1248,7 @@ export interface FileRoutesByTo {
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
+  '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
@@ -1311,6 +1327,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/pricing': typeof PricingRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1390,6 +1407,7 @@ export interface FileRoutesById {
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
+  '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
   '/v1/me/license/users': typeof V1MeLicenseUsersRoute
   '/v1/mobile-auth/devices/$sessionId': typeof V1MobileAuthDevicesSessionIdRoute
@@ -1469,6 +1487,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/join'
     | '/llms.txt'
+    | '/pricing'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
@@ -1548,6 +1567,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
     | '/v1/me/license/checkout'
+    | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
     | '/v1/mobile-auth/devices/$sessionId'
@@ -1625,6 +1645,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/join'
     | '/llms.txt'
+    | '/pricing'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
@@ -1704,6 +1725,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
     | '/v1/me/license/checkout'
+    | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
     | '/v1/mobile-auth/devices/$sessionId'
@@ -1781,6 +1803,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/join'
     | '/llms.txt'
+    | '/pricing'
     | '/privacy-policy'
     | '/report-site'
     | '/sitemap.xml'
@@ -1860,6 +1883,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
     | '/v1/me/license/checkout'
+    | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
     | '/v1/me/license/users'
     | '/v1/mobile-auth/devices/$sessionId'
@@ -1938,6 +1962,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   JoinRoute: typeof JoinRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
+  PricingRoute: typeof PricingRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ReportSiteRoute: typeof ReportSiteRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -2116,6 +2141,13 @@ declare module '@tanstack/solid-router' {
       path: '/llms.txt'
       fullPath: '/llms.txt'
       preLoaderRoute: typeof LlmsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy-policy': {
@@ -2692,6 +2724,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeLicenseCheckoutRouteImport
       parentRoute: typeof V1MeRoute
     }
+    '/v1/me/license/plan': {
+      id: '/v1/me/license/plan'
+      path: '/license/plan'
+      fullPath: '/v1/me/license/plan'
+      preLoaderRoute: typeof V1MeLicensePlanRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/license/renewal': {
       id: '/v1/me/license/renewal'
       path: '/license/renewal'
@@ -3155,6 +3194,7 @@ interface V1MeRouteChildren {
   V1MeProfileRoute: typeof V1MeProfileRoute
   V1MeBillingPortalRoute: typeof V1MeBillingPortalRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
+  V1MeLicensePlanRoute: typeof V1MeLicensePlanRoute
   V1MeLicenseRenewalRoute: typeof V1MeLicenseRenewalRoute
   V1MeLicenseUsersRoute: typeof V1MeLicenseUsersRoute
   V1MeBillingIndexRoute: typeof V1MeBillingIndexRoute
@@ -3166,6 +3206,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeProfileRoute: V1MeProfileRoute,
   V1MeBillingPortalRoute: V1MeBillingPortalRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,
+  V1MeLicensePlanRoute: V1MeLicensePlanRoute,
   V1MeLicenseRenewalRoute: V1MeLicenseRenewalRoute,
   V1MeLicenseUsersRoute: V1MeLicenseUsersRoute,
   V1MeBillingIndexRoute: V1MeBillingIndexRoute,
@@ -3292,6 +3333,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   JoinRoute: JoinRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
+  PricingRoute: PricingRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   ReportSiteRoute: ReportSiteRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

@@ -59,6 +59,11 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    `{name, plan, interval, currency}` and an `Idempotency-Key`. The Worker stores a row in
    `awaiting_payment` with no claim and no sandbox, makes the Stripe customer, and returns a Stripe
    Checkout URL (35 minutes). A repeated request expires the old Checkout and returns a new one.
+   An optional `license: {tier, users}` adds the commercial license at the bundle price to the same
+   page, so one payment buys both. The first sync moves the license to its own subscription that
+   renews on the same day as the server ([Commercial license](architecture/servers.md#commercial-license)).
+   Refunds are by email only: email licenses@openbot.run within 24 hours of the first payment for a
+   refund less a €3 / $3.60 / 13.20 zł fee, once per account. There are no refunds for later changes.
    The desktop main process opens the URL only when it is an `https://checkout.stripe.com` URL; the
    renderer never gets it. The web client goes to the page in the same tab, and Stripe returns to
    `/app?hosting=checkout&hosted_server=<id>` (`&cancelled=1` when the user went back).
@@ -282,10 +287,14 @@ a Claude subscription on a server, read [provider terms](provider-terms.md#claud
 
 ## Members
 
-The plan sets the number of active members, owner included: Starter 3, Standard 10 and Pro 25
-(`BILLING_PLANS`). A host with no plan has 3 (`DEFAULT_TEAM_MEMBER_LIMIT`). The Worker reads the plan
+The plan sets the number of active members, owner included: Starter 1, Standard 10 and Pro 25
+(`BILLING_PLANS`). A host with no plan has 3 (`DEFAULT_TEAM_MEMBER_LIMIT`). A Starter server made
+before the 1-member limit keeps 3: migration `0040` sets `hosted_servers.legacy_starter_members` to 1
+for each existing row, and the Worker writes 0 for a new server. `getServerEntitlement` returns the
+limit as `memberLimit`. The Worker reads the plan
 with `getServerEntitlement` when a member joins or is reactivated, and refuses a member over the limit
-(`409 member_limit_reached`). This also applies to a self-hosted host that has a plan.
+(`409 member_limit_reached`). A lower limit removes no member who is already active. This also applies to a
+self-hosted host that has a plan.
 
 - A lower limit after a plan change or a plan end removes no one. Active members keep their seats.
   A new join or a reactivation waits for a free seat.

@@ -87,6 +87,12 @@ export const messages = {
   "server.add.billing.monthly": "Mensual",
   "server.add.billing.yearly": "Anual",
   "server.add.billing.save": "Ahorra un {percent}%",
+  "server.add.use.label": "Uso",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Trabajo",
+  "server.add.license.people": "Personas en el trabajo",
+  "server.add.license.bundle": "Paquete −{price}",
+  "server.add.license.summary": "Servidor + {license}",
   "server.add.billedMonthly": "Facturación mensual",
   "server.add.billedYearly": "{price} facturados anualmente",
   "server.add.yearlySaving": "Ahorra {amount}",
@@ -389,8 +395,10 @@ export const messages = {
   "server.invite.showQr": "Mostrar código QR de invitación",
   "server.invite.permaHint":
     "Nunca caduca y se puede usar muchas veces. Cualquiera con este enlace puede unirse; revócalo para desactivarlo.",
-  "server.invite.full":
-    "Este servidor tiene el máximo de {limit} miembros. Elimina a un miembro para invitar a otra persona.",
+  "server.invite.full": {
+    one: "Este servidor tiene el máximo de {count} miembro. Elimina a un miembro para invitar a otra persona.",
+    other: "Este servidor tiene el máximo de {count} miembros. Elimina a un miembro para invitar a otra persona.",
+  },
   "server.invite.qrLabel": "Código QR de invitación",
   "server.invite.qrDescription": "Escanea este código en OpenBot Mobile para unirte a este servidor.",
   "server.invite.accepted": "Invitación aceptada",

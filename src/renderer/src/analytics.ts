@@ -270,6 +270,7 @@ interface DesktopAnalyticsEvents {
       | "buy_opened"
       | "checkout_opened"
       | "users_change_requested"
+      | "plan_change_requested"
       | "cancel_requested"
       | "cancel_kept"
       | "renewal_resumed"
@@ -576,6 +577,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
     "buy_opened",
     "checkout_opened",
     "users_change_requested",
+    "plan_change_requested",
     "cancel_requested",
     "cancel_kept",
     "renewal_resumed",

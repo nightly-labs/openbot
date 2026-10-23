@@ -1,7 +1,13 @@
 import { isOpenBillingStatus } from "@openbot/contracts/billing";
 import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { InviteSummary, TeamPresenceMember, TeamRole } from "@openbot/contracts/ipc";
-import { LICENSE_MAX_USERS, type License, licenseAmount } from "@openbot/contracts/license";
+import {
+  LICENSE_INCLUDED_USERS,
+  LICENSE_MAX_USERS,
+  type License,
+  licenseMonthlyAmount,
+  licensePlanOf,
+} from "@openbot/contracts/license";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -43,7 +49,7 @@ import {
   Trash2,
   UserRound,
 } from "@openbot/ui";
-import { formatLicenseMoney } from "@openbot/ui/features/billing/LicenseSection";
+import { formatMinorMoney } from "@openbot/ui/features/billing/LicenseSection";
 import { MemberRoleMenu } from "@openbot/ui/features/servers/ServerRoles";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
@@ -648,7 +654,7 @@ export function createServerMembersSection(
             </Show>
             <Show when={membersFull()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
-                {t("server.invite.full", { limit: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
+                {t("server.invite.full", { count: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
             </Show>
             <Show
@@ -935,21 +941,28 @@ export function createServerMembersSection(
   }
 
   /**
-   * Asks the owner to add a user to the full license, then sends the invite. A license at the maximum
-   * cannot grow, so the dialog offers the contact page and sends no invite.
+   * Asks the owner to add a user to the full license, then sends the invite. A Starter license is for
+   * 1 user, so the dialog changes it to Team monthly. A license at the maximum cannot grow, so the
+   * dialog offers the contact page and sends no invite.
    */
   function LicenseUserDialog() {
     const { errorMessage } = useText();
     return (
       <Show when={licenseStep()}>
         {(step) => {
+          const plan = () => licensePlanOf(step().license);
+          const toTeam = () => plan().tier !== "team";
           // A license can count more people than it pays for, when they joined before a lower limit.
-          const users = () => Math.max(step().license.users, step().used) + 1;
+          const next = () => Math.max(step().license.users, step().used) + 1;
+          const users = () => (toTeam() ? Math.max(LICENSE_INCLUDED_USERS, next()) : next());
           const price = () =>
             users() > LICENSE_MAX_USERS
               ? null
-              : licenseAmount(users(), step().license.currency) -
-                licenseAmount(step().license.users, step().license.currency);
+              : licenseMonthlyAmount(
+                  toTeam() ? { tier: "team", interval: "month", bundle: plan().bundle } : plan(),
+                  users(),
+                  step().license.currency,
+                ) - step().license.amount;
           return (
             <ConfirmDialog
               open
@@ -959,15 +972,20 @@ export function createServerMembersSection(
               title={t("billing.license.invite.title")}
               description={
                 <Show when={price()} fallback={t("billing.license.invite.max", { count: LICENSE_MAX_USERS })}>
-                  {(amount) =>
-                    t("billing.license.invite.description", {
-                      price: formatLicenseMoney(format, amount(), step().license.currency),
-                    })
-                  }
+                  {(amount) => {
+                    const money = formatMinorMoney(format, amount(), step().license.currency);
+                    return toTeam()
+                      ? t("billing.license.invite.oneUser", { users: format.number(users()), price: money })
+                      : t("billing.license.invite.description", { price: money });
+                  }}
                 </Show>
               }
               confirmLabel={
-                price() !== null ? t("billing.license.invite.confirm") : t("billing.license.contact.action")
+                price() === null
+                  ? t("billing.license.contact.action")
+                  : toTeam()
+                    ? t("billing.license.invite.confirmTeam")
+                    : t("billing.license.invite.confirm")
               }
               error={step().error ?? undefined}
               onCancel={() => {
@@ -985,16 +1003,14 @@ export function createServerMembersSection(
                 }
                 desktopAnalytics.track("limit_reached", { kind: "license_users", action: "confirmed" });
                 if (calls) {
+                  const action = toTeam() ? "plan_change_requested" : "users_change_requested";
                   try {
-                    await calls.setUsers({ users: users() });
-                    desktopAnalytics.track("license_action", {
-                      action: "users_change_requested",
-                      result: "succeeded",
-                      direction: "up",
-                    });
+                    if (toTeam()) await calls.changePlan({ interval: "month", users: users() });
+                    else await calls.setUsers({ users: users() });
+                    desktopAnalytics.track("license_action", { action, result: "succeeded", direction: "up" });
                   } catch (error) {
                     desktopAnalytics.track("license_action", {
-                      action: "users_change_requested",
+                      action,
                       result: "failed",
                       direction: "up",
                       failure_code: "update_failed",

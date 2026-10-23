@@ -449,6 +449,8 @@ export const messages = {
   "settings.hostedServers.plan.linux": "Machine Linux",
   "settings.hostedServers.plan.startsOnUse": "Démarre quand vous l’utilisez",
   "settings.hostedServers.plan.members": { one: "Jusqu’à {count} membre", other: "Jusqu’à {count} membres" },
+  "settings.hostedServers.plan.license.starter": "Licence professionnelle : {price} / mois",
+  "settings.hostedServers.plan.license.team": "Le travail nécessite une licence Team",
   "settings.hostedServers.plan.speed.base": "Vitesse de base",
   "settings.hostedServers.plan.speed.faster": "{factor}× plus rapide",
   "settings.hostedServers.plan.starter.name": "Starter",

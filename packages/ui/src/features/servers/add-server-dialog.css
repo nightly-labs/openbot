@@ -88,6 +88,21 @@
   transform: translateY(-50%);
 }
 
+/* With a license offer: personal or work use at the left, the currency and billing at the right. */
+.add-server-bar[data-license] {
+  justify-content: flex-end;
+  padding-inline: 0;
+}
+
+.add-server-bar[data-license] .hosted-use {
+  margin-right: auto;
+}
+
+.add-server-bar[data-license] .hosted-currency {
+  position: static;
+  transform: none;
+}
+
 /* Two equal columns, so the pill moves by exactly its own width. */
 .hosted-billing {
   --hosted-billing-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
@@ -113,7 +128,8 @@
   transition: transform 300ms var(--hosted-billing-ease);
 }
 
-.hosted-billing[data-billing="yearly"]::before {
+.hosted-billing[data-billing="yearly"]::before,
+.hosted-billing[data-use="work"]::before {
   transform: translateX(100%);
 }
 
@@ -164,6 +180,11 @@
   background: var(--openbot-success-soft);
   color: var(--openbot-success-text);
   animation: hosted-billing-save-pop 300ms var(--hosted-billing-ease) 80ms both;
+}
+
+/* The saving changes between personal and work use; equal digit widths keep the switch in place. */
+.add-server-bar[data-license] .hosted-billing-save {
+  font-variant-numeric: tabular-nums;
 }
 
 /* One framed panel. Hairlines divide the plans. */
@@ -353,6 +374,92 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
+}
+
+/* The bundle discount of a server with its license, in place of the "Best value" badge. */
+.hosted-plan-bundle {
+  padding: 0 var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success-text);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
+  white-space: nowrap;
+}
+
+/* The personal and work summaries differ in length; two lines for both, so the buttons stay in place. */
+.hosted-plans[data-license] .hosted-plan-summary {
+  min-height: 2lh;
+}
+
+/* The price line breaks for all counts or for none. LongestPrice measures the longest price. */
+.hosted-plans[data-license] .hosted-plan-price {
+  position: relative;
+}
+
+.hosted-plan-longest {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Only the visible price: the copy must not change the width that it measures. */
+.hosted-plans[data-stacked] .hosted-plan-price > .hosted-plan-was[data-shown] {
+  flex-basis: 100%;
+}
+
+/* The people row closes the frame of the plans. It stays for personal use, disabled, so nothing moves. */
+.hosted-plans[data-license] {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.hosted-license-people {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-6);
+  border: 1px solid var(--openbot-border);
+  border-top: 0;
+  border-radius: 0 0 var(--openbot-radius-card) var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  transition: color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.hosted-license-people[data-disabled] {
+  color: var(--openbot-text-muted);
+}
+
+.hosted-license-people > span {
+  white-space: nowrap;
+}
+
+.hosted-license-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* As wide as "25 members", so the buttons stay in place while the count changes. */
+.hosted-license-stepper > span {
+  min-width: 11ch;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hosted-license-stepper .ui-icon-button {
+  border-radius: var(--openbot-radius-pill);
 }
 
 /* The buttons line up when the summaries wrap to different lengths. */
@@ -809,6 +916,16 @@
     transform: none;
   }
 
+  /* Personal or work use and the currency on one line, the billing under them. */
+  .add-server-bar[data-license] {
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+
+  .add-server-bar[data-license] .hosted-billing:not(.hosted-use) {
+    flex: 1 1 100%;
+  }
+
   .add-server-custom {
     flex-direction: column;
     align-items: stretch;
@@ -833,6 +950,7 @@
   .hosted-billing-save,
   .hosted-plan,
   .hosted-plan-was,
+  .hosted-license-people,
   .add-server-progress[data-status] .add-server-ring-segment circle,
   .add-server-progress[data-status] .add-server-ring-core {
     transition: none;
