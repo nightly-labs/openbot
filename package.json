@@ -212,6 +212,7 @@
     "test:claude-foreign-session": "bun scripts/claude-foreign-session-e2e.ts",
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
+    "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
     "test:mcp-tool-consent": "bun scripts/mcp-tool-consent-e2e.ts",
     "test:agent-mcp-tools": "bun scripts/agent-mcp-tools-e2e.ts",
     "test:agent-update-agents": "bun scripts/agent-update-agents-e2e.ts",
