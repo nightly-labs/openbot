@@ -198,6 +198,15 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.recentDeployments": "Listez les déploiements d’aujourd’hui et leur statut.",
   "marketplace.plugin.vercel.prompt.runtimeErrors":
     "Quelles routes ont eu des erreurs d’exécution au cours de la dernière heure ?",
+  "marketplace.plugin.supabase.tagline": "Base de données, journaux et conseillers",
+  "marketplace.plugin.supabase.description":
+    "Supabase permet aux agents de lister les tables et les migrations, d’exécuter du SQL en lecture seule, de lire les journaux du projet et les conseillers de sécurité, et de chercher dans la documentation Supabase. Chaque utilisateur se connecte à son propre compte Supabase dans le navigateur et choisit l’organisation que les agents peuvent utiliser. Le serveur fonctionne en mode lecture seule, comme Supabase le recommande pour les agents sans surveillance. Les agents ne peuvent donc ni appliquer de migrations, ni déployer d’Edge Functions, ni créer de projets.",
+  "marketplace.plugin.supabase.app":
+    "Tables, SQL en lecture seule, journaux et conseillers, via le serveur MCP de Supabase avec connexion dans le navigateur.",
+  "marketplace.plugin.supabase.prompt.schema": "Quelles tables contient ce projet, et comment sont-elles liées ?",
+  "marketplace.plugin.supabase.prompt.advisors": "Que signalent les conseillers de sécurité et de performance ?",
+  "marketplace.plugin.supabase.prompt.errors":
+    "Quelles erreurs les journaux de l’API ont-ils montrées au cours de la dernière heure ?",
   "marketplace.plugin.context7.tagline": "Documentation à jour des bibliothèques",
   "marketplace.plugin.context7.description":
     "Context7 récupère la documentation et les références d’API à jour des bibliothèques et des frameworks, pour que les réponses utilisent la version que le projet exécute réellement. Il ne demande ni compte ni clé.",

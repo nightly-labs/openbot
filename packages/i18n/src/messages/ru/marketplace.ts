@@ -212,6 +212,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Почему не удался последний продакшен-деплой?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Покажите сегодняшние деплои и их статус.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "На каких маршрутах были ошибки выполнения за последний час?",
+  "marketplace.plugin.supabase.tagline": "База данных, логи и советники",
+  "marketplace.plugin.supabase.description":
+    "Supabase позволяет агентам просматривать таблицы и миграции, выполнять SQL только для чтения, читать логи проекта и советников по безопасности, а также искать в документации Supabase. Каждый пользователь входит в свой аккаунт Supabase через браузер и выбирает организацию, которую могут использовать агенты. Сервер работает в режиме только для чтения, как Supabase рекомендует для агентов без присмотра, поэтому агенты не могут применять миграции, развёртывать Edge Functions и создавать проекты.",
+  "marketplace.plugin.supabase.app":
+    "Таблицы, SQL только для чтения, логи и советники через MCP-сервер Supabase со входом в браузере.",
+  "marketplace.plugin.supabase.prompt.schema": "Какие таблицы есть в этом проекте и как они связаны?",
+  "marketplace.plugin.supabase.prompt.advisors": "Что сообщают советники по безопасности и производительности?",
+  "marketplace.plugin.supabase.prompt.errors": "Какие ошибки показали логи API за последний час?",
   "marketplace.plugin.context7.tagline": "Актуальная документация библиотек",
   "marketplace.plugin.context7.description":
     "Context7 получает актуальную документацию и справочники API для библиотек и фреймворков, чтобы ответы учитывали версию, которая действительно используется в проекте. Аккаунт и ключ не нужны.",

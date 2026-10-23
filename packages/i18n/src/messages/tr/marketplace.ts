@@ -213,6 +213,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Son üretim dağıtımı neden başarısız oldu?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Bugünkü dağıtımları ve durumlarını listele.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Son bir saatte hangi rotalarda çalışma zamanı hatası oluştu?",
+  "marketplace.plugin.supabase.tagline": "Veritabanı, günlükler ve danışmanlar",
+  "marketplace.plugin.supabase.description":
+    "Supabase, ajanların tabloları ve geçişleri listelemesini, salt okunur SQL çalıştırmasını, proje günlüklerini ve güvenlik danışmanlarını okumasını ve Supabase belgelerinde arama yapmasını sağlar. Her kullanıcı tarayıcıdan kendi Supabase hesabına giriş yapar ve ajanların kullanabileceği kuruluşu seçer. Sunucu, Supabase'in gözetimsiz ajanlar için önerdiği salt okunur modda çalışır; bu nedenle ajanlar geçiş uygulayamaz, Edge Functions dağıtamaz ve proje oluşturamaz.",
+  "marketplace.plugin.supabase.app":
+    "Tablolar, salt okunur SQL, günlükler ve danışmanlar; tarayıcıda giriş yapılan Supabase MCP sunucusu üzerinden.",
+  "marketplace.plugin.supabase.prompt.schema": "Bu projede hangi tablolar var ve birbirleriyle nasıl ilişkili?",
+  "marketplace.plugin.supabase.prompt.advisors": "Güvenlik ve performans danışmanları neler bildiriyor?",
+  "marketplace.plugin.supabase.prompt.errors": "Son bir saatte API günlüklerinde hangi hatalar göründü?",
   "marketplace.plugin.context7.tagline": "Güncel kitaplık belgeleri",
   "marketplace.plugin.context7.description":
     "Context7, kitaplıklar ve çerçeveler için güncel belgeleri ve API başvurularını getirir; böylece yanıtlar projenin gerçekten çalıştırdığı sürümü kullanır. Hesap veya anahtar gerektirmez.",

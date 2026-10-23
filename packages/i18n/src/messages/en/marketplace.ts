@@ -193,6 +193,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.vercel.prompt.failedBuild": "Why did the last production deployment fail?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "List the deployments from today and their status.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Which routes had runtime errors in the last hour?",
+  "marketplace.plugin.supabase.tagline": "Database, logs and advisors",
+  "marketplace.plugin.supabase.description":
+    "Supabase lets agents list tables and migrations, run read-only SQL, read project logs and security advisors, and search the Supabase docs. Each user signs in to their own Supabase account through the browser and chooses the organization that agents can use. The server runs in read-only mode, as Supabase recommends for unattended agents, so agents cannot apply migrations, deploy Edge Functions or create projects.",
+  "marketplace.plugin.supabase.app":
+    "Tables, read-only SQL, logs, and advisors, over Supabase's MCP server with browser sign-in.",
+  "marketplace.plugin.supabase.prompt.schema": "Which tables are in this project, and how do they relate?",
+  "marketplace.plugin.supabase.prompt.advisors": "What do the security and performance advisors report?",
+  "marketplace.plugin.supabase.prompt.errors": "Which errors did the API logs show in the last hour?",
   "marketplace.plugin.context7.tagline": "Current library documentation",
   "marketplace.plugin.context7.description":
     "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",

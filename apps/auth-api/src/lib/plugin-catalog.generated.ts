@@ -73,6 +73,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "7e5ead435028c8e74d1e4bf84e7e61bc4216de8d0636a862d160e48391589253",
     },
     {
+      slug: "supabase",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d422af0b156c5674b46c75d2e79a802a1cfdd7e79f492c58e2a5c67cefc6f058",
+    },
+    {
       slug: "context7",
       version: "1.0.0",
       featured: false,
@@ -480,6 +486,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://vercel.com",
     privacyPolicyUrl: "https://vercel.com/legal/privacy-notice",
     termsUrl: "https://vercel.com/legal/terms",
+    skills: [],
+  },
+  supabase: {
+    slug: "supabase",
+    name: "Supabase",
+    tagline: "Database, logs and advisors",
+    description:
+      "Supabase lets agents list tables and migrations, run read-only SQL, read project logs and security advisors, and search the Supabase docs. Each user signs in to their own Supabase account through the browser and chooses the organization that agents can use. The server runs in read-only mode, as Supabase recommends for unattended agents, so agents cannot apply migrations, deploy Edge Functions or create projects.",
+    category: "coding",
+    creatorName: "supabase.com",
+    iconUrl: "https://supabase.com/favicon/apple-icon-180x180.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-schema", text: "Which tables are in this project, and how do they relate?" },
+      { id: "prompt-advisors", text: "What do the security and performance advisors report?" },
+      { id: "prompt-errors", text: "Which errors did the API logs show in the last hour?" },
+    ],
+    apps: [
+      {
+        id: "app-supabase-mcp",
+        name: "Supabase",
+        description: "Tables, read-only SQL, logs, and advisors, over Supabase's MCP server with browser sign-in.",
+        iconUrl: "https://supabase.com/favicon/apple-icon-180x180.png",
+        server: {
+          name: "supabase",
+          transport: "http",
+          url: "https://mcp.supabase.com/mcp?read_only=true",
+          auth: [{ id: "supabase-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://supabase.com",
+    privacyPolicyUrl: "https://supabase.com/privacy",
+    termsUrl: "https://supabase.com/terms",
     skills: [],
   },
   context7: {

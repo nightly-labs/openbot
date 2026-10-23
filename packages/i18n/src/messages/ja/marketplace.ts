@@ -190,6 +190,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "直近の本番デプロイが失敗したのはなぜですか？",
   "marketplace.plugin.vercel.prompt.recentDeployments": "今日のデプロイとそのステータスを一覧にしてください。",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "過去 1 時間にランタイムエラーが発生したルートはどれですか？",
+  "marketplace.plugin.supabase.tagline": "データベース、ログ、アドバイザー",
+  "marketplace.plugin.supabase.description":
+    "Supabase を使うと、エージェントはテーブルとマイグレーションを一覧表示し、読み取り専用の SQL を実行し、プロジェクトのログとセキュリティアドバイザーを読み、Supabase のドキュメントを検索できます。各ユーザーはブラウザーで自分の Supabase アカウントにサインインし、エージェントが使える組織を選びます。サーバーは、Supabase が無人のエージェントに推奨する読み取り専用モードで動作するため、エージェントはマイグレーションの適用、Edge Functions のデプロイ、プロジェクトの作成はできません。",
+  "marketplace.plugin.supabase.app":
+    "テーブル、読み取り専用の SQL、ログ、アドバイザーを、ブラウザーでサインインする Supabase の MCP サーバーで提供します。",
+  "marketplace.plugin.supabase.prompt.schema": "このプロジェクトにはどのテーブルがあり、どのように関連していますか？",
+  "marketplace.plugin.supabase.prompt.advisors": "セキュリティとパフォーマンスのアドバイザーは何を報告していますか？",
+  "marketplace.plugin.supabase.prompt.errors": "過去 1 時間に API ログにはどのエラーが出ましたか？",
   "marketplace.plugin.context7.tagline": "最新のライブラリドキュメント",
   "marketplace.plugin.context7.description":
     "Context7 はライブラリとフレームワークの最新のドキュメントと API リファレンスを取得するので、回答はプロジェクトが実際に使っているバージョンに基づきます。アカウントもキーも不要です。",

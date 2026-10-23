@@ -194,6 +194,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Perché l'ultimo deploy di produzione non è riuscito?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Elenca i deploy di oggi e il loro stato.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Quali route hanno avuto errori di runtime nell'ultima ora?",
+  "marketplace.plugin.supabase.tagline": "Database, log e advisor",
+  "marketplace.plugin.supabase.description":
+    "Supabase consente agli agenti di elencare tabelle e migrazioni, eseguire SQL in sola lettura, leggere i log del progetto e gli advisor di sicurezza e cercare nella documentazione di Supabase. Ogni utente accede al proprio account Supabase dal browser e sceglie l'organizzazione che gli agenti possono usare. Il server funziona in modalità di sola lettura, come Supabase consiglia per gli agenti senza supervisione, quindi gli agenti non possono applicare migrazioni, distribuire Edge Functions né creare progetti.",
+  "marketplace.plugin.supabase.app":
+    "Tabelle, SQL in sola lettura, log e advisor, tramite il server MCP di Supabase con accesso dal browser.",
+  "marketplace.plugin.supabase.prompt.schema": "Quali tabelle ci sono in questo progetto e come sono collegate?",
+  "marketplace.plugin.supabase.prompt.advisors": "Cosa segnalano gli advisor di sicurezza e prestazioni?",
+  "marketplace.plugin.supabase.prompt.errors": "Quali errori hanno mostrato i log dell'API nell'ultima ora?",
   "marketplace.plugin.context7.tagline": "Documentazione aggiornata delle librerie",
   "marketplace.plugin.context7.description":
     "Context7 recupera la documentazione e i riferimenti API aggiornati di librerie e framework, così le risposte usano la versione che il progetto usa davvero. Non servono né un account né una chiave.",

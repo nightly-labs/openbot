@@ -198,6 +198,15 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Warum ist das letzte Production-Deployment fehlgeschlagen?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Liste die heutigen Deployments und ihren Status auf.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Welche Routen hatten in der letzten Stunde Laufzeitfehler?",
+  "marketplace.plugin.supabase.tagline": "Datenbank, Logs und Advisors",
+  "marketplace.plugin.supabase.description":
+    "Mit Supabase listen Agenten Tabellen und Migrationen auf, führen schreibgeschütztes SQL aus, lesen Projekt-Logs und Sicherheits-Advisors und durchsuchen die Supabase-Dokumentation. Jeder Nutzer meldet sich im Browser bei seinem eigenen Supabase-Konto an und wählt die Organisation, die Agenten nutzen dürfen. Der Server läuft im schreibgeschützten Modus, wie Supabase es für unbeaufsichtigte Agenten empfiehlt. Agenten können daher keine Migrationen anwenden, keine Edge Functions bereitstellen und keine Projekte erstellen.",
+  "marketplace.plugin.supabase.app":
+    "Tabellen, schreibgeschütztes SQL, Logs und Advisors über den MCP-Server von Supabase mit Anmeldung im Browser.",
+  "marketplace.plugin.supabase.prompt.schema":
+    "Welche Tabellen gibt es in diesem Projekt, und wie hängen sie zusammen?",
+  "marketplace.plugin.supabase.prompt.advisors": "Was melden die Sicherheits- und Performance-Advisors?",
+  "marketplace.plugin.supabase.prompt.errors": "Welche Fehler zeigten die API-Logs in der letzten Stunde?",
   "marketplace.plugin.context7.tagline": "Aktuelle Bibliotheksdokumentation",
   "marketplace.plugin.context7.description":
     "Context7 ruft aktuelle Dokumentation und API-Referenzen für Bibliotheken und Frameworks ab, damit Antworten die Version verwenden, die das Projekt tatsächlich nutzt. Es braucht kein Konto und keinen Schlüssel.",

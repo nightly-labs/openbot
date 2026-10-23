@@ -129,6 +129,18 @@ const PLUGIN_TEXT = {
       "prompt-runtime-errors": "marketplace.plugin.vercel.prompt.runtimeErrors",
     },
   },
+  supabase: {
+    tagline: "marketplace.plugin.supabase.tagline",
+    description: "marketplace.plugin.supabase.description",
+    apps: {
+      "app-supabase-mcp": "marketplace.plugin.supabase.app",
+    },
+    prompts: {
+      "prompt-schema": "marketplace.plugin.supabase.prompt.schema",
+      "prompt-advisors": "marketplace.plugin.supabase.prompt.advisors",
+      "prompt-errors": "marketplace.plugin.supabase.prompt.errors",
+    },
+  },
   context7: {
     tagline: "marketplace.plugin.context7.tagline",
     description: "marketplace.plugin.context7.description",
