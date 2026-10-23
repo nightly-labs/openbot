@@ -213,6 +213,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Son üretim dağıtımı neden başarısız oldu?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Bugünkü dağıtımları ve durumlarını listele.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Son bir saatte hangi rotalarda çalışma zamanı hatası oluştu?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, depolama ve günlükler",
+  "marketplace.plugin.cloudflare.description":
+    "Cloudflare, ajanların Cloudflare API'si üzerinden Workers, DNS kayıtları, R2, D1 ve KV'yi listelemesini ve yönetmesini, Workers günlüklerini sorgulamasını ve Cloudflare belgelerinde arama yapmasını sağlar. Her kullanıcı tarayıcıdan kendi Cloudflare hesabına giriş yapar. Cloudflare'in onay sayfasında Read only seçeneğini seçin: varsayılan Minimal seçeneğiyle ajanlar Workers'ı, günlükleri ve DNS kayıtlarını göremez. Yazma izinleriyle ajanlar Workers dağıtabilir ve silebilir, DNS kayıtlarını değiştirebilir ve diğer hesap ayarlarını değiştirebilir.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, depolama ve günlükler; tarayıcıda giriş yapılan Cloudflare API MCP sunucusu üzerinden.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Cloudflare hesabımda hangi Workers dağıtılmış?",
+  "marketplace.plugin.cloudflare.prompt.errors": "Son bir saatte hangi Cloudflare Workers hata kaydetti?",
+  "marketplace.plugin.cloudflare.prompt.dns": "Cloudflare hesabımdaki her bölgenin DNS kayıtlarını listele.",
   "marketplace.plugin.context7.tagline": "Güncel kitaplık belgeleri",
   "marketplace.plugin.context7.description":
     "Context7, kitaplıklar ve çerçeveler için güncel belgeleri ve API başvurularını getirir; böylece yanıtlar projenin gerçekten çalıştırdığı sürümü kullanır. Hesap veya anahtar gerektirmez.",

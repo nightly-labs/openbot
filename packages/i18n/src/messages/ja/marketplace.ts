@@ -190,6 +190,16 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "直近の本番デプロイが失敗したのはなぜですか？",
   "marketplace.plugin.vercel.prompt.recentDeployments": "今日のデプロイとそのステータスを一覧にしてください。",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "過去 1 時間にランタイムエラーが発生したルートはどれですか？",
+  "marketplace.plugin.cloudflare.tagline": "Workers、DNS、ストレージ、ログ",
+  "marketplace.plugin.cloudflare.description":
+    "Cloudflare を使うと、エージェントは Cloudflare API を通じて Workers、DNS レコード、R2、D1、KV を一覧表示して管理し、Workers のログを照会し、Cloudflare のドキュメントを検索できます。各ユーザーはブラウザーで自分の Cloudflare アカウントにサインインします。Cloudflare の同意ページでは Read only を選んでください。既定の Minimal では、エージェントは Workers、ログ、DNS レコードを参照できません。書き込み権限があると、エージェントは Workers のデプロイと削除、DNS レコードの変更、その他のアカウント設定の変更ができます。",
+  "marketplace.plugin.cloudflare.app":
+    "Workers、DNS、ストレージ、ログを、ブラウザーでサインインする Cloudflare の API MCP サーバーで提供します。",
+  "marketplace.plugin.cloudflare.prompt.workers":
+    "自分の Cloudflare アカウントにはどの Workers がデプロイされていますか？",
+  "marketplace.plugin.cloudflare.prompt.errors": "過去 1 時間にエラーを記録した Cloudflare Workers はどれですか？",
+  "marketplace.plugin.cloudflare.prompt.dns":
+    "自分の Cloudflare アカウントの各ゾーンの DNS レコードを一覧表示してください。",
   "marketplace.plugin.context7.tagline": "最新のライブラリドキュメント",
   "marketplace.plugin.context7.description":
     "Context7 はライブラリとフレームワークの最新のドキュメントと API リファレンスを取得するので、回答はプロジェクトが実際に使っているバージョンに基づきます。アカウントもキーも不要です。",

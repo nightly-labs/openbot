@@ -411,6 +411,46 @@ const VERCEL: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/vercel",
 };
 
+const CLOUDFLARE: MarketplacePluginDetail = {
+  id: "plugin-cloudflare",
+  slug: "cloudflare",
+  name: "Cloudflare",
+  tagline: "Workers, DNS, storage and logs",
+  description:
+    "Cloudflare lets agents list and manage Workers, DNS records, R2, D1 and KV through the Cloudflare API, query Workers logs, and search the Cloudflare docs. Each user signs in to their own Cloudflare account through the browser. On Cloudflare's consent page, choose Read only: the default, Minimal, does not let agents see Workers, logs or DNS records. With write permissions, agents can deploy and delete Workers, change DNS records and change other account settings.",
+  category: "coding",
+  creatorName: "cloudflare.com",
+  iconUrl: "https://www.cloudflare.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-workers", text: "Which Workers are deployed in my Cloudflare account?" },
+    { id: "prompt-errors", text: "Which Cloudflare Workers logged errors in the last hour?" },
+    { id: "prompt-dns", text: "List the DNS records of each zone in my Cloudflare account." },
+  ],
+  apps: [
+    {
+      id: "app-cloudflare-mcp",
+      name: "Cloudflare",
+      description: "Workers, DNS, storage, and logs, over Cloudflare's API MCP server with browser sign-in.",
+      iconUrl: "https://www.cloudflare.com/favicon.ico",
+      server: {
+        name: "cloudflare",
+        transport: "http",
+        url: "https://mcp.cloudflare.com/mcp",
+        auth: [{ id: "cloudflare-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.cloudflare.com",
+  privacyPolicyUrl: "https://www.cloudflare.com/privacypolicy/",
+  termsUrl: "https://www.cloudflare.com/website-terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/cloudflare",
+};
+
 const CONTEXT7: MarketplacePluginDetail = {
   id: "plugin-context7",
   slug: "context7",
@@ -830,6 +870,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   PAPER,
   SENTRY,
   VERCEL,
+  CLOUDFLARE,
   CONTEXT7,
   STRIPE,
   POSTHOG,

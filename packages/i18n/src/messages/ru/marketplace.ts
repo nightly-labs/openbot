@@ -212,6 +212,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Почему не удался последний продакшен-деплой?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Покажите сегодняшние деплои и их статус.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "На каких маршрутах были ошибки выполнения за последний час?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, хранилища и логи",
+  "marketplace.plugin.cloudflare.description":
+    "Cloudflare позволяет агентам просматривать Workers, DNS-записи, R2, D1 и KV и управлять ими через API Cloudflare, запрашивать логи Workers и искать в документации Cloudflare. Каждый пользователь входит в свой аккаунт Cloudflare через браузер. На странице согласия Cloudflare выберите Read only: с вариантом по умолчанию, Minimal, агенты не видят Workers, логи и DNS-записи. С правами на запись агенты могут развёртывать и удалять Workers, менять DNS-записи и другие настройки аккаунта.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, хранилища и логи через MCP-сервер API Cloudflare со входом в браузере.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Какие Workers развёрнуты в моём аккаунте Cloudflare?",
+  "marketplace.plugin.cloudflare.prompt.errors": "Какие Cloudflare Workers записали ошибки за последний час?",
+  "marketplace.plugin.cloudflare.prompt.dns": "Покажи DNS-записи каждой зоны в моём аккаунте Cloudflare.",
   "marketplace.plugin.context7.tagline": "Актуальная документация библиотек",
   "marketplace.plugin.context7.description":
     "Context7 получает актуальную документацию и справочники API для библиотек и фреймворков, чтобы ответы учитывали версию, которая действительно используется в проекте. Аккаунт и ключ не нужны.",

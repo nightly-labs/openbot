@@ -198,6 +198,15 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.recentDeployments": "Listez les déploiements d’aujourd’hui et leur statut.",
   "marketplace.plugin.vercel.prompt.runtimeErrors":
     "Quelles routes ont eu des erreurs d’exécution au cours de la dernière heure ?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, stockage et journaux",
+  "marketplace.plugin.cloudflare.description":
+    "Cloudflare permet aux agents de lister et de gérer les Workers, les enregistrements DNS, R2, D1 et KV via l’API Cloudflare, d’interroger les journaux des Workers et de chercher dans la documentation Cloudflare. Chaque utilisateur se connecte à son propre compte Cloudflare dans le navigateur. Sur la page de consentement de Cloudflare, choisissez Read only : avec l’option par défaut, Minimal, les agents ne voient ni les Workers, ni les journaux, ni les enregistrements DNS. Avec les droits d’écriture, les agents peuvent déployer et supprimer des Workers, modifier les enregistrements DNS et changer d’autres paramètres du compte.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, stockage et journaux, via le serveur MCP de l’API Cloudflare avec connexion dans le navigateur.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Quels Workers sont déployés dans mon compte Cloudflare ?",
+  "marketplace.plugin.cloudflare.prompt.errors":
+    "Quels Workers Cloudflare ont enregistré des erreurs au cours de la dernière heure ?",
+  "marketplace.plugin.cloudflare.prompt.dns": "Liste les enregistrements DNS de chaque zone de mon compte Cloudflare.",
   "marketplace.plugin.context7.tagline": "Documentation à jour des bibliothèques",
   "marketplace.plugin.context7.description":
     "Context7 récupère la documentation et les références d’API à jour des bibliothèques et des frameworks, pour que les réponses utilisent la version que le projet exécute réellement. Il ne demande ni compte ni clé.",

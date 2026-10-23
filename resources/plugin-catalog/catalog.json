@@ -57,6 +57,12 @@
       "detailSha256": "7e5ead435028c8e74d1e4bf84e7e61bc4216de8d0636a862d160e48391589253"
     },
     {
+      "slug": "cloudflare",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "9360bcbc4784bb85ffb53474c0e6213ba0cb38c2a99884a718cff70769043b63"
+    },
+    {
       "slug": "context7",
       "version": "1.0.0",
       "featured": false,

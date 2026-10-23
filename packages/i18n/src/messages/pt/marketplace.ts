@@ -181,6 +181,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Por que o último deploy de produção falhou?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Liste os deploys de hoje e o status de cada um.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Quais rotas tiveram erros de execução na última hora?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, armazenamento e logs",
+  "marketplace.plugin.cloudflare.description":
+    "O Cloudflare permite que os agentes listem e gerenciem Workers, registros DNS, R2, D1 e KV pela API do Cloudflare, consultem os logs dos Workers e pesquisem a documentação do Cloudflare. Cada usuário entra na própria conta do Cloudflare pelo navegador. Na página de consentimento do Cloudflare, escolha Read only: com a opção padrão, Minimal, os agentes não veem Workers, logs nem registros DNS. Com permissões de escrita, os agentes podem implantar e excluir Workers, alterar registros DNS e alterar outras configurações da conta.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, armazenamento e logs, pelo servidor MCP da API do Cloudflare com login no navegador.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Quais Workers estão implantados na minha conta do Cloudflare?",
+  "marketplace.plugin.cloudflare.prompt.errors": "Quais Workers do Cloudflare registraram erros na última hora?",
+  "marketplace.plugin.cloudflare.prompt.dns": "Liste os registros DNS de cada zona da minha conta do Cloudflare.",
   "marketplace.plugin.context7.tagline": "Documentação atual de bibliotecas",
   "marketplace.plugin.context7.description":
     "O Context7 busca documentação e referências de API atuais para bibliotecas e frameworks, então as respostas usam a versão que o projeto realmente roda. Não precisa de conta nem de chave.",

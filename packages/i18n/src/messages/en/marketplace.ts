@@ -193,6 +193,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.vercel.prompt.failedBuild": "Why did the last production deployment fail?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "List the deployments from today and their status.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Which routes had runtime errors in the last hour?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, storage and logs",
+  "marketplace.plugin.cloudflare.description":
+    "Cloudflare lets agents list and manage Workers, DNS records, R2, D1 and KV through the Cloudflare API, query Workers logs, and search the Cloudflare docs. Each user signs in to their own Cloudflare account through the browser. On Cloudflare's consent page, choose Read only: the default, Minimal, does not let agents see Workers, logs or DNS records. With write permissions, agents can deploy and delete Workers, change DNS records and change other account settings.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, storage, and logs, over Cloudflare's API MCP server with browser sign-in.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Which Workers are deployed in my Cloudflare account?",
+  "marketplace.plugin.cloudflare.prompt.errors": "Which Cloudflare Workers logged errors in the last hour?",
+  "marketplace.plugin.cloudflare.prompt.dns": "List the DNS records of each zone in my Cloudflare account.",
   "marketplace.plugin.context7.tagline": "Current library documentation",
   "marketplace.plugin.context7.description":
     "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",

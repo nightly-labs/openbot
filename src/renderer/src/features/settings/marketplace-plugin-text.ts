@@ -129,6 +129,18 @@ const PLUGIN_TEXT = {
       "prompt-runtime-errors": "marketplace.plugin.vercel.prompt.runtimeErrors",
     },
   },
+  cloudflare: {
+    tagline: "marketplace.plugin.cloudflare.tagline",
+    description: "marketplace.plugin.cloudflare.description",
+    apps: {
+      "app-cloudflare-mcp": "marketplace.plugin.cloudflare.app",
+    },
+    prompts: {
+      "prompt-workers": "marketplace.plugin.cloudflare.prompt.workers",
+      "prompt-errors": "marketplace.plugin.cloudflare.prompt.errors",
+      "prompt-dns": "marketplace.plugin.cloudflare.prompt.dns",
+    },
+  },
   context7: {
     tagline: "marketplace.plugin.context7.tagline",
     description: "marketplace.plugin.context7.description",
