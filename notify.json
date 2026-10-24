@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "checkedAt": "2026-10-24T18:37:20.702Z",
+  "services": {
+    "accounts": "ok",
+    "connections": "ok",
+    "hosted": "ok",
+    "updates": "ok",
+    "marketplace": "ok"
+  },
+  "seen": {
+    "service.changed:hosted:2026-10-18T10:31:53.815Z": "2026-10-18T10:32:28.428Z",
+    "service.changed:hosted:2026-10-18T14:08:55.190Z": "2026-10-18T14:09:28.720Z"
+  },
+  "open": {},
+  "outbox": []
+}
