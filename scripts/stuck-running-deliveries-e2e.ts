@@ -7,7 +7,8 @@
 // (d) Stop on a delivery that stays running after its turn ended frees the queue;
 // (e) Stop while the normal turn end runs does not settle the completed turn as interrupted;
 // (f) a turn end that fails after its deliveries settled still closes the stored turn;
-// (g) a delivery that runs again under the same turn id, after its session was refused, runs to its end (#2468).
+// (g) a delivery that runs again under the same turn id, after its session was refused, runs to its end (#2468);
+// (h) a turn row that stays `running` although no thread names it as its active turn is closed at restart.
 // `bun scripts/stuck-running-deliveries-e2e.ts`. Writes .openbot-build/stuck-running-deliveries-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -648,7 +649,32 @@ try {
     return null;
   });
 
-  report.passed = report.cases.length === 8 && report.cases.every((entry) => entry.passed);
+  await runCase("h: a running turn row that no thread names is closed at restart", async (details) => {
+    const threadId = second.store.list()[0]?.threadId;
+    if (!threadId) return "No agent thread survived the restart.";
+    const staleTurnId = "stale-turn-of-a-dead-run";
+    second.database.connection
+      .prepare(
+        `INSERT INTO projection_turns
+           (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
+         VALUES (?, ?, NULL, 'running', ?, NULL, 0)`,
+      )
+      .run(staleTurnId, threadId, new Date().toISOString());
+    await shutdown(second);
+    current = null;
+    const third = await start();
+    current = third;
+    const thirdError = await initialize(third);
+    details.initializeError = thirdError;
+    const row = turnRow(third.database, staleTurnId);
+    details.turnRow = row;
+    if (thirdError) return "The restart failed.";
+    if (!row) return "The stale turn row is gone.";
+    if (row.status !== "interrupted" || !row.completedAt) return "The stale turn row stays running after the restart.";
+    return null;
+  });
+
+  report.passed = report.cases.length === 9 && report.cases.every((entry) => entry.passed);
   if (!report.passed) process.exitCode = 1;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

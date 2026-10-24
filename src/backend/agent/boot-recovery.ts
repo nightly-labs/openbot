@@ -285,6 +285,11 @@ export class BootRecovery {
     for (const agent of this.threads()) {
       if (!agent.threadId) continue;
       const turnId = this.#store.database.readConversationRuntime(agent.id, agent.threadId).activeTurnId;
+      // A running turn that is not the thread's active turn has no writer left, and no turn of
+      // this process runs yet, so the recovery write below closes it too (#2214).
+      const staleTurns = this.#store.database
+        .readRunningTurnIds(agent.threadId)
+        .filter((candidate) => candidate !== turnId);
       const changedMessages = this.#store.database
         .readConversationRecoveryMessages(agent.id, agent.threadId, turnId)
         .flatMap((message) => {
@@ -304,7 +309,7 @@ export class BootRecovery {
             ? [changed]
             : [];
         });
-      const changed = turnId !== null || changedMessages.length > 0;
+      const changed = turnId !== null || changedMessages.length > 0 || staleTurns.length > 0;
       if (!changed) continue;
       const revision = this.#store.database.persistConversationChanges({
         agentId: agent.id,
