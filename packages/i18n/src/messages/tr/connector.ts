@@ -426,7 +426,7 @@ export const messages = {
   "connector.bitwarden.scope":
     "Bu bilgisayardaki tüm ajanlar Shared with OpenBot içindeki eşleşen girişleri kullanabilir. OpenBot tam HTTPS kaynaklarını kullanır. Ana parola istemi veya özel URI eşleştirme kuralı gerektiren öğeleri kullanmaz.",
   "connector.bitwarden.session":
-    "Oturum anahtarı bellekte kalır. Kasa 8 saat kullanılmazsa veya OpenBot kapanırsa tekrar bağlanın. Bağlantıyı kesmek OpenBot erişimini durdurur; diğer Bitwarden istemcilerini kilitlemez.",
+    "OpenBot oturum anahtarını bu bilgisayarda şifreli tutar ve yeniden başlatma veya güncellemeden sonra yeniden bağlanır. Bağlantıyı kesmek onu siler. Diğer Bitwarden istemcilerini kilitlemez.",
   "connector.bitwarden.sessionKey": "Bitwarden oturum anahtarı",
   "connector.bitwarden.connect": "Bitwarden'a bağlan",
   "connector.bitwarden.disconnect": "Bitwarden bağlantısını kes",

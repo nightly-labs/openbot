@@ -559,9 +559,12 @@ is not included in analytics; provider output uses the application's secret reda
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
-- The Bitwarden connection keeps a CLI session key in process memory only. OpenBot does not
-  save it to a file. Disconnect, eight hours without vault use, and app exit stop this connection.
-  The log redactor can retain values in memory until exit to mask later messages.
+- The Bitwarden connection of this computer keeps the CLI session key in
+  `openbot-bitwarden-connector-v1.json` in the application data folder, encrypted by the operating
+  system's secret storage, so OpenBot can unlock again after a restart or an update. Disconnect
+  deletes the file. Eight hours without vault use ends the in-memory session; the stored key unlocks
+  again on the next fill. The log redactor can retain values in memory until exit to mask later
+  messages.
   The Bitwarden CLI keeps its own encrypted vault cache. OpenBot reads login items in the folder
   `Shared with OpenBot`. Agents receive item ids, titles, and usernames; passwords and authenticator
   codes go through the main process to the browser page. This folder is an OpenBot access rule;

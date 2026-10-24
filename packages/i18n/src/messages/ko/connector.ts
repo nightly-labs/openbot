@@ -350,7 +350,7 @@ export const messages = {
   "connector.bitwarden.scope":
     "이 컴퓨터의 모든 에이전트가 Shared with OpenBot의 일치하는 로그인 정보를 사용할 수 있어요. OpenBot은 정확히 일치하는 HTTPS 출처만 사용해요. 마스터 비밀번호 확인이 필요한 항목이나 사용자 지정 URI 일치 규칙이 있는 항목은 사용하지 않아요.",
   "connector.bitwarden.session":
-    "세션 키는 메모리에만 보관돼요. 보관함을 8시간 동안 쓰지 않거나 OpenBot이 종료되면 다시 연결하세요. 연결을 해제하면 OpenBot의 접근이 중지되지만, 다른 Bitwarden 클라이언트는 잠기지 않아요.",
+    "OpenBot은 세션 키를 이 컴퓨터에 암호화해 저장하고, 재시작이나 업데이트 후에 다시 연결해요. 연결을 해제하면 키가 삭제돼요. 다른 Bitwarden 클라이언트는 잠기지 않아요.",
   "connector.bitwarden.sessionKey": "Bitwarden 세션 키",
   "connector.bitwarden.connect": "Bitwarden 연결",
   "connector.bitwarden.disconnect": "Bitwarden 연결 해제",

@@ -392,7 +392,7 @@ export const messages = {
   "connector.bitwarden.scope":
     "このコンピューターのすべてのエージェントが、Shared with OpenBot 内の一致するログイン情報を使えます。OpenBot は HTTPS のオリジンが完全に一致する場合にのみ使います。マスターパスワードの再入力が必要な項目や、カスタムの URI 一致ルールがある項目は使いません。",
   "connector.bitwarden.session":
-    "セッションキーはメモリーにのみ保持されます。保管庫を 8 時間使わなかった場合や OpenBot を終了した場合は、もう一度接続してください。切断すると OpenBot のアクセスは停止しますが、他の Bitwarden クライアントはロックされません。",
+    "OpenBot はセッションキーをこのコンピュータに暗号化して保存し、再起動やアップデートの後に再接続します。切断すると削除されます。他の Bitwarden クライアントはロックされません。",
   "connector.bitwarden.sessionKey": "Bitwarden のセッションキー",
   "connector.bitwarden.connect": "Bitwarden を接続",
   "connector.bitwarden.disconnect": "Bitwarden を切断",

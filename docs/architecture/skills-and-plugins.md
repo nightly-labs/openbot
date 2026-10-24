@@ -73,11 +73,13 @@ password or a code.
 The Bitwarden connector also implements `PasswordVault`. It uses an installed `bw` executable,
 resolved to an absolute path from absolute `PATH` entries or common installation directories.
 It runs fixed arguments without a shell and with an allowlisted environment. The user supplies a
-CLI session key after signing in and unlocking Bitwarden outside OpenBot. OpenBot keeps no
-connection file and never asks for the master password. The CLI owns its encrypted cache and server
-configuration. Each operation has a 30-second deadline and an output limit. Errors discard all
-CLI output. Disconnect cancels active calls, and a late call cannot return a credential from an
-old session. Eight hours without a successful vault call ends the connection.
+CLI session key after signing in and unlocking Bitwarden outside OpenBot. OpenBot never asks for the
+master password on this computer. It keeps the session key in `openbot-bitwarden-connector-v1.json`,
+encrypted with `safeStorage`. The CLI owns its encrypted cache and server configuration. Each
+operation has a 30-second deadline and an output limit. Errors discard all CLI output. Disconnect
+cancels active calls and deletes the file, and a late call cannot return a credential from an old
+session. Eight hours without a successful vault call ends the in-memory session; the stored key
+unlocks again on the next fill.
 
 Connect requires exactly one folder named `Shared with OpenBot`. Its id scopes later reads.
 Each fill syncs and checks the current item, its folder, its saved HTTPS origin, its deleted state,

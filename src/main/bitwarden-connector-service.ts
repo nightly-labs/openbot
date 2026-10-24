@@ -8,7 +8,13 @@ import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/l
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import { type PasswordVault, PasswordVaultError, type VaultLogin } from "../backend/password-vault";
-import type { BitwardenConnectorRecord, BitwardenConnectorStore } from "./bitwarden-connector-store";
+import {
+  type BitwardenConnectorRecord,
+  type BitwardenConnectorStore,
+  type BitwardenHostRecord,
+  type BitwardenSessionRecord,
+  isBitwardenSessionRecord,
+} from "./bitwarden-connector-store";
 
 const logger = createOpenBotLogger("bitwarden-connector");
 const { io: vaultCall } = causeHelpers(PasswordVaultError);
@@ -157,9 +163,8 @@ function matches(item: Item, folderId: string, origin: string): boolean {
 
 /**
  * Owns one CLI session. It reads only logins in the folder the user shared. A session key that the
- * user pastes stays in memory only. A host connection (`bitwarden-connector-v1`) signs in with an API
- * key and unlocks with the master password, both kept in the encrypted store, so the host unlocks
- * again after a restart or an idle timeout.
+ * user pastes, or a host connection's API key and master password, is kept in the encrypted store so
+ * OpenBot unlocks again after a restart, an update, or an idle timeout.
  */
 export class BitwardenConnectorService implements PasswordVault {
   readonly #run: BitwardenCliRunner;
@@ -189,7 +194,7 @@ export class BitwardenConnectorService implements PasswordVault {
     this.#host = options.host ?? null;
   }
 
-  /** Reads the stored host connection. A file that cannot be read is logged and treated as no connection. */
+  /** Reads the stored connection. A file that cannot be read is logged and treated as no connection. */
   readonly load = Effect.fn("BitwardenConnector.load")(function* (this: BitwardenConnectorService) {
     const error = yield* this.#host ? this.#host.store.load() : Effect.succeed(null);
     if (error) logger.warn("The Bitwarden connection file could not be read.", { cause: toLogValue(error) });
@@ -204,7 +209,7 @@ export class BitwardenConnectorService implements PasswordVault {
     return {
       connected: this.connected(),
       connecting: this.#connecting !== null,
-      serverUrl: this.#connecting?.serverUrl ?? this.#host?.store.read()?.serverUrl ?? null,
+      serverUrl: this.#connecting?.serverUrl ?? storedServerUrl(this.#host?.store.read()),
       error: this.#error,
     };
   }
@@ -223,6 +228,7 @@ export class BitwardenConnectorService implements PasswordVault {
     if (attempt !== this.#attempt) return this.status();
     this.#session = session;
     return yield* this.#openFolder(session).pipe(
+      Effect.flatMap(() => this.#persistSession(key, session)),
       Effect.map(() => this.status()),
       Effect.onExit((exit) => (Exit.isFailure(exit) && this.#session === session ? this.#dropSession() : Effect.void)),
     );
@@ -239,7 +245,7 @@ export class BitwardenConnectorService implements PasswordVault {
   ): Effect.fn.Return<BitwardenConnectorStatus, PasswordVaultError> {
     const host = this.#host;
     if (!host) return yield* failure();
-    const record: BitwardenConnectorRecord = {
+    const record: BitwardenHostRecord = {
       serverUrl: input.serverUrl,
       clientId: input.clientId.trim(),
       clientSecret: input.clientSecret.trim(),
@@ -291,7 +297,7 @@ export class BitwardenConnectorService implements PasswordVault {
     return this.status();
   }).bind(this);
 
-  /** Stops access, forgets a stored host connection, and removes the host's CLI data. */
+  /** Stops access, forgets a stored connection, and removes the host's CLI data. */
   readonly disconnect = Effect.fn("BitwardenConnector.disconnect")(function* (this: BitwardenConnectorService) {
     yield* this.#stop();
     this.#error = null;
@@ -362,7 +368,7 @@ export class BitwardenConnectorService implements PasswordVault {
     return value;
   }).bind(this);
 
-  /** The open session, or a new one from the stored host connection, or null when there is neither. */
+  /** The open session, or a new one from the stored connection, or null when there is neither. */
   readonly #ready = Effect.fn("BitwardenConnector.ready")(function* (
     this: BitwardenConnectorService,
   ): Effect.fn.Return<Session | null, PasswordVaultError> {
@@ -376,12 +382,17 @@ export class BitwardenConnectorService implements PasswordVault {
         // `#stop` aborts it, so a stopped unlock neither reports an error nor touches a newer session.
         const abort = new AbortController();
         this.#unlockAbort = abort;
-        return yield* this.#unlock(record, abort.signal).pipe(
+        const open = isBitwardenSessionRecord(record)
+          ? this.#restoreSession(record, abort.signal)
+          : this.#unlock(record, abort.signal);
+        return yield* open.pipe(
           Effect.tapError(({ cause }) =>
             Effect.sync(() => {
               if (abort.signal.aborted) return;
               logger.warn("Unable to unlock Bitwarden with the stored connection", { cause: toLogValue(cause) });
-              this.#error = hostError(cause);
+              this.#error = isBitwardenSessionRecord(record)
+                ? sourceText("error.connector.bitwardenFailed")
+                : hostError(cause);
               this.#emit();
             }),
           ),
@@ -402,7 +413,7 @@ export class BitwardenConnectorService implements PasswordVault {
    */
   readonly #unlock = Effect.fn("BitwardenConnector.unlock")(function* (
     this: BitwardenConnectorService,
-    record: BitwardenConnectorRecord,
+    record: BitwardenHostRecord,
     signal: AbortSignal,
   ): Effect.fn.Return<Session, PasswordVaultError> {
     const host = this.#host;
@@ -443,6 +454,35 @@ export class BitwardenConnectorService implements PasswordVault {
       Effect.onExit((exit) => (Exit.isFailure(exit) && this.#session === session ? this.#dropSession() : Effect.void)),
     );
   }).bind(this);
+
+  /** Opens the shared folder with a stored session key. Uses this computer's `bw` data, not the host directory. */
+  readonly #restoreSession = Effect.fn("BitwardenConnector.restoreSession")(function* (
+    this: BitwardenConnectorService,
+    record: BitwardenSessionRecord,
+    signal: AbortSignal,
+  ): Effect.fn.Return<Session, PasswordVaultError> {
+    const attempt = this.#attempt;
+    const executable = yield* Effect.tryPromise({ try: this.#find, catch: failure });
+    if (attempt !== this.#attempt || signal.aborted) return yield* failure();
+    const abort = new AbortController();
+    signal.addEventListener("abort", () => abort.abort(), { once: true });
+    registerSecretValue(record.key);
+    const session: Session = { executable, env: { BW_SESSION: record.key }, folderId: "", abort };
+    this.#session = session;
+    return yield* this.#openFolder(session).pipe(
+      Effect.map(() => session),
+      Effect.onExit((exit) => (Exit.isFailure(exit) && this.#session === session ? this.#dropSession() : Effect.void)),
+    );
+  }).bind(this);
+
+  /** Writes the pasted session key after the shared folder opened. */
+  #persistSession(key: string, session: Session): Effect.Effect<void, PasswordVaultError> {
+    const host = this.#host;
+    if (!host) return Effect.void;
+    return host.store
+      .write({ type: "session", key, connectedAt: Date.now() }, () => this.#session === session)
+      .pipe(Effect.flatMap((kept) => (kept ? Effect.void : Effect.fail(failure()))));
+  }
 
   /** Syncs and finds the one folder named "Shared with OpenBot". */
   readonly #openFolder = Effect.fn("BitwardenConnector.openFolder")(function* (
@@ -512,7 +552,7 @@ export class BitwardenConnectorService implements PasswordVault {
     (operation) => this.#queue.withPermit(operation),
   ).bind(this);
 
-  /** After 8 hours with no vault use the session ends. A stored host connection unlocks again on the next use. */
+  /** After 8 hours with no vault use the in-memory session ends. A stored connection unlocks again on the next use. */
   #touch(): void {
     clearTimeout(this.#timer);
     this.#timer = setTimeout(() => {
@@ -529,9 +569,18 @@ export class BitwardenConnectorService implements PasswordVault {
 }
 
 function registerRecord(record: BitwardenConnectorRecord): void {
+  if (isBitwardenSessionRecord(record)) {
+    registerSecretValue(record.key);
+    return;
+  }
   registerSecretValue(record.clientId);
   registerSecretValue(record.clientSecret);
   registerSecretValue(record.masterPassword, { allowShort: true });
+}
+
+function storedServerUrl(record: BitwardenConnectorRecord | null | undefined): string | null {
+  if (!record || isBitwardenSessionRecord(record)) return null;
+  return record.serverUrl;
 }
 
 /** The install failure names itself; every other host failure gets one sentence about the inputs. */

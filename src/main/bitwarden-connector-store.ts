@@ -1,6 +1,6 @@
-// The Bitwarden API key and master password of this host, encrypted at rest by the operating system.
-// Only a connection made through `bitwarden-connector-v1` is stored: the host unlocks again with it
-// after a restart. A session key that the user pastes on their own computer stays in memory only.
+// The Bitwarden connection of this computer, encrypted at rest by the operating system.
+// Version 1 is a joined-server API key and master password (`bitwarden-connector-v1`). Version 2 is a
+// session key pasted on this computer. Each unlocks again after a restart. Disconnect removes the file.
 
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
@@ -12,7 +12,7 @@ import type { SecretCipher } from "./provider-credential-store";
 
 const { io: vaultCall, sync: vaultDecode } = causeHelpers(PasswordVaultError);
 
-const recordSchema = Schema.Struct({
+const hostRecordSchema = Schema.Struct({
   /** The Bitwarden or Vaultwarden server, an `https:` origin. */
   serverUrl: Schema.String,
   /** The personal API key. It signs in; it cannot unlock the vault. */
@@ -22,18 +22,33 @@ const recordSchema = Schema.Struct({
   masterPassword: Schema.String,
   connectedAt: Schema.Number,
 });
+const sessionRecordSchema = Schema.Struct({
+  type: Schema.Literal("session"),
+  /** `BW_SESSION` from `bw unlock --raw` on this computer. */
+  key: Schema.String,
+  connectedAt: Schema.Number,
+});
 
-export type BitwardenConnectorRecord = typeof recordSchema.Type;
+export type BitwardenHostRecord = typeof hostRecordSchema.Type;
+export type BitwardenSessionRecord = typeof sessionRecordSchema.Type;
+export type BitwardenConnectorRecord = BitwardenHostRecord | BitwardenSessionRecord;
+
+export function isBitwardenSessionRecord(record: BitwardenConnectorRecord): record is BitwardenSessionRecord {
+  return "type" in record && record.type === "session";
+}
 
 /** `version` is checked: an envelope that this build cannot read is reported as unreadable. */
-const envelopeSchema = Schema.Struct({ version: Schema.Literal(1), record: Schema.String });
+const envelopeSchema = Schema.Union([
+  Schema.Struct({ version: Schema.Literal(1), record: Schema.String }),
+  Schema.Struct({ version: Schema.Literal(2), record: Schema.String }),
+]);
 
 /** One record is small; a larger file is not one that this app wrote. */
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
 /**
- * Reads and writes the host connection. The decrypted record is kept in memory only. Writes run one
- * at a time, because a connect and a disconnect can arrive together.
+ * Reads and writes the connection. The decrypted record is kept in memory only. Writes run one at a
+ * time, because a connect and a disconnect can arrive together.
  */
 export class BitwardenConnectorStore {
   readonly #path: string;
@@ -72,8 +87,9 @@ export class BitwardenConnectorStore {
     return this.#serialize(
       Effect.gen({ self: this }, function* () {
         if (!current()) return false;
+        const version = isBitwardenSessionRecord(record) ? 2 : 1;
         const encrypted = yield* vaultDecode(() => this.#cipher.encrypt(JSON.stringify(record)).toString("base64"));
-        yield* writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true }).pipe(
+        yield* writeJsonFileAtomically(this.#path, { version, record: encrypted }, { createDirectory: true }).pipe(
           Effect.mapError(({ cause }) => new PasswordVaultError({ cause })),
         );
         if (!current()) {
@@ -119,9 +135,10 @@ export class BitwardenConnectorStore {
       return yield* new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFileUnreadable")) });
     return yield* vaultDecode(() => {
       const envelope = Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(source));
-      return Schema.decodeUnknownSync(recordSchema)(
-        JSON.parse(this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))),
-      );
+      const decrypted = JSON.parse(this.#cipher.decrypt(Buffer.from(envelope.record, "base64")));
+      return envelope.version === 2
+        ? Schema.decodeUnknownSync(sessionRecordSchema)(decrypted)
+        : Schema.decodeUnknownSync(hostRecordSchema)(decrypted);
     }).pipe(
       Effect.mapError(
         () => new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFileUnreadable")) }),

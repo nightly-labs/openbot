@@ -397,7 +397,7 @@ export const messages = {
   "connector.bitwarden.scope":
     "Todos los agentes de este equipo pueden usar los inicios de sesión coincidentes de Shared with OpenBot. OpenBot usa orígenes HTTPS exactos. No usa elementos que requieran solicitar la contraseña maestra ni una regla personalizada de coincidencia de URI.",
   "connector.bitwarden.session":
-    "La clave de sesión permanece en memoria. Vuelve a conectarte tras 8 horas sin usar la bóveda o después de cerrar OpenBot. Desconectar detiene el acceso de OpenBot; no bloquea otros clientes de Bitwarden.",
+    "OpenBot guarda la clave de sesión cifrada en este equipo y vuelve a conectar tras un reinicio o una actualización. Desconectar la elimina. No bloquea otros clientes de Bitwarden.",
   "connector.bitwarden.sessionKey": "Clave de sesión de Bitwarden",
   "connector.bitwarden.connect": "Conectar Bitwarden",
   "connector.bitwarden.disconnect": "Desconectar Bitwarden",

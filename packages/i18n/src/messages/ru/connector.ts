@@ -418,7 +418,7 @@ export const messages = {
   "connector.bitwarden.scope":
     "Все агенты на этом компьютере могут использовать подходящие логины из Shared with OpenBot. OpenBot сопоставляет точные источники HTTPS. Записи, для которых нужен запрос мастер-пароля или особое правило сопоставления URI, не используются.",
   "connector.bitwarden.session":
-    "Ключ сессии хранится в памяти. Подключитесь снова, если хранилищем не пользовались 8 часов или OpenBot был закрыт. Отключение прекращает доступ OpenBot, но не блокирует другие клиенты Bitwarden.",
+    "OpenBot хранит ключ сессии в зашифрованном виде на этом компьютере и подключается снова после перезапуска или обновления. Отключение удаляет его. Другие клиенты Bitwarden не блокируются.",
   "connector.bitwarden.sessionKey": "Ключ сессии Bitwarden",
   "connector.bitwarden.connect": "Подключить Bitwarden",
   "connector.bitwarden.disconnect": "Отключить Bitwarden",
