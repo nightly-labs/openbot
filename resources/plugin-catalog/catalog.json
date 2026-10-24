@@ -103,6 +103,12 @@
       "version": "1.1.0",
       "featured": false,
       "detailSha256": "443362cf513bc0925fa9df7158def02d78a5e6c5a403ffb42759436a27367284"
+    },
+    {
+      "slug": "cafecito-beans",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b8aa1a2cc2e1565e2d6e90489d0743f3c481bc730eddf0e9e32a3d83d9647c80"
     }
   ]
 }
