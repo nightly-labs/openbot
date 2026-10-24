@@ -36,6 +36,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="language" options={{ title: t("mobile.settings.language.title") }} />
       <Stack.Screen name="haptics" options={{ title: t("mobile.settings.feedback.haptics") }} />
       <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />
+      <Stack.Screen name="device-apps" options={{ title: t("mobile.deviceApps.title") }} />
       <Stack.Screen name="privacy" options={{ title: t("mobile.settings.privacy.title") }} />
       <Stack.Screen name="app-lock" options={{ title: t("mobile.appLock.title") }} />
       <Stack.Screen name="app-lock-pin" options={{ title: t("mobile.appLock.pinSetup.title") }} />

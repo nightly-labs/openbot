@@ -1250,6 +1250,26 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /**
+   * The one team member who sent the messages that this turn answers, or null. A turn that answers a
+   * routine, another agent, a platform chat or two different people has no single member, so the
+   * phone tools stay off for it.
+   */
+  memberOfTurn(agentId: string, turnId: string): string | null {
+    const messages = this.#messagesById();
+    const memberIds = new Set<string>();
+    let deliveries = 0;
+    for (const delivery of this.#state.deliveries) {
+      if (delivery.recipientAgentId !== agentId || delivery.turnId !== turnId) continue;
+      if (delivery.status !== "starting" && delivery.status !== "running") continue;
+      deliveries += 1;
+      const message = messages.get(delivery.messageId);
+      if (message?.sender.kind !== "user" || !message.senderMember || message.messaging) return null;
+      memberIds.add(message.senderMember.id);
+    }
+    return deliveries > 0 && memberIds.size === 1 ? ([...memberIds][0] ?? null) : null;
+  }
+
   findDeliveryByTurn(turnId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.turnId === turnId);
     return delivery ? this.#context(delivery) : null;

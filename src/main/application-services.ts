@@ -8,6 +8,7 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { createDeviceToolService, type DeviceToolServiceHandle } from "../backend/device-tool-service";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
@@ -411,6 +412,8 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   // After the connections that hold it.
   signalIngress: 86,
+  // Before the host, so every open phone request ends while the Team API still runs to say so.
+  deviceTools: 88,
   host: 90,
   teamWebRtcBridge: 100,
   // Before the agent service, so no handoff is sent to an agent while the service stops.
@@ -1525,6 +1528,11 @@ export async function createApplicationServices({
   // Outside every workspace. Each saved key is masked in the logs before the first agent starts.
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"));
   await Effect.runPromise(agentApiKeys.registerSaved());
+  // The phone tools of the team members. The Team API server is built later, so the transport is a getter.
+  const deviceTools: DeviceToolServiceHandle = await Effect.runPromise(
+    createDeviceToolService({ transport: () => host.deviceToolTransport() }),
+  );
+  teardown.push(TEARDOWN_ORDER.deviceTools, "the device tools", () => Effect.runPromise(deviceTools.close()));
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -1618,6 +1626,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     routineFlowTools: () => routineFlowRuntime,
+    deviceTools: () => deviceTools,
     // `events` is built later, after the account service and the relay.
     webhookRoutines: () => agentWebhookRoutineWriter(events),
     approvalAutomation,
@@ -2131,6 +2140,8 @@ export async function createApplicationServices({
     browserProfiles,
     // True on a hosted server, so the host advertises `focus-use-v1`. Any member can send it.
     focusUse: hostedServer !== null,
+    // Present, so the host advertises `device-tools`. A member answers only the requests of their own turns.
+    deviceTools,
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
     admin: {
       agents: agentAdminSettings,

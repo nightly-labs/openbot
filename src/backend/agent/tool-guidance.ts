@@ -1,11 +1,15 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { agentComputerUseEnabled } from "@openbot/contracts/ipc";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { OPENBOT_DEVICE_NAMESPACE } from "../device-tools";
 import { ROUTINE_INSTRUCTION_RULE } from "../routine-tool-schema";
 
 export interface ToolGuidanceOptions {
   passwordVault?: boolean;
 }
+
+const deviceReminderGuidance =
+  "The phone tools work only in the user's own chat turn, while their phone is connected. A routine run cannot use them. To remind the user before a calendar event, call openbot_device.calendar_list_events for the range, find the event, and then call openbot.create_routine with a once schedule at the event start minus the lead time the user asked for. Write the event title and start time in the routine instruction, so the routine needs no phone tool when it runs. The routine does not follow later changes: if the user moves or cancels the event, say that you must update or delete the routine, and do it when they tell you. One routine covers one event. Do not promise reminders before every meeting, or reminders that start when the user arrives at or leaves a place: OpenBot cannot do these yet, so say that. To remind the user at a fixed time with no event, openbot_device.reminders_add adds an item to the Reminders app of the phone.";
 
 /** Owns detailed tool workflows. It does not import the prompt builder or tool catalog. */
 export function toolGuidance(
@@ -14,6 +18,9 @@ export function toolGuidance(
   agent: AgentSummary,
   options: ToolGuidanceOptions = { passwordVault: true },
 ): string {
+  if (namespace === OPENBOT_DEVICE_NAMESPACE) {
+    return tool === "calendar_list_events" || tool === "reminders_add" ? deviceReminderGuidance : "";
+  }
   if (namespace === OPENBOT_BROWSER_NAMESPACE) {
     return [
       "The names below identify original openbot_browser tools. Use their qualified names with openbot.tool_search, openbot.tool_describe, and openbot.tool_call; they are not directly exposed tools.",

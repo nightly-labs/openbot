@@ -15,4 +15,8 @@ export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
     ios: { upTo: "1.4.1", except: ["1.3.0"] },
     android: { upTo: "1.4.1" },
   },
+  deviceTools: {
+    ios: { upTo: "1.4.1", except: ["1.3.0"] },
+    android: { upTo: "0" },
+  },
 };

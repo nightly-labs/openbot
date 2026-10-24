@@ -143,6 +143,7 @@
     "./team-protocol/browser-page-state-v1": "./src/team-protocol/browser-page-state-v1.ts",
     "./team-protocol/browser-sign-in-v1": "./src/team-protocol/browser-sign-in-v1.ts",
     "./team-protocol/browser-user-control-v1": "./src/team-protocol/browser-user-control-v1.ts",
+    "./team-protocol/device-tools-v1": "./src/team-protocol/device-tools-v1.ts",
     "./team-protocol/providers-v5": "./src/team-protocol/providers-v5.ts",
     "./team-protocol/providers-v8": "./src/team-protocol/providers-v8.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",

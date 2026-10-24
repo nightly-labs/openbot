@@ -50,6 +50,7 @@ import {
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CONNECTORS_CAPABILITY,
+  DEVICE_TOOLS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
   FOCUS_USE_CAPABILITY,
@@ -135,6 +136,7 @@ import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
+import type { DeviceToolTransport } from "../backend/device-tool-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
 import { StoredStateFailure } from "../backend/stored-state-effects";
@@ -189,6 +191,7 @@ import { routeChannels } from "./team-api/route-channels";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
+import { routeDeviceTools } from "./team-api/route-device-tools";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
 import { routeEvents } from "./team-api/route-events";
@@ -557,6 +560,32 @@ export class TeamApiServer {
     this.#publishPresence();
   }
 
+  /**
+   * The only path of a device tool event. It sends to the event connections of one member that
+   * declared `device-tools`, never to another member and never through the broadcast, which skips
+   * these events. A connection of a revoked or disabled member gets nothing.
+   */
+  deviceToolTransport(): DeviceToolTransport {
+    const targets = (memberId: string, exceptSessionId: string | null = null) =>
+      [...this.#eventClients].filter(
+        ([client, connection]) =>
+          connection.memberId === memberId &&
+          connection.capabilities.has(DEVICE_TOOLS_CAPABILITY) &&
+          (exceptSessionId === null || connection.sessionId !== exceptSessionId) &&
+          client.readyState === webSockets.WebSocket.OPEN &&
+          this.#options.store.authenticate(connection.token)?.id === memberId,
+      );
+    return {
+      hasDevice: (memberId) => targets(memberId).length > 0,
+      send: (memberId, event, exceptSessionId) => {
+        const payload = JSON.stringify(optionalTeamEvent(event));
+        const recipients = targets(memberId, exceptSessionId ?? null);
+        for (const [client] of recipients) client.send(payload);
+        return recipients.length;
+      },
+    };
+  }
+
   refreshIdentity(): void {
     const identity = this.#options.store.getIdentity();
     if (!identity) return;
@@ -826,6 +855,7 @@ export class TeamApiServer {
       if ((await this.#routeRemoteScreen(context)) === "handled") return;
       if ((await this.#routeDirect(context)) === "handled") return;
       if ((await this.#routeBrowser(context)) === "handled") return;
+      if ((await routeDeviceTools(context, this.#options.deviceTools)) === "handled") return;
       if ((await this.#routeFiles(context)) === "handled") return;
       if ((await routeChannels(context, this.#options.channels, this.#options.agents, hidden)) === "handled") return;
       if (
@@ -1179,6 +1209,8 @@ export class TeamApiServer {
       return resolved;
     };
 
+    // A device tool event names a member only through `deviceToolTransport`; a broadcast would reach all.
+    if (broadcast.type === "device-tool-requested" || broadcast.type === "device-tool-resolved") return;
     for (const [client, connection] of this.#eventClients) {
       const event = this.#eventFor(connection, broadcast);
       if (event.type === "conversation") {
@@ -1940,6 +1972,7 @@ export class TeamApiServer {
         if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
           return this.#options.pushNotifications !== undefined;
         if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
+        if (capability === DEVICE_TOOLS_CAPABILITY) return this.#options.deviceTools !== undefined;
         return true;
       }),
     };
@@ -2089,6 +2122,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;
+  if (event.type === "device-tool-requested" || event.type === "device-tool-resolved") return DEVICE_TOOLS_CAPABILITY;
   if (
     event.type === "agent-tasks-changed" ||
     event.type === "agent-task-conversation" ||

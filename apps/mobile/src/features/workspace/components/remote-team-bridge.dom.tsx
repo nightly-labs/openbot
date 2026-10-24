@@ -1,6 +1,7 @@
 "use dom";
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { DEVICE_TOOLS_CAPABILITY } from "@openbot/contracts/team-protocol/device-tools-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteTeamPeer,
@@ -22,6 +23,8 @@ interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
   ref?: Ref<RemoteTeamBridgeHandle>;
   commands: RemoteTeamCommand[];
   active: boolean;
+  /** This phone serves `device-tools`. Without it the page does not declare the capability. */
+  deviceTools?: boolean;
   onCommandResult: (result: RemoteTeamCommandResult) => Promise<void>;
   onBrowserViewEvent?: (event: BrowserViewBridgeEvent) => Promise<void>;
   dom?: import("expo/dom").DOMProps;
@@ -41,6 +44,7 @@ export default function RemoteTeamBridge({
   ref,
   commands = NO_COMMANDS,
   active,
+  deviceTools = false,
   onCommandResult,
   onBrowserViewEvent,
   ...callbacks
@@ -57,8 +61,13 @@ export default function RemoteTeamBridge({
       await callbacks.onConnectionUpdate(update);
     },
   };
+  const deviceToolsOn = useRef(deviceTools);
+  deviceToolsOn.current = deviceTools;
   const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
-  if (!runtime.current) runtime.current = createRemoteTeamPeer(actions);
+  if (!runtime.current)
+    runtime.current = createRemoteTeamPeer(actions, {
+      withheldCapabilities: () => (deviceToolsOn.current ? [] : [DEVICE_TOOLS_CAPABILITY]),
+    });
   const peer = runtime.current;
   if (!browserView.current)
     browserView.current = createBrowserViewBridge(

@@ -33,6 +33,8 @@ import {
   isBackgroundRead,
 } from "@/features/workspace/model/request-lanes";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
+import { useMobileFeature } from "@/shared/lib/mobile-features";
+import { isIOS } from "@/shared/lib/platform";
 import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
@@ -77,7 +79,10 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
     { active: foreground, directory, onConnectionUpdate, onMembershipChanged, onNetworkRestored, onTeamEvent },
     ref,
   ) {
-    const { refreshProfile } = useMobileSession();
+    const { refreshProfile, session } = useMobileSession();
+    // Only an iPhone with the feature on declares `device-tools`; the host sends it nothing otherwise.
+    const deviceToolsFlag = useMobileFeature(session?.apiUrl ?? "", "deviceTools");
+    const deviceTools = isIOS && deviceToolsFlag;
     const [commands, setCommands] = useState<RemoteTeamCommand[]>([]);
     const mailboxRef = useRef<ReturnType<typeof createRemoteCommandMailbox> | null>(null);
     if (!mailboxRef.current) mailboxRef.current = createRemoteCommandMailbox(setCommands);
@@ -208,6 +213,7 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
       <RemoteTeamBridge
         ref={bridge}
         active={foreground}
+        deviceTools={deviceTools}
         commands={commands}
         dom={{
           ...expoGoDomOptions,

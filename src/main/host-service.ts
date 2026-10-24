@@ -43,6 +43,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Context, Deferred, Effect, Fiber, Layer, ManagedRuntime, Result, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
+import type { DeviceToolTransport } from "../backend/device-tool-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
@@ -106,6 +107,7 @@ interface HostServiceOptions {
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
   admin?: ForwardedApiOptions["admin"];
   focusUse?: ForwardedApiOptions["focusUse"];
+  deviceTools?: ForwardedApiOptions["deviceTools"];
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads">;
@@ -423,6 +425,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(this.#liveActivityPush === undefined ? {} : { liveActivityPush: this.#liveActivityPush }),
       ...(this.#pushNotifications === undefined ? {} : { pushNotifications: this.#pushNotifications }),
       ...(options.focusUse === undefined ? {} : { focusUse: options.focusUse }),
+      ...(options.deviceTools === undefined ? {} : { deviceTools: options.deviceTools }),
     });
     this.#runtime = ManagedRuntime.make(
       Layer.succeed(
@@ -648,6 +651,11 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#api.refreshPresence();
       this.#api.refreshIdentity();
     }
+  }
+
+  /** Where the device tool service sends a request to the phones of one member. */
+  deviceToolTransport(): DeviceToolTransport {
+    return this.#api.deviceToolTransport();
   }
 
   getMobileConnectHost(): { hostId: string; fingerprint: string } | null {

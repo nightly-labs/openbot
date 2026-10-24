@@ -127,6 +127,8 @@ export interface TurnHooks {
   emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
+  /** Ends the phone requests that the turn still has open. */
+  endDeviceRequests?(agentId: string, turnId: string): void;
   /** Closes a provider session the provider refuses; the next turn opens a new one with the transcript. */
   dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
@@ -369,6 +371,7 @@ export class TurnLifecycle {
       ) {
         // The client is gone, so no browser tool of this turn can run. Other agents keep their controls.
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
+        this.#hooks.endDeviceRequests?.(turn.agentId, turnId);
         // The turn does not end here, so a provider error held for a failover shows now.
         const failover = this.#failoverTurns.get(turnId);
         this.#failoverTurns.delete(turnId);
@@ -852,6 +855,7 @@ export class TurnLifecycle {
       const shouldCompact =
         !refused && !limited && !mayRunAgain && !routineSession && this.#compaction.reserve(agentId, threadId);
       this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
+      this.#hooks.endDeviceRequests?.(agentId, turnId);
       const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
       snapshot.activeTurnId = null;
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);

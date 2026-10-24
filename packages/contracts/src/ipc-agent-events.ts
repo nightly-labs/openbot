@@ -28,6 +28,7 @@ import { type HiddenAgent, isHiddenAgentsSnapshot } from "./ipc-hidden-agents";
 import { isQueueSnapshot, type QueueSnapshot } from "./ipc-queue";
 import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import type { DeviceToolRequestedEvent, DeviceToolResolvedEvent } from "./team-protocol/device-tools-v1";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
@@ -123,6 +124,9 @@ export type AgentEvent =
   | { type: "browser-control-changed"; state: BrowserControlState }
   /** The whole list of tabs that a person controls, in the `browser-user-control` wire shape. */
   | { type: "browser-user-control-changed"; tabIds: string[] }
+  /** A request for the phone of a member, in the `device-tools` wire shape. */
+  | DeviceToolRequestedEvent
+  | DeviceToolResolvedEvent
   /** The history state of every tab, in the `browser-page-state` wire shape. */
   | {
       type: "browser-page-state-changed";
@@ -287,6 +291,9 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isDynamicRecord(value.state);
     case "browser-user-control-changed":
       return Array.isArray(value.tabIds) && value.tabIds.every(isString);
+    case "device-tool-requested":
+    case "device-tool-resolved":
+      return isString(value.requestId);
     case "browser-page-state-changed":
       return (
         Array.isArray(value.tabs) &&

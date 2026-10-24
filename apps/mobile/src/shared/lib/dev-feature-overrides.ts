@@ -8,10 +8,12 @@ import type { MobileFeature } from "@openbot/contracts/mobile-features";
  * - `cloudServers`: the plans page of the plus button in the server list. `true` also shows it for
  *   an account that cannot have hosted servers.
  * - `browser`: the live view of an agent's browser tab.
+ * - `deviceTools`: the tools that let an agent use Calendar, Reminders, Contacts and Location on this phone.
  */
 const DEV_FEATURE_OVERRIDES: Readonly<Record<MobileFeature, boolean | null>> = {
   cloudServers: null,
   browser: null,
+  deviceTools: null,
 };
 
 /** The override of one feature in a development build, or null to follow the account server. */

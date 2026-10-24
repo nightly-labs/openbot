@@ -1,5 +1,7 @@
+import type { DeviceToolRespondRequest } from "@openbot/contracts/team-protocol/device-tools-v1";
 import type { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
+import type { DeviceToolFailed, DeviceToolForbidden } from "../../backend/device-tool-service";
 import type { AcpRegistry } from "../acp-registry";
 import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
@@ -400,6 +402,15 @@ export type TeamApiBitwardenConnector = Pick<BitwardenConnectorService, "status"
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 
+/** What the `device-tools` route needs from the device tool service. */
+export interface TeamApiDeviceTools {
+  answer(
+    memberId: string,
+    answer: DeviceToolRespondRequest,
+    sessionId: string,
+  ): Effect.Effect<void, DeviceToolFailed | DeviceToolForbidden>;
+}
+
 export interface TeamApiOptions {
   /** `events-v1`: admin-only event source and routine management. */
   events?: HostEventsApi | undefined;
@@ -460,6 +471,8 @@ export interface TeamApiOptions {
   liveActivityPush?: LiveActivityPushService | undefined;
   /** Sends notifications to members' phones. Absent when this host has no account credential. */
   pushNotifications?: PushNotificationService | undefined;
+  /** `device-tools-v1`: takes the answers of members' phones. Absent where no agent can call a phone. */
+  deviceTools?: TeamApiDeviceTools | undefined;
   /** `focus-use-v1`: true on a hosted server, where a focused app keeps the server running. */
   focusUse?: boolean | undefined;
   rateLimitCapacity?: number | undefined;

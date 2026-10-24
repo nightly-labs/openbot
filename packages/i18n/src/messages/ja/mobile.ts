@@ -7,6 +7,7 @@ import { messages as mobileAuth } from "./mobile/auth";
 import { messages as mobileBrowser } from "./mobile/browser";
 import { messages as mobileChannel } from "./mobile/channel";
 import { messages as mobileChat } from "./mobile/chat";
+import { messages as mobileDeviceApps } from "./mobile/deviceApps";
 import { messages as mobileLink } from "./mobile/link";
 import { messages as mobileLiveActivity } from "./mobile/liveActivity";
 import { messages as mobileMarketplace } from "./mobile/marketplace";
@@ -36,6 +37,7 @@ export const jaMobile = {
   ...mobileSettings,
   ...mobileLink,
   ...mobileLiveActivity,
+  ...mobileDeviceApps,
   ...mobileMarketplace,
   ...mobileOnboarding,
   ...mobileWorkspace,

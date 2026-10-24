@@ -4,11 +4,15 @@ import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { useMobileFeature } from "@/shared/lib/mobile-features";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
   const { t } = useText();
+  // Only an iPhone with the feature on serves device tools, so no other phone has the row.
+  const deviceToolsOn = useMobileFeature(session?.apiUrl ?? "", "deviceTools");
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
   return (
     <SettingsContent>
@@ -45,6 +49,11 @@ export function SettingsScreen() {
         <SettingsRow onPress={() => router.push("/settings/notifications")}>
           <Typography.Paragraph>{t("mobile.settings.notifications.title")}</Typography.Paragraph>
         </SettingsRow>
+        {isIOS && deviceToolsOn ? (
+          <SettingsRow onPress={() => router.push("/settings/device-apps")}>
+            <Typography.Paragraph>{t("mobile.deviceApps.title")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
         <SettingsRow onPress={() => router.push("/settings/privacy")}>
           <Typography.Paragraph>{t("mobile.settings.privacy.title")}</Typography.Paragraph>
         </SettingsRow>

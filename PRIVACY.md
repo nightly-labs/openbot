@@ -1157,6 +1157,22 @@ releases the host hold merely because the editor closes or disconnects. The host
 attachment drafts released by edit cancellation or message deletion until they are sent or
 discarded. This lets a disconnected desktop recover its saved composer backup after host restart.
 
+## iPhone connected apps
+
+The iPhone app can let an agent on the host use Calendar, Reminders, Contacts, and the current
+location of the phone. The feature is off for an app until the member allows it in Settings >
+Connected apps on the phone, or answers the prompt that the phone shows at the first use. The
+phone also asks iOS for its own permission. The host keeps no consent. "Full access" on the host
+does not skip the prompt on the phone.
+
+The host sends a request only to the phones of the member whose agent made it. The phone answers
+over the encrypted host connection. The answer can contain event titles, reminder titles, contact
+names, phone numbers, email addresses, or coordinates rounded to about 100 meters. The host gives
+the answer to the agent, so the model provider of that agent receives it. The OpenBot account
+service receives none of it. The host and the phone log only the app, the operation, an error
+code, and the duration. They do not log arguments or answers. Neither side stores the answer
+outside the conversation of the agent.
+
 ## iPhone Live Activity
 
 The iPhone app can show the state of the agents on the Lock Screen and in the Dynamic Island. While

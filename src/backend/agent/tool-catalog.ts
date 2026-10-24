@@ -2,19 +2,21 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { DEVICE_DYNAMIC_TOOLS, OPENBOT_DEVICE_NAMESPACE } from "../device-tools";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import type { DynamicToolCallParams } from "../protocol";
 import { toolGuidance } from "./tool-guidance";
 
 /** Discovery changes visibility only. Original definitions and execution owners stay authoritative. */
-export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_TOOLS].flatMap((namespace) =>
-  namespace.tools.map((tool) => ({
-    namespace: namespace.name,
-    tool: tool.name,
-    name: `${namespace.name}.${tool.name}`,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-  })),
+export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_TOOLS, ...DEVICE_DYNAMIC_TOOLS].flatMap(
+  (namespace) =>
+    namespace.tools.map((tool) => ({
+      namespace: namespace.name,
+      tool: tool.name,
+      name: `${namespace.name}.${tool.name}`,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    })),
 );
 
 const DIRECT_NAMES = new Set([
@@ -31,8 +33,11 @@ const DIRECT_NAMES = new Set([
   "request_api_key",
 ]);
 
-// Names keep the complete, stable catalog below 4,000 characters without schema duplication.
-const INITIAL_TOOL_CATALOG = BUILTIN_TOOL_CATALOG.map((tool) => tool.name).join(", ");
+// Names keep the complete, stable catalog below 4,000 characters without schema duplication. The phone
+// tools are not named here: only a member with a connected phone finds them, by search.
+const INITIAL_TOOL_CATALOG = BUILTIN_TOOL_CATALOG.filter((tool) => tool.namespace !== OPENBOT_DEVICE_NAMESPACE)
+  .map((tool) => tool.name)
+  .join(", ");
 const qualifiedName = z.string().trim().min(1).max(160);
 const searchQuery = z.string().trim().min(1).max(200);
 // Models often send one query string, so search accepts `query` as well as `queries`.
@@ -114,8 +119,8 @@ function words(text: string): string[] {
 /** Each step to describe a tool sends the full context again, so search includes the schemas of its best matches. */
 const READY_SEARCH_RESULTS = 3;
 
-function requireTool(name: string) {
-  const tool = BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name);
+function requireTool(catalog: BuiltinCatalog, name: string) {
+  const tool = catalog.find((entry) => entry.name === name);
   if (!tool) throw new Error(sourceText("error.agent.toolRequestInvalid"));
   return tool;
 }
@@ -133,7 +138,21 @@ function toolGuidanceFor(entries: readonly (typeof BUILTIN_TOOL_CATALOG)[number]
   return [...new Set(entries.map((entry) => toolGuidance(entry.namespace, entry.tool, agent)))].filter(Boolean);
 }
 
-export function discoverTools(params: DynamicToolCallParams, agent: AgentSummary) {
+type BuiltinCatalog = readonly (typeof BUILTIN_TOOL_CATALOG)[number][];
+
+/** What the turn's member can use: the phone tools show only for a member with a connected phone. */
+export interface ToolDiscoveryOptions {
+  deviceTools: boolean;
+}
+
+export function discoverTools(
+  params: DynamicToolCallParams,
+  agent: AgentSummary,
+  { deviceTools }: ToolDiscoveryOptions = { deviceTools: false },
+) {
+  const catalog: BuiltinCatalog = deviceTools
+    ? BUILTIN_TOOL_CATALOG
+    : BUILTIN_TOOL_CATALOG.filter((entry) => entry.namespace !== OPENBOT_DEVICE_NAMESPACE);
   if (params.tool === "tool_search") {
     const parsed = searchSchema.safeParse(params.arguments);
     if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
@@ -141,19 +160,20 @@ export function discoverTools(params: DynamicToolCallParams, agent: AgentSummary
       query.toLowerCase(),
     );
     const terms = new Set(queries.flatMap(words));
-    const matches = BUILTIN_TOOL_CATALOG.map((entry, index) => {
-      const nameWords = new Set(words(entry.name));
-      const descriptionWords = new Set(words(entry.description));
-      const exact = queries.some((query) => query === entry.name || query === entry.tool);
-      // A strong result matches each word of its tool name. Namespace words, such as "browser", match a whole
-      // namespace, and one shared verb, such as "read", matches many unrelated tools.
-      const strong = exact || words(entry.tool).every((word) => terms.has(word));
-      const score = [...terms].reduce(
-        (sum, term) => sum + (nameWords.has(term) ? 3 : descriptionWords.has(term) ? 1 : 0),
-        0,
-      );
-      return { entry, index, exact, strong, score };
-    })
+    const matches = catalog
+      .map((entry, index) => {
+        const nameWords = new Set(words(entry.name));
+        const descriptionWords = new Set(words(entry.description));
+        const exact = queries.some((query) => query === entry.name || query === entry.tool);
+        // A strong result matches each word of its tool name. Namespace words, such as "browser", match a whole
+        // namespace, and one shared verb, such as "read", matches many unrelated tools.
+        const strong = exact || words(entry.tool).every((word) => terms.has(word));
+        const score = [...terms].reduce(
+          (sum, term) => sum + (nameWords.has(term) ? 3 : descriptionWords.has(term) ? 1 : 0),
+          0,
+        );
+        return { entry, index, exact, strong, score };
+      })
       .filter((result) => result.exact || result.score > 0)
       .sort((a, b) => Number(b.exact) - Number(a.exact) || b.score - a.score || a.index - b.index);
     const found = matches.slice(0, parsed.data.limit ?? 5);
@@ -176,7 +196,7 @@ export function discoverTools(params: DynamicToolCallParams, agent: AgentSummary
   }
   const parsed = describeSchema.safeParse(params.arguments);
   if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
-  const entries = [...new Set(parsed.data.names)].map(requireTool);
+  const entries = [...new Set(parsed.data.names)].map((name) => requireTool(catalog, name));
   return {
     tools: entries.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
     guidance: toolGuidanceFor(entries, agent),

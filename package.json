@@ -215,6 +215,7 @@
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
     "test:mcp-tool-consent": "bun scripts/mcp-tool-consent-e2e.ts",
+    "test:device-tools": "bun scripts/device-tools-e2e.ts",
     "test:agent-mcp-tools": "bun scripts/agent-mcp-tools-e2e.ts",
     "test:agent-update-agents": "bun scripts/agent-update-agents-e2e.ts",
     "test:ui-blocks": "bun scripts/ui-blocks-e2e.ts",

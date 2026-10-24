@@ -251,6 +251,18 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="device-app-consent"
+          // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerShown: false,
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.6],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen
           name="channel-actions/[channelId]"
           // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
           options={{

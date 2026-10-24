@@ -266,6 +266,18 @@ from peers below 8, and for the local-only providers that no protocol shows.
 
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
+The optional `device-tools` capability lets an agent on the host use the iPhone apps of the member
+who owns the turn. The host sends the event `device-tool-requested` (`requestId`, `app`,
+`operation`, `args`) only to the event connections of that member that declared the capability.
+The phone answers with `POST /v1/device-tools/respond`, either `{requestId, ok: true, result}` or
+`{requestId, ok: false, code}`. The host sends `device-tool-resolved` to the other connections of
+the member when the first answer arrives. A caller that does not own the `requestId` gets 403. A
+late answer gets 409 `device_request_closed`. The host decodes the result with the shape of the
+pending operation. The apps are `calendar`, `reminders`, `contacts` and `location`. The codes of an
+error answer are `app_not_allowed`, `os_permission_denied`, `invalid_arguments` and `device_error`.
+The meaning and the bounds are frozen; a wider operation needs a second capability string. The
+phone owns consent, and the host stores none.
+
 The optional `agent-memories-v1` capability adds three POST routes. `/v1/agent-memories/page`
 returns up to 256 memories. `/v1/agent-memories/selection` returns up to 256 selection records,
 the agent ID, and essential-memory byte usage. Both use ascending memory IDs and an `after`

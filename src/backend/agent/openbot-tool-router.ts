@@ -40,6 +40,8 @@ import type { AgentWaits } from "../agent-waits/agent-waits";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
+import type { DeviceToolServiceShape } from "../device-tool-service";
+import { OPENBOT_DEVICE_NAMESPACE, parseDeviceToolCall } from "../device-tools";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
@@ -187,6 +189,8 @@ export interface OpenBotToolRouterOptions {
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
   localSkillTools?: (() => LocalSkillTools) | undefined;
+  /** The phone tools of the members; absent where this process serves no phone. */
+  deviceTools?: (() => DeviceToolServiceShape | null) | undefined;
   routineFlowTools?: (() => RoutineFlowTools) | undefined;
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
@@ -228,6 +232,7 @@ export class OpenBotToolRouter {
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
+  readonly #deviceTools: (() => DeviceToolServiceShape | null) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
@@ -263,6 +268,7 @@ export class OpenBotToolRouter {
     this.#sidebarLayout = options.sidebarLayout;
     this.#localSkillTools = options.localSkillTools;
     this.#routineFlowTools = options.routineFlowTools;
+    this.#deviceTools = options.deviceTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
@@ -326,7 +332,9 @@ export class OpenBotToolRouter {
               const agentId = this.#conversation.agentForThread(params.threadId);
               if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
               try {
-                const result = discoverTools(params, this.#requireAgent(agentId));
+                const result = discoverTools(params, this.#requireAgent(agentId), {
+                  deviceTools: this.#deviceMember(agentId, params.turnId) !== null,
+                });
                 client.respond(request.id, openBotToolResult(result));
               } catch {
                 client.respond(request.id, openBotToolFailure(sourceText("error.agent.toolRequestInvalid")));
@@ -412,6 +420,14 @@ export class OpenBotToolRouter {
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
             if (!signal?.aborted && client.running) client.respond(toolRequest.id, result);
+            return;
+          }
+          if (toolRequest.params.namespace === OPENBOT_DEVICE_NAMESPACE) {
+            const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
+            if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
+            if (toolRequest.signal?.aborted) return;
+            const result = yield* this.#deviceTool(agentId, toolRequest.params, toolRequest.signal);
+            if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
             return;
           }
           if (toolRequest.params.namespace === "openbot") {
@@ -500,6 +516,45 @@ export class OpenBotToolRouter {
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
    * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
    */
+  /**
+   * The member who owns the turn, when that member has a connected phone with the capability; else null.
+   * Full access does not change this: the phone holds the consent, so every call needs a phone.
+   */
+  #deviceMember(agentId: string, turnId: string): string | null {
+    const memberId = this.#mailbox.memberOfTurn(agentId, turnId);
+    return memberId !== null && this.#deviceTools?.()?.available(memberId) === true ? memberId : null;
+  }
+
+  /** A phone tool call. The model sees the failure code only; arguments and results stay out of logs. */
+  readonly #deviceTool = Effect.fn("OpenBotToolRouter.deviceTool")(function* (
+    this: OpenBotToolRouter,
+    agentId: string,
+    params: DynamicToolCallParams,
+    signal: AbortSignal | undefined,
+  ) {
+    const service = this.#deviceTools?.() ?? null;
+    const memberId = this.#deviceMember(agentId, params.turnId);
+    if (!service || memberId === null) return openBotToolFailure("device_unavailable");
+    let request: ReturnType<typeof parseDeviceToolCall>;
+    try {
+      request = parseDeviceToolCall(params.tool, params.arguments);
+    } catch {
+      return openBotToolFailure("invalid_arguments");
+    }
+    // The provider cancels a call when its turn stops; the service then closes the request on the phone.
+    const cancelled = Effect.callback<never>((resume) => {
+      const abort = () => resume(Effect.interrupt);
+      if (signal?.aborted) abort();
+      else signal?.addEventListener("abort", abort, { once: true });
+      return Effect.sync(() => signal?.removeEventListener("abort", abort));
+    });
+    return yield* service.call({ memberId, agentId, turnId: params.turnId, request }).pipe(
+      Effect.map((result) => openBotToolResult(result)),
+      Effect.catch((failure) => Effect.succeed(openBotToolFailure(failure.code))),
+      Effect.raceFirst(cancelled),
+    );
+  });
+
   #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const parsed = askUiToolSchema.safeParse(params.arguments);

@@ -337,9 +337,14 @@ class RemotePeerIO extends Context.Service<
 
 /**
  * `waitForHost` asks Signal to hold an attempt while the host is offline, rather than fail it. The
- * consumer must handle the `hostOffline` update.
+ * consumer must handle the `hostOffline` update. `withheldCapabilities` names the capabilities that
+ * this client does not declare now, such as `device-tools` on a phone that cannot serve it. It is read
+ * for each request.
  */
-export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost?: boolean } = {}) {
+export function createRemoteTeamPeer(
+  actions: ActionsRef,
+  options: { waitForHost?: boolean; withheldCapabilities?: () => readonly string[] } = {},
+) {
   const runtime = ManagedRuntime.make(RemotePeerIO.layer(actions));
   const workScope = Scope.makeUnsafe();
   const running = new Set<Promise<unknown>>();
@@ -1349,7 +1354,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               path,
               body: payloadBody,
               ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
-              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
+              capabilities: teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol).filter(
+                (capability) => !(options.withheldCapabilities?.() ?? []).includes(capability),
+              ),
             },
           }),
         );

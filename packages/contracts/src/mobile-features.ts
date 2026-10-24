@@ -9,6 +9,8 @@ export const MOBILE_FEATURES = [
   "cloudServers",
   /** The live view of an agent's browser tab on its host, and the controls of the tab. */
   "browser",
+  /** The tools that let an agent on the host use Calendar, Reminders, Contacts and Location on the phone. */
+  "deviceTools",
 ] as const;
 
 export type MobileFeature = (typeof MOBILE_FEATURES)[number];
@@ -28,7 +30,7 @@ export const MOBILE_FEATURES_PATH = "/v1/mobile/features";
 
 /** Every feature off: the answer for an unknown platform or version, and when the app cannot read the flags. */
 export function mobileFeaturesOff(): MobileFeatureFlags {
-  return { cloudServers: false, browser: false };
+  return { cloudServers: false, browser: false, deviceTools: false };
 }
 
 function versionParts(value: string): number[] | null {

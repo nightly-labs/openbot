@@ -82,6 +82,7 @@ import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
+import { handleDeviceToolEvent } from "@/features/device-apps/model/device-tool-events";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
@@ -481,6 +482,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, queryClient, queryScope],
   );
   const postLiveActivityAction = useCallback(
+    (serverId: string, path: string, body: TeamProtocolV2Json) => request("POST", path, ignoreResponse, body, serverId),
+    [request],
+  );
+  // The answer of this phone to a device tool request of the host, such as a Calendar read.
+  const postDeviceToolAnswer = useCallback(
     (serverId: string, path: string, body: TeamProtocolV2Json) => request("POST", path, ignoreResponse, body, serverId),
     [request],
   );
@@ -976,6 +982,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return next === previous ? current : { ...current, [serverId]: next };
       });
       applyBrowserEvent(liveState, serverId, event);
+      // Native side: the consent sheet and the iPhone permission need the app, not the peer page.
+      if (handleDeviceToolEvent(serverId, event, postDeviceToolAnswer)) return;
       if (event.type === "sidebar-layout-changed") {
         applySidebarLayout(serverId, event.layout);
         return;
@@ -1085,6 +1093,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       queryClient,
       queryScope,
       applyConversationReads,
+      postDeviceToolAnswer,
     ],
   );
 
