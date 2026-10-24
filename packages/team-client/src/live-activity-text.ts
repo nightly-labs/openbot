@@ -17,7 +17,8 @@ function blockText(source: string): string {
   const parts: string[] = [];
   let fence: { marker: string; math: boolean; lines: string[] } | null = null;
   for (const line of source.replace(/\r\n?/gu, "\n").split("\n")) {
-    const opening = /^\s{0,3}(`{3,}|~{3,})\s*([\w-]*)/u.exec(line);
+    // A backtick fence has no backtick after its marker, so "```npm install``` first" is a code span.
+    const opening = /^\s{0,3}(`{3,}(?!.*`)|~{3,})\s*([\w-]*)/u.exec(line);
     if (!fence && opening?.[1]) {
       fence = { marker: opening[1], math: opening[2] === "math", lines: [] };
       continue;
