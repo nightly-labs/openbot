@@ -213,6 +213,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Son üretim dağıtımı neden başarısız oldu?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Bugünkü dağıtımları ve durumlarını listele.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Son bir saatte hangi rotalarda çalışma zamanı hatası oluştu?",
+  "marketplace.plugin.neon.tagline": "Postgres projeleri, şemalar ve SQL",
+  "marketplace.plugin.neon.description":
+    "Neon, ajanların projeleri ve dalları listelemesini, tablo şemalarını okumasını, salt okunur SQL çalıştırmasını, yavaş sorguları bulmasını ve Neon belgelerinde arama yapmasını sağlar. Her kullanıcı tarayıcıdan kendi Neon hesabına giriş yapar. Sunucu salt okunur modda çalışır; bu nedenle ajanlar proje ve dal oluşturamaz veya silemez, geçiş çalıştıramaz ve bağlantı dizelerini okuyamaz.",
+  "marketplace.plugin.neon.app":
+    "Projeler, dallar, şemalar ve salt okunur SQL; tarayıcıda giriş yapılan Neon MCP sunucusu üzerinden.",
+  "marketplace.plugin.neon.prompt.schema": "Neon veritabanımda hangi tablolar var ve birbirleriyle nasıl ilişkili?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Neon veritabanımdaki en yavaş sorgular hangileri?",
+  "marketplace.plugin.neon.prompt.branches": "Neon projelerimin her birinde hangi dallar var?",
   "marketplace.plugin.context7.tagline": "Güncel kitaplık belgeleri",
   "marketplace.plugin.context7.description":
     "Context7, kitaplıklar ve çerçeveler için güncel belgeleri ve API başvurularını getirir; böylece yanıtlar projenin gerçekten çalıştırdığı sürümü kullanır. Hesap veya anahtar gerektirmez.",

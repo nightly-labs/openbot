@@ -73,6 +73,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "7e5ead435028c8e74d1e4bf84e7e61bc4216de8d0636a862d160e48391589253",
     },
     {
+      slug: "neon",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "e711e2ab2eb82bd9d3bb6fda7a4f1b4be0482595ea11b7887dfb39fe4629067e",
+    },
+    {
       slug: "context7",
       version: "1.0.0",
       featured: false,
@@ -480,6 +486,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://vercel.com",
     privacyPolicyUrl: "https://vercel.com/legal/privacy-notice",
     termsUrl: "https://vercel.com/legal/terms",
+    skills: [],
+  },
+  neon: {
+    slug: "neon",
+    name: "Neon",
+    tagline: "Postgres projects, schemas and SQL",
+    description:
+      "Neon lets agents list projects and branches, read table schemas, run read-only SQL, find slow queries, and search the Neon docs. Each user signs in to their own Neon account through the browser. The server runs in read-only mode, so agents cannot create or delete projects and branches, run migrations or read connection strings.",
+    category: "coding",
+    creatorName: "neon.com",
+    iconUrl: "https://neon.com/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-schema", text: "Which tables are in my Neon database, and how do they relate?" },
+      { id: "prompt-slow-queries", text: "Which queries are the slowest in my Neon database?" },
+      { id: "prompt-branches", text: "Which branches does each of my Neon projects have?" },
+    ],
+    apps: [
+      {
+        id: "app-neon-mcp",
+        name: "Neon",
+        description: "Projects, branches, schemas, and read-only SQL, over Neon's MCP server with browser sign-in.",
+        iconUrl: "https://neon.com/apple-touch-icon.png",
+        server: {
+          name: "neon",
+          transport: "http",
+          url: "https://mcp.neon.tech/mcp?readonly=true",
+          auth: [{ id: "neon-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://neon.com",
+    privacyPolicyUrl: "https://neon.com/privacy-policy",
+    termsUrl: "https://neon.com/platform-terms",
     skills: [],
   },
   context7: {

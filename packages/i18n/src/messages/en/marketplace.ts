@@ -193,6 +193,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.vercel.prompt.failedBuild": "Why did the last production deployment fail?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "List the deployments from today and their status.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Which routes had runtime errors in the last hour?",
+  "marketplace.plugin.neon.tagline": "Postgres projects, schemas and SQL",
+  "marketplace.plugin.neon.description":
+    "Neon lets agents list projects and branches, read table schemas, run read-only SQL, find slow queries, and search the Neon docs. Each user signs in to their own Neon account through the browser. The server runs in read-only mode, so agents cannot create or delete projects and branches, run migrations or read connection strings.",
+  "marketplace.plugin.neon.app":
+    "Projects, branches, schemas, and read-only SQL, over Neon's MCP server with browser sign-in.",
+  "marketplace.plugin.neon.prompt.schema": "Which tables are in my Neon database, and how do they relate?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Which queries are the slowest in my Neon database?",
+  "marketplace.plugin.neon.prompt.branches": "Which branches does each of my Neon projects have?",
   "marketplace.plugin.context7.tagline": "Current library documentation",
   "marketplace.plugin.context7.description":
     "Context7 fetches current documentation and API references for libraries and frameworks, so answers use the version the project actually runs. It needs no account and no key.",

@@ -202,6 +202,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Dlaczego ostatnie wdrożenie produkcyjne się nie powiodło?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Wypisz dzisiejsze wdrożenia i ich status.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Które ścieżki miały błędy działania w ostatniej godzinie?",
+  "marketplace.plugin.neon.tagline": "Projekty Postgres, schematy i SQL",
+  "marketplace.plugin.neon.description":
+    "Neon pozwala agentom wyświetlać projekty i gałęzie, czytać schematy tabel, uruchamiać SQL tylko do odczytu, znajdować wolne zapytania oraz przeszukiwać dokumentację Neon. Każdy użytkownik loguje się na własne konto Neon przez przeglądarkę. Serwer działa w trybie tylko do odczytu, więc agenci nie mogą tworzyć ani usuwać projektów i gałęzi, uruchamiać migracji ani odczytywać parametrów połączenia.",
+  "marketplace.plugin.neon.app":
+    "Projekty, gałęzie, schematy i SQL tylko do odczytu przez serwer MCP Neon z logowaniem w przeglądarce.",
+  "marketplace.plugin.neon.prompt.schema": "Jakie tabele są w mojej bazie danych Neon i jak są ze sobą powiązane?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Które zapytania są najwolniejsze w mojej bazie danych Neon?",
+  "marketplace.plugin.neon.prompt.branches": "Jakie gałęzie ma każdy z moich projektów Neon?",
   "marketplace.plugin.context7.tagline": "Aktualna dokumentacja bibliotek",
   "marketplace.plugin.context7.description":
     "Context7 pobiera aktualną dokumentację i opisy API bibliotek oraz frameworków, więc odpowiedzi dotyczą wersji, której projekt faktycznie używa. Nie wymaga konta ani klucza.",

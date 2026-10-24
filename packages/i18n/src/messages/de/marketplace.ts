@@ -198,6 +198,15 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Warum ist das letzte Production-Deployment fehlgeschlagen?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Liste die heutigen Deployments und ihren Status auf.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "Welche Routen hatten in der letzten Stunde Laufzeitfehler?",
+  "marketplace.plugin.neon.tagline": "Postgres-Projekte, Schemas und SQL",
+  "marketplace.plugin.neon.description":
+    "Mit Neon listen Agenten Projekte und Branches auf, lesen Tabellenschemas, führen schreibgeschütztes SQL aus, finden langsame Abfragen und durchsuchen die Neon-Dokumentation. Jeder Nutzer meldet sich im Browser bei seinem eigenen Neon-Konto an. Der Server läuft im schreibgeschützten Modus. Agenten können daher keine Projekte und Branches erstellen oder löschen, keine Migrationen ausführen und keine Verbindungsstrings lesen.",
+  "marketplace.plugin.neon.app":
+    "Projekte, Branches, Schemas und schreibgeschütztes SQL über den MCP-Server von Neon mit Anmeldung im Browser.",
+  "marketplace.plugin.neon.prompt.schema":
+    "Welche Tabellen gibt es in meiner Neon-Datenbank, und wie hängen sie zusammen?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Welche Abfragen sind in meiner Neon-Datenbank am langsamsten?",
+  "marketplace.plugin.neon.prompt.branches": "Welche Branches hat jedes meiner Neon-Projekte?",
   "marketplace.plugin.context7.tagline": "Aktuelle Bibliotheksdokumentation",
   "marketplace.plugin.context7.description":
     "Context7 ruft aktuelle Dokumentation und API-Referenzen für Bibliotheken und Frameworks ab, damit Antworten die Version verwenden, die das Projekt tatsächlich nutzt. Es braucht kein Konto und keinen Schlüssel.",

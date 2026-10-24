@@ -190,6 +190,15 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "直近の本番デプロイが失敗したのはなぜですか？",
   "marketplace.plugin.vercel.prompt.recentDeployments": "今日のデプロイとそのステータスを一覧にしてください。",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "過去 1 時間にランタイムエラーが発生したルートはどれですか？",
+  "marketplace.plugin.neon.tagline": "Postgres のプロジェクト、スキーマ、SQL",
+  "marketplace.plugin.neon.description":
+    "Neon を使うと、エージェントはプロジェクトとブランチを一覧表示し、テーブルのスキーマを読み、読み取り専用の SQL を実行し、遅いクエリを見つけ、Neon のドキュメントを検索できます。各ユーザーはブラウザーで自分の Neon アカウントにサインインします。サーバーは読み取り専用モードで動作するため、エージェントはプロジェクトとブランチの作成や削除、マイグレーションの実行、接続文字列の読み取りはできません。",
+  "marketplace.plugin.neon.app":
+    "プロジェクト、ブランチ、スキーマ、読み取り専用の SQL を、ブラウザーでサインインする Neon の MCP サーバーで提供します。",
+  "marketplace.plugin.neon.prompt.schema":
+    "自分の Neon データベースにはどのテーブルがあり、どのように関連していますか？",
+  "marketplace.plugin.neon.prompt.slowQueries": "自分の Neon データベースで最も遅いクエリはどれですか？",
+  "marketplace.plugin.neon.prompt.branches": "自分の各 Neon プロジェクトにはどのブランチがありますか？",
   "marketplace.plugin.context7.tagline": "最新のライブラリドキュメント",
   "marketplace.plugin.context7.description":
     "Context7 はライブラリとフレームワークの最新のドキュメントと API リファレンスを取得するので、回答はプロジェクトが実際に使っているバージョンに基づきます。アカウントもキーも不要です。",

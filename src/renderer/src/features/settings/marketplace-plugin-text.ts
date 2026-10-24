@@ -129,6 +129,18 @@ const PLUGIN_TEXT = {
       "prompt-runtime-errors": "marketplace.plugin.vercel.prompt.runtimeErrors",
     },
   },
+  neon: {
+    tagline: "marketplace.plugin.neon.tagline",
+    description: "marketplace.plugin.neon.description",
+    apps: {
+      "app-neon-mcp": "marketplace.plugin.neon.app",
+    },
+    prompts: {
+      "prompt-schema": "marketplace.plugin.neon.prompt.schema",
+      "prompt-slow-queries": "marketplace.plugin.neon.prompt.slowQueries",
+      "prompt-branches": "marketplace.plugin.neon.prompt.branches",
+    },
+  },
   context7: {
     tagline: "marketplace.plugin.context7.tagline",
     description: "marketplace.plugin.context7.description",

@@ -198,6 +198,16 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.recentDeployments": "Listez les déploiements d’aujourd’hui et leur statut.",
   "marketplace.plugin.vercel.prompt.runtimeErrors":
     "Quelles routes ont eu des erreurs d’exécution au cours de la dernière heure ?",
+  "marketplace.plugin.neon.tagline": "Projets Postgres, schémas et SQL",
+  "marketplace.plugin.neon.description":
+    "Neon permet aux agents de lister les projets et les branches, de lire les schémas des tables, d’exécuter du SQL en lecture seule, de trouver les requêtes lentes et de chercher dans la documentation Neon. Chaque utilisateur se connecte à son propre compte Neon dans le navigateur. Le serveur fonctionne en mode lecture seule. Les agents ne peuvent donc ni créer ni supprimer de projets et de branches, ni exécuter de migrations, ni lire les chaînes de connexion.",
+  "marketplace.plugin.neon.app":
+    "Projets, branches, schémas et SQL en lecture seule, via le serveur MCP de Neon avec connexion dans le navigateur.",
+  "marketplace.plugin.neon.prompt.schema":
+    "Quelles tables contient ma base de données Neon, et comment sont-elles liées ?",
+  "marketplace.plugin.neon.prompt.slowQueries":
+    "Quelles sont les requêtes les plus lentes de ma base de données Neon ?",
+  "marketplace.plugin.neon.prompt.branches": "Quelles branches contient chacun de mes projets Neon ?",
   "marketplace.plugin.context7.tagline": "Documentation à jour des bibliothèques",
   "marketplace.plugin.context7.description":
     "Context7 récupère la documentation et les références d’API à jour des bibliothèques et des frameworks, pour que les réponses utilisent la version que le projet exécute réellement. Il ne demande ni compte ni clé.",

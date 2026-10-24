@@ -212,6 +212,14 @@ export const messages = {
   "marketplace.plugin.vercel.prompt.failedBuild": "Почему не удался последний продакшен-деплой?",
   "marketplace.plugin.vercel.prompt.recentDeployments": "Покажите сегодняшние деплои и их статус.",
   "marketplace.plugin.vercel.prompt.runtimeErrors": "На каких маршрутах были ошибки выполнения за последний час?",
+  "marketplace.plugin.neon.tagline": "Проекты Postgres, схемы и SQL",
+  "marketplace.plugin.neon.description":
+    "Neon позволяет агентам просматривать проекты и ветки, читать схемы таблиц, выполнять SQL только для чтения, находить медленные запросы и искать в документации Neon. Каждый пользователь входит в свой аккаунт Neon через браузер. Сервер работает в режиме только для чтения, поэтому агенты не могут создавать и удалять проекты и ветки, выполнять миграции и читать строки подключения.",
+  "marketplace.plugin.neon.app":
+    "Проекты, ветки, схемы и SQL только для чтения через MCP-сервер Neon со входом в браузере.",
+  "marketplace.plugin.neon.prompt.schema": "Какие таблицы есть в моей базе данных Neon и как они связаны?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Какие запросы в моей базе данных Neon самые медленные?",
+  "marketplace.plugin.neon.prompt.branches": "Какие ветки есть в каждом из моих проектов Neon?",
   "marketplace.plugin.context7.tagline": "Актуальная документация библиотек",
   "marketplace.plugin.context7.description":
     "Context7 получает актуальную документацию и справочники API для библиотек и фреймворков, чтобы ответы учитывали версию, которая действительно используется в проекте. Аккаунт и ключ не нужны.",

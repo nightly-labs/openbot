@@ -411,6 +411,46 @@ const VERCEL: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/vercel",
 };
 
+const NEON: MarketplacePluginDetail = {
+  id: "plugin-neon",
+  slug: "neon",
+  name: "Neon",
+  tagline: "Postgres projects, schemas and SQL",
+  description:
+    "Neon lets agents list projects and branches, read table schemas, run read-only SQL, find slow queries, and search the Neon docs. Each user signs in to their own Neon account through the browser. The server runs in read-only mode, so agents cannot create or delete projects and branches, run migrations or read connection strings.",
+  category: "coding",
+  creatorName: "neon.com",
+  iconUrl: "https://neon.com/apple-touch-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-schema", text: "Which tables are in my Neon database, and how do they relate?" },
+    { id: "prompt-slow-queries", text: "Which queries are the slowest in my Neon database?" },
+    { id: "prompt-branches", text: "Which branches does each of my Neon projects have?" },
+  ],
+  apps: [
+    {
+      id: "app-neon-mcp",
+      name: "Neon",
+      description: "Projects, branches, schemas, and read-only SQL, over Neon's MCP server with browser sign-in.",
+      iconUrl: "https://neon.com/apple-touch-icon.png",
+      server: {
+        name: "neon",
+        transport: "http",
+        url: "https://mcp.neon.tech/mcp?readonly=true",
+        auth: [{ id: "neon-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://neon.com",
+  privacyPolicyUrl: "https://neon.com/privacy-policy",
+  termsUrl: "https://neon.com/platform-terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/neon",
+};
+
 const CONTEXT7: MarketplacePluginDetail = {
   id: "plugin-context7",
   slug: "context7",
@@ -830,6 +870,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   PAPER,
   SENTRY,
   VERCEL,
+  NEON,
   CONTEXT7,
   STRIPE,
   POSTHOG,
