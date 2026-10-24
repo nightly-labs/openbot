@@ -74,19 +74,45 @@ export function insertMention(
   return `${before}${serializeChatTagReference(kind, agent.name, agent.id)} ${after}`;
 }
 
+interface MentionMatcher {
+  expression: RegExp;
+  /** The place in the agent list of each lower-case name. */
+  indexByName: ReadonlyMap<string, number>;
+}
+
+/** One matcher for each agent list: the text of every message token reads the same list. */
+const mentionMatchers = new WeakMap<readonly { name: string }[], MentionMatcher | null>();
+
+function mentionMatcher(agents: readonly { name: string }[]): MentionMatcher | null {
+  const cached = mentionMatchers.get(agents);
+  if (cached !== undefined) return cached;
+  // The longest name first, so a name that starts another name does not take its match.
+  const ordered = agents
+    .map((agent, index) => ({ name: agent.name, index }))
+    .filter((agent) => agent.name.length > 0)
+    .sort((a, b) => b.name.length - a.name.length);
+  let matcher: MentionMatcher | null = null;
+  if (ordered.length) {
+    const indexByName = new Map(ordered.map((agent) => [agent.name.toLocaleLowerCase(), agent.index]));
+    const names = ordered.map((agent) => agent.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    matcher = { expression: new RegExp(`@(${names})(?=$|[\\s.,!?;:()\\[\\]{}])`, "giu"), indexByName };
+  }
+  mentionMatchers.set(agents, matcher);
+  return matcher;
+}
+
 /** Display-only matching for prose from providers and older messages. Never changes stored text. */
 export function plainMentionParts<T extends { id: string; name: string }>(body: string, agents: readonly T[]) {
-  const ordered = agents.filter((agent) => agent.name.length > 0).sort((a, b) => b.name.length - a.name.length);
+  const matcher = mentionMatcher(agents);
   const parts: Array<{ text: string; agent: T | undefined }> = [];
-  if (!ordered.length) return [{ text: body, agent: undefined }];
-  const byName = new Map(ordered.map((agent) => [agent.name.toLocaleLowerCase(), agent]));
-  const names = ordered.map((agent) => agent.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-  const expression = new RegExp(`@(${names})(?=$|[\\s.,!?;:()\\[\\]{}])`, "giu");
+  if (!matcher) return [{ text: body, agent: undefined }];
   let cursor = 0;
-  for (const match of body.matchAll(expression)) {
+  // `matchAll` reads a copy of the expression, so the shared expression keeps no state.
+  for (const match of body.matchAll(matcher.expression)) {
     if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(body.charAt(match.index - 1))) continue;
     if (match.index > cursor) parts.push({ text: body.slice(cursor, match.index), agent: undefined });
-    parts.push({ text: match[0], agent: byName.get((match[1] ?? "").toLocaleLowerCase()) });
+    const index = matcher.indexByName.get((match[1] ?? "").toLocaleLowerCase());
+    parts.push({ text: match[0], agent: index === undefined ? undefined : agents[index] });
     cursor = match.index + match[0].length;
   }
   if (cursor < body.length) parts.push({ text: body.slice(cursor), agent: undefined });

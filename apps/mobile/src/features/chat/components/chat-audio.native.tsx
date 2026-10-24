@@ -17,6 +17,7 @@ import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
 import type { AttachmentTint } from "./chat-attachment";
 import { playbackTime, runFileAction } from "./chat-video.native";
+import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 
@@ -44,13 +45,14 @@ let playing: VideoPlayer | null = null;
 
 /**
  * Follows a player: whether it plays, where it is, its length, and whether it failed. `seekTo`
- * moves the player and shows the new time at once.
+ * moves the player and shows the new time at once. Without a player nothing plays yet.
  */
-function usePlayback(player: VideoPlayer) {
+function usePlayback(player: VideoPlayer | null) {
   const [state, setState] = useState({ playing: false, time: 0, duration: 0, failed: false, ready: false });
   const pendingSeek = useRef<{ target: number; until: number } | null>(null);
   const seekTo = useCallback(
     (seconds: number) => {
+      if (!player) return;
       pendingSeek.current = { target: seconds, until: Date.now() + SEEK_WAIT_MS };
       player.currentTime = seconds;
       setState((current) => ({ ...current, time: seconds }));
@@ -58,6 +60,7 @@ function usePlayback(player: VideoPlayer) {
     [player],
   );
   useEffect(() => {
+    if (!player) return;
     player.timeUpdateEventInterval = TIME_STEP;
     const update = (next: Partial<typeof state>) => setState((current) => ({ ...current, ...next }));
     const subscriptions = [
@@ -93,23 +96,50 @@ function usePlayback(player: VideoPlayer) {
   return { ...state, seekTo };
 }
 
-/**
- * An audio file from the chat, such as an MP3, drawn as desktop draws a voice message: a play
- * button, the waveform, which the user taps or drags to move the position, the time and the
- * speed. The card has the same height in every state. The file downloads when the chat stops
- * scrolling, so the card knows its length and shape before the first play.
- */
-export function ChatAudioAttachment({
-  attachment,
-  serverId,
-  alignment = "left",
-  tint,
-}: {
+interface AudioAttachmentProps {
   attachment: AttachmentSummary;
   serverId: string;
   alignment?: "left" | "right";
   tint?: AttachmentTint;
-}) {
+}
+
+/**
+ * An audio file from the chat, such as an MP3, drawn as desktop draws a voice message: a play
+ * button, the waveform, which the user taps or drags to move the position, the time and the
+ * speed. The card has the same height in every state. The file downloads when the chat shows its
+ * history and does not scroll, so the card knows its length and shape before the first play.
+ */
+export function ChatAudioAttachment(props: AudioAttachmentProps) {
+  const { attachment, serverId } = props;
+  const settled = useListSettled();
+  const historyShown = useHistoryShown();
+  const query = useMediaFile(serverId, attachment, settled && historyShown);
+  const uri = query.data ?? null;
+  // The player is made with the file: each player is a native media player, and a card without its
+  // file has nothing to play.
+  return uri ? (
+    <AudioWithPlayer {...props} query={query} uri={uri} />
+  ) : (
+    <AudioCard {...props} query={query} uri={null} player={null} />
+  );
+}
+
+type MediaFileQuery = ReturnType<typeof useMediaFile>;
+
+function AudioWithPlayer(props: AudioAttachmentProps & { query: MediaFileQuery; uri: string }) {
+  const player = useVideoPlayer(props.uri);
+  return <AudioCard {...props} player={player} />;
+}
+
+function AudioCard({
+  attachment,
+  serverId,
+  alignment = "left",
+  tint,
+  query,
+  uri,
+  player,
+}: AudioAttachmentProps & { query: MediaFileQuery; uri: string | null; player: VideoPlayer | null }) {
   const text = useText();
   const { t, format, sourceText } = text;
   const [muted, themeAccentForeground, foreground] = useThemeColor(["muted", "accent-foreground", "foreground"]);
@@ -122,10 +152,6 @@ export function ChatAudioAttachment({
       : tint.foreground
     : String(foreground);
   const { width } = useWindowDimensions();
-  const settled = useListSettled();
-  const query = useMediaFile(serverId, attachment, settled);
-  const uri = query.data ?? null;
-  const player = useVideoPlayer(uri);
   const playback = usePlayback(player);
   const waveform = useAudioWaveform(`${serverId}:${attachment.id}`, uri);
   // While a finger is on the waveform, the bars follow it and the player waits for the release.
@@ -143,6 +169,7 @@ export function ChatAudioAttachment({
   const started = shownPlaying || position > 0;
 
   function toggle() {
+    if (!player) return;
     void haptics.impact("soft");
     if (player.playing) {
       player.pause();
@@ -161,7 +188,7 @@ export function ChatAudioAttachment({
 
   // A drag stops the sound while the finger moves, and plays again from the new place on release.
   function startScrub() {
-    if (!player.playing) return;
+    if (!player?.playing) return;
     setResumeAfterScrub(true);
     player.pause();
   }
@@ -171,7 +198,7 @@ export function ChatAudioAttachment({
     else seek(seconds);
     if (!resumeAfterScrub) return;
     setResumeAfterScrub(false);
-    player.play();
+    player?.play();
   }
 
   function changeSpeed() {
@@ -179,7 +206,7 @@ export function ChatAudioAttachment({
     const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
     setSpeed(next);
     // On iOS a new rate starts a paused player, so a paused card takes the speed at the next play.
-    if (player.playing) player.playbackRate = next;
+    if (player?.playing) player.playbackRate = next;
   }
 
   async function share() {

@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import X from "lucide-react-native/icons/x";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -42,7 +42,8 @@ export function useOpenAgentTasks(serverId: string, agentId: string): AgentTask[
     queryFn: () => workspace().loadAgentTasks(agentId, serverId),
   });
   const tasks = list.data?.tasks;
-  return tasks?.some(isAgentTaskOpen) ? tasks.filter(isAgentTaskOpen) : NO_TASKS;
+  // One array while the list stays, so the rows under the activity do not draw the chat again.
+  return useMemo(() => (tasks?.some(isAgentTaskOpen) ? tasks.filter(isAgentTaskOpen) : NO_TASKS), [tasks]);
 }
 
 /**

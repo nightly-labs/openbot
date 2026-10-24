@@ -8,7 +8,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
@@ -27,11 +30,11 @@ export function roleLevel(role: AgentAccessRole, agentId: string): AgentAccessLe
  * a stale one, and the pages read the roles again.
  */
 export function useServerRoles(serverId: string) {
-  const { canManageServerRoles, agents } = useMobileWorkspace();
+  const available = useMobileWorkspaceSelector((workspace) => workspace.canManageServerRoles(serverId));
+  const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const { loadServerRoles, setServerRoles } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const available = canManageServerRoles(serverId);
   const key = queryKeys.serverRoles(queryScope, serverId);
   const locked = useRef(false);
   const roles = useQuery({
@@ -90,19 +93,21 @@ export function useServerRoles(serverId: string) {
  * checks each write.
  */
 export function useAgentViewOnly(serverId: string, agentId: string): boolean {
-  const { hasAgentAccessLimits, servers } = useMobileWorkspace();
+  const limited = useMobileWorkspaceSelector((workspace) => workspace.hasAgentAccessLimits(serverId));
+  // An owner or admin can use all agents, also with levels read before a promotion.
+  const role = useMobileWorkspaceSelector(
+    (workspace) => workspace.servers.find((server) => server.id === serverId)?.role,
+  );
   const { loadServerRoles } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const access = useQuery({
     queryKey: queryKeys.serverRoles(queryScope, serverId),
-    enabled: hasAgentAccessLimits(serverId),
+    enabled: limited,
     // Kept while the app runs: offline, the last levels that the host sent still apply. After a
     // restart offline, the levels are unknown until the host answers.
     gcTime: Number.POSITIVE_INFINITY,
     queryFn: () => loadServerRoles(serverId),
   });
-  // An owner or admin can use all agents, also with levels read before a promotion.
-  const role = servers.find((server) => server.id === serverId)?.role;
   return !canAdministerServer(role) && access.data?.mine[agentId] === "view";
 }
 

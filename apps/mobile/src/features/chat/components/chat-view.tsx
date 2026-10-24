@@ -127,6 +127,8 @@ export interface ChatViewProps {
   focusMessageId?: string | null;
   /** True while the chat opens at a message from search, also before its page loads. */
   holdOpening?: boolean;
+  /** True while the chat shows the messages that the phone kept and reads its latest page. */
+  catchingUp?: boolean;
   onFocusPlaced?: () => void;
   /** The loaded messages are a window around a searched message and do not reach the latest message. */
   detached?: boolean;
@@ -160,8 +162,9 @@ const OPEN_TRANSITION_DEADLINE_MS = 700;
 /**
  * Whether the message rows render. Android starts the push animation of a screen only after the
  * screen's first commit, and the rows made that commit long: the chat came seconds after the tap.
- * There the chat slides in without its rows, which render when it is in place, as when the history
- * arrives after a first open. iOS animates the screen while it renders, so it renders them at once.
+ * There the first commit has no rows. The list renders its latest rows while the chat slides in,
+ * and the older rows when it is in place. iOS animates the screen while it renders, so it renders
+ * them all at once.
  */
 export function useRowsAfterOpenTransition(): boolean {
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
@@ -214,6 +217,7 @@ export function ChatView({
   loadOlder,
   focusMessageId = null,
   holdOpening = false,
+  catchingUp = false,
   onFocusPlaced,
   detached = false,
   showLatestMessages,
@@ -505,6 +509,7 @@ export function ChatView({
     lastUserId,
     questionForm?.question ? (questionForm.messageId ?? null) : null,
     holdOpening,
+    catchingUp,
   );
   const atLatest = motion.atLatest;
   // The end of a window around a searched message is not the latest message.
@@ -924,7 +929,9 @@ export function ChatView({
               }
               appActive={appActive}
               activeTurnId={activeTurnId}
-              questionForm={questionForm}
+              // The form is a new object on each render. Without a question the list does not read it,
+              // so it is left out and does not draw the list again.
+              questionForm={questionForm?.messageId ? questionForm : undefined}
               onSelectQuestion={readOnly ? undefined : onSelectQuestion}
               activityAccessory={activityAccessory}
               approvals={readOnly ? undefined : approvals}

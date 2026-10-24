@@ -14,12 +14,19 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isAndroid } from "@/shared/lib/platform";
 import { chatContentIsVisible } from "../model/chat-layout";
 
 /** The space under each row of the list. */
 export const CHAT_ROW_GAP = 10;
 /** A message from search opens this far under the header. */
 const FOCUS_GAP = 12;
+/** On Android the chat takes the latest message this many frames after the last row has its size. */
+const ANDROID_PLACE_FRAMES = 2;
+/** The longest wait on Android before the chat takes the latest message, also without a measured row. */
+const ANDROID_PLACE_TIMEOUT_MS = 250;
+/** How long the list keeps the latest message in view after the chat has its rows and its latest page. */
+const OPENING_FOLLOW_MS = 600;
 
 type AnchorReadyInfo = Parameters<NonNullable<AnchoredEndSpaceConfig["onReady"]>>[0];
 
@@ -33,6 +40,8 @@ export function useChatMotion(
   requiredInputId: string | null = null,
   /** The chat opens at a message from search: do not move to the latest message while it loads. */
   holdOpening = false,
+  /** The chat shows the messages that the phone kept, and reads the latest page of the host. */
+  catchingUp = false,
 ) {
   const listRef = useRef<LegendListRef>(null);
   const reducedMotion = useReducedMotion();
@@ -137,6 +146,9 @@ export function useChatMotion(
   // list has no position to wait for, and Legend List calls `onReady` only after it lays out a row.
   const listPlaced = !hasRows || placedWithRows === true;
   const shown = useRef(false);
+  // While the chat opens, the list keeps the latest message in view: older rows come above the
+  // first rows and get their sizes, and the latest page can add messages after the kept ones.
+  const [openingFollow, setOpeningFollow] = useState(!holdOpening);
   const heldOpening = useRef(holdOpening);
   const current = useRef({ lastUserId });
   current.current = { lastUserId };
@@ -166,6 +178,35 @@ export function useChatMotion(
     if (held) void (listRef.current?.scrollToEnd({ animated: false }) ?? Promise.resolve()).then(reveal, reveal);
     else reveal();
   }, [listPlaced, ready, holdOpening, reveal]);
+  // Android moves the list to the latest message with a native scroll, and Legend List can wait for
+  // seconds for that scroll to report before it calls `onReady`. Once the last row has its size,
+  // the chat takes the end itself: this ends the wait, and the list calls `onReady`. iOS places the
+  // list without a native scroll, so it keeps the wait.
+  useEffect(() => {
+    if (!isAndroid || shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
+    const started = Date.now();
+    let measuredFrames = 0;
+    let frame = requestAnimationFrame(function place() {
+      const list = listRef.current;
+      const state = list?.getState();
+      const last = state ? state.data.length - 1 : -1;
+      // The size of a row is unset until the list has measured it.
+      if (state && last >= 0 && state.sizeAtIndex(last) > 0) measuredFrames += 1;
+      if (list && (measuredFrames > ANDROID_PLACE_FRAMES || Date.now() - started >= ANDROID_PLACE_TIMEOUT_MS)) {
+        // The list calls `onReady` when this ends its wait. The end of the scroll places the list
+        // also if it had no wait left to end.
+        void list.scrollToEnd({ animated: false }).then(() => setPlacedWithRows(true));
+        return;
+      }
+      frame = requestAnimationFrame(place);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [hasRows, placedWithRows, ready, holdOpening]);
+  useEffect(() => {
+    if (!openingFollow || !ready || catchingUp) return;
+    const timer = setTimeout(() => setOpeningFollow(false), OPENING_FOLLOW_MS);
+    return () => clearTimeout(timer);
+  }, [openingFollow, ready, catchingUp]);
   useLayoutEffect(() => {
     if (requiredInputId !== lastRequiredInputId.current && requiredInputId && followLatest.current && shown.current) {
       // The question row renders in this commit; its size is known from the next frame.
@@ -294,6 +335,8 @@ export function useChatMotion(
   const responseStyle = useAnimatedStyle(() => ({ opacity: responseOpacity.get() }));
 
   const beginSend = useCallback(() => {
+    // A sent message takes its own place in the list.
+    setOpeningFollow(false);
     followLatest.current = true;
     setKeyboardLiftBehavior("whenAtEnd");
     const baseline = current.current.lastUserId;
@@ -322,6 +365,8 @@ export function useChatMotion(
     setKeyboardLiftBehavior("never");
   }, []);
   const onScrollBeginDrag = useCallback(() => {
+    // A drag is the reader's choice. A move of the list while rows get their sizes is not.
+    setOpeningFollow(false);
     leaveLatest();
     reveal();
     cancelSend();
@@ -377,8 +422,11 @@ export function useChatMotion(
       keyboardHeight,
       keyboardProgress,
       keyboardLiftBehavior,
-      /** A question waits for the reader at the end of the chat: the list keeps it in view while it grows. */
-      followsRequiredInput: requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd",
+      /**
+       * The list keeps the latest message in view. A question waits for the reader at the end of the
+       * chat while it grows, and an opening chat stays at the latest message until the reader drags.
+       */
+      followsEnd: (requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd") || (openingFollow && !holdOpening),
       scrollOffset,
       historyStyle,
       firstMessageStyle,
@@ -410,6 +458,7 @@ export function useChatMotion(
       keyboardProgress,
       keyboardLiftBehavior,
       requiredInputId,
+      openingFollow,
       scrollOffset,
       historyStyle,
       firstMessageStyle,

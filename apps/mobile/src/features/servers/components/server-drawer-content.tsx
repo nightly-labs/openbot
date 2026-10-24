@@ -12,7 +12,7 @@ import Settings2 from "lucide-react-native/icons/settings-2";
 import ShoppingBag from "lucide-react-native/icons/shopping-bag";
 import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
-import { type PropsWithChildren, type ReactNode, useEffect, useRef, useState } from "react";
+import { memo, type PropsWithChildren, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import Animated, {
   cubicBezier,
@@ -48,7 +48,7 @@ import { typeScale } from "@/shared/lib/type-scale";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
 import { SERVER_ROW_HEIGHT, SortableServerList } from "./sortable-server-list";
-import { useDrawerServerValues } from "./use-drawer-server-values";
+import { useDrawerMemberCount, useDrawerServerValues } from "./use-drawer-server-values";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const SERVER_LIST_MOTION = { duration: 240, easing: EASE_OUT };
@@ -59,6 +59,7 @@ const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 interface ServerDrawerContentProps {
   activeServerId: string;
   muted: ViewStyle["backgroundColor"];
+  /** True after the drawer has opened: the drawer then reads its values from the host. */
   open: boolean;
   servers: MobileServer[];
   session: MobileSession;
@@ -88,9 +89,10 @@ function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
 /**
  * The drawer under the home screen. The name of the open server opens the server list in place;
  * below it are the tools of that server, each with its current value. The app opens on the first
- * server of the list.
+ * server of the list. The shell renders again while the drawer moves; with the same props this
+ * content does not.
  */
-export function ServerDrawerContent({
+export const ServerDrawerContent = memo(function ServerDrawerContent({
   activeServerId,
   muted,
   open,
@@ -122,7 +124,7 @@ export function ServerDrawerContent({
   const canReorder = serverIds.length > 1;
   // Without an open server the list is the only content, so it stays open.
   const showsList = listOpen || editing || !activeServer;
-  const values = useDrawerServerValues(activeServer, open);
+  const memberCount = useDrawerMemberCount(activeServer?.id ?? "");
   const hostedServerIds = useHostedServerAvailability((state) =>
     state.userId === session.user.id ? state.serverIds : null,
   );
@@ -327,13 +329,12 @@ export function ServerDrawerContent({
     );
   }
 
-  const serverId = activeServer?.id ?? "";
   const subtitle = activeServer
-    ? values.memberCount === null
+    ? memberCount === null
       ? serverDetail(activeServer, t)
       : t("mobile.server.drawer.kindMembers", {
           kind: serverDetail(activeServer, t),
-          members: t("mobile.server.drawer.memberCount", { count: values.memberCount }),
+          members: t("mobile.server.drawer.memberCount", { count: memberCount }),
         })
     : null;
 
@@ -443,48 +444,7 @@ export function ServerDrawerContent({
           {activeServer ? <DrawerDivider /> : null}
         </ServerListCollapse>
 
-        {activeServer ? (
-          <View className="pt-1.5">
-            {values.tasks ? (
-              <DrawerRow
-                icon={SquareCheck}
-                label={t("mobile.app.route.tasks")}
-                value={values.tasks.value}
-                accentValue={values.tasks.needsYou}
-                onPress={() => onNavigate({ pathname: "/server-tasks", params: { serverId } })}
-              />
-            ) : null}
-            <DrawerRow
-              icon={Calendar}
-              label={t("mobile.app.route.routines")}
-              value={values.nextRoutine}
-              onPress={() => onNavigate({ pathname: "/server-routines", params: { serverId } })}
-            />
-            <DrawerRow
-              icon={ShoppingBag}
-              label={t("mobile.app.route.marketplace")}
-              onPress={() => onNavigate({ pathname: "/server-marketplace", params: { serverId } })}
-            />
-            <DrawerRow
-              icon={ChartColumn}
-              label={t("mobile.app.route.usage")}
-              value={values.usage}
-              onPress={() => onNavigate({ pathname: "/server-usage", params: { serverId } })}
-            />
-            <DrawerRow
-              icon={UsersRound}
-              label={t("mobile.app.route.members")}
-              value={values.members}
-              onPress={() => onNavigate({ pathname: "/server-settings/members", params: { serverId } })}
-            />
-            <DrawerDivider />
-            <DrawerRow
-              icon={Settings2}
-              label={t("mobile.server.drawer.serverSettings")}
-              onPress={() => onNavigate({ pathname: "/server-settings", params: { serverId } })}
-            />
-          </View>
-        ) : null}
+        {activeServer ? <DrawerServerTools server={activeServer} open={open} onNavigate={onNavigate} /> : null}
       </ScrollView>
 
       <View className="mr-3 flex-row items-center gap-2 pt-2">
@@ -509,6 +469,85 @@ export function ServerDrawerContent({
         </ServerDrawerIconButton>
       </View>
     </>
+  );
+});
+
+type DrawerRoute = "tasks" | "routines" | "marketplace" | "usage" | "members" | "settings";
+
+/**
+ * The tools of the open server with their values. Each answer from the host renders only this part
+ * of the drawer, not the server list above it.
+ */
+function DrawerServerTools({
+  server,
+  open,
+  onNavigate,
+}: {
+  server: MobileServer;
+  open: boolean;
+  onNavigate: (href: Href) => void;
+}) {
+  const { t } = useText();
+  const values = useDrawerServerValues(server, open);
+  const serverId = server.id;
+  const routes = useMemo(
+    (): Record<DrawerRoute, Href> => ({
+      tasks: { pathname: "/server-tasks", params: { serverId } },
+      routines: { pathname: "/server-routines", params: { serverId } },
+      marketplace: { pathname: "/server-marketplace", params: { serverId } },
+      usage: { pathname: "/server-usage", params: { serverId } },
+      members: { pathname: "/server-settings/members", params: { serverId } },
+      settings: { pathname: "/server-settings", params: { serverId } },
+    }),
+    [serverId],
+  );
+  return (
+    <View className="pt-1.5">
+      {values.tasks ? (
+        <DrawerRow
+          icon={SquareCheck}
+          label={t("mobile.app.route.tasks")}
+          value={values.tasks.value}
+          accentValue={values.tasks.needsYou}
+          href={routes.tasks}
+          onNavigate={onNavigate}
+        />
+      ) : null}
+      <DrawerRow
+        icon={Calendar}
+        label={t("mobile.app.route.routines")}
+        value={values.nextRoutine}
+        href={routes.routines}
+        onNavigate={onNavigate}
+      />
+      <DrawerRow
+        icon={ShoppingBag}
+        label={t("mobile.app.route.marketplace")}
+        href={routes.marketplace}
+        onNavigate={onNavigate}
+      />
+      <DrawerRow
+        icon={ChartColumn}
+        label={t("mobile.app.route.usage")}
+        value={values.usage}
+        href={routes.usage}
+        onNavigate={onNavigate}
+      />
+      <DrawerRow
+        icon={UsersRound}
+        label={t("mobile.app.route.members")}
+        value={values.members}
+        href={routes.members}
+        onNavigate={onNavigate}
+      />
+      <DrawerDivider />
+      <DrawerRow
+        icon={Settings2}
+        label={t("mobile.server.drawer.serverSettings")}
+        href={routes.settings}
+        onNavigate={onNavigate}
+      />
+    </View>
   );
 }
 
@@ -579,20 +618,22 @@ function DrawerDivider() {
   return <View accessibilityElementsHidden className="mx-2.5 mt-2.5 mb-1 h-px bg-grouped-border" />;
 }
 
-/** One tool of the open server, with its current value on the right. */
-function DrawerRow({
+/** One tool of the open server, with its current value on the right. A new value renders only its row. */
+const DrawerRow = memo(function DrawerRow({
   icon: Icon,
   label,
   value,
   accentValue = false,
-  onPress,
+  href,
+  onNavigate,
 }: {
   icon: LucideIcon;
   label: string;
   value?: string | null;
   /** A value that asks for the person, such as tasks that need them. */
   accentValue?: boolean;
-  onPress: () => void;
+  href: Href;
+  onNavigate: (href: Href) => void;
 }) {
   const [secondary, control] = useCSSVariable(["--openbot-text-secondary", "--openbot-bg-control"]);
   return (
@@ -603,7 +644,7 @@ function DrawerRow({
       style={({ pressed }) => ({ height: DRAWER_ROW_HEIGHT, backgroundColor: pressed ? String(control) : undefined })}
       onPress={() => {
         void haptics.impact("soft");
-        onPress();
+        onNavigate(href);
       }}
     >
       <Icon color={String(secondary)} size={20} strokeWidth={1.8} />
@@ -621,4 +662,4 @@ function DrawerRow({
       ) : null}
     </Pressable>
   );
-}
+});

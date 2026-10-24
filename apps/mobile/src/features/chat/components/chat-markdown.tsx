@@ -974,25 +974,41 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       },
     };
   }, [generation, onSelect]);
+  const animateTail = (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal;
+  const nativeSelectionTarget = revealed ? nativeTarget : undefined;
+  // One object while its values stay, so each block keeps its memo when the message renders again.
+  const presentation = useMemo<TextPresentation>(
+    () => ({
+      selectable,
+      type: compact ? "body-sm" : "body",
+      style: { color: color ?? codeColor },
+      codeColor,
+      agents,
+      mentionOffset: 4 * fontScale,
+      fontScale,
+      t,
+      streaming,
+      finished,
+      animateTail,
+      nativeSelection: nativeSelectionTarget,
+    }),
+    [
+      selectable,
+      compact,
+      color,
+      codeColor,
+      agents,
+      fontScale,
+      t,
+      streaming,
+      finished,
+      animateTail,
+      nativeSelectionTarget,
+    ],
+  );
   return (
     <StreamRevealProvider>
-      <MarkdownBlocks
-        tokens={visibleTokens}
-        presentation={{
-          selectable,
-          type: compact ? "body-sm" : "body",
-          style: { color: color ?? codeColor },
-          codeColor,
-          agents,
-          mentionOffset: 4 * fontScale,
-          fontScale,
-          t,
-          streaming,
-          finished,
-          animateTail: (streaming || (Boolean(playback?.enabled) && !flushed)) && animationEnabled && textReveal,
-          nativeSelection: revealed ? nativeTarget : undefined,
-        }}
-      />
+      <MarkdownBlocks tokens={visibleTokens} presentation={presentation} />
     </StreamRevealProvider>
   );
 });

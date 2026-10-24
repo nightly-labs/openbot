@@ -59,6 +59,8 @@ export function useChatQueue(
     queryKey,
     queryFn: () => workspace().loadQueue(agentId, serverId),
     enabled: online,
+    // The chat reads the queue once when it opens, also when the cache holds a recent copy.
+    refetchOnMount: "always",
     retry: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -146,9 +148,13 @@ export function useChatQueue(
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
+  // A connection that comes back reads the queue again. The chat that opens online has its read
+  // from the query: a second request here would replace it.
+  const wasOnline = useRef(online);
   useEffect(() => {
-    if (online) refresh();
-  }, [online, refresh]);
+    if (online && !wasOnline.current) void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
+    wasOnline.current = online;
+  }, [online, queryClient, queryKey]);
 
   const run = useCallback(
     async (action: () => Promise<void>) => {

@@ -36,8 +36,17 @@ import TextWrap from "lucide-react-native/icons/text-wrap";
 import Trash2 from "lucide-react-native/icons/trash";
 import Users from "lucide-react-native/icons/users";
 import X from "lucide-react-native/icons/x";
-import { Fragment, type Ref, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { BackHandler, Pressable, useWindowDimensions, type ViewInstance } from "react-native";
+import {
+  Fragment,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { BackHandler, Pressable, StyleSheet, useWindowDimensions, View, type ViewInstance } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
@@ -164,6 +173,9 @@ function MenuItem({ action, colors, onPressAction }: ItemProps) {
  * The Android `MenuView`, with the props of `@expo/ui/community/menu`. It draws the HeroUI menu of the
  * app, because the Material menu takes the palette and shape of the device and does not match the app.
  * iOS keeps the native menu. A string `image` names an SF Symbol, and Android shows its Lucide icon.
+ *
+ * A closed menu that was never opened is only its trigger. A list has one menu for each row, and the
+ * HeroUI menu tree of each row made the list slow to mount. The menu mounts when it opens first.
  */
 export function MenuView({
   ref,
@@ -177,6 +189,76 @@ export function MenuView({
   children,
   testID,
 }: MenuComponentProps & { ref?: Ref<MenuComponentRef> }) {
+  const anchor = useRef<ViewInstance>(null);
+  const menu = useRef<MenuComponentRef>(null);
+  const [mounted, setMounted] = useState(false);
+  // An open that comes before the menu mounts. The menu opens when its trigger has a layout.
+  const pendingOpen = useRef(false);
+  const open = useCallback(() => {
+    if (menu.current) {
+      menu.current.show();
+      return;
+    }
+    pendingOpen.current = true;
+    setMounted(true);
+  }, []);
+  useImperativeHandle(ref, () => ({ show: open }), [open]);
+  const takePendingOpen = useCallback(() => {
+    const pending = pendingOpen.current;
+    pendingOpen.current = false;
+    return pending;
+  }, []);
+
+  // The children keep the same place in the tree, so the menu mounts without a new row under it.
+  return (
+    <View style={style} testID={testID}>
+      <Pressable
+        ref={anchor}
+        onPress={shouldOpenOnLongPress ? undefined : open}
+        onLongPress={shouldOpenOnLongPress ? open : undefined}
+        android_disableSound
+        focusable={false}
+        accessible={false}
+      >
+        {children}
+        {mounted ? (
+          <OpenedMenu
+            ref={menu}
+            anchor={anchor}
+            title={title}
+            actions={actions}
+            onPressAction={onPressAction}
+            onOpenMenu={onOpenMenu}
+            onCloseMenu={onCloseMenu}
+            takePendingOpen={takePendingOpen}
+          />
+        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
+type OpenedMenuProps = Pick<
+  MenuComponentProps,
+  "title" | "actions" | "onPressAction" | "onOpenMenu" | "onCloseMenu"
+> & {
+  ref: Ref<MenuComponentRef>;
+  anchor: RefObject<ViewInstance | null>;
+  /** True once when an open waited for this menu to mount. */
+  takePendingOpen: () => boolean;
+};
+
+/** The HeroUI menu over its trigger. It stays mounted after it closes, so its closing motion can run. */
+function OpenedMenu({
+  ref,
+  anchor,
+  title,
+  actions,
+  onPressAction,
+  onOpenMenu,
+  onCloseMenu,
+  takePendingOpen,
+}: OpenedMenuProps) {
   const tokens = useCSSVariable([
     "--openbot-text-primary",
     "--openbot-text-muted",
@@ -194,7 +276,6 @@ export function MenuView({
   const { height } = useWindowDimensions();
   const safeArea = useSafeAreaInsets();
   const trigger = useRef<MenuTriggerRef>(null);
-  const anchor = useRef<ViewInstance>(null);
   const [isOpen, setIsOpen] = useState(false);
   // Where the menu opens and the height it has there. A button in the lower half of the screen, such as
   // the filter beside a bottom search field, opens the menu above it, so the menu does not run off the
@@ -226,7 +307,7 @@ export function MenuView({
       setRoom(above > below ? { placement: "top", height: above } : { placement: "bottom", height: below });
       trigger.current?.open();
     });
-  }, [height, safeArea.top, safeArea.bottom]);
+  }, [anchor, height, safeArea.top, safeArea.bottom]);
   useImperativeHandle(ref, () => ({ show: open }), [open]);
 
   useEffect(() => {
@@ -254,20 +335,18 @@ export function MenuView({
   const scrolls = !visible(actions).some((action) => action.subactions?.length && !action.displayInline);
 
   return (
-    <Menu isOpen={isOpen} onOpenChange={onOpenChange} style={style} testID={testID}>
-      {/* The trigger only measures the anchor. The inner Pressable opens the menu on a tap or a long press. */}
-      <Menu.Trigger ref={trigger} isDisabled accessible={false} aria-disabled={false}>
-        <Pressable
-          ref={anchor}
-          onPress={shouldOpenOnLongPress ? undefined : open}
-          onLongPress={shouldOpenOnLongPress ? open : undefined}
-          android_disableSound
-          focusable={false}
-          accessible={false}
-        >
-          {children}
-        </Pressable>
-      </Menu.Trigger>
+    <Menu isOpen={isOpen} onOpenChange={onOpenChange} pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {/* The trigger covers the anchor and only measures it. The anchor opens the menu on a tap or a long press. */}
+      <Menu.Trigger
+        ref={trigger}
+        isDisabled
+        accessible={false}
+        aria-disabled={false}
+        style={StyleSheet.absoluteFill}
+        onLayout={() => {
+          if (takePendingOpen()) open();
+        }}
+      />
       <Menu.Portal>
         <Menu.Overlay />
         <Menu.Content

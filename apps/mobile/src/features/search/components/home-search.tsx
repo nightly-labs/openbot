@@ -21,6 +21,7 @@ import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import SquareCheck from "lucide-react-native/icons/square-check";
 import UsersRound from "lucide-react-native/icons/users-round";
 import {
+  type ComponentProps,
   type PropsWithChildren,
   type RefObject,
   useCallback,
@@ -63,6 +64,7 @@ import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { MobileSearchResults, SearchCaption } from "@/features/search/components/mobile-search-results";
 import { setHomeSearchOpener } from "@/features/search/model/home-search-request";
+import { useAppDrawerShown } from "@/features/servers/components/app-drawer-activity";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { TaskListRow } from "@/features/servers/components/task-list-row";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
@@ -732,7 +734,7 @@ export function HomeSearchBar({
         </Animated.View>
       ) : null}
       <Animated.View className="min-w-0 flex-1" layout={layout}>
-        <GlassCapsule
+        <HomeFieldCapsule
           liquidGlass={liquidGlass}
           fallbackBackground={fieldBackground}
           tint={resultTint}
@@ -869,7 +871,7 @@ export function HomeSearchBar({
               />
             ) : null}
           </Animated.View>
-        </GlassCapsule>
+        </HomeFieldCapsule>
       </Animated.View>
     </Animated.View>
   );
@@ -1004,6 +1006,16 @@ function useHomeAtRest(): boolean {
     };
   }, [navigation]);
   return atRest;
+}
+
+/**
+ * The capsule of the home field. It shows the solid glass while the drawer is open or moves: the
+ * scrim covers home then, and the Android blur would blur the whole home list again on each frame of
+ * the motion. Only the capsule reads the drawer state, so the field itself does not render again.
+ */
+function HomeFieldCapsule({ blurPaused = false, ...props }: ComponentProps<typeof GlassCapsule>) {
+  const drawerShown = useAppDrawerShown();
+  return <GlassCapsule {...props} blurPaused={blurPaused || drawerShown} />;
 }
 
 interface Shortcut {

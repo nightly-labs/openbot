@@ -1,6 +1,6 @@
 import { useThemeColor } from "heroui-native/hooks";
 import Reply from "lucide-react-native/icons/reply";
-import { type PropsWithChildren, useMemo, useRef } from "react";
+import { type PropsWithChildren, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -26,6 +26,9 @@ export function ChatMessageGesture({
   const offset = useSharedValue(0);
   const bubbleStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }));
   const iconStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, offset.get() / 64) }));
+  // The reply icon behind the bubble mounts with the first swipe, not with each row of the chat.
+  // It is clear until the bubble has moved, so it shows in time.
+  const [iconShown, setIconShown] = useState(false);
   const handlers = useRef({ onReply, onSelectText });
   handlers.current = { onReply, onSelectText };
   const canReply = Boolean(onReply) && !selecting;
@@ -46,6 +49,7 @@ export function ChatMessageGesture({
       .activeOffsetX(16)
       .failOffsetX(-8)
       .failOffsetY([-12, 12])
+      .onStart(() => scheduleOnRN(setIconShown, true))
       .onUpdate((event) => {
         offset.set(Math.max(0, Math.min(event.translationX, 64) + Math.max(0, event.translationX - 64) * 0.15));
       })
@@ -63,9 +67,11 @@ export function ChatMessageGesture({
 
   return (
     <View className="max-w-[88%] self-start">
-      <Animated.View pointerEvents="none" className="absolute bottom-0 left-0 top-0 justify-center" style={iconStyle}>
-        <Reply color={muted} size={22} />
-      </Animated.View>
+      {iconShown ? (
+        <Animated.View pointerEvents="none" className="absolute bottom-0 left-0 top-0 justify-center" style={iconStyle}>
+          <Reply color={muted} size={22} />
+        </Animated.View>
+      ) : null}
       <GestureDetector gesture={gesture}>
         <Animated.View style={bubbleStyle}>{children}</Animated.View>
       </GestureDetector>

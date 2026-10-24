@@ -11,6 +11,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
+  decodeTeamProtocolV2Json,
   decodeTeamProtocolV2RpcFrame,
   decodeTeamProtocolV8CurrentEvent,
   decodeTeamProtocolV8WebRtcHttpResponse,
@@ -111,8 +112,12 @@ export interface RemoteTeamCommandResult {
   reference?: string;
 }
 
-/** Carries every outstanding command across the native/DOM bridge, keyed by request ID. */
-export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand[]) => void) {
+/**
+ * Keeps every outstanding command of the native/DOM bridge, keyed by request ID. `deliver` sends one
+ * new command to the page. A page that loads again does not have the commands of the page before it,
+ * so the consumer sends it `outstanding()` once it is ready, and the page skips an ID that it has.
+ */
+export function createRemoteCommandMailbox(deliver: (command: RemoteTeamCommand) => void) {
   const pending = new Map<string, { command: RemoteTeamCommand; resolve: (result: RemoteTeamCommandResult) => void }>();
   let target: { hostId: string; hostPublicKey: string } | null = null;
   const cancel = () => {
@@ -134,7 +139,7 @@ export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand
       }
       return new Promise((resolve) => {
         pending.set(command.id, { command, resolve });
-        publish([...pending.values()].map((entry) => entry.command));
+        deliver(command);
       });
     },
     receive(result: RemoteTeamCommandResult) {
@@ -142,9 +147,64 @@ export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand
       if (!entry) return;
       pending.delete(result.commandId);
       entry.resolve(result);
-      publish([...pending.values()].map((item) => item.command));
     },
+    /** The commands that have no result yet, in the order they were sent. */
+    outstanding: (): RemoteTeamCommand[] => [...pending.values()].map((entry) => entry.command),
     dispose: cancel,
+  };
+}
+
+function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
+  if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
+    return null;
+  const maxBytes = value.maxBytes;
+  if (!(maxBytes === undefined || isNumber(maxBytes))) return null;
+  return {
+    name: value.name,
+    mimeType: value.mimeType,
+    base64: value.base64,
+    ...(maxBytes === undefined ? {} : { maxBytes }),
+  };
+}
+
+/**
+ * Reads a command that crossed the native/DOM bridge as JSON. `command` is null when the value is not
+ * a command; `commandId` is then its ID when it has one, so the page can still answer it.
+ */
+export function decodeRemoteTeamCommand(value: unknown): {
+  command: RemoteTeamCommand | null;
+  commandId: string | null;
+} {
+  if (!isDynamicRecord(value) || !isString(value.id)) return { command: null, commandId: null };
+  const id = value.id;
+  const invalid = { command: null, commandId: id };
+  if (value.type === "disconnect") return { command: { id, type: "disconnect" }, commandId: id };
+  if (value.type === "connect")
+    return isString(value.hostId) && isString(value.hostPublicKey)
+      ? { command: { id, type: "connect", hostId: value.hostId, hostPublicKey: value.hostPublicKey }, commandId: id }
+      : invalid;
+  if (value.type !== "request" || !isString(value.method) || !isString(value.path)) return invalid;
+  const timeoutMs = value.timeoutMs;
+  if (!(timeoutMs === undefined || isNumber(timeoutMs))) return invalid;
+  const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
+  if (upload === null) return invalid;
+  let body: TeamProtocolV2Json;
+  try {
+    body = decodeTeamProtocolV2Json(value.body);
+  } catch {
+    return invalid;
+  }
+  return {
+    command: {
+      id,
+      type: "request",
+      method: value.method,
+      path: value.path,
+      body,
+      ...(upload ? { upload } : {}),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    },
+    commandId: id,
   };
 }
 

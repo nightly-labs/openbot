@@ -1,4 +1,4 @@
-import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
+import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
 import { useEffect } from "react";
 import { type SharedValue, useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -71,7 +71,12 @@ half4 main(float2 position) {
 }
 `;
 
-const EFFECT = Skia.RuntimeEffect.Make(SOURCE);
+// Compiled on first use, not when the chat loads this module.
+let effect: SkRuntimeEffect | null | undefined;
+function auroraEffect(): SkRuntimeEffect | null {
+  if (effect === undefined) effect = Skia.RuntimeEffect.Make(SOURCE);
+  return effect;
+}
 // The level rises fast and falls slowly, so the glow follows the voice without flicker.
 const ATTACK_PER_SECOND = 8;
 const RELEASE_PER_SECOND = 2.75;
@@ -120,7 +125,8 @@ export function VoiceAurora({
     c2: [...c2],
     c3: [...c3],
   }));
-  if (!EFFECT) return null;
+  const shader = auroraEffect();
+  if (!shader) return null;
   return (
     <Canvas
       pointerEvents="none"
@@ -129,7 +135,7 @@ export function VoiceAurora({
       style={{ position: "absolute", left: 0, right: 0, bottom: 0, height }}
     >
       <Fill>
-        <Shader source={EFFECT} uniforms={uniforms} />
+        <Shader source={shader} uniforms={uniforms} />
       </Fill>
     </Canvas>
   );

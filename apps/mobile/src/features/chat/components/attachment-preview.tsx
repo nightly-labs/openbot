@@ -94,6 +94,30 @@ function keepImageFile(serverId: string, attachment: AttachmentSummary, data: Re
 }
 
 /**
+ * An image that this launch downloaded before, as a file that is whole, when the phone also knows
+ * its size. The chat then shows it again without a new download. Its data has no Base64.
+ */
+function keptImageFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+): (RemoteFileUpload & { fileUri: string }) | null {
+  if (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id)) return null;
+  try {
+    const file = mediaFile(serverId, attachment);
+    if (!file.exists || file.size !== attachment.size) return null;
+    return { name: attachment.name, mimeType: attachment.mimeType, base64: "", fileUri: file.uri };
+  } catch {
+    return null;
+  }
+}
+
+/** The Base64 of a file, read from its kept copy when the data has none. */
+async function fileBase64(data: RemoteFileUpload & { fileUri?: string }): Promise<string> {
+  if (data.base64 || !data.fileUri) return data.base64;
+  return new File(data.fileUri).base64();
+}
+
+/**
  * One host file: its image for a preview, and the share sheet for opening it. The query key is the
  * one the chat uses, so a file read in a message is not downloaded a second time for a queue row.
  */
@@ -110,6 +134,8 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
     queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
       if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLargeForMobile"));
+      const kept = keptImageFile(serverId, attachment);
+      if (kept) return kept;
       const data = await downloadAttachment(serverId, attachment.id);
       return {
         ...data,
@@ -142,7 +168,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
       file = new File(Paths.cache, `${Date.now()}-${name}`);
-      file.writeSync(result.data.base64, { encoding: "base64" });
+      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
       void haptics.notification("error");
@@ -174,7 +200,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       // The photo library reads the type from the extension, so the file keeps one.
       const extension = attachmentFileExtension(attachment.name) ?? result.data.mimeType.split("/")[1] ?? "png";
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
-      file.writeSync(result.data.base64, { encoding: "base64" });
+      file.writeSync(await fileBase64(result.data), { encoding: "base64" });
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
