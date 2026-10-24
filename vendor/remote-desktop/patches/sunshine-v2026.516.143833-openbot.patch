@@ -85,7 +85,7 @@ diff --git a/package-lock.json b/package-lock.json
          "@vitejs/plugin-vue": "6.0.7",
          "serve": "14.2.6",
 -        "vite": "6.4.2",
-+        "vite": "^6.4.3",
++        "vite": "^6.4.4",
          "vite-plugin-ejs": "1.7.0"
        }
      },
@@ -645,9 +645,9 @@ diff --git a/package-lock.json b/package-lock.json
 -      "integrity": "sha512-2N/55r4JDJ4gdrCvGgINMy+HH3iRpNIz8K6SFwVsA+JbQScLiC+clmAxBgwiSPgcG9U15QmvqCGWzMbqda5zGQ==",
 -      "dev": true,
 -      "license": "MIT",
-+      "version": "6.4.3",
-+      "resolved": "https://registry.npmjs.org/vite/-/vite-6.4.3.tgz",
-+      "integrity": "sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==",
++      "version": "6.4.4",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-6.4.4.tgz",
++      "integrity": "sha512-xGjU/SyjeNyb0E4KxXBvYz/1C+3JXuujvf2hXNOtnlcE+58o5ajd9N2/n2VhkiJvpCP2qQasnUpx5PXNeI+p1Q==",
 +      "dev": true,
 +      "license": "MIT",
 +      "peer": true,
@@ -699,7 +699,7 @@ diff --git a/package.json b/package.json
      "@vitejs/plugin-vue": "6.0.7",
      "serve": "14.2.6",
 -    "vite": "6.4.2",
-+    "vite": "^6.4.3",
++    "vite": "^6.4.4",
      "vite-plugin-ejs": "1.7.0"
 +  },
 +  "overrides": {

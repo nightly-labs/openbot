@@ -247,13 +247,18 @@ The published runtime uses a new recipe/input digest; no existing release assets
 The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: the Linux runtime is built
 with the tray off, and OpenBot gives Sunshine no file capabilities.
 
-### Linux runtime (recipe 14)
+### Linux runtime (recipe 16)
 
 The `linux-x64` target builds on Ubuntu 24.04 with GCC 14, X11 capture and software encoding only
 (CUDA, DRM, KWin, VAAPI, Vulkan, Wayland, portal and tray are off). The OpenBot patch adds an XTest
 input backend, because Xvfb does not read uinput devices. It also links libcap when DRM is off and
 adds a `vaMapBuffer2` shim, because the prebuilt FFmpeg needs libva 2.21 and Ubuntu 24.04 has 2.20.
-The runtime uses the system libraries of Ubuntu 24.04; the hosted server template installs them.
+The runtime uses the system libraries of Ubuntu 24.04 that Ubuntu 26.04 also has; the hosted server
+template installs them (the remote desktop part of `scripts/hosting/packages.txt`). Since recipe 16,
+Boost.Locale has no ICU backend, and the runtime carries `lib/libminiupnpc.so.17` with its Debian
+licence, because Ubuntu 26.04 has only `libminiupnpc21`. Sunshine finds it through its RUNPATH
+`$ORIGIN/lib`. The build job checks with `ldd` that each executable finds all its libraries on
+Ubuntu 26.04.
 Linux arm64 builds only for local development and has no release artifact.
 
 ## Pin the Gemini server

@@ -279,7 +279,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
         title: "A server with no screen",
         steps: [
           {
-            text: "On Ubuntu 24.04 with systemd, install OpenBot as an always-on server of your account, then sign in with an email code:",
+            text: "On Ubuntu 24.04 or 26.04 with systemd, install OpenBot as an always-on server of your account, then sign in with an email code:",
             code: "curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash\nsudo openbot login",
           },
           { text: "Then use it from the desktop app, the mobile app or openbot.run/app." },
@@ -287,7 +287,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
       },
     ],
     notes: [
-      "Each release is tested on Ubuntu 24.04 on x64.",
+      "Each release is tested on Ubuntu 24.04 on x64. OpenBot also runs on Ubuntu 26.04.",
       UPDATES_NOTE,
       NETWORK_NOTE,
       "Remote desktop works with the x64 AppImage in an X11 session, such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.",

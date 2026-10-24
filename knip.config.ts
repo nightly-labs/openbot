@@ -28,6 +28,8 @@ const config: KnipConfig = {
     // Rewrite and inspect macOS dylib load paths.
     "otool",
     "install_name_tool",
+    // Finds the Linux libraries that the remote desktop runtime bundles.
+    "ldd",
     // Stops a stuck packaged app during Windows package verification.
     "taskkill.exe",
     // Tunnels Slack to the local Signal and account API in `bun run dev:slack`.

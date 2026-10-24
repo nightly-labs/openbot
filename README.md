@@ -81,8 +81,8 @@ desktop session on the same host or VM. Google sends the callback to that host t
 
 #### Linux server with no screen
 
-To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 with
-systemd), install it from a terminal and sign in with an email code:
+To run OpenBot as an always-on server of your account on a VPS or home server (Ubuntu 24.04 or
+26.04 with systemd), install it from a terminal and sign in with an email code:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
