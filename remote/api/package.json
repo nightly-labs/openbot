@@ -13,14 +13,14 @@
     "@discordjs/rest": "2.6.3",
     "@discordjs/ws": "2.0.4",
     "@openbot/contracts": "workspace:*",
-    "discord-api-types": "0.38.56",
+    "discord-api-types": "0.38.57",
     "effect": "catalog:",
     "elysia": "1.4.30",
     "jose": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/bun": "1.4.0",
+    "@types/bun": "1.4.3",
     "typescript": "catalog:"
   }
 }
