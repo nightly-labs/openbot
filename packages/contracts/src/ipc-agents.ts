@@ -23,6 +23,7 @@ import {
 import { isAgentTaskLimit } from "./ipc-agent-tasks";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBrowserProfileId } from "./ipc-browser-profiles";
+import { isArchivedAt } from "./ipc-archived-agents";
 import { isHiddenAt } from "./ipc-hidden-agents";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import type { SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
@@ -259,6 +260,7 @@ export interface AgentSummary {
    * hidden agents through `agent-hidden-v1`. Absent means the agent is not hidden.
    */
   hiddenAt?: string;
+  archivedAt?: string;
   threadId: string | null;
   workspacePath: string;
   preview: string;
@@ -314,6 +316,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.backupModels === undefined || isAgentBackupModels(value.backupModels)) &&
     (value.usageLimitReturn === undefined || isAgentUsageLimitReturn(value.usageLimitReturn)) &&
     (value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)) &&
+    (value.archivedAt === undefined || isArchivedAt(value.archivedAt)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
     isBoundedString(value.preview, INPUT_LIMITS.messageText) &&

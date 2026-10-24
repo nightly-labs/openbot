@@ -1,4 +1,5 @@
 import type {
+  ArchivedAgent,
   AvatarHue,
   ChannelSummary,
   DirectThreadSummary,
@@ -32,6 +33,7 @@ export type SidebarView = "agents" | "routines";
  * The colon keeps it apart from the section ids that the layout makes.
  */
 export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
+export const SIDEBAR_ARCHIVED_GROUP_OPEN_ID = "archived-agents:open";
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */
@@ -109,6 +111,15 @@ export interface SidebarProps {
   onHideAgent?: ((agentId: string) => void) | undefined;
   /** Puts a hidden agent back in its section. Without it, a hidden agent's menu shows no restore item. */
   onRestoreAgent?: ((agentId: string) => void) | undefined;
+  /**
+   * The agents the user archived for long-term storage. Like hidden agents, each one keeps its
+   * section and its pin for an unarchive. Routines do not run and delegation is excluded.
+   */
+  userArchivedAgents?: ArchivedAgent[] | undefined;
+  /** Archives an agent. Without it, the agent menu shows no archive item. */
+  onArchiveAgent?: ((agentId: string) => void) | undefined;
+  /** Unarchives an agent back to its section. Without it, an archived agent's menu shows no unarchive item. */
+  onUnarchiveAgent?: ((agentId: string) => void) | undefined;
   /** Opens the agent's chat in a window of its own. Without it, the agent menu shows no window item. */
   onOpenAgentWindow?: ((agentId: string) => void) | undefined;
   /** The agents whose chat is open in a window of its own. Their rows show a window mark. */

@@ -3,7 +3,7 @@
  * away is `SidebarMoveToSubmenu`, which the channel menu shows too; everything here is agent-only.
  */
 
-import { AppWindow, ContextMenu, Copy, Moon, Pin, PinOff, RotateCcw } from "@openbot/ui";
+import { AppWindow, Archive, ArchiveRestore, ContextMenu, Copy, Moon, Pin, PinOff, RotateCcw } from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -13,7 +13,12 @@ import type { SidebarPinnedItem } from "./sidebar-pins";
 import { useSidebarScope } from "./sidebar-scope";
 
 /** `userHidden` swaps the hide item for a restore item that names the section the agent goes back to. */
-export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned: boolean; userHidden?: boolean }) {
+export function SidebarAgentContextMenu(menuProps: {
+  agent: AgentProfile;
+  pinned: boolean;
+  userHidden?: boolean;
+  userArchived?: boolean;
+}) {
   const { customSectionById, openDelete, props } = useSidebarScope();
   const { t } = useText();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
@@ -70,6 +75,18 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
           <ContextMenu.Item onSelectAfterClose={() => props.onRestoreAgent?.(menuProps.agent.id)}>
             <RotateCcw class="agent-context-icon size-4" aria-hidden="true" />
             <span>{restoreLabel()}</span>
+          </ContextMenu.Item>
+        </Show>
+        <Show when={!menuProps.userArchived && !menuProps.userHidden && props.onArchiveAgent}>
+          <ContextMenu.Item onSelectAfterClose={() => props.onArchiveAgent?.(menuProps.agent.id)}>
+            <Archive class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("sidebar.agentMenu.archive")}</span>
+          </ContextMenu.Item>
+        </Show>
+        <Show when={menuProps.userArchived && props.onUnarchiveAgent}>
+          <ContextMenu.Item onSelectAfterClose={() => props.onUnarchiveAgent?.(menuProps.agent.id)}>
+            <ArchiveRestore class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("sidebar.agentMenu.unarchive")}</span>
           </ContextMenu.Item>
         </Show>
         <Show when={props.deleteSupported !== false}>
