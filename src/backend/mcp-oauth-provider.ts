@@ -1079,9 +1079,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!isAuthorizationUrlSafe(authorizationUrl))
           return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNotWebPage")));
         const { app } = this.#record();
-        const url = app?.scope
-          ? withAppScope(authorizationUrl, app)
-          : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata);
+        const url = withGoogleOfflineAccess(
+          app?.scope
+            ? withAppScope(authorizationUrl, app)
+            : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
+        );
         yield* mcpCall(() => this.#options.openExternal(url.toString()));
       }),
     );
@@ -1324,6 +1326,21 @@ function withOfflineAccess(authorizationUrl: URL, metadata: OAuthDiscoveryState[
   if (scope.split(/\s+/).includes("offline_access")) return authorizationUrl;
   const url = new URL(authorizationUrl);
   url.searchParams.set("scope", `${scope} offline_access`);
+  if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
+  return url;
+}
+
+/**
+ * Google issues a refresh token only when the request says `access_type=offline`, and only at a
+ * consent, so `prompt=consent` comes with it. Its metadata lists no `offline_access` scope, so
+ * `withOfflineAccess` never adds one, and its access tokens last one hour: without this a sign-in
+ * to Google's MCP servers, such as Gmail or Drive, stopped working an hour later.
+ */
+function withGoogleOfflineAccess(authorizationUrl: URL): URL {
+  if (authorizationUrl.origin !== "https://accounts.google.com" || authorizationUrl.searchParams.has("access_type"))
+    return authorizationUrl;
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("access_type", "offline");
   if (!url.searchParams.has("prompt")) url.searchParams.set("prompt", "consent");
   return url;
 }
