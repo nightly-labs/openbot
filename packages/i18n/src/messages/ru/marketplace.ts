@@ -210,11 +210,11 @@ export const messages = {
   "marketplace.plugin.notion.prompt.updateDoc": "Добавьте в документ по онбордингу новый чек-лист релиза.",
   "marketplace.plugin.cobrain.tagline": "Общая память для ваших ИИ-агентов",
   "marketplace.plugin.cobrain.description":
-    "Cobrain — это память в формате Markdown, которую может читать и дополнять любой подключённый ИИ. Перед работой агенты загружают контекст клиента или проекта, ищут прошлые заметки и решения и сохраняют то, что узнали, чтобы следующий диалог начинался там, где закончился предыдущий. Каждый пользователь входит в свой аккаунт Cobrain.",
+    "Cobrain — это ваша собственная память в формате Markdown вне OpenBot: одни и те же заметки работают в Claude, ChatGPT, Codex и любом другом подключённом ИИ. Используйте её рядом с памятью OpenBot для того, что должно пережить одно приложение. Попросите «Сохрани этого клиента в Cobrain» или «Что мы вчера решили по проекту X?», и завтра Claude или ChatGPT прочитают те же заметки. Каждый пользователь входит в свой аккаунт Cobrain.",
   "marketplace.plugin.cobrain.app": "Чтение, поиск и запись заметок в вашем Cobrain через один сервер MCP.",
-  "marketplace.plugin.cobrain.prompt.startSession":
-    "Загрузите мой контекст Cobrain для этого проекта, прежде чем мы начнём.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "Найдите в моих заметках Cobrain, что мы решили насчёт цен.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "Задайте мне три вопроса о моей работе и сохраните мои ответы в Cobrain.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Что вы знаете обо мне из Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Сохраните в Cobrain заметку о том, что мы сделали сегодня и что осталось.",
   "marketplace.plugin.figma.tagline": "Дизайны и прототипы",

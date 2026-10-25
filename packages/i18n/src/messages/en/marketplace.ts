@@ -213,10 +213,11 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.notion.prompt.updateDoc": "Update the onboarding doc with the new release checklist.",
   "marketplace.plugin.cobrain.tagline": "Shared memory for your AI agents",
   "marketplace.plugin.cobrain.description":
-    "Cobrain is a Markdown memory that every AI you connect can read and write. Agents load the context of a client or project before working, search past notes and decisions, and save what they learn so the next thread starts where the last one ended. Each user signs in to their own Cobrain account.",
+    "Cobrain is a Markdown memory you own, outside OpenBot: the same notes work in Claude, ChatGPT, Codex and every other AI you connect. Use it next to OpenBot’s own memory for what has to outlast one app. Ask “Save this client in Cobrain” or “What did we decide yesterday about project X?”, and tomorrow Claude or ChatGPT read the same notes. Each user signs in to their own Cobrain account.",
   "marketplace.plugin.cobrain.app": "Read, search and write notes in your Cobrain brain over one MCP server.",
-  "marketplace.plugin.cobrain.prompt.startSession": "Load my Cobrain context for this project before we start.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "Search my Cobrain notes for what we decided about pricing.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "Ask me three questions about my work, then save my answers in Cobrain.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "What do you know about me from Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Save a note in Cobrain with what we did today and what is left.",
   "marketplace.plugin.figma.tagline": "Designs and prototypes",
   "marketplace.plugin.figma.description":

@@ -210,10 +210,10 @@ export const messages = {
   "marketplace.plugin.notion.prompt.updateDoc": "حدّث مستند التهيئة بقائمة التحقق الجديدة للإصدار.",
   "marketplace.plugin.cobrain.tagline": "ذاكرة مشتركة لوكلاء الذكاء الاصطناعي",
   "marketplace.plugin.cobrain.description":
-    "Cobrain ذاكرة بتنسيق Markdown يستطيع كل ذكاء اصطناعي تربطه قراءتها والكتابة فيها. يحمّل الوكلاء سياق العميل أو المشروع قبل العمل، ويبحثون في الملاحظات والقرارات السابقة، ويحفظون ما يتعلمونه لتبدأ السلسلة التالية من حيث انتهت السابقة. يسجّل كل مستخدم الدخول إلى حساب Cobrain الخاص به.",
+    "Cobrain ذاكرة بتنسيق Markdown تملكها أنت، خارج OpenBot: الملاحظات نفسها تعمل في Claude وChatGPT وCodex وأي ذكاء اصطناعي آخر تربطه. استخدمها إلى جانب ذاكرة OpenBot لما يجب أن يبقى أطول من تطبيق واحد. اطلب «احفظ هذا العميل في Cobrain» أو «ماذا قررنا أمس بشأن المشروع X؟»، وفي اليوم التالي يقرأ Claude أو ChatGPT الملاحظات نفسها. يسجّل كل مستخدم الدخول إلى حساب Cobrain الخاص به.",
   "marketplace.plugin.cobrain.app": "قراءة الملاحظات والبحث فيها وكتابتها في دماغ Cobrain عبر خادم MCP واحد.",
-  "marketplace.plugin.cobrain.prompt.startSession": "حمّل سياق Cobrain لهذا المشروع قبل أن نبدأ.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "ابحث في ملاحظات Cobrain عمّا قررناه بشأن التسعير.",
+  "marketplace.plugin.cobrain.prompt.firstNote": "اطرح عليّ ثلاثة أسئلة عن عملي، ثم احفظ إجاباتي في Cobrain.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "ماذا تعرف عني من Cobrain؟",
   "marketplace.plugin.cobrain.prompt.saveNote": "احفظ ملاحظة في Cobrain بما أنجزناه اليوم وما تبقّى.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",
   "marketplace.plugin.figma.description":
