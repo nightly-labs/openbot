@@ -195,7 +195,7 @@ bun run remote:check
 
 Updating Signal may close the WebSocket. An active WebRTC connection stays up. `remote:update` puts coturn
 into drain and waits for the allocations to finish. A single coturn instance is no protection against machine
-failure. Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
+failure; see the standby host in [the deployment procedure](../docs/remote-session-deployment.md#standby-signal). Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
 a file transfer from the last acknowledged offset once the service is back.
 
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
