@@ -4,9 +4,11 @@
 // names in `<<CALLS[...]CALLS>>`, logs each result, and then answers. The check asserts that a called
 // run ends `failed` with the redacted reason while its delivery stays `completed` and its answer shows in its routine thread,
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
-// still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
-// a flow skips the agents after a failed owner or linked step, and that a result destination gets the
-// answer of a reported failure but not of a provider failure.
+// still wins, that a reported failure stays visible, that the tool fails outside a routine run, that
+// an accepted quiet `routine_no_update` stops the turn, that empty reasoning after that call still
+// ends the run quietly, that a user stop stays interrupted, that a flow skips the agents after a
+// failed owner or linked step, and that a result destination gets the answer of a reported failure
+// but not of a provider failure.
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -70,7 +72,9 @@ const noUpdate: FakeCall = { tool: "routine_no_update", arguments: {} };
  * result, then answers:
  * `FAILED_ANSWER` after a call, `Relay report <<CALLS...CALLS>>` for an input with `<<NEXT...NEXT>>`
  * (so the next agent of a flow gets the calls), and "All good." otherwise. An input with
- * `PROVIDER-FAIL` ends the turn failed with an error and no answer.
+ * `PROVIDER-FAIL` ends the turn failed with an error and no answer. A quiet `routine_no_update`
+ * result holds the turn open until `turn/interrupt`. `REASONING-ONLY` keeps sending empty reasoning
+ * items while it waits. `HOLD-STOP` answers the first interrupt and ends the turn on the next one.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -85,6 +89,30 @@ let threads = 0;
 let turns = 0;
 /** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
+/** Quiet turns that wait for turn/interrupt. */
+const live = new Map();
+const startReasoning = (turn) => {
+  let count = 0;
+  const send = () => {
+    if (turn.stopped) return;
+    count += 1;
+    write({
+      method: "item/completed",
+      params: {
+        threadId: turn.threadId,
+        turnId: turn.turnId,
+        item: { type: "reasoning", id: "reason-" + turn.turnId + "-" + count, summary: [], content: [] },
+      },
+    });
+    log({ method: "reasoning-only", turnId: turn.turnId, n: count });
+  };
+  send();
+  const timer = setInterval(send, 40);
+  turn.stopReasoning = () => {
+    turn.stopped = true;
+    clearInterval(timer);
+  };
+};
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
   throw error;
@@ -141,10 +169,27 @@ const answer = (message) => {
       const next = /<<NEXT([\\s\\S]*?)NEXT>>/.exec(task);
       const turnCalls = named ? JSON.parse(named[1]) : [];
       const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
-      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL") });
+      return callNext({
+        threadId: params.threadId,
+        turnId,
+        calls: turnCalls,
+        reply,
+        providerFail: task.includes("PROVIDER-FAIL"),
+        reasoningOnly: task.includes("REASONING-ONLY"),
+        holdInterrupt: task.includes("HOLD-STOP"),
+      });
     }
     case "turn/interrupt": {
       write({ id: message.id, result: {} });
+      const turn = live.get(params.turnId);
+      if (turn?.holdInterrupt && !turn.released) {
+        turn.released = true;
+        log({ method: "turn/interrupt", turnId: params.turnId, held: true });
+        return;
+      }
+      if (turn?.stopReasoning) turn.stopReasoning();
+      log({ method: "turn/interrupt", turnId: params.turnId, held: false });
+      write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
       return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
     }
     default:
@@ -165,7 +210,12 @@ process.stdin.on("data", (chunk) => {
         const { turn, tool } = waiting.get(message.id);
         waiting.delete(message.id);
         log({ method: "tool-result", turnId: turn.turnId, tool, result: message.result ?? null, error: message.error ?? null });
-        callNext(turn);
+        const quiet = tool === "routine_no_update" && message.result?.contentItems?.some((item) => item.text.includes('"quiet"'));
+        if (quiet) {
+          live.set(turn.turnId, turn);
+          if (turn.reasoningOnly) startReasoning(turn);
+          log({ method: "quiet-held", turnId: turn.turnId, pending: turn.calls.map((call) => call.tool) });
+        } else callNext(turn);
       }
     }
     newline = buffer.indexOf("\\n");
@@ -179,6 +229,9 @@ interface LogEntry {
   turnId: string;
   text?: string;
   tool?: string;
+  held?: boolean;
+  pending?: string[];
+  n?: number;
   result?: { success: boolean; contentItems: { type: string; text: string }[] } | null;
 }
 
@@ -331,6 +384,13 @@ function toolResults(turnId: string | null, tool: string) {
   );
 }
 
+function routineCompletion(turnId: string | null) {
+  return events.find(
+    (event): event is Extract<AgentEvent, { type: "routine-thread-turn-completed" }> =>
+      event.type === "routine-thread-turn-completed" && event.turn.turnId === turnId,
+  );
+}
+
 async function steps(name: string, runId: string, count: number) {
   const ready = await waitFor(`${name} flow steps`, () => {
     const found = flowStore.steps(runId);
@@ -361,7 +421,13 @@ try {
     "Quiet failed",
     `Check quietly. ${calls(noUpdate, reportFailure(REASON))}`,
   );
-  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. ${calls(noUpdate)}`);
+  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. QUIET-HANG ${calls(noUpdate)}`);
+  const quietReasoning = createRoutine(
+    checker.id,
+    "Quiet reasoning",
+    `Check quietly. REASONING-ONLY ${calls(noUpdate)}`,
+  );
+  const userStop = createRoutine(checker.id, "User stop", `Check quietly. HOLD-STOP ${calls(noUpdate)}`);
   const failedThenQuiet = createRoutine(
     checker.id,
     "Failed then quiet",
@@ -492,20 +558,91 @@ try {
     healthAfter?.status === "failed" && healthAfter.error === healthRun.run.error,
   );
 
-  // Script runs: a reported failure is never quiet, also after `routine_no_update`.
+  // Script runs: an accepted no-update call ends the run without another model response.
   await runCauseEffect(agents.updateAgent({ agentId: checker.id, allowAutomation: true }));
+  const quietTestRun = await settledRun(
+    "Quiet Test",
+    await runCauseEffect(agents.testRoutine({ agentId: checker.id, routineId: quietOk.id })),
+  );
+  const quietTestThread = agents.listTasks(checker.id).tasks.find((task) => task.routineId === quietOk.id);
+  pass(
+    "A Test no-update call keeps the visible answer",
+    quietTestRun.run.status === "succeeded" &&
+      routineCompletion(quietTestRun.delivery.turnId)?.turn.quiet !== true &&
+      quietTestThread !== undefined &&
+      agents
+        .readTask(checker.id, quietTestThread.id)
+        .messages.some((message) => message.turnId === quietTestRun.delivery.turnId && message.text === FAILED_ANSWER),
+  );
   const quietOkRun = await settledRun(
     "Quiet ok",
     await runCauseEffect(agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietOk.id, payload: "" })),
   );
-  pass("A script run with only routine_no_update succeeds", quietOkRun.run.status === "succeeded");
+  pass(
+    "A script run with only routine_no_update is quiet",
+    quietOkRun.run.status === "succeeded" &&
+      routineCompletion(quietOkRun.delivery.turnId) === undefined &&
+      !events.some((event) => event.type === "turn-completed" && event.turnId === quietOkRun.delivery.turnId),
+  );
+  pass(
+    "A duplicate stop completion settles the quiet turn once",
+    events.filter(
+      (event) =>
+        (event.type === "turn-completed" && event.turnId === quietOkRun.delivery.turnId) ||
+        (event.type === "routine-thread-turn-completed" && event.turn.turnId === quietOkRun.delivery.turnId),
+    ).length === 0 && !events.some((event) => event.type === "error" && event.code === "turn_completion_failed"),
+  );
+  const reasoningStarted = Date.now();
+  const quietReasoningRun = await settledRun(
+    "Quiet reasoning",
+    await runCauseEffect(
+      agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietReasoning.id, payload: "" }),
+    ),
+  );
+  const reasoningElapsed = Date.now() - reasoningStarted;
+  pass(
+    "Empty reasoning after routine_no_update finishes quiet without the stall wait",
+    quietReasoningRun.run.status === "succeeded" &&
+      reasoningElapsed < 30_000 &&
+      routineCompletion(quietReasoningRun.delivery.turnId) === undefined &&
+      fakeEntries().some(
+        (entry) => entry.method === "reasoning-only" && entry.turnId === quietReasoningRun.delivery.turnId,
+      ),
+    { reasoningElapsed, status: quietReasoningRun.run.status },
+  );
+  const userStopPromise = runCauseEffect(
+    agents.runRoutineFromAutomation({ agentId: checker.id, routineId: userStop.id, payload: "" }),
+  );
+  await waitFor("the held quiet interrupt", () =>
+    fakeEntries().some((entry) => entry.method === "turn/interrupt" && entry.held === true),
+  );
+  const userStopThread = agents.listTasks(checker.id).tasks.find((task) => task.routineId === userStop.id);
+  assert.ok(userStopThread);
+  await runCauseEffect(agents.stopTask({ agentId: checker.id, taskId: userStopThread.id }));
+  const userStopRun = await settledRun("User stop", await userStopPromise);
+  pass(
+    "A user stop stays interrupted after a quiet tool call",
+    userStopRun.run.status === "interrupted" && userStopRun.delivery.status === "interrupted",
+    userStopRun.run,
+  );
   const quietFailedRun = await settledRun(
     "Quiet failed",
     await runCauseEffect(
       agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietFailed.id, payload: "" }),
     ),
   );
-  pass("A script run that reports a failure after routine_no_update fails", quietFailedRun.run.status === "failed");
+  pass(
+    "An accepted quiet completion does not execute later tool calls",
+    quietFailedRun.run.status === "succeeded" &&
+      routineCompletion(quietFailedRun.delivery.turnId) === undefined &&
+      toolResults(quietFailedRun.delivery.turnId, "routine_report_failure").length === 0 &&
+      fakeEntries().some(
+        (entry) =>
+          entry.method === "quiet-held" &&
+          entry.turnId === quietFailedRun.delivery.turnId &&
+          entry.pending?.includes("routine_report_failure") === true,
+      ),
+  );
   const failedThenQuietRun = await settledRun(
     "Failed then quiet",
     await runCauseEffect(
@@ -539,9 +676,9 @@ try {
     failedThenQuiet: shownAnswers(failedThenQuiet.id, failedThenQuietRun.delivery.turnId),
   };
   pass(
-    "A failed script run is not quiet, also after routine_no_update, and a quiet run is",
+    "A failed script run is not quiet, and a quiet run stays quiet after routine_no_update",
     quietness.quietOk?.length === 0 &&
-      quietness.quietFailed?.includes(FAILED_ANSWER) === true &&
+      quietness.quietFailed?.length === 0 &&
       quietness.failedThenQuiet?.includes(FAILED_ANSWER) === true,
     quietness,
   );
@@ -550,8 +687,8 @@ try {
     events.filter((event) => event.type === "routine-thread-turn-completed" && event.turn.turnId === turnId);
   const routineThread = (routineId: string) =>
     agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
-  const failedTurns = routineTurns(quietFailedRun.delivery.turnId);
-  const failedThread = routineThread(quietFailed.id);
+  const failedTurns = routineTurns(failedThenQuietRun.delivery.turnId);
+  const failedThread = routineThread(failedThenQuiet.id);
   pass(
     "A run in a routine thread sends one routine-thread-turn-completed, and a quiet run sends none",
     failedTurns.length === 1 &&
@@ -559,7 +696,8 @@ try {
       failedTurns[0].taskId === failedThread?.id &&
       failedTurns[0].turn.threadId === failedThread?.threadId &&
       routineTurns(quietOkRun.delivery.turnId).length === 0 &&
-      !events.some((event) => event.type === "turn-completed" && event.turnId === quietFailedRun.delivery.turnId),
+      routineTurns(quietFailedRun.delivery.turnId).length === 0 &&
+      !events.some((event) => event.type === "turn-completed" && event.turnId === failedThenQuietRun.delivery.turnId),
     { failedTurns, failedThread },
   );
   const scriptPrompt = fakeEntries().find(
