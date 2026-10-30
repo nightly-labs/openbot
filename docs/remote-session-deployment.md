@@ -125,7 +125,8 @@ TURN credentials, so `turn.openbot.run` does not need a change. Discord stays of
 Failback: point the record back to `sui-alexandria`.
 
 After each Signal deployment, stage and build the same commit on the standby with the same commands,
-and start `remote-api` there.
+and start `remote-api` there. Send the two `curl` checks to `signal2.openbot.run`, not to
+`signal.openbot.run`, which reaches production.
 
 ## Required device validation — pending
 
