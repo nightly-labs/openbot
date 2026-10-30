@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -19,13 +20,18 @@ import {
 import { BrowserUploads } from "../src/backend/agent/browser-uploads";
 import { attachmentCall } from "../src/backend/attachment-effects";
 import { BrowserHost } from "../src/backend/browser-host";
+import { navigateAndWait } from "../src/backend/browser-navigation";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
+import { TimeoutError } from "../src/backend/with-timeout";
 import { runSecretHandoffScenario } from "./browser-secret-smoke";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
+let uncommittedNavigationRequests = 0;
+let previousDocumentGates = 0;
+let releasePreviousDocumentRedirect = (): void => {};
 // `/slow-document?action` stays open until the smoke releases it, so the navigation that the timed
 // click starts is still pending when the click reaches its deadline.
 let actionNavigationRequests = 0;
@@ -155,6 +161,37 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/abort") {
     response.destroy();
+    return;
+  }
+  if (url.pathname === "/navigation-pending") {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.write("<!doctype html><main>pending navigation</main>");
+    return;
+  }
+  if (url.pathname === "/navigation-uncommitted") {
+    uncommittedNavigationRequests++;
+    releasePreviousDocumentRedirect();
+    return;
+  }
+  if (url.pathname === "/previous-document-gate") {
+    releasePreviousDocumentRedirect = () => response.end("continue");
+    previousDocumentGates++;
+    return;
+  }
+  if (url.pathname === "/redirect-http") {
+    response.writeHead(302, { location: "/redirect-end" }).end();
+    return;
+  }
+  if (url.pathname === "/frame-redirect-parent") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end("<script>parent.location.replace('/redirect-end')</script>");
+    return;
+  }
+  if (url.pathname === "/reload-redirect") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      "<script>if (sessionStorage.getItem('reload-redirect')) location.replace('/redirect-end');</script><img src='/redirect-image'>",
+    );
     return;
   }
   if (url.pathname === "/identity-frame") {
@@ -353,8 +390,13 @@ const server = createServer((request, response) => {
   // The slow image keeps the first load open until the redirect starts.
   if (url.pathname === "/redirect-start") {
     response.setHeader("content-type", "text/html; charset=utf-8");
+    if (url.search === "?frame") {
+      response.end('<iframe src="/frame-redirect-parent"></iframe><img src="/redirect-image">');
+      return;
+    }
+    const destination = url.search === "?failed" ? "/abort" : `/redirect-end${url.search}`;
     response.end(
-      `<!doctype html><script>setTimeout(() => location.replace('/redirect-end${url.search}'), 0)</script><img src="/redirect-image">`,
+      `<!doctype html><script>setTimeout(() => location.replace(${JSON.stringify(destination)}), 0)</script><img src="/redirect-image">`,
     );
     return;
   }
@@ -364,7 +406,9 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/redirect-end") {
     response.setHeader("content-type", "text/html; charset=utf-8");
-    if (url.search === "?slow") {
+    if (url.search === "?pending") {
+      response.write("<!doctype html><main>pending successor</main>");
+    } else if (url.search === "?slow") {
       response.write("<!doctype html><main>loading</main>");
       setTimeout(() => response.end("<script>document.querySelector('main').textContent='redirected'</script>"), 200);
     } else response.end("<!doctype html><main>redirected</main>");
@@ -2042,44 +2086,207 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
  * redirected page.
  */
 async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
-  const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
   const outcomes: { via: string; url: string; success: boolean; error?: string }[] = [];
+  await mkdir(".openbot-build", { recursive: true });
   try {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      for (const url of [`${origin}/redirect-start`, `${origin}/redirect-start?slow`]) {
-        const result = await callBrowserTool(browser, "navigate", { tabId: tab.id, url, timeoutMs: 5_000 });
-        outcomes.push({
-          via: "tool",
-          url,
-          success: result.success,
-          ...(result.success ? {} : { error: toolError(result) }),
-        });
-        const exit = await Effect.runPromiseExit(browser.loadUrl(tab.id, url));
-        outcomes.push({
-          via: "loadUrl",
-          url,
-          success: exit._tag === "Success",
-          ...(exit._tag === "Success" ? {} : { error: String(exit.cause) }),
-        });
+    for (const suffix of ["", "?slow"]) {
+      const url = `${origin}/redirect-start${suffix}`;
+      const redirected = await runCauseEffect(browser.open(url, "smoke-thread", "smoke-bot"));
+      try {
+        assert.equal(redirected.url, `${origin}/redirect-end${suffix}`);
+        assert.equal(redirected.loading, false);
+        const snapshot = await runCauseEffect(browser.snapshot(redirected.id));
+        assert.equal(snapshot.url, `${origin}/redirect-end${suffix}`);
+        assert(snapshot.text.includes("redirected"), snapshot.text);
+        outcomes.push({ via: "open", url, success: true });
+      } finally {
+        await runCauseEffect(browser.close(redirected.id));
       }
     }
-    await waitFor(
-      async () =>
-        browser
-          .listTabs()
-          .find((candidate) => candidate.id === tab.id)
-          ?.url.includes("/redirect-end") === true,
-      "redirected tab URL",
+    const tabsBeforeFailure = browser.listTabs().map((tab) => tab.id);
+    const httpRedirect = await runCauseEffect(browser.open(`${origin}/redirect-http`, "smoke-thread", "smoke-bot"));
+    assert.equal(httpRedirect.url, `${origin}/redirect-end`);
+    await runCauseEffect(browser.close(httpRedirect.id));
+    outcomes.push({ via: "http-redirect", url: `${origin}/redirect-http`, success: true });
+    await expectFailure(() => runCauseEffect(browser.open(`${origin}/abort`, "smoke-thread", "smoke-bot")));
+    assert.deepEqual(
+      browser.listTabs().map((tab) => tab.id),
+      tabsBeforeFailure,
     );
-  } finally {
-    await runCauseEffect(browser.close(tab.id));
+    outcomes.push({ via: "failed-open-cleanup", url: `${origin}/abort`, success: true });
+    const { tab, contents } = await openTabWithContents(browser, origin, "smoke-thread", "smoke-bot");
+    try {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        for (const url of [`${origin}/redirect-start`, `${origin}/redirect-start?slow`]) {
+          const result = await callBrowserTool(browser, "navigate", { tabId: tab.id, url, timeoutMs: 5_000 });
+          outcomes.push({
+            via: "tool",
+            url,
+            success: result.success,
+            ...(result.success ? {} : { error: toolError(result) }),
+          });
+          assert(result.success, toolError(result));
+          assert.equal(toolTextPayload(result)?.url, url.replace("redirect-start", "redirect-end"));
+          const exit = await Effect.runPromiseExit(browser.loadUrl(tab.id, url));
+          outcomes.push({
+            via: "loadUrl",
+            url,
+            success: exit._tag === "Success",
+            ...(exit._tag === "Success" ? {} : { error: String(exit.cause) }),
+          });
+          assert.equal(exit._tag, "Success", JSON.stringify(exit));
+        }
+      }
+      await waitFor(
+        async () =>
+          browser
+            .listTabs()
+            .find((candidate) => candidate.id === tab.id)
+            ?.url.includes("/redirect-end") === true,
+        "redirected tab URL",
+      );
+      const requestsBefore = uncommittedNavigationRequests;
+      const gatesBefore = previousDocumentGates;
+      let previousDocumentStarted = false;
+      const observePreviousDocument = (_event: unknown, url: string, _inPlace: boolean, mainFrame: boolean) => {
+        if (mainFrame && url === `${origin}/redirect-end?previous-document`) previousDocumentStarted = true;
+      };
+      contents.on("did-start-navigation", observePreviousDocument);
+      await contents.executeJavaScript(
+        "fetch('/previous-document-gate').then(() => location.replace('/redirect-end?previous-document')); true",
+      );
+      await waitFor(async () => previousDocumentGates > gatesBefore, "previous document redirect gate");
+      const provisionalNavigation = callBrowserTool(browser, "navigate", {
+        tabId: tab.id,
+        url: `${origin}/navigation-uncommitted`,
+        timeoutMs: 5_000,
+      });
+      await waitFor(async () => uncommittedNavigationRequests > requestsBefore, "uncommitted requested navigation");
+      await waitFor(async () => previousDocumentStarted, "previous document started a new load");
+      const previousDocumentResult = await provisionalNavigation;
+      contents.off("did-start-navigation", observePreviousDocument);
+      await writeFile(
+        ".openbot-build/browser-previous-document-refusal.json",
+        JSON.stringify(
+          {
+            success: previousDocumentResult.success,
+            error: previousDocumentResult.success ? null : toolError(previousDocumentResult),
+          },
+          null,
+          2,
+        ),
+      );
+      assert(!previousDocumentResult.success, JSON.stringify(previousDocumentResult));
+      assert(!toolError(previousDocumentResult).includes("timed out"), toolError(previousDocumentResult));
+      await waitFor(async () => !contents.isLoading(), "previous-document navigation stopped");
+      outcomes.push({ via: "previous-document-refusal", url: `${origin}/navigation-uncommitted`, success: true });
+      await expectFailure(() =>
+        runCauseEffect(browser.open(`${origin}/redirect-start?failed`, "smoke-thread", "smoke-bot")),
+      );
+      assert.deepEqual(
+        browser.listTabs().map((candidate) => candidate.id),
+        [...tabsBeforeFailure, tab.id],
+      );
+      outcomes.push({ via: "successor-failure", url: `${origin}/redirect-start?failed`, success: true });
+      await expectFailure(() =>
+        runCauseEffect(browser.open(`${origin}/redirect-start?frame`, "smoke-thread", "smoke-bot")),
+      );
+      assert.deepEqual(
+        browser.listTabs().map((candidate) => candidate.id),
+        [...tabsBeforeFailure, tab.id],
+      );
+      outcomes.push({ via: "other-frame-refusal", url: `${origin}/redirect-start?frame`, success: true });
+
+      for (const action of ["stop", "replace", "cancel", "timeout"]) {
+        const pendingUrl = `${origin}/navigation-pending`;
+        const controller = new AbortController();
+        let replacement: Promise<unknown> | undefined;
+        const changeNavigation = (_event: unknown, url: string, _inPlace: boolean, mainFrame: boolean) => {
+          if (!mainFrame || url !== pendingUrl || action === "timeout") return;
+          setImmediate(() => {
+            if (action === "stop") contents.stop();
+            else if (action === "cancel") controller.abort();
+            else replacement = contents.loadURL(`${origin}/redirect-end`).catch(() => undefined);
+          });
+        };
+        contents.on("did-start-navigation", changeNavigation);
+        const beforeListeners = contents.listenerCount("did-finish-load");
+        try {
+          const exit = await Effect.runPromiseExit(
+            navigateAndWait(contents, () => contents.loadURL(pendingUrl), 1_000),
+            { signal: controller.signal },
+          );
+          assert.equal(exit._tag, "Failure", `${action} unexpectedly succeeded`);
+          if (replacement) await replacement;
+          await waitFor(async () => !contents.isLoading(), `${action} navigation stopped`);
+          await waitFor(
+            async () => contents.listenerCount("did-finish-load") === beforeListeners,
+            `${action} navigation listener cleanup`,
+          );
+          outcomes.push({ via: `refused-${action}`, url: pendingUrl, success: true });
+        } finally {
+          contents.off("did-start-navigation", changeNavigation);
+        }
+      }
+      const timedOut = await Effect.runPromise(
+        navigateAndWait(contents, () => contents.loadURL(`${origin}/redirect-start?pending`), 1_000).pipe(Effect.flip),
+      );
+      assert(timedOut.cause instanceof TimeoutError, String(timedOut.cause));
+      await waitFor(async () => !contents.isLoading(), "successor deadline stopped navigation");
+      outcomes.push({ via: "successor-deadline", url: `${origin}/redirect-start?pending`, success: true });
+      await contents.loadURL(`${origin}/reload-redirect`);
+      await contents.executeJavaScript("sessionStorage.setItem('reload-redirect', 'yes'); true");
+      await runCauseEffect(
+        navigateAndWait(contents, () => {
+          contents.reload();
+          return true;
+        }),
+      );
+      assert.equal(contents.getURL(), `${origin}/redirect-end`);
+      assert((await contents.executeJavaScript("document.body.textContent")).includes("redirected"));
+      outcomes.push({ via: "boolean-reload-successor", url: `${origin}/reload-redirect`, success: true });
+      await contents.executeJavaScript("sessionStorage.removeItem('reload-redirect'); true");
+      const existingTabs = new Set(browser.listTabs().map((candidate) => candidate.id));
+      await expectFailure(() =>
+        runCauseEffect(browser.open(`${origin}/navigation-pending`, "smoke-thread", "smoke-bot")),
+      );
+      const retainedOpen = browser.listTabs().filter((candidate) => !existingTabs.has(candidate.id));
+      assert.equal(retainedOpen.length, 1);
+      const retainedTab = retainedOpen[0];
+      assert(retainedTab);
+      assert.equal(retainedTab.url, `${origin}/navigation-pending`);
+      const retainedSnapshot = await runCauseEffect(browser.snapshot(retainedTab.id));
+      assert(retainedSnapshot.text.includes("pending navigation"), retainedSnapshot.text);
+      await runCauseEffect(browser.close(retainedTab.id));
+      assert.deepEqual(new Set(browser.listTabs().map((candidate) => candidate.id)), existingTabs);
+      outcomes.push({ via: "open-timeout-retains-tab", url: `${origin}/navigation-pending`, success: true });
+      await expectFailure(() => runCauseEffect(browser.openPrivate(`${origin}/navigation-pending`)));
+      assert.deepEqual(new Set(browser.listTabs().map((candidate) => candidate.id)), existingTabs);
+      outcomes.push({ via: "private-open-timeout-cleanup", url: `${origin}/navigation-pending`, success: true });
+    } finally {
+      await runCauseEffect(browser.close(tab.id));
+    }
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(
+      ".openbot-build/browser-redirect-navigation-report.json",
+      JSON.stringify(
+        { status: "passed", processAlive: true, versions: process.versions, attempts: outcomes.length, outcomes },
+        null,
+        2,
+      ),
+    );
+    process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
+  } catch (error) {
+    await writeFile(
+      ".openbot-build/browser-redirect-navigation-report.json",
+      JSON.stringify(
+        { status: "failed", processAlive: true, versions: process.versions, outcomes, error: String(error) },
+        null,
+        2,
+      ),
+    );
+    throw error;
   }
-  await mkdir(".openbot-build", { recursive: true });
-  await writeFile(
-    ".openbot-build/browser-redirect-navigation-report.json",
-    JSON.stringify({ processAlive: true, attempts: outcomes.length, outcomes }, null, 2),
-  );
-  process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {

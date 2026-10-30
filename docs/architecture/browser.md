@@ -220,6 +220,16 @@ answers `agentSettingsUnsupported`, and the client shows no select, section or l
 
 ### Tab lifetime
 
+Initiated navigation can continue through a page redirect after the requested main-frame document
+commits and starts its own successor. The successor must finish within the same deadline. A
+previous-document redirect, a child-frame request, an unrelated navigation, or a failed successor
+still fails. The operation never repeats the request. Same-URL aborts without sufficient proof fail.
+Initial normal and private opens use the existing 10-second navigation deadline. A normal timeout
+reports failure but retains the tab for inspection; a failed private open closes its tab because
+its caller has no returned tab ID for cleanup. The focused native scenario is
+`bun run test:browser --scenario=redirect-navigation`; it also runs in the default smoke flow and
+writes `.openbot-build/browser-redirect-navigation-report.json`.
+
 The agent decides when a tab closes. Nothing closes a tab when a turn ends: `close_tab` is the only
 cleanup path, and the prompt asks the agent to use it once a task no longer needs the tab. A tab
 therefore outlives its turn by design, which is what lets the next turn in the same thread carry on in
