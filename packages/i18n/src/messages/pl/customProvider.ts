@@ -33,6 +33,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Ten dostawca ma już na liście {id}.",
   "customProvider.error.modelIdInvalid":
     "Tego ID modelu nie można użyć. Usuń spacje, cudzysłowy i inne znaki interpunkcyjne.",
+  "customProvider.error.contextWindowInvalid": "Wpisz liczbę całkowitą tokenów od {min} do {max}.",
   "customProvider.error.headerNameRequired": "Wpisz nazwę nagłówka.",
   "customProvider.error.headerNameInvalid": "Użyj prawidłowej nazwy nagłówka HTTP.",
   "customProvider.error.headerDuplicate": "Ten dostawca już ustawia {name}.",
@@ -70,6 +71,8 @@ export const messages = {
   "customProvider.model.id": "ID modelu {number}",
   "customProvider.model.name": "Nazwa wyświetlana modelu {number}",
   "customProvider.model.namePlaceholder": "Nazwa wyświetlana",
+  "customProvider.model.contextWindow": "Okno kontekstu modelu {number}",
+  "customProvider.model.contextWindowPlaceholder": "Tokeny",
   "customProvider.model.remove": "Usuń model {number}",
   "customProvider.model.add": "Dodaj model",
   "customProvider.headers": "Nagłówki",

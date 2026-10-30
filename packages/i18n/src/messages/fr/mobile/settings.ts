@@ -54,9 +54,8 @@ export const messages = {
   "mobile.settings.sessions.disconnectBody":
     "Cela met aussi fin aux connexions distantes actives du compte. L’appareil pourra se reconnecter.",
   "mobile.settings.sessions.disconnect": "Déconnecter",
-  "mobile.settings.dictation.title": "Dictée",
   "mobile.settings.dictation.footer":
-    "La langue que vous parlez quand vous dictez un message. « Automatique » utilise la première langue des réglages de votre téléphone que la reconnaissance vocale prend en charge.",
+    "La langue que vous parlez à la reconnaissance du téléphone, dans une conversation vocale et en dictée. « Automatique » utilise la première langue des réglages de votre téléphone qu’elle prend en charge.",
   "mobile.settings.dictation.automatic": "Automatique",
   "mobile.settings.appearance.title": "Apparence",
   "mobile.settings.appearance.footer": "« Système » suit l’apparence de votre appareil.",
@@ -168,4 +167,91 @@ export const messages = {
   "mobile.settings.profile.signOutBody":
     "Reconnectez-vous en scannant un nouveau code depuis OpenBot sur votre ordinateur.",
   "mobile.settings.profile.signOut": "Se déconnecter",
+  "mobile.settings.voice.title": "Voix",
+  "mobile.settings.voice.sample": "Bonjour. Voici comment je lirai mes réponses.",
+  "mobile.settings.voice.voice": "Voix",
+  "mobile.settings.voice.listen": "Écouter",
+  "mobile.settings.voice.stop": "Arrêter",
+  "mobile.settings.voice.unavailable":
+    "Cette version de l’app ne peut pas lire les réponses à voix haute. Mettez l’app à jour pour la conversation vocale.",
+  "mobile.settings.voice.removeFailed": "Suppression impossible. Réessayez.",
+  "mobile.settings.voice.engine.title": "Voix des réponses",
+  "mobile.settings.voice.engine.footer": "La voix cochée lit les réponses de l’agent pendant une conversation vocale.",
+  "mobile.settings.voice.engine.supertonic": "Supertonic 3",
+  "mobile.settings.voice.engine.elevenLabs": "ElevenLabs",
+  "mobile.settings.voice.supertonic.title": "Supertonic 3",
+  "mobile.settings.voice.supertonic.footer":
+    "Téléchargez le modèle une fois, de préférence en Wi-Fi. Il reste sur ce téléphone jusqu’à sa suppression.",
+  "mobile.settings.voice.supertonic.model": "Modèle vocal",
+  "mobile.settings.voice.supertonic.downloading": "Téléchargement… {percent}",
+  "mobile.settings.voice.supertonic.ready": "Téléchargé · {size}",
+  "mobile.settings.voice.supertonic.missing": "Non téléchargé · {size}",
+  "mobile.settings.voice.supertonic.verifyFailed": "Un fichier téléchargé était endommagé. Téléchargez à nouveau.",
+  "mobile.settings.voice.supertonic.downloadFailed":
+    "Le téléchargement s’est arrêté. Vérifiez la connexion et téléchargez à nouveau.",
+  "mobile.settings.voice.supertonic.download": "Télécharger",
+  "mobile.settings.voice.supertonic.remove": "Supprimer",
+  "mobile.settings.voice.supertonic.removeTitle": "Supprimer le modèle vocal ?",
+  "mobile.settings.voice.supertonic.removeBody":
+    "Supertonic 3 ne lira plus les réponses tant que vous ne le téléchargez pas à nouveau.",
+  "mobile.settings.voice.supertonic.female": "Voix féminine {number}",
+  "mobile.settings.voice.supertonic.male": "Voix masculine {number}",
+  "mobile.settings.voice.elevenLabs.title": "ElevenLabs",
+  "mobile.settings.voice.elevenLabs.footer":
+    "OpenBot envoie le texte de chaque réponse à ElevenLabs avec votre clé, et ElevenLabs facture votre compte. La clé reste dans le trousseau de ce téléphone.",
+  "mobile.settings.voice.elevenLabs.key": "Clé d’API",
+  "mobile.settings.voice.elevenLabs.keySaved": "Enregistrée sur ce téléphone",
+  "mobile.settings.voice.elevenLabs.chooseVoice": "Choisir une voix",
+  "mobile.settings.voice.elevenLabs.voicesFailed": "Impossible de charger vos voix ElevenLabs.",
+  "mobile.settings.voice.elevenLabs.removeKey": "Supprimer la clé",
+  "mobile.settings.voice.elevenLabs.removeTitle": "Supprimer la clé ElevenLabs ?",
+  "mobile.settings.voice.elevenLabs.removeBody": "Supertonic 3 lit de nouveau les réponses.",
+  "mobile.settings.voice.elevenLabs.saveKey": "Enregistrer la clé",
+  "mobile.settings.voice.elevenLabs.testing": "Test de la clé",
+  "mobile.settings.voice.elevenLabs.keyHint":
+    "OpenBot teste les deux premières autorisations avant d’enregistrer la clé.",
+  "mobile.settings.voice.elevenLabs.testFailed": "ElevenLabs n’a pas répondu. Réessayez.",
+  "mobile.settings.voice.elevenLabs.getKey": "Obtenir une clé d’API",
+  "mobile.settings.voice.engine.supertonicReady": "Sur ce téléphone · {voice}",
+  "mobile.settings.voice.engine.supertonicMissing": "Téléchargement requis · {size}",
+  "mobile.settings.voice.engine.elevenLabsNoKey": "Ajoutez une clé d’API pour l’utiliser",
+  "mobile.settings.voice.choiceFooter": "Touchez une voix pour l’utiliser. Touchez lecture pour l’écouter d’abord.",
+  "mobile.settings.voice.choiceDownloadFirst": "Téléchargez Supertonic 3 dans Réglages > Voix pour écouter les voix.",
+  "mobile.settings.voice.playVoice": "Lire {name}",
+  "mobile.settings.voice.stopVoice": "Arrêter {name}",
+  "mobile.settings.voice.elevenLabs.missingVoicesPermission":
+    "La clé n’a pas l’autorisation Voices: Read. Activez-la pour cette clé dans ElevenLabs.",
+  "mobile.settings.voice.elevenLabs.missingSpeechPermission":
+    "La clé n’a pas l’autorisation Text to Speech: Access. Activez-la pour cette clé dans ElevenLabs.",
+  "mobile.settings.voice.elevenLabs.permissionsTitle": "Autorisations requises",
+  "mobile.settings.voice.elevenLabs.permissionSpeech": "Text to Speech: Access",
+  "mobile.settings.voice.elevenLabs.permissionSpeechHint": "Lit les réponses à voix haute.",
+  "mobile.settings.voice.elevenLabs.permissionVoices": "Voices: Read",
+  "mobile.settings.voice.elevenLabs.permissionVoicesHint": "Liste les voix à choisir.",
+  "mobile.settings.voice.elevenLabs.permissionsFooter":
+    "Dans ElevenLabs, ouvrez Developers > API keys et créez une clé. Si vous activez Restrict key, accordez ces autorisations et laissez les autres désactivées. Une clé sans restriction fonctionne aussi.",
+  "mobile.settings.voice.recognition.title": "Reconnaissance vocale",
+  "mobile.settings.voice.recognition.footer":
+    "Le moteur coché reconnaît ce que vous dites dans une conversation vocale et en dictée.",
+  "mobile.settings.voice.recognition.system": "Reconnaissance du téléphone",
+  "mobile.settings.voice.recognition.systemHint": "Aucun téléchargement · une langue à la fois",
+  "mobile.settings.voice.recognition.parakeet": "Parakeet v3",
+  "mobile.settings.voice.recognition.parakeetReady": "Sur ce téléphone · trouve la langue seul",
+  "mobile.settings.voice.recognition.parakeetUnsupported": "Nécessite un téléphone avec au moins 6 Go de mémoire",
+  "mobile.settings.voice.recognition.parakeetFooter":
+    "Parakeet fonctionne sur ce téléphone, comme sur l’ordinateur. Il trouve la langue que vous parlez, parmi 25 langues européennes, et votre voix reste sur le téléphone. Tant que le modèle n’est pas téléchargé, la reconnaissance du téléphone écoute.",
+  "mobile.settings.voice.recognition.elevenLabs": "ElevenLabs Scribe",
+  "mobile.settings.voice.recognition.elevenLabsHint": "Plus de 90 langues · envoie votre voix à ElevenLabs",
+  "mobile.settings.voice.recognition.model": "Modèle vocal",
+  "mobile.settings.voice.recognition.removeTitle": "Supprimer le modèle vocal ?",
+  "mobile.settings.voice.recognition.removeBody":
+    "La reconnaissance du téléphone écoute jusqu’à ce que vous téléchargiez de nouveau le modèle.",
+  "mobile.settings.voice.elevenLabs.permissionTranscription": "Speech to Text: Access",
+  "mobile.settings.voice.elevenLabs.permissionTranscriptionHint":
+    "Reconnaît votre voix quand ElevenLabs Scribe est coché.",
+  "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
+  "mobile.settings.voice.tab.listening": "Écoute",
+  "mobile.settings.voice.tab.speaking": "Parole",
+  "mobile.settings.voice.elevenLabs.recognitionFooter":
+    "OpenBot envoie votre voix en continu à ElevenLabs avec un jeton à usage unique, et ElevenLabs le facture sur votre compte. La clé reste sur ce téléphone.",
 } as const satisfies PartialTranslation<typeof source>;

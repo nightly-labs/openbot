@@ -134,6 +134,47 @@
   content: "·";
 }
 
+/* In the chat header the picker text has the size of the tab labels. When the thread tabs do not
+   fit, the picker gets smaller: first the effort closes, then the model name. Each part slides closed
+   and fades. The tooltip and the accessible name of the picker keep both. */
+.conversation-header .provider-model-trigger {
+  interpolate-size: allow-keywords;
+}
+
+.conversation-header .provider-model-trigger :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  transition:
+    width var(--openbot-duration-normal) var(--openbot-ease-out),
+    margin var(--openbot-duration-normal) var(--openbot-ease-out),
+    opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* A closed part also takes back the gap before it, so the picker has no blank space. When the thread
+   tabs become one button, the picker shows only its icon, so the button has room for the thread title. */
+.conversation-header[data-model-fit] .provider-model-trigger-effort,
+.conversation-header[data-model-fit="icon"] .provider-model-trigger-name,
+.conversation-header:where(:has(.agent-threads-header:not([data-mode="tabs"])))
+  .provider-model-trigger
+  :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  width: 0;
+  margin-left: calc(var(--openbot-space-1-5) * -1);
+  opacity: 0;
+}
+
+/* While the tabs measure a step, the picker shows it at once. */
+.conversation-header[data-model-measure]
+  .provider-model-trigger
+  :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-header .provider-model-trigger :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+    transition: none;
+  }
+}
+
 /* The Fast chip gets its own room, so the model name keeps the width it has without it. */
 .provider-model-trigger:has(.provider-model-trigger-fast) {
   max-width: 296px;

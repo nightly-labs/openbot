@@ -34,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "このプロバイダーにはすでに {id} があります。",
   "customProvider.error.modelIdInvalid":
     "このモデル ID は使えません。スペース、引用符、その他の記号を削除してください。",
+  "customProvider.error.contextWindowInvalid": "{min} から {max} までの整数のトークン数を入力してください。",
   "customProvider.error.headerNameRequired": "ヘッダー名を入力してください。",
   "customProvider.error.headerNameInvalid": "有効な HTTP ヘッダー名を使ってください。",
   "customProvider.error.headerDuplicate": "このプロバイダーはすでに {name} を設定しています。",
@@ -73,6 +74,8 @@ export const messages = {
   "customProvider.model.id": "モデル {number} の ID",
   "customProvider.model.name": "モデル {number} の表示名",
   "customProvider.model.namePlaceholder": "表示名",
+  "customProvider.model.contextWindow": "モデル {number} のコンテキストウィンドウ",
+  "customProvider.model.contextWindowPlaceholder": "トークン",
   "customProvider.model.remove": "モデル {number} を削除",
   "customProvider.model.add": "モデルを追加",
   "customProvider.headers": "ヘッダー",

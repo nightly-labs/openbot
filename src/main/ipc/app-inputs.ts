@@ -23,6 +23,8 @@ import type {
   MacPermissionId,
   MarketplaceAgentQuery,
   MarketplaceSkillQuery,
+  MarketplaceSkillSort,
+  MemoryReviewPreference,
   NotificationPreference,
   PublishHostedSiteInput,
   RemoteNetworkRoutePreference,
@@ -61,6 +63,7 @@ import {
   isDynamicIslandInteractive,
   isDynamicIslandPreference,
   isDynamicIslandPresentation,
+  isMemoryReviewInterval,
   isRemoteNetworkRoute,
   isSkillCategory,
   MAC_AUTOMATION_TARGETS,
@@ -115,6 +118,12 @@ export function parseAgentDefaults(input: unknown): AgentDefaults {
 export function parseAgentMemoryLimitPreference(input: unknown): AgentMemoryLimitPreference {
   if (!isDynamicRecord(input) || !isAgentMemoryLimit(input.limit)) throw new Error("Agent memory limit is required.");
   return { limit: input.limit };
+}
+
+export function parseMemoryReviewPreference(input: unknown): MemoryReviewPreference {
+  if (!isDynamicRecord(input) || !isMemoryReviewInterval(input.interval))
+    throw new Error("Memory review interval is required.");
+  return { interval: input.interval };
 }
 
 export function parseChatWindowTarget(input: unknown): ChatWindowTarget {
@@ -307,23 +316,33 @@ export function parseProfileName(input: unknown): string {
 
 // The two marketplaces share query fields and validate their category filters at the boundary.
 // `query` is truncated rather than rejected, which is the behaviour these channels have always had.
-function parseMarketplaceQueryFields(input: DynamicRecord, sortError: string): MarketplaceAgentQuery {
-  if (input.sort !== undefined && input.sort !== "installs") throw new Error(sortError);
+function parseMarketplaceQueryFields(input: DynamicRecord) {
   return {
     ...(isString(input.query) ? { query: input.query.slice(0, 100) } : {}),
     ...(input.featured === true ? { featured: true } : {}),
-    ...(input.sort === "installs" ? { sort: "installs" as const } : {}),
     ...(isString(input.cursor) ? { cursor: input.cursor } : {}),
     ...(isNumber(input.limit) ? { limit: input.limit } : {}),
   };
 }
 
+function parseMarketplaceSort<T extends string>(value: unknown, sorts: readonly T[], error: string): { sort?: T } {
+  if (value === undefined) return {};
+  if (!isOneOf(sorts, value)) throw new Error(error);
+  return { sort: value };
+}
+
+const SKILL_SORTS = ["installs", "updated", "name"] as const satisfies readonly MarketplaceSkillSort[];
+
 export function parseMarketplaceSkillQuery(input: unknown): MarketplaceSkillQuery {
   if (!isObject(input)) throw new Error("Invalid marketplace query.");
   const category = input.category;
   if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown skill category.");
+  const verified = input.verified;
+  if (verified !== undefined && !isBoolean(verified)) throw new Error("Invalid skill source filter.");
   return {
-    ...parseMarketplaceQueryFields(input, "Unknown skill sort order."),
+    ...parseMarketplaceQueryFields(input),
+    ...parseMarketplaceSort(input.sort, SKILL_SORTS, "Unknown skill sort order."),
+    ...(verified === undefined ? {} : { verified }),
     ...(category ? { category } : {}),
   };
 }
@@ -332,7 +351,11 @@ export function parseMarketplaceAgentQuery(input: unknown): MarketplaceAgentQuer
   if (!isObject(input)) throw new Error("Invalid agent marketplace query.");
   const category = input.category;
   if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
-  return { ...parseMarketplaceQueryFields(input, "Unknown agent sort order."), ...(category ? { category } : {}) };
+  return {
+    ...parseMarketplaceQueryFields(input),
+    ...parseMarketplaceSort(input.sort, ["installs"] as const, "Unknown agent sort order."),
+    ...(category ? { category } : {}),
+  };
 }
 
 export function parseSubmitSkill(input: unknown): SubmitSkillInput {

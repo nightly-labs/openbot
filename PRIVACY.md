@@ -71,6 +71,10 @@ and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 
+For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
+message or a welcome email), it sends OpenPanel one event with the kind of email and the result of the send. This
+event has no account ID, email address, name or message content.
+
 The account service also records a return from Checkout without payment and later payment
 recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
 currency, and dated exchange rate. Refunds and disputes produce an event with the same USD amount,
@@ -461,17 +465,52 @@ the system share sheet and removes it when that sheet closes. The app you select
 Cloudflare account storage does not receive these files.
 When you share text, a link, an image or a file from another app to OpenBot, the phone keeps a copy
 of each file in its app cache until the chat that you choose has read it, or until you close the
-share sheet. Nothing is sent until you send the message. To find out whether a shared link points to
+share sheet. Nothing is sent until you send the message. On iPhone, the OpenBot share extension can
+send the message itself, without the app. It uses the same encrypted connection to the host and the
+same account service as the app. For this, the app gives the extension its session in a keychain
+item that only the app and the extension can read, and writes the names of your servers and agents,
+the agents' pictures and the servers' public keys to storage that only the app and its extensions share. These stay on
+the phone, and sign-out removes them. The app tells iOS which agents you send messages to, so the
+iOS share sheet can offer those agents first. iOS keeps this on the phone, and sign-out removes it. To find out whether a shared link points to
 an image, the phone requests the link from its website and reads only the response headers. When the
 link is an image, the phone downloads it and attaches it in place of the link. It stops a download
 after 10 MB, and a larger image stays a link.
 
-Mobile dictation uses the phone's speech recognition only after you press the microphone. It asks
-for on-device recognition. On iOS, this applies when the phone supports it for your language. On
+Mobile dictation and voice conversations listen only after you press the microphone. They use the
+recognizer chosen under **Speech recognition** in **Settings → Voice**:
+
+- Phone recognizer, the default. It is described below.
+- Parakeet v3. When you press Download, the phone downloads the pinned Parakeet TDT 0.6B v3 model
+  from `huggingface.co`, the same files as desktop, checks the SHA-256 of each file, and keeps it in
+  the app's storage outside the device backup until you remove it. The request carries no user data.
+  The audio and the recognized text stay on the phone.
+- ElevenLabs Scribe, only with your own ElevenLabs API key. For each dictation, the phone asks
+  `api.elevenlabs.io` for a single-use token with the key, then streams the microphone audio to
+  ElevenLabs with that token, and receives the text. ElevenLabs handles the audio and the text under
+  its own policy and your ElevenLabs plan. Nothing else is sent.
+
+The phone recognizer asks for on-device recognition. On iOS, this applies when the phone supports it for your language. On
 Android, it applies when the language model is installed. Otherwise, or when on-device recognition
 fails before it recognizes any speech, the phone's recognition service, Apple or Google, receives the
 audio. The recognized text goes into the message field and is sent
 only when you send the message. OpenBot does not store or send the audio.
+
+In a mobile voice conversation, the same recognizer hears what you say, and the recognized text is
+sent to the agent as a message. The phone then reads the agent's reply aloud with the voice chosen in
+**Settings → Voice**:
+
+- Supertonic 3, the default. When you press Download, the phone downloads the pinned Supertonic 3
+  model from `huggingface.co`, checks the SHA-256 of each file, and keeps it in the app's storage
+  outside the device backup until you remove it. The request carries no user data. The reply text
+  and its audio stay on the phone.
+- ElevenLabs, only after you save your own ElevenLabs API key. The phone tests the key by listing
+  your ElevenLabs voices and reading one character with the first voice, and then sends the text of each reply that it reads to `api.elevenlabs.io`
+  with the key, and receives the audio. Nothing else is sent: no conversation history, file or agent
+  instruction. ElevenLabs handles the text and the audio under its own policy and your ElevenLabs
+  plan. The key is kept in the phone's keychain (iOS) or encrypted storage (Android), never in a log
+  or an analytics event. Remove key in **Settings → Voice** deletes it.
+
+The chosen voice settings are kept on the phone. OpenBot does not store the reply audio.
 
 ## Email delivery and infrastructure providers
 
@@ -527,7 +566,15 @@ Saved agent memories, their inclusion settings, and their full-text search index
 SQLite database. Essential memories enter the agent's provider instructions within a fixed size
 limit. Other saved memories reach the provider only when the agent retrieves them with a memory
 tool. Search runs locally and does not use an external search or embedding service. Memory content
-is not included in analytics; provider output uses the application's secret redaction.
+is not included in analytics; provider output uses the application's secret redaction. After every
+20 turns of an agent's chat or side thread, after 15 minutes with no new turn, when the user clears
+the chat, and when the user closes a side thread, OpenBot sends the agent's profile, its essential
+memories, the saved memories that relate most to the conversation, and the new part of the
+conversation, with secrets redacted, to the agent's own provider, on the agent's model or on the
+provider's lower-priced default model, which proposes memory changes. Nothing else receives them.
+Server settings > General > Memory review sets the number of turns (10, 20 or 40) for the agents of
+the server, or turns these reviews off; off, no review sends anything. An owner or admin of a joined
+server can change it.
 
 - `~/OpenBot/Agents` contains one workspace per agent. A profile written by a release before the
   bot-to-agent rename holds them under `~/OpenBot/Bots`; the application moves them on first launch.
@@ -557,14 +604,18 @@ is not included in analytics; provider output uses the application's secret reda
   `~/Library/Application Support/OpenBot/openbot-github-connector-v1.json`, encrypted by the operating
   system's secret storage. It holds the GitHub access and refresh tokens, the account name, ID and
   avatar address, and the port and secret of the local GitHub MCP server.
-- The ElevenLabs API key for dictation is kept in
-  `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
-  secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
-  deletes the file. The key is redacted from logs, exports and diagnostics.
   While the connection is on, `provider-state/github` in the same folder holds the access token and
   the OpenBot GitHub App's installation tokens in plain text, with mode 0600, for `gh` and `git` in
   agent tools. OpenBot deletes that folder when you disconnect and when the app closes; after a crash
   it stays until the next start. The tokens are redacted from logs, exports and diagnostics.
+- The ElevenLabs API key for dictation is kept in
+  `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
+  secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
+  deletes the file. The key is redacted from logs, exports and diagnostics.
+- The API key of the voice server is kept in
+  `~/Library/Application Support/OpenBot/voice-server-key.json`, encrypted by the operating system's
+  secret storage. The app window never receives the key back. Remove in the Voice server section of
+  **Settings → Voice** deletes the file. The key is redacted from logs, exports and diagnostics.
 - The Bitwarden connection keeps a CLI session key in process memory only. OpenBot does not
   save it to a file. Disconnect, eight hours without vault use, and app exit stop this connection.
   The log redactor can retain values in memory until exit to mask later messages.
@@ -636,7 +687,8 @@ is not included in analytics; provider output uses the application's secret reda
   helper process with its reason word, and the reason that OpenBot quit (such as
   `main_window_closed` or `quit`).
 - `~/Library/Application Support/OpenBot/logs/main/main.log` holds the redacted lines of the main
-  process: startup failures, uncaught errors, and the reason that OpenBot quit. It is kept to two
+  process: startup failures, uncaught errors, the reason that OpenBot quit, and why an update check,
+  download or install failed. It is kept to two
   files of 1 MB each and is never sent.
 - OpenBot keeps crash dumps of its own processes in the `Crashpad` folder of its user data
   (`%APPDATA%\OpenBot\Crashpad` on Windows). A dump holds part of the memory of the process that
@@ -736,6 +788,14 @@ Network traffic can also occur when:
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
+- the user sets up a voice server in **Settings → Voice**. OpenBot sends requests only to the address
+  that the user enters, with the user's API key when there is one. To connect, it lists the server's
+  models and voices. When the server does dictation, OpenBot sends the recorded audio, the chosen
+  model and, when the user set one, the language to `/v1/audio/transcriptions` and receives the text. When the server reads
+  replies aloud, OpenBot sends the text of each reply that it reads, the chosen model and the voice to
+  `/v1/audio/speech` and receives the audio. Nothing else is sent: no conversation, file or agent
+  instruction. The server handles the audio and the text under the policy of the person who runs it.
+  The address and the choices are saved in `voice-server.json` in the application data folder;
 - the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`

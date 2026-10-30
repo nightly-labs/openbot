@@ -79,7 +79,12 @@ export type McpEndpointSource = (
  * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
  * say so without probing anything.
  */
-type McpDropReason = "command_not_found" | "working_directory_unsupported" | "name_conflict" | "unusable";
+type McpDropReason =
+  | "command_not_found"
+  | "working_directory_unsupported"
+  | "name_conflict"
+  | "unusable"
+  | "failed_to_start";
 
 /** One server a provider did not get, named so the user can be told which one and why. */
 export interface McpServerDrop {

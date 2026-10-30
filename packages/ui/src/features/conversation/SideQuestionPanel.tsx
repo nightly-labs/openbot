@@ -31,6 +31,8 @@ export interface SideQuestionPanelProps {
   onAsk: (question: string) => void;
   onClosePanel: () => void;
   onOpenLink: (url: string) => void;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
 }
 
 function exchangeMessages(exchange: SideQuestionExchange): AgentMessage[] {
@@ -122,6 +124,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
                     onOpenLink={props.onOpenLink}
                     onPreview={() => undefined}
                     onAttachmentAction={() => undefined}
+                    macWindowControls={props.macWindowControls}
                   />
                 </div>
               )}

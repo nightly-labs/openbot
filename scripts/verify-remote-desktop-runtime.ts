@@ -36,6 +36,9 @@ const moonlightPatch = basename(lock.remoteDesktop.moonlightWeb.patch.path);
 await Promise.all([
   ...names.map((name) => access(join(root, name))),
   access(join(root, "static/stream.html")),
+  ...(platform === "win32"
+    ? [access(join(root, "assets/shaders/directx/convert_yuv420_packed_uv_type0_ps.hlsl"))]
+    : []),
   access(resolve("build/remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve("build/remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(`build/remote-desktop-runtime/sources/Sunshine-${lock.remoteDesktop.sunshine.version}-source.tar.gz`)),

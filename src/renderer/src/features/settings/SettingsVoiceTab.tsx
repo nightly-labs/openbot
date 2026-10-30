@@ -37,8 +37,9 @@ import {
   SwitchField,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createMemo, createStore, For, Show } from "solid-js";
+import { createMemo, createSignal, createStore, For, Show } from "solid-js";
 import type { SettingsVoiceStore } from "./settings-voice-store";
+import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
 
 const MODEL_DESCRIPTION = {
   "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
@@ -153,10 +154,17 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   const { t, format, errorMessage } = useText();
   const settings = () => props.store.state.settings;
   const activeModel = () => VOICE_MODELS.find((model) => model.id === settings()?.modelId);
+  const server = () => props.store.state.server;
+  /** While the user's own server takes dictation, no model on this computer is in use. */
+  const serverDictates = () => server()?.routes.dictation === true;
+  /** While the user's own server reads replies, Supertonic's voices do not apply. */
+  const serverSpeaks = () => server()?.routes.speech === true;
+  /** The server gets the language that the user sets, so a local model's fixed language does not apply. */
   const fixedLanguage = () => {
     const model = activeModel();
-    return model && !model.supportsLanguage ? FIXED_LANGUAGE[model.id] : undefined;
+    return model && !model.supportsLanguage && !serverDictates() ? FIXED_LANGUAGE[model.id] : undefined;
   };
+  const languageLocked = () => !settings() || (!serverDictates() && activeModel()?.supportsLanguage === false);
   const languageName = (language: VoiceLanguage) =>
     language === AUTOMATIC_VOICE_LANGUAGE ? t("settings.voice.language.automatic") : t(LANGUAGE_NAME[language]);
   const languageOptions = createMemo((): VoiceLanguage[] => {
@@ -198,6 +206,8 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
     return downloadText(model.bytes, status);
   };
 
+  const [editingServer, setEditingServer] = createSignal(false);
+
   const speech = () => props.store.state.speech;
   const speechPhase = () => speech().status?.phase;
   const voiceName = (voice: SpeechVoice) =>
@@ -223,7 +233,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             {(model) => {
               const status = () => props.store.state.statuses[model.id];
               const phase = () => status()?.phase;
-              const inUse = () => settings()?.modelId === model.id;
+              const inUse = () => settings()?.modelId === model.id && !serverDictates();
               return (
                 <Item class="settings-modal-row">
                   <ItemContent>
@@ -358,7 +368,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                 options={languageOptions()}
                 value={fixedLanguage()?.language ?? settings()?.language ?? null}
                 onChange={(next) => next && props.store.setLanguage(next)}
-                disabled={!settings() || activeModel()?.supportsLanguage === false}
+                disabled={languageLocked()}
                 placement="bottom-end"
                 itemComponent={(selectProps) => (
                   <SelectItem item={selectProps.item}>
@@ -449,48 +459,113 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             label={t("settings.voice.speech.readReplies.title")}
             description={t("settings.voice.speech.readReplies.description")}
           />
-          <Item data-settings-row="settings.voice.speech.voice.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
-            </ItemContent>
-            <ItemActions>
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                disabled={speechPhase() !== "ready"}
-                onClick={() => void props.store.listen(t("settings.voice.speech.sample"))}
-              >
-                <Show when={speech().listening} fallback={<Play size={14} aria-hidden="true" />}>
-                  <Square size={14} aria-hidden="true" />
-                </Show>
-                {speech().listening ? t("settings.voice.speech.voice.stop") : t("settings.voice.speech.voice.listen")}
-              </Button>
-              <Select<SpeechVoice>
-                class="settings-modal-select"
-                options={[...SPEECH_VOICES]}
-                value={speech().settings?.voice ?? null}
-                onChange={(next) => next && props.store.setSpeechVoice(next)}
-                disabled={!speech().settings}
-                placement="bottom-end"
-                itemComponent={(selectProps) => (
-                  <SelectItem item={selectProps.item}>{voiceName(selectProps.item.rawValue)}</SelectItem>
-                )}
-              >
-                <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
-                  <SelectValue<SpeechVoice>>
-                    {(state) => {
-                      const voice = state.selectedOption();
-                      return voice && voiceName(voice);
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent mount={props.selectMount} />
-              </Select>
-            </ItemActions>
-          </Item>
+          <Show when={!serverSpeaks()}>
+            <Item data-settings-row="settings.voice.speech.voice.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  disabled={speechPhase() !== "ready"}
+                  onClick={() => void props.store.listen(t("settings.voice.speech.sample"))}
+                >
+                  <Show when={speech().listening} fallback={<Play size={14} aria-hidden="true" />}>
+                    <Square size={14} aria-hidden="true" />
+                  </Show>
+                  {speech().listening ? t("settings.voice.speech.voice.stop") : t("settings.voice.speech.voice.listen")}
+                </Button>
+                <Select<SpeechVoice>
+                  class="settings-modal-select"
+                  options={[...SPEECH_VOICES]}
+                  value={speech().settings?.voice ?? null}
+                  onChange={(next) => next && props.store.setSpeechVoice(next)}
+                  disabled={!speech().settings}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>{voiceName(selectProps.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>
+                    <SelectValue<SpeechVoice>>
+                      {(state) => {
+                        const voice = state.selectedOption();
+                        return voice && voiceName(voice);
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+          </Show>
         </ItemGroup>
       </SettingsSection>
+
+      <SettingsSection data-settings-row="settings.voice.server.section" title={t("settings.voice.server.section")}>
+        <ItemGroup class="settings-modal-card">
+          <Show
+            when={server()}
+            fallback={
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.voice.server.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.voice.server.notSetUp")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setEditingServer(true)}>
+                    {t("settings.voice.server.setUp")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            }
+          >
+            {(saved) => (
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{voiceServerHost(saved().address)}</ItemTitle>
+                  <Show when={!serverDictates() && !serverSpeaks()}>
+                    <ItemDescription>{t("settings.voice.server.notInUse")}</ItemDescription>
+                  </Show>
+                  <Show when={serverDictates()}>
+                    <ItemDescription>
+                      {t("settings.voice.server.dictationSummary", {
+                        model: shortModel(saved().routes.transcriptionModel),
+                      })}
+                    </ItemDescription>
+                  </Show>
+                  <Show when={serverSpeaks()}>
+                    <ItemDescription>
+                      {t("settings.voice.server.speechSummary", {
+                        model: shortModel(saved().routes.speechModel),
+                        voice: saved().routes.voice ?? "",
+                      })}
+                    </ItemDescription>
+                  </Show>
+                </ItemContent>
+                <ItemActions>
+                  <Button variant="ghost" size="sm" type="button" onClick={() => setEditingServer(true)}>
+                    {t("common.edit")}
+                  </Button>
+                  <Button variant="ghost" size="sm" type="button" onClick={() => void props.store.saveServer(null)}>
+                    {t("common.remove")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            )}
+          </Show>
+        </ItemGroup>
+      </SettingsSection>
+      <Show when={editingServer()}>
+        <VoiceServerDialog
+          saved={server()}
+          probe={props.store.probeServer}
+          onSave={props.store.saveServer}
+          onClose={() => setEditingServer(false)}
+        />
+      </Show>
     </>
   );
 }

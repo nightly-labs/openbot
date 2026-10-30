@@ -6,6 +6,7 @@
 
 import {
   type AgentTask,
+  type AgentTaskReadState,
   type AgentTasksSnapshot,
   type AgentWaitsSnapshot,
   type ConversationFileSearchPage,
@@ -18,6 +19,7 @@ import {
   type DraftAttachment,
   type FilePreview,
   isAgentTask,
+  isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAgentWaitsSnapshot,
   isAttachmentSummary,
@@ -171,6 +173,13 @@ export function decodeReceipt(value: unknown): QueuedMessageReceipt {
 export function decodeWaits(value: unknown): AgentWaitsSnapshot {
   if (!isAgentWaitsSnapshot(value)) {
     throw new Error("Invalid open waits response.");
+  }
+  return value;
+}
+
+export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
+  if (!isAgentTaskReadState(value)) {
+    throw new Error("Invalid thread read state.");
   }
   return value;
 }

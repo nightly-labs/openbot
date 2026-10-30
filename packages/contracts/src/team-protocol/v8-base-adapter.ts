@@ -5,6 +5,7 @@ import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { restoreBrowserTakeoverReason } from "./browser-sign-in-v1";
+import { withRuntimeSnapshotContextUsage } from "./context-usage-v1";
 import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
 import {
@@ -44,11 +45,15 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
   try {
     current = withEventPromptMultiSelect(
       withEventConversationPlans(
-        restoreBrowserTakeoverReason(restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value), value),
+        restoreBrowserTakeoverReason(
+          restoreBrowserSecretMetadata(toCurrentAgentKeys(withRuntimeSnapshotContextUsage(decodedValue, value)), value),
+          value,
+        ),
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // multi-select flag only under prompt-multi-select-v1, and a takeover reason only under
-        // browser-sign-in, so a present one is always kept.
+        // multi-select flag only under prompt-multi-select-v1, a takeover reason only under
+        // browser-sign-in, and context states only under context-usage-v1, so a present one is always
+        // kept.
         value,
         value,
       ),
@@ -71,6 +76,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
+    contextUsage?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
@@ -86,12 +92,14 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   if (decoded.kind !== "known") return null;
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
+  const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
   if (
     !encoded ||
     (!options.preserveBrowserSecrets &&
       !options.browserSignIn &&
       !eventConversationKey(event.type) &&
-      !promptMultiSelect)
+      !promptMultiSelect &&
+      !contextUsage)
   )
     return encoded;
   // The block and the subagents go as written: the key swap would rename a response value under a
@@ -102,7 +110,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     options.uiBlocks ? currentValue : null,
     options.subagents ? currentValue : null,
   );
-  const output = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
+  const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
+  const output = contextUsage ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true) : withMultiSelect;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   return JSON.stringify(options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets);
 }

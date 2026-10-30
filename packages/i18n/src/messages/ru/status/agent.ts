@@ -25,6 +25,12 @@ export const messages = {
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
+  "status.agent.browserOpening": "Открытие веб-страницы…",
+  "status.agent.browserReading": "Чтение веб-страницы…",
+  "status.agent.browserClicking": "Нажатие на веб-странице…",
+  "status.agent.browserTyping": "Ввод на веб-странице…",
+  "status.agent.browserActing": "Работа с веб-страницей…",
+  "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
   "status.agent.memoriesSearched": {
     one: "Поиск в памяти: найдено {count}",
@@ -38,4 +44,5 @@ export const messages = {
   "status.agent.memoryChanges": "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
+  "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
 } as const satisfies PartialTranslation<typeof source>;

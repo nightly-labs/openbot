@@ -187,6 +187,12 @@ const ServerSelection = createSimpleContext({
       }
     }
 
+    /** Creates a server on this computer and opens it. Main resolves when the desktop is connected to it. */
+    async function createLocalServer(name: string): Promise<void> {
+      const server = await serversPort().localServers.create(name);
+      await selectServer(server.id, false);
+    }
+
     async function joinRemoteDuringSetup(input: { inviteUrl: string }, provider: AgentProviderId): Promise<void> {
       await joinServer(input);
       await saveSetup(provider);
@@ -195,6 +201,7 @@ const ServerSelection = createSimpleContext({
     return {
       selectServer,
       joinServer,
+      createLocalServer,
       joinRemoteDuringSetup,
       openInstalledMarketplaceAgent,
     };

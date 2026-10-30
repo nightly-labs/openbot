@@ -5,6 +5,7 @@
 // A server that lists `none` must get a public registration and a working sign-in. A server that
 // does not list it gets a secret client, and the refusal must say that the server did not accept
 // OpenBot, not the SDK's "Existing OAuth client information is required" text.
+// Make lists only `client_secret_post` and refuses a registration that names no method it lists.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -62,7 +63,11 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
-async function fakeServer(authMethods: string[]): Promise<FakeServer> {
+/**
+ * `secretAccepted` is Make: the token endpoint takes the secret in the body. Without it, the server
+ * is Railway and refuses every secret it issued.
+ */
+async function fakeServer(authMethods: string[], secretAccepted: boolean): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = { registrations: [], tokenRequestsWithSecret: [], toolLists: [] };
   let base = "";
   const server: Server = createServer((request, response) => {
@@ -85,7 +90,14 @@ async function fakeServer(authMethods: string[]): Promise<FakeServer> {
         const asked = registrationRequest.parse(JSON.parse(await body(request)));
         state.registrations.push(asked.token_endpoint_auth_method ?? null);
         const id = `e2e-client-${state.registrations.length}`;
-        const method = asked.token_endpoint_auth_method === "none" ? "none" : "client_secret_basic";
+        // RFC 7591: a registration that names no method asks for `client_secret_basic`.
+        const method = asked.token_endpoint_auth_method ?? "client_secret_basic";
+        if (!authMethods.includes(method))
+          return json(response, 400, {
+            code: "SC400",
+            name: "APIError",
+            message: "No supported Token Endpoint Auth Method provided.",
+          });
         return json(response, 201, {
           client_id: id,
           ...(method === "none" ? {} : { client_secret: CLIENT_SECRET }),
@@ -97,8 +109,9 @@ async function fakeServer(authMethods: string[]): Promise<FakeServer> {
         const form = new URLSearchParams(await body(request));
         const withSecret = request.headers.authorization !== undefined || form.has("client_secret");
         state.tokenRequestsWithSecret.push(withSecret);
-        // Railway: the secret it issued is refused.
-        if (withSecret)
+        const secretInBody = request.headers.authorization === undefined && form.get("client_secret") === CLIENT_SECRET;
+        // Railway: the secret it issued is refused. Make: the secret must come in the body.
+        if (secretAccepted ? !secretInBody : withSecret)
           return json(response, 401, { error: "invalid_client", error_description: "client authentication failed" });
         if (form.get("code") !== "e2e-grant") return json(response, 400, { error: "invalid_grant" });
         return json(response, 200, { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 });
@@ -171,8 +184,13 @@ function httpConfig(url: string): McpServerConfig {
  * store starts with only the discovery state, as an earlier sign-in that ended before the token
  * leaves it: the SDK reads that state and no server metadata.
  */
-async function runCase(name: string, authMethods: string[], attempts: number, storedDiscovery = false): Promise<Case> {
-  const server = await fakeServer(authMethods);
+async function runCase(
+  name: string,
+  authMethods: string[],
+  attempts: number,
+  { storedDiscovery = false, secretAccepted = false } = {},
+): Promise<Case> {
+  const server = await fakeServer(authMethods, secretAccepted);
   const records = new Map<string, McpOAuthRecord>();
   if (storedDiscovery)
     records.set(server.url, {
@@ -238,7 +256,9 @@ async function main(): Promise<void> {
     report.cases.push(listed);
 
     // The same server, with a discovery state already on file: the registration is still public.
-    const cached = await runCase("public-client-with-stored-discovery", ["client_secret_basic", "none"], 1, true);
+    const cached = await runCase("public-client-with-stored-discovery", ["client_secret_basic", "none"], 1, {
+      storedDiscovery: true,
+    });
     check(cached, cached.attempts[0]?.error === null, `the sign-in failed: ${cached.attempts[0]?.error}`);
     check(cached, cached.registrations.join() === "none", `the registration asked for ${cached.registrations.join()}`);
     check(cached, cached.tokenRequestsWithSecret.join() === "false", "a token request carried a client secret");
@@ -257,6 +277,34 @@ async function main(): Promise<void> {
     check(unlisted, !unlisted.storedClient, "the refused client is still stored");
     check(unlisted, !unlisted.signedIn, "a token is stored after a refused sign-in");
     report.cases.push(unlisted);
+
+    // Make lists only `client_secret_post`. A registration that names no method asks for
+    // `client_secret_basic`, and Make answers 400, so OpenBot must ask for `client_secret_post`.
+    const make = await runCase("secret-post-only", ["client_secret_post"], 1, { secretAccepted: true });
+    check(make, make.attempts[0]?.error === null, `the sign-in failed: ${make.attempts[0]?.error}`);
+    check(make, make.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(
+      make,
+      make.registrations.join() === "client_secret_post",
+      `the registration asked for ${make.registrations.join()}`,
+    );
+    check(make, make.tokenRequestsWithSecret.join() === "true", "the token request did not carry the client secret");
+    check(make, make.signedIn, "no token is stored after the sign-in");
+    report.cases.push(make);
+
+    // The same server, with a discovery state already on file: the registration still names the method.
+    const makeCached = await runCase("secret-post-only-with-stored-discovery", ["client_secret_post"], 1, {
+      storedDiscovery: true,
+      secretAccepted: true,
+    });
+    check(makeCached, makeCached.attempts[0]?.error === null, `the sign-in failed: ${makeCached.attempts[0]?.error}`);
+    check(
+      makeCached,
+      makeCached.registrations.join() === "client_secret_post",
+      `the registration asked for ${makeCached.registrations.join()}`,
+    );
+    check(makeCached, makeCached.signedIn, "no token is stored after the sign-in");
+    report.cases.push(makeCached);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

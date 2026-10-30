@@ -38,6 +38,9 @@ import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -159,10 +162,14 @@ import {
   type AgentMemoriesRequest,
   agentTaskControl,
   clearAgentContext,
+  deleteAgentThread,
   listAgentTasks,
+  listAgentThreadReads,
+  markAgentThreadRead,
   readAgentMemories,
   readAgentMemorySelection,
   readAgentTask,
+  renameAgentThread,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   startAgentTask,
@@ -236,6 +243,10 @@ type HostRequestActions = Pick<
   | "startAgentTask"
   | "sendAgentTaskMessage"
   | "controlAgentTask"
+  | "renameAgentThread"
+  | "deleteAgentThread"
+  | "loadAgentThreadReads"
+  | "markAgentThreadRead"
   | "respondToTaskPrompt"
   | "loadAgentSkills"
   | "installAgentSkill"
@@ -388,7 +399,18 @@ export function createHostRequestActions({
     capabilityApi(serverId, AGENT_SESSION_SETTINGS_CAPABILITY, "mobile.agent.session.unsupported");
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
-    capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.tasks.unsupported");
+    capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
+  /** Rename and delete of a thread are an optional route set beside the tasks. */
+  const threadsApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_THREADS_CAPABILITY, "mobile.chat.threads.unsupported");
+  /** Files in a thread are an optional route set beside the tasks. A message without files uses the tasks. */
+  const threadMessageApi = (serverId: string, attachmentDraftIds: readonly string[] | undefined) =>
+    attachmentDraftIds?.length
+      ? capabilityApi(serverId, AGENT_THREAD_FILES_CAPABILITY, "mobile.chat.threads.filesUnsupported")
+      : tasksApi(serverId);
+  /** The read marks of the threads are an optional route set beside the tasks. */
+  const threadReadsApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_THREAD_READS_CAPABILITY, "mobile.chat.threads.unsupported");
   /** The server timezone and the agent memory limit are optional admin route sets. */
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
@@ -433,6 +455,9 @@ export function createHostRequestActions({
   const checks: HostRequestChecks = {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
+    canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
+    canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -698,10 +723,18 @@ export function createHostRequestActions({
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     loadAgentTasks: async (agentId, serverId) => runTeamRequest(listAgentTasks(tasksApi(serverId), agentId)),
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
-    startAgentTask: async (input, serverId) => runTeamRequest(startAgentTask(tasksApi(serverId), input)),
-    sendAgentTaskMessage: async (input, serverId) => runTeamRequest(sendAgentTaskMessage(tasksApi(serverId), input)),
+    startAgentTask: async (input, serverId) =>
+      runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),
+    sendAgentTaskMessage: async (input, serverId) =>
+      runTeamRequest(sendAgentTaskMessage(threadMessageApi(serverId, input.attachmentDraftIds), input)),
     controlAgentTask: async (action, input, serverId) =>
       runTeamRequest(agentTaskControl(tasksApi(serverId), action, input)),
+    renameAgentThread: async (input, serverId) => runTeamRequest(renameAgentThread(threadsApi(serverId), input)),
+    deleteAgentThread: async (input, serverId) => runTeamRequest(deleteAgentThread(threadsApi(serverId), input)),
+    loadAgentThreadReads: async (agentId, serverId) =>
+      runTeamRequest(listAgentThreadReads(threadReadsApi(serverId), agentId)),
+    markAgentThreadRead: async (input, serverId) =>
+      runTeamRequest(markAgentThreadRead(threadReadsApi(serverId), input)),
     respondToTaskPrompt: async (input, serverId) => {
       await request(
         "POST",

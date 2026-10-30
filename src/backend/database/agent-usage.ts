@@ -171,6 +171,13 @@ export class AgentUsage {
                     ? "OpenCode session cost report; API-equivalent rates, not subscription charges"
                     : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
               };
+        const turn = databaseRow(
+          db
+            .prepare("SELECT occurred_at FROM agent_usage_activity WHERE agent_id = ? AND activity_id = ?")
+            .get(sample.agentId, `turn:${sample.sessionId}:${sample.turnId}`),
+        );
+        const occurredAt =
+          sample.occurredAt ?? (turn ? requiredStringColumn(turn, "occurred_at") : new Date().toISOString());
         const estimate =
           reported ??
           estimateUsageCost(
@@ -179,14 +186,8 @@ export class AgentUsage {
             delta,
             sample.lastRequestInputTokens ?? null,
             sample.smallestRequestInputTokens ?? null,
+            occurredAt,
           );
-        const turn = databaseRow(
-          db
-            .prepare("SELECT occurred_at FROM agent_usage_activity WHERE agent_id = ? AND activity_id = ?")
-            .get(sample.agentId, `turn:${sample.sessionId}:${sample.turnId}`),
-        );
-        const occurredAt =
-          sample.occurredAt ?? (turn ? requiredStringColumn(turn, "occurred_at") : new Date().toISOString());
         db.prepare("INSERT INTO agent_usage_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
           sample.agentId,
           digest,

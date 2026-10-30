@@ -75,6 +75,7 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         message: agent?.message,
         email: agent?.email,
         connectionState: agent?.connectionState,
+        signInPending: agent?.signInPending,
         restartPending: agent?.restartPending,
         checkError: agent?.checkError,
         lastError: agent?.lastError,

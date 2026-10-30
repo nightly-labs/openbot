@@ -241,7 +241,7 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
   thread: a Slack thread ts, a Discord message ID, a Telegram message ID, or `t<topic ID>` for a
   Telegram forum topic. The text is redacted before it leaves this computer. A Discord post pings
   nobody; a Telegram `@username` notifies that person. A Telegram connection posts only in its own
-  chat.
+  chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the

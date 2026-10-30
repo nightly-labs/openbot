@@ -11,11 +11,12 @@ import { readFile } from "node:fs/promises";
 import type {
   CustomProviderHeader,
   CustomProviderHeaderInput,
+  CustomProviderModel,
   CustomProviderSummary,
   SaveCustomProviderInput,
   UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
-import { sameCustomProviderOrigin } from "@openbot/contracts/ipc";
+import { isCustomProviderContextWindow, sameCustomProviderOrigin } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
@@ -35,7 +36,15 @@ export interface CustomProviderCipher {
   decrypt: (value: Buffer) => string;
 }
 
-const modelSchema = z.object({ id: z.string(), name: z.string() });
+/**
+ * `contextWindow` was added in a later release: a file without it still reads, and an older build drops it.
+ * A value out of range is dropped, not refused, so that it cannot hide every saved endpoint.
+ */
+const modelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  contextWindow: z.number().refine(isCustomProviderContextWindow).optional().catch(undefined),
+});
 const headerSchema = z.object({ name: z.string(), value: z.string() });
 
 /**
@@ -134,7 +143,7 @@ export class CustomProviderStore {
       hasApiKey: Boolean(secret?.apiKey),
       headerNames: (secret?.headers ?? []).map((header) => header.name),
       // Copied, not shared: the renderer's list must not alias the stored entry.
-      models: stored.models.map((model) => ({ id: model.id, name: model.name })),
+      models: stored.models.map(copyModel),
     }));
   }
 
@@ -145,7 +154,7 @@ export class CustomProviderStore {
       name: stored.name,
       baseUrl: stored.baseUrl,
       apiKey: secret?.apiKey ?? null,
-      models: stored.models,
+      models: stored.models.map(copyModel),
       headers: secret?.headers ?? [],
     }));
   }
@@ -170,7 +179,7 @@ export class CustomProviderStore {
             id: input.id,
             name: input.name,
             baseUrl: input.baseUrl,
-            models: input.models.map((model) => ({ id: model.id, name: model.name })),
+            models: input.models.map(copyModel),
             secret: secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null,
           },
           secret,
@@ -205,7 +214,7 @@ export class CustomProviderStore {
           id: current.stored.id,
           name: input.name,
           baseUrl: input.baseUrl,
-          models: input.models.map((model) => ({ id: model.id, name: model.name })),
+          models: input.models.map(copyModel),
           secret: sealed,
         },
         secret,
@@ -321,6 +330,13 @@ export class CustomProviderStore {
       Effect.mapError(({ cause }) => new CustomProviderFailure({ cause })),
     );
   });
+}
+
+/** The parse keeps an out-of-range `contextWindow` key as undefined. The copy drops that key. */
+function copyModel(model: z.infer<typeof modelSchema>): CustomProviderModel {
+  return model.contextWindow === undefined
+    ? { id: model.id, name: model.name }
+    : { id: model.id, name: model.name, contextWindow: model.contextWindow };
 }
 
 /** The same names in the same order, each with its saved value. */

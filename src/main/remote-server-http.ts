@@ -97,7 +97,11 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     value = yield* Effect.try({
       try: () =>
         sideRoute
-          ? sideRoute.response(path, response.status, input, { historyExtent: true, channelAttention: true })
+          ? sideRoute.response(path, response.status, input, {
+              historyExtent: true,
+              channelAttention: true,
+              agentTaskUiBlocks: true,
+            })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>
         new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),

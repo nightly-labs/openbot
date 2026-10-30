@@ -34,6 +34,7 @@ import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { ServerMemoryLimitSetting } from "./ServerMemoryLimitSetting";
+import { ServerMemoryReviewSetting } from "./ServerMemoryReviewSetting";
 import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -113,6 +114,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
   const canSetTimezone = () => serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable();
   const canSetMemoryLimit = () => serverCanAdminister(props.server, "agent-memory-limit-v1") && actionsAvailable();
+  const canSetMemoryReview = () => serverCanAdminister(props.server, "memory-review-v1") && actionsAvailable();
   const trimmedName = () => panels.identity.name.trim();
   const nameError = () => {
     if (!canEditIdentity()) return null;
@@ -394,7 +396,13 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
             </Item>
           </ItemGroup>
         </SettingsSection>
-        <Show when={(canSetTimezone() && props.hostTimezone) || (canSetMemoryLimit() && props.hostMemoryLimit)}>
+        <Show
+          when={
+            (canSetTimezone() && props.hostTimezone) ||
+            (canSetMemoryLimit() && props.hostMemoryLimit) ||
+            (canSetMemoryReview() && props.memoryReview)
+          }
+        >
           <SettingsSection title={t("server.settings.agents")}>
             <ItemGroup class="settings-modal-card">
               <Show when={canSetTimezone() && props.hostTimezone}>
@@ -411,6 +419,17 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
               <Show when={canSetMemoryLimit() && props.hostMemoryLimit}>
                 {(options) => (
                   <ServerMemoryLimitSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={canSetMemoryReview() && props.memoryReview}>
+                {(options) => (
+                  <ServerMemoryReviewSetting
                     {...options()}
                     serverId={props.server.id}
                     disabled={Boolean(busy())}

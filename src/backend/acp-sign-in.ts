@@ -52,7 +52,10 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   logout?: boolean;
   /** Called when the server answered `logout`: what it kept is gone, whether the sign-in ends or not. */
   onLoggedOut?: () => void;
-  /** Linux Gemini delegates its browser launch to the desktop so failure is visible. */
+  /**
+   * Gemini prints its Google page instead of opening it, and OpenBot opens it, so a launch that fails
+   * shows an error. When the server opened it itself, a failure showed nothing (#3520).
+   */
   openGoogleSignIn?: (url: string) => Promise<void>;
   /** A temporary folder of its own for the process (`provider-temp.ts`). */
   privateTemp?: ProviderTempOptions | undefined;
@@ -72,7 +75,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
               ...tempEnv,
             },
             windowsVerbatimArguments: target.windowsVerbatimArguments,
-            // Only Gemini on Linux delegates the browser launch. Other servers still open it themselves.
+            // Only Gemini delegates the browser launch. Other servers still open it themselves.
             stdio: ["pipe", "pipe", "pipe"],
             shell: false,
             windowsHide: process.platform === "win32",
@@ -96,7 +99,14 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       let output = "";
       let opened = false;
       const signInFailed = (message: string) => fail(new ProviderSignInError({ message }));
-      const browserFailed = () => signInFailed(sourceText("error.provider.geminiBrowserUnavailable"));
+      const browserFailed = () =>
+        signInFailed(
+          sourceText(
+            process.platform === "linux"
+              ? "error.provider.geminiBrowserUnavailable"
+              : "error.provider.geminiBrowserOpenFailed",
+          ),
+        );
       const readSignInLink = (chunk: Buffer) => {
         if (settled || opened || !openGoogleSignIn) return;
         output += chunk.toString("utf8");

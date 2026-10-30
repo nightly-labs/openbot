@@ -1322,6 +1322,27 @@
   flex: 1 1 auto;
 }
 
+/* A provider setting: its row, then the notes under it. The row rounds with the card at an end. */
+.agent-session-setting > .ui-select,
+.agent-session-setting .agent-settings-runtime-row {
+  border-radius: inherit;
+}
+
+.agent-session-setting-notes {
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.agent-session-setting > .agent-session-setting-notes {
+  padding-top: 0;
+}
+
+.agent-session-setting-notes:empty {
+  display: none;
+}
+
 .agent-settings-runtime-rows .provider-model-trigger-field,
 .agent-settings-runtime-rows .agent-settings-runtime-row {
   width: 100%;

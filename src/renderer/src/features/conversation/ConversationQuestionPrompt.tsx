@@ -1,13 +1,19 @@
+import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import { createMemo, Loading, lazy, Show } from "solid-js";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { useConversationViewScope } from "./conversation-scope";
-import type { ConversationProps } from "./conversation-types";
+import type { ConversationProps, PromptAnswerOptions } from "./conversation-types";
 
 /**
  * The question that the open thread waits for, as a card. The agent's chat and an open side thread show it.
- * `elementRef` gets the card, for the chat that keeps it in view.
+ * `elementRef` gets the card, for the chat that keeps it in view. `onAnswer` replaces the view's answer.
+ * `registerComposerAnswer` lets the message box of the same chat answer the question.
  */
-export function ConversationQuestionPrompt(props: { elementRef?: (element: HTMLElement | undefined) => void }) {
+export function ConversationQuestionPrompt(props: {
+  elementRef?: (element: HTMLElement | undefined) => void;
+  onAnswer?: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
+  registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
+}) {
   const { props: view, openExternalMessageUrl } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
@@ -26,6 +32,8 @@ export function ConversationQuestionPrompt(props: { elementRef?: (element: HTMLE
    * agent asked without one, the prompt's questions draw it.
    */
   const pendingPromptBlock = createMemo(() => (keyedPrompt() ? view.promptUiBlock : undefined));
+  const answer = (answers: Record<string, string[]>, options?: PromptAnswerOptions) =>
+    (props.onAnswer ?? view.onAnswerPrompt)(answers, options);
   return (
     <Show when={keyedPrompt()} keyed>
       {(entry) => {
@@ -39,8 +47,9 @@ export function ConversationQuestionPrompt(props: { elementRef?: (element: HTMLE
                 <QuestionPromptBubble
                   questions={entry.prompt.questions}
                   elementRef={(element) => props.elementRef?.(element)}
+                  registerComposerAnswer={props.registerComposerAnswer}
                   sendShortcut={deviceSendShortcut(view.platform)}
-                  onSubmit={view.onAnswerPrompt}
+                  onSubmit={answer}
                   onResolutionPresented={presentResolution}
                 />
               }
@@ -52,7 +61,7 @@ export function ConversationQuestionPrompt(props: { elementRef?: (element: HTMLE
                   onSelectAgent={view.onSelectAgent}
                   onOpenLink={(url) => void openExternalMessageUrl(url)}
                   elementRef={(element) => props.elementRef?.(element)}
-                  onAnswer={view.onAnswerPrompt}
+                  onAnswer={answer}
                   onAnswered={presentResolution}
                 />
               )}

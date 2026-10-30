@@ -1,5 +1,5 @@
 // Checks two Discord servers on one OpenBot server, the role list of a Discord server, the
-// replied-to message as context, and an earlier image posted without a mention as context. A Gateway event goes through Signal's normalizer
+// replied-to message as context, a forwarded message as context, and an earlier image posted without a mention as context. A Gateway event goes through Signal's normalizer
 // (`remote/api/src/discord-events.ts`), a JSON round trip and the host's decoder, into the real
 // Discord driver and messaging service on a temporary profile. Signal's API (`makeDiscordApi`) runs
 // over a fake Discord REST client. No agent turn runs: the check reads the prompt that a turn would get.
@@ -61,6 +61,9 @@ const IGA = "500000000000000006";
 const ULA = "500000000000000007";
 const TOMEK = "500000000000000008";
 const OLEK = "500000000000000009";
+const NINA = "500000000000000010";
+const PIOTR = "500000000000000011";
+const RITA = "500000000000000012";
 
 interface Step {
   name: string;
@@ -125,6 +128,9 @@ interface RestMessage {
   timestamp: string;
   author: { id: string; username: string };
   attachments: { id: string; filename: string; content_type: string; size: number; url: string }[];
+  /** A forward has no text or files of its own: they are in its snapshot. */
+  message_reference?: { type: number; message_id: string };
+  message_snapshots?: { message: { content: string; attachments: RestMessage["attachments"] } }[];
 }
 /** The earlier messages of CHANNEL_ONE that `listMessages` gives. */
 const channelOne: RestMessage[] = [];
@@ -327,6 +333,8 @@ interface Mention {
     authorName: string;
     content: string;
     attachments?: { id: string; filename: string; content_type: string; size: number; url: string }[];
+    /** The replied-to message is a forward: Discord gives its text and files in its snapshot. */
+    forwarded?: boolean;
   };
 }
 
@@ -348,10 +356,20 @@ async function mention(message: Mention) {
             message_reference: { type: 0, message_id: message.replyTo.id },
             referenced_message: {
               id: message.replyTo.id,
-              content: message.replyTo.content,
               timestamp: "2026-10-19T11:40:00.000Z",
               author: { id: message.replyTo.authorId, username: message.replyTo.authorName },
-              attachments: message.replyTo.attachments ?? [],
+              ...(message.replyTo.forwarded
+                ? {
+                    content: "",
+                    attachments: [],
+                    message_reference: { type: 1, message_id: nextId() },
+                    message_snapshots: [
+                      {
+                        message: { content: message.replyTo.content, attachments: message.replyTo.attachments ?? [] },
+                      },
+                    ],
+                  }
+                : { content: message.replyTo.content, attachments: message.replyTo.attachments ?? [] }),
             },
           }
         : {}),
@@ -728,6 +746,108 @@ try {
         globalThis.fetch = realFetch;
         channelOne.length = 0;
       }
+    });
+
+    await step("a forwarded report gives its text and image to the agent, or says that Discord gave none", async () => {
+      const replied = nextId();
+      const id = nextId();
+      const url = `https://cdn.discordapp.com/attachments/${CHANNEL_ONE}/${replied}/report.png`;
+      const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = Object.assign(
+        (input: string | URL | Request, init?: RequestInit) =>
+          String(input) === url
+            ? Promise.resolve(new Response(image, { headers: { "content-type": "image/png" } }))
+            : realFetch(input, init),
+        realFetch,
+      );
+      try {
+        // Nina replies to a forward of a report that has a screenshot.
+        await mention({
+          id,
+          guildId: GUILD_ONE,
+          channelId: CHANNEL_ONE,
+          authorId: NINA,
+          authorName: "Nina",
+          roles: [MAINTAINERS],
+          content: "ini",
+          replyTo: {
+            id: replied,
+            authorId: ANA,
+            authorName: "Ana",
+            content: "Login fails after the update.",
+            attachments: [
+              { id: nextId(), filename: "report.png", content_type: "image/png", size: image.byteLength, url },
+            ],
+            forwarded: true,
+          },
+        });
+        await received(id);
+        const record = services.threads.store.connectionForWorkspace("discord", GUILD_ONE);
+        assert.ok(record);
+        const context = services.mailbox.deliveryForKey(`messaging:${record.connectionId}:${CHANNEL_ONE}:${id}`);
+        assert.deepEqual(
+          context?.managedAttachments.map((file) => file.name),
+          ["report.png"],
+          "The agent's message has no forwarded image.",
+        );
+        assert.match(
+          await promptOf(services, GUILD_ONE, id, CHANNEL_ONE),
+          /the message this one replies to \(context\) ---\n\[[^\]]+\] Ana: \(Forwarded message\)\nLogin fails after the update\.\n\(Attached files: report\.png\)\n/u,
+        );
+      } finally {
+        globalThis.fetch = realFetch;
+      }
+
+      // Without the Message Content intent, Discord gives a forward with an empty snapshot.
+      const empty = nextId();
+      await mention({
+        id: empty,
+        guildId: GUILD_ONE,
+        channelId: CHANNEL_ONE,
+        authorId: PIOTR,
+        authorName: "Piotr",
+        roles: [MAINTAINERS],
+        content: "ini",
+        replyTo: { id: nextId(), authorId: ANA, authorName: "Ana", content: "", forwarded: true },
+      });
+      await received(empty);
+      assert.match(
+        await promptOf(services, GUILD_ONE, empty, CHANNEL_ONE),
+        /\] Ana: \(Forwarded message: Discord did not give its text or files\)\n/u,
+      );
+
+      // A forward posted without a mention, before a new conversation, is context too.
+      const posted = nextId();
+      channelOne.push({
+        id: posted,
+        content: "",
+        timestamp: "2026-10-19T11:46:00.000Z",
+        author: { id: TOMEK, username: "tomek" },
+        attachments: [],
+        message_reference: { type: 1, message_id: nextId() },
+        message_snapshots: [{ message: { content: "Report: the export button does nothing.", attachments: [] } }],
+      });
+      try {
+        const asked = nextId();
+        await mention({
+          id: asked,
+          guildId: GUILD_ONE,
+          channelId: CHANNEL_ONE,
+          authorId: RITA,
+          authorName: "Rita",
+          roles: [MAINTAINERS],
+          content: "sesuai report diatas",
+        });
+        await received(asked);
+        assert.match(
+          await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
+          /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Forwarded message\)\nReport: the export button does nothing\.\n/u,
+        );
+      } finally {
+        channelOne.length = 0;
+      }
+      return { forwardedReport: true };
     });
   });
 

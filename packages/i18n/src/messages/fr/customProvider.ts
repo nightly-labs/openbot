@@ -33,6 +33,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Ce fournisseur liste déjà {id}.",
   "customProvider.error.modelIdInvalid":
     "Cet ID de modèle n’est pas utilisable. Supprimez les espaces, les guillemets et les autres signes de ponctuation.",
+  "customProvider.error.contextWindowInvalid": "Saisissez un nombre entier de jetons entre {min} et {max}.",
   "customProvider.error.headerNameRequired": "Saisissez un nom d’en-tête.",
   "customProvider.error.headerNameInvalid": "Utilisez un nom d’en-tête HTTP valide.",
   "customProvider.error.headerDuplicate": "Ce fournisseur définit déjà {name}.",
@@ -72,6 +73,8 @@ export const messages = {
   "customProvider.model.id": "ID du modèle {number}",
   "customProvider.model.name": "Nom d’affichage du modèle {number}",
   "customProvider.model.namePlaceholder": "Nom d’affichage",
+  "customProvider.model.contextWindow": "Fenêtre de contexte du modèle {number}",
+  "customProvider.model.contextWindowPlaceholder": "Jetons",
   "customProvider.model.remove": "Supprimer le modèle {number}",
   "customProvider.model.add": "Ajouter un modèle",
   "customProvider.headers": "En-têtes",

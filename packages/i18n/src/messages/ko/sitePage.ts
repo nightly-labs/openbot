@@ -75,4 +75,11 @@ export const messages = {
   "sitePage.report.sentTitle": "신고를 보냈어요",
   "sitePage.report.sentBody": "감사합니다. 신고를 받았어요.",
   "sitePage.report.home": "홈 페이지로 이동",
+  "sitePage.pricing.title": "OpenBot 요금",
+  "sitePage.pricing.description": "호스팅 서버와 팀용 라이선스. 내 컴퓨터에서 개인용으로 사용하면 OpenBot은 무료예요.",
+  "sitePage.pricing.heading": "요금",
+  "sitePage.pricing.enterprise.title": "Enterprise",
+  "sitePage.pricing.enterprise.body":
+    "더 큰 서버, {count}명이 넘는 멤버 등 필요한 것은 무엇이든 제공해요. 엔터프라이즈 지원도 포함돼요.",
+  "sitePage.pricing.enterprise.contact": "영업팀에 문의",
 } as const satisfies PartialTranslation<typeof source>;

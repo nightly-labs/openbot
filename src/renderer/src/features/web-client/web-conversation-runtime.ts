@@ -260,6 +260,7 @@ export function createWebConversationRuntime(
     },
     voice: {
       getSettings: unavailable,
+      getServer: async () => null,
       onModelStatus: () => () => {},
       prepareModel: unavailable,
       transcribe: unavailable,

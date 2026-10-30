@@ -5,6 +5,7 @@ import {
   type FileAction,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
@@ -41,10 +42,11 @@ export interface SidePanelState {
   maximized: boolean;
 }
 
-/** The side panel of each agent, and the subagent in its Subagent pane. */
+/** The side panel of each agent, the subagent in its Subagent pane, and the side thread that it shows. */
 export interface SidePanelsState {
   side: Record<string, SidePanelState>;
   subagents: Record<string, string>;
+  threads: Record<string, string>;
 }
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
@@ -116,7 +118,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return (agentId && panels.side[agentId]) || SIDE_PANEL_EMPTY;
   };
-  const sidePanelOpen = () => activeRightPanel() === "side-panel" || paneOfMode(activeRightPanel()) !== null;
+  const sidePanelOpen = () =>
+    activeRightPanel() === "side-panel" || activeRightPanel() === "thread" || paneOfMode(activeRightPanel()) !== null;
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -144,6 +147,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return agentId ? (panels.subagents[agentId] ?? null) : null;
   };
+  /** The side thread of the side panel, while it shows or when it showed last. It can be gone. */
+  const panelThreadId = (): string | null => {
+    const agentId = conversationOwnerId(deps.props);
+    return agentId ? (panels.threads[agentId] ?? null) : null;
+  };
   const filePreviewOpen = () =>
     activeRightPanel() === "file-preview" &&
     deps.sidebarFilePreview()?.ownerAgentId === conversationOwnerId(deps.props);
@@ -162,7 +170,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
         selected: pane,
       }));
-    else if (mode === "side-panel") updateSidePanel(agentId, (state) => ({ ...state, selected: null }));
+    else if (mode === "side-panel" || mode === "thread")
+      updateSidePanel(agentId, (state) => ({ ...state, selected: null }));
     else if (mode === "none" && panels.side[agentId]?.maximized) {
       updateSidePanel(agentId, (state) => ({ ...state, maximized: false }));
     }
@@ -176,6 +185,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       draft.subagents[agentId] = subagentId;
     });
     setActiveRightPanel("subagent", agentId);
+  }
+
+  /** Shows a side thread in the side panel. */
+  function openPanelThread(threadId: string): void {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return;
+    setPanels((draft) => {
+      draft.threads[agentId] = threadId;
+    });
+    setActiveRightPanel("thread", agentId);
   }
 
   function openRoutineSettings(routine: { routineId: string; name: string } | "new"): void {
@@ -438,6 +457,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     void request.catch((error) => deps.setComposerError(errorMessage(error, fallback), target));
   }
 
+  /** Downloads an image file that a message names. `agentId` is the agent whose workspace holds a workspace path. */
+  function downloadMessageImageFile(file: MessageImageFile, agentId: string | undefined) {
+    const ownerAgentId = conversationOwnerId(deps.props);
+    if (!ownerAgentId) return;
+    const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
+    const agent = conversationRuntime(deps.props).agent;
+    let request: Promise<void>;
+    if (file.kind === "shared") request = agent.openSharedFile({ path: file.path, action: "download" });
+    else if (agentId) request = agent.openWorkspaceFile({ agentId, path: file.path, action: "download" });
+    else return;
+    void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.download")), target));
+  }
+
   function closeSidebarFilePreview() {
     deps.invalidateFilePreviewGeneration();
     deps.setSidebarFilePreview(null);
@@ -453,6 +485,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     filesOpen,
     panelSubagentId,
     openSubagentPanel,
+    panelThreadId,
+    openPanelThread,
     sidePanel,
     sidePanelOpen,
     setSidePanelMaximized,
@@ -478,6 +512,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSidebarFileBack,
     openSidebarFileExternally,
     downloadSidebarFile,
+    downloadMessageImageFile,
     revealSidebarFile,
     closeSidebarFilePreview,
   };

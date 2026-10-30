@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { BrowserBounds } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -391,6 +391,8 @@ const server = createServer((request, response) => {
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
       <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
+      <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
+      <button aria-label="No chooser">No chooser</button>
       <canvas width="40" height="20" style="display:block;width:80px;height:40px" onclick="document.querySelector('output').textContent='canvas:' + event.isTrusted"></canvas>
       <iframe title="Same origin frame" src="/same-frame"></iframe>
       <iframe title="Cross origin frame" src="http://localhost:${port}/frame?frame_token=frame-secret"></iframe>
@@ -1366,6 +1368,26 @@ async function main(): Promise<void> {
       paths: [uploadPath],
     });
     if (!uploaded.success) throw new Error(`V2 upload failed: ${toolError(uploaded)}`);
+    // GitHub's comment box makes its file input only on click: the upload answers that file chooser.
+    const chooserUpload = await callBrowserTool(browser, "upload_files", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "button", name: "Attach files", exact: true },
+      paths: [uploadPath],
+    });
+    if (!chooserUpload.success) throw new Error(`V2 file chooser upload failed: ${toolError(chooserUpload)}`);
+    const chooserOutput = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (chooserOutput !== "chooser:v2-upload.txt") {
+      throw new Error(`V2 file chooser upload did not reach the page: ${String(chooserOutput)}`);
+    }
+    const noChooser = await callBrowserTool(browser, "upload_files", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "button", name: "No chooser", exact: true },
+      paths: [uploadPath],
+      timeoutMs: 1_000,
+    });
+    if (noChooser.success || !toolError(noChooser).includes("did not open a file chooser")) {
+      throw new Error(`V2 upload to a target without a file chooser did not fail: ${toolError(noChooser)}`);
+    }
     const frameUploadInputIds: string[] = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const frameUpload = await callBrowserTool(
@@ -1383,7 +1405,7 @@ async function main(): Promise<void> {
     if (frameUploadInputIds.length !== 2 || frameUploadInputIds[0] !== frameUploadInputIds[1]) {
       throw new Error("V2 frame upload input identity changed between CDP sessions.");
     }
-    await runStagedUploadScenario(browser, v2Tab.id, uploadPath, join(temporaryRoot, "missing-upload.txt"));
+    await runStagedUploadScenario(browser, v2Tab.id, v2Contents, uploadPath, join(temporaryRoot, "missing-upload.txt"));
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 220, height: 560 } }));
     const narrowFillEnvironment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
@@ -2201,10 +2223,12 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     true,
   );
   const frames: Array<{ sequence: number; at: number }> = [];
+  let frameWaiter: { count: number; resolve: () => void } | null = null;
   const stopView = await runCauseEffect(
     browser.startView(tabId, (frame) => {
       if (frame.image.byteLength === 0) throw new Error("A live view frame carried no image.");
       frames.push({ sequence: frame.sequence, at: Date.now() });
+      if (frameWaiter && frames.length >= frameWaiter.count) frameWaiter.resolve();
     }),
   );
   try {
@@ -2262,6 +2286,50 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
     await runLiveViewClipboard(browser, tabId, contents);
+
+    // An upload through a file chooser turns the Page domain on and off. The view must not stop.
+    await contents.executeJavaScript(
+      `(() => {
+      const button = document.createElement('button');
+      button.textContent = 'Live view attach';
+      button.style.cssText = 'position:fixed;left:250px;top:150px;width:200px;height:60px;z-index:2147483647';
+      button.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.click();
+      });
+      document.body.append(button);
+    })()`,
+      true,
+    );
+    const uploadRoot = await mkdtemp(join(tmpdir(), "openbot-live-view-upload-"));
+    try {
+      const uploadPath = join(uploadRoot, "live-view-upload.txt");
+      await writeFile(uploadPath, "live view upload");
+      const uploaded = await callBrowserTool(browser, "upload_files", {
+        tabId,
+        target: { kind: "role", role: "button", name: "Live view attach", exact: true },
+        paths: [uploadPath],
+      });
+      if (!uploaded.success) throw new Error(`A file chooser upload failed in live view: ${toolError(uploaded)}`);
+    } finally {
+      await rm(uploadRoot, { recursive: true, force: true });
+    }
+    const moreFrames = new Promise<void>((resolve) => {
+      frameWaiter = { count: frames.length + 5, resolve };
+    });
+    let stalled: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        moreFrames,
+        new Promise<never>((_resolve, reject) => {
+          stalled = setTimeout(() => reject(new Error("The live view stopped after a file chooser upload.")), 5_000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(stalled);
+      frameWaiter = null;
+    }
   } finally {
     await Effect.runPromise(stopView());
   }
@@ -2927,6 +2995,7 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
 async function runStagedUploadScenario(
   browser: BrowserHost,
   tabId: string,
+  contents: WebContents,
   uploadPath: string,
   missingPath: string,
 ): Promise<void> {
@@ -2964,6 +3033,16 @@ async function runStagedUploadScenario(
     if (missing.success) throw new Error("V2 staged upload reported success for a missing file.");
     const staged = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
     if (!staged.success) throw new Error(`V2 staged upload failed: ${toolError(staged)}`);
+    await contents.executeJavaScript("document.querySelector('output').textContent = 'staged chooser pending'", true);
+    const stagedChooser = await upload({ kind: "role", role: "button", name: "Attach files", exact: true }, [
+      uploadPath,
+    ]);
+    if (!stagedChooser.success) throw new Error(`V2 staged file chooser upload failed: ${toolError(stagedChooser)}`);
+    // The staged copy keeps the file name, so the page names the file the agent chose.
+    const stagedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (stagedOutput !== `chooser:${basename(uploadPath)}`) {
+      throw new Error(`V2 staged file chooser upload did not reach the page: ${String(stagedOutput)}`);
+    }
   } finally {
     await runCauseEffect(uploads.dispose());
   }

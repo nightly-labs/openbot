@@ -68,6 +68,11 @@ export interface WorkerBindings {
   /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
+   * a new license is paid at once.
+   */
+  LICENSE_TRIAL_END?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;

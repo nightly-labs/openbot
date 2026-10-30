@@ -7,6 +7,63 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-10-29 (iOS)
+
+### Added
+
+- The Marketplace now lists Neon, Prisma, Netlify, Railway, Atlassian (Jira and Confluence), Todoist and Hugging Face.
+- Attach MP4 videos in chat when the host runs a version of OpenBot that accepts them.
+- The sidebar has Workflows. See the workflows of a server, the status of each last run, and the runs that wait for you.
+- Pin a workflow to the sidebar. A pinned workflow shows its last run, and its button runs it or opens the run that waits for you.
+- Open a run to see the status and output of each step. Approve or decline a step that waits, retry a step that failed, or stop the run.
+- Edit a workflow on the phone: change its name and trigger, add steps, change their settings, move them, duplicate them and delete them. Make a new workflow with the + button.
+- The Marketplace now lists Trello. Agents can work with your boards, lists and cards after you sign in to Trello.
+- Dutch interface. Choose Nederlands in Settings > App language, or keep System default on an
+  iPhone that uses Dutch.
+- An owner or admin can connect Bitwarden or Vaultwarden on a joined server, in Server settings ›
+  Connectors. Enter the server address, the API key and the master password. The server keeps them;
+  the phone does not.
+- An owner or admin can manage the Vault of a server in Server settings › Vault: add, change and
+  delete logins, cards and contact info, and import passwords from a CSV file. The phone can set a
+  new password, card number or security code, but it never shows a saved one.
+- Server settings > Providers can save the API key of DeepSeek, OpenRouter and Inception on the
+  server. Agents on these providers show in the agent list and the model picker.
+- Server settings > Providers shows the mark of each provider, and a Default provider choice for
+  the new agents of the server. The choice needs an updated server.
+- An owner or admin can add, change and delete the API keys in a server's Vault from the iPhone app,
+  when the server has the OpenBot version that keeps API keys. The phone sends a new key once and
+  cannot show a saved key.
+- An agent's chat has threads, as on desktop. Tap the agent's name in the chat header to open the thread menu: switch to the main chat or to an open thread, start a new thread, see all threads, or open the agent's info. A dot in the agent's color on the name, and beside each thread in the menu, shows a thread with messages that you have not read, on the phone or on desktop.
+- Start a new thread from the thread menu, or with + on an agent's Threads page. Your first message starts it, and the main chat does not change. The + on the Threads page of the server asks which agent starts the thread.
+- Send files in a thread, as in the agent's chat: tap + in the thread composer. The server must have the newest version of OpenBot.
+- Rename, archive, restore or delete a thread from its ⋯ menu, or touch and hold a row on the Threads page. A thread that runs cannot be deleted until you stop it.
+- On iPhone, you can send a share to an agent without opening the app. Tap Share in another app, tap OpenBot, choose the agent and tap Send. The iOS share sheet also shows the agents that you send messages to, so you can tap one of them directly. When the share cannot be sent, such as with the app lock on, OpenBot opens with the share as before.
+- You can now talk with an agent by voice, as on the desktop. In an agent chat or a channel, tap the microphone in the message field. The message field turns into a call bar with the agent's glow, and the chat stays in view. The agent listens until you stop speaking, sends what you said, and reads its answer aloud while it writes it. Then it listens again. In a channel, the call bar shows the leader. When the leader gives the task to a member, the bar changes to that member, and it reads the first agent that answers. The call bar mutes the microphone, interrupts the answer, and ends the conversation.
+- A new Voice page in Settings, with a Listening tab and a Speaking tab. Choose the voice that reads replies: Supertonic 3, the same voice as on the desktop, which you download once and which runs on your phone, or ElevenLabs with your own API key. You can choose a voice, listen to a sample, and remove the model or the key.
+- Speech recognition in more languages, as on the desktop. In Settings > Voice, choose what recognizes your speech: the phone recognizer, which hears one language; Parakeet v3, which you download once (670 MB), runs on your phone and finds the language you speak in 25 European languages; or ElevenLabs Scribe with your own API key, which finds more than 90 languages. The choice applies to voice conversations and to dictation. Parakeet needs a phone with 6 GB of memory or more.
+
+### Changed
+
+- The developer of each Marketplace app now shows as a name, for example "Notion", not as a web address.
+- In the message queue, tap a teammate's answer to steer it into the running turn. Before, the
+  answer had no actions and waited for the turn to end.
+- The app icon has a new design, with a dark appearance on iOS.
+- Settings > About opens the privacy policy on openbot.run instead of GitHub.
+- The Threads row of the server menu shows how many threads have unread messages, not "needs you".
+- The Threads page puts threads in Working, Unread, Read and Archived sections. A host that does not keep read marks still shows Needs you, Working and Waiting.
+- Tasks are now called threads, as on desktop. The Tasks page is now Threads, and Close and Reopen are now Archive and Restore.
+- The agent's chat no longer shows a card for each open thread. The thread menu on the agent's name lists them.
+- A long press on an agent, a channel, a workflow, a thread or a server gives a vibration when its menu opens, so you know when to lift your finger. On Android, the menu also opens sooner.
+- In an agent chat and in a channel, the microphone now starts a voice conversation in place of dictation with review. When no voice is ready, it opens Settings > Voice. Threads still dictate a message that you can review before you send it.
+
+### Fixed
+
+- An SVG or HEIC path in an agent answer showed as code. It now shows with a file badge, like
+  other file paths.
+- When you return to the app, channel pictures no longer fade while the app connects again quietly. Agents already stayed visible.
+- On Android, the top edge fade no longer covers the top of the screen title before you scroll.
+- On Android, a menu with a long item, such as the agent menu, now holds all its items. Before, the last item went out of the bottom of the menu.
+
 ## [1.4.2] - 2026-10-27
 
 ### Added

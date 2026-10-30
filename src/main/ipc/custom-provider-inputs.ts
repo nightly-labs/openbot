@@ -14,6 +14,7 @@ import {
   CUSTOM_PROVIDER_LIMITS,
   composedCustomModelId,
   isAgentModel,
+  isCustomProviderContextWindow,
   isCustomProviderHeaderName,
   isCustomProviderId,
   isNewCustomProviderId,
@@ -73,7 +74,20 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
       throw new Error(sourceText("error.provider.modelIdCharacter"));
     if (seen.has(id)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
     seen.add(id);
-    models.push({ id, name: requireString(entry.name, "Model name", INPUT_LIMITS.modelName) });
+    const name = requireString(entry.name, "Model name", INPUT_LIMITS.modelName);
+    if (entry.contextWindow === undefined) {
+      models.push({ id, name });
+      continue;
+    }
+    if (!isCustomProviderContextWindow(entry.contextWindow)) {
+      throw new Error(
+        sourceText("error.provider.contextWindowInvalid", {
+          min: CUSTOM_PROVIDER_LIMITS.contextWindowMin,
+          max: CUSTOM_PROVIDER_LIMITS.contextWindowMax,
+        }),
+      );
+    }
+    models.push({ id, name, contextWindow: entry.contextWindow });
   }
   return models;
 }

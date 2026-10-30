@@ -71,6 +71,8 @@ interface FilePreviewPanelProps {
    * the selection actions, so the user can quote the passage or ask for a change.
    */
   selectionQuoteId?: string | undefined;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
   onOpenExternally: () => void;
   allowExternalOpen?: boolean;
   onDownload?: () => void;
@@ -381,6 +383,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             html={pageHtml() ?? undefined}
             title={title()}
             onOpenLink={props.onOpenLink}
+            macWindowControls={props.macWindowControls}
           />
         </Show>
         <Show when={showsSourceText()}>

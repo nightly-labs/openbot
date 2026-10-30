@@ -6,6 +6,7 @@
 //
 // The route sets compare `url.pathname` for equality and share no path, so the order of the checks
 // below does not change which codec a route gets.
+import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
 import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
@@ -25,6 +26,8 @@ export interface TeamSideRouteOptions {
    * keeps its UI blocks. A host passes the negotiated capability; a client passes `true`, as above.
    */
   channelAttention?: boolean;
+  /** agent-task-ui-blocks-v1: a task conversation keeps its UI blocks. Passed as `channelAttention` is. */
+  agentTaskUiBlocks?: boolean;
 }
 
 export interface TeamSideRouteCodec {
@@ -57,7 +60,10 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
   return admin
     ? {
         request: (_path, value) => admin.request(value),
-        response: (_path, status, value) => admin.response(status, value),
+        response: (path, status, value, options) => {
+          const projected = admin.response(status, value);
+          return options?.agentTaskUiBlocks && status < 400 ? withAgentTaskUiBlocks(path, projected, value) : projected;
+        },
       }
     : null;
 }

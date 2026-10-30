@@ -71,9 +71,13 @@ export type FooterLink =
         | "/compare"
         | "/providers"
         | "/teams"
+        | "/pricing"
         | "/brand"
         | "/contact"
-        | "/privacy-policy";
+        | "/privacy-policy"
+        | "/terms"
+        | "/commercial-license"
+        | "/dpa";
       readonly hash?: string;
     }
   | {
@@ -98,11 +102,15 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Plugins", external: false, to: "/plugins" },
       { label: "Changelog", external: false, to: "/changelog" },
       { label: "Teams", external: false, to: "/teams" },
+      { label: "Pricing", external: false, to: "/pricing" },
       { label: "Contact", external: false, to: "/contact" },
       { label: "Brand", external: false, to: "/brand" },
       { label: "Source code", external: true, href: OPENBOT_LINKS.repository },
       { label: "License", external: true, href: OPENBOT_LINKS.license },
       { label: "Privacy policy", external: false, to: "/privacy-policy" },
+      { label: "Terms", external: false, to: "/terms" },
+      { label: "Commercial license", external: false, to: "/commercial-license" },
+      { label: "DPA", external: false, to: "/dpa" },
     ],
   },
   {

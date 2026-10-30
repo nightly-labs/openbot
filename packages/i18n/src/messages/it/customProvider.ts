@@ -33,6 +33,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Questo provider elenca già {id}.",
   "customProvider.error.modelIdInvalid":
     "Questo ID del modello non può essere usato. Rimuovi spazi, virgolette e altra punteggiatura.",
+  "customProvider.error.contextWindowInvalid": "Inserisci un numero intero di token tra {min} e {max}.",
   "customProvider.error.headerNameRequired": "Inserisci un nome per l'header.",
   "customProvider.error.headerNameInvalid": "Usa un nome di header HTTP valido.",
   "customProvider.error.headerDuplicate": "Questo provider imposta già {name}.",
@@ -70,6 +71,8 @@ export const messages = {
   "customProvider.model.id": "ID del modello {number}",
   "customProvider.model.name": "Nome visualizzato del modello {number}",
   "customProvider.model.namePlaceholder": "Nome visualizzato",
+  "customProvider.model.contextWindow": "Finestra di contesto del modello {number}",
+  "customProvider.model.contextWindowPlaceholder": "Token",
   "customProvider.model.remove": "Rimuovi il modello {number}",
   "customProvider.model.add": "Aggiungi modello",
   "customProvider.headers": "Header",

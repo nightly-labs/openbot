@@ -4,8 +4,11 @@ name: Status page
 # Cloudflare does not. Each run checks the services, keeps the check history in `state.json` on the
 # `status-data` branch, opens or closes the automatic incident issues, and publishes the page with
 # the `status` issues. See apps/status/scripts/update.ts. The `notify` job sends the status webhooks
-# of the team (apps/status/scripts/notify.ts). The `alert` job reports check runs that fail.
+# of the team (apps/status/scripts/notify.ts). The `alert` job reports check runs that fail. The
+# `next` job starts the next check run, because GitHub drops most scheduled runs.
 on:
+  # In October 2026 GitHub started 5 to 7 of the 288 scheduled runs a day. A scheduled run checks the
+  # services as the other runs do, and starts the `next` chain again when it stopped.
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
@@ -347,3 +350,46 @@ jobs:
           elif [ "$PASSED" = "true" ] && [ -n "$open" ]; then
             gh issue close "$open" --comment "The checks run again: $RUN_URL"
           fi
+
+  # GitHub drops most scheduled runs, so each check run starts the next one, 5 minutes after it
+  # started. GITHUB_TOKEN can start a `workflow_dispatch` run. A failed check run also starts the next
+  # one, but a cancelled run does not: to stop the chain, cancel the newest run or disable the workflow.
+  next:
+    name: Start the next check run
+    needs: update
+    if: >-
+      !cancelled() && github.repository == 'nightly-labs/openbot' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+    steps:
+      - name: Wait, then start the next run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # One GitHub error must not stop the chain until the next scheduled run, so a failed query
+          # does not stop the step.
+          if started=$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID" --jq .run_started_at); then
+            wait=$(( $(date -d "$started" +%s) + 300 - $(date +%s) ))
+          else
+            wait=300
+          fi
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+          # Only the newest check run on main starts the next run, so a scheduled run does not start a
+          # second chain. A newer run waits until 5 minutes after its own start, so it decides after
+          # this run. Issue events start many runs, so the query asks for each check event. When the
+          # query fails, this run starts the next run: the newest run stops a second chain later.
+          for event in schedule workflow_dispatch; do
+            newer=$(gh api -X GET "repos/$GH_REPO/actions/workflows/status-page.yml/runs" \
+              -f event="$event" -f branch=main -f per_page=10 \
+              --jq "[.workflow_runs[] | select(.id > $GITHUB_RUN_ID)] | length") || newer=0
+            if [ "$newer" != "0" ]; then
+              echo "::notice::A newer check run starts the next run."
+              exit 0
+            fi
+          done
+          gh workflow run status-page.yml --ref main || { sleep 30; gh workflow run status-page.yml --ref main; }

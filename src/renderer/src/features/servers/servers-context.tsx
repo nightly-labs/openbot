@@ -56,6 +56,8 @@ const Servers = createSimpleContext({
     const [servers, setServers] = createSignal<ServerSummary[]>([]);
     const [hostStatus, setHostStatus] = createSignal<HostStatus>(FALLBACK_HOST_STATUS);
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
+    /** The dialog that creates a server on this computer. */
+    const [createLocalServerOpen, setCreateLocalServerOpen] = createSignal(false);
     /** Where the user opened the hosted server plans, or null while they are closed. */
     const [addServerEntryPoint, setAddServerEntryPoint] = createSignal<HostedServerEntryPoint | null>(null);
     const addServerOpen = () => addServerEntryPoint() !== null;
@@ -423,6 +425,8 @@ const Servers = createSimpleContext({
       setHostStatus,
       joinServerOpen,
       setJoinServerOpen,
+      createLocalServerOpen,
+      setCreateLocalServerOpen,
       addServerOpen,
       addServerEntryPoint,
       setAddServerOpen,

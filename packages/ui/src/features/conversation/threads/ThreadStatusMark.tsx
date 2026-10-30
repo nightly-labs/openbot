@@ -1,5 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Clock3, X } from "@openbot/ui";
+import { Clock3, Split, X } from "@openbot/ui";
 import { TypingDots } from "@openbot/ui/components/TypingDots";
 import { SidebarWaitIcon } from "@openbot/ui/features/sidebar/SidebarAgentIndicator";
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
@@ -39,9 +39,39 @@ function waitReason(status: ThreadStatus): SidebarWaitReason | undefined {
   return status.kind === "waiting" ? status.reason : undefined;
 }
 
+/** The badge of a status, with the colors of the sidebar badges. An idle thread has no badge. */
+function StatusBadge(props: { status: ThreadStatus }) {
+  return (
+    <span class="agent-threads-tab-mark" data-kind={props.status.kind}>
+      <Show when={props.status.kind === "working"}>
+        <span class="agent-threads-state agent-threads-state-working">
+          <TypingDots class="agent-row-thinking-dots" />
+        </span>
+      </Show>
+      <Show when={waitReason(props.status)}>
+        {(reason) => (
+          <span class="agent-threads-state agent-threads-state-icon">
+            <SidebarWaitIcon reason={reason()} />
+          </span>
+        )}
+      </Show>
+      <Show when={props.status.kind === "queued"}>
+        <span class="agent-threads-state agent-threads-state-icon">
+          <Clock3 />
+        </span>
+      </Show>
+      <Show when={props.status.kind === "failed"}>
+        <span class="agent-threads-state agent-threads-state-icon">
+          <X />
+        </span>
+      </Show>
+    </span>
+  );
+}
+
 /**
- * The icon of a status, with the colors of the sidebar badges. When the state ends, the mark keeps its
- * last icon and narrows to nothing, so the tab does not jump to its new width.
+ * The icon of a status. When the state ends, the mark keeps its last icon and narrows to nothing, so
+ * the menu row does not jump to its new width.
  */
 function StatusIcon(props: { status: ThreadStatus }) {
   let last: ThreadStatus = { kind: "idle" };
@@ -52,41 +82,35 @@ function StatusIcon(props: { status: ThreadStatus }) {
   const open = () => (props.status.kind === "idle" ? undefined : "");
   return (
     <span class="agent-threads-tab-mark-slot" data-open={open()} aria-hidden="true">
-      <span class="agent-threads-tab-mark" data-kind={shown().kind}>
-        <Show when={shown().kind === "working"}>
-          <span class="agent-threads-state agent-threads-state-working">
-            <TypingDots class="agent-row-thinking-dots" />
-          </span>
-        </Show>
-        <Show when={waitReason(shown())}>
-          {(reason) => (
-            <span class="agent-threads-state agent-threads-state-icon">
-              <SidebarWaitIcon reason={reason()} />
-            </span>
-          )}
-        </Show>
-        <Show when={shown().kind === "queued"}>
-          <span class="agent-threads-state agent-threads-state-icon">
-            <Clock3 />
-          </span>
-        </Show>
-        <Show when={shown().kind === "failed"}>
-          <span class="agent-threads-state agent-threads-state-icon">
-            <X />
-          </span>
-        </Show>
-      </span>
+      <StatusBadge status={shown()} />
     </span>
   );
 }
 
+/**
+ * The icon slot of a thread tab, in the chat header and in the side panel: the badge of the thread's
+ * state, or the thread icon while the thread is idle.
+ */
+export function ThreadTabIcon(props: { status: ThreadStatus }) {
+  return (
+    <Show when={props.status.kind !== "idle"} fallback={<Split aria-hidden="true" />}>
+      <StatusBadge status={props.status} />
+    </Show>
+  );
+}
+
+/** What a thread does now, for a screen reader, as the tab title says it. An idle thread has no label. */
+export function ThreadStatusText(props: { status: ThreadStatus }) {
+  const { t } = useText();
+  return <Show when={threadStatusLabel(props.status, t)}>{(label) => <span class="sr-only">{label()}</span>}</Show>;
+}
+
 /** The state of a thread, as on a sidebar row, with its label for a screen reader. */
 export function ThreadStatusMark(props: { status: ThreadStatus }) {
-  const { t } = useText();
   return (
     <>
       <StatusIcon status={props.status} />
-      <Show when={threadStatusLabel(props.status, t)}>{(label) => <span class="sr-only">{label()}</span>}</Show>
+      <ThreadStatusText status={props.status} />
     </>
   );
 }

@@ -47,7 +47,7 @@ function shouldAutoCompactSidebar(
 }
 
 /** The pages in the rail until the user chooses. The others start in the More menu. */
-const RAIL_PINNED_BY_DEFAULT: ReadonlySet<PageRailPinnablePage> = new Set(["workflows", "usage"]);
+const RAIL_PINNED_BY_DEFAULT: ReadonlySet<PageRailPinnablePage> = new Set(["tasks", "workflows", "usage"]);
 
 // A record, not an object: a page that only another version knows keeps its choice when this version saves.
 const railPinChoicesSchema = z.record(z.string(), z.boolean().optional().catch(undefined));

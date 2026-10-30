@@ -64,6 +64,7 @@ import { type ServerImportDetail, type ServerImportOptions, ServerImportPanel } 
 import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
+import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
@@ -100,7 +101,7 @@ export interface ServerSettingsModalProps {
    * The license of the signed-in account. When the owner invites a person to a full license, the
    * Members section first asks to add a user to it. Absent on surfaces with no account license.
    */
-  license?: Pick<LicenseCalls, "getState" | "setUsers"> | undefined;
+  license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -196,6 +197,11 @@ export interface ServerSettingsModalProps {
    * the local server or a remote host with `agent-memory-limit-v1` that this member administers.
    */
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
+  /**
+   * General shows how often the agents review their memories only when a caller supplies this, and
+   * only for the local server or a remote host with `memory-review-v1` that this member administers.
+   */
+  memoryReview?: ServerMemoryReviewOptions | undefined;
   /**
    * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
    * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member

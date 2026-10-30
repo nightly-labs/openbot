@@ -10,7 +10,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { type EdgeInsets, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
@@ -34,14 +34,14 @@ const ANDROID_SPLASH_EYES_SCALE = 0.78;
 function StageCaption({
   request,
   height,
-  bottomInset,
+  insets,
   textColor,
   textOpacity,
   reduced,
 }: {
   request: BloubStageRequest;
   height: number;
-  bottomInset: number;
+  insets: EdgeInsets;
   textColor: string;
   /** The text under a title is a little lighter. The status line keeps full strength. */
   textOpacity: number;
@@ -62,8 +62,8 @@ function StageCaption({
         entering={enter}
         exiting={exit}
         pointerEvents="none"
-        className="absolute inset-x-6 items-center gap-2"
-        style={{ top: height * 0.585 }}
+        className="absolute items-center gap-2"
+        style={{ top: height * 0.585, left: insets.left + 24, right: insets.right + 24 }}
       >
         <Typography.Heading
           type="h2"
@@ -91,8 +91,8 @@ function StageCaption({
       accessibilityLabel={caption.text}
       accessibilityState={{ busy: true }}
       accessibilityLiveRegion="polite"
-      className="absolute inset-x-6 items-center"
-      style={{ bottom: bottomInset + STATUS_GAP }}
+      className="absolute items-center"
+      style={{ bottom: insets.bottom + STATUS_GAP, left: insets.left + 24, right: insets.right + 24 }}
     >
       <Typography.Paragraph type="body-sm" align="center" numberOfLines={2} style={{ color: textColor }}>
         {caption.text}
@@ -101,7 +101,17 @@ function StageCaption({
   );
 }
 
-function StageBack({ request, top, eyeColor }: { request: BloubStageRequest; top: number; eyeColor: string }) {
+function StageBack({
+  request,
+  top,
+  left,
+  eyeColor,
+}: {
+  request: BloubStageRequest;
+  top: number;
+  left: number;
+  eyeColor: string;
+}) {
   const back = request.back;
   if (!back) return null;
   const overCamera = request.shape.kind === "clear";
@@ -110,8 +120,8 @@ function StageBack({ request, top, eyeColor }: { request: BloubStageRequest; top
       key={`${back.icon}-${overCamera}`}
       entering={FadeIn.duration(200).delay(300).easing(SPLASH_EASE_OUT)}
       exiting={FadeOut.duration(120)}
-      className="absolute left-4"
-      style={{ top }}
+      className="absolute"
+      style={{ top, left }}
     >
       <StageBackButton
         icon={back.icon}
@@ -312,14 +322,14 @@ export function BloubStage({
         <StageCaption
           request={request}
           height={height}
-          bottomInset={insets.bottom}
+          insets={insets}
           // The text has the color of the eyes. The dim dark block needs it at more strength.
           textColor={eyeColor}
           textOpacity={dimmed ? 0.85 : 0.62}
           reduced={reduced}
         />
       ) : null}
-      {request ? <StageBack request={request} top={top + 6} eyeColor={eyeColor} /> : null}
+      {request ? <StageBack request={request} top={top + 6} left={insets.left + 16} eyeColor={eyeColor} /> : null}
     </View>
   );
 }

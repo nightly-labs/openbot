@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { isQueueEditRejected, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import {
   type ComposerPasteResult,
   type ComposerSelection,
@@ -21,7 +22,7 @@ import {
 } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
 import { playActionSound } from "../../../action-sounds";
-import { claimDictatedSend } from "../../speech/speech-replies";
+import { claimDictatedSend, forgetDictatedMessage } from "../../speech/speech-replies";
 import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
 import { copyComposerDraft, EMPTY_DRAFT, QUEUE_EDIT_STORAGE_KEY, type StoredQueueEdit } from "../composer-draft";
@@ -67,6 +68,8 @@ export interface ComposerActionsDeps {
   submitting: () => boolean;
   setSubmitting: (submitting: boolean) => void;
   voicePhase: () => string;
+  /** The side thread that the recording is for. Undefined for the agent's own chat. */
+  voiceThreadKey: () => string | undefined;
   /** `cause` is the failure behind `error`. The banner shows its code. */
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   setComposerFocusRequest: (update: (current: number) => number) => void;
@@ -102,6 +105,8 @@ export interface ComposerActionsDeps {
   attachmentPicker: () => HTMLInputElement | undefined;
   /** False in a chat window (#2964): the stored queue edit is one slot, and the main window owns it. */
   persistQueueEdit: boolean;
+  /** The open question form of this conversation, which takes the composer text as its answer. */
+  promptComposerAnswer: () => QuestionPromptComposerAnswer | undefined;
 }
 
 /**
@@ -346,10 +351,6 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (!picker) return;
     picker.value = "";
     picker.click();
-  }
-
-  function openAttachmentPickerFromKey(event: KeyboardEvent) {
-    if (event.key === "Enter" || event.key === " ") openAttachmentPicker();
   }
 
   async function editQueuedMessage(delivery: QueueDelivery) {
@@ -681,12 +682,35 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     );
   }
 
-  /** `voice` is set when a voice conversation sends the draft. */
+  /**
+   * While the agent asks a question, the composer text answers it and does not steer the turn. Files,
+   * a reply to a message and a queued message edit still go as a message. A channel message is for
+   * the whole channel, so it does not answer one agent.
+   */
+  function promptAnswerFor(
+    draft: ComposerDraft,
+    target: ConversationTarget | undefined,
+  ): QuestionPromptComposerAnswer | undefined {
+    const answer = deps.promptComposerAnswer();
+    const active = deps.currentTarget();
+    if (deps.props.channel || !answer?.available() || !target || !active) return undefined;
+    if (target.agentId !== active.agentId || target.serverId !== active.serverId) return undefined;
+    if (draft.attachments.length > 0 || draft.replyToMessageId) return undefined;
+    return answer;
+  }
+
+  /** Whether a send from the composer now answers the open question. */
+  function composerAnswersPrompt(): boolean {
+    return !deps.currentEditingDeliveryId() && Boolean(promptAnswerFor(deps.currentDraft(), deps.currentTarget()));
+  }
+
+  /** `voice` is set when a voice conversation sends the draft. `steer` takes it into the running turn. */
   async function submitMessage(
     draftOverride?: ComposerDraft,
     targetOverride?: ConversationTarget,
     submittedSnapshot?: ComposerDraft,
     voice?: VoiceSend,
+    steer = false,
   ): Promise<boolean> {
     if (deps.attachmentBusy()) return false;
     if (!draftOverride && deps.currentEditingDeliveryId()) {
@@ -696,6 +720,21 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     const target = targetOverride ?? (agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined);
     const draft = copyComposerDraft(draftOverride ?? deps.currentDraft());
     const text = expandComposerMentions(draft.text);
+    const promptAnswer = promptAnswerFor(draft, target);
+    if (promptAnswer && target) {
+      if (deps.submitting() || !promptAnswer.answer(text)) return false;
+      // An answer is not a message, so no spoken reply or voice recording belongs to it.
+      if (claimDictatedSend(target)) forgetDictatedMessage(target);
+      if (voice?.recordingDraftId)
+        void conversationRuntime(deps.props)
+          .agent.discardDraftAttachment(voice.recordingDraftId, LOCAL_SERVER_ID)
+          .catch(() => {});
+      stopTeamTyping();
+      deps.setComposerError(null, target);
+      deps.clearConversationError(target);
+      deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
+      return true;
+    }
     if (!agentId || !target || deps.submitting() || (!text.trim() && draft.attachments.length === 0)) return false;
     const provider =
       deps.props.agent?.id === agentId
@@ -709,7 +748,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     stopTeamTyping();
     deps.setComposerError(null, target);
     deps.clearConversationError(target);
-    queueSend(target, draft, text, voice);
+    queueSend(target, draft, text, voice, steer);
     deps.clearSubmittedDraft(target, submittedSnapshot ?? draft);
     return true;
   }
@@ -718,13 +757,29 @@ export function createComposerActions(deps: ComposerActionsDeps) {
    * Shows a message at once and sends it after the earlier sends of its chat, so the host stores the
    * chat's messages in the order the user sent them. `draft` is what Edit puts back in the composer.
    */
-  function queueSend(target: ConversationTarget, draft: ComposerDraft, text: string, voice?: VoiceSend): void {
-    const activeTarget = deps.currentTarget();
-    if (activeTarget && activeTarget.agentId === target.agentId && activeTarget.serverId === target.serverId) {
-      deps.setStickToLatest(true);
-    }
-    // Read the send function now: the send outlives this view when the user switches server.
+  function queueSend(
+    target: ConversationTarget,
+    draft: ComposerDraft,
+    text: string,
+    voice?: VoiceSend,
+    steer = false,
+  ): void {
+    const onScreen = () => {
+      const activeTarget = deps.currentTarget();
+      return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
+    };
+    if (onScreen()) deps.setStickToLatest(true);
+    // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
+    // An earlier send that has not failed is about to start a turn, so this one waits behind it.
+    const queued =
+      onScreen() &&
+      !deps.props.channel &&
+      (Boolean(deps.props.activeTurnId) ||
+        deps.orderedQueuedDeliveries().length > 0 ||
+        deps.pendingSends.list(target).some((send) => send.state !== "failed"));
+    // Read the send functions now: the send outlives this view when the user switches server.
     const send = deps.props.onSendMessage;
+    const steerQueued = deps.props.onSteerQueuedMessage;
     const server = deps.props.server;
     // A deferred voice send can name a server that is no longer on screen. Its capabilities are not
     // known here, so only the local host, which always drops a repeat, is safe to retry then.
@@ -735,7 +790,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
           Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY))));
     const voiceRecordingDraftId = voice?.recordingDraftId ?? null;
     const dictatedSent = claimDictatedSend(target);
-    deps.pendingSends.add(target, { draft, text, retrySafe, voiceRecordingDraftId }, async (pending) => {
+    deps.pendingSends.add(target, { draft, text, retrySafe, voiceRecordingDraftId, queued }, async (pending) => {
       rememberAttachmentKinds(pending.draft.attachments);
       const result = await send(
         pending.text,
@@ -748,7 +803,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       if ("error" in result) {
         playActionSound("error");
         voice?.onFailed();
-      } else dictatedSent?.(result.messageId);
+      } else {
+        dictatedSent?.(result.messageId);
+        // The id is the delivery's. Steer acts on the chat on screen, so not after a switch.
+        if (steer && onScreen()) steerQueued(result.messageId);
+      }
       return result;
     });
   }
@@ -792,7 +851,8 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   function submitComposer(): void {
     if (deps.attachmentBusy()) return;
     const phase = deps.voicePhase();
-    if (phase === "recording") {
+    // A recording for a side thread sends to that thread, not to this message box.
+    if (phase === "recording" && deps.voiceThreadKey() === undefined) {
       const agentId = deps.voice.agentId;
       const serverId = deps.voice.serverId;
       if (!agentId || !serverId) return;
@@ -830,6 +890,16 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
+  /**
+   * Sends the draft into the running turn: Send, then Steer on its queue row, in one key. An agent
+   * that steers each message sent while it works does that itself, so a second steer is not asked.
+   */
+  function steerComposer(): void {
+    if (deps.attachmentBusy() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
+    const hostSteers = (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
+    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers);
+  }
+
   /** An instruction about selected text is a reply to that message. A failure shows on its row. */
   async function sendSelectionInstruction(messageId: string, body: string): Promise<boolean> {
     const target = deps.currentTarget();
@@ -855,13 +925,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     pasteFiles,
     releaseCutAttachments,
     openAttachmentPicker,
-    openAttachmentPickerFromKey,
     editQueuedMessage,
     cancelQueuedMessageEdit,
     saveQueuedMessageEdit,
     reorderPresentedQueue,
     submitMessage,
     submitComposer,
+    steerComposer,
+    composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
     retryPendingSend,

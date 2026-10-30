@@ -738,7 +738,18 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         withAccountEnvironment(context),
         context.history?.("grok"),
       ),
-    createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
+    createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
+      new GrokAgentClient(
+        cli,
+        requestTimeoutMs,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        accountEnvironment && (() => accountEnvironment),
+      ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
@@ -816,6 +827,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // Each new Antigravity session keeps a conversation database in the account's folder.
       usageLeavesSession: true,
     },
+    // `model/list` opens a probe session and then probes the efforts of each model. On a busy
+    // computer the two together pass 5 s, and the picker then had no Gemini models (#3546).
+    catalog: { slowList: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

@@ -76,15 +76,15 @@ export function createWebMarketplaceCalls(
         if (!serverId) throw new Error(sourceText("error.mcp.signInOnHost"));
         return relay.signIn(request(serverId), config);
       },
+      cancelMcpSignIn: async (input, serverId) => {
+        await runTeamEffect(cancelMcpSignIn(request(serverId), input).pipe(Effect.mapError((error) => error.cause)));
+      },
     },
     signInRelay: {
       page: async (url) => relay.page(url),
       // No await comes before `window.open`: a browser blocks a page that the user's click did not open.
       open: async (url) => relay.open(url),
       paste: (url, address) => relay.paste(url, address),
-      cancel: async (url, serverId) => {
-        await runTeamEffect(cancelMcpSignIn(request(serverId), { url }).pipe(Effect.mapError((error) => error.cause)));
-      },
     },
     addAgent: async (input, serverId) => {
       if (!serverId) throw new Error(noAgentInstall());

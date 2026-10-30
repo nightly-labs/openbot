@@ -22,10 +22,18 @@ import type {
   HostedServerCatalogPlan,
   HostedServerEntryPoint,
 } from "@openbot/contracts/hosted-servers";
-import { LICENSE_METADATA, LICENSE_METADATA_KIND } from "@openbot/contracts/license";
+import {
+  LICENSE_METADATA,
+  LICENSE_METADATA_KIND,
+  type LicenseOrder,
+  licensePeriodAmount,
+  ORDER_METADATA,
+  parseLicenseOrder,
+} from "@openbot/contracts/license";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer } from "effect";
+import { SOLD_OUT_PLANS } from "../lib/pricing-page";
 import {
   type AccountAnalytics,
   type BillingAction,
@@ -43,7 +51,7 @@ import {
 } from "./billing-errors";
 import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
-import { isLicensePrice, LicenseService, type LicenseSync } from "./license-service";
+import { LicenseService, type LicenseSync, ordersLicense } from "./license-service";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
 import {
@@ -58,7 +66,9 @@ import {
   subscriptionAmount,
   subscriptionCustomerId,
   subscriptionLatestInvoiceId,
+  subscriptionLicenseItem,
   subscriptionPeriodEnd,
+  subscriptionServerItem,
   verifyStripeSignature,
 } from "./stripe-client";
 
@@ -79,9 +89,6 @@ export { BillingError } from "./billing-errors";
 
 /** Where the Stripe page sends the user back: the desktop return page or the web client. */
 export type BillingReturnTarget = "desktop" | "web";
-
-/** The plans that no new server can take. Servers that have one keep it. */
-export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set(["starter"]);
 
 export const BILLING_UNAVAILABLE_STATE: BillingState = { available: false, hasCustomer: false, servers: [] };
 
@@ -114,6 +121,8 @@ export interface BillingServiceOptions {
   database: D1Database;
   secretKey: string;
   webhookSecret: string | null;
+  /** A license bought before this time is free until then, in milliseconds since the epoch. */
+  licenseTrialEnd?: number | null;
   fetch: StripeFetch;
   now?: () => number;
   /**
@@ -121,6 +130,8 @@ export interface BillingServiceOptions {
    * billing does not know about the provider. An error makes Stripe send the event again.
    */
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  /** Runs after the webhook stores a license change that can change the member limit of the owner's servers. */
+  onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
   sales?: BillingSales;
   /**
@@ -136,6 +147,9 @@ export interface FirstPlanStart {
   plan: BillingPlanId;
   serverName: string;
 }
+
+/** A closed Checkout page. `paid` when the user paid on it, so no second page must open. */
+export type ClosedCheckout = { status: "paid" } | { status: "closed"; license: LicenseOrder | null };
 
 /** The stored state of a subscription before a sync, to find the change that the sync made. */
 interface StoredSubscription {
@@ -166,6 +180,12 @@ export interface CheckoutRequest {
   origin: string;
   /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
+  /**
+   * A license to buy with the server, at the bundle price for the same interval and currency. The page
+   * then has 2 items, and the customer pays one invoice. The first sync moves the license to its own
+   * subscription (`LicenseService.splitOrder`).
+   */
+  license?: LicenseOrder;
 }
 
 class BillingDependencies extends Context.Service<
@@ -211,10 +231,12 @@ export class BillingService {
       database,
       stripe,
       secretKey: options.secretKey,
+      trialEnd: options.licenseTrialEnd ?? null,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       analytics: this.#analytics,
       sales: this.#sales,
+      ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
     });
   }
 
@@ -294,7 +316,7 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A Stripe Checkout page that starts the plan of one server. */
+  /** A Stripe Checkout page that starts the plan of one server, and its license when the order has one. */
 
   readonly createCheckout = Effect.fn("BillingService.createCheckout")(
     function* (
@@ -305,9 +327,24 @@ export class BillingService {
       const price = (yield* this.#prices()).get(billingLookupKey(request.plan, request.interval));
       const amount = priceAmount(price, request.currency);
       if (!price || amount === null) return yield* plansUnavailable();
+      const order = request.license;
+      const licensePlan = order ? { tier: order.tier, interval: request.interval, bundle: true } : null;
+      const licensePrice = licensePlan ? yield* this.license.price(licensePlan) : null;
+      if (licensePlan && !licensePrice)
+        return yield* new BillingError(503, "license_unavailable", sourceText("error.billing.licenseUnavailable"));
+      if (order) yield* this.license.assertCanOrder(request.user.id, order.users);
+      yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
+      // During a promotion the license is free until its trial end, so the order pays for the server only.
+      const trialEnd = order ? this.license.trialEnd() : null;
+      const orderMetadata = order
+        ? {
+            [ORDER_METADATA.licenseTier]: order.tier,
+            [ORDER_METADATA.licenseUsers]: String(order.users),
+          }
+        : null;
       const session = yield* this.#stripeCall(() =>
         dependencies.stripe.createCheckoutSession({
           customerId,
@@ -315,6 +352,20 @@ export class BillingService {
           currency: request.currency,
           userId: request.user.id,
           serverId: request.serverId,
+          ...(orderMetadata && trialEnd !== null
+            ? {
+                metadata: {
+                  ...orderMetadata,
+                  [ORDER_METADATA.licenseInterval]: request.interval,
+                  [ORDER_METADATA.licenseTrialEnd]: String(Math.floor(trialEnd / 1_000)),
+                },
+              }
+            : orderMetadata && order && licensePrice
+              ? {
+                  extraItems: [{ priceId: licensePrice.id, quantity: order.users }],
+                  sessionMetadata: orderMetadata,
+                }
+              : {}),
           // Stripe puts the session ID in the URL. The desktop return page sends it with the first
           // website visit of the browser, so that the saved checkout names the account.
           successUrl:
@@ -327,6 +378,7 @@ export class BillingService {
           nowSeconds: Math.floor(dependencies.now() / 1_000),
         }),
       );
+      if (order) yield* this.license.keepOrderPage(customerId, session.id);
       if (this.#sales && returnToken) {
         const destination = new URL(returnUrl);
         destination.searchParams.set("cancelled", "1");
@@ -356,24 +408,58 @@ export class BillingService {
           amount,
           ...(request.entryPoint ? { entryPoint: request.entryPoint } : {}),
         });
+      if (order && licensePlan) {
+        const licenseAmount = licensePeriodAmount(licensePlan, order.users, request.currency);
+        if (this.#sales)
+          yield* this.#sales
+            .licenseCheckout({
+              sessionId: session.id,
+              userId: request.user.id,
+              users: order.users,
+              interval: request.interval,
+              currency: request.currency,
+              amount: licenseAmount,
+              createdAt: dependencies.now(),
+              order: true,
+            })
+            .pipe(Effect.catch(() => Effect.sync(() => console.warn("billing: license checkout fact was not saved"))));
+        else
+          dependencies.analytics.track(request.user.id, {
+            name: "billing_action",
+            action: "checkout_started",
+            product: "license",
+            users: order.users,
+            interval: request.interval,
+            currency: request.currency,
+            amount: licenseAmount,
+          });
+      }
       return { sessionId: session.id, url: session.url };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
   /**
-   * Closes a Checkout page. `paid` when the user paid on it, so no second page must open. The plan of a
-   * paid page is stored now: its webhook can be late, or can fail each time.
+   * Closes a Checkout page. The plan of a paid page is stored now: its webhook can be late, or can fail
+   * each time. A closed page returns its license order, unless the account got a license after it opened.
    */
 
   readonly closeCheckout = Effect.fn("BillingService.closeCheckout")(
     function* (
       this: BillingService,
       sessionId: string,
-    ): Effect.fn.Return<"closed" | "paid", BillingError | BillingOperationError, BillingDependencies> {
+    ): Effect.fn.Return<ClosedCheckout, BillingError | BillingOperationError, BillingDependencies> {
       const dependencies = yield* BillingDependencies;
       const session = yield* this.#stripeCall(() => dependencies.stripe.expireCheckoutSession(sessionId));
-      if (session.status !== "complete") return "closed";
+      if (session.status !== "complete") {
+        const users = Number(session.metadata[ORDER_METADATA.licenseUsers]);
+        const license = parseLicenseOrder({ tier: session.metadata[ORDER_METADATA.licenseTier], users });
+        const userId = session.metadata[BILLING_METADATA.userId];
+        return {
+          status: "closed",
+          license: license && userId && !(yield* this.license.hasLicense(userId)) ? license : null,
+        };
+      }
       const subscriptionId = session.subscription;
       if (subscriptionId) {
         // The webhook or the next close stores it. A Stripe failure is logged by `#stripeCall`.
@@ -385,7 +471,7 @@ export class BillingService {
           ),
         );
       }
-      return "paid";
+      return { status: "paid" };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -482,13 +568,13 @@ export class BillingService {
       const subscriptionId = rows.results[0].stripe_subscription_id;
       if (expectedPeriodEnd !== undefined) {
         const before = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
-        const end = before.items.data[0]?.current_period_end ?? before.current_period_end;
+        const end = subscriptionServerItem(before)?.current_period_end ?? before.current_period_end;
         if (!end || end * 1000 !== expectedPeriodEnd) {
           return yield* new BillingError(409, "billing_plan_unavailable", sourceText("error.billing.lifecycleFailed"));
         }
       }
       const subscription = yield* this.#stripeCall(() => dependencies.stripe.setRenewal(subscriptionId, cancel));
-      const periodEnd = subscription.items.data[0]?.current_period_end ?? subscription.current_period_end;
+      const periodEnd = subscriptionServerItem(subscription)?.current_period_end ?? subscription.current_period_end;
       if (
         !periodEnd ||
         periodEnd * 1000 <= dependencies.now() ||
@@ -726,7 +812,13 @@ export class BillingService {
       // License events count as sales with `product: license`. The sync reports the license lifecycle.
       const sold: BillingSalesSynced | null =
         synced?.kind === "license"
-          ? { product: "license", userId: synced.userId, users: synced.users, currency: synced.currency }
+          ? {
+              product: "license",
+              userId: synced.userId,
+              users: synced.users,
+              interval: synced.interval,
+              currency: synced.currency,
+            }
           : synced;
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
@@ -798,7 +890,7 @@ export class BillingService {
       action: paid ? "payment_succeeded" : "payment_failed",
       product: synced.kind === "license" ? "license" : "server",
       ...(synced.kind === "license" ? { users: synced.users } : { plan: synced.plan }),
-      interval: synced.kind === "license" ? "month" : synced.interval,
+      interval: synced.interval,
       currency: synced.currency,
       amount: currency === synced.currency && isBillingAmount(amount) ? amount : null,
     });
@@ -817,8 +909,9 @@ export class BillingService {
     const readAt = dependencies.now();
     const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
     const customerId = subscriptionCustomerId(subscription);
-    const price = subscription.items.data[0]?.price;
-    if (price && isLicensePrice(price)) {
+    // A server order has a server item and a license item until its split. It is a server plan.
+    const price = subscriptionServerItem(subscription)?.price;
+    if (!price && subscriptionLicenseItem(subscription)) {
       const ownerId = yield* this.#subscriptionOwner(subscription, customerId);
       return ownerId ? yield* this.license.sync(subscription, ownerId, readAt) : null;
     }
@@ -889,7 +982,17 @@ export class BillingService {
       currency,
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
     };
-    if (stored.meta.changes !== 1) return synced;
+    // A paid server order moves its license to its own subscription, and any server plan gives the license
+    // the bundle price from its next renewal. A sync that stores nothing new also runs both, so a failed
+    // split or price change runs again on the next webhook. Each does nothing when it is already done.
+    const finish = Effect.andThen(
+      ordersLicense(subscription) ? this.license.splitOrder(subscription, ownerId) : Effect.void,
+      this.license.alignBundlePrice(ownerId),
+    );
+    if (stored.meta.changes !== 1) {
+      yield* finish;
+      return synced;
+    }
     const current = { ...synced, amount, status: subscription.status, cancelAtPeriodEnd };
     const action = planChange(previous, current);
     // The other plans of an account whose plan starts. A failed read leaves them out: the subscription
@@ -927,6 +1030,7 @@ export class BillingService {
         currency,
       }).pipe(Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))));
     }
+    yield* finish;
     return synced;
   });
 

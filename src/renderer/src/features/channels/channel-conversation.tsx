@@ -4,7 +4,7 @@
  * host from its own contexts.
  */
 
-import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -50,6 +50,8 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
+  /** The agents that a user hid on the host. */
+  hiddenAgentIds: () => ReadonlySet<string>;
 }
 
 /** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
@@ -158,10 +160,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     if (!env.connectionReady() || readOnly()) return { error: t("channel.error.action") };
     const sequenceBefore = page()?.throughSequence ?? 0;
     // A request that opens with a member is addressed to that member, the way a reader writes it. A
-    // mention later in the text is a reference that the owner of the work can see.
-    const mention = chatTagReferences(body).find(
-      (reference) => reference.kind === "agent" && !body.slice(0, reference.start).trim(),
-    );
+    // mention later in the text is a reference that the owner of the work can see. The host reads
+    // every opening mention from the text; the field names the first one for a host that reads one.
+    const mention = leadingAddress(body).mentions[0];
     try {
       const after = await channels.send({
         type: "send",
@@ -228,7 +229,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     },
     workers: () => {
       const current = page();
-      return current ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback")) : [];
+      return current
+        ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.hiddenAgentIds())
+        : [];
     },
     workingTurns,
     interactionAgentName: () => {

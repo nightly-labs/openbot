@@ -6,13 +6,12 @@ import type {
   AgentPromptResolution,
   RespondToBrowserTakeoverInput,
 } from "@openbot/contracts/ipc";
-import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
+import { COMPUTER_USE_MCP_SERVER_NAME, MCP_ELICITATION_DECISION_QUESTION_ID } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { normalizeUiBlockSpec, type UiBlockResponse, type UiBlockSpec } from "@openbot/contracts/ui-blocks";
 import type { SavedApiKey } from "../agent-api-keys";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
-const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
@@ -98,7 +97,7 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   const subject = serverName === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : (serverName ?? "this plugin");
   const persistence = getArray(getRecord(params, "_meta"), "persist").filter(isString);
   return {
-    id: MCP_ELICITATION_DECISION_ID,
+    id: MCP_ELICITATION_DECISION_QUESTION_ID,
     header: subject.slice(0, INPUT_LIMITS.promptHeader),
     question: message.slice(0, INPUT_LIMITS.promptQuestion),
     isSecret: false,
@@ -153,7 +152,7 @@ const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
 /** The card answer "Allow once", which `mcpElicitationResult` turns into one accepted consent. */
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {
-  [MCP_ELICITATION_DECISION_ID]: [MCP_ELICITATION_ALLOW_ONCE],
+  [MCP_ELICITATION_DECISION_QUESTION_ID]: [MCP_ELICITATION_ALLOW_ONCE],
 };
 
 /**
@@ -181,7 +180,7 @@ export function mcpElicitationResult(
   if (properties && Object.keys(properties).length > 0) {
     return elicitationFieldResult(params, properties, answers);
   }
-  const selected = answers[MCP_ELICITATION_DECISION_ID]?.[0];
+  const selected = answers[MCP_ELICITATION_DECISION_QUESTION_ID]?.[0];
   if (selected === MCP_ELICITATION_ALLOW_ONCE) {
     return { action: "accept", content: {}, _meta: null };
   }

@@ -332,27 +332,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   min-width: 0;
 }
 
-.marketplace-install-menu {
-  min-width: 220px;
-}
-
-/* The button can show an agent's name. A long name is cut, and the skill name keeps its space. */
-.marketplace-install-trigger {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.marketplace-install-trigger svg {
-  flex: none;
-}
-
-.marketplace-install-label {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 .marketplace-block {
   display: grid;
   gap: var(--openbot-space-2);
@@ -858,6 +837,462 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 /* ---------------------------------------------------------------- narrow */
 
 /* A narrow window puts the kinds in a row above the list. The connected apps are in the list. */
+/* ---------------------------------------------------------------- skills */
+
+/* A state that needs the user: "Off", "Update available", "Changed by you", "Needs repair". */
+.marketplace-skill-attention {
+  color: var(--openbot-text-secondary);
+}
+
+/* The skill mark sits under the row's hit area, as an app logo does. */
+.marketplace-skill-row > .marketplace-skill-mark {
+  pointer-events: none;
+}
+
+.marketplace-skill-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.marketplace-skill-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.marketplace-skill-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border: 1px dashed var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-4);
+}
+
+/* The search icon, as in the Marketplace search. */
+:is(.marketplace-skill-picker-search, .marketplace-skill-page-search) > svg {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  flex: none;
+}
+
+.marketplace-skill-agents-trigger {
+  gap: var(--openbot-space-1-5);
+}
+
+.marketplace-skill-stack {
+  display: inline-flex;
+}
+
+.marketplace-skill-stack > :not(:first-child) {
+  margin-inline-start: calc(var(--openbot-space-1) * -1);
+}
+
+/* The agent picker in the agents dialog. */
+.marketplace-skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  font-size: var(--openbot-text-md);
+}
+
+.marketplace-skill-picker-search {
+  margin-block-end: var(--openbot-space-1);
+}
+
+/* Many agents do not fit: the list scrolls under the search field. */
+.marketplace-skill-picker-list {
+  --marketplace-skill-fade-top: 0px;
+  --marketplace-skill-fade-bottom: 0px;
+  display: flex;
+  max-height: calc(var(--openbot-space-1) * 90);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  list-style: none;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-transparent),
+    var(--openbot-text-primary) var(--marketplace-skill-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--marketplace-skill-fade-bottom)),
+    var(--openbot-transparent)
+  );
+}
+
+/* No scroll bar: the fades show that more rows are above or below. */
+.marketplace-skill-picker-list::-webkit-scrollbar {
+  display: none;
+}
+
+.marketplace-skill-picker-list.scroll-fade-top {
+  --marketplace-skill-fade-top: calc(var(--openbot-space-1) * 6);
+}
+
+.marketplace-skill-picker-list.scroll-fade-bottom {
+  --marketplace-skill-fade-bottom: calc(var(--openbot-space-1) * 6);
+}
+
+/* A drag over the rows sets them all, so it must not select their text. */
+.marketplace-skill-picker-list:has(label.marketplace-skill-picker-row) {
+  user-select: none;
+}
+
+.marketplace-skill-picker-row {
+  display: flex;
+  width: 100%;
+  min-height: calc(var(--openbot-space-1) * 9);
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  padding-inline: var(--openbot-space-2);
+  cursor: pointer;
+  font-weight: inherit;
+  text-align: start;
+}
+
+label.marketplace-skill-picker-row:hover {
+  background: var(--openbot-hover);
+}
+
+/* While a drag runs, the row under the pointer does not light up: the check boxes show the range. */
+.marketplace-skill-picker-list[data-dragging] label.marketplace-skill-picker-row:hover {
+  background: none;
+}
+
+.marketplace-skill-picker-row[aria-current="true"] {
+  background: var(--openbot-bg-control-active);
+}
+
+.marketplace-skill-picker-all {
+  border-block-end: 1px solid var(--openbot-border);
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.marketplace-skill-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-skill-picker-none {
+  padding: var(--openbot-space-2);
+}
+
+/* The agents dialog names the skill, as a row does: its mark and its name. */
+.marketplace-skill-dialog-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  margin-block: calc(var(--openbot-space-2) * -1) calc(var(--openbot-space-1) * -1);
+}
+
+.marketplace-skill-dialog-head h2 {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The dialog stays inside the window: the list takes the height that is left, and it scrolls. */
+.integration-wizard-dialog.marketplace-skill-agents-dialog {
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.marketplace-skill-agents-dialog .integration-wizard-form {
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.marketplace-skill-agents-dialog .integration-wizard-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.marketplace-skill-agents-dialog .marketplace-skill-picker {
+  min-height: 0;
+}
+
+.marketplace-skill-agents-dialog .marketplace-skill-picker-list {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* A long list of agent names stops at the button edge; the title gives the full text. */
+.marketplace-skill-agents-dialog .integration-wizard-foot > .ui-button {
+  flex-shrink: 0;
+}
+
+.marketplace-skill-agents-dialog .integration-wizard-foot > .marketplace-skill-dialog-submit {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.marketplace-skill-dialog-submit > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The skill page: a search over the agents that have the skill. */
+.marketplace-skill-page-search {
+  width: calc(var(--openbot-space-1) * 56);
+}
+
+/* The skill name and, for a skill that OpenBot checked, the verified mark after it. */
+.marketplace-skill-name {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+}
+
+.marketplace-skill-verified {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-secondary);
+}
+
+/* The title on the left and the source switch (All, Verified, Public) on the right. */
+.marketplace-skill-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--openbot-space-4);
+}
+
+.marketplace-skill-source .ui-sliding-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  white-space: nowrap;
+}
+
+/* A group page: the title, then the search and the sort, which stay at the top while the list scrolls. */
+.marketplace-skill-group-page {
+  display: grid;
+  align-content: start;
+  gap: var(--openbot-space-4);
+}
+
+.marketplace-skill-group-bar {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  padding-block: var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
+}
+
+.marketplace-skill-group-list {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+/* The highlights of a group: three cards over their artwork, so the page does not start as a flat list. */
+.marketplace-skill-featured {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.marketplace-skill-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--openbot-space-3);
+}
+
+/* Its own stack, so "Add" above the hit area stays under the sticky search bar. */
+.marketplace-skill-feature {
+  isolation: isolate;
+  grid-template-rows: auto auto 1fr auto;
+  padding: var(--openbot-space-3);
+}
+
+.marketplace-skill-feature > :not(.marketplace-hitarea, .marketplace-skill-feature-art) {
+  padding-inline: var(--openbot-space-1);
+}
+
+.marketplace-skill-feature-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: calc(var(--openbot-space-1) * 24);
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--openbot-radius-xl);
+}
+
+.marketplace-skill-feature-art > :not(.skill-preview-gradient) {
+  position: relative;
+}
+
+/* The mark stays beside the last word when a long name wraps. */
+.marketplace-skill-feature .marketplace-skill-verified {
+  display: inline-block;
+  margin-inline-start: var(--openbot-space-1);
+  vertical-align: text-bottom;
+}
+
+/* ---------------------------------------------------------------- view transitions */
+
+/* View changes run in a view transition (`moveView`). The page slides a little in the way the
+   user goes: a deeper view comes in from the end, back comes in from the start. Blur and fade
+   carry the change, not travel. The old page leaves faster than the new one arrives. The names
+   apply only during a Marketplace transition, so other transitions of the app do not capture them. */
+html:active-view-transition-type(marketplace-forward, marketplace-back, marketplace-tab, marketplace-swap) {
+  --marketplace-skill-blur: calc(var(--openbot-space-0-5) * 1.5);
+  --marketplace-skill-blur-small: var(--openbot-space-0-5);
+}
+
+html:active-view-transition-type(marketplace-forward, marketplace-back, marketplace-tab, marketplace-swap)
+  .skills-marketplace-body {
+  view-transition-name: marketplace-page;
+}
+
+html:active-view-transition-type(marketplace-forward, marketplace-back, marketplace-tab, marketplace-swap)
+  .skills-marketplace
+  .marketplace-heading {
+  view-transition-name: marketplace-crumbs;
+}
+
+/* Another source keeps the switch live, so its pill slides and does not fade over a copy. */
+html:active-view-transition-type(marketplace-swap) .marketplace-skill-source {
+  view-transition-name: marketplace-skill-source;
+}
+
+html:active-view-transition-type(
+  marketplace-forward,
+  marketplace-back,
+  marketplace-tab,
+  marketplace-swap
+)::view-transition-group(root),
+::view-transition-group(marketplace-page),
+::view-transition-group(marketplace-crumbs) {
+  animation-duration: var(--openbot-duration-overlay);
+  animation-timing-function: var(--openbot-ease-out);
+}
+
+html:active-view-transition-type(marketplace-forward)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: calc(var(--openbot-space-2) * -1);
+  animation: marketplace-skill-page-out var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(marketplace-forward)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: var(--openbot-space-2);
+  animation: marketplace-skill-page-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(marketplace-back)::view-transition-old(marketplace-page) {
+  --marketplace-skill-to: var(--openbot-space-2);
+  animation: marketplace-skill-page-out var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(marketplace-back)::view-transition-new(marketplace-page) {
+  --marketplace-skill-from: calc(var(--openbot-space-2) * -1);
+  animation: marketplace-skill-page-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+/* Another kind in the side panel is a new list, not a step: it rises a little into place. */
+html:active-view-transition-type(marketplace-tab)::view-transition-old(marketplace-page) {
+  animation: marketplace-skill-blur-out var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(marketplace-tab)::view-transition-new(marketplace-page) {
+  animation: marketplace-skill-rise-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+/* Another source or sort is the same list with other rows: the rows change through a blur in place. */
+html:active-view-transition-type(marketplace-swap)::view-transition-old(marketplace-page) {
+  animation: marketplace-skill-blur-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+html:active-view-transition-type(marketplace-swap)::view-transition-new(marketplace-page) {
+  animation: marketplace-skill-blur-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+::view-transition-old(marketplace-skill-source) {
+  animation: none;
+  opacity: 0;
+}
+
+::view-transition-new(marketplace-skill-source) {
+  animation: none;
+}
+
+/* The crumbs change their last name in place. */
+::view-transition-old(marketplace-crumbs) {
+  animation: marketplace-skill-blur-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+::view-transition-new(marketplace-crumbs) {
+  animation: marketplace-skill-blur-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+@keyframes marketplace-skill-page-out {
+  to {
+    opacity: 0;
+    transform: translateX(var(--marketplace-skill-to));
+    filter: blur(var(--marketplace-skill-blur));
+  }
+}
+
+@keyframes marketplace-skill-page-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--marketplace-skill-from));
+    filter: blur(var(--marketplace-skill-blur));
+  }
+}
+
+@keyframes marketplace-skill-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--openbot-space-2));
+    filter: blur(var(--marketplace-skill-blur));
+  }
+}
+
+@keyframes marketplace-skill-blur-out {
+  to {
+    opacity: 0;
+    filter: blur(var(--marketplace-skill-blur-small));
+  }
+}
+
+@keyframes marketplace-skill-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--marketplace-skill-blur-small));
+  }
+}
+
+/* `moveView` skips the transition with reduced motion. This guard also stops one that starts. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(marketplace-page),
+  ::view-transition-group(marketplace-crumbs),
+  ::view-transition-old(marketplace-page),
+  ::view-transition-new(marketplace-page),
+  ::view-transition-old(marketplace-crumbs),
+  ::view-transition-new(marketplace-crumbs) {
+    animation: none;
+  }
+}
+
 @media (max-width: 720px) {
   .skills-marketplace {
     grid-template-columns: minmax(0, 1fr);
@@ -919,4 +1354,17 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 /* After the icon size rule, so that the warning color wins. */
 .marketplace-app-action[data-status="attention"] > svg {
   color: var(--openbot-warning-text);
+}
+
+/* After the icon size rule: an agent avatar draws past its box, so a button must not shrink it. */
+:is(.marketplace-skill-agents-trigger, .marketplace-skill-picker-row) .agent-avatar > svg {
+  width: 128%;
+  height: 128%;
+}
+
+/* After the icon size rule: the source switch icons are small. */
+.marketplace-skill-source .ui-sliding-tabs-trigger svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
 }

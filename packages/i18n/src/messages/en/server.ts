@@ -86,6 +86,23 @@ export const messages = defineMessages("server", {
   "server.add.billing.monthly": "Monthly",
   "server.add.billing.yearly": "Yearly",
   "server.add.billing.save": "Save {percent}%",
+  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
+  "server.add.use.label": "Use",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Work",
+  // The row under the plans that sets the users of the license. It is disabled for personal use.
+  "server.add.license.people": "People at work",
+  // A toast when "Fewer members" is at the people who use the account's servers now. The license must include them.
+  "server.add.license.minimum": {
+    one: "{count} person uses your servers now, so you cannot choose fewer.",
+    other: "{count} people use your servers now, so you cannot choose fewer.",
+  },
+  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
+  "server.add.license.bundle": "Bundle −{percent}%",
+  // The plan summary for work: the price includes the license. {license} is the license line, such as
+  // "Team license, 5 members".
+  "server.add.license.included": "Includes {license}",
+  "server.add.license.includedTrial": "Includes {license}, free until {date}",
   "server.add.billedMonthly": "Billed monthly",
   "server.add.billedYearly": "{price} billed yearly",
   // {amount} is a formatted amount, such as "€120". It follows the yearly price.
@@ -98,8 +115,22 @@ export const messages = defineMessages("server", {
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
-  "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
+  "server.add.otherOptions": "Other options",
+  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
+  "server.local.createTitle": "New server on this computer",
+  "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
+  "server.local.nameLabel": "Server name",
+  "server.local.create": "Create server",
+  "server.local.creating": "Creating server…",
+  "server.local.createFailed": "Could not create the server.",
+  "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "server.local.deleteConfirmTitle": "Delete {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stops the server and moves its agents, chats and files to the trash.",
+  "server.local.deleting": "Deleting server…",
+  "server.local.deletedTitle": "Deleted {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -191,6 +222,8 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
+  // Added to the tooltip of a server that runs on this computer, after its name.
+  "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
   "server.rail.unmute": "Unmute server",
@@ -317,6 +350,12 @@ export const messages = defineMessages("server", {
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
+  "server.settings.memoryReview": "Memory review",
+  "server.settings.memoryReviewDescription":
+    "How often agents on this server save lasting facts from their chats in the background.",
+  "server.settings.memoryReviewOff": "Off",
+  "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
+  "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
   "server.settings.rolesTitle": "Roles",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
@@ -436,7 +475,10 @@ export const messages = defineMessages("server", {
   "server.invite.showQr": "Show invitation QR code",
   "server.invite.permaHint":
     "Never expires and can be used many times. Anyone with this link can join; revoke it to disable.",
-  "server.invite.full": "This server has the maximum of {limit} members. Remove a member to invite a new person.",
+  "server.invite.full": {
+    one: "This server has the maximum of {count} member. Remove a member to invite a new person.",
+    other: "This server has the maximum of {count} members. Remove a member to invite a new person.",
+  },
   "server.invite.qrLabel": "Invitation QR code",
   "server.invite.qrDescription": "Scan this code in OpenBot Mobile to join this server.",
   "server.invite.accepted": "Invitation accepted",

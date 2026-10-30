@@ -306,6 +306,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           draft={editDraft()}
           providerIdLocked={Boolean(editing())}
           apiKeyKept={Boolean(editing()?.hasApiKey)}
+          // Edit and the context window are both of this computer: the Team API has neither.
+          contextWindows={Boolean(props.onUpdateCustomProvider)}
           busy={host.state.saving}
           submitError={host.state.submitError}
           takenProviderIds={customProviders().map((provider) => provider.id)}

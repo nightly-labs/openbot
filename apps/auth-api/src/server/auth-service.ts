@@ -16,7 +16,11 @@ import { randomToken, sha256 } from "./crypto";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
-import { EMAIL_CODE_DELIVERY_BUDGET_MS, RATE_LIMITED_DELIVERY_ERROR } from "./smtp-email-delivery";
+import {
+  AMBIGUOUS_DELIVERY_ERRORS,
+  EMAIL_CODE_DELIVERY_BUDGET_MS,
+  RATE_LIMITED_DELIVERY_ERROR,
+} from "./smtp-email-delivery";
 import type {
   AuthRepository,
   AuthUser,
@@ -36,7 +40,6 @@ const MOBILE_CONNECT_SERVER_ID = "00000000-0000-4000-8000-000000000002";
 // The host ID rule of `isMobileConnectHostBinding`.
 const MOBILE_CONNECT_HOST_ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/u;
 const RATE_WINDOW_MS = 15 * 60_000;
-const AMBIGUOUS_DELIVERY_ERRORS = new Set(["smtp_delivery_unknown", "email_delivery_unknown"]);
 // A provider sender limit frees again as its window rolls forward, so the client waits and retries
 // rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
 // capacity returns before the window ends, and a countdown of a whole hour reads like an outage.

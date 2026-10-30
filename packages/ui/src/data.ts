@@ -154,6 +154,8 @@ export type ChatActionMarkerModel =
   /** A member agent changed the channel at a person's request. `text` is the host's note. */
   | { kind: "channel-change"; text: string; timestamp: string }
   | { kind: "vault-change"; text: string; timestamp: string }
+  /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
+  | { kind: "plan-continuation"; text: string; timestamp: string }
   | {
       kind: "unavailable";
       label: string;
@@ -261,6 +263,10 @@ export interface AgentProfile {
   taskLimit?: ClientAgentSummary["taskLimit"];
   /** Absent means ask before a switch at a usage limit. Absent for an agent on a remote host too. */
   backupModels?: ClientAgentSummary["backupModels"];
+  /** The folders the user gave the agent besides its workspace. Absent for none, and on a remote host. */
+  additionalFolders?: ClientAgentSummary["additionalFolders"];
+  /** The folders in them that the agent must not change. Absent for none, and on a remote host. */
+  excludedFolders?: ClientAgentSummary["excludedFolders"];
   /** Set while the agent works on a backup model for a usage limit: the model it goes back to. */
   usageLimitReturn?: ClientAgentSummary["usageLimitReturn"];
   /** Set while a turn or task still runs on the previous provider. The next turn uses this runtime. */

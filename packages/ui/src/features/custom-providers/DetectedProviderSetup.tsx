@@ -118,6 +118,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         takenProviderIds={taken(props.takenProviderIds)}
         providerIdLocked={Boolean(models()?.added)}
         apiKeyKept={Boolean(models()?.added && models()?.keyStored)}
+        contextWindows
         onSubmit={(value) => void save({ kind: "models", value })}
         onCancel={props.onClose}
       />

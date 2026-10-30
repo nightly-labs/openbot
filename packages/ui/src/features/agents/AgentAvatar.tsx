@@ -318,6 +318,12 @@ function GeneratedAvatar(props: {
     const interactionTarget = group?.matches(HOVER_GROUP) ? group : element;
     const startInteraction = () => setInteracting(true);
     const stopInteraction = () => setInteracting(false);
+    // Only keyboard focus starts the avatar. A click leaves the focus on the button it lands on, such as
+    // the sidebar row of the open channel, and the window gives that button `focusin` again each time it
+    // comes back to the front. No pointer is there to leave, so the avatar moved until the next click.
+    const startFocusInteraction = (event: FocusEvent) => {
+      if (event.target instanceof Element && event.target.matches(":focus-visible")) startInteraction();
+    };
     const stopFocusInteraction = (event: FocusEvent) => {
       if (!(event.relatedTarget instanceof Node) || !interactionTarget?.contains(event.relatedTarget)) {
         stopInteraction();
@@ -325,14 +331,14 @@ function GeneratedAvatar(props: {
     };
     interactionTarget?.addEventListener("pointerenter", startInteraction);
     interactionTarget?.addEventListener("pointerleave", stopInteraction);
-    interactionTarget?.addEventListener("focusin", startInteraction);
+    interactionTarget?.addEventListener("focusin", startFocusInteraction);
     interactionTarget?.addEventListener("focusout", stopFocusInteraction);
 
     return () => {
       media?.removeEventListener?.("change", syncReducedMotion);
       interactionTarget?.removeEventListener("pointerenter", startInteraction);
       interactionTarget?.removeEventListener("pointerleave", stopInteraction);
-      interactionTarget?.removeEventListener("focusin", startInteraction);
+      interactionTarget?.removeEventListener("focusin", startFocusInteraction);
       interactionTarget?.removeEventListener("focusout", stopFocusInteraction);
     };
   });

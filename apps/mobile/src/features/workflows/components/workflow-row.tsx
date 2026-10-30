@@ -10,7 +10,7 @@ import { RUN_STATUS_LABEL } from "@/features/workflows/model/workflow-steps";
 import { type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -101,7 +101,9 @@ export function WorkflowRow({
           }}
           // The native context menu does not cancel this touch. Without a long-press handler, lifting the
           // finger after the menu opens counts as a tap. Android opens its menu from the row.
+          delayLongPress={longPressDelay}
           onLongPress={() => {
+            void haptics.longPress();
             if (isAndroid) menu.current?.show();
           }}
         >

@@ -85,6 +85,18 @@ export const messages = {
   "server.add.billing.monthly": "按月",
   "server.add.billing.yearly": "按年",
   "server.add.billing.save": "省 {percent}%",
+  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
+  "server.add.use.label": "用途",
+  "server.add.use.personal": "个人",
+  "server.add.use.work": "工作",
+  // The row under the plans that sets the users of the license. It is disabled for personal use.
+  "server.add.license.people": "工作人数",
+  "server.add.license.minimum": { other: "目前有 {count} 人在使用你的服务器，因此不能选择更少。" },
+  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
+  "server.add.license.bundle": "组合 −{percent}%",
+  // The plan summary for work. {license} is the license line, such as "Team license, 5 members".
+  "server.add.license.included": "包含{license}",
+  "server.add.license.includedTrial": "包含{license}，{date} 前免费",
   "server.add.billedMonthly": "按月计费",
   "server.add.billedYearly": "每年计费 {price}",
   // {amount} is a formatted amount, such as "€120". It follows the yearly price.
@@ -96,8 +108,19 @@ export const messages = {
   "server.add.custom.title": "需要更高性能或定制方案？",
   "server.add.custom.description": "可提供专属基础设施、额外存储，或按你的工作流定制的功能。",
   "server.add.custom.action": "联系我们",
-  "server.add.join.title": "已有邀请？",
   "server.add.join.action": "加入服务器",
+  "server.add.otherOptions": "其他选项",
+  "server.local.createTitle": "这台电脑上的新服务器",
+  "server.local.createDescription": "该服务器有自己的助手、对话和文件，在这台电脑上运行。",
+  "server.local.nameLabel": "服务器名称",
+  "server.local.create": "创建服务器",
+  "server.local.creating": "正在创建服务器…",
+  "server.local.createFailed": "无法创建该服务器。",
+  "server.local.limitReached": "这台电脑上最多可以有 {limit} 个服务器。请删除一个后再创建。",
+  "server.local.deleteConfirmTitle": "删除 {name}？",
+  "server.local.deleteConfirmDescription": "OpenBot 会停止该服务器，并将其助手、对话和文件移到回收站。",
+  "server.local.deleting": "正在删除服务器…",
+  "server.local.deletedTitle": "已删除 {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "该账号的服务器数量已达上限",
   "server.add.limit.description": {
@@ -182,6 +205,7 @@ export const messages = {
   "server.rail.addRemote": "添加远程服务器",
   "server.rail.add": "添加服务器",
   "server.rail.buttonLabel": "{name} 服务器",
+  "server.rail.thisComputer": "在这台电脑上",
   "server.rail.notificationsMuted": "通知已静音",
   "server.rail.actions": "服务器操作",
   "server.rail.unmute": "取消静音",
@@ -303,6 +327,11 @@ export const messages = {
   "server.settings.memoryLimit": "每个助手的记忆数",
   "server.settings.memoryLimitDescription": "该服务器上每个助手最多可保留多少条记忆。",
   "server.settings.memoryLimitLoadFailed": "无法加载该服务器的记忆上限。",
+  "server.settings.memoryReview": "记忆整理",
+  "server.settings.memoryReviewDescription": "该服务器上的助手在后台从聊天中保存长期事实的频率。",
+  "server.settings.memoryReviewOff": "关闭",
+  "server.settings.memoryReviewTurns": { other: "每 {count} 轮" },
+  "server.settings.memoryReviewLoadFailed": "无法加载记忆整理设置。",
   "server.settings.rolesTitle": "角色",
   "server.settings.rolesDescription":
     "选择成员可以使用的助手。成员拥有“所有人”和自己所属角色中最高的访问权限。所有者和管理员可以使用所有助手。",
@@ -416,7 +445,9 @@ export const messages = {
   "server.invite.copyLink": "复制链接",
   "server.invite.showQr": "显示邀请二维码",
   "server.invite.permaHint": "永不过期，可多次使用。任何拿到该链接的人都能加入；撤销后失效。",
-  "server.invite.full": "该服务器成员已达上限 {limit} 人，请先移除成员再邀请新成员。",
+  "server.invite.full": {
+    other: "该服务器成员已达上限 {count} 人，请先移除成员再邀请新成员。",
+  },
   "server.invite.qrLabel": "邀请二维码",
   "server.invite.qrDescription": "在 OpenBot 手机版中扫描该二维码即可加入该服务器。",
   "server.invite.accepted": "邀请已被接受",

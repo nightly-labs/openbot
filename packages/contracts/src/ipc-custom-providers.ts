@@ -7,7 +7,7 @@
 import { AGENT_PROVIDERS } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString } from "./ipc-bounded-values";
-import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
  * A custom provider is served by the OpenCode CLI, so its bounds are OpenCode's config shape rather
@@ -20,6 +20,12 @@ export const CUSTOM_PROVIDER_LIMITS = {
   baseUrl: 2_048,
   models: 64,
   headers: 32,
+  /**
+   * The context window of one model, in tokens. OpenCode's own prompt and tools take about 12K
+   * tokens, so a smaller window compacts on every turn.
+   */
+  contextWindowMin: 1_024,
+  contextWindowMax: 100_000_000,
 } as const;
 
 /** A `provider` key in OpenCode's config, so lowercase and free of separators. */
@@ -31,6 +37,21 @@ export const CUSTOM_PROVIDER_HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+
 export interface CustomProviderModel {
   id: string;
   name: string;
+  /**
+   * The context window in tokens. Absent: OpenCode assumes its own default, 200K tokens in OpenCode
+   * 2.1.4. This computer only: a Team API list and save keep their released model fields.
+   */
+  contextWindow?: number;
+}
+
+/** A context window that OpenCode can use for a model. */
+export function isCustomProviderContextWindow(value: unknown): value is number {
+  return (
+    isNumber(value) &&
+    Number.isSafeInteger(value) &&
+    value >= CUSTOM_PROVIDER_LIMITS.contextWindowMin &&
+    value <= CUSTOM_PROVIDER_LIMITS.contextWindowMax
+  );
 }
 
 export interface CustomProviderHeader {
@@ -168,7 +189,8 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
-    isBoundedString(value.name, INPUT_LIMITS.modelName)
+    isBoundedString(value.name, INPUT_LIMITS.modelName) &&
+    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow))
   );
 }
 

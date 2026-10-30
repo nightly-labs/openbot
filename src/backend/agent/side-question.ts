@@ -17,7 +17,7 @@ const CHAT_CHARACTERS = 60_000;
 const EARLIER_CHARACTERS = 60_000;
 
 /** Indented JSON for a prompt block, with `<` escaped as `tagSafe` does. */
-function promptJson(value: unknown): string {
+export function promptJson(value: unknown): string {
   return tagSafe(JSON.stringify(value, null, 2));
 }
 
@@ -36,7 +36,8 @@ function chatMessage(message: ConversationMessage): boolean {
   );
 }
 
-function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
+/** The chat messages that fit the budget, newest last, each with the name of its writer. */
+export function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
   const entries: { from: string; text: string }[] = [];
   let characters = 0;
   for (const message of [...messages].filter(chatMessage).reverse()) {

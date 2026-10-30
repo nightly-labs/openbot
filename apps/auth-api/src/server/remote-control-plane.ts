@@ -1,9 +1,9 @@
-import { memberLimitForPlan } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
   hostKeyHandoverStatement,
 } from "@openbot/contracts/host-key-handover";
+import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
@@ -48,8 +48,12 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
 import { importJWK, type JWK, type JWTPayload, SignJWT } from "jose";
-import { getServerEntitlement, SERVER_MEMBER_LIMIT_SQL } from "./billing-entitlement";
-import { OPEN_STATUSES_SQL } from "./billing-errors";
+import {
+  getServerEntitlement,
+  type OwnerLicense,
+  ownerLicenseForHost,
+  SERVER_MEMBER_LIMIT_SQL,
+} from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -79,13 +83,20 @@ const LICENSE_SEAT_AVAILABLE_SQL = `(
        WHERE h.owner_user_id = ? AND m.user_id <> ? AND m.status = 'active') + 1 < ?
 )`;
 
-/** The seat checks for one user on one host: the server plan's member limit and the owner's license. */
+/** The seat checks for one user on one host: the host's member limit and the owner's license. */
 interface MemberSeat {
   readonly sql: string;
   readonly binds: readonly (string | number)[];
   readonly limit: number;
-  readonly memberBinds: readonly (string | number)[];
+  /** Null when the license gives the limit: the license count is then the stricter check. */
+  readonly memberBinds: readonly (string | number)[] | null;
   readonly licenseBinds: readonly (string | number)[] | null;
+}
+
+interface MemberLimit {
+  readonly limit: number;
+  /** True when the users of the owner's license give the limit. */
+  readonly fromLicense: boolean;
 }
 
 /** The membership row that this accept wrote: its id and its update time. */
@@ -821,6 +832,8 @@ export class RemoteControlPlane {
         result.results ?? [],
         (row) =>
           Effect.gen({ self: this }, function* () {
+            const license = yield* this.#ownerLicense(row.host_id);
+            const { limit } = yield* this.#memberLimit(row.host_id, license);
             return {
               hostId: row.host_id,
               name: row.name,
@@ -830,7 +843,9 @@ export class RemoteControlPlane {
               authEpoch: row.auth_epoch,
               membershipId: row.membership_id,
               role: row.role,
-              memberLimit: yield* this.#memberLimit(row.host_id),
+              // The license counts the people of all the owner's servers, and any open license refuses a
+              // join after its users. So no server takes more people than the license has users.
+              memberLimit: license ? Math.min(limit, license.users) : limit,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
               hosted: row.hosted === 1,
             };
@@ -1817,22 +1832,29 @@ export class RemoteControlPlane {
 
   readonly planChanged = Effect.fn("RemoteControlPlane.planChanged")(
     function* (this: RemoteControlPlane, hostId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
-      const dependencies = yield* RemoteDependencies;
-      const now = dependencies.now();
-      yield* remoteCall(() =>
-        dependencies.database
-          .prepare(
-            `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
-         SELECT lower(hex(randomblob(16))),
-                json_object('type', 'account-servers-changed', 'userId', user_id),
-                ?, 0, ?
-           FROM remote_memberships
-          WHERE host_id = ? AND status = 'active'`,
-          )
-          .bind(now, now, hostId)
-          .run(),
+      yield* this.#serversChanged(
+        "SELECT user_id FROM remote_memberships WHERE host_id = ? AND status = 'active'",
+        hostId,
       );
-      yield* this.#flushAuthEvents();
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * The license of an account changed, so the member limit of its servers can be different. Each active
+   * member of those servers reads the server list again, once.
+   */
+
+  readonly licenseChanged = Effect.fn("RemoteControlPlane.licenseChanged")(
+    function* (
+      this: RemoteControlPlane,
+      ownerUserId: string,
+    ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      yield* this.#serversChanged(
+        `SELECT DISTINCT m.user_id FROM remote_memberships m JOIN remote_hosts h ON h.host_id = m.host_id
+          WHERE h.owner_user_id = ? AND m.status = 'active'`,
+        ownerUserId,
+      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2795,21 +2817,16 @@ export class RemoteControlPlane {
     hostId: string,
     userId: string,
   ): Effect.fn.Return<MemberSeat, RemoteFailure, RemoteDependencies> {
-    const dependencies = yield* RemoteDependencies;
-    const limit = yield* this.#memberLimit(hostId);
-    const license = yield* remoteCall(() =>
-      dependencies.database
-        .prepare(
-          `SELECT l.user_id AS owner_id, l.users FROM remote_hosts h
-             JOIN licenses l ON l.user_id = h.owner_user_id AND l.status IN ${OPEN_STATUSES_SQL}
-            WHERE h.host_id = ? ORDER BY l.updated_at DESC LIMIT 1`,
-        )
-        .bind(hostId)
-        .first<{ owner_id: string; users: number }>(),
-    );
+    const license = yield* this.#ownerLicense(hostId);
+    const { limit, fromLicense } = yield* this.#memberLimit(hostId, license);
+    const licenseBinds = license ? [license.ownerId, userId, license.ownerId, license.ownerId, license.users] : null;
+    // The license count covers each of the owner's servers, so it is never below this host's count. With
+    // a limit from the license, a full server then answers that the license is full.
+    if (fromLicense && licenseBinds) {
+      return { sql: LICENSE_SEAT_AVAILABLE_SQL, binds: licenseBinds, limit, memberBinds: null, licenseBinds };
+    }
     const memberBinds = [hostId, userId, hostId, limit];
-    if (!license) return { sql: MEMBER_SEAT_AVAILABLE_SQL, binds: memberBinds, limit, memberBinds, licenseBinds: null };
-    const licenseBinds = [license.owner_id, userId, license.owner_id, license.owner_id, license.users];
+    if (!licenseBinds) return { sql: MEMBER_SEAT_AVAILABLE_SQL, binds: memberBinds, limit, memberBinds, licenseBinds };
     return {
       sql: `(${MEMBER_SEAT_AVAILABLE_SQL} AND ${LICENSE_SEAT_AVAILABLE_SQL})`,
       binds: [...memberBinds, ...licenseBinds],
@@ -2827,33 +2844,70 @@ export class RemoteControlPlane {
     const available = yield* remoteCall(() =>
       dependencies.database
         .prepare(
-          `SELECT ${MEMBER_SEAT_AVAILABLE_SQL} AS member, ${seat.licenseBinds ? LICENSE_SEAT_AVAILABLE_SQL : "1"} AS license`,
+          `SELECT ${seat.memberBinds ? MEMBER_SEAT_AVAILABLE_SQL : "1"} AS member, ${seat.licenseBinds ? LICENSE_SEAT_AVAILABLE_SQL : "1"} AS license`,
         )
-        .bind(...seat.memberBinds, ...(seat.licenseBinds ?? []))
+        .bind(...(seat.memberBinds ?? []), ...(seat.licenseBinds ?? []))
         .first<{ member: number; license: number }>(),
     );
     if (!available?.member) return yield* memberLimitReached(seat.limit);
     if (!available.license) return yield* licenseUsersFull();
   });
 
+  /** Each user that `usersSql` selects (one `user_id` column, one bind) reads the server list again, once. */
+  readonly #serversChanged = Effect.fn("RemoteControlPlane.serversChanged")(function* (
+    this: RemoteControlPlane,
+    usersSql: string,
+    bind: string,
+  ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const now = dependencies.now();
+    yield* remoteCall(() =>
+      dependencies.database
+        .prepare(
+          `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+           SELECT lower(hex(randomblob(16))), json_object('type', 'account-servers-changed', 'userId', user_id), ?, 0, ?
+             FROM (${usersSql})`,
+        )
+        .bind(now, now, bind)
+        .run(),
+    );
+    yield* this.#flushAuthEvents();
+  });
+
+  readonly #ownerLicense = Effect.fn("RemoteControlPlane.ownerLicense")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+  ): Effect.fn.Return<OwnerLicense | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    return yield* ownerLicenseForHost(dependencies.database, hostId, dependencies.now()).pipe(
+      Effect.mapError(() => new RemoteOperationError({})),
+    );
+  });
+
   /**
-   * The active members that the host's custom limit allows, else its plan, else the default for a
-   * host with no plan. A lower limit removes no one: members who are active keep their seats.
+   * The active members that the host's custom limit allows, else its hosted plan. A hosted plan already
+   * holds the license users, so it keeps its own limit. Else the users of the owner's entitled license
+   * when they are more than a plan that a self-hosted host keeps from before the license, else that plan,
+   * else the default. A lower limit removes no one: members who are active keep their seats. `license`
+   * is the owner's open license (`ownerLicenseForHost`).
    */
   readonly #memberLimit = Effect.fn("RemoteControlPlane.memberLimit")(function* (
     this: RemoteControlPlane,
     hostId: string,
-  ): Effect.fn.Return<number, RemoteFailure, RemoteDependencies> {
+    license: OwnerLicense | null,
+  ): Effect.fn.Return<MemberLimit, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const custom = yield* remoteCall(() =>
       dependencies.database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(hostId).first<{ member_limit: number }>(),
     );
-    if (custom) return custom.member_limit;
-    return memberLimitForPlan(
-      (yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
-        Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
-      ))?.plan ?? null,
+    if (custom) return { limit: custom.member_limit, fromLicense: false };
+    const plan = yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
+      Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
     );
+    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false };
+    if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
+      return { limit: license.users, fromLicense: true };
+    return { limit: plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT, fromLicense: false };
   });
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {

@@ -134,6 +134,9 @@ export const readHostConfig = Effect.fn("HostFiles.readConfig")(function* (
   hostUid = 0,
 ): Effect.fn.Return<HostManagerConfig | null, HostProtocolFileError> {
   return yield* Effect.gen(function* () {
+    // No host directory means no host manager, whatever its parents allow (#3802). The parent
+    // checks apply only to a host directory that exists.
+    yield* fileCall(() => lstat(directory));
     yield* verifyHostDirectory(directory, hostUid);
     return yield* readOwnedJson(join(directory, "config.json"), hostUid, hostConfigSchema);
   }).pipe(Effect.catch((failure) => (isMissingFileError(failure.cause) ? Effect.succeed(null) : Effect.fail(failure))));

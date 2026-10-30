@@ -39,6 +39,11 @@ export function applyTaskEvent(
 ): void {
   if (event.type === "agent-tasks-changed") {
     queryClient.setQueryData(queryKeys.agentTasks(scope, serverId, event.snapshot.agentId), event.snapshot);
+    // A new answer in a thread, or a thread that starts or goes, changes what is unread. The host
+    // sends no event when a read mark moves, so the marks load again with the list.
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.agentThreadReads(scope, serverId, event.snapshot.agentId),
+    });
   } else if (event.type === "agent-task-conversation") {
     // A delta raises the revision, so an older snapshot loses.
     queryClient.setQueryData<ConversationSnapshot>(

@@ -1,4 +1,9 @@
-import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from "@openbot/contracts/ipc";
+import {
+  type MarketplaceSkillQuery,
+  type MarketplaceSkillSort,
+  SKILL_CATEGORIES,
+  type SkillCategory,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { createEffect, createStore, onCleanup, untrack } from "solid-js";
 import { currentText } from "../../text";
@@ -41,12 +46,16 @@ function inCategory<T extends CatalogItem>(items: T[], category: SkillCategory):
  * The overview in one request while the whole catalog fits in one page. A larger catalog can leave a
  * category short of rows, so only those categories then ask for their own first rows.
  */
-async function loadHomePage<T extends CatalogItem>(list: CatalogList<T>): Promise<CatalogPage<T>> {
-  const page = await list({ sort: "installs", limit: HOME_PAGE_SIZE });
+async function loadHomePage<T extends CatalogItem>(
+  list: CatalogList<T>,
+  verified?: boolean | undefined,
+): Promise<CatalogPage<T>> {
+  const source = verified === undefined ? {} : { verified };
+  const page = await list({ ...source, sort: "installs", limit: HOME_PAGE_SIZE });
   if (!page.nextCursor) return page;
   const short = SKILL_CATEGORIES.filter((category) => inCategory(page.items, category).length < HOME_ROWS_PER_CATEGORY);
   const pages = await Promise.all(
-    short.map((category) => list({ category, sort: "installs", limit: HOME_ROWS_PER_CATEGORY })),
+    short.map((category) => list({ ...source, category, sort: "installs", limit: HOME_ROWS_PER_CATEGORY })),
   );
   /* "Load more" goes on from the first page. A category row that page brings again is dropped as a duplicate. */
   return {
@@ -100,9 +109,20 @@ export interface MarketplaceListing<T> {
   retry: () => void;
 }
 
+/** What a listing asks the catalog for, apart from the search. A change loads at once. */
+interface ListingFilter {
+  category: SkillCategory | null;
+  sort: MarketplaceSkillSort;
+  verified: boolean | undefined;
+}
+
+function sameFilter(a: ListingFilter, b: ListingFilter) {
+  return a.category === b.category && a.sort === b.sort && a.verified === b.verified;
+}
+
 /**
  * One Marketplace listing: the overview, a category or a search, in pages. The search waits for a
- * pause in typing, and an answer to an older search or category never replaces a newer one.
+ * pause in typing, and an answer to an older search or filter never replaces a newer one.
  */
 export function createMarketplaceListing<T extends CatalogItem>(options: {
   list: CatalogList<T>;
@@ -110,7 +130,16 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
   homeCache?: MarketplaceHomeCache<T> | undefined;
   query: () => string;
   category: () => SkillCategory | null;
+  /** The order of the rows. Most installs first when omitted. */
+  sort?: (() => MarketplaceSkillSort) | undefined;
+  /** True: only verified skills. False: only the other skills. Omitted or undefined: all. */
+  verified?: (() => boolean | undefined) | undefined;
 }): MarketplaceListing<T> {
+  const filter = (): ListingFilter => ({
+    category: options.category(),
+    sort: options.sort?.() ?? "installs",
+    verified: options.verified?.(),
+  });
   const [state, setState] = createStore<{
     /** The trimmed query `items` came back for, so a newer keystroke knows it must filter them itself. */
     loadedQuery: string;
@@ -123,7 +152,7 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
   let requestVersion = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  async function load(category: SkillCategory | null, query: string, cursor?: string) {
+  async function load({ category, sort, verified }: ListingFilter, query: string, cursor?: string) {
     const version = ++requestVersion;
     const trimmed = query.trim();
     /* A search keeps the rows it already has and filters them below, so typing never flashes a skeleton. */
@@ -143,16 +172,17 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
       }
     });
     try {
-      const home = !category && !trimmed && !cursor;
-      const homePage = home
-        ? await (options.homeCache ? options.homeCache.load(options.list) : loadHomePage(options.list))
-        : null;
+      const home = !category && !trimmed && !cursor && sort === "installs";
+      /* The cache holds the overview of the whole catalog only. */
+      const cache = verified === undefined ? options.homeCache : undefined;
+      const homePage = home ? await (cache ? cache.load(options.list) : loadHomePage(options.list, verified)) : null;
       const page = homePage
         ? null
         : await options.list({
             ...(category ? { category } : {}),
             ...(trimmed ? { query: trimmed } : {}),
-            sort: "installs",
+            ...(verified === undefined ? {} : { verified }),
+            sort,
             limit: PAGE_SIZE,
             ...(cursor ? { cursor } : {}),
           });
@@ -188,22 +218,22 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     }
   }
 
-  /* A category change loads at once; typing waits for a pause before it reaches the network. */
+  /* A filter change loads at once; typing waits for a pause before it reaches the network. */
   createEffect(
-    () => [options.category(), options.query()] as const,
-    ([category, query], previous) => {
+    () => [filter(), options.query()] as const,
+    ([current, query], previous) => {
       clearTimeout(timer);
-      if (previous && previous[0] === category) {
+      if (previous && sameFilter(previous[0], current)) {
         if (previous[1] === query) return;
         requestVersion++;
         /* Paging stops at the keystroke and starts again from the first page of the new query. */
         setState((s) => {
           s.nextCursor = null;
         });
-        timer = setTimeout(() => void load(category, query), SEARCH_DELAY_MS);
+        timer = setTimeout(() => void load(current, query), SEARCH_DELAY_MS);
         return;
       }
-      void untrack(() => load(category, query));
+      void untrack(() => load(current, query));
     },
   );
   onCleanup(() => {
@@ -235,13 +265,13 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     hasMore: () => Boolean(state.nextCursor) && !searchPending(),
     loadMore: () => {
       const cursor = state.nextCursor;
-      if (cursor && !state.loadingMore) void load(options.category(), options.query(), cursor);
+      if (cursor && !state.loadingMore) void load(filter(), options.query(), cursor);
     },
     retry: () => {
       clearTimeout(timer);
       /* A failed "Load more" keeps its rows and its cursor: ask for that page again. */
       const cursor = state.items.length > 0 ? (state.nextCursor ?? undefined) : undefined;
-      void load(options.category(), options.query(), cursor);
+      void load(filter(), options.query(), cursor);
     },
   };
 }

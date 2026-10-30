@@ -274,7 +274,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       // native updater for the ZIP on demand, so the restart action is available immediately.
       this.#markReady(info.version);
     });
-    this.#updater.on("error", () => {
+    this.#updater.on("error", (error: Error) => {
       // Both awaited calls reject on failure, so this only has to cover errors raised outside them,
       // and only for an operation still in flight. An abandoned operation reporting late must not
       // replace the state the user is now looking at.
@@ -286,6 +286,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         // so the app cannot install again; it reports the failure and asks to be relaunched.
         this.#installGeneration += 1;
         this.#activeInstall = null;
+        logUpdateFailure("OpenBot update install failed.", error);
         this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
         return;
       }
@@ -528,6 +529,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           ),
         );
         if (Result.isFailure(result) && this.#downloadGeneration === generation) {
+          logUpdateFailure("OpenBot update download failed.", result.failure.cause);
           this.#activeDownload = null;
           this.#setError("download_failed");
         }
@@ -591,6 +593,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         }),
       );
       if (Result.isFailure(installed) && this.#installGeneration === generation) {
+        logUpdateFailure("OpenBot update install failed.", installed.failure.cause);
         this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.restartFailed")) });
       }
@@ -635,6 +638,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       const request = Deferred.makeUnsafe<UpdateCheckOutcome | null, UpdateOperationFailure>();
       this.#checkRequest = request;
       return yield* updateIO(() => this.#updater.checkForUpdates()).pipe(
+        // Logged once per request, here, because joined callers and the status keep only a message.
+        Effect.tapError(({ cause }) => Effect.sync(() => logUpdateFailure("OpenBot update check failed.", cause))),
         Effect.onExit((exit) =>
           Effect.gen({ self: this }, function* () {
             yield* Deferred.done(request, exit);
@@ -684,6 +689,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return Effect.gen({ self: this }, function* () {
       if (this.#cancellationToken && !this.#cancellationToken.cancelled) return this.#cancellationToken;
       const checked = yield* Effect.result(updateIO(() => this.#updater.checkForUpdates()));
+      if (Result.isFailure(checked)) logUpdateFailure("OpenBot update check failed.", checked.failure.cause);
       this.#cancellationToken = Result.isSuccess(checked) ? (checked.success?.cancellationToken ?? null) : null;
       return this.#cancellationToken;
     });
@@ -873,6 +879,24 @@ function describeCheckFailure(error: unknown) {
   // here once the causes above have been ruled out of its message.
   if (code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND") return CHECK_SERVICE_MESSAGE;
   return errorMessage("check_failed");
+}
+
+/**
+ * The status and `update.log` keep only a failure code. electron-updater puts its own code and the
+ * HTTP status on the error, outside its message, so they are logged apart. The stack is left out:
+ * an offline app fails a check each interval, and electron-updater already puts the stack of the
+ * cause in the message.
+ */
+function logUpdateFailure(text: string, error: unknown): void {
+  const fields = typeof error === "object" && error !== null ? error : {};
+  logger.warn(
+    text,
+    toLogValue({
+      code: "code" in fields ? fields.code : undefined,
+      statusCode: "statusCode" in fields ? fields.statusCode : undefined,
+      message: error instanceof Error ? error.message : error,
+    }),
+  );
 }
 
 function errorMessage(code: UpdateFailureCode) {

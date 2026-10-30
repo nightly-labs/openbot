@@ -79,6 +79,8 @@ export interface ProviderPickerOption {
   message?: string | null | undefined;
   email?: string | null | undefined;
   connectionState?: "connecting" | undefined;
+  /** False while a connecting row is checked again, with no sign-in that waits for the user. */
+  signInPending?: boolean | undefined;
   checkError?: string | null | undefined;
   /** A restart the user asked for waits for the provider's tasks to stop. */
   restartPending?: boolean | undefined;

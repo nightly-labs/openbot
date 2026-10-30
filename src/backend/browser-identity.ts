@@ -9,7 +9,8 @@ export function sessionBrowserUserAgent(userAgent: string): string {
  */
 export function browserRequestUserAgent(url: string, userAgent: string, electronVersion: string): string {
   const cleanAgent = sessionBrowserUserAgent(userAgent);
-  const hostname = new URL(url).hostname.replace(/\.+$/u, "");
+  // Chromium requests some URLs that Node cannot parse, such as a host with an escaped space (#3775).
+  const hostname = URL.parse(url)?.hostname.replace(/\.+$/u, "");
   if (hostname !== "accounts.google.com") return cleanAgent;
   return cleanAgent.replace(/(Chrome\/[^\s]+)/u, `$1 Electron/${electronVersion}`);
 }

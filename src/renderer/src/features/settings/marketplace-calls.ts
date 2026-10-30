@@ -12,7 +12,13 @@ export interface MarketplaceCalls {
   agentSkills: (hostServerId?: string) => AgentSkillCalls;
   mcp: Pick<
     SkillsPort["agent"],
-    "listMcpServers" | "listMcpSignIns" | "removeMcpServer" | "saveMcpServer" | "signInMcpServer" | "testMcpServer"
+    | "cancelMcpSignIn"
+    | "listMcpServers"
+    | "listMcpSignIns"
+    | "removeMcpServer"
+    | "saveMcpServer"
+    | "signInMcpServer"
+    | "testMcpServer"
   >;
   /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
   addAgent: (input: InstallMarketplaceAgentInput, serverId: string | undefined) => Promise<AddedAgent>;
@@ -28,7 +34,6 @@ export interface MarketplaceSignInRelay {
   page: (url: string, serverId: string) => Promise<McpSignInRelayPage | null>;
   open: (url: string, serverId: string) => Promise<void>;
   paste: (url: string, address: string, serverId: string) => Promise<void>;
-  cancel: (url: string, serverId: string) => Promise<void>;
 }
 
 /** Read on each call, as `skillsPort` is: tests and stories replace `window.openbot` per case. */
@@ -46,7 +51,6 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
       page: (url, serverId) => port.agent.mcpSignInRelay({ url }, serverId),
       open: (url, serverId) => port.agent.openMcpSignInRelay({ url }, serverId),
       paste: (url, address, serverId) => port.agent.completeMcpSignInRelay({ url, address }, serverId),
-      cancel: (url, serverId) => port.agent.cancelMcpSignIn({ url }, serverId),
     },
     macAutomation: (targets) => port.macAutomation.request(targets),
   };

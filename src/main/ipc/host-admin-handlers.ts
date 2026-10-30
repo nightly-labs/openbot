@@ -5,9 +5,10 @@ import {
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { Effect, Result } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, prompt cache time and app update of one
-// server's host. On a joined server the request goes to the host. Identity, timezone, memory limit,
-// prompt cache time, settings, cancellation, and forced restarts require an owner or admin.
+// The server name, logo, timezone, agent memory limit, memory review, prompt cache time and app
+// update of one server's host. On a joined server the request goes to the host. Identity, timezone,
+// memory limit, memory review, prompt cache time, settings, cancellation, and forced restarts require
+// an owner or admin.
 // Ordinary members can check and request an idle update through host-member-update-v1.
 
 import {
@@ -15,6 +16,7 @@ import {
   type AgentAccessSnapshot,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
+  decodeHostMemoryReview,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
@@ -22,6 +24,7 @@ import {
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
+  hostMemoryReview,
   isPromptCacheTtl,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
@@ -46,6 +49,7 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_ROUTES,
@@ -56,11 +60,12 @@ import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-stor
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
-import { parseAgentMemoryLimitPreference, parseHostUpdateSettings } from "./app-inputs";
+import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { parseHostIdentity } from "./server-inputs";
@@ -83,6 +88,7 @@ interface HostAdminIpcDependencies {
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
+  memoryReview: MemoryReviewPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
@@ -102,6 +108,7 @@ export function hostAdminIpcHandlers({
   remoteServers,
   serverTimezone,
   agentMemoryLimit,
+  memoryReview,
   machineAlerts,
   promptCacheTtl,
   agentAccess,
@@ -129,6 +136,11 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_MEMORY_LIMIT_CAPABILITY))
       throw new Error(sourceText("error.team.agentMemoryLimitUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostAgentMemoryLimit, { method: "POST", body }));
+  }
+  function remoteMemoryReview(serverId: string, route: string, body: { interval?: number }) {
+    if (!remoteServers.supportsCapability(serverId, MEMORY_REVIEW_CAPABILITY))
+      throw new Error(sourceText("error.team.memoryReviewUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostMemoryReview, { method: "POST", body }));
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))
@@ -246,6 +258,16 @@ export function hostAdminIpcHandlers({
           hostAgentMemoryLimit(await runCauseEffect(agentMemoryLimit.set(parseAgentMemoryLimitPreference({ limit })))),
         remote: (limit, serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.update, { limit }),
       }),
+      getMemoryReview: scopedQueryHandler({
+        local: () => hostMemoryReview(memoryReview.get()),
+        remote: (serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.settings, {}),
+      }),
+      // The host checks the value against its own choices, so a remote value is any count; 0 is off.
+      setMemoryReview: scopedHandler(parseMemoryReviewCount, {
+        local: async (interval) =>
+          hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
+        remote: (interval, serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.update, { interval }),
+      }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
         remote: (serverId) => remoteMachineAlerts(serverId, MACHINE_RESOURCES_ROUTES.alerts, {}),
@@ -307,6 +329,12 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {
   if (!isPromptCacheTtl(value)) throw new Error("Prompt cache time is required.");
+  return value;
+}
+
+function parseMemoryReviewCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+    throw new Error("Memory review interval is required.");
   return value;
 }
 

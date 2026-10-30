@@ -94,6 +94,13 @@ try {
   } else {
     await cp(sunshineBinary, join(outputRoot, `sunshine${executableSuffix}`));
   }
+  // Windows Sunshine reads its DirectX shaders from `assets/` in its working directory, the
+  // runtime directory. Without them it cannot convert a captured frame and does not start.
+  if (platform === "win32") {
+    await cp(join(sunshineSource, "src_assets/windows/assets/shaders"), join(outputRoot, "assets/shaders"), {
+      recursive: true,
+    });
+  }
   await cp(
     join(moonlightSource, "target/release", `web-server${executableSuffix}`),
     join(outputRoot, `web-server${executableSuffix}`),

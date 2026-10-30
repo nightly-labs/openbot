@@ -14,6 +14,8 @@ export interface RepeatableColumn<T> {
   maxlength: number;
   /** An identifier must not be autocorrected. A display name is prose and may be. */
   identifier?: boolean;
+  /** A count, such as a number of tokens: touch keyboards show digits. */
+  numeric?: boolean;
   read: (row: T) => string;
   write: (index: number, value: string) => void;
 }
@@ -24,8 +26,14 @@ interface RepeatableRowsProps<T> {
   /** Names the remove control of row `number`, as `Remove model 1`. */
   removeLabel: (number: number) => string;
   addLabel: string;
-  /** One column for a plain list, such as addresses; two for a name and its value. */
-  columns: readonly [RepeatableColumn<T>] | readonly [RepeatableColumn<T>, RepeatableColumn<T>];
+  /**
+   * One column for a plain list, such as addresses; two for a name and its value; three for a model
+   * with its context window.
+   */
+  columns:
+    | readonly [RepeatableColumn<T>]
+    | readonly [RepeatableColumn<T>, RepeatableColumn<T>]
+    | readonly [RepeatableColumn<T>, RepeatableColumn<T>, RepeatableColumn<T>];
   rows: readonly T[];
   limit: number;
   busy: boolean;
@@ -61,7 +69,15 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
       <For each={props.rows}>
         {(row, index) => (
           <div class="custom-provider-row">
-            <div class={["custom-provider-row-inputs", { "custom-provider-row-single": props.columns.length === 1 }]}>
+            <div
+              class={[
+                "custom-provider-row-inputs",
+                {
+                  "custom-provider-row-single": props.columns.length === 1,
+                  "custom-provider-row-triple": props.columns.length === 3,
+                },
+              ]}
+            >
               <For each={props.columns}>
                 {(column) => (
                   <Input
@@ -71,6 +87,7 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                     placeholder={column.placeholder(row)}
                     autocomplete={column.identifier ? "off" : undefined}
                     spellcheck={column.identifier ? false : undefined}
+                    inputmode={column.numeric ? "numeric" : undefined}
                     maxlength={column.maxlength}
                     disabled={props.busy}
                   />

@@ -153,6 +153,12 @@ export const queryKeys = {
     "agent",
     agentId,
   ],
+  /** The person's read mark of each open thread of one agent, from `agent-thread-reads-v1`. */
+  agentThreadReads: (scope: QueryScope, serverId: string, agentId: string) => [
+    ...queryKeys.serverTasks(scope, serverId),
+    "reads",
+    agentId,
+  ],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",

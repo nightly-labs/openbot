@@ -9,6 +9,7 @@ import {
   isStripeCheckoutUrl,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
+import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { slugifyTeamServerName } from "./validation";
 
@@ -261,6 +262,7 @@ export const HOSTED_SERVER_ENTRY_POINTS = [
   "checkout_resume",
   "drawer",
   "onboarding",
+  "pricing_page",
 ] as const;
 export type HostedServerEntryPoint = (typeof HOSTED_SERVER_ENTRY_POINTS)[number];
 
@@ -273,6 +275,11 @@ export interface CreateHostedServerInput {
   requestId: string;
   /** Older clients do not send it. */
   entryPoint?: HostedServerEntryPoint;
+  /**
+   * A license to buy with the server, at the bundle price, in the same Checkout and payment. It has the
+   * interval and currency of the server. Absent: the server only.
+   */
+  license?: LicenseOrder;
 }
 
 /**
@@ -330,6 +337,11 @@ export function parseCreateHostedServerInput(value: unknown): CreateHostedServer
   };
   // An unknown entry point is left out, not refused: it is analytics only.
   if (isOneOf(HOSTED_SERVER_ENTRY_POINTS, value.entryPoint)) input.entryPoint = value.entryPoint;
+  if (value.license !== undefined) {
+    const license = parseLicenseOrder(value.license);
+    if (!license) return null;
+    input.license = license;
+  }
   return input;
 }
 

@@ -97,6 +97,10 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     return null;
   });
   const activeActivityDetail = createMemo(() => {
+    // A card on screen stops the turn until the user acts, so the last tool step is not what happens now (#3707).
+    if (deps.props.prompt) return currentText().t("chat.activity.waitingForAnswer");
+    if (deps.props.approval) return currentText().t("chat.activity.waitingForApproval");
+    if (deps.props.browserTakeover) return currentText().t("chat.activity.waitingForBrowser");
     const hold = heldByOwnChannelWork();
     if (hold) return currentText().t("chat.activity.workingIn", { channel: hold.channelName });
     const progress = deps.props.activityDetail?.trim();

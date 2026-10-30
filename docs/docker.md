@@ -61,6 +61,32 @@ client at your own origin is not included in this image. The
 [self-hosted account service](self-hosting.md#what-changes) is a separate deployment with its own
 client limits.
 
+## Network
+
+The container uses the Docker bridge network. In the container, OpenBot sees only its bridge
+address. Devices connect to it through the public address of the host or through TURN. On a public
+server, this is sufficient: a test on a VPS gave the same connection time with the bridge network
+and with host networking.
+
+When the devices are on the same local network or Tailscale tailnet as the host, the bridge network
+can make the connection slow: the container does not see the local or `tailscale0` addresses of the
+host, so devices often use TURN. With host networking, OpenBot sees all addresses of the host, and
+devices can connect directly. Add `network_mode: host` to the service in `compose.yaml`, or
+`--network host` to `docker run`. Host networking is available on Linux with Docker Engine.
+
+Host networking removes the network isolation of the container:
+
+- Other programs on the host can connect to the listeners of OpenBot on `127.0.0.1`. These
+  listeners take tokens and team requests.
+- Agents can connect to the services of the host that listen only on `127.0.0.1`.
+- The virtual displays `:0` and `:1` of the container use abstract X sockets, which are in the
+  network namespace. When the host has its own display `:0` or `:1`, the container does not start.
+  Other programs on the host can connect to the displays, see the agent display and send input to it.
+
+Use it only on a host where you trust the other programs and users. Do not use it with
+[several instances on one host](#several-instances-on-one-host): their firewall works only on the
+`openbot` bridge network.
+
 ## Tags
 
 | Tag | Image |
@@ -480,6 +506,9 @@ does not use systemd.
   Podman, Kubernetes, rootless Docker, and hosts that restrict user namespaces with AppArmor, such as
   Ubuntu 23.10 or newer. On such a host, the container can need an AppArmor profile that permits
   `userns`.
+- Host networking: users report that it makes the connection fast on a local network and on a
+  Tailscale tailnet. This was not tested here. On a public Ubuntu 24.04 VPS with Docker 29, the
+  bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.
 - The two displays of the entrypoint were tested with a stand-in for OpenBot: `:0` is 1280x800 and
   `:1` has the display size. Computer Use and remote desktop on `:1` were not tested.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in

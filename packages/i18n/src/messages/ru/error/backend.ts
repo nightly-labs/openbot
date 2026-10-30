@@ -78,6 +78,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "Доставка в канал не создана.",
   "error.backend.channelAssignmentStopped": "Это назначение в канале остановлено или заменено.",
   "error.backend.channelAssigneeUnavailable": "Назначенный агент недоступен.",
+  "error.backend.channelAssigneeRemoved": "Назначенный участник удалён.",
+  "error.backend.channelAssigneeReassign": "Назначенный участник недоступен. Переназначьте эту задачу.",
   "error.backend.channelAssignmentChanged": "Это назначение в канале изменилось.",
   "error.backend.channelMemberRequired": "Выберите доступного участника этого канала.",
   "error.backend.memoryEssentialBudget":
@@ -190,6 +192,7 @@ export const messages = {
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
+  "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
   "error.backend.mcpSignInClientRefused":
@@ -213,6 +216,7 @@ export const messages = {
     "OpenBot не удалось прочитать сведения о входе для этого сервера. Проверьте адрес сервера и повторите попытку.",
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
+  "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":

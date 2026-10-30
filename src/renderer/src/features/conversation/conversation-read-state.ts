@@ -13,6 +13,7 @@ import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -67,6 +68,7 @@ function isIncoming(message: { itemType?: string | undefined }, fromUser: boolea
     message.itemType !== "plan" &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
     message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
+    message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
     message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
     !isRoutineEventItem(message)
   );

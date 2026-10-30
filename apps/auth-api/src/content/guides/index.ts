@@ -5,6 +5,8 @@ import type { ArticleBody } from "../body";
 import { AgenticAIDefinition } from "./agentic-ai-definition";
 import { AIAgentsExamples } from "./ai-agents-examples";
 import { AIAgentsVsAgenticAI } from "./ai-agents-vs-agentic-ai";
+import { ImportGrokBotAgents } from "./import-grok-bot-agents";
+import { ImportHermesAgents } from "./import-hermes-agents";
 import { OpenBot101 } from "./openbot-101";
 import { OpenBotHostedServers } from "./openbot-hosted-servers";
 import { OpenBotMarketplace } from "./openbot-marketplace";
@@ -12,6 +14,8 @@ import { WhatAreAIAgents } from "./what-are-ai-agents";
 import { WtfIsOpenBot } from "./wtf-is-openbot";
 
 export const GUIDE_BODIES: Readonly<Record<string, ArticleBody>> = {
+  "import-hermes-agents": ImportHermesAgents,
+  "import-grok-bot-agents": ImportGrokBotAgents,
   "ai-agents-examples": AIAgentsExamples,
   "ai-agents-vs-agentic-ai": AIAgentsVsAgenticAI,
   "agentic-ai-definition": AgenticAIDefinition,

@@ -96,6 +96,8 @@ export interface BrowserDockPresentation {
   hold: QueueHold | null;
   editingDeliveryId: string | null;
   canSteer: boolean;
+  /** Whether the agent's provider can steer a running turn at all. */
+  steerSupported: boolean;
   canRunAsTask: boolean;
   island: BrowserDockIsland | null;
   handoffPending: boolean;
@@ -159,6 +161,7 @@ export function isBrowserDockPresentation(value: unknown): value is BrowserDockP
     (value.hold === null || isQueueHold(value.hold)) &&
     (value.editingDeliveryId === null || isIdentifier(value.editingDeliveryId)) &&
     isBoolean(value.canSteer) &&
+    isBoolean(value.steerSupported) &&
     isBoolean(value.canRunAsTask) &&
     (value.island === null || isBrowserDockIsland(value.island)) &&
     isBoolean(value.handoffPending) &&

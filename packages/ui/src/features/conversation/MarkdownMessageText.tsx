@@ -542,7 +542,7 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   const { t } = useText();
   return (
     <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
-      <table class="message-markdown-table">
+      <table class="message-markdown-table" style={`--message-markdown-table-columns: ${headers().length}`}>
         <thead>
           <tr>
             <For each={headers()}>

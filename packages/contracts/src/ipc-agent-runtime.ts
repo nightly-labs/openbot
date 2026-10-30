@@ -154,7 +154,11 @@ export interface AgentContextCategoryUsage {
   tokens: number;
 }
 
-/** Local desktop context state. Frozen Team adapters do not carry this field. */
+/**
+ * How full the context window of one chat is. The Team API carries it only under context-usage-v1, with
+ * the keys and values that `team-protocol/context-usage-v1.ts` freezes: a new key or value goes only to a
+ * later capability.
+ */
 export interface AgentContextState {
   agentId: string;
   threadId: string;
@@ -220,7 +224,7 @@ function isAgentContextState(value: unknown): value is AgentContextState {
 
 export interface AgentRuntimeSnapshot {
   contextStates?: AgentContextState[];
-  /** The context of each side thread that reported one, by its `threadId`. Local only, as `contextStates` is. */
+  /** The context of each side thread that reported one, by its `threadId`. Team API: as `contextStates`. */
   threadContextStates?: AgentContextState[];
   agents: AgentRuntimeRosterEntry[];
   activeTurns: Array<{ agentId: string; threadId: string; turnId: string }>;

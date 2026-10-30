@@ -1,11 +1,17 @@
+import { ConfirmDialog } from "@openbot/ui";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
 import { createMarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
 import { McpConnectDialog } from "@openbot/ui/features/settings/McpConnectDialog";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
-import { createMarketplaceController, type MarketplaceControllerProps } from "./marketplace-controller";
+import {
+  createMarketplaceController,
+  type MarketplaceControllerProps,
+  type PendingSkillConfirm,
+} from "./marketplace-controller";
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
   /**
@@ -28,8 +34,19 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 
 /** The Marketplace on this computer's or a joined server's data, with the dialogs it opens. */
 export function MarketplaceModal(props: MarketplaceModalProps) {
+  const { t } = useText();
   const nav = createMarketplaceNavigation();
   const controller = createMarketplaceController(props);
+  const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
+  const skillConfirmBody = (confirm: PendingSkillConfirm) =>
+    `${t(confirm.kind === "replace" ? "skill.confirm.replaceBody" : "skill.confirm.removeModifiedBody")} ${t(
+      "skill.marketplace.confirmAgents",
+      { agents: confirm.agents },
+    )}`;
+  const skillConfirmLabel = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replace" : "skill.confirm.remove");
+  const skillConfirmTone = (confirm: PendingSkillConfirm) => (confirm.kind === "replace" ? "default" : "destructive");
   /**
    * A Connect press from a chat card. It runs when the listing is in the apps and their states are
    * read, so an installed app is not installed again.
@@ -128,6 +145,20 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           />
         )}
       </Show>
+      <Show when={controller.skillConfirm()} keyed>
+        {(confirm) => (
+          <ConfirmDialog
+            open={true}
+            onCancel={() => confirm.settle(false)}
+            onConfirm={() => confirm.settle(true)}
+            title={skillConfirmTitle(confirm)}
+            description={skillConfirmBody(confirm)}
+            tone={skillConfirmTone(confirm)}
+            confirmLabel={skillConfirmLabel(confirm)}
+            initialFocus="cancel"
+          />
+        )}
+      </Show>
       <Show when={controller.connecting()} keyed>
         {(pending) => (
           <McpConnectDialog
@@ -140,7 +171,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             onOpenUrl={controller.openPluginUrl}
             hostName={props.pluginHostName}
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
-            onCancelSignIn={controller.cancelSignInRelay}
+            onCancelSignIn={controller.cancelSignIn}
             signInExtra={
               /* The page opens in this computer's browser; the paste field is the way back when the
                  browser cannot reach this computer's listener. */
@@ -153,7 +184,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
                     page={relay.page}
                     onOpen={controller.openSignInRelay}
                     onPaste={controller.pasteSignInRelay}
-                    onCancel={controller.cancelSignInRelay}
+                    onCancel={controller.cancelSignIn}
                   />
                 )}
               </Show>

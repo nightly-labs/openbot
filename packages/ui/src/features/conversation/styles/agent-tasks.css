@@ -1,0 +1,7 @@
+/* The state glyph of a task on the Tasks page. */
+.agent-tasks-mark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  --task-list-glyph: 14px;
+}

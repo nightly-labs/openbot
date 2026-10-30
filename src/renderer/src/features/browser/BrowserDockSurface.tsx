@@ -155,7 +155,7 @@ export function BrowserDockSurface() {
             }}
             onSend={(value) => perform({ type: "send", text: value })}
             onStop={() => perform({ type: "stop" })}
-            onSteer={(deliveryId) => perform({ type: "steer", deliveryId })}
+            onSteer={dock().steerSupported ? (deliveryId) => perform({ type: "steer", deliveryId }) : undefined}
             onRunAsTask={dock().canRunAsTask ? (deliveryId) => perform({ type: "run-as-task", deliveryId }) : undefined}
             onCancel={(deliveryId) => perform({ type: "cancel", deliveryId })}
             onEdit={(delivery) => perform({ type: "edit", deliveryId: delivery.id })}

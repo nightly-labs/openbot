@@ -21,6 +21,22 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "import-hermes-agents",
+      title: "How to Import Hermes Agents into OpenBot",
+      description:
+        "Import your Hermes Agent profiles into OpenBot. Choose what to bring over, review instructions, memories and skills, and check your agents after import.",
+      publishedAt: "2026-10-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "import-grok-bot-agents",
+      title: "How to Import Grok Bot Agents into OpenBot",
+      description:
+        "Move your Grok Bot agents into OpenBot with one ZIP export. Follow the steps for instructions, skills, memories, routines and optional files.",
+      publishedAt: "2026-10-23",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "ai-agents-examples",
       title: "20 Real AI Agent Examples for Work and Business",
       description:

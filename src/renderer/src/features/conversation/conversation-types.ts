@@ -37,7 +37,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
-import type { ThreadHeaderProps } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
@@ -69,7 +69,12 @@ export interface ConversationTarget {
 /** What was said so far in a recording, and the conversation it is dictated into. */
 export interface VoiceLiveTranscript extends ConversationTarget {
   text: string;
+  /** The side thread draft that the recording is dictated into. Undefined for the agent's own chat. */
+  threadKey?: string | undefined;
 }
+
+/** A browser takeover that an agent's turn waits for. */
+export type BrowserTakeoverRequest = Extract<AgentEvent, { type: "browser-takeover-requested" }>["request"];
 
 /** How an answer to a prompt reports a failure. */
 export interface PromptAnswerOptions {
@@ -264,7 +269,8 @@ export interface ConversationProps {
   usageLimitAsk?: UsageLimitAskCardProps | undefined;
   /** Whether a usage limit holds this model and account now. Absent for a joined server. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
-  browserTakeover: Extract<AgentEvent, { type: "browser-takeover-requested" }>["request"] | undefined;
+  /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
+  browserTakeover: BrowserTakeoverRequest | undefined;
   onSelectAgent: (agentId: string) => void;
   /**
    * What stops each agent in its own chat: a question, an approval, a browser takeover or a usage
@@ -309,7 +315,12 @@ export interface ConversationProps {
   remoteBackupModelsLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
   remoteTaskLimitLoaded?: boolean | undefined;
-  /** The app default an agent without its own busy-message setting follows. Local agents only. */
+  /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
+  remoteBusyMessageModeLoaded?: boolean | undefined;
+  /**
+   * The default an agent without its own busy-message setting follows: this computer's for a local
+   * agent, the host's for an agent of a joined server.
+   */
   defaultBusyMessageMode?: BusyMessageMode | undefined;
   /** The account defaults an agent without its own value follows. Local agents only. */
   agentDefaults?: AgentDefaults | undefined;
@@ -321,7 +332,8 @@ export interface ConversationProps {
   onClearAgentContext?: (() => Promise<void>) | undefined;
   /** Compacts the agent's context now. The context ring offers it only where OpenBot compacts. */
   onCompactAgentContext?: (() => Promise<void>) | undefined;
-  onRespondToBrowserTakeover: (decision: "complete" | "cancel") => Promise<boolean>;
+  /** Answers `browserTakeover`. */
+  onRespondToBrowserTakeover: (decision: "complete" | "cancel", options?: PromptAnswerOptions) => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string) => void;
   onCancelWait?: ((waitId: string) => void) | undefined;
   onSteerQueuedMessage: (deliveryId: string) => void;
@@ -384,7 +396,9 @@ export type RightPanelMode =
   | "files"
   | "question"
   | "voice"
-  | "subagent";
+  | "subagent"
+  /** A side thread in the side panel, beside the agent's own chat. */
+  | "thread";
 
 export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 
@@ -394,6 +408,8 @@ export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel"
  */
 export interface ConversationThreads {
   header: ThreadHeaderProps;
+  /** The side threads with a tab in the side panel. */
+  side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
   /** How many side threads of the agent can run at the same time. */
@@ -409,11 +425,40 @@ export interface ConversationThreads {
   /** `attachmentDraftIds` are the files that the text names. */
   onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
   onStop: () => void;
-  onRespondApproval: (decision: "accept" | "decline") => Promise<boolean>;
+  /** The person sees the open side thread through this message. */
+  onRead: (messageId: string) => void;
+  onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;
   /** The context of the open side thread, when its provider reported it. */
   contextState: AgentContextState | undefined;
   /** Missing when the host cannot compact a side thread. */
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+}
+
+/** The side threads in the side panel. Each shows beside the agent's own chat. */
+interface SideThreads {
+  /** In tab order. */
+  tabs: readonly ThreadItem[];
+  /** A thread of a tab, with the actions of its own message box. Undefined when the thread is gone. */
+  thread: (id: string) => SideThread | undefined;
+  /** Moves a chat tab to the side panel. */
+  onToSide: (id: string) => void;
+  /** Moves a side panel tab back to the chat tabs, and opens it there. */
+  onToChat: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+}
+
+/** A side thread in the side panel. Each action applies to this thread. */
+export interface SideThread {
+  task: AgentTask;
+  conversation: ConversationSnapshot | undefined;
+  approval: AgentApproval | undefined;
+  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  onStop: () => void;
+  onRead: (messageId: string) => void;
+  onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;
+  contextState: AgentContextState | undefined;
+  onCompactContext?: (() => Promise<void>) | undefined;
 }

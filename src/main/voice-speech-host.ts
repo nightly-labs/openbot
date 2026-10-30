@@ -11,7 +11,11 @@
 import { join } from "node:path";
 import type { VoiceSpeechFailure, VoiceSpeechRequest, VoiceSpeechResponse } from "./voice-speech-protocol";
 
-/** More denoising steps sound cleaner and take longer; 8 still reads about five times real time. */
+/**
+ * More denoising steps sound cleaner and take longer; 8 still reads about five times real time.
+ * The same value as `SUPERTONIC_DENOISING_STEPS` in `@openbot/contracts/speech-models`, which the
+ * phone uses. This host imports only `node:*` at runtime, so the number is repeated here.
+ */
 const DENOISING_STEPS = 8;
 
 /** The part of the sherpa-onnx offline TTS configuration that OpenBot sets. */

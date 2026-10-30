@@ -1,8 +1,9 @@
-import { isAgentTaskOpen, taskNeedsYou } from "@openbot/team-client/agent-tasks";
+import { isAgentTaskOpen } from "@openbot/team-client/agent-tasks";
 import { addCalendarDays, calendarDayOf } from "@openbot/team-client/routine-calendar-dates";
 import { useQuery } from "@tanstack/react-query";
 import { lastUsageDays } from "@/features/agents/components/usage-range-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useServerThreadReads } from "@/features/chat/components/use-agent-thread-reads";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
 import {
   useMobileWorkspaceActions,
@@ -69,6 +70,7 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   const from = new Date(start).toISOString();
   const to = new Date(start + ROUTINE_LOOKAHEAD_DAYS * DAY).toISOString();
   const serverTasks = useServerTasks(serverId, { enabled });
+  const threadReads = useServerThreadReads(serverId, serverTasks.tasks);
   const routines = useQuery({
     queryKey: queryKeys.serverRoutines(queryScope, serverId, from, to),
     queryFn: () =>
@@ -120,19 +122,21 @@ export function useDrawerServerValues(server: MobileServer | undefined, open: bo
   const cost = usage.data?.totals.estimatedCostUsd ?? null;
   // A large amount drops its cents: the row has room for a short value.
   const digits = cost !== null && cost >= 100 ? 0 : 2;
-  // As the prototype: the tasks that need the person, else the tasks that run.
-  const openTasks = serverTasks.tasks.filter(isAgentTaskOpen);
-  const needsYou = openTasks.filter(taskNeedsYou).length;
-  const working = openTasks.filter((task) => task.state === "running").length;
+  // The threads with agent messages that the person has not read, else the threads that run. The host
+  // keeps the read marks; a host without them shows only the threads that run.
+  const unread = serverTasks.tasks.filter(
+    (task) => isAgentTaskOpen(task) && (threadReads?.get(task.id)?.unreadCount ?? 0) > 0,
+  ).length;
+  const working = serverTasks.tasks.filter((task) => isAgentTaskOpen(task) && task.state === "running").length;
   return {
     tasks: serverTasks.supported
       ? {
-          value: needsYou
-            ? t("mobile.server.drawer.tasksNeedYou", { count: needsYou })
+          value: unread
+            ? t("mobile.server.drawer.threadsUnread", { count: unread })
             : working
-              ? t("mobile.server.drawer.tasksWorking", { count: working })
+              ? t("mobile.server.drawer.threadsWorking", { count: working })
               : null,
-          needsYou: needsYou > 0,
+          needsYou: unread > 0,
         }
       : null,
     nextRoutine,

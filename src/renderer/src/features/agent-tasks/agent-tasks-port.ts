@@ -4,7 +4,15 @@ import type { AgentTaskInput, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface AgentTasksPort
   extends Pick<
     OpenBotDesktopApi["agent"],
-    "closeTask" | "deleteTask" | "listTasks" | "readTask" | "renameTask" | "reopenTask" | "startTask" | "stopTask"
+    | "closeTask"
+    | "deleteTask"
+    | "listTasks"
+    | "markTaskRead"
+    | "readTask"
+    | "renameTask"
+    | "reopenTask"
+    | "startTask"
+    | "stopTask"
   > {
   /** Steers the thread's running turn, or queues the message in the thread. */
   sendToTask(
@@ -32,5 +40,6 @@ export function agentTasksPort(): AgentTasksPort {
     reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
     renameTask: (input) => agent.renameTask(input),
     deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
+    markTaskRead: (input) => agent.markTaskRead(input),
   };
 }

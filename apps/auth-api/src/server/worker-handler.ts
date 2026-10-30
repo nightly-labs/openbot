@@ -209,6 +209,7 @@ function tickHostedServers(
     const result = yield* createHostedBilling(bindings, {
       removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
       planChanged: (hostId) => remote.planChanged(hostId),
+      licenseChanged: (userId) => remote.licenseChanged(userId),
       schedule: (send) => sends.push(send),
     }).hosting.tick(now);
     return result;

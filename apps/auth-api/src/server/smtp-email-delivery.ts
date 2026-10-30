@@ -95,6 +95,11 @@ export const EMAIL_CODE_DELIVERY_BUDGET_MS = 25_000;
 // `auth-service` answers 429 for this message instead of a permanent 502. Every delivery method
 // raises it, so the service stays free of provider detail.
 export const RATE_LIMITED_DELIVERY_ERROR = "email_delivery_rate_limited";
+/** The messages of a send that the server may have taken, so the recipient can still get it. */
+export const AMBIGUOUS_DELIVERY_ERRORS: ReadonlySet<string> = new Set([
+  "smtp_delivery_unknown",
+  "email_delivery_unknown",
+]);
 // A sender-limit refusal that arrives with a permanent 5xx reply. Namecheap Private Email answers
 // `554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60
 // minutes` when the hourly quota of the sending mailbox is spent, which is a temporary condition

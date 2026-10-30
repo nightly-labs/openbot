@@ -1,5 +1,6 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { StackActions } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import X from "lucide-react-native/icons/x";
 import { useMemo } from "react";
@@ -54,8 +55,13 @@ function UploadRow({ pending }: { pending: QueuedUpload }) {
   );
 }
 
+/** The route name of an agent chat in the app stack, `app/(app)/chat/[agentId].tsx`. */
+const CHAT_ROUTE = "chat/[agentId]";
+
 export function QueuedMessagesScreen() {
   const { t, format } = useText();
+  // The stack that presents this sheet. The sheet has its own stack inside.
+  const sheetStack = useNavigation().getParent();
   const { chat } = useLocalSearchParams<{ chat: string }>();
   const { queue, pending } = useQueuedChat(chat);
   const queued = queue?.queued;
@@ -98,6 +104,8 @@ export function QueuedMessagesScreen() {
             ? (deliveryId) => router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId } })
             : undefined
         }
+        // The teammate's chat takes the place of the sheet, so Back returns to this agent's chat.
+        onOpenAgent={(teammateId) => sheetStack?.dispatch(StackActions.replace(CHAT_ROUTE, { agentId: teammateId }))}
       />
       {count > 0 ? (
         <SettingsSection title={t("mobile.chat.queue.waitingTitle")}>

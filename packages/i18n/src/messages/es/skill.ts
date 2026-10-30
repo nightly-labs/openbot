@@ -63,4 +63,14 @@ export const messages = {
   "skill.preview.examplePrompt": "Ayúdame a usar esta habilidad.",
   "skill.preview.try": "Probar habilidad",
   "skill.preview.linkFailed": "No se pudo abrir el enlace.",
+
+  "skill.marketplace.changed": { one: "{name} cambió en {count} agente.", other: "{name} cambió en {count} agentes." },
+  "skill.marketplace.updated": {
+    one: "{name} actualizada en {count} agente.",
+    other: "{name} actualizada en {count} agentes.",
+  },
+  "skill.marketplace.undone": "Se deshizo el cambio en {name}.",
+  "skill.marketplace.confirmAgents": "Agentes: {agents}.",
+  "skill.marketplace.limitReason": "Un agente puede tener hasta {limit} habilidades.",
+  "skill.marketplace.cannotRemove": "OpenBot no puede eliminar una habilidad integrada ni una que no instaló.",
 } as const satisfies PartialTranslation<typeof source>;

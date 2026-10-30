@@ -44,7 +44,7 @@ import { devFeatureOverride } from "@/shared/lib/dev-feature-overrides";
 import { haptics } from "@/shared/lib/haptics";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { ServerAvatar } from "./server-avatar";
@@ -79,8 +79,6 @@ function serverDetail(server: MobileServer, t: MobileTranslate): string {
   const pending = server.state === "connecting" && server.initialConnectionPending;
   return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server, t)}` : label;
 }
-
-function ignoreLongPress(): void {}
 
 type ServerExit = "leave" | "remove";
 
@@ -266,7 +264,17 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
         // The native context menu does not cancel this touch. Without a long-press handler, lifting the
         // finger after the menu opens counts as a tap and closes the drawer under the open menu.
-        onLongPress={editing ? undefined : isAndroid ? () => menus.current.get(serverItem.id)?.show() : ignoreLongPress}
+        delayLongPress={longPressDelay}
+        onLongPress={
+          editing
+            ? undefined
+            : () => {
+                // A row with no actions has no menu, so it gives no menu haptic.
+                if (menuActions(serverItem).length === 0) return;
+                void haptics.longPress();
+                if (isAndroid) menus.current.get(serverItem.id)?.show();
+              }
+        }
         style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 4, opacity: pressed ? 0.58 : 1, width })}
       >
         <ServerAvatar server={serverItem} size={SERVER_AVATAR_SIZE} />
@@ -510,7 +518,7 @@ function DrawerServerTools({
       {values.tasks ? (
         <DrawerRow
           icon={SquareCheck}
-          label={t("mobile.app.route.tasks")}
+          label={t("mobile.app.route.threads")}
           value={values.tasks.value}
           accentValue={values.tasks.needsYou}
           href={routes.tasks}

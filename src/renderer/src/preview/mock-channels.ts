@@ -1,3 +1,4 @@
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentEvent,
   Channel,
@@ -108,13 +109,24 @@ export function createMockChannels(
         // choice as a channel message. It skips both when the answer is already known: a named
         // recipient, or a channel with one member. The preview has no model, so it keeps assigning
         // the lead, but it reproduces which requests get a visible dispatch row and which do not.
-        const routed = !input.recipientAgentId && channel.members.length > 1 && channel.leadAgentId !== null;
+        // As in the real service, each member that the message opens with gets a task of its own.
+        const address = leadingAddress(input.text);
+        const recipients = [
+          ...new Set([
+            ...(input.recipientAgentId ? [input.recipientAgentId] : []),
+            ...address.mentions
+              .map((mention) => mention.id)
+              .filter((agentId) => channel.members.some((member) => member.agentId === agentId)),
+            ...(address.everyone ? channel.members.map((member) => member.agentId) : []),
+          ]),
+        ];
+        const routed = !recipients.length && channel.members.length > 1 && channel.leadAgentId !== null;
         work.push({
           id: taskId,
           channelId: channel.id,
           rootTaskId: taskId,
           parentTaskId: null,
-          ownerAgentId: input.recipientAgentId ?? channel.leadAgentId,
+          ownerAgentId: recipients[0] ?? channel.leadAgentId,
           requestMessageId: id,
           instruction: input.text,
           attachmentDraftIds: input.attachmentDraftIds,
@@ -127,6 +139,27 @@ export function createMockChannels(
           assignmentCount: 0,
           error: null,
         });
+        for (const agentId of recipients.slice(1)) {
+          const siblingId = crypto.randomUUID();
+          work.push({
+            id: siblingId,
+            channelId: channel.id,
+            rootTaskId: siblingId,
+            parentTaskId: null,
+            ownerAgentId: agentId,
+            requestMessageId: id,
+            instruction: input.text,
+            attachmentDraftIds: [],
+            expectedResult: "Complete the requested work and report the result.",
+            sourceMessageIds: [id],
+            dependencies: [],
+            resources: ["host"],
+            state: "queued",
+            revision: 0,
+            assignmentCount: 0,
+            error: null,
+          });
+        }
         list.push({
           id,
           channelId: channel.id,

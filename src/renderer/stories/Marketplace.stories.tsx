@@ -1,13 +1,17 @@
-import type {
-  InstalledSkill,
-  MarketplaceAgentSummary,
-  MarketplaceSkillQuery,
-  MarketplaceSkillSummary,
-  McpServerConfig,
+import {
+  AVATAR_HUES,
+  type ClientAgentSummary,
+  type InstalledSkill,
+  type MarketplaceAgentSummary,
+  type MarketplaceSkillQuery,
+  type MarketplaceSkillSummary,
+  type McpServerConfig,
+  type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
+import { AgentsDialog } from "@openbot/ui/features/marketplace/MarketplaceAgentsDialog";
 import type { MarketplaceApp, MarketplaceModel } from "@openbot/ui/features/marketplace/marketplace-model";
 import {
   createMarketplaceNavigation,
@@ -47,7 +51,143 @@ function page<T extends { name: string; description: string; category?: string |
   };
 }
 
-function installed(skill: MarketplaceSkillSummary): InstalledSkill {
+/** The skill catalog: filters, sort and pages of `limit`, as the catalog server answers. */
+function skillPage(items: readonly MarketplaceSkillSummary[], query: MarketplaceSkillQuery) {
+  const found = page(items, query).items.filter(
+    (item) =>
+      (query.verified === undefined || (item.verified === true) === query.verified) &&
+      (query.featured !== true || item.featured),
+  );
+  const sort = query.sort ?? "installs";
+  found.sort((left, right) => {
+    if (sort === "name") return left.name.localeCompare(right.name);
+    if (sort === "updated") return right.updatedAt.localeCompare(left.updatedAt);
+    return right.installs - left.installs;
+  });
+  const start = Number(query.cursor ?? 0);
+  const end = start + (query.limit ?? 50);
+  return { items: found.slice(start, end), nextCursor: end < found.length ? String(end) : null };
+}
+
+/** More catalog skills, so that a group holds more than the 6 rows that the Skills tab shows. */
+const SKILL_WORDS: readonly (readonly [SkillCategory, readonly string[], readonly string[]])[] = [
+  [
+    "coding",
+    ["Review", "Test", "Lint", "Document", "Profile", "Refactor"],
+    ["pull requests", "SQL queries", "React components", "Go services", "shell scripts"],
+  ],
+  ["documents", ["Summarize", "Translate", "Proofread"], ["contracts", "meeting notes", "reports", "proposals"]],
+  ["design", ["Audit", "Critique"], ["color palettes", "landing pages", "forms"]],
+];
+
+const MORE_SKILLS: readonly MarketplaceSkillSummary[] = SKILL_WORDS.flatMap(([category, verbs, things]) =>
+  verbs.flatMap((verb) => things.map((thing) => ({ category, name: `${verb} ${thing}` }))),
+).map(({ category, name }, index): MarketplaceSkillSummary => {
+  const slug = name.toLowerCase().replaceAll(" ", "-");
+  return {
+    id: `skill-${slug}`,
+    slug,
+    name,
+    description: `${name.replace(/^\S+/, (verb) => `${verb}s`)} and reports what it found, one line for each.`,
+    category,
+    creatorName: index % 3 === 0 ? "OpenBot" : "Priya Raman",
+    version: 1 + (index % 4),
+    installs: 900 - index * 17,
+    featured: index % 9 === 0,
+    verified: index % 3 === 0,
+    iconUrl: null,
+    updatedAt: `2026-08-${String(1 + (index % 28)).padStart(2, "0")}T09:00:00.000Z`,
+  };
+});
+
+const CATALOG: readonly MarketplaceSkillSummary[] = [...STORY_MARKETPLACE_SKILLS, ...MORE_SKILLS];
+
+/** The 47 agents after the fixture agents: 50 in all, as a user with a large team has. */
+const MORE_AGENTS = [
+  "Support Triage|Support lead",
+  "Billing|Billing assistant",
+  "Recruiting|Recruiter",
+  "Onboarding|Onboarding guide",
+  "Legal Review|Contract reviewer",
+  "Finance Close|Month-end accountant",
+  "Data Pipeline|Data engineer",
+  "QA|Test engineer",
+  "Release Manager|Release coordinator",
+  "Docs Writer|Technical writer",
+  "Design Review|Design critic",
+  "Security Audit|Security reviewer",
+  "Social Media|Social media manager",
+  "Newsletter|Newsletter editor",
+  "SEO|Search specialist",
+  "Customer Success|Account manager",
+  "Partnerships|Partner manager",
+  "Procurement|Buyer",
+  "Payroll|Payroll assistant",
+  "IT Helpdesk|IT support",
+  "Infra On-call|Site reliability engineer",
+  "Mobile QA|Mobile tester",
+  "Web QA|Web tester",
+  "Growth Analytics|Growth analyst",
+  "Pricing|Pricing analyst",
+  "Investor Updates|Investor relations",
+  "Board Prep|Chief of staff deputy",
+  "Hiring Pipeline|Hiring coordinator",
+  "Interview Notes|Interview scribe",
+  "Translation DE|German translator",
+  "Translation JA|Japanese translator",
+  "Translation ES|Spanish translator",
+  "Community|Community manager",
+  "Discord Moderator|Moderator",
+  "Events|Event planner",
+  "Travel|Travel planner",
+  "Inbox Zero|Inbox assistant",
+  "Calendar|Scheduler",
+  "Meeting Notes|Note taker",
+  "Competitor Watch|Market watcher",
+  "Market Research|Market researcher",
+  "Grant Writing|Grant writer",
+  "Contracts|Contract manager",
+  "Compliance|Compliance officer",
+  "Vendor Review|Vendor analyst",
+  "Incident Review|Postmortem writer",
+  "Code Review|Reviewer",
+];
+
+const MANY_AGENTS: readonly ClientAgentSummary[] = [
+  ...STORY_AGENT_SUMMARIES,
+  ...MORE_AGENTS.flatMap((entry, index): ClientAgentSummary[] => {
+    const [name = "", title = ""] = entry.split("|");
+    const base = STORY_AGENT_SUMMARIES[index % STORY_AGENT_SUMMARIES.length];
+    const id = name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+    if (!base) return [];
+    return [
+      {
+        ...base,
+        id,
+        name,
+        title,
+        threadId: `thread-${id}`,
+        avatarSeed: id,
+        avatarHue: AVATAR_HUES[index % AVATAR_HUES.length] ?? null,
+      },
+    ];
+  }),
+];
+
+/** A skill that the user made on this computer: no catalog listing. */
+const LOCAL_SKILL: InstalledSkill = {
+  skillId: "local-weekly-report",
+  slug: "weekly-report",
+  name: "Weekly report",
+  installedVersion: 1,
+  availableVersion: 1,
+  state: "installed",
+  enabled: true,
+  origin: "local",
+  description: "Writes the Friday report from this week's closed tasks.",
+};
+
+function installed(skill: MarketplaceSkillSummary, change: Partial<InstalledSkill> = {}): InstalledSkill {
   return {
     skillId: skill.id,
     slug: skill.slug,
@@ -56,7 +196,29 @@ function installed(skill: MarketplaceSkillSummary): InstalledSkill {
     availableVersion: skill.version,
     state: "installed",
     enabled: true,
+    origin: "marketplace",
+    description: skill.description,
+    ...change,
   };
+}
+
+/** What the agents have: an update, a skill that is off, one that the user changed, and a local skill. */
+function startSkills(agents: readonly ClientAgentSummary[]): Record<string, InstalledSkill[]> {
+  const [releaseNotes, sqlReview, designAudit] = STORY_MARKETPLACE_SKILLS;
+  if (!releaseNotes || !sqlReview || !designAudit) return {};
+  const skills: Record<string, InstalledSkill[]> = {
+    chief: [
+      installed(releaseNotes, { installedVersion: releaseNotes.version - 1, state: "update-available" }),
+      installed(sqlReview),
+      LOCAL_SKILL,
+    ],
+    research: [installed(releaseNotes), installed(designAudit, { enabled: false })],
+  };
+  // With many agents, the first skill is on 12 of them, so its page has a search.
+  for (const agent of agents.slice(3, 13)) skills[agent.id] = [installed(releaseNotes)];
+  const third = agents[2];
+  if (third) skills[third.id] = [installed(sqlReview, { state: "modified" })];
+  return skills;
 }
 
 /** What the host holds for a plugin's apps: a working row, or a row whose sign-in the server refused. */
@@ -76,6 +238,12 @@ interface StoryProps {
   connected?: boolean;
   /** The window runs on a Mac, so the Apple apps listing can ask macOS for access. */
   macOS?: boolean;
+  /** 50 agents, as a user with a large team has. */
+  manyAgents?: boolean;
+  /** No agent has a skill yet. */
+  noSkills?: boolean;
+  /** The agents dialog of this skill is open over the window. */
+  dialogSkill?: string;
 }
 
 /** The Apple apps listing, which only a Mac asks macOS about. */
@@ -90,11 +258,21 @@ function pluginStatus(held: HeldState | undefined): MarketplaceApp["status"] {
 
 /** The real window on fixtures. Each action changes the fixture state, so the states can be tried. */
 function MarketplaceStory(props: StoryProps) {
-  const { member, empty, start, held = FIRST_HELD, connected, macOS } = untrack(() => ({ ...props }));
+  const {
+    member,
+    empty,
+    start,
+    held = FIRST_HELD,
+    connected,
+    macOS,
+    manyAgents,
+    noSkills,
+    dialogSkill,
+  } = untrack(() => ({ ...props }));
   const details = connected ? CONNECTED_CONNECTOR_DETAILS : STORY_CONNECTOR_DETAILS;
   const agents = empty ? [] : STORY_MARKETPLACE_AGENTS;
-  const skills = empty ? [] : STORY_MARKETPLACE_SKILLS;
-  const firstSkill = STORY_MARKETPLACE_SKILLS[0];
+  const skills = empty ? [] : CATALOG;
+  const userAgents = manyAgents ? MANY_AGENTS : STORY_AGENT_SUMMARIES;
   const connectors = storyConnectorSet(details);
   // The story fixes the names once, in the language it opens with.
   const connectorApps = untrack(() =>
@@ -119,7 +297,7 @@ function MarketplaceStory(props: StoryProps) {
     notice: string;
   }>({
     added: { [STORY_MARKETPLACE_AGENTS[1]?.id ?? ""]: true },
-    installed: { chief: firstSkill ? [installed(firstSkill)] : [] },
+    installed: noSkills ? {} : startSkills(userAgents),
     apps: [
       ...connectorApps,
       ...[...STORY_MARKETPLACE_PLUGINS, ...(macOS ? APPLE_APPS : [])].map((plugin): MarketplaceApp => {
@@ -195,6 +373,40 @@ function MarketplaceStory(props: StoryProps) {
     });
   };
 
+  /** A catalog skill, or a copy of the skill that another agent has: a local skill has no listing. */
+  const skillFor = (skillId: string): InstalledSkill | undefined => {
+    const listing = CATALOG.find((entry) => entry.id === skillId);
+    if (listing) return installed(listing);
+    const copy = Object.values(state.installed)
+      .flat()
+      .find((entry) => entry.skillId === skillId);
+    return copy && { ...copy, enabled: true };
+  };
+  const changeSkill = (skillId: string, change: { add: readonly string[]; remove: readonly string[] }) => {
+    const skill = skillFor(skillId);
+    setState((draft) => {
+      for (const agentId of change.remove)
+        draft.installed[agentId] = (draft.installed[agentId] ?? []).filter((entry) => entry.skillId !== skillId);
+      for (const agentId of change.add)
+        if (skill) draft.installed[agentId] = [...(draft.installed[agentId] ?? []), skill];
+    });
+  };
+  /** A generated listing has no details in the fixtures: its page shows its summary and a short SKILL.md. */
+  const skillDetail = (id: string) => {
+    const listing = CATALOG.find((entry) => entry.id === id);
+    return (
+      listing && {
+        ...listing,
+        versionId: `${listing.id}-v${listing.version}`,
+        bundleSha256: "0".repeat(64),
+        files: ["SKILL.md"],
+        instructions: `# ${listing.name}\n\n${listing.description}`,
+      }
+    );
+  };
+  const dialogListing = CATALOG.find((entry) => entry.id === dialogSkill);
+  const [dialogOpen, setDialogOpen] = createSignal(true);
+
   const model: MarketplaceModel = {
     listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
     loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
@@ -209,21 +421,32 @@ function MarketplaceStory(props: StoryProps) {
     },
     openChat: () => setOpen(false),
 
-    listSkills: async (query) => page<MarketplaceSkillSummary>(skills, query),
-    loadSkill: async (id) => STORY_MARKETPLACE_SKILL_DETAILS[id],
-    agents: () => (member ? [] : STORY_AGENT_SUMMARIES),
-    activeAgentId: () => STORY_AGENT_SUMMARIES[0]?.id ?? "",
+    listSkills: async (query) => skillPage(skills, query),
+    loadSkill: async (id) => STORY_MARKETPLACE_SKILL_DETAILS[id] ?? skillDetail(id),
+    skillListing: async (id) => skills.find((skill) => skill.id === id),
+    agents: () => (member ? [] : userAgents),
+    activeAgentId: () => userAgents[0]?.id ?? "",
     readSkills: () => undefined,
     skillRead: () => "loaded",
     installedSkill: (agentId, skillId) => state.installed[agentId]?.find((skill) => skill.skillId === skillId),
+    installedSkills: (agentId) => state.installed[agentId] ?? [],
     skillBusy: () => false,
-    setSkill: async (skill, agentIds, on) =>
+    changeSkill: async (skill, change) => changeSkill(skill.id, change),
+    setSkillEnabled: async (agentId, skillId, on) =>
+      setState((draft) => {
+        const skill = draft.installed[agentId]?.find((entry) => entry.skillId === skillId);
+        if (skill) skill.enabled = on;
+      }),
+    updateSkill: async (skill, agentIds) =>
       setState((draft) => {
         for (const agentId of agentIds) {
-          const list = (draft.installed[agentId] ?? []).filter((entry) => entry.skillId !== skill.id);
-          draft.installed[agentId] = on ? [...list, installed(skill)] : list;
+          const entry = draft.installed[agentId]?.find((one) => one.skillId === skill.id);
+          if (!entry) continue;
+          entry.installedVersion = entry.availableVersion;
+          entry.state = "installed";
         }
       }),
+    createSkill: member ? undefined : fn(),
     trySkill: fn(),
 
     apps: () => state.apps,
@@ -297,6 +520,9 @@ function MarketplaceStory(props: StoryProps) {
   return (
     <>
       <Marketplace model={model} nav={nav} open={open()} onOpenChange={setOpen} />
+      <Show when={dialogOpen() && dialogListing}>
+        {(skill) => <AgentsDialog model={model} skill={skill()} onClose={() => setDialogOpen(false)} />}
+      </Show>
       <Show when={pending()} keyed>
         {(step) => (
           <McpConnectDialog
@@ -386,12 +612,37 @@ export const CustomServer = at((nav) => {
   nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[0]?.id ?? ""}` });
 });
 
+/** The Skills tab: "Your skills" on top, then 6 rows of each catalog group. */
 export const Skills = at(tab("skills"));
 
-export const SkillPage = at((nav) => {
+/** No agent has a skill yet: "Your skills" says what a skill is and how to get one. */
+export const SkillsFirstUse = at(tab("skills"), { noSkills: true });
+
+/** A group page: three featured skills, then the group in two columns, with a sort and Load more. */
+export const SkillGroup = at((nav) => {
+  tab("skills")(nav);
+  nav.go({ kind: "skillGroup", group: "coding" });
+});
+
+const firstSkillPage = (nav: MarketplaceNavigation) => {
   const listing = STORY_MARKETPLACE_SKILLS[0];
   tab("skills")(nav);
   if (listing) nav.go({ kind: "skill", listing });
+};
+
+/** A skill on 12 of 50 agents: the agents section has a search, a switch, Update and Remove for each agent. */
+export const SkillPage = at(firstSkillPage, { manyAgents: true });
+
+/** A skill made on this computer: no listing, but the same agents section and dialog. */
+export const LocalSkillPage = at((nav) => {
+  tab("skills")(nav);
+  nav.go({ kind: "localSkill", skillId: LOCAL_SKILL.skillId });
+});
+
+/** The agents dialog with 50 agents: a search, "All 50 agents", and one row for each agent. */
+export const SkillAgentsDialog = at(firstSkillPage, {
+  manyAgents: true,
+  dialogSkill: STORY_MARKETPLACE_SKILLS[0]?.id ?? "",
 });
 
 export const AgentPage = at((nav) => {

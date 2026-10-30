@@ -117,6 +117,21 @@ export class ConversationReader {
     this.#reads.adoptMemberState(sourceMemberId, targetMemberId);
   }
 
+  /** The member's read mark of a side thread, by the thread's own id. */
+  readThread(memberId: string, threadId: string, options: ConversationMarkerExclusions = {}) {
+    return this.#reads.readStateForThread(memberId, threadId, options);
+  }
+
+  /** Moves the member's read mark of a side thread. The mark never moves back. */
+  markThreadRead(
+    memberId: string,
+    threadId: string,
+    throughMessageId: string,
+    options: ConversationMarkerExclusions = {},
+  ) {
+    return this.#reads.markReadForThread(memberId, threadId, throughMessageId, options);
+  }
+
   readonly markRead = Effect.fn("ConversationReader.markRead")(function* (
     this: ConversationReader,
     agentId: string,

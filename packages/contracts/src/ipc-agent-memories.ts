@@ -67,13 +67,17 @@ export interface DeleteAgentMemoryInput {
 }
 
 /**
- * The choices for how many memories one agent can hold on this computer. The first is the default,
- * which was the only cap before the setting existed. A lower cap never deletes memories: an agent
- * over it keeps them and only cannot add another.
+ * The choices for how many memories one agent can hold on this computer. The first was the only cap
+ * before the setting existed. A lower cap never deletes memories: an agent over it keeps them and
+ * only cannot add another.
  */
 export const AGENT_MEMORY_LIMITS = [INPUT_LIMITS.agentMemories, 128, 256, 512] as const;
 export type AgentMemoryLimit = (typeof AGENT_MEMORY_LIMITS)[number];
-export const DEFAULT_AGENT_MEMORY_LIMIT: AgentMemoryLimit = INPUT_LIMITS.agentMemories;
+/**
+ * Background reviews add memories without a request, so the default leaves room for many small ones.
+ * Only essential memories enter each prompt, within their own budget; the rest cost a search.
+ */
+export const DEFAULT_AGENT_MEMORY_LIMIT: AgentMemoryLimit = 256;
 
 export function isAgentMemoryLimit(value: unknown): value is AgentMemoryLimit {
   return isOneOf(AGENT_MEMORY_LIMITS, value);
@@ -82,6 +86,45 @@ export function isAgentMemoryLimit(value: unknown): value is AgentMemoryLimit {
 /** The app setting, as it is stored and as it crosses IPC. */
 export interface AgentMemoryLimitPreference {
   limit: AgentMemoryLimit;
+}
+
+/**
+ * The choices for how many completed turns of one conversation pass between two background memory
+ * reviews on this computer. `0` turns the reviews off, also after a pause, a cleared chat and a
+ * closed side thread. The default is 20.
+ */
+export const MEMORY_REVIEW_INTERVALS = [0, 10, 20, 40] as const;
+export type MemoryReviewInterval = (typeof MEMORY_REVIEW_INTERVALS)[number];
+export const DEFAULT_MEMORY_REVIEW_INTERVAL: MemoryReviewInterval = 20;
+
+export function isMemoryReviewInterval(value: unknown): value is MemoryReviewInterval {
+  return isOneOf(MEMORY_REVIEW_INTERVALS, value);
+}
+
+/** The app setting, as it is stored. */
+export interface MemoryReviewPreference {
+  interval: MemoryReviewInterval;
+}
+
+/**
+ * The review cadence of one server's agents (`memory-review-v1`) and the values that host permits.
+ * A newer host can permit other values, so they are numbers here, not `MemoryReviewInterval`.
+ */
+export interface HostMemoryReview {
+  interval: number;
+  choices: number[];
+}
+
+export function hostMemoryReview({ interval }: MemoryReviewPreference): HostMemoryReview {
+  return { interval, choices: [...MEMORY_REVIEW_INTERVALS] };
+}
+
+/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
+export function decodeHostMemoryReview(value: unknown): HostMemoryReview {
+  const count = (item: unknown): item is number => typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
+  if (!isDynamicRecord(value) || !count(value.interval) || !Array.isArray(value.choices) || !value.choices.every(count))
+    throw new Error("Invalid memory review setting.");
+  return { interval: value.interval, choices: [...value.choices] };
 }
 
 /**
