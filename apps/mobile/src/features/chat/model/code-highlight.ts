@@ -110,7 +110,7 @@ function codeLanguage(info = "") {
 
 /** Prose, such as a message draft, so its lines wrap instead of scrolling. */
 export function codeTextWraps(info = ""): boolean {
-  return ["plaintext", "text", "txt"].includes((info.trim().split(/\s+/u)[0] ?? "").toLowerCase());
+  return ["plain", "plaintext", "text", "txt"].includes((info.trim().split(/\s+/u)[0] ?? "").toLowerCase());
 }
 
 const LANGUAGE_LABEL_KEYS: Partial<Record<ShjLanguage, MobileTextKey>> = {
