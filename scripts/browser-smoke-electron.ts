@@ -1971,6 +1971,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
   );
   const cases: Array<{ name: string; safe: boolean; toolSuccess: boolean; state: string; error: string }> = [];
   try {
+    await waitForKeyInput(browser, tab.id, contents);
     for (const surface of [
       "ordinary",
       "shadow",
@@ -2831,6 +2832,45 @@ async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: 
   }
   await contents.executeJavaScript("document.getElementById('smoke-input-probe').remove()", true);
   if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
+}
+
+/**
+ * Wait until the view actually delivers a key event to the page. Under a virtual display the first
+ * key events after a tab opens can be dropped with no error, so the first typing-focus cases lost
+ * Enter and failed at random in CI. As with {@link waitForMouseInput}, the probe is thrown away.
+ */
+async function waitForKeyInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('input');
+    probe.id = 'smoke-key-probe';
+    probe.setAttribute('aria-label', 'Key probe');
+    probe.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.isTrusted) probe.dataset.entered = 'true';
+      event.preventDefault();
+    });
+    document.body.prepend(probe);
+  })()`,
+    true,
+  );
+  const deadline = Date.now() + 60_000;
+  let landed = false;
+  while (!landed && Date.now() < deadline) {
+    await callBrowserTool(browser, "type", {
+      tabId,
+      target: { kind: "role", role: "textbox", name: "Key probe", exact: true },
+      text: "x",
+      mode: "replace",
+      submit: true,
+    });
+    landed =
+      (await contents.executeJavaScript(
+        "document.getElementById('smoke-key-probe').dataset.entered === 'true'",
+        true,
+      )) === true;
+  }
+  await contents.executeJavaScript("document.getElementById('smoke-key-probe').remove()", true);
+  if (!landed) throw new Error("The view never delivered a native key event to the page.");
 }
 
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
