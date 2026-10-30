@@ -97,16 +97,35 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
 });
 
 /**
+ * A page also changes with no tool action: live data, timers and late content. An image older than
+ * this does not count as current.
+ */
+const CURRENT_IMAGE_MS = 15_000;
+
+/**
  * Call in a queued operation. True when the operation before it gave the agent a full-page image, or
- * passed one on, so the page has had no operation that can change it since.
+ * passed one on, of the same address, and the page is not loading. No queued operation changed the page
+ * since; the page itself can have.
  */
 export function hasCurrentImage(tab: BrowserHostTab): boolean {
-  return tab.imageOperation !== undefined && tab.imageOperation === (tab.operations ?? 0) - 1;
+  const image = tab.image;
+  return (
+    image !== undefined &&
+    image.operation === (tab.operations ?? 0) - 1 &&
+    Date.now() - image.taken < CURRENT_IMAGE_MS &&
+    !tab.contents.isLoading() &&
+    tab.contents.getURL() === image.url
+  );
 }
 
-/** Call in a queued operation that gave the agent a full-page image, or that passes a current one on. */
-export function markImageCurrent(tab: BrowserHostTab): void {
-  tab.imageOperation = tab.operations;
+/** Call in a queued operation that gave the agent a full-page image. */
+export function markImageTaken(tab: BrowserHostTab): void {
+  tab.image = { operation: tab.operations ?? 0, url: tab.contents.getURL(), taken: Date.now() };
+}
+
+/** Call in a queued operation that sent no image because `hasCurrentImage` was true. */
+export function passImageOn(tab: BrowserHostTab): void {
+  if (tab.image) tab.image.operation = tab.operations ?? 0;
 }
 
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
@@ -115,6 +134,8 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   keepQueueBlocked: KeepQueueBlocked,
   timeoutMs = 10_000,
   timeoutMessage = "Browser snapshot timed out.",
+  /** Throws when the snapshot must not reach the agent. Its entries then stay undelivered. */
+  release?: () => void,
 ) {
   const history = tab.diagnostics.snapshot();
   const result = yield* boundEngineOperation(
@@ -130,8 +151,9 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     timeoutMessage,
     keepQueueBlocked,
   );
-  tab.diagnostics.delivered(history.cursor);
   tab.revision = revision;
+  if (release) yield* browserSync(release);
+  tab.diagnostics.delivered(history.cursor);
   return result;
 });
 
@@ -167,7 +189,12 @@ export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.
       timeoutMessage,
       keepQueueBlocked,
     );
-    const errors = tab.diagnostics.undeliveredErrors();
+    // A page can put a typed card value in an error message, as in a snapshot.
+    const errors = tab.diagnostics.takeStatusErrors().map((entry) => ({
+      ...entry,
+      message: tab.engine.scrubText(entry.message),
+      ...(entry.url === undefined ? {} : { url: tab.engine.scrubText(entry.url) }),
+    }));
     return { tabId: tab.id, revision: tab.revision, ...page, ...(errors.length > 0 ? { errors } : {}) };
   },
 );
@@ -496,9 +523,9 @@ export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
             keepQueueBlocked,
             yield* browserSync(() => remainingTime(deadline, "Browser fill_fields timed out.")),
             "Browser fill_fields timed out.",
+            // A card or takeover that appeared during capture must never release that capture.
+            checkPolicy,
           );
-          // A card or takeover that appeared during capture must never release that capture.
-          yield* browserSync(checkPolicy);
           tab.diagnostics.action({ action: "fill_fields", outcome: "success" });
           return result(undefined, captured.snapshot);
         }).pipe(

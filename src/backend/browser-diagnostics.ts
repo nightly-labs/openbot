@@ -27,6 +27,7 @@ export class BrowserDiagnostics {
   #addedActions = 0;
   #deliveredDiagnostics = 0;
   #deliveredActions = 0;
+  #statusDiagnostics = 0;
 
   add(entry: Omit<BrowserDiagnosticEntry, "timestamp">): void {
     pushRing(
@@ -64,9 +65,14 @@ export class BrowserDiagnostics {
     };
   }
 
-  /** The newest errors that no snapshot delivered. The cursor stays, so the next snapshot lists them too. */
-  undeliveredErrors(): BrowserDiagnosticEntry[] {
-    return newest(this.#diagnostics, this.#addedDiagnostics - this.#deliveredDiagnostics, DIAGNOSTIC_LIMIT)
+  /**
+   * The newest errors that no snapshot and no earlier status delivered. The snapshot cursor stays, so the
+   * next snapshot lists them too.
+   */
+  takeStatusErrors(): BrowserDiagnosticEntry[] {
+    const undelivered = this.#addedDiagnostics - Math.max(this.#deliveredDiagnostics, this.#statusDiagnostics);
+    this.#statusDiagnostics = this.#addedDiagnostics;
+    return newest(this.#diagnostics, undelivered, DIAGNOSTIC_LIMIT)
       .filter((entry) => entry.level === "error")
       .slice(-STATUS_ERRORS);
   }

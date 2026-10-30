@@ -120,7 +120,8 @@ import {
   enqueueTabOperation,
   hasCurrentImage,
   isTimeoutError,
-  markImageCurrent,
+  markImageTaken,
+  passImageOn,
   readActionSnapshot,
   readActionStatus,
   readTabSnapshot,
@@ -1469,8 +1470,8 @@ export class BrowserHost {
           "Browser screenshot timed out.",
           keepQueueBlocked,
         );
-        // An element image does not show the full page, but it does not make an earlier one old.
-        if (!target || hasCurrentImage(tab)) markImageCurrent(tab);
+        // An element image can scroll the page to the element, so it does not pass an earlier one on.
+        if (!target) markImageTaken(tab);
         return boundedCaptureDataUrl(image);
       }),
     );
@@ -1706,18 +1707,18 @@ export class BrowserHost {
         const mode = args.image ?? "auto";
         const capture = yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
           Effect.gen({ self: this }, function* () {
-            const result = yield* readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked);
             if (mode === "always") yield* browserSync(() => this.#requireNoFilledCard(tab, "A snapshot image"));
+            const result = yield* readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked);
             const recommended = mode === "auto" && result.recommendImage && !tab.filledCard;
             // A screenshot or snapshot image just before this one shows the same page.
             const imageCurrent = hasCurrentImage(tab);
             if (mode !== "always" && (!recommended || imageCurrent)) {
-              if (imageCurrent) markImageCurrent(tab);
+              if (imageCurrent) passImageOn(tab);
               if (recommended) {
                 result.snapshot.image = {
                   included: false,
                   reason:
-                    "The last image shows this page, and no action changed it since. Pass image: always for a new one.",
+                    "The last image is of this page, and no tool action ran since. Pass image: always if the page can have changed.",
                   width: result.snapshot.viewport.width,
                   height: result.snapshot.viewport.height,
                 };
@@ -1731,7 +1732,7 @@ export class BrowserHost {
               "Browser screenshot timed out.",
               keepQueueBlocked,
             );
-            markImageCurrent(tab);
+            markImageTaken(tab);
             return { result, imageUrl: boundedCaptureDataUrl(image) };
           }),
         );
@@ -2375,8 +2376,9 @@ export class BrowserHost {
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       if (!tab || tab.secret) return;
-      // The page or a navigation cancelled the request: it did not fail. Live pages cancel many.
-      const cancelled = details.error === "net::ERR_ABORTED";
+      // The page or a navigation cancelled a subresource request: it did not fail. Live pages cancel
+      // many. A cancelled page load can be a blocked navigation, so it stays an error.
+      const cancelled = details.error === "net::ERR_ABORTED" && details.resourceType !== "mainFrame";
       tab.diagnostics.add({
         kind: "network",
         level: cancelled ? "info" : "error",
@@ -3215,7 +3217,8 @@ const ROLE_TAGS: Readonly<Record<string, readonly string[]>> = {
   link: ["a"],
   textbox: ["input", "textarea"],
   searchbox: ["input"],
-  combobox: ["select", "input"],
+  // A native select keeps its tag: only it takes select_option.
+  combobox: ["input"],
   checkbox: ["input"],
   radio: ["input"],
   slider: ["input"],

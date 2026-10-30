@@ -728,6 +728,9 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
   ): Effect.fn.Return<BrowserPageStatus, BrowserOperationError> {
     const focus = yield* this.#leaseEffect((send) => collectFocus(send)).pipe(Effect.catch(() => Effect.succeed(null)));
+    // The action can close the tab. The caller then returns the closed-tab result.
+    if (this.#closing || this.#contents.isDestroyed())
+      return yield* browserFailure(new Error("Browser tab was closed."));
     return {
       title: this.#cardScrub.text(this.#contents.getTitle().slice(0, 500)),
       url: this.#cardScrub.text(this.#contents.getURL()),
@@ -2871,8 +2874,9 @@ export class BrowserCdpEngine {
   });
 
   /**
-   * The select that a page rendered in place of one it removed: the only connected select with the same
-   * option labels, or, when there are more, the one at the old center point. Null when none matches.
+   * The select that a page rendered in place of one it removed: a connected select with the same option
+   * labels at the old center point. A select with the same labels elsewhere, as in the next cart row,
+   * is a different control. Null when none matches.
    */
   readonly #replacementSelectEffect = Effect.fn("BrowserCdp.replacementSelect")(function* (
     this: BrowserCdpEngine,
@@ -2891,9 +2895,10 @@ export class BrowserCdpEngine {
           const candidates = Array.from(document.querySelectorAll('select')).filter(select =>
             !select.multiple && select.options.length === labels.length &&
             Array.from(select.options).every((option, index) => (option.label || option.text) === labels[index]));
-          if (candidates.length <= 1) return candidates[0] ?? null;
-          const hit = document.elementFromPoint(x, y);
-          return candidates.find(select => hit !== null && (select === hit || select.contains(hit))) ?? null;
+          return candidates.find(select => {
+            const box = select.getBoundingClientRect();
+            return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+          }) ?? null;
         }`,
         arguments: [{ value: labels }, { value: x }, { value: y }],
         returnByValue: false,
