@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal, omit, onSettled } from "solid-js";
 import { Textarea, type TextareaProps } from "../form";
+import { createPointerDrag } from "./createPointerDrag";
 
 const KEYBOARD_STEP = 24;
 
@@ -16,11 +17,9 @@ export interface ResizableTextareaProps extends Omit<TextareaProps, "ref" | "sty
 export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
   const textareaProps = omit(props, "resizeLabel");
   let textarea: HTMLTextAreaElement | undefined;
-  let cleanupDrag: (() => void) | undefined;
   const [height, setHeight] = createSignal<number>();
   const [minimum, setMinimum] = createSignal(0);
   const [startHeight, setStartHeight] = createSignal(0);
-  const [isResizing, setIsResizing] = createSignal(false);
 
   // A field taller than the window cannot be read in one view, so the window height is the limit.
   const maximum = () => Math.max(minimum(), window.innerHeight);
@@ -36,44 +35,18 @@ export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
       setMinimum(Number.parseFloat(getComputedStyle(textarea).minHeight) || 0);
       setStartHeight(textarea.offsetHeight);
     }
-    return () => cleanupDrag?.();
+    return () => drag.cancel();
   });
 
-  const beginDrag = (event: PointerEvent) => {
-    if (event.button !== 0 || !textarea) return;
-    event.preventDefault();
-    if (!(event.currentTarget instanceof HTMLElement)) return;
-    const handle = event.currentTarget;
-    handle.setPointerCapture?.(event.pointerId);
-    const startY = event.clientY;
-    const dragStartHeight = textarea.offsetHeight;
-    setIsResizing(true);
-    document.documentElement.classList.add("ui-textarea-resizing");
-
-    const move = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== event.pointerId) return;
-      setHeight(clamp(dragStartHeight + moveEvent.clientY - startY));
-    };
-    const finish = (finishEvent?: PointerEvent) => {
-      if (finishEvent && finishEvent.pointerId !== event.pointerId) return;
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("blur", cancel);
-      document.documentElement.classList.remove("ui-textarea-resizing");
-      setIsResizing(false);
-      cleanupDrag = undefined;
-      if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-    };
-    const cancel = () => finish();
-
-    cleanupDrag?.();
-    cleanupDrag = cancel;
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("blur", cancel);
-  };
+  let dragStartHeight = 0;
+  const drag = createPointerDrag({
+    axis: "y",
+    rootClass: "ui-textarea-resizing",
+    onStart: () => {
+      dragStartHeight = textarea?.offsetHeight ?? currentHeight();
+    },
+    onMove: (delta) => setHeight(clamp(dragStartHeight + delta)),
+  });
 
   const handleKeyDown = (event: KeyboardEvent) => {
     // Measure now: the field can be hidden when it mounts, and then the start height is 0.
@@ -93,14 +66,14 @@ export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
       <Textarea {...textareaProps} ref={(element) => (textarea = element)} style={textareaStyle()} />
       <hr
         class="ui-textarea-resizer"
-        data-active={isResizing() ? "" : undefined}
+        data-active={drag.isDragging() ? "" : undefined}
         tabindex={0}
         aria-label={props.resizeLabel}
         aria-orientation="horizontal"
         aria-valuemin={minimum()}
         aria-valuemax={maximum()}
         aria-valuenow={currentHeight()}
-        onPointerDown={beginDrag}
+        onPointerDown={drag.begin}
         onKeyDown={handleKeyDown}
         onDblClick={(event) => {
           event.preventDefault();
