@@ -408,15 +408,18 @@ function attachAppInput(
       window.webContents.toggleDevTools();
       return;
     }
+    // A focused frame, such as the remote desktop viewer, gets the select-all and size keys. The
+    // viewer sends them to the remote computer and stops the menu items with the same keys (#3921).
+    const frameFocused = Boolean(window.webContents.focusedFrame?.parent);
     const sizeStep = interfaceSizeShortcut(input, process.platform === "darwin");
     const interfaceSize = getServices()?.interfaceSize;
-    if (sizeStep && interfaceSize) {
+    if (!frameFocused && sizeStep && interfaceSize) {
       // This also stops the View menu item with the same key, which would step the size again.
       event.preventDefault();
       Effect.runFork(interfaceSize.step(sizeStep));
       return;
     }
-    if (isSelectAllShortcut(input)) {
+    if (!frameFocused && isSelectAllShortcut(input)) {
       event.preventDefault();
       void window.webContents.executeJavaScript(
         `(() => {
