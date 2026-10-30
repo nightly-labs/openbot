@@ -250,7 +250,7 @@ function shortcutLetter(key: string, code: string): string {
 /** Ctrl or Meta: either one is the command modifier, whichever system the client runs. */
 const COMMAND_MODIFIERS = 2 | 4;
 
-export type BrowserDialogType = "alert" | "confirm";
+type BrowserDialogType = "alert" | "confirm";
 
 /** A JavaScript dialog that is open in the tab. `agent` is true when the agent can answer it with `handle_dialog`. */
 export interface BrowserDialog {
