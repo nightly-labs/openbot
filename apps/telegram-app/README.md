@@ -14,8 +14,11 @@ username. Hosts have no Telegram secret.
 
 Make the bot with `/newbot` in [@BotFather](https://t.me/BotFather), and copy the token once.
 
-- **Privacy mode**: keep it on (the default). Telegram then sends the bot only messages that mention
-  it, replies to it and commands.
+- **Privacy mode** (`/setprivacy`): Disable. With privacy mode on, Telegram does not send a plain
+  `@meetOpenBot` mention to a bot that is not an admin of the group, so only replies work there.
+  With it off, Telegram sends the bot every message of the group. OpenBot answers only a mention, a
+  reply to the bot, or a message of a reply chain that an agent answers. A group must remove the bot
+  and add it again before the new setting applies. An admin bot gets every message in both cases.
 - **Allow groups**: keep it on (the default).
 - **Commands**: set none. `/start` is only the link from the OpenBot app, and `stop` is a word or a
   button, not a command.
@@ -75,8 +78,8 @@ curl -s "https://api.telegram.org/bot<token>/getWebhookInfo"
 
 ## Limits of Telegram
 
-- With privacy mode on, a message that does not mention the bot and does not reply to it does not
-  reach OpenBot.
+- With privacy mode on, a plain mention does not reach a bot that is not an admin of the group.
+  Only replies to the bot and commands do. This is why privacy mode is off.
 - A basic group has no reply threads. OpenBot keeps the reply chain in memory, so after a restart an
   older chain needs a mention or a reply to the bot.
 - A group has no private message. When a person who is not the requester presses an approval button,

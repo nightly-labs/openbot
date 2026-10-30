@@ -367,8 +367,8 @@ Each account can buy hosted servers. A hosted server is a Linux
 OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
 France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
 team data, the same as your own computer would. The server stops 15 to 30 minutes after its last use and
-starts again when you press a key or click in an app that shows it, when a Slack, Discord or
-Telegram message addresses OpenBot, or a few minutes before its next scheduled routine run. Use means that an agent works, a remote desktop is open, a file moves, or you
+starts again when you press a key or click in an app that shows it, when a Slack or Discord
+message addresses OpenBot, when any message comes in a linked Telegram chat, or a few minutes before its next scheduled routine run. Use means that an agent works, a remote desktop is open, a file moves, or you
 sent a message, made a change, typed or used a shared browser view in the last 5 minutes. An app
 that has focus (a focused window or tab, or the phone app in the foreground) also counts, for at
 most 30 minutes after your last message, change or typing, or after you return to the app. The app
@@ -1018,8 +1018,8 @@ Signal then asks the account service to link the chat to the computer. The accou
 the Telegram chat ID, the bot ID, the computer, the OpenBot account and the time of the link, and a
 hash of each code until it is used or expires. It keeps no chat name and no message.
 
-Telegram sends each update of a linked chat, which contains the messages that mention the bot or reply
-to it, the messages of a direct chat, and button presses, to Signal. Signal checks Telegram's secret
+Telegram sends each update of a linked chat, which contains every message of a group or a direct chat
+and button presses, to Signal. Signal checks Telegram's secret
 header and reads only the chat ID, a link code and the ID of a button press, to find the computer. It
 passes each update to that computer over its Signal connection, in transit only: it does not store or
 log it. The computer's answers, status posts, reactions and files go to Telegram through Signal,
@@ -1036,11 +1036,13 @@ short-lived signed addresses, in transit only.
   for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
   Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
   memories; deleting an agent removes its conversations.
-- **Read from Telegram.** The messages that mention the bot, replies to it and the other messages of a
-  reply chain that Telegram sends, the messages of a direct chat, the message that a request
-  answers, the files in them, the names of their authors and the name of the chat. With privacy
-  mode on, which is Telegram's default for a bot, Telegram sends a bot only messages that mention it,
-  replies to it and commands.
+- **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
+  authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
+  Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
+  from a message that mentions the bot, a reply to it, another message of a reply chain that an
+  agent answers, or a message of a direct chat. The other messages of a group stay in the
+  computer's memory until OpenBot quits, and an agent can read the last of them with its history
+  tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
