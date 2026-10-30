@@ -2449,6 +2449,45 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
     "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
     true,
   );
+  // A click that reached the page and then stopped its renderer. The timeout must say the input
+  // arrived, so the agent checks the page instead of repeating the click. A separate site keeps the
+  // stopped renderer away from the `/v2` tab.
+  const address = server.address();
+  if (!address || isString(address)) throw new Error("Local server address was not available.");
+  const frozenClickOrigin = `http://frozen-click.localhost:${address.port}`;
+  const frozenClickTab = await runCauseEffect(
+    browser.open(`${frozenClickOrigin}/spinning-frame`, "smoke-thread", "smoke-bot"),
+  );
+  const frozenClickContents = webContents
+    .getAllWebContents()
+    .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenClickOrigin));
+  if (!frozenClickContents) throw new Error("Frozen click fixture web contents were not available.");
+  let frozenClicks = 0;
+  frozenClickContents.on("console-message", (details: ElectronEvent<WebContentsConsoleMessageEventParams>) => {
+    if (details.message === "frozen click ran") frozenClicks += 1;
+  });
+  await frozenClickContents.executeJavaScript(
+    "document.querySelector('button').onclick = () => { console.info('frozen click ran'); while (true) {} }; true",
+    true,
+  );
+  const frozenClick = await callBrowserTool(browser, "click", {
+    tabId: frozenClickTab.id,
+    target: { kind: "role", role: "button", name: "Blocked frame button", exact: true },
+    timeoutMs: 1_000,
+  });
+  await waitFor(async () => frozenClicks > 0, "the frozen click to reach the page");
+  if (
+    frozenClick.success ||
+    !toolError(frozenClick).includes("timed out after its input reached the page") ||
+    frozenClicks !== 1
+  ) {
+    throw new Error(`V2 click timeout did not report input that reached the page: ${JSON.stringify(frozenClick)}`);
+  }
+  const frozenClickClosed = await Promise.race([
+    runCauseEffect(browser.close(frozenClickTab.id)).then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
+  ]);
+  if (!frozenClickClosed) throw new Error("V2 frozen click timeout left the tab queue blocked.");
 }
 
 /**
