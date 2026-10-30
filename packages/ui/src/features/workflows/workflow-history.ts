@@ -16,8 +16,8 @@ import {
 import { createSignal } from "solid-js";
 import type { BoardSnapshot, WfnFields, WfnPoint, WfnSize } from "./workflow-board";
 import type { Stroke } from "./workflow-ink";
-import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
-import { isColor, wfKnownProvider } from "./workflow-node-parts";
+import { defaultWorkflowModel, type WorkflowCatalogs, type WorkflowFeatures } from "./workflow-model";
+import { isColor } from "./workflow-node-parts";
 
 /** A node on the canvas. Its place, size and fields are in their own stores. */
 export interface CanvasItem {
@@ -206,11 +206,11 @@ export function hostDefaults(
       return agent ? { agentId: agent.id, model: agent.model, provider: agent.provider } : {};
     }
     case "llm": {
-      const model = catalogs.models[0];
+      const model = defaultWorkflowModel(catalogs);
       return model
         ? {
             model: model.id,
-            provider: wfKnownProvider(model.provider),
+            provider: model.provider,
             effort: model.defaultReasoningEffort ?? "medium",
           }
         : {};

@@ -5,6 +5,7 @@ import { Button, Play, Sparkles, Textarea } from "@openbot/ui";
 import { untrack } from "solid-js";
 import { useText } from "../../text";
 import { useBoard } from "./workflow-board";
+import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
 import {
   asProvider,
@@ -19,7 +20,6 @@ import {
   useStepRun,
   useTextField,
   type WfProvider,
-  wfKnownProvider,
 } from "./workflow-node-parts";
 
 /**
@@ -30,14 +30,9 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
   const board = useBoard();
   const { t } = useText();
   const models = () => board.catalogs().models;
-  const first = untrack(() => models()[0]);
+  const first = untrack(() => defaultWorkflowModel(board.catalogs()));
   const [model] = useField<AgentModelId>(() => props.id, "model", first?.id ?? "", asString);
-  const [provider] = useField<WfProvider>(
-    () => props.id,
-    "provider",
-    first ? wfKnownProvider(first.provider) : "codex",
-    asProvider,
-  );
+  const [provider] = useField<WfProvider>(() => props.id, "provider", first?.provider ?? "codex", asProvider);
   const [effort, setEffort] = useField<AgentReasoningEffort>(
     () => props.id,
     "effort",

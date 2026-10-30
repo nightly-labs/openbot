@@ -17,6 +17,7 @@ import { OutputNode } from "@openbot/ui/features/workflows/WorkflowOutputNode";
 import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
+import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
 import {
@@ -24,6 +25,7 @@ import {
   competitorWatch,
   LLM_RESULT,
   newCompetitorAlert,
+  STORY_CATALOGS,
   STORY_IMAGES,
   STORY_SEED,
   storyWebhook,
@@ -34,6 +36,17 @@ import { STORY_ALL_FEATURES, WorkflowInAppStory, WorkflowStory } from "./workflo
 const TASK = "Check competitor sites, changelogs and launch posts since yesterday";
 const RESULT = AGENT_RESULT;
 const AGENT = STORY_SEED.agentId;
+
+/** The story catalogs with a ChatGPT sign-in that the user did not do. */
+const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  status: {
+    ...STORY_CATALOGS.status,
+    providers: (STORY_CATALOGS.status.providers ?? []).map((provider) =>
+      provider.id === "codex" ? { ...provider, state: "sign-in-required", version: null, email: null } : provider,
+    ),
+  },
+};
 
 const meta = {
   title: "Workflows",
@@ -138,6 +151,20 @@ export const Llm: Story = {
         prompt="Summarize the research in 3 lines for the market team"
         system="You write for busy readers. Use short sentences and no adjectives."
       />
+    </NodeGallery>
+  ),
+};
+
+/**
+ * ChatGPT is not connected. A new LLM step takes a Claude model, and its list has no ChatGPT tab. The
+ * agent step keeps ChatGPT, because its agent runs on it.
+ */
+export const LlmChatGptNotConnected: Story = {
+  name: "LLM, ChatGPT not connected",
+  render: () => (
+    <NodeGallery catalogs={CHATGPT_NOT_CONNECTED}>
+      <LlmNode id="empty" />
+      <AgentNode id="chief" agentId="chief" />
     </NodeGallery>
   ),
 };

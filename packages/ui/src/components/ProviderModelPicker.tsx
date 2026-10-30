@@ -59,6 +59,9 @@ import {
   type PickerModel,
   type PickerModelGroup,
   pickerModels,
+  providerAvailability,
+  providerTurnedOff,
+  providerUsable,
 } from "./provider-model-options";
 import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
@@ -181,9 +184,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let popover: HTMLElement | undefined;
 
   const visibleProviders = createMemo(() =>
-    PROVIDERS.filter(
-      (provider) => !props.agentStatus?.providers?.some((status) => status.id === provider && status.off),
-    ),
+    PROVIDERS.filter((provider) => provider === CUSTOM_RAIL || !providerTurnedOff(props.agentStatus, provider)),
   );
   /** The accounts that get rail entries: only a provider's with more than one, and only on request. */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
@@ -317,14 +318,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       return false;
     }
     const status = entryStatus(key);
-    const phase = props.runtimeStatuses?.[status.id]?.phase;
-    return (
-      status.state === "available" ||
-      status.state === "checking" ||
-      status.connectionState === "connecting" ||
-      phase === "downloading" ||
-      phase === "finishing"
-    );
+    return providerUsable(status, props.runtimeStatuses?.[status.id]);
   };
   /** The entries listed when the picker opened. An open rail does not drop a tab under the pointer. */
   const [openedKeys, setOpenedKeys] = createSignal<readonly RailKey[]>([]);
@@ -1002,27 +996,6 @@ function railName(rail: RailId, t: AppTranslate): string {
 /** Nothing is the default on the Custom tab: the user's own endpoints have no shipped starting model. */
 function railDefaultModel(rail: RailId): AgentModelId | null {
   return rail === CUSTOM_RAIL ? null : defaultProviderModel(rail);
-}
-
-function providerAvailability(
-  status: AgentStatus,
-  models: ClientAgentModelOption[],
-  rail: RailId,
-  t: AppTranslate,
-): AgentProviderStatus {
-  const provider = wireProvider(rail);
-  const explicit = status.providers?.find((item) => item.id === provider);
-  if (explicit) return explicit;
-  if (status.phase === "starting" || status.phase === "restarting") {
-    return { id: provider, state: "checking", version: null, message: null };
-  }
-  const available = models.some((model) => model.provider === provider);
-  return {
-    id: provider,
-    state: available ? "available" : "error",
-    version: null,
-    message: available ? null : t("provider.picker.unavailable", { name: agentProviderName(provider) }),
-  };
 }
 
 function providerSummary(provider: AgentProviderId, status: AgentProviderStatus, text: PickerText): string {

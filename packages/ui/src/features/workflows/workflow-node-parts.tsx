@@ -4,6 +4,7 @@
  * results strip. The control blocks share their choice pills, the toolbar menus and the colours.
  */
 
+import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { isAgentProviderRef } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -60,9 +61,9 @@ import type { WorkflowPlace } from "./workflow-model";
 
 export type WfProvider = AgentProfile["provider"];
 
-/** A provider that this build knows, so it has a logo. Another provider shows the Codex logo. */
-export function wfKnownProvider(provider: WfProvider) {
-  return isKnownAgentProvider(provider) ? provider : "codex";
+/** The logo of a provider. A provider that this build does not know has the neutral mark. */
+export function wfProviderLogo(provider: WfProvider): ProviderLogoVariant {
+  return isKnownAgentProvider(provider) ? provider : "unknown";
 }
 
 /* ---------------------------------------------------------------- Kinds */

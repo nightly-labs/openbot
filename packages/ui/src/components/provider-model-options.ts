@@ -1,8 +1,11 @@
 import type {
   AgentProviderId,
+  AgentProviderStatus,
+  AgentStatus,
   ClientAgentModelOption,
   CustomProviderHarness,
   CustomProviderSummary,
+  ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import {
   agentProviderName,
@@ -12,7 +15,7 @@ import {
   isFreeOpencodeModel,
   isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { currentText } from "../text";
 
 /** The efforts that have a name in the catalog. The other efforts show their id. */
@@ -214,4 +217,60 @@ export function isCustomModel(
   customIds: ReadonlyMap<string, CustomProviderHarness>,
 ): boolean {
   return model.provider === "acp" || isCustomEndpointModel(model.provider, model.id, customIds);
+}
+
+/**
+ * The status of a provider: the one that the host reports, else one from the host phase. A host
+ * that is ready and reports no status for a provider can run it when it lists a model of it.
+ */
+export function providerAvailability(
+  status: AgentStatus,
+  models: readonly ClientAgentModelOption[],
+  provider: AgentProviderId,
+  t: AppTranslate,
+): AgentProviderStatus {
+  const explicit = status.providers?.find((item) => item.id === provider);
+  if (explicit) return explicit;
+  if (status.phase === "starting" || status.phase === "restarting") {
+    return { id: provider, state: "checking", version: null, message: null };
+  }
+  const available = models.some((model) => model.provider === provider);
+  return {
+    id: provider,
+    state: available ? "available" : "error",
+    version: null,
+    message: available ? null : t("provider.picker.unavailable", { name: agentProviderName(provider) }),
+  };
+}
+
+/** Whether the user turned the provider off on this computer. */
+export function providerTurnedOff(status: AgentStatus, provider: AgentProviderId): boolean {
+  return status.providers?.some((item) => item.id === provider && item.off) ?? false;
+}
+
+/**
+ * Whether the user can choose a model of the provider now, or soon: it is available, OpenBot checks
+ * it, it signs in, or its runtime downloads. A provider that is not connected cannot.
+ */
+export function providerUsable(status: AgentProviderStatus, runtime?: ProviderRuntimeStatus): boolean {
+  return (
+    status.state === "available" ||
+    status.state === "checking" ||
+    status.connectionState === "connecting" ||
+    runtime?.phase === "downloading" ||
+    runtime?.phase === "finishing"
+  );
+}
+
+/** Whether a model list offers the provider: it is on, and the user can choose its models now or soon. */
+export function providerOffersModels(
+  status: AgentStatus,
+  models: readonly ClientAgentModelOption[],
+  provider: AgentProviderId,
+  runtime?: ProviderRuntimeStatus,
+): boolean {
+  return (
+    !providerTurnedOff(status, provider) &&
+    providerUsable(providerAvailability(status, models, provider, currentText().t), runtime)
+  );
 }

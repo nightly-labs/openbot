@@ -1,14 +1,16 @@
 /**
  * The model and effort pills of the LLM and agent steps. The models come from the catalogs of the
- * board, so the list has the models that the host can run.
+ * board. The list offers only the providers that the host can run now or soon, and the provider of
+ * the step.
  */
 
 import { ProviderLogo } from "@openbot/brand";
 import {
   type AgentModelId,
+  type AgentProviderRef,
   type AgentReasoningEffort,
-  agentProviderName,
   type ClientAgentModelOption,
+  providerDisplayName,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -28,7 +30,8 @@ import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type PickerChip, PickerMenu, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
 import { Hint, useBoard } from "./workflow-board";
-import { type WfProvider, wfKnownProvider } from "./workflow-node-parts";
+import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model";
+import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
 
 const EFFORT_LABEL = {
   low: "provider.effort.low",
@@ -43,12 +46,9 @@ export function modelOption(models: readonly ClientAgentModelOption[], id: Agent
   return models.find((option) => option.id === id);
 }
 
-type WfModelProvider = ReturnType<typeof wfKnownProvider>;
-
-/** The providers of the models, in the order of the first model of each. */
-const modelProviders = (models: readonly ClientAgentModelOption[]) => [
-  ...new Set(models.map((option) => wfKnownProvider(option.provider))),
-];
+/** The name of a provider. A provider that this build does not know has the name that its host sends. */
+const providerName = (catalogs: WorkflowCatalogs, provider: AgentProviderRef) =>
+  providerDisplayName(provider, catalogs.status.providers?.find((status) => status.id === provider)?.displayName);
 
 /** The facts of a model that the picker shows: the efforts that it supports, and the fast tier. */
 function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip[] {
@@ -83,23 +83,24 @@ export function ModelPill(props: {
   const board = useBoard();
   const { t } = useText();
   const models = () => board.catalogs().models;
-  const providers = () => modelProviders(models());
+  const providers = () => workflowModelProviders(board.catalogs(), props.provider);
+  const name = (provider: AgentProviderRef) => providerName(board.catalogs(), provider);
   const [open, setOpen] = createSignal(false);
-  const [tab, setTab] = createSignal<WfModelProvider>(untrack(() => wfKnownProvider(props.provider)));
+  const [tab, setTab] = createSignal<AgentProviderRef>(untrack(() => props.provider));
   const [query, setQuery] = createSignal("");
   const current = () => modelOption(models(), props.value);
   let panel: HTMLDivElement | undefined;
   let opening = false;
-  const rows = (provider: WfModelProvider) => {
+  const rows = (provider: AgentProviderRef) => {
     const text = query().trim().toLowerCase();
     const options: PickerOption<AgentModelId>[] = models()
-      .filter((option) => wfKnownProvider(option.provider) === provider)
+      .filter((option) => option.provider === provider)
       .map((option) => ({ value: option.id, label: option.name, chips: modelChips(t, option) }));
     return text ? options.filter((option) => pickerMatches(option, text)) : options;
   };
   const choose = (id: AgentModelId) => {
     const option = modelOption(models(), id);
-    if (option && id !== props.value) props.onChange(id, wfKnownProvider(option.provider));
+    if (option && id !== props.value) props.onChange(id, option.provider);
     setOpen(false);
   };
   return (
@@ -108,7 +109,7 @@ export function ModelPill(props: {
       onOpenChange={(next) => {
         if (next) {
           // Each open starts on the provider of the step, with no filter.
-          setTab(wfKnownProvider(props.provider));
+          setTab(props.provider);
           setQuery("");
           opening = true;
         }
@@ -123,7 +124,7 @@ export function ModelPill(props: {
         aria-label={t("workflow.model.label", { name: current()?.name ?? props.value })}
         disabled={props.disabled}
       >
-        <ProviderLogo provider={wfKnownProvider(props.provider)} class="wfn-model-logo" />
+        <ProviderLogo provider={wfProviderLogo(props.provider)} class="wfn-model-logo" />
         <span>{current()?.name ?? props.value}</span>
         <ChevronDown aria-hidden="true" />
       </Popover.Trigger>
@@ -157,10 +158,10 @@ export function ModelPill(props: {
             <Tabs.List class="wfn-model-rail" aria-label={t("workflow.model.providers")}>
               <For each={providers()}>
                 {(provider) => (
-                  <Hint label={agentProviderName(provider)} placement="left">
+                  <Hint label={name(provider)} placement="left">
                     <LabelTooltipTrigger as="div" class="wfn-model-tab-hint">
-                      <Tabs.Trigger value={provider} class="wfn-model-tab" aria-label={agentProviderName(provider)}>
-                        <ProviderLogo provider={provider} class="wfn-model-mark" />
+                      <Tabs.Trigger value={provider} class="wfn-model-tab" aria-label={name(provider)}>
+                        <ProviderLogo provider={wfProviderLogo(provider)} class="wfn-model-mark" />
                       </Tabs.Trigger>
                     </LabelTooltipTrigger>
                   </Hint>
@@ -170,7 +171,7 @@ export function ModelPill(props: {
             <For each={providers()}>
               {(provider) => (
                 <Tabs.Content value={provider} class="wfn-model-panel">
-                  <strong class="wfn-model-heading">{agentProviderName(provider)}</strong>
+                  <strong class="wfn-model-heading">{name(provider)}</strong>
                   <div class="wfn-picker-search">
                     <Search aria-hidden="true" />
                     <Input
@@ -210,7 +211,7 @@ export function ModelPill(props: {
                         );
                       }}
                       class="wfn-picker-list wfn-model-list"
-                      aria-label={t("workflow.model.providerModels", { name: agentProviderName(provider) })}
+                      aria-label={t("workflow.model.providerModels", { name: name(provider) })}
                       options={[...rows(provider)]}
                       optionValue={(option) => option.value}
                       optionTextValue={(option) => option.label}

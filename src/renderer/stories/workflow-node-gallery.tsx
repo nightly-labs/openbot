@@ -10,9 +10,10 @@ import {
   type WfnResult,
   type WfnRunStatus,
 } from "@openbot/ui/features/workflows/workflow-board";
+import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, untrack } from "solid-js";
-import { STEP_ANSWER, STORY_IMAGES, STORY_SEED, storyCatalogs } from "./workflow-story-data";
+import { STEP_ANSWER, STORY_CATALOGS, STORY_IMAGES, STORY_SEED } from "./workflow-story-data";
 
 export function NodeGallery(props: {
   selected?: string;
@@ -22,6 +23,8 @@ export function NodeGallery(props: {
   status?: Record<string, WfnRunStatus>;
   errors?: Record<string, string>;
   locked?: readonly string[];
+  /** The choices of the nodes. The story catalogs when absent. */
+  catalogs?: WorkflowCatalogs;
   children: JSX.Element;
 }) {
   const [run, setRun] = createStore<{ status: Record<string, WfnRunStatus> }>({
@@ -61,7 +64,7 @@ export function NodeGallery(props: {
     );
   };
   const gallery = createBoard({
-    catalogs: storyCatalogs,
+    catalogs: () => props.catalogs ?? STORY_CATALOGS,
     selected: untrack(() => props.selected),
     edges: untrack(() => props.edges),
     results: untrack(() => props.results),
