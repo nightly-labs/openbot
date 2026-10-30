@@ -264,6 +264,8 @@ export const messages = {
   "error.provider.clineVersionUnreadable": "No se pudo leer la versión de Cline CLI.",
   "error.provider.clineSignIn": "Inicia sesión con Cline o define CLINE_API_KEY para usar Cline.",
   "error.provider.usageLimitReached": "La cuenta alcanzó su límite de uso.",
+  "error.provider.outputTokenLimit":
+    "{provider} alcanzó su límite máximo de tokens de salida para este turno. OpenBot inició una nueva sesión con el historial del chat para que puedas continuar con la tarea.",
   "error.provider.foreignReasoning":
     "{provider} no aceptó el razonamiento anterior de este chat porque lo recibió otra cuenta o clave de API. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
