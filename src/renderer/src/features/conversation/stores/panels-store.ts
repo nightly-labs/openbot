@@ -52,6 +52,11 @@ export interface SidePanelsState {
 
 /** While the agent's turn runs, the shown file is read again at most this often. */
 const FILE_PREVIEW_REFRESH_MS = 750;
+/**
+ * A larger file is not read again while the turn runs: a turn seldom changes a video or a large PDF,
+ * and each read can download all of it from a remote host.
+ */
+const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
 
@@ -460,11 +465,17 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     }
     const read =
       source.kind === "shared"
-        ? agent.previewSharedFile({ path: source.path })
-        : agent.previewWorkspaceFile({ agentId: source.agentId, path: source.path });
+        ? agent.previewSharedFile({ path: source.path, maxBytes: FILE_PREVIEW_REFRESH_BYTES })
+        : agent.previewWorkspaceFile({
+            agentId: source.agentId,
+            path: source.path,
+            maxBytes: FILE_PREVIEW_REFRESH_BYTES,
+          });
     void read.then(
       (preview) => {
-        if (!current() || (file.preview && samePreview(preview, file.preview))) {
+        // No bytes from a file that showed bytes: the file is over the limit, so keep what shows.
+        const overLimit = preview.bytes === null && file.preview?.bytes;
+        if (!current() || overLimit || (file.preview && samePreview(preview, file.preview))) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
