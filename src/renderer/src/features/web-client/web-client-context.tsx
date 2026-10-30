@@ -306,6 +306,13 @@ export function createWebWorkspace(
     recovery.offline();
     recovery.setActive(!document.hidden);
   }
+  /** The user is back on the page. `offline` keeps the wait after failed attempts, up to two minutes; this ends it. */
+  function recoverNow() {
+    if (disposed || !hostId || recoveryBlocked) return;
+    if (state.recovery?.phase !== "waiting" && state.recovery?.phase !== "cooldown") return recover();
+    recovery.refresh();
+    recovery.setActive(!document.hidden);
+  }
   const hostLifecycle = createWebHostLifecycle({
     accountFetch: props.accountFetch,
     hostId: () => hostId,
@@ -1487,7 +1494,7 @@ export function createWebWorkspace(
           // While the host stays online, its events keep the workspace current. A focus soon after a
           // full read, such as a switch between windows, does not read the host again.
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
-          if (state.recovery?.phase !== "suspended") recover();
+          if (state.recovery?.phase !== "suspended") recoverNow();
         })
         .catch(report);
     };
@@ -1499,7 +1506,7 @@ export function createWebWorkspace(
         recovery.setActive(false);
       } else {
         hostLifecycle.resume();
-        if (state.status !== "online" && state.recovery?.phase !== "suspended") recover();
+        if (state.status !== "online" && state.recovery?.phase !== "suspended") recoverNow();
       }
     };
     const network = () => {
