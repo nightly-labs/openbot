@@ -762,7 +762,7 @@ export const messages = {
   "mobile.server.mcp.stdioDescription": "Le serveur lance cette commande sur l’ordinateur du serveur.",
   "mobile.server.mcp.httpDescription": "Tous les fournisseurs peuvent utiliser un serveur MCP HTTP.",
   "mobile.server.mcp.providerLimit":
-    "Claude uniquement : les autres fournisseurs ne reçoivent pas un serveur qui a un dossier de travail.",
+    "Claude et Codex uniquement : les autres fournisseurs ne reçoivent pas un serveur qui a un dossier de travail.",
   "mobile.server.mcp.command": "Commande",
   "mobile.server.mcp.commandHint": "Le programme uniquement. Mettez chaque mot qui suit dans Arguments.",
   "mobile.server.mcp.arguments": "Arguments",

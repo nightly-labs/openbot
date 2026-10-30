@@ -751,7 +751,8 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "Sunucu bu komutu sunucunun bilgisayarında başlatır.",
   "mobile.server.mcp.httpDescription": "Her sağlayıcı bir HTTP MCP sunucusunu kullanabilir.",
-  "mobile.server.mcp.providerLimit": "Yalnızca Claude: çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
+  "mobile.server.mcp.providerLimit":
+    "Yalnızca Claude ve Codex: çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
   "mobile.server.mcp.command": "Komut",
   "mobile.server.mcp.commandHint": "Yalnızca program. Sonraki her kelimeyi Argümanlar alanına yazın.",
   "mobile.server.mcp.arguments": "Argümanlar",

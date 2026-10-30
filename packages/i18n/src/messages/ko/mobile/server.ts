@@ -719,7 +719,8 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "서버가 이 서버의 컴퓨터에서 이 명령을 실행해요.",
   "mobile.server.mcp.httpDescription": "모든 제공자가 HTTP MCP 서버를 사용할 수 있어요.",
-  "mobile.server.mcp.providerLimit": "Claude 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
+  "mobile.server.mcp.providerLimit":
+    "Claude 및 Codex 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
   "mobile.server.mcp.command": "명령",
   "mobile.server.mcp.commandHint": "프로그램만 입력하세요. 뒤에 오는 각 단어는 인수에 넣으세요.",
   "mobile.server.mcp.arguments": "인수",
