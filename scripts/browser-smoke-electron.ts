@@ -2204,10 +2204,8 @@ async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindo
     );
     assert(
       cases.every((item) => item.safe),
-      cases
-        .filter((item) => !item.safe)
-        .map((item) => item.name)
-        .join("; "),
+      // CI keeps no report file, so the message carries the failed cases.
+      JSON.stringify(cases.filter((item) => !item.safe)),
     );
   } finally {
     try {
