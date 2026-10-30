@@ -102,6 +102,8 @@ function hmac(secret: string, text: string, encoding: "hex" | "base64url") {
 // The account service that Signal asks. It confirms every route that a ticket names, and records
 // whether each request carried a valid service signature.
 const controlPlaneCalls: Array<{ path: string; signed: boolean }> = [];
+// The Telegram chat and the `wake` flag of each route-wake request.
+const routeWakes: Array<{ chatId: string; wake: boolean }> = [];
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolveBody, reject) => {
     const chunks: Buffer[] = [];
@@ -135,7 +137,10 @@ function startControlPlane(port: number): Promise<Server> {
     if (path === "/v2/remote/telegram-route/link")
       return payload.code === LINK_CODE ? answer(200, { hostId: LINK_HOST_ID, linkedAt: Date.now() }) : answer(404);
     // With route wakes, Signal keeps events for a host. No route here is of a hosted server.
-    if (path === "/v2/remote/route-wake") return answer(200, { hostId: null, state: "not_hosted" });
+    if (path === "/v2/remote/route-wake") {
+      if (payload.route?.platform === "telegram") routeWakes.push({ chatId: payload.route.chatId, wake: payload.wake });
+      return answer(200, { hostId: null, state: "not_hosted" });
+    }
     if (path === "/v2/remote/webhook-route/validate")
       return answer(200, { routes: payload.routes.map((route: { id: string }) => route.id) });
     return answer(404);
@@ -438,6 +443,77 @@ try {
     );
     second.socket.close();
     return "the next socket got the kept link with linked=true, and the next update of the chat";
+  });
+
+  await check("Only a Telegram update that can address OpenBot asks to start a hosted server", async () => {
+    // Each case uses its own chat that no socket holds, so Signal asks the account service once for it.
+    const message = <Fields extends object>(fields: Fields) => ({ message_id: 1, from: { id: 5 }, ...fields });
+    const cases: Array<{ chatId: string; wake: boolean; body: object }> = [
+      { chatId: "-600", wake: false, body: { message: message({ chat: { id: -600, type: "group" }, text: "hi" }) } },
+      {
+        chatId: "-601",
+        wake: false,
+        body: { message: message({ chat: { id: -601, type: "supergroup" }, caption: "photo", photo: [] }) },
+      },
+      {
+        chatId: "-602",
+        wake: true,
+        body: {
+          message: message({
+            chat: { id: -602, type: "group" },
+            text: "@bot hi",
+            entities: [{ type: "mention", offset: 0, length: 4 }],
+          }),
+        },
+      },
+      {
+        chatId: "-603",
+        wake: true,
+        body: {
+          message: message({
+            chat: { id: -603, type: "group" },
+            caption: "@bot",
+            caption_entities: [{ type: "mention", offset: 0, length: 4 }],
+          }),
+        },
+      },
+      {
+        chatId: "-604",
+        wake: true,
+        body: {
+          message: message({ chat: { id: -604, type: "group" }, text: "ok", reply_to_message: { message_id: 0 } }),
+        },
+      },
+      {
+        chatId: "-605",
+        wake: true,
+        body: { message: message({ chat: { id: -605, type: "supergroup" }, text: "ok", message_thread_id: 9 }) },
+      },
+      { chatId: "606", wake: true, body: { message: message({ chat: { id: 606, type: "private" }, text: "hi" }) } },
+      {
+        chatId: "-607",
+        wake: true,
+        body: { message: message({ chat: { id: -607, type: "group" }, new_chat_title: "T" }) },
+      },
+      {
+        chatId: "-608",
+        wake: true,
+        body: { callback_query: { id: "q-608", data: "s:x", message: { message_id: 1, chat: { id: -608 } } } },
+      },
+    ];
+    for (const { chatId, body } of cases) {
+      const response = await postUpdate(JSON.stringify({ update_id: 1, ...body }));
+      expect(response.status === 200, `chat ${chatId}: ${response.status}`);
+    }
+    const deadline = Date.now() + 5_000;
+    while (cases.some(({ chatId }) => !routeWakes.some((call) => call.chatId === chatId)) && Date.now() < deadline)
+      await new Promise((next) => setTimeout(next, 20));
+    const wrong = cases.filter(({ chatId, wake }) => routeWakes.find((call) => call.chatId === chatId)?.wake !== wake);
+    expect(
+      wrong.length === 0,
+      `wrong wake: ${wrong.map(({ chatId }) => `${chatId}=${routeWakes.find((call) => call.chatId === chatId)?.wake}`).join(", ")}`,
+    );
+    return "plain text and caption: wake=false; mention, caption mention, reply, thread, direct, rename, button: wake=true";
   });
 
   // 2. Signed account events: Signal acts only on an event that the account service signed now.
