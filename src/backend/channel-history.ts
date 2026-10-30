@@ -213,9 +213,13 @@ export class ChannelHistory {
       const origin = messages.find((message) => message.id === task.sourceMessageIds[0]) ?? request;
       // Members that answer one request each give their own view. The reply of a member that
       // finished first made the next one copy its first sentence, so the rows that the other tasks
-      // of this request wrote after the request stay out until this assignment ends.
+      // of this request wrote after the request stay out until this assignment ends. After the
+      // member gave its own view, a follow-up can ask about the others, so they show again.
+      const answered = messages.some(
+        (message) => message.author.kind === "agent" && message.taskId === task.id && message.message.text.trim(),
+      );
       const siblings = new Set(
-        task.parentTaskId === null
+        task.parentTaskId === null && !answered
           ? tasks
               .filter((item) => item.id !== task.id && item.parentTaskId === null && sameRequest(item, task))
               .map((item) => item.id)
