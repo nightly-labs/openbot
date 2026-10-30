@@ -1640,17 +1640,24 @@ export class ProviderRuntime implements ProviderPort {
     provider: AgentProvider,
   ) {
     const accounts = yield* this.#requireAccounts(provider);
-    // The sign-out removes the credential that a running turn uses.
-    if (this.#hooks.isProviderBusy(provider)) {
-      return yield* new ProviderOperationFailed({
-        cause: new Error(sourceText("error.provider.cliBusySignOut", { provider: providerLabel(provider) })),
-      });
-    }
-    yield* this.#cancelCliLogin(provider);
-    const disposals = this.#disposals;
-    yield* accounts.signOutDefault(provider).pipe(toProviderOperationFailed);
-    yield* this.#endSignedOutClient(provider, disposals);
-    return this.status();
+    // Codex signs in, by browser or by code, through its own login client.
+    const codex = requireProviderDriver(provider).signIn.kind === "browser";
+    return yield* this.#runProviderConnectionCommand(provider, () =>
+      Effect.gen({ self: this }, function* () {
+        // The sign-out removes the credential that a running turn uses.
+        if (this.#hooks.isProviderBusy(provider)) {
+          return yield* new ProviderOperationFailed({
+            cause: new Error(sourceText("error.provider.cliBusySignOut", { provider: providerLabel(provider) })),
+          });
+        }
+        // A sign-in that finished after the sign-out would sign the provider in again.
+        yield* codex ? this.#codexLogin.cancel(null) : this.#cancelCliLogin(provider);
+        const disposals = this.#disposals;
+        yield* accounts.signOutDefault(provider).pipe(toProviderOperationFailed);
+        yield* this.#endSignedOutClient(provider, disposals);
+        return this.status();
+      }),
+    );
   }, Effect.uninterruptible).bind(this);
 
   /** Whether the provider has a saved API key. */
