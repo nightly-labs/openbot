@@ -490,12 +490,10 @@ async function main(): Promise<void> {
 
     await app.whenReady();
     process.stdout.write("BrowserHost: Electron ready.\n");
-    const window = new BrowserWindow({ show: false, opacity: 0, focusable: scenario !== "typing-focus" });
+    const window = new BrowserWindow({ show: false, opacity: 0 });
     window.show();
-    if (scenario !== "typing-focus") {
-      app.focus({ steal: true });
-      window.focus();
-    }
+    app.focus({ steal: true });
+    window.focus();
     await new Promise((resolve) => setTimeout(resolve, 100));
     const downloadsRoot = join(temporaryRoot, "downloads");
     const statePath = join(temporaryRoot, "browser-tabs.json");
@@ -529,7 +527,7 @@ async function main(): Promise<void> {
         } else if (scenario === "redirect-navigation") {
           await runRedirectNavigationScenario(browser, origin);
         } else if (scenario === "typing-focus") {
-          await runTypingFocusScenario(browser, window, origin);
+          await runTypingFocusScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -557,7 +555,7 @@ async function main(): Promise<void> {
       }
       return;
     }
-    await runTypingFocusScenario(browser, window, origin);
+    await runTypingFocusScenario(browser, origin);
     const documentChangedTabs: string[] = [];
     const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
     browser.onDocumentChanged((tabId, documentIds) => {
@@ -1964,7 +1962,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindow, origin: string): Promise<void> {
+async function runTypingFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
   const { tab, contents } = await openTabWithContents(
     browser,
     `${origin}/blocking-frame?typing-focus`,
@@ -1972,10 +1970,6 @@ async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindo
     "smoke-bot",
   );
   const cases: Array<{ name: string; safe: boolean; toolSuccess: boolean; state: string; error: string }> = [];
-  const wasFocusable = window.isFocusable();
-  const wasFocused = window.isFocused();
-  // Native CDP input works in the background; physical keys must stay with the user's window.
-  window.setFocusable(false);
   try {
     for (const surface of [
       "ordinary",
@@ -2208,12 +2202,7 @@ async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindo
       JSON.stringify(cases.filter((item) => !item.safe)),
     );
   } finally {
-    try {
-      await runCauseEffect(browser.close(tab.id));
-    } finally {
-      window.setFocusable(wasFocusable);
-      if (wasFocused) window.focus();
-    }
+    await runCauseEffect(browser.close(tab.id));
   }
 }
 
