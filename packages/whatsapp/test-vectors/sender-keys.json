@@ -1,0 +1,251 @@
+{
+  "description": "Group sender keys (skmsg) and SenderKeyDistributionMessage, produced by the Baileys 7.0.0-rc14 Group modules on libsignal@6.0.0 crypto. Note: that sender skips every odd iteration after the first message (0, 2, 4, ...) - a Baileys quirk, not a protocol rule; receivers must accept any forward jump up to 2000. Signatures are deterministic here but a reimplementation may produce different valid signatures: compare skmsg bytes excluding the last 64 bytes, and verify the signature.",
+  "source": "baileys@7.0.0-rc14 lib/Signal/Group (MIT) + libsignal@6.0.0 crypto/curve",
+  "groupId": "120363000000000000@g.us",
+  "senderAddress": "15550001111_1.3",
+  "inputs": {
+    "keyId": 1234567890,
+    "iteration": 0,
+    "chainKey": "2f515f840d2fd7ec93bc7ac1a0e288fe1b42f1fe9c6a91c3b0ca7c6b0cf19a7f",
+    "signingKeyPrivate": "9eff56f9d3b73c5d0889ff8f2947f330ece0fee6a21f94f6af2852fdc0f563bc",
+    "signingKeyPublic": "0587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634"
+  },
+  "skdm": {
+    "bytes": "3308d285d8cc0410001a202f515f840d2fd7ec93bc7ac1a0e288fe1b42f1fe9c6a91c3b0ca7c6b0cf19a7f22210587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634",
+    "versionByte": "33",
+    "protobuf": "08d285d8cc0410001a202f515f840d2fd7ec93bc7ac1a0e288fe1b42f1fe9c6a91c3b0ca7c6b0cf19a7f22210587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634",
+    "id": 1234567890,
+    "iteration": 0,
+    "chainKey": "2f515f840d2fd7ec93bc7ac1a0e288fe1b42f1fe9c6a91c3b0ca7c6b0cf19a7f",
+    "signingKey": "0587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634"
+  },
+  "lateSkdm": {
+    "description": "SKDM the sender produces after the 12 messages: current chain iteration and chain key (seed) at that iteration",
+    "bytes": "3308d285d8cc0410171a2051c033f2b254111ce04219bc0df1278e573aa962cd910b7a8c703f7c9f0a356822210587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634",
+    "versionByte": "33",
+    "protobuf": "08d285d8cc0410171a2051c033f2b254111ce04219bc0df1278e573aa962cd910b7a8c703f7c9f0a356822210587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634",
+    "id": 1234567890,
+    "iteration": 23,
+    "chainKey": "51c033f2b254111ce04219bc0df1278e573aa962cd910b7a8c703f7c9f0a3568",
+    "signingKey": "0587a78f215c0d0d0cf6eb188ce3c36e512cbbe7d6b1a6a60e5b464fa8c1af8634"
+  },
+  "derived": {
+    "description": "Iteration 0, recomputed independently",
+    "messageKeySeed": "aaac8befcf7de7f735baa6dc7a6b9b467436f932a2e9e37c8a56ccb6aaa6ed0b",
+    "iv": "32970437f4a49acca7c5d9600986d596",
+    "cipherKey": "d7f3fe9c96b78d01a15c544aa599d6ad0c3fa8aeaa2253ec80843abc085ccc96",
+    "nextChainKey": "6f980c4cf62ca265693e09c9c46e54cf2a43f1e229fd7f18d9e93dee9cfb4333"
+  },
+  "messages": [
+    {
+      "index": 0,
+      "plaintext": "67726f7570206d6573736167652030",
+      "ciphertext": "3308d285d8cc0410001a100a698fc932ef20170143caa9ef67eedc533e19bb647fdc227261ac4019b9bf7a4fb11fa226c4d9051b8f191a5753503d3d84a4d64474422f9f3a9691071692aef84c96fce459b4922e281f555d287803",
+      "keyId": 1234567890,
+      "iteration": 0,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410001a100a698fc932ef20170143caa9ef67eedc",
+      "signature": "533e19bb647fdc227261ac4019b9bf7a4fb11fa226c4d9051b8f191a5753503d3d84a4d64474422f9f3a9691071692aef84c96fce459b4922e281f555d287803"
+    },
+    {
+      "index": 1,
+      "plaintext": "67726f7570206d6573736167652031",
+      "ciphertext": "3308d285d8cc0410021a1039d2fa265a478dc012bbeb93151d76a631fa976399c3e1d69881f8cd18c8a0b8d3b4b551c34e8f7f2713c9e944e30ac1b8a8f55c121db644ee407ced282e6f6ffbde288af4354f6e67df48b7cdf83407",
+      "keyId": 1234567890,
+      "iteration": 2,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410021a1039d2fa265a478dc012bbeb93151d76a6",
+      "signature": "31fa976399c3e1d69881f8cd18c8a0b8d3b4b551c34e8f7f2713c9e944e30ac1b8a8f55c121db644ee407ced282e6f6ffbde288af4354f6e67df48b7cdf83407"
+    },
+    {
+      "index": 2,
+      "plaintext": "67726f7570206d6573736167652032",
+      "ciphertext": "3308d285d8cc0410041a10290d87daf64fce2b1d5d1f382eff58dca4791c540d1c4fa574f24fff96c4c8922cdf57e010d07ea09bcfef371849b71477a17d644b9a2221f4b1e7f5a16462d75926ca3d5a573004beaef2fe58cf8e0c",
+      "keyId": 1234567890,
+      "iteration": 4,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410041a10290d87daf64fce2b1d5d1f382eff58dc",
+      "signature": "a4791c540d1c4fa574f24fff96c4c8922cdf57e010d07ea09bcfef371849b71477a17d644b9a2221f4b1e7f5a16462d75926ca3d5a573004beaef2fe58cf8e0c"
+    },
+    {
+      "index": 3,
+      "plaintext": "67726f7570206d65737361676520332070616464656420746f2033322062797465732121212121",
+      "ciphertext": "3308d285d8cc0410061a30b6d08e82a368eebe2e821a25d318e8c7808c0c38d66544fdb0b043029181974f92b54507e4939c85eacf406262743266e93c15f9da5f01f4afb7954761523e2a1a576613c7664ce6364df89af893d137fa5b8975e02f0665384ab16b4e935cdef272991286b5ca611a5b85d8fc7d5900",
+      "keyId": 1234567890,
+      "iteration": 6,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410061a30b6d08e82a368eebe2e821a25d318e8c7808c0c38d66544fdb0b043029181974f92b54507e4939c85eacf406262743266",
+      "signature": "e93c15f9da5f01f4afb7954761523e2a1a576613c7664ce6364df89af893d137fa5b8975e02f0665384ab16b4e935cdef272991286b5ca611a5b85d8fc7d5900"
+    },
+    {
+      "index": 4,
+      "plaintext": "67726f7570206d6573736167652034",
+      "ciphertext": "3308d285d8cc0410081a10a3f27aae4e3fa76d619cea280d334d890498494fd187526b1abd5502f4ae2b9eedae774438af88689a88cb4e8d4ec9cc438f9d5c5fce72855b63e10a5db99732e3f2201be458a02363d8859c8f9d2105",
+      "keyId": 1234567890,
+      "iteration": 8,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410081a10a3f27aae4e3fa76d619cea280d334d89",
+      "signature": "0498494fd187526b1abd5502f4ae2b9eedae774438af88689a88cb4e8d4ec9cc438f9d5c5fce72855b63e10a5db99732e3f2201be458a02363d8859c8f9d2105"
+    },
+    {
+      "index": 5,
+      "plaintext": "67726f7570206d6573736167652035",
+      "ciphertext": "3308d285d8cc04100a1a10996df84eec9de6f10b53543496ffff95b7d035382a8db8f95dba10edd69cb80db5b49c3feb177b1c76b4209bb9e8c86252afd3e25e9ae1d76cc39f9f8e080221204aaf0efb7adfc9f134388e6a0c320d",
+      "keyId": 1234567890,
+      "iteration": 10,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc04100a1a10996df84eec9de6f10b53543496ffff95",
+      "signature": "b7d035382a8db8f95dba10edd69cb80db5b49c3feb177b1c76b4209bb9e8c86252afd3e25e9ae1d76cc39f9f8e080221204aaf0efb7adfc9f134388e6a0c320d"
+    },
+    {
+      "index": 6,
+      "plaintext": "67726f7570206d6573736167652036",
+      "ciphertext": "3308d285d8cc04100c1a1020eeaaf58d8f53cd382fcae03e9a12fcd8721697c0988f0678992a8ed08933818716ff39f15183f258c7b7cd8c31e89989e634b03f8c0425b233417ebc6fc2a697fa25fcafe66a4bed784f3dd05a3607",
+      "keyId": 1234567890,
+      "iteration": 12,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc04100c1a1020eeaaf58d8f53cd382fcae03e9a12fc",
+      "signature": "d8721697c0988f0678992a8ed08933818716ff39f15183f258c7b7cd8c31e89989e634b03f8c0425b233417ebc6fc2a697fa25fcafe66a4bed784f3dd05a3607"
+    },
+    {
+      "index": 7,
+      "plaintext": "67726f7570206d6573736167652037",
+      "ciphertext": "3308d285d8cc04100e1a1092c71b6755fc618d1fb318bc8ca701f7f63e19cd003e5d1b6286704b193bd636c4307251c0a06aa958da0c5fa650f93285f5ce5269c07b7990d58bda03fb0fe4513e6b6750b951a7bd236ff89265f40a",
+      "keyId": 1234567890,
+      "iteration": 14,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc04100e1a1092c71b6755fc618d1fb318bc8ca701f7",
+      "signature": "f63e19cd003e5d1b6286704b193bd636c4307251c0a06aa958da0c5fa650f93285f5ce5269c07b7990d58bda03fb0fe4513e6b6750b951a7bd236ff89265f40a"
+    },
+    {
+      "index": 8,
+      "plaintext": "67726f7570206d6573736167652038",
+      "ciphertext": "3308d285d8cc0410101a10cff714ae266e4db2deda308889451c670a5ac9df953db47c1e61d5d6bfbc9c46123efc9c12f18818d94d0d816c604322872d0907af57b553ac9df4422dc8555c4dc335a04032287524f33605dc5e3b00",
+      "keyId": 1234567890,
+      "iteration": 16,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410101a10cff714ae266e4db2deda308889451c67",
+      "signature": "0a5ac9df953db47c1e61d5d6bfbc9c46123efc9c12f18818d94d0d816c604322872d0907af57b553ac9df4422dc8555c4dc335a04032287524f33605dc5e3b00"
+    },
+    {
+      "index": 9,
+      "plaintext": "67726f7570206d6573736167652039",
+      "ciphertext": "3308d285d8cc0410121a103c2c50db9cb916dd668c4a72a553341254b0afeeedf94fec2328c5fd25e3c795bfb31cf588ea8541dd318cefa4a8da6c67780c6730c8e728776502dd1415131f3d4b35a88a78776380f3b50f8653da0e",
+      "keyId": 1234567890,
+      "iteration": 18,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410121a103c2c50db9cb916dd668c4a72a5533412",
+      "signature": "54b0afeeedf94fec2328c5fd25e3c795bfb31cf588ea8541dd318cefa4a8da6c67780c6730c8e728776502dd1415131f3d4b35a88a78776380f3b50f8653da0e"
+    },
+    {
+      "index": 10,
+      "plaintext": "67726f7570206d657373616765203130",
+      "ciphertext": "3308d285d8cc0410141a209dc688c77fe5a9ca8bd146fcbf0057a085f421ffa1209fb04ef833a033fcf5e0783a63a07481b25d497a531a514392acda3b42925d815a663f881f67095bd9da24c5ae0eb26f6f39a31edea4f325ad69e50f7c11a3b2c366d9f7c234a41c2e04",
+      "keyId": 1234567890,
+      "iteration": 20,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410141a209dc688c77fe5a9ca8bd146fcbf0057a085f421ffa1209fb04ef833a033fcf5e0",
+      "signature": "783a63a07481b25d497a531a514392acda3b42925d815a663f881f67095bd9da24c5ae0eb26f6f39a31edea4f325ad69e50f7c11a3b2c366d9f7c234a41c2e04"
+    },
+    {
+      "index": 11,
+      "plaintext": "67726f7570206d657373616765203131",
+      "ciphertext": "3308d285d8cc0410161a206c89915a1d5d4884e0ea89950d50f56a02633482230c0d931e0ceaf9f41ff5cbdaf01531bae45f13b1f89129a94299dd8895c2e353a975507d86ba5b77a24734c3957acf28619c7ebd88353f778e16b6d6ba9823de00397e0f06619621068705",
+      "keyId": 1234567890,
+      "iteration": 22,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410161a206c89915a1d5d4884e0ea89950d50f56a02633482230c0d931e0ceaf9f41ff5cb",
+      "signature": "daf01531bae45f13b1f89129a94299dd8895c2e353a975507d86ba5b77a24734c3957acf28619c7ebd88353f778e16b6d6ba9823de00397e0f06619621068705"
+    },
+    {
+      "index": 12,
+      "plaintext": "6166746572206c61746520534b444d",
+      "ciphertext": "3308d285d8cc0410181a1016a52f0a446aea6ee175c779cc9d2f36a71d4210951a906f058accce03c813b82b2e26e62444fa2490a6babc1c1a56c6bf01007632b50d339b2ed591484c4a3069630141b39d301b227b2fef65a8710d",
+      "keyId": 1234567890,
+      "iteration": 24,
+      "versionByte": "33",
+      "protobuf": "08d285d8cc0410181a1016a52f0a446aea6ee175c779cc9d2f36",
+      "signature": "a71d4210951a906f058accce03c813b82b2e26e62444fa2490a6babc1c1a56c6bf01007632b50d339b2ed591484c4a3069630141b39d301b227b2fef65a8710d"
+    },
+    {
+      "index": 13,
+      "description": "message 10 with one ciphertext bit flipped: signature check must fail",
+      "ciphertext": "3308d285d8cc0410141a209dc688c77fe5a9ca8bd146fcbf0057a085f421ffa1209fb04ef832a033fcf5e0783a63a07481b25d497a531a514392acda3b42925d815a663f881f67095bd9da24c5ae0eb26f6f39a31edea4f325ad69e50f7c11a3b2c366d9f7c234a41c2e04",
+      "plaintext": "67726f7570206d657373616765203130",
+      "iteration": 20,
+      "keyId": 1234567890
+    }
+  ],
+  "deliveries": [
+    {
+      "receiver": "early",
+      "message": 0,
+      "iteration": 0,
+      "expectedPlaintext": "67726f7570206d6573736167652030",
+      "label": "in order"
+    },
+    {
+      "receiver": "early",
+      "message": 1,
+      "iteration": 2,
+      "expectedPlaintext": "67726f7570206d6573736167652031",
+      "label": "next message"
+    },
+    {
+      "receiver": "early",
+      "message": 9,
+      "iteration": 18,
+      "expectedPlaintext": "67726f7570206d6573736167652039",
+      "label": "jump forward several iterations (skipped message keys kept)"
+    },
+    {
+      "receiver": "early",
+      "message": 4,
+      "iteration": 8,
+      "expectedPlaintext": "67726f7570206d6573736167652034",
+      "label": "older message from kept keys"
+    },
+    {
+      "receiver": "early",
+      "message": 4,
+      "iteration": 8,
+      "expectError": true,
+      "label": "same message again: must fail"
+    },
+    {
+      "receiver": "early",
+      "message": 2,
+      "iteration": 4,
+      "expectedPlaintext": "67726f7570206d6573736167652032",
+      "label": "another older message from kept keys"
+    },
+    {
+      "receiver": "early",
+      "message": 13,
+      "iteration": 20,
+      "expectError": true,
+      "label": "tampered: must fail"
+    },
+    {
+      "receiver": "early",
+      "message": 10,
+      "iteration": 20,
+      "expectedPlaintext": "67726f7570206d657373616765203130",
+      "label": "untampered original still decrypts"
+    },
+    {
+      "receiver": "late",
+      "message": 12,
+      "iteration": 24,
+      "expectedPlaintext": "6166746572206c61746520534b444d",
+      "label": "late receiver seeded by later SKDM decrypts the next message"
+    },
+    {
+      "receiver": "late",
+      "message": 5,
+      "iteration": 10,
+      "expectError": true,
+      "label": "late receiver cannot decrypt a message from before its SKDM iteration"
+    }
+  ]
+}

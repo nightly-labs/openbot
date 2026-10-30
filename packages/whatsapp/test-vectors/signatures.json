@@ -1,0 +1,100 @@
+{
+  "description": "Curve25519 (XEdDSA-compatible) signatures from libsignal@6.0.0 curve.calculateSignature. 64 bytes = R(32) || s(32), with the Edwards sign bit of the signer public key in bit 7 of byte 63. libsignal-node signing is deterministic; a reimplementation may sign differently (e.g. randomized XEdDSA) as long as verification passes, so compare by verifying, not by bytes. publicKey is 33 bytes (0x05 prefix).",
+  "source": "libsignal@6.0.0 curve.calculateSignature / verifySignature",
+  "valid": [
+    {
+      "description": "signed prekey: message is the 33-byte (0x05-prefixed) signed prekey public key; signature byte 63 bit 7 clear",
+      "privateKey": "48fb1d6ef8660b94c789eb54f13b6b2ca95a1f41a2831341f5b51e45ce1b4e85",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a0e"
+    },
+    {
+      "description": "signed prekey: message is the 33-byte (0x05-prefixed) signed prekey public key; signature byte 63 bit 7 clear",
+      "privateKey": "ee36641dd6e58e2f5fb5eb3013c814839090c4e8b1ee8be4b73729f50fa846d5",
+      "publicKey": "055aa270d8422b45a8bf88aaacdcf89ee723440eafa8c205e50aa189b425b9c712",
+      "message": "0514a0859fea1eeb68da8616c5942f02c2ee385ee399131e7c82fef042aaea571e",
+      "signature": "0eb9f5cbca3116171dc73940b385a71273dd90de54dd5f21eebd12cc0c3169ca7207c8014d314ce7893711f91b2564ba99f2d7f002847e104432fe5de19aa703"
+    },
+    {
+      "description": "arbitrary message; signature byte 63 bit 7 clear",
+      "privateKey": "1ee4ce78c4223431eb88ae86572d343f582e183bae23fd45c6dd916f0b020488",
+      "publicKey": "05e386857a6b943787d5b07a6ecbabe94eb27599297059e4e3302481000d3c5c66",
+      "message": "617262697472617279206d657373616765206279746573",
+      "signature": "f32d6683e1e466450c5f89264107b4d299b92683dee2abe071b636c989ebbd38558f046322661d07b6bd8c4fce4391e9a08bee8e65f54f033c7cbcd658250a0e"
+    },
+    {
+      "description": "long message; signature byte 63 bit 7 clear",
+      "privateKey": "276783c14e71a603eda2f9ce3f2f9adf8d016b8b08aff4a59b1b6aebb5bea7d4",
+      "publicKey": "0538548a0f39bf28d450a6499a64503a3e05c7a91397858e63effe3fe22caff036",
+      "message": "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+      "signature": "b54028fe7a615a79b2acddb71377a2b68d71d50238b1bee340551f8d692d22e5f24947b96ba0de40568031ea0e5afabccd1a4d0be8d190b8bf6acce93fa5aa0d"
+    },
+    {
+      "description": "signed prekey: message is the 33-byte (0x05-prefixed) signed prekey public key; signature byte 63 has bit 7 set (Edwards sign bit of the signer key is 1)",
+      "privateKey": "ce4ec5f2641fe22e16d9a63de94ed251da9d590ae63ac944411670599c31150f",
+      "publicKey": "05603433d93e080dcfd8ab03b7633def4b0bdbdf96aa2d36a50875b7b441dcc170",
+      "message": "05840d6fddd8a05bd22b5efec73cce77fe39636b975fb70eac9a22fd39c5058053",
+      "signature": "3fd59deac6940d3a6cb3e794af680dfb5f52b8b532db8879b73ca4bf69a1308e9f20e5264080b3e5c2fe77dd45ea2e84ca43ccc905948d5d894c609d9bf74781"
+    },
+    {
+      "description": "signed prekey: message is the 33-byte (0x05-prefixed) signed prekey public key; signature byte 63 bit 7 clear",
+      "privateKey": "acf626dbc592aa96170ff19ae2b1c30053a04c13f6db18087d08c3a3028dc9af",
+      "publicKey": "053d4dea3cba43c05ce8fd16894cdc627a5f6f4400bc29a12e658cbc0f28ee8271",
+      "message": "05bf8e6aa5cc0e5dea44198112c21bdc815aa8d9a77b8ff893de4445ff9361c729",
+      "signature": "8c480a9ce59850c423b33a0bbaf4db3c7aff74ab23846c329eb7a8f332b284875d85a8b93aad460d6fe70b036a3c1cfd76555896c751dd4b9470a31a6e28c50e"
+    },
+    {
+      "description": "NOT produced by libsignal: a standard Ed25519 signature (RFC 8032 nonce) for the Edwards form of the key, with the Edwards sign bit copied into bit 7 of byte 63. libsignal accepts it, so verification must not depend on how the nonce was made. privateKey is the equivalent X25519 private key.",
+      "privateKey": "e28e72c4de1a68252c9964bc21cf48ed9427ee4eed8ce097c967a60896534bdd",
+      "publicKey": "05ea6772f639607ac42ac3a1678a22e95470b888e0ff88e01c61ec84d906e91d56",
+      "message": "666f726569676e207369676e6572",
+      "signature": "9cf74b4e49591a7012cc64420ffc63546d7fdbd7dfe32ca33bb3a681becc33ab71cc64e042451d06eeb39d0cd2b752ff0efaa25d6d03608cd1e141498e528887",
+      "edwardsPublicKey": "3afb6445d1314c1ecf85443e7bac419e28f32d291abf7afff8805263e43517f1"
+    }
+  ],
+  "invalid": [
+    {
+      "description": "message changed (one bit)",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c3b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a0e"
+    },
+    {
+      "description": "R changed (one bit)",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4425ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a0e"
+    },
+    {
+      "description": "s changed (one bit)",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee5a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a0e"
+    },
+    {
+      "description": "sign bit (byte 63 bit 7) flipped",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a8e"
+    },
+    {
+      "description": "sign bit cleared on a signature that needs it set",
+      "publicKey": "05603433d93e080dcfd8ab03b7633def4b0bdbdf96aa2d36a50875b7b441dcc170",
+      "message": "05840d6fddd8a05bd22b5efec73cce77fe39636b975fb70eac9a22fd39c5058053",
+      "signature": "3fd59deac6940d3a6cb3e794af680dfb5f52b8b532db8879b73ca4bf69a1308e9f20e5264080b3e5c2fe77dd45ea2e84ca43ccc905948d5d894c609d9bf74701"
+    },
+    {
+      "description": "wrong public key",
+      "publicKey": "055aa270d8422b45a8bf88aaacdcf89ee723440eafa8c205e50aa189b425b9c712",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a0e"
+    },
+    {
+      "description": "signature too short (63 bytes)",
+      "publicKey": "051debadb6e47405ee9296156745ee04c7655e89785bf46b2befc8e34033fa5d2a",
+      "message": "05f879a2c0c2b0995c9bc69cca7b13b7902bf4c78191c089181456b8857da88819",
+      "signature": "3175a4465ca7b4ef7495b77d350eee1e176bc69fc39fa2feb6487d45c1be46d0b80c3208a1fb960ee7a33290dcfc1079c7ecc3343fb38b5fab5da85047ff5a"
+    }
+  ]
+}

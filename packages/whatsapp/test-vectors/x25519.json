@@ -1,0 +1,39 @@
+{
+  "description": "X25519 key agreement (RFC 7748) as used by libsignal. Public keys are the raw 32-byte form; in Signal messages they carry a 0x05 prefix (33 bytes). Shared secret is the raw 32-byte X25519 output, not hashed.",
+  "source": "libsignal@6.0.0 curve.calculateAgreement (node crypto x25519)",
+  "samples": [
+    {
+      "description": "random private keys (top bits not clamped in storage)",
+      "privateA": "438f13a33abdbf3c7921d3ac4f11fa9b8d6f92d6f350ae555f629703b3dab842",
+      "publicA": "0d237fa38f1b5810ea96a393f9ce53e3674cfa2209337103493d80f86c6ee877",
+      "privateB": "ada7293cc674bb9a34a606b35af0fd7bca46673de73033e27fdaa8c9480ad18e",
+      "publicB": "c8678a3bcff5bdb7152f442f538d054d71907bf90ec88f3b1e1c09d38917d74d",
+      "shared": "df37b1f6682e73fdf4fd6b95fd3c44d54500629fc0ff6308f1b11b6e9adf7057"
+    },
+    {
+      "description": "random private keys",
+      "privateA": "4ad131acdc4773635df78dbeebf65f5710f07144792708a96d94136750e79c5f",
+      "publicA": "2c01bdd6a3c55e5a791c9b405c74f0d467da9afd4ab65acb813ba42f2ba5eb73",
+      "privateB": "52e06c1e70347641281276821bbd429afe868cf6acd021a362b59aa2e9811524",
+      "publicB": "3111a4aea3d36c693106cca2e1ec810ea5384a14bd00cbba5161ad26afcef243",
+      "shared": "19a1560407165816d055c9b3c26bfad95500850409621ef6a7f5db3d236b0d48"
+    },
+    {
+      "description": "random private keys",
+      "privateA": "ac92b711869ceaa4250545b5fb4f5a9a0cc72d14ad4b99b803c6d00a404bdb6c",
+      "publicA": "aaf999fdbeee1fc6396bc5a483fafc60b2fe4ac0f1b033b6bc5f143144d12423",
+      "privateB": "fd9a29824bb3a73cdc68addf4571bf38c820e583950c22596fd89b2a761c4062",
+      "publicB": "8395b7509ad8fb6fbefaf3efa1f0cceca688e0771696fc1e08ea45432a1db06f",
+      "shared": "d0b6e360bd1140277295e2673658ca46a9349f4df2fd07a81f1243cf40ea7954"
+    },
+    {
+      "description": "unclamped private key (bits 0-2 and 254-255 set); X25519 clamps before use, so it equals the clamped form",
+      "privateA": "4fd594daadd9323679e3bb0e62614a6abe9b63eca9338de34fea7df31dbc57c9",
+      "privateAClamped": "48d594daadd9323679e3bb0e62614a6abe9b63eca9338de34fea7df31dbc5749",
+      "publicA": "b72091d7c7b9e3dda8dea8775e624825cea1652aa86ff8e8df1a0a7b89bf4a15",
+      "privateB": "f219ecb0fd40f86160bb08cabf9ad0ada3bf38110a17495b839fdf841f65e431",
+      "publicB": "2a81695e50801f18862ca0ab0916018a8796dec8c1e606719ea60b9e89499c6b",
+      "shared": "b08f7254037d17a511306d7048098aaf93a30108aa7edcfa4a4bfd1c7869ea34"
+    }
+  ]
+}

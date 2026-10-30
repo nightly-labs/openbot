@@ -77,6 +77,17 @@ const config: KnipConfig = {
         // `@openbot/team-client` imports it, and the main bundle keeps it external through this
         // entry. Bundled, a JSDoc `import` line in it takes the `__dirname` shim of electron-vite.
         "@noble/hashes",
+        // The vendored Baileys in `@openbot/whatsapp` imports these at runtime. The main bundle keeps
+        // them external, so electron-builder packs them only from these root entries.
+        "@cacheable/node-cache",
+        "@noble/curves",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
       ],
       // Scripts start other scripts by path (`bun scripts/<name>.ts`), relative to the repository
       // root. Every file in scripts/ is already an entry.
@@ -126,6 +137,26 @@ const config: KnipConfig = {
       // Metro resolves mobile-catalogs.native.ts in place of mobile-catalogs.ts.
       entry: ["src/lazy-catalogs.ts", "src/mobile-catalogs.native.ts"],
       project: ["src/**/*.{ts,tsx,css}"],
+    },
+    "packages/whatsapp": {
+      entry: ["src/*.ts", "scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/*.ts"],
+      // The vendored Baileys imports these. Knip does not read the vendor, which keeps upstream's code
+      // as it is (vendor/baileys/OPENBOT-PATCHES.md).
+      ignoreDependencies: [
+        "@cacheable/node-cache",
+        "@hapi/boom",
+        "async-mutex",
+        "long",
+        "lru-cache",
+        "music-metadata",
+        "p-queue",
+        "pino",
+        "protobufjs",
+        "ws",
+        // The vendor's own type check reads these types.
+        "@types/ws",
+      ],
     },
     "packages/*": {
       project: ["src/**/*.{ts,tsx,css}"],
