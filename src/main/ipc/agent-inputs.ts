@@ -1,9 +1,10 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
   type AgentIpcRequest,
   type AgentMemorySelectionChange,
   type AgentTaskInput,
+  agentThreadTitle,
   type CancelAgentWaitInput,
   type CancelMessageLinkInput,
   type CancelQueuedMessageInput,
@@ -37,13 +38,18 @@ import {
   isRoutineSchedule,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
+  type MarkAgentTaskReadInput,
   type MarkConversationReadInput,
+  type MarkConversationUnreadInput,
   type OpenAttachmentInput,
   type OpenMessageLinkInput,
   type OpenSharedFileInput,
   type OpenWorkspaceFileInput,
   type PasteMessageLinkInput,
+  type PreviewSharedFileInput,
+  type PreviewWorkspaceFileInput,
   type ReadConversationPageInput,
+  type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
@@ -415,9 +421,11 @@ export function parseListChannelRoutineRuns(value: unknown): ListChannelRoutineR
 
 export function parseReadConversationPage(value: unknown): ReadConversationPageInput {
   if (!isObject(value)) throw new Error("Invalid conversation page request.");
+  const agentId = requireString(value.agentId, "agentId", INPUT_LIMITS.identifier);
+  const anchor = parsePageAnchor(value.anchor);
   return {
-    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
-    anchor: parsePageAnchor(value.anchor),
+    agentId,
+    ...(anchor === undefined ? {} : { anchor }),
     limit: parsePageLimit(value.limit),
   };
 }
@@ -455,6 +463,7 @@ export function parseSearchConversationMessages(value: unknown): SearchConversat
       : { agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier) }),
     ...(value.cursor === undefined ? {} : { cursor: requireString(value.cursor, "cursor", 2048) }),
     limit,
+    ...(value.includeSideThreads === true ? { includeSideThreads: true } : {}),
   };
 }
 
@@ -518,6 +527,16 @@ export function parseSendMessage(value: unknown): SendMessageInput {
   if (taskId !== undefined && (!isString(taskId) || !taskId || taskId.length > INPUT_LIMITS.identifier)) {
     throw new Error("Invalid task id.");
   }
+  const voiceRecordingDraftId = value.voiceRecordingDraftId;
+  if (
+    voiceRecordingDraftId !== undefined &&
+    (!isString(voiceRecordingDraftId) ||
+      !voiceRecordingDraftId ||
+      voiceRecordingDraftId.length > INPUT_LIMITS.identifier ||
+      attachmentDraftIds.includes(voiceRecordingDraftId))
+  ) {
+    throw new Error("Invalid voice recording draft.");
+  }
   return {
     agentId: requireString(value.agentId, "agentId"),
     text: value.text,
@@ -525,6 +544,7 @@ export function parseSendMessage(value: unknown): SendMessageInput {
     replyToMessageId: replyToMessageId?.trim() || null,
     ...(clientMessageId === undefined ? {} : { clientMessageId }),
     ...(taskId === undefined ? {} : { taskId }),
+    ...(voiceRecordingDraftId === undefined ? {} : { voiceRecordingDraftId }),
   };
 }
 
@@ -554,6 +574,20 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseRenameAgentTask(value: unknown): RenameAgentTaskInput {
+  const task = parseAgentTask(value);
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  const title = agentThreadTitle(value.title);
+  if (title === null) throw new Error("Invalid title.");
+  return { ...task, title };
+}
+
+export function parseMarkAgentTaskRead(value: unknown): MarkAgentTaskReadInput {
+  const task = parseAgentTask(value);
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return { ...task, throughMessageId: requireString(value.throughMessageId, "throughMessageId") };
+}
+
 export function parseMessageReaction(value: unknown): SetMessageReactionInput {
   if (!isObject(value)) throw new Error("Invalid message reaction request.");
   const emoji = value.emoji;
@@ -577,6 +611,14 @@ export function parseMarkConversationRead(value: unknown): MarkConversationReadI
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     throughMessageId:
       throughMessageId === null ? null : requireString(throughMessageId, "throughMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseMarkConversationUnread(value: unknown): MarkConversationUnreadInput {
+  if (!isObject(value)) throw new Error("Invalid conversation unread request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
   };
 }
 
@@ -624,9 +666,24 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
     result.computerUse = value.computerUse;
   }
+  // `null` returns the agent to the account default.
   if (value.allowAutomation !== undefined) {
-    if (!isBoolean(value.allowAutomation)) throw new Error("Invalid automation value.");
+    if (value.allowAutomation !== null && !isBoolean(value.allowAutomation))
+      throw new Error("Invalid automation value.");
     result.allowAutomation = value.allowAutomation;
+  }
+  if (value.allowNewChat !== undefined) {
+    if (value.allowNewChat !== null && !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat value.");
+    result.allowNewChat = value.allowNewChat;
+  }
+  if (value.quickAcknowledgement !== undefined) {
+    if (value.quickAcknowledgement !== null && !isBoolean(value.quickAcknowledgement))
+      throw new Error("Invalid quick acknowledgement value.");
+    result.quickAcknowledgement = value.quickAcknowledgement;
+  }
+  if (value.fastMode !== undefined) {
+    if (!isBoolean(value.fastMode)) throw new Error("Invalid fast mode value.");
+    result.fastMode = value.fastMode;
   }
   if (value.providerAccountId !== undefined) {
     if (value.providerAccountId !== null && !isProviderAccountId(value.providerAccountId))
@@ -706,6 +763,12 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
   return { paths: value.paths, data };
 }
 
+/** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
+export function parseAttachmentData(value: unknown): ImportAttachmentsInput["data"] {
+  if (!Array.isArray(value)) throw new Error("Invalid attachment data.");
+  return parseImportAttachments({ paths: [], data: value }).data;
+}
+
 export function parseChooseAttachments(value: unknown): ChooseAttachmentsInput {
   if (!isObject(value) || (value.filter !== "all" && value.filter !== "images")) {
     throw new Error("Invalid attachment picker filter.");
@@ -764,6 +827,23 @@ export function parseOpenWorkspaceFile(value: unknown): OpenWorkspaceFileInput {
     path: requireString(value.path, "path", INPUT_LIMITS.path),
     action: parseFileAction(value.action),
   };
+}
+
+export function parsePreviewSharedFile(value: unknown): PreviewSharedFileInput {
+  if (!isObject(value)) throw new Error("Invalid shared file request.");
+  return { ...parseOpenSharedFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+}
+
+export function parsePreviewWorkspaceFile(value: unknown): PreviewWorkspaceFileInput {
+  if (!isObject(value)) throw new Error("Invalid workspace file request.");
+  return { ...parseOpenWorkspaceFile(value), ...optionalPreviewByteLimit(value.maxBytes) };
+}
+
+function optionalPreviewByteLimit(value: unknown): { maxBytes?: number } {
+  if (value === undefined) return {};
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > ATTACHMENT_LIMITS.fileBytes)
+    throw new Error("Invalid preview size limit.");
+  return { maxBytes: value };
 }
 
 export function parseCancelQueuedMessage(value: unknown): CancelQueuedMessageInput {

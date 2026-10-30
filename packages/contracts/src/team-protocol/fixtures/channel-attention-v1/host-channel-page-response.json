@@ -1,0 +1,67 @@
+{
+  "channel": {
+    "name": "launch",
+    "title": "Launch",
+    "instructions": "",
+    "members": [
+      {
+        "agentId": "agent-1"
+      },
+      {
+        "agentId": "agent-2"
+      }
+    ],
+    "leadAgentId": "agent-1",
+    "id": "channel-1",
+    "archived": false,
+    "revision": 3,
+    "createdAt": "2026-10-20T09:00:00.000Z"
+  },
+  "messages": [
+    {
+      "id": "channel-message-1",
+      "channelId": "channel-1",
+      "sequence": 1,
+      "author": {
+        "kind": "agent",
+        "id": "agent-1",
+        "name": "Ada"
+      },
+      "taskId": null,
+      "superseded": false,
+      "message": {
+        "id": "question-prompt:turn-1:1",
+        "turnId": "turn-1",
+        "author": "agent",
+        "text": "Send the report?",
+        "createdAt": "2026-10-21T10:00:00.000Z",
+        "status": "completed",
+        "uiBlock": {
+          "version": 1,
+          "blockId": "block-1",
+          "spec": {
+            "type": "confirm",
+            "title": "Send the report?",
+            "actions": [
+              {
+                "id": "send",
+                "label": "Send",
+                "style": "primary"
+              },
+              {
+                "id": "cancel",
+                "label": "Cancel"
+              }
+            ]
+          },
+          "state": {
+            "status": "pending"
+          }
+        }
+      }
+    }
+  ],
+  "tasks": [],
+  "olderCursor": null,
+  "throughSequence": 1
+}

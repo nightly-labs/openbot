@@ -10,6 +10,7 @@ import {
   decodeDiscordHistory,
   decodeDiscordMessageId,
   decodeDiscordName,
+  decodeDiscordRoles,
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result } from "effect";
@@ -31,13 +32,22 @@ import type {
   StatusReaction,
 } from "../messaging-types";
 import { DiscordApiError, MessagingAdapterError } from "../messaging-types";
-import { discordCustomId, discordMentionIds, discordPlainText } from "./discord-events";
+import {
+  discordContextText,
+  discordCustomId,
+  discordMentionIds,
+  discordPlainText,
+  inboundFile,
+} from "./discord-events";
 import { DiscordTransport } from "./discord-transport";
 
 /** A margin under Discord's limit for the fence that `chunkMarkdown` can add. */
 const CHUNK_CHARACTERS = DISCORD_MESSAGE_TEXT_LIMIT - 40;
 /** How many pages of a channel the context reads after the conversation's first message. */
 const HISTORY_PAGES = 3;
+/** The channel messages before a conversation's first message that are its context: the most, and how old. */
+const PRECEDING_MESSAGES = 10;
+const PRECEDING_WINDOW_MS = 15 * 60_000;
 /** The times the history tool reads a channel from, shortest first: an hour, a day, a week. */
 const RECENT_WINDOWS_MS = [3_600_000, 86_400_000, 604_800_000];
 /** The most `listMessages` calls of one history tool call. */
@@ -180,7 +190,9 @@ class DiscordAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     const [first = "", ...rest] = chunkMarkdown(markdown, CHUNK_CHARACTERS);
+    let firstId: string;
     if (replaceMessageId) {
+      firstId = replaceMessageId;
       const updated = yield* Effect.result(this.edit(target, replaceMessageId, { text: first }));
       if (Result.isFailure(updated)) {
         yield* this.#call(
@@ -192,10 +204,11 @@ class DiscordAdapter implements MessagingAdapter {
           },
           ignoreAnswer,
         ).pipe(Effect.catch(() => Effect.void));
-        yield* this.post(target, { text: first });
+        firstId = yield* this.post(target, { text: first });
       }
-    } else yield* this.post(target, { text: first });
+    } else firstId = yield* this.post(target, { text: first });
     for (const chunk of rest) yield* this.post(target, { text: chunk });
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
@@ -233,8 +246,10 @@ class DiscordAdapter implements MessagingAdapter {
    * The messages of the reply chain that `threadKey` starts, after `afterId` and before `beforeId`.
    * Discord has no thread of replies, so this reads the channel from the first message on and keeps
    * the first message, the replies to it and the replies to OpenBot's posts, which all reply to it.
-   * Without the Message Content intent, Discord gives the text only of a message that mentions
-   * OpenBot, so a message without text is left out.
+   * The first message of a conversation has no chain before it: its context is the channel's
+   * messages of the last minutes before it, such as an image that a person posted without a mention.
+   * Without the Message Content intent, Discord gives the text and files only of a message that
+   * mentions OpenBot, so a message without either is left out.
    */
   readonly history = Effect.fnUntraced(function* (
     this: DiscordAdapter,
@@ -244,11 +259,13 @@ class DiscordAdapter implements MessagingAdapter {
     beforeId: string,
   ): Effect.fn.Return<ContextEntry[], MessagingAdapterError> {
     const after = afterId ? BigInt(afterId) : null;
-    const chain = yield* this.#chain(platformChannelId, threadKey, BigInt(beforeId));
+    const messages =
+      threadKey === beforeId
+        ? yield* this.#preceding(platformChannelId, BigInt(beforeId))
+        : yield* this.#chain(platformChannelId, threadKey, BigInt(beforeId));
     return yield* this.#entries(
-      chain.filter(
-        (message) =>
-          !message.authorIsBot && discordPlainText(message.content) && (after === null || BigInt(message.id) > after),
+      messages.filter(
+        (message) => !message.authorIsBot && hasContent(message) && (after === null || BigInt(message.id) > after),
       ),
     );
   });
@@ -257,7 +274,7 @@ class DiscordAdapter implements MessagingAdapter {
    * The newest messages of a reply chain or of the channel, OpenBot's posts included, for the agent's
    * history tool. Discord lists a channel only forward from an id, so the channel is read from a
    * time: the last hour first, and a longer time when that has too few messages. A message without
-   * text is left out, as in `history`.
+   * text or files is left out, as in `history`.
    */
   readonly recent = Effect.fnUntraced(function* (
     this: DiscordAdapter,
@@ -269,7 +286,7 @@ class DiscordAdapter implements MessagingAdapter {
     if (threadKey) {
       // A margin past now: this computer's clock can be behind Discord's.
       const chain = yield* this.#chain(platformChannelId, threadKey, snowflakeAt(now + CLOCK_MARGIN_MS));
-      return (yield* this.#entries(chain.filter((message) => discordPlainText(message.content)))).slice(-limit);
+      return (yield* this.#entries(chain.filter(hasContent))).slice(-limit);
     }
     let calls = 0;
     let visible: DiscordHistoryMessage[] | null = null;
@@ -288,7 +305,7 @@ class DiscordAdapter implements MessagingAdapter {
       // A longer time that was not read to its end has only its oldest messages: the shorter time
       // before it, read to its end, is newer.
       if (!complete && visible) break;
-      visible = read.filter((message) => discordPlainText(message.content));
+      visible = read.filter(hasContent);
       if (!complete || visible.length >= limit || calls >= RECENT_CALLS) break;
     }
     if (!visible) return [];
@@ -337,6 +354,27 @@ class DiscordAdapter implements MessagingAdapter {
     return chain;
   });
 
+  /** The newest channel messages before `before`, from the last minutes before it, oldest first. */
+  readonly #preceding = Effect.fnUntraced(function* (
+    this: DiscordAdapter,
+    platformChannelId: string,
+    before: bigint,
+  ): Effect.fn.Return<DiscordHistoryMessage[], MessagingAdapterError> {
+    const messages: DiscordHistoryMessage[] = [];
+    let cursor = (snowflakeAt(Number(snowflakeTime(before)) - PRECEDING_WINDOW_MS) - 1n).toString();
+    for (let page = 0; page < HISTORY_PAGES; page += 1) {
+      const batch = yield* this.#listMessages(platformChannelId, cursor);
+      messages.push(...batch);
+      const last = batch.at(-1);
+      if (!last || batch.length < DISCORD_LIST_MESSAGES_LIMIT || BigInt(last.id) >= before) break;
+      cursor = last.id;
+    }
+    return messages
+      .filter((message) => BigInt(message.id) < before)
+      .sort((left, right) => compareSnowflakes(left.id, right.id))
+      .slice(-PRECEDING_MESSAGES);
+  });
+
   #listMessages(
     platformChannelId: string,
     after: string,
@@ -363,8 +401,13 @@ class DiscordAdapter implements MessagingAdapter {
       (message): ContextEntry => ({
         id: message.id,
         authorName: message.authorIsBot ? `${message.authorName} (bot)` : message.authorName,
-        text: withMentionNames(discordPlainText(message.content), names),
+        text: discordContextText(
+          withMentionNames(discordPlainText(message.content), names),
+          message.attachments,
+          message.forwarded,
+        ),
         sentAt: message.sentAt,
+        ...(message.attachments.length ? { files: message.attachments.map(inboundFile) } : {}),
       }),
     );
   });
@@ -431,6 +474,11 @@ class DiscordAdapter implements MessagingAdapter {
     );
   }
 
+  /** A Signal that predates `listRoles` refuses it as an invalid request. */
+  roles(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError> {
+    return this.#call({ op: "listRoles", guildId: this.#guildId }, decodeDiscordRoles);
+  }
+
   /** Signal posts with no mention allowed, so a mention shows the person and pings nobody. */
   mention(userId: string): string {
     return /^[0-9]+$/.test(userId) ? `<@${userId}>` : userId;
@@ -488,6 +536,15 @@ function clip(text: string): string {
 /** The smallest Discord id of a message sent at `milliseconds`. */
 function snowflakeAt(milliseconds: number): bigint {
   return (BigInt(milliseconds) - DISCORD_EPOCH_MS) << 22n;
+}
+
+function snowflakeTime(id: bigint): bigint {
+  return (id >> 22n) + DISCORD_EPOCH_MS;
+}
+
+/** A message that has text or files for the context, or a forward, which says when it has neither. */
+function hasContent(message: DiscordHistoryMessage): boolean {
+  return discordPlainText(message.content) !== "" || message.attachments.length > 0 || message.forwarded;
 }
 
 function compareSnowflakes(left: string, right: string): number {

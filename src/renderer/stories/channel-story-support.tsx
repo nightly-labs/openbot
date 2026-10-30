@@ -1,162 +1,154 @@
 /**
- * The channel transcript as stories draw it, from the shared message row. It is written out rather
- * than mounted from `ChannelConversation`, which needs the channels context and every context behind
- * it. `ChannelConversation.stories.tsx` builds its variants on it, and the diagram workspace story
- * shows it when a channel is open.
+ * The channel chat as the app shows it: the conversation view with a channel source. The source
+ * is written out here rather than built from the channels store, which needs the account, server and
+ * turns contexts and a channel-aware `window.openbot` behind it. `ChannelConversation.stories.tsx`
+ * builds its variants on it, and the diagram workspace story shows it when a channel is open.
  */
 
-import { ArrowUp, Button } from "@openbot/ui";
+import { Button } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
-import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
-import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
-import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
-import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
-import { UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
-import type { JSX } from "@solidjs/web";
-import { createSignal, For, Show } from "solid-js";
+import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
+import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { fn } from "storybook/test";
+import type { ConversationChannelSource } from "../src/features/conversation/conversation-types";
+import { StoryConversation } from "./conversation-story-support";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
-const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
-const sales = requireFixture(STORY_AGENTS[1], "Story agent 1");
-const research = requireFixture(STORY_AGENTS[2], "Story agent 2");
+export const CHANNEL_STORY_CHIEF = requireFixture(STORY_AGENTS[0], "Story agent 0");
+export const CHANNEL_STORY_RESEARCH = requireFixture(STORY_AGENTS[1], "Story agent 1");
+export const CHANNEL_STORY_SALES = requireFixture(STORY_AGENTS[2], "Story agent 2");
 
-export interface ChannelStoryRow {
-  id: string;
-  author: { kind: "you" | "agent"; name: string; agent?: (typeof STORY_AGENTS)[number] };
-  showAuthor: boolean;
-  dayMarker?: string;
-  unread?: boolean;
-  message: AgentMessage;
+const members = [CHANNEL_STORY_CHIEF, CHANNEL_STORY_RESEARCH, CHANNEL_STORY_SALES].map((agent) => ({
+  agentId: agent.id,
+}));
+
+/** A message time of the story day as the stored timestamp, so that a run of one author groups. */
+function storyCreatedAt(time: string) {
+  return `2026-09-01T${time}:00`;
 }
 
-export function channelStoryMessage(id: string, body: string, time: string, streaming = false): AgentMessage {
-  return { id, author: "agent", body, time, streaming };
+export function channelStoryAgentMessage(
+  id: string,
+  agentId: string,
+  body: string,
+  time: string,
+  streaming = false,
+): AgentMessage {
+  return {
+    id,
+    author: "agent",
+    senderAgentId: agentId,
+    body,
+    time,
+    createdAt: storyCreatedAt(time),
+    streaming,
+    kind: "text",
+  };
 }
 
-export const CHANNEL_STORY_ROWS: ChannelStoryRow[] = [
-  {
-    id: "m1",
-    author: { kind: "agent", name: chief.name, agent: chief },
-    showAuthor: true,
-    dayMarker: "Mon, Sep 7 11:12 PM",
-    message: channelStoryMessage("m1", "I read the brief. I will split it into three tasks.", "11:12 PM"),
-  },
-  {
-    id: "m2",
-    author: { kind: "agent", name: chief.name, agent: chief },
-    showAuthor: false,
-    message: channelStoryMessage("m2", "Sales Outbound takes the first, I take the other two.", "11:13 PM"),
-  },
-  {
-    id: "m3",
-    author: { kind: "you", name: "You" },
-    showAuthor: true,
-    dayMarker: "Today 12:59 PM",
-    message: { id: "m3", author: "you", body: "Good. Start with the numbers.", time: "12:59 PM" },
-  },
-  {
-    id: "m4",
-    author: { kind: "agent", name: sales.name, agent: sales },
-    showAuthor: true,
-    unread: true,
-    message: channelStoryMessage("m4", "Last quarter closed 12% over plan. The detail is in the sheet.", "1:04 PM"),
-  },
-  {
-    id: "m5",
-    author: { kind: "agent", name: research.name, agent: research },
-    showAuthor: true,
-    message: channelStoryMessage("m5", "I am checking the source of the 12%…", "1:05 PM", true),
-  },
+export function channelStoryMemberMessage(
+  id: string,
+  body: string,
+  time: string,
+  memberId = "member-self",
+): AgentMessage {
+  return {
+    id,
+    author: "you",
+    senderMember: { id: memberId, name: memberId === "member-self" ? "You" : "Avery" },
+    body,
+    time,
+    createdAt: storyCreatedAt(time),
+    kind: "text",
+  };
+}
+
+export const CHANNEL_STORY_MESSAGES: AgentMessage[] = [
+  channelStoryAgentMessage(
+    "m1",
+    CHANNEL_STORY_CHIEF.id,
+    "I read the brief. I will split it into three tasks.",
+    "11:12",
+  ),
+  channelStoryAgentMessage(
+    "m2",
+    CHANNEL_STORY_CHIEF.id,
+    "Sales Outbound takes the first, I take the other two.",
+    "11:13",
+  ),
+  channelStoryMemberMessage("m3", "Good. Start with the numbers.", "12:59"),
+  channelStoryAgentMessage(
+    "m4",
+    CHANNEL_STORY_SALES.id,
+    "Last quarter closed 12% over plan. The detail is in the sheet.",
+    "13:04",
+  ),
+  channelStoryMemberMessage("m5", "Can you add the regional split?", "13:05", "member-avery"),
+  channelStoryAgentMessage("m6", CHANNEL_STORY_RESEARCH.id, "I am checking the source of the 12%…", "13:05", true),
 ];
 
-export function ChannelTranscript(props: {
-  rows: ChannelStoryRow[];
-  workers: ChannelWorker[];
-  children?: JSX.Element;
-}) {
-  return (
-    <main class="conversation-panel" aria-label="Channel conversation" style={{ height: "100dvh" }}>
-      <section class="conversation-scroll" aria-label="Shared messages">
-        <div class="virtual-chat-list virtual-chat-list-static">
-          <For each={props.rows}>
-            {(row) => (
-              <div class="virtual-chat-row" data-grouped={row.showAuthor ? undefined : "sender"}>
-                <Show when={row.dayMarker}>
-                  <div class="time-marker">
-                    <span>{row.dayMarker}</span>
-                  </div>
-                </Show>
-                <Show when={row.unread}>
-                  <UnreadMessagesDivider />
-                </Show>
-                <ChatMessageRow
-                  message={row.message}
-                  author={row.author}
-                  showAuthor={row.showAuthor}
-                  showTime={row.showAuthor}
-                  agents={STORY_AGENTS}
-                  onSelectAgent={fn()}
-                  onOpenLink={fn()}
-                  onPreview={fn()}
-                  onAttachmentAction={fn()}
-                  actions={
-                    <MessageActions
-                      message={row.message}
-                      authorName={row.author.name}
-                      reactions={false}
-                      pickerOpen={false}
-                      expandedEmoji={false}
-                      copied={false}
-                      onTogglePicker={fn()}
-                      onExpandEmoji={fn()}
-                      onReact={fn()}
-                      onReply={fn()}
-                      onCopy={fn()}
-                    />
-                  }
-                />
-              </div>
-            )}
-          </For>
-        </div>
-        <div class="agent-activity-slot" data-reserved={props.workers.length > 0 ? "true" : "false"}>
-          <Show when={props.workers.length > 0}>
-            <ChannelActivityIndicator workers={props.workers} />
-          </Show>
-        </div>
-      </section>
-      {props.children}
-    </main>
-  );
+export interface ChannelStoryProps {
+  name?: string;
+  messages?: AgentMessage[];
+  workers?: ChannelWorker[];
+  awaiting?: AwaitingReplyItem[];
+  stopped?: { id: string; ownerAgentId: string; error: string }[];
+  archived?: boolean;
+  activeTurnId?: string | null;
+  unreadCount?: number;
+  firstUnreadMessageId?: string | null;
 }
 
-/** The channel composer at rest: the editor and the send button, for a story that shows a whole chat. */
-export function ChannelStoryComposer(props: { channelName: string }) {
-  const [text, setText] = createSignal("");
+/** The channel chat on a mocked bridge, for a story that shows a channel or composes screens. */
+export function StoryChannelConversation(props: ChannelStoryProps) {
+  const name = () => props.name ?? "Project room";
+  const agentName = (id: string | null) => STORY_AGENTS.find((agent) => agent.id === id)?.name ?? "Unassigned";
+  const source: ConversationChannelSource = {
+    id: "story-channel",
+    name,
+    readOnly: () => props.archived === true,
+    author: (message) => {
+      const agent = STORY_AGENTS.find((candidate) => candidate.id === message.senderAgentId);
+      return { kind: "agent", name: agent?.name ?? "Former member", agent, avatarSeed: message.senderAgentId };
+    },
+    workers: () => props.workers ?? [],
+    workingTurns: () => [],
+    interactionAgentName: () => undefined,
+    awaitingReplies: () => props.awaiting ?? [],
+    HeaderTitle: () => (
+      <Button variant="ghost" size="sm" class="conversation-title channel-title no-drag" aria-label="Channel settings">
+        <ChannelAvatar members={members} agents={STORY_AGENTS} />
+        <span class="channel-header-copy">
+          <h1>{name()}</h1>
+          <span class="channel-header-title">Quarterly launch</span>
+        </span>
+      </Button>
+    ),
+    SettingsPane: () => null,
+    AboveComposer: () => (
+      <ChannelStoppedTasks tasks={props.stopped ?? []} members={members} name={agentName} onResume={fn()} />
+    ),
+    EmptyState: () => (
+      <div class="channel-empty">
+        <ChannelAvatar members={members} agents={STORY_AGENTS} />
+        <h2>{name()}</h2>
+        <p class="channel-empty-title">Quarterly launch</p>
+        <p>Plan the launch post and check every number before it goes out.</p>
+      </div>
+    ),
+  };
   return (
-    <div class="composer-wrap">
-      <form class="composer" data-compact="true" onSubmit={(event) => event.preventDefault()}>
-        <div class="composer-input-label">
-          <ComposerEditor
-            agentId={undefined}
-            agents={STORY_AGENTS}
-            value={text()}
-            placeholder={`Message ${props.channelName}`}
-            ariaLabel="Message to channel"
-            disabled={false}
-            onSubmit={fn()}
-            onValueChange={setText}
-          />
-        </div>
-        <div class="composer-toolbar">
-          <div class="composer-primary-actions">
-            <Button type="submit" variant="ghost" class="voice-button" aria-label="Send message">
-              <ArrowUp aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      </form>
-    </div>
+    <StoryConversation
+      channel={source}
+      agent={undefined}
+      modelOptions={[]}
+      mentionAgents={STORY_AGENTS.slice(0, 3)}
+      messages={props.messages ?? CHANNEL_STORY_MESSAGES}
+      activeTurnId={props.activeTurnId ?? null}
+      unreadCount={props.unreadCount ?? 0}
+      firstUnreadMessageId={props.firstUnreadMessageId ?? null}
+    />
   );
 }

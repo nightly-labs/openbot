@@ -168,3 +168,49 @@ export const IMAGE_COLLAGE = `<!doctype html>
   <figure><img src="${logoUrl}" alt="OpenBot logo" style="object-fit: contain"><figcaption>App logo</figcaption></figure>
 </div>
 </body></html>`;
+
+/**
+ * A page that answers the agent: a choice goes to the message box, the count goes to the context,
+ * and the page can go full screen. Its count shows that full screen does not load the page again.
+ */
+export const INTERACTIVE_CHOICE = `<!doctype html>
+<html><head>
+<style>
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; color: var(--foreground); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  p { color: var(--muted-foreground); font-size: 13px; }
+  img { display: block; width: 100%; max-width: 480px; margin-top: 12px; border-radius: var(--radius); }
+</style>
+</head><body>
+<p>Which plan do you want?</p>
+<div class="row">
+  <button type="button" data-plan="A">Pick A</button>
+  <button type="button" data-plan="B">Pick B</button>
+  <button type="button" id="count">Count: 0</button>
+  <button type="button" id="large">Full screen</button>
+</div>
+<img id="chart" alt="Runs per day">
+<script>
+  // The chart is an image, drawn here with the theme colours, so a click on it opens the image viewer.
+  const canvas = document.createElement("canvas");
+  canvas.width = 480;
+  canvas.height = 200;
+  const context = canvas.getContext("2d");
+  context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--chart-1");
+  [80, 130, 180, 110, 60].forEach((height, index) => context.fillRect(30 + index * 90, 200 - height, 60, height));
+  document.getElementById("chart").src = canvas.toDataURL("image/png");
+  let count = 0;
+  for (const button of document.querySelectorAll("[data-plan]")) {
+    button.addEventListener("click", () => openbotPage.sendMessage("I pick plan " + button.dataset.plan + "."));
+  }
+  document.getElementById("count").addEventListener("click", (event) => {
+    count += 1;
+    event.currentTarget.textContent = "Count: " + count;
+    openbotPage.setContext("The counter shows " + count + ".");
+  });
+  document.getElementById("large").addEventListener("click", () =>
+    openbotPage.displayMode === "fullscreen" ? openbotPage.exitFullscreen() : openbotPage.requestFullscreen(),
+  );
+</script>
+</body></html>`;

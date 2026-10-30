@@ -6,6 +6,2140 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-10-30
+
+### Added
+
+- In Workspace only, you can now exclude folders on an agent's Folders page. The agent cannot change files in an excluded folder, also when it is in the workspace, the shared folder or an added folder. Claude and the sandboxed providers block these writes. Codex gets the exclusions as instructions only.
+- The Marketplace Skills tab shows "Your skills" first: each skill that your agents have, with the
+  agents that have it, and an Update button when a new version is available.
+- Choose the agents of a skill in one dialog. Search 50 or more agents, select a range with a drag
+  or with Shift+click, and save all the changes with one button.
+- Show only verified skills or only public skills with the All, Verified and Public switch.
+- Each skill group has its own page with three featured skills, a sort by use, date or name, and
+  Load more.
+- A skill page lists each agent that has the skill, with a switch to turn it on or off, Update and
+  Remove. A skill that you made on this computer has the same page.
+- Remove a skill from one agent or from all its agents. Undo in the notice takes the change back
+  before the skill is removed.
+- While an agent works, press Tab in the message box to send the message into its running turn. Before, you sent the message and then selected Steer on its queue row.
+- You can dictate a message in a side thread, as in the agent's own chat. Click the microphone, speak, and the words appear in the thread's message box.
+- A side thread's message box has the same "+" menu as the agent's own chat: attach an image, use a skill, add context, or ask a side question.
+- Settings → Voice has a Voice server section. Connect an OpenAI-compatible server, such as Speaches
+  or Kokoro-FastAPI on your network, with its address and an optional API key. Then use it for
+  dictation, for spoken replies, or for both, with the model and voice that you choose. Nothing has
+  to be downloaded for a part that the server does.
+- You can open a thread beside the agent's chat. Drag its tab from the chat header to the side panel, or right-click the tab and choose Open beside the chat. Drag it back to the chat header to open it there again. The side panel keeps its thread tabs after a restart.
+- You can create more servers on this computer. Each server is a separate workspace with its own agents, chats, files and settings. To add one, click the plus button on the server rail, then click "Other options" > "New server on this computer". You can have up to 5 of these servers.
+- Settings > Providers has **Disconnect** in the ⋯ menu of the Claude and Codex sign-in, on this
+  computer and in Server settings of a server. It signs the provider out and removes the stored
+  sign-in. On this computer, the `claude` or `codex` CLI in the terminal signs out too (#3487).
+- Log in to ChatGPT with an OpenAI API key. On this computer, open Settings > Providers > ChatGPT and select Add key under API key. Codex saves the key, and OpenAI bills each request to it instead of your ChatGPT plan. Change key replaces it, and Disconnect removes it.
+- Settings › Agents now lists the background processes that agents left running on your Mac or Linux computer, such as a dev server that an agent started with `nohup`. Each row shows the command, the agent, the start time and the ports, and Stop ends the process and its child processes. Before, such a process kept running after the chat ended and after you quit OpenBot, and only a terminal could find and stop it.
+- A custom endpoint can now run on Pi. Open Settings › Providers › Custom endpoints, edit the endpoint, and set "Runs on" to Pi. Its models then show in Pi's model list. Endpoints that you saved before keep running on OpenCode. When Pi is not downloaded, choose it in "Runs on" to download it. On a joined server, the model picker also knows which endpoints run on Pi, when the host has this version.
+- Settings › Notifications is now the one place for notifications: one table shows each server and its agents, with All activity, Only when it needs me, or Nothing, and a mute for each server. The level of a server and of each agent is yours only and applies on your computer, in the web client and on your phones, and a change on one device shows at once on the others. The server menu and the agent settings show the level and open this table; Server settings no longer have a Notifications section. A mute still applies to the device where you set it. The agent settings no longer have their own Notifications switch; an agent that was switched off for everyone shows "Turn on" in the table.
+
+### Changed
+
+- In a channel, more than one agent can now answer. When you ask for the view of each agent, speak to the whole group, or need the work of several agents, the lead gives the request to each of them, and each one answers in its own reply. A message that starts with more than one mention, such as "@Writer @Editor what do you think?", goes to each mentioned agent, and a message that starts with `@everyone` goes to every agent in the channel. The mention picker shows an "Everyone" option in channels. "continue" after a stop continues the work of each agent that the request went to. Before, only one agent answered.
+- The Skills tab shows 6 skills for each group, with "See all" for the full group. It replaces the
+  install menu and the Installed filter.
+- Pages in the Marketplace window move with a short transition. When reduced motion is on, the
+  page changes at once.
+- The Tasks page is back on desktop and the web, pinned to the page rail. It lists the side threads of all agents in Needs you, Working, Waiting and Archived, and starts a new task. A task opens beside the list in the same thread view as the chat, with its steps, Archive and Restore, and Open in chat. A task that waits for your approval or answer moves to Needs you. A task that you read there shows as read in the chat header and on the phone.
+- In a side thread, Stop replaces Send while the agent works and the message box is empty, as in the agent's own chat.
+- While an agent asks you a question, a message that you send from the chat box is your answer to that question. Before, the message went into the running turn and the question stayed open. A channel message, a message with files, or a reply to a message still goes as a message, and a private answer still uses its own field.
+- An agent that ends a turn with open steps in its plan now continues by itself, up to 3 times for
+  one request. It stops when the plan does not change, when it waits or asks you, or when you stop
+  it or send a new message. Steps that were already open before your request do not count. A short
+  line in the chat shows each automatic continuation.
+- Agents now finish the whole request before they end a turn. They do not stop only to report
+  progress or to ask whether to continue.
+- The thread tabs in the chat header now look and work like the side panel tabs. The agent's name is the first tab, for the agent's own chat. All thread tabs have the same width. When the tabs need more room, the model picker shows less first: without the effort, then only its icon. Then the tabs get narrower together, and after that they scroll. Thread tabs in the side panel have the same width.
+- In a narrow chat header, the open thread shows as one button with the look of a selected tab, and the model picker shows only its icon. When the header gets narrower again, the agent's name, then "+", then the thread list button hide, so no control covers another.
+- You rename a thread tab in the tab itself. The thread icon stays, and the field does not cover the next tab.
+- "Join a server" is now in the "Other options" menu at the top of the server plans.
+- The sidebar shows larger avatars: 46px in the agent, channel and people rows, and 56px in the pinned row.
+- Group chats show larger author faces beside messages: 32px instead of 24px.
+- MCP servers that OpenBot signed in to, such as Notion, now see OpenBot as the client, with the name of the agent that connects, for example "Research Bot (OpenBot)". Notion shows "with MCP" until it adds OpenBot to the clients it names.
+- Code blocks in chat now wrap long lines, so you can read an email draft or a long command without scrolling sideways. Line breaks and Copy do not change.
+- A notification with a preview, on the computer, in the web client and on the phone, now shows the first sentences of the agent's message, not all of it. It leaves out code blocks, tables, headings and mail headers such as "In-Reply-To", shows tool names such as "openbot.revise_skill" as words, and shows a hidden email address or secret as "•••" in place of "[redacted-email]". The iPhone Live Activity that the computer updates shows the same short text.
+
+### Fixed
+
+- On a joined server, a second ChatGPT account now connects after its sign-in in the browser of your computer. Before, the sign-in screen stayed open after the browser page closed, and after 10 minutes the server removed the account.
+- When you ask, agents run your own browser scripts, such as Selenium. Without your request, they still use the OpenBot browser.
+- An owner or admin of a joined server can now choose Queue or Steer for each agent of that server, in the agent's settings › Advanced › While working. Before, the row was hidden for these agents, so a message sent while they worked always waited in the queue. The default choice shows the server's own default.
+- Gemini with a saved API key no longer stays on "Connecting" when Gemini does not answer its key sign-in. After the start time limit, the provider shows an error. Before, it waited with no end, and Cancel waited too.
+- The provider settings and the model picker show "Finish the sign-in if a browser page opens" and Cancel only while a sign-in waits for you. Before, they also showed when OpenBot checked a provider again after a key change, a restart or an update, when no browser page opens.
+- A right-click on the message box and on other text fields now shows Undo, Redo, Cut, Copy, Paste, Delete
+  and Select All on Windows, Linux and macOS, and Paste and Match Style on macOS. Each item is available
+  only when it can act, the labels use the app language, and a misspelled word shows its spelling
+  suggestions. Before, the menu showed only Select All, or Copy and Select All with selected text.
+- Side threads now use your send shortcut setting.
+- A message sent while an agent works now goes straight to the queue. Before, it showed in the chat for a moment and then moved to the queue.
+- A message sent to an idle agent now stays in the chat. Before, it left the chat for a moment and the queue panel opened.
+- You can now sign in to the Make MCP server. Before, sign-in stopped with "The server answered 400."
+- The plan usage that windows, browser tabs and phones show is now read at most once every four minutes for each provider sign-in, however many of them are open. Before, each of them read it again, so a provider such as Claude could refuse more reads for a long time.
+- When a usage read fails, for example because the provider limits requests, OpenBot keeps the last reading and waits longer before it tries again: 5 minutes, then 10, 20 and 40, up to one hour. Before, the reading disappeared and OpenBot tried again every 5 minutes.
+- A server that you host yourself, such as on a VPS, now takes as many members as your license has users. Before, it stopped at 3.
+- Gemini no longer fills the memory of a computer or server over hours of use. Before, each Gemini chat and each model list refresh kept a helper process of about 100 MB until Gemini stopped, so a 4 GB server often held new messages for low memory. Now a model list refresh uses no more memory. On macOS and Linux, each Gemini chat also runs in a process of its own, and OpenBot ends that process when the chat has been idle for 10 minutes, when more than two chats are idle, or when memory is low. The next message continues the same chat.
+- An agent from the ACP registry, such as Mistral Vibe, now installs on Linux when its runtime archive puts `./` before each file name. Before, the install stopped with "The runtime archive contains an unsafe path."
+- A channel lead can now route a very long request. Before, a Grok lead got only part of a request of about 100,000 bytes or more, and the channel showed "The channel lead could not route this message". The lead now reads the first 20,000 bytes of the request.
+- Show all your agents when you go back to the mobile app. Before, agents that use DeepSeek,
+  OpenRouter or Inception could go out of the list and lose their pin.
+- Server Settings > General > Timezone saves the zone that you choose. Before, only "Automatic" and "UTC" stayed selected, and a zone such as "Europe/Warsaw" did nothing.
+- The OpenBot Telegram bot now answers a mention such as "@meetOpenBot hello" in a group where it is not an admin. Before, only replies to the bot worked there, and a mention got no answer.
+- **In a Telegram group that you connected before this fix, remove OpenBot from the group and connect the group again from OpenBot, or make OpenBot a group admin.**
+- Settings now show Pi, Muse, Inception, DeepSeek and OpenRouter as off when you turned them off. Before, after a restart their switch showed on, and saving a key failed with "OpenRouter is off in OpenBot".
+- Put the cursor in the chat box when you click Reply. Before, after you went between an agent chat
+  and a channel, Reply could leave the focus on the button, and you had to click the chat box before
+  you typed.
+- The agent's browser can now click, hover, drag and upload files on a part of a page that it must scroll to. Before, these actions failed with "No node found at given location", for example when an agent attached a file to a GitHub comment.
+- Remote Desktop and device connections to a server connect through the relay when the server has
+  more than one network, or many devices are connected. Before, the relay refused new connections
+  after the first few.
+- A routine or provider handoff no longer cuts an emoji in half when it shortens long chat history. Before, the cut could make Codex reject the request.
+- Usage now shows the OpenCode Go quota when the OpenCode CLI has its own key: an OpenCode Console
+  connection, a key from `opencode auth login`, or `OPENCODE_API_KEY` in the environment. Before,
+  the quota showed only for a key saved in OpenBot.
+- **Log in with code** for Codex works when the stored ChatGPT sign-in can no longer refresh. Before,
+  it failed with "Your access token could not be refreshed", or the code dialog closed after a second
+  with "Connect ChatGPT to continue".
+- On a long page, a browser snapshot now shows the controls in view first. Before, controls earlier on the page could fill the snapshot, and the agent could not see the controls that you scrolled to.
+- When a member of a group chat fails because of a provider error, such as a rate limit or a spent quota, the group now shows the reason from the provider. Before, it showed only "The agent could not complete this task."
+- A transfer export keeps all the skills of a skill pack, such as pstack, as one skill. Before, it
+  counted each skill of the pack, so an agent such as Dr. Eggbot lost skills at the limit of 32.
+- On a server that you joined, the secure card for a password or a code sends your answer to the
+  agent again. Before, Submit, Take over and Cancel failed with `http/400/team_api_error`.
+- The mouse wheel and trackpad scroll in the remote desktop of a Mac. Before, the Mac did not scroll for most wheel steps and trackpad gestures. The Mac that you connect to must have this version.
+- A thread that you open in place of another thread now shows its latest message, not its first message.
+- Add account for Gemini on a joined server now opens the Google sign-in in the browser of your computer, as the first Gemini account does. Before, the page opened in the browser of the server, and Google refused it with "Your browser is not supported any more" (#4004). The server and the app must both have this version.
+- ChatGPT agents now run when Codex signs in with an OpenAI API key, also with `codex login --with-api-key` in a terminal. Before, OpenBot showed "Codex requires a ChatGPT subscription login" and did not start Codex. Connect now uses that login too, and does not open a ChatGPT sign-in.
+- DeepSeek models now work when an MCP server, such as Webflow, has a tool with a `[` in a regex character class. Before, DeepSeek refused each request with a 400 error.
+- Agents find your 1Password and Bitwarden logins when you ask them to sign in with your password manager. Before, an agent did not find a tool for 1Password and looked only in the OpenBot Vault.
+- The `$` list of a side question shows the agent's skills. It said "This agent has no skills."
+- The Local scripts guide now tells how to answer a question that lets the person pick several
+  choices. The pending list shows these choices in the question text, and a script sends each picked
+  label as one answer.
+- Codex agents now get the tools of a STDIO MCP server that has a working directory. Before, OpenBot left such a server out of Codex sessions, although its connection test passed.
+- Gemini agents in Full access can now read and change files in the folders that you add to them. Before, Gemini refused all files outside the agent's workspace and the shared folder, and Full access showed no way to add a folder.
+- A folder that you add to or remove from an agent now applies at the next message in an open chat. Before, Gemini and other ACP agents used the old folders until a new thread started.
+- Agents' browser typing no longer goes into a different field when the page moves focus. Before, the text or the Enter key could reach another field, and the agent was told that typing worked. Now the agent gets an error that says whether the text is already in the field.
+- A sign-in code email is sent again when the mail server does not answer. Before, OpenBot showed a "confirming delivery" countdown and then waited for a code that was never sent.
+- A channel task that you stop now shows Continue and Reassign. Before, it stayed stopped with no
+  button. Tasks of an archived channel get the same buttons when you restore it.
+- "continue" in a channel now continues the work that you stopped last, also when older work is
+  still open. The members get their original request again, not only the word "continue".
+- A channel message that starts with a typed "@Name" now goes to that member directly.
+- When the lead cannot read its own routing answer, the channel now says so and offers Reassign.
+- The lead no longer posts "Assigned to" itself when it answers a message alone.
+- In the remote desktop, Cmd+A or Ctrl+A and the zoom keys (Cmd or Ctrl with =, - and 0) now go to the remote computer when the viewer has focus. Before, OpenBot kept these keys: select all did nothing and the zoom keys changed the OpenBot interface size.
+- A Cursor agent can use OpenBot's tools and message its teammates when `openbot` is in Cursor's list of disabled MCP servers for the project. Before, Cursor started the agent without OpenBot's tools and showed no error, so messages to teammates were not sent.
+- When Cursor does not load OpenBot's tools for another reason, such as a Cursor team policy, the chat shows an error. Before, the turn ended and the model reported tool errors that did not occur.
+- Keep text from later browser frames in snapshots after the control limit is reached.
+- Agents no longer load a tool schema again when the tool search already returned it.
+- A channel no longer shows old replies again as new messages after OpenBot starts again.
+- A channel turn that you stop no longer leaves an empty reply.
+- When a request goes to several members, each member now gives its own view. Before, a member could
+  copy the reply of a member that answered first.
+- Members no longer get notes such as "Result submitted to the shared chat." from other members, and a
+  member now ends its turn when it posts its result.
+- Channel tasks that you stopped in an earlier version now show Continue and Reassign after the update.
+- Agents now call a tool directly when tool search already returns its schema. Before, the agent instructions told them to describe each tool before its first call, which was in conflict with the search results.
+- Agents can now open a page that goes to its next page while it loads, as sign-in pages often do. Before, the agent got an `ERR_ABORTED` error, and the `open` tool closed the new tab.
+- Cursor and other ACP agents no longer ask you to sign in again after a timeout, a network failure or a server error during start while you are still signed in. Only a real sign-out, such as an "Authentication required" answer or `401 Unauthorized`, asks for sign-in. The log now keeps the text of the agent's answer.
+- The agent's avatar in the sidebar now shows that the agent works when it works in a side thread. Before, the avatar stayed still until the agent worked in its own chat.
+- When a browser action timed out after its click or key press reached the page, the agent got only "timed out" and could repeat the action. The error now says that the input reached the page and tells the agent to check the page first.
+- You can now drag the window by the empty top row of the settings page.
+- A custom endpoint on a llama-swap server no longer unloads the agent's model at the start of a new chat. OpenCode asked its `small_model` for a chat title, and llama-swap loaded that model, then loaded the agent's model again. OpenBot does not use these titles, so it now turns them off.
+- Computers, the web client and phones now use Team API protocol 9, which has room for more features. A server on an older version and an app on an older version keep working with this version: they do not get the features that need protocol 9, such as notification levels that apply on all devices.
+- The iPhone Live Activity that the computer updates now hides secrets and email addresses, as notifications do. It also no longer offers Approve for a command whose secret it hides, so you approve such a command in the app.
+- Your phone now gets the notification of an agent event that came just after you left the OpenBot app. Before, the computer did not send it when the app went to the background before it told the computer, and the notification was lost.
+- An iPhone Live Activity now takes the place of a notification only when it shows that event. Before, a reply or a failure did not notify while the activity showed another agent at work or a request of another agent.
+- An iPhone Live Activity that does not get its updates no longer stops notifications. The computer also sends a notification again when Apple or Google do not take it the first time.
+- An iPhone Live Activity now takes the first update from the computer after you leave the app, and ends also when the phone was without network at that time. Before, it could stay out of date.
+- A desktop notification for an agent on another server now shows also when the list of its agents cannot be read at that moment.
+- Picture in Picture now shows the page of a joined server's browser. Before, the floating window stayed empty and dark.
+- Picture in Picture now follows the tab that the agent changes to on a joined server.
+- Keep the web app on screen when openbot.run gets an update. Before, the page could go blank and
+  load again after an update.
+- Connect the web app to your server again within about 30 seconds after the server comes back.
+  Before, the web app could wait up to 2 minutes, and you had to reconnect from Settings.
+- The web app now connects again at once when you go back to its tab or window. Before, after some failed attempts it could wait up to two minutes, also when the server was already back, and you had to reconnect from Settings.
+
+## [0.54.0] - 2026-10-29
+
+### Added
+
+- A Workspace only agent can now change files in folders that you add. Open the agent's settings, then Folders, or drop a folder on the chat. The agent knows which folders it can change.
+- You can set the context window of each model of a custom provider on this computer. OpenCode then compacts the conversation at the correct size, and does not use its 200K-token default.
+- Ctrl+F (⌘F on macOS) now searches the open side thread. Before, the shortcut did nothing in a side thread.
+- The website has a Pricing page. It shows the hosted servers at their Stripe prices, the Starter
+  license (1 member) and the Team license (2 to 10 members), monthly or yearly, in EUR, USD or PLN.
+  Choose a server, a license or both. The summary shows the total. Visitors in the EU see that the
+  prices do not include VAT. A license bought with a server costs 10% less (bundle discount), and yearly
+  billing takes 20% off a license. When the Stripe prices do not load, the page shows the list prices.
+- The header and the footer of the website have a Pricing link.
+- The Pricing page has one button. It opens the web app at the add server dialog, or at Billing
+  when you choose only a license.
+
+### Changed
+
+- An agent's post to Slack, Discord or Telegram now gives the agent the ID of the post, and for
+  Discord a link to it, so the agent can link to the post.
+- A new server has fewer members: Starter 1, Standard 5 and Pro 10. Servers that already exist keep
+  their limits (Starter 3, Standard 10, Pro 25).
+- Sell the commercial license in two plans. Starter is €10 a month for 1 user. Team is €25 a month
+  for 2 users and €15 for each extra user, up to 10. For more than 10 users, contact us. Yearly
+  billing takes 20% off. An account that pays for a hosted server (any plan) then pays 10% less for
+  the license. Each user can use up to 3 devices.
+- On the Pricing page, set more than 10 members for the Team license to see the custom price and a
+  Contact us button.
+- Add server lets an account with no license choose personal or work use. For work, set the people
+  at work, and buy the server and its license at the bundle price with one payment.
+  The license cannot have fewer users than the people who use your servers now, and the order uses
+  the currency of your other plans.
+- Buy a license alone from Billing: set the people with a slider and see the price at once.
+- Change a Starter license to Team, or a monthly Team license to yearly, from Billing. When an
+  invite needs more than 1 user, the members section offers the change to Team.
+- Make a new commercial license free until 1 December 2026. Billing, Add server and the pricing page
+  show "Free until 1 December 2026". Stripe takes the first payment on that day. Cancel before then
+  to pay nothing.
+- The pricing page sends its order to the web app. After sign-in, the app goes straight to Stripe
+  Checkout with the same server, license, users, billing period and currency, so you do not choose
+  again. When the order does not fit the account, such as another currency than your other plans,
+  the app shows the order filled in and you confirm it.
+- Update the Privacy Policy, Terms & Conditions and Commercial License Agreement on openbot.run.
+  Add the Data Processing Addendum at openbot.run/dpa. openbot.run/privacy shows the Privacy Policy too.
+  openbot.run/commerciallicense and openbot.run/branding open the existing pages.
+- The site footer links to the Terms, the Commercial License Agreement and the DPA.
+- When you add a server for work, the dialog now tells you why it does not let you choose fewer people: everyone who uses your servers now needs a seat on the license.
+- Prices in PLN are 4 times the EUR price, so they are round amounts. The Starter license costs 40 zł a month, and the Team license costs 100 zł a month for 2 users and 60 zł for each extra user. A new hosted server costs 80 zł (Starter), 200 zł (Standard) or 400 zł (Pro) a month, not 90, 220 or 440 zł.
+
+### Fixed
+
+- OpenBot starts on a Mac where `/Library/Application Support` or `/Library/Application Support/OpenBot`
+  has a non-root owner or group write permission, and no host manager is installed. Before, OpenBot
+  stopped at each start with an empty error. A start error from the host manager check now shows its
+  cause.
+- Remote desktop pairing on macOS 27 works again. Before, the host stopped at each pairing attempt and every setup check showed as not checked.
+- When an agent cannot open a secure password or code card for a sign-in, it now gets the reason,
+  such as which field or button target is wrong, and can correct the request. Before, it got only
+  "Secure authentication is unavailable".
+- Routine agents now check saved Vault logins before they report a sign-in requirement. They can use saved passwords and authenticator codes through secure browser input.
+- Quit OpenBot without the error "OpenBot database is not initialized." when an agent reports its
+  context use during the quit.
+- Keep a self-hosted or hosted server responsive after an error in the main process, and let it
+  finish a quit. Before, an error box that nobody could close on the server display stopped the
+  process, and the service manager did not start it again. On desktop, an error during a quit also
+  shows no error box.
+- OpenBot keeps working when a page in the browser requests an address that it cannot read, such as a host that starts with an escaped space. Before, OpenBot stopped and did not answer until a restart.
+- Show the reason of a group chat task that stopped because its member was removed or is not
+  available in your language. Before, the reason was always in English.
+- Show only Reassign on a stopped group chat task whose member left the group chat. Before,
+  Continue stopped the task again.
+- Provider settings in agent settings show in one card, as the other groups do. Before, each switch showed under its name and each choice was a full-width field outside a card.
+- Keep a new provider account, such as another Gemini account, when its sign-in works but its first
+  usage reading fails. Before, OpenBot removed the account after the Google sign-in, so it looked as
+  if OpenBot did not add the account. A Reconnect with the same failure now shows the account as
+  connected, not as an error.
+- Keep the chat steady when you switch between agents that have queued messages. Before, the queue
+  animated the other agent's messages out and this agent's messages in, and the chat jumped while
+  the queue changed height. When the agent that you open has no queued messages, the queue of the
+  other agent now closes at once.
+- Let Gemini continue when one MCP server that OpenBot gives it does not start, such as a server that asks for a sign-in. Before, each Gemini turn failed with "The MCP server '<name>' failed to initialize". Now OpenBot leaves the server out, tells you which server it left out, and sends the message again.
+- Cancel and × now stop a browser sign-in in the Apps connect dialog. Before, both stayed off while the dialog waited for the browser, for up to 5 minutes.
+- Show the agent's steps in a side thread, as in the agent's own chat: the thinking while the agent
+  works, and the steps row above each answer. Before, a side thread showed only the answer.
+- On macOS, **OpenBot → Check for Updates…** opens Settings on the Updates tab, where the check and its
+  result show. Before, nothing changed on screen when OpenBot was up to date or the check failed.
+- Check the remote desktop permissions when you open Server settings → Remote desktop on a Mac.
+  Hide the Grant button of a permission that is already allowed. Before, all rows showed
+  "Not checked" and Grant until you selected Check again.
+- Cursor turns fail less often with "Invalid model value". Cursor asks its server for the model
+  list each time the model is set, and reports a failed request as an invalid model. OpenBot now
+  sets the Cursor model only when it changes, not before every turn (#3800).
+- An agent that a ChatGPT (Codex) usage limit moved to a backup model now goes back to its model within 15 minutes when Codex ends the limit early, for example after you spend a reset credit in the Codex app. Before, OpenBot kept the agent on the backup model until the old reset time, also when you selected the model again.
+
+## [0.53.2] - 2026-10-28
+
+### Added
+
+- Agents now save lasting preferences and facts from your chats and side threads in the
+  background. After every 20 turns, after 15 minutes with no new turn, when you clear a chat and when
+  you close a side thread, the agent's provider reviews the new part of the conversation and adds,
+  updates or forgets memories. The conversation shows the changes. Memories that you wrote or set
+  stay as they are.
+- Agents now search their saved memories before they say that they do not know something about you.
+  A search also finds other forms of a word, so "closing" finds "closes".
+- A memory review uses the provider's smaller default model when the agent's model costs more, such
+  as Claude Haiku for an agent on Opus or Sonnet.
+- Server settings > General > Memory review sets how often the agents on a server review their
+  memories: every 10, 20 or 40 turns, or Off. Off also stops the reviews after a pause, a clear and a
+  closed side thread. An owner or admin can set it for this computer and for a joined, hosted or
+  self-hosted server that runs this release.
+
+### Changed
+
+- An agent can now keep 256 memories by default instead of 64, so the background reviews have room
+  for many small facts. Only the essential memories go into each prompt, so this adds no cost. A
+  limit that you set in Server settings > General > Memories per agent stays as it is.
+
+### Fixed
+
+- On Windows, OpenBot updates again when it was installed in `%USERPROFILE%\OpenBot`, the folder that
+  also holds your agent folders. Before, each update stopped with "Failed to uninstall old application
+  files. Please try running the installer again.: 2", also after a restart. The update now installs
+  OpenBot in `%LOCALAPPDATA%\Programs\OpenBot` and removes only the app files from the earlier folder.
+  Your agents, `Shared` and `Downloads` stay where they are. **A taskbar pin of the earlier copy stops
+  working: pin OpenBot again from the Start menu.** The Start menu and desktop shortcuts, the
+  openbot:// links and the open-at-login setting move to the new copy. **Do not uninstall OpenBot from Windows
+  Settings to repair this: in that folder, the uninstaller of 0.53.1 or earlier also deletes your
+  agent folders.**
+- The Windows installer no longer accepts `%USERPROFILE%\OpenBot`, `%APPDATA%\OpenBot`, or a folder
+  that holds one of them, as the install folder. It uses the default folder instead.
+
+## [0.53.1] - 2026-10-28
+
+### Changed
+
+- Server settings › Storage no longer shows the disk, memory and CPU use of the machine or its alert
+  levels. OpenBot no longer sends machine alerts and does not show the machine card in the sidebar.
+
+### Fixed
+
+- While a question, approval or browser request waits for you, the activity line under the chat now
+  says that the agent waits for your answer, your approval or you in the browser. Before, it kept the
+  last tool step, such as "Working through the next tool-assisted step…".
+- A message that you send with a Markdown table is now as wide as an agent table. Before, the message stayed 420px wide, and the table broke names and dates in the middle. In a narrow window, the table scrolls sideways.
+- The model picker shows the Gemini models also when Gemini starts slowly. Before, Gemini had only
+  5 seconds to list its models, and the picker showed "No models are available from Gemini" until
+  the next refresh.
+- Queued messages no longer show Steer for Gemini, OpenCode, Cursor, Cline and custom agents. These
+  providers cannot take a message into a running turn, so Steer always failed. The message still
+  starts when the turn ends.
+- On macOS, the blue Computer Use rim no longer shows on top of the OpenBot window when that window is in front of the agent's window. Before, OpenBot read the windows in the wrong front-to-back order on some macOS versions, and did not cut the rim where the OpenBot window covers it.
+- A failed update check, download or install now writes its reason, error code and HTTP status in
+  `logs/main/main.log`. Before, the logs showed only `check_failed`, with no reason.
+- The activity log in `openbot.db` now records the turn of each `turn.completed` event and keeps the
+  turn of each activity when OpenBot rebuilds a thread. Before, these rows had no turn.
+- In a workflow Agent or LLM step, a long model name now stays inside the field and ends with "…".
+  Before, the model button went past the right edge of the field. A long agent name next to it
+  stays full until the model button has only room for a few letters.
+- Agent chats in the sidebar now show their new replies when the app starts before your account
+  finishes signing in. Before, the unread counts of those chats were missing after the start.
+- A group chat no longer shows its lead as "Working on it…" while the lead is paused. Before, a message that waited for a paused lead showed the lead at work until the user restored it, but the lead did no work.
+- Usage now shows an estimated cost for Gemini (Antigravity) turns that use Gemini 4 Argon, Gemini 3.8 Flash, Claude Sonnet 5.5 or Claude Opus 5.5. Before, these turns had token counts but no cost. The estimate uses the new Gemini rates from the day that Google changes them. Turns from before the upgrade stay without a cost.
+
+## [0.53.0] - 2026-10-28
+
+### Added
+
+- Server settings › Storage shows the disk, memory and CPU use of the computer that runs the server,
+  for owners and admins. It updates each minute while it is open.
+- Set an alert level for disk, memory and CPU, and choose the owner or admin who gets the alert.
+  When the use passes a level, that person gets a notification on each of their computers, and
+  again each day while it stays above the level. A server must have this version to use it.
+- While a level is passed, owners and admins see a card at the bottom of the sidebar with the use
+  and who gets the alert. It opens Server settings › Storage.
+- A side thread shows how full its context is next to the send button, as the agent's own chat does.
+  Open it to see the details, and select Compact to compact the thread's context now. Compact shows
+  for providers that OpenBot can ask to compact, on this computer only.
+- A thread that you read on this computer is read on your phone too. The server keeps your read place in each thread for all your devices.
+- You can send files in a thread of a joined server and in the web app. The server must have this version of OpenBot.
+- Add guides for importing Grok Bot agents and Hermes Agent profiles into OpenBot, with screenshots and instructions for each import method.
+
+### Changed
+
+- The Timezone list in Server Settings has a search field. Type part of a zone, such as "new_york", or its name, such as "Eastern", then use the arrow keys and Enter to choose it.
+- When an agent answer names an output file by its full path and does not attach it, OpenBot now attaches the file to the answer. This applies to images, audio, video, ZIP, PDF, office documents, CSV, text and Markdown files of 25 MB or smaller in the agent's workspace or the Shared folder. Before, the iPhone app and other devices showed only the path, and you could not open the file. Code, configuration, log and SVG files, and folders, stay as paths.
+- The "Add backup model" list in agent settings has a search field. Type part of a model name, a provider name or a model id, such as "glm" or "openrouter/qwen", then use the arrow keys and Enter to add the model.
+- On a sidebar of 300 px or less, the wait chip of a "Needs you" row shows only its icon, so that a long agent name has more space.
+- Agent avatars and photo avatars have a thin outline in the colour of the row behind them. In a
+  group avatar, the faces are larger and overlap, a photo has the size of the other faces, and each
+  outline cuts the face below it. The count of more members is a round disc that overlaps the last
+  face. A count of two digits goes under two faces.
+- The OpenBot server offer opens as a window only one time: after your first routine on this
+  computer. Before, it opened after a new routine on this computer, a remote computer or the web
+  app, up to three times. The note above the routine list and the line in the offline notice do
+  not change.
+- Settings › Mobile Connect shows your phones as cards. "Add phone" opens a short dialog that asks if
+  OpenBot is on the phone, then shows only one QR code: the App Store or Google Play code, or the
+  sign-in code. A tag under each code says what it does. Before, the tab showed the download code
+  and the sign-in code together, and a phone camera could scan the wrong one.
+- The permanent link is a card among your phones. Its code opens in a dialog with a warning, and
+  hides after one minute. Replace and revoke are in its menu.
+- "How devices connect" is a button in the tab header that opens both choices.
+
+### Fixed
+
+- Sliders, such as the Dynamic Island width and height in Settings, move again with the pointer and
+  the arrow keys. Before, they did not move.
+- OpenBot starts after an upgrade when its database has broken links between rows from an earlier
+  version. Before, the upgrade stopped at each start with "OpenBot database migration to version 47
+  failed", and the app did not open. OpenBot keeps these rows as they are, and an upgrade step stops
+  only when it breaks a link itself.
+- A custom provider on an Azure OpenAI or Azure AI Foundry v1 endpoint
+  (`https://<resource>.openai.azure.com/openai/v1`) runs agent turns in OpenCode. Before, each turn
+  failed with "Function tools with reasoning_effort are not supported".
+- The `$` list in an agent thread shows the agent's skills and MCP servers. Before, it said "This agent has no skills.", and a skill in a sent thread message showed as unavailable.
+- You can paste, drop or pick images and files in a side thread of an agent on this computer, and they go with the thread message. Before, a pasted image in a thread made a sound but went to the draft of the agent's main chat. A thread of an agent on another computer takes text only, and now says so.
+- A chat in "Needs you" shows the question or the command as its preview. Before, it showed the previous message, and the question was only in the tooltip.
+- On a server that you joined, a tab that you open in an agent's browser panel opens in the agent's
+  browser profile. Before, the tab opened in the shared profile, so a sign-in there was available to
+  other agents.
+- When an agent asks a question in a thread, the thread now shows the question card and waits for your answer. Before, the question showed only as text, and you could not answer it.
+- While a side thread waits for your answer to a question or an API key request, the thread and its tab now show that it waits for you. Before, they showed that the agent worked.
+- When a side thread's agent asks you to take over the browser, the thread and its tab now show that the thread waits for you. Before, they showed that the agent worked.
+- When your answer or approval in a side thread fails, the error now shows where you answered. Before, it showed in the agent's own chat.
+- In the web app, and on a computer joined to a server, a side thread now shows the API key card and the other question forms. Before, it showed only a plain question. The server must also run this version.
+- On Windows and macOS, OpenBot now opens the Google sign-in page for Gemini, as it does on Linux.
+  Before, the Gemini server opened it itself, and when no page opened, Connect showed no error and
+  waited ten minutes.
+- When the Gemini process stops answering, OpenBot now ends it and starts a new one. Before, a turn
+  could wait with no end, and Gemini worked again only after you restarted it.
+- The channel header shows the face of each member. Before, the faces were almost on top of each
+  other, so the header showed only one face.
+- When an MCP server that you added in Server settings needs a sign-in, the agent now shows the Sign in card in the conversation. Before, the card showed only for a server that the agent added.
+- In Discord, the agent now gets the text and files of a forwarded message, when you reply to the forward or mention OpenBot after it. Before, the agent got only your mention and said that it saw no report. When Discord does not give the forwarded content, the agent is told so.
+- The activity line of an agent that uses the built-in browser now says what the step does, such as opening, reading, clicking or typing on a web page. Before, each browser step showed "Searching for current information…" and "Reviewing the sources and information I found…".
+- About 30 seconds after iOS puts the OpenBot app to sleep, a server now updates the iPhone Live Activity
+  and Dynamic Island, and sends notifications. Before, when the app went to sleep before it told the
+  server, the activity could show "Working" for more than two minutes after the agent finished, and
+  notifications for that time did not come.
+- An agent on a second provider account uses that account when it routes group work, makes a group
+  summary, answers a side question, or writes its profile. Before, these requests used the
+  provider's first account. When the first account was at its usage limit, a group lead on the
+  second account stopped with a usage limit notice, and the usage limit card did not offer its model.
+- A chat with unread messages now keeps the "NEW" divider in view while its images and previews load. Before, content that loaded after the chat opened moved the divider down, and the chat showed older messages.
+- On Windows, Remote Desktop starts again. The remote desktop runtime did not include the Sunshine
+  DirectX shaders, so Sunshine did not start and OpenBot showed "Sunshine did not start on the host".
+- On macOS, the name of the image in the image viewer no longer shows under the window controls. Before, the first letters of the name were behind the close, minimize and zoom buttons.
+- On macOS, OpenBot can now ask for Automation access, so the Apple apps and Messages tools work in
+  the released app. Before, macOS refused the request without a prompt, and a Messages lookup
+  stopped with `bootstrapTimedOut`.
+- When Gemini starts slowly after its first download, as on an Intel Mac, OpenBot now keeps the
+  download and tries again, and waits twice as long at each try. Before, OpenBot deleted Gemini
+  after 3 minutes, and each Retry downloaded it again and failed the same way.
+- After you clicked a channel in the sidebar and then went back to the OpenBot window, the avatars on that row moved without stop, also when the agents were idle. Now they move only while the pointer or the keyboard focus is on the row.
+- On a computer joined to a server, the chat of the server's agent now shows the context window meter beside the microphone. Before, the meter was missing. The server must also run this version.
+- Start OpenBot when a saved MCP server has headers or other values that it cannot read. Before, the
+  app did not open until the server was deleted from the database. Now Server settings shows that
+  server turned off, and you can correct it or remove it there.
+- When an agent started a new ChatGPT session, for example after it moved to a backup model, the chat
+  could show a red `paginated_threads is not supported yet` error. ChatGPT cannot read a session
+  before it saves the first turn, and OpenBot now does not show this as an error.
+- Show the Download button for an image attached in a side thread, under the image and in the image
+  viewer. Before, only the agent's main chat had it.
+- Show the Download button for an image file that an agent message names by its path, under the
+  message and in the image viewer. Before, only an attached image had it.
+- Usage now shows an estimated cost for Codex turns that use GPT-6.1 Terra. Before, these turns had token counts but no cost. Turns from before the upgrade stay without a cost.
+- An MCP server that refuses to register OpenBot, such as Dropbox, now shows **Refused** and says
+  that the server does not accept OpenBot as an app. Before, it showed **Failed** with the
+  server's own text.
+- An agent can attach files in the built-in browser when the page opens its file chooser from a
+  button, such as the "Paste, drop, or click to add files" button in a GitHub comment. Before,
+  `upload_files` worked only on a file input, and on these pages it stopped with "Node is not a file
+  input element".
+- A channel no longer stops all work when a member repeats its result as its last reply. Before, that reply could stay "still arriving" after the turn ended, and every later assignment in the channel failed with "The provider could not start this assignment". A channel that this blocked works again when OpenBot starts after the upgrade.
+- A second Gemini account stays after its Google sign-in when Gemini starts slowly, as it can on Windows. Before, OpenBot stopped the check after the sign-in at 30 seconds, and the new account disappeared.
+- When a new provider account cannot sign in, OpenBot now shows an error with the reason. Before, the account disappeared with no message.
+- Cancel on a provider account that is still connecting no longer waits until the provider finishes starting.
+
+## [0.52.1] - 2026-10-27
+
+### Added
+
+- Remove the downloaded CLI of a provider that is off. Open the provider in Settings > Providers and
+  select Remove download. It shows the space it frees. Accounts, sign-ins and agents stay. When you
+  turn the provider on again, OpenBot downloads the CLI again (#3321).
+- An owner or admin can import a CSV password export into a server's Vault from the iPhone app.
+  The server answers only how many logins it added and skipped.
+- An owner or admin can set the default provider of a server from the phone. The server starts new
+  agents on that provider. Clients older than Team API protocol 8 do not see DeepSeek, OpenRouter or
+  Inception as the default.
+- The Apple apps listing in the Marketplace has a switch that asks macOS for access to Calendar, Contacts, Mail, Notes, Reminders, Messages and Safari when you install it. macOS shows one prompt for each app, so the prompts no longer stop an agent in the middle of a task. After the install, "Ask for access" asks again, and a message names each app that macOS did not allow. macOS only.
+- The Vault keeps API keys. Add a key with its variable name, such as `OPENAI_API_KEY`, in Server
+  settings › Vault › New item › API key. Every agent on the server finds it with `list_api_keys` and
+  reads it from a private file in its commands, so the key does not go into the chat. Only the user
+  can add, change or delete a Vault API key. An owner or admin of a joined server can manage its API
+  keys from the desktop app or the web app when the server has this version.
+
+### Changed
+
+- Agents get shorter instructions, with each rule in one place, so each turn uses less context.
+
+### Fixed
+
+- Show Mermaid diagrams that have a line break in a label. Before, the chat showed a broken image.
+- The secure password card now always shows "Save to Vault" and names the Vault: this computer or the joined server. An owner or admin of a joined server can save the password to that server's Vault; the box starts unchecked. A member, or a server that needs an update, sees why the box is off. Before, the option did not show on a joined server or in the web app, and the password was not saved.
+- While an agent writes, the activity line shows its text without Markdown marks such as `**` and `- `.
+- Start Claude agents as new sessions when a Claude Code session opens OpenBot, for example with
+  `open -a OpenBot`. Before, the agents got the session ID, entry point and messaging token of that
+  session, and each new chat wrote its prompt cache again.
+- Let Gemini start MCP servers whose command, such as `node`, is on the login shell PATH. Before, OpenBot opened from the Dock or a login item could not find the command.
+- OpenBot now quits when a file operation never finishes, for example when macOS waits for a privacy
+  approval that nobody answers. It stops itself at most 10 seconds after its shutdown, which can take
+  up to 30 seconds. Before, OpenBot stopped responding after you quit it, and it did not open again
+  until you forced it to quit on macOS or ended it on Linux.
+- Agents now follow a confirmation rule in any `CLAUDE.md` or `AGENTS.md` file, also when a request
+  names the action. Before, an agent could make a change that cannot be undone, such as a Stripe
+  setting, without the confirmation that the file asked for.
+- When an agent asks for a password, a code, or browser control in a thread, the thread now shows the card. Before, the card did not show, and the agent waited without end.
+- An OpenCode agent's answer after a background subagent ends now shows in the chat. Before, OpenCode saved the answer, but the chat never showed it, because no message had started that turn.
+- An OpenCode answer that the agent writes in two steps now shows as two paragraphs. Before, the text of the two steps showed as one line.
+- Text that you type in a side thread and do not send now stays in the message box of that thread. It stays when a turn in another thread of the agent ends, when you open another thread or chat and come back, and after a restart. Before, the text was removed when a turn of the agent ended.
+- Connect Railway works again. OpenBot now registers as a public client when the sign-in server
+  supports it. Before, Railway refused the client secret that it gave, and the sign-in stopped with
+  "Existing OAuth client information is required when exchanging an authorization code".
+- Show a clear message when a sign-in server refuses OpenBot at the end of an MCP sign-in. Before,
+  the message did not say what went wrong.
+- When this computer's server was published, OpenBot publishes it again after a start, also when the
+  account service or Signal does not answer at first, for example at login before the network is
+  ready. It also publishes the server again when Signal disconnects it later. It tries again after
+  1 minute, and then less frequently. Before, the server stayed private after one failed try, and
+  you had to publish it again, for example after an update.
+- A long context compaction with Codex or Pi now runs to its end. Before, OpenBot stopped each
+  compaction after 2 minutes, so the compaction of a long thread did not complete. OpenBot now stops
+  a compaction only when the provider does not start it in 2 minutes, or when it runs for 20 minutes.
+- When Gemini or another ACP agent crashes, the error now shows the first line of the crash report,
+  such as `F… Check failed: …` or `*** SIGABRT received …`. Before, it showed only the last line,
+  `RAW: Raising signal 6`, which does not say why the agent stopped.
+- End a Remote Control session when its stream fails and you go back to OpenBot. Before, the session stayed open, and the Remote Control button showed a green dot on every agent of that server.
+
+## [0.52.0] - 2026-10-27
+
+### Added
+
+- Add Obsidian to the Apps catalog. Agents can search, read and write the notes in an Obsidian vault,
+  so the vault can be their memory. Install the Local REST API plugin in Obsidian, turn on its HTTP
+  server, and type its API key in the connect dialog.
+- Add Neon, Prisma, Netlify, Railway, Atlassian (Jira and Confluence), Todoist and Hugging Face to the Apps catalog. Sign in in the browser to connect each of them, except Hugging Face: it reads public Hub data and needs no account. Neon, Prisma, Netlify, Railway, Atlassian and Todoist give agents write access, so agents can change or delete data there. Each listing says what agents can change.
+- The website has the OpenBot Commercial License Agreement at openbot.run/commercial-license. The
+  Terms & Conditions link to it.
+- Give an agent more than one conversation. Click + in the chat header to start a new thread. Each thread has its own tab
+  and runs at the same time as the other threads of the agent. The agent keeps its main chat.
+- Rename, close, archive and delete threads from the tab menu. An archived thread moves to "Archived" in the thread
+  list, and opening it restores it. Delete shows an Undo button for some seconds first.
+- Use threads in the web app and on a computer that is joined to a server, when the server has this version.
+- Search on this computer also finds messages in open threads. Select a result to open its thread tab.
+- A notification from a thread opens that thread's tab.
+- An image file that an agent names in its answer, such as a PNG or SVG in the shared folder, now
+  shows as a preview under the answer. Click it to open it at full size.
+- Right-click an agent in the sidebar and choose "New thread" to open its chat with a new thread.
+- Attach MP4 videos in chat. The chat plays them, and the agent gets the original file. A remote host
+  must run this version of OpenBot to accept MP4 files.
+- Add Render to the Apps catalog. Connect it with a Render API key. Agents can list workspaces and services, read
+  logs, events and metrics, find why a deploy failed, trigger deploys, and run read-only SQL on Render Postgres. The
+  key reaches every workspace of the account, so agents can also create services and databases and replace the
+  environment variables of a service. The server cannot delete a resource.
+- An owner or admin of a joined server can now open that server's Vault in Server settings, in the web app and in the desktop app. They can add, change and delete logins, cards and contact info, and show or copy a saved password, card number or security code. A CSV import is available only on the server's own computer. Before, the Vault showed only for this computer, so the web app had no Vault.
+- Add Trello to the Apps catalog. Sign in to Trello in the browser and choose the workspaces. Agents can search and
+  read boards, lists, cards, checklists and comments, create boards and cards, move lists and cards, and mark cards
+  done. They can also read and add cards in your Trello Inbox and read your Planner events. Agents have the same permissions as you in the workspaces that you choose. They can archive cards and lists,
+  but the server cannot delete anything permanently.
+- Dutch interface. Choose Nederlands in Settings > General > Language, or keep System default on a
+  computer that uses Dutch. The web client uses it too.
+
+### Changed
+
+- Update the Terms & Conditions on openbot.run/terms. They now describe free non-commercial use,
+  Commercial Licenses (Starter and Team seats), hosted server plans, the refund and withdrawal rules,
+  30-day hosted server data retention after expiry, and Marketplace content reports. The minimum
+  age is now 16.
+- Change the minimum age in the Privacy Policy to 16, the same as the Terms & Conditions.
+- In the web client, the Marketplace now opens as a full page of the window, as in the desktop app. Before, it opened as a dialog over the workspace.
+- The Marketplace now has a side panel, as the settings page has. Select Apps, Agents or Skills there. Below them, "Your apps" lists the apps that you connected, and a warning shows on an app that needs your attention. While you search, the panel shows how many results each kind has.
+- The Marketplace now opens on Apps. Apps show in groups by category, in compact rows with Connect, Connected or Reconnect at the end of the row.
+- To add your own MCP server, click "Add custom" next to the search on the Apps page of the Marketplace. Server settings open on the form for a new MCP server. Only a user who can add MCP servers to the server sees the button.
+- On an app, agent or skill page of the Marketplace, the top row now shows the path to it, for example "Apps › GitHub". Click "Apps" to go back to the list. On an app, agent or skill page, Apps, Agents or Skills stays selected in the side panel. On the page of an app in "Your apps", that app is selected. The page has the same width as the list, so the content does not move when it opens.
+- Connectors are now only in the Marketplace. Server settings no longer has a Connectors section. To connect or change Slack, Discord, Telegram, GitHub, 1Password or Bitwarden, open Marketplace › Apps.
+- All app pages now use one layout: the header, then alerts, then sections with a heading and one card each, and last the danger zone. Text, forms and notes now show inside the cards, and all buttons in a card have the same small size. A plugin that is not completely installed shows a warning above its sections. An app that is not connected now shows "Not connected" at the top of its page. Before, some pages showed "Not set up".
+- Slack, Discord and Telegram pages now have a danger zone that disconnects every workspace, server or chat at once, after you confirm. Each row still has its own Disconnect.
+- The page that opens after a Slack or Discord sign-in in the browser now tells you to open Marketplace › Apps to try again.
+- The connect dialogs of Marketplace apps that you sign in to, give a key to, or turn on in their desktop app now look and work as the GitHub and Slack connect dialogs do. They show OpenBot and the app with a line that moves while they connect, and Cancel and the main button at the bottom right. When a connection fails, the line breaks. Connect in the Marketplace now starts the connection at once: a sign-in opens the browser, and an app on this computer connects if its server is on. An app that needs a key opens with the cursor in the key field.
+- To disconnect Bitwarden, use the button in the new danger zone at the bottom of its page.
+- The Cloudflare, Airtable and Paper icons in the Marketplace are now centered and clear on a dark background.
+- A plugin page now has a Connection section. It shows how each app connects: you are signed in, an API key is saved, it uses a desktop app on this computer, or it needs nothing. Use "Sign in again", "Change key" or "Connect again" there.
+- When the sign-in of a plugin expires, the plugin shows "Needs attention" and a warning, and "Sign in again" signs in again. The page header, the Connection row and the Apps list use the same name for this action. A plugin with more than one app shows the button only on the row of the app that needs it.
+- Every connector page now has an Information section with the developer, the category and the website.
+- On the Slack, Discord and Telegram pages, the sections are now named "Workspaces", "Discord servers" and "Chats". "Add workspace", "Add Discord server" and "Link a chat" are at the right of that section.
+- The 1Password and Bitwarden pages now look the same. Bitwarden shows the shared folder and the server address in one card, and the session key field has a label.
+- The danger zone of every app page is now named for the app, for example "Disconnect Notion".
+- Under the name of Slack, Discord, Telegram, GitHub, 1Password and Bitwarden, the page now shows a short line, as the Apps list does. The full description is at the top of the Information section.
+- On the Bitwarden page, the shared folder row now says "Folder in Bitwarden" under the folder name.
+- The developer of each catalog app now shows as a name, for example "Notion", not as a web address.
+- Tasks are now threads. A task that an agent starts opens as a tab in the chat header, and your existing tasks show
+  as threads after the upgrade. Closed tasks show as archived threads. The Tasks page and the task panel are removed.
+- "Tasks at once" in the agent settings is now "Parallel threads". "Run as task" on a queued message is now "Run in
+  new thread".
+- Deleting a thread also deletes its messages and their files from the agent's inbox.
+- After this upgrade, an earlier version of OpenBot cannot open your data.
+- A message from another agent now steers the running turn when the agent that gets it is set to
+  steer busy messages. Before, it always waited in the queue until the turn ended.
+- You can steer a teammate's answer into the running turn with Steer in the "Waiting for replies"
+  block. Before, the answer waited for the turn to end.
+- The iPhone app is on the App Store. Settings > Mobile, the download pages and the changelog page
+  link to the App Store, not to the TestFlight beta.
+- Messages that you send while an agent works now start one next turn together, in their order.
+  Before, each message started its own turn.
+- Slack, Discord and Telegram conversations send the agent's messaging guidance and the saved
+  facts of the server only in the first turn of a provider session, and again when a fact changes.
+  This makes each later turn smaller.
+- The agent's name in the chat header opens the agent's main chat while a thread is open. In the main chat it opens
+  the agent settings, as before. The main chat no longer has a tab, and the thread list shows only threads.
+- Agents get a shorter list of models when they look for a model for a teammate: the default model, the models that agents use, and the first models of each provider. They can search for the other models. This uses less of the agent's context with providers such as OpenRouter that offer hundreds of models.
+- In the desktop app, when Cursor uses a merged plan, such as an X subscription, the sidebar shows one usage ring for Grok and Cursor. Before, both rings showed the same shared quota. Hover the Grok ring to see both.
+- A server now offers DeepSeek, OpenRouter and Inception, as the computer does. An owner or admin
+  saves the provider's API key in the server's provider settings, and the server downloads Pi when
+  it needs it. Phones and team members also see agents on these providers. Clients older than Team
+  API protocol 8 still do not see them.
+
+### Fixed
+
+- A Cursor agent with Workspace only access on macOS can sign in again. Before, each of its turns stopped with "Cursor did not return an authenticated account." although Cursor was signed in.
+- Settings › Profile now says that its activity is the activity on this computer. Before, the title showed only "Activity", also when a different server was open.
+- When you save, change or remove a custom model endpoint while an OpenCode task runs, OpenCode now
+  restarts after its tasks stop, and the new models show in the model picker. Before, OpenCode kept
+  the old models until it stopped for another reason.
+- On Windows and Linux, the Alt key no longer shows the menu bar. Before, a single Alt press, or a
+  keyboard layout switch with Alt+Shift, moved the page down and took focus from the message input.
+  Menu shortcuts work as before.
+- Reconnect on a plugin that is already connected no longer fails with "An MCP server named … already exists". It now updates the saved connection.
+- A Cursor reply no longer ends with "Error: RetriableError: WritableIterable is closed" after a turn that succeeded.
+- When an agent asks another agent from a side thread, the answer now comes back to that side thread. Before, it arrived in the agent's own chat. The request still arrives in the other agent's own chat.
+- A side thread now names the other agent as the author of its answer. Before, screen readers read the answer as a message from the thread's own agent.
+- A chat with queued messages no longer slows down OpenBot. Before, each queue change wrote the
+  queued messages to the database again and sent the whole chat to each connected device, and the
+  queued messages went out of the chat and came back.
+- Text that you select in a code block of a message shows the selection actions (Quote, Explain,
+  Improve). Before, a double-click or a selection in a code block showed no actions.
+- OpenBot starts again when an update for a provider CLI is available. Before, the app stopped at start and showed no update notification.
+- Muse agents on Windows can start a turn again. Before, each turn failed at once with no reply,
+  because OpenBot sent the workspace folders in a form that Muse does not accept.
+- A Pi agent keeps its OpenBot tools after OpenBot restarts. Before, a chat that was opened after a restart lost every OpenBot tool, and each restart gave the tools new names, so the agent could call old names and get "Tool ... not found". A Pi chat that already shows this error gets its tools again at its next turn.
+- A Pi agent whose session file was moved or deleted starts a new session. Before, each turn stopped with "The Pi session file is not available on this computer."
+- A Pi, DeepSeek, Inception or OpenRouter agent with Workspace only access on macOS replies again. Before, each message stopped with "Credential store read failed" and "EPERM", or Pi stopped at the start.
+- Edit of a custom provider now shows the names of its saved headers. An empty value keeps the saved value, and you can change or remove one header. Before, the header rows opened empty, so the saved headers looked lost.
+- OpenBot no longer offers a CLI update for a provider that is turned off. When you turn the provider on again, the update is offered.
+- An answer through OpenCode stays whole when the model streams its reasoning between the words of the answer. Before, the answer was cut at each thought, so the start of a word moved to the steps and words showed in pieces, such as "B aca" for "Baca".
+- An SVG path in an agent answer was plain text. It is now a file link that opens the file.
+- An agent that tried to attach an SVG file got a general "not supported" error. It now gets told
+  to write the file path in its answer, where the chat shows the image.
+- The working rings around an agent's face in the activity line of a chat now show in full. Before,
+  the edge of the line cut them, most in a channel.
+- Go back from a thread to the agent's main chat at once. Before, the main chat was built again, which took about half
+  a second and moved it to the top. Now it keeps its place.
+- Show the full time of each thread in the thread list. Before, a 12-hour time such as "10:12 AM" stopped after "10:1".
+- Close the side panel after you close its last tab. Before, the app stopped responding and the panel stayed open.
+- Keep the provider session of a thread when its delete fails and you restore it. Before, the restored thread started a
+  new session and lost its thread instructions.
+- A message steered into a Claude turn just as the turn ends now shows its answer one time. Before, the answer showed again in the chat after OpenBot started again.
+- The browser client at openbot.run/app now shows the custom images of agents. Before, it showed the
+  generated avatar for each agent with a custom image.
+- An agent with Full access no longer asks before each Computer Use action. Workspace only and Ask
+  first agents still ask.
+- The usage limit notice in the composer now reads the ChatGPT account that the agent uses. An agent
+  on a second account with quota left no longer shows the limit of the first account.
+- When you connect or resume Slack, Discord or Telegram on this computer, OpenBot now publishes this computer's server first. Before, the connection failed until you published the server or gave it a name in the server settings.
+- A Codex agent no longer says that it could not get an image after it generated the image. Before, the image showed in the chat, but the agent reported a failure and asked the user to try again. Each existing Codex chat starts a new Codex session one time after this update. To edit an image from before the update, attach it again.
+
+## [0.51.1] - 2026-10-26
+
+### Fixed
+
+- On Linux, closing the OpenBot AppImage no longer shows a crash report for `chrome_crashpad_handler`. Before, its crash helper stopped with `SIGBUS` after each quit.
+- An agent on a shared server no longer tells you to open the chat on another device to use that device. The agent now says that it works only on the computer that runs the server. Settings › Computer Use also says that agents on another server use that server's computer.
+- On a Docker server of `docker/instances` with LXCFS, Gemini works again. Before, it stopped with
+  SIGILL when it started, because the container listed only the CPUs of its limit as online.
+- On a server, Node programs that Claude agents start now also see the server's CPU limit. Before,
+  only Codex and the ACP agents got it, and a build of a Claude agent started a worker for each CPU of
+  the host.
+- DeepSeek, Inception and OpenRouter now download the Pi CLI when you save their API key. Before, the
+  key was saved but the provider showed "The pi CLI is not installed" until you downloaded Pi from
+  its own row in Settings.
+
+## [0.51.0] - 2026-10-26
+
+### Added
+
+- Choose the reasoning level of a new agent in the create-an-agent form. The model picker shows the
+  level next to the model, as it does in the agent settings. The web app has the same choice.
+- Settings › General › "Open external links in" now lists each browser on your Mac, and "Other app…"
+  lets you choose an app that is not in the list. On Linux and Windows, "Command…" takes a program
+  path or command. Links in chats, sign-in pages, billing pages and connector pages open there. When
+  that browser does not start, the page opens in the default browser and OpenBot shows a short
+  notice.
+- Pin pages to the page rail. The new More button under the rail pages lists Routines, Workflows,
+  Tasks, Schedule and Usage. Click a page to open it, or click the pin at the end of its row to show
+  it in the rail or take it off. Routines, Tasks and Schedule start in the More menu. The choice is
+  saved on this computer, and on the web app in this browser.
+- You can change the provider, account or custom agent while a turn or a task runs on this computer. The running work keeps its sessions. The new provider starts before the next turn after the running turn and its tasks end. The header shows the same "After this turn" badge that a model change already uses. On a remote server, a provider change still waits until the work ends.
+- Add DeepSeek as a provider. Connect it with a DeepSeek API key, then choose DeepSeek V4 Pro or
+  DeepSeek V4.1 Flash for an agent. The agents run in the Pi CLI that OpenBot downloads, and the key
+  stays encrypted on this computer.
+- A pasted image goes into the message box at the cursor, as a reference with a small preview, its
+  name and its size. Thanks to @sebapaszynski.
+- When you copy or cut a draft that has attachments and paste it into another agent's message box, the
+  files come with the text as new copies. The Copy action on a message also keeps its attachments.
+  Other apps get the text with the file names. The clipboard holds no file paths and no file bytes.
+- The website has a Brand page at `/brand`. It has the OpenBot logo in each shape and color, with
+  and without the name, as SVG and PNG files. "Download all" saves all of them in one zip file.
+- Right-click the OpenBot logo in the website header to copy the logo as SVG, download the brand
+  files, or open the Brand page.
+- Agents use the skills in your `~/.agents/skills` folder with every provider. Claude gets them as `agents:<name>`, and a skill that Claude already reads from `~/.claude/skills` is not added again. Antigravity, Muse and custom ACP agents get a list of these skills in their instructions and read a skill's `SKILL.md` when a task needs it. The other providers already read the folder.
+- Type `$` in the message field to tag a skill from `~/.agents/skills`. The agent gets the path of the skill's `SKILL.md`, so every provider can open it.
+- You can now zoom into an image in the image viewer of a chat. Pinch, or hold Ctrl or Command and scroll, to zoom around the pointer; double-click to zoom in or back to the whole image; drag or scroll to move a zoomed image. The viewer also has zoom out, zoom in and fit buttons, and the `+`, `-` and `0` keys. Before, you had to download a large image to see its detail.
+- Add Apple apps to the Apps catalog. On a Mac, agents can use Mail, Calendar, Contacts, Reminders, Notes, Messages
+  and Safari through the community server mcp-icloud. It needs no account or key; macOS asks for Automation access the
+  first time an agent uses each app.
+- Add OpenRouter as a provider. Connect it with an OpenRouter API key, then choose one of the
+  models that OpenRouter serves for an agent. The model picker groups the models by lab and marks
+  the free models. The agents run in the Pi CLI that OpenBot downloads, and the key stays encrypted
+  on this computer.
+- Add Supabase to the Apps catalog. After you sign in to Supabase in the browser, agents can list projects, run SQL,
+  read table schemas and logs, check advisors, manage edge functions and branches, and search the Supabase docs.
+  Agents get full access, so they can also change data, apply migrations and create or pause projects.
+
+### Changed
+
+- Claude agents use Claude Code's own prompt cache time again by default: 5 minutes with an Anthropic
+  API key, and 1 hour for the main chat of a Claude plan within its usage limits. In 0.50.0, OpenBot
+  asked for 1 hour for all agents, and a 1-hour cache write costs more. The "Prompt cache" setting on
+  the Claude page in Server settings › Providers now has "Claude Code default" and "1 hour". If you
+  chose "1 hour", it stays.
+- The website FAQ answer to "Is OpenBot open source?" now uses simpler words. It says that all of the source code is public, links to it on GitHub, and says that it is free for noncommercial use. The launch news post now calls OpenBot source-available, not open-source.
+- The website header has a Resources menu with Download, Changelog, Community, Documentation, Brand
+  and Status. Changelog and the Community button moved into it.
+- When OpenBot updates to a new version, it also updates the provider CLIs that it installed, such
+  as Claude, OpenCode and Grok, with no update notification. A notification shows only when an
+  update fails, with a Retry. A CLI that you installed yourself is not changed.
+
+### Fixed
+
+- A server with a saved Anthropic API key no longer starts a Claude sign-in on the API key account, or
+  removes that account, when an older OpenBot version asks for it. That version shows the key as a
+  signed-out account. Now it gets a message that tells you to change the key in Server settings ›
+  Providers.
+- Open and create agent routines in the web app. Before, Create routine and a routine in Schedule
+  showed the "This page could not load" error page.
+- Show why an OpenCode agent does not answer when the free models reach their usage limit. Before,
+  each message failed with no error, and only the agent's face changed.
+- Pi agents no longer stop with "Pi returned an invalid RPC record." when a tool call has a value
+  such as `true` that is also the value of an MCP server setting or of the GitHub connection. Before,
+  OpenBot stopped Pi and started it again, and the turn failed.
+- The Cursor usage ring no longer shows an "Other models" window for a Cursor plan that includes no other models, such as an X subscription. It shows the plan's total usage only. Before, it showed an "Other models" window that the plan does not have.
+- Escape in the model picker of the create-an-agent form now closes only the picker. Before, it also
+  closed the form and the draft was lost.
+- In the web app, browser Back and Forward, including the side buttons of a mouse, now open the chats
+  that you opened before, also on another server. Before, Back left the app and opened the page that
+  you came from.
+- On macOS 26 with the Dark icon style, the OpenBot app icon is a black tile with white eyes. Before,
+  macOS made a black tile with black eyes, and the eyes were almost invisible. The Light style still
+  shows the lavender icon.
+- The "Open external links in" setting had no effect, and it went back to "Default browser" after a
+  restart. Now OpenBot keeps it, and "OpenBot" opens links in chats in the built-in browser.
+- The Linux AppImage starts on Arch Linux, Omarchy and other systems with no libfuse2. It mounts
+  itself with `fusermount3` from the `fuse3` package. Before, it stopped with an error about
+  `libfuse.so.2`.
+- In a wide window, the agent's working row and its pending questions, approvals and other cards now show in the centered chat column. Before, they showed at the left edge of the pane until the turn finished. (#3146)
+- Give MCP server tools to Codex agents on GPT-6 and other code-mode models after an update to Codex
+  0.164. Before, a chat that started before OpenBot 0.50.0 had no MCP tools. Each Codex agent starts
+  one new Codex session to get the tools.
+- On Windows, OpenBot now tries again when another program, such as antivirus, has a settings file
+  open while OpenBot saves it. Before, a save at sign-in could fail, and then Slack, Discord and
+  Telegram connections failed with "Sign in, give this computer a name, and try again."
+- On Windows, Claude starts when the Claude Code CLI comes from npm (`claude.cmd`). Before, every Claude session, model list and usage read failed with "spawn EINVAL", and sign-in and sign-out through such a CLI failed too. Stopping a session now also stops the Claude process that the `.cmd` file started.
+- Keep the web client connected while a server sends many events. Before, it disconnected and connected again every few seconds during a turn.
+- OpenBot no longer shows "OpenBot database is not initialized." when you quit it. The windows now
+  hide when the quit starts, and the database waits a short time for a slow agent stop before it
+  closes.
+- A sleeping cloud server keeps its data when the hosting provider refuses its keep-alive start or
+  its start for a routine run. Before, a refusal such as a billing error left the server in an error
+  state, no automatic start tried again, and the provider deleted the server's disk 14 days after its
+  last stop.
+- Continue unfinished agent work after a provider reaches its usage limit and switches to a backup.
+  Keep completed work, tool results and attachments with the request, including across backup models.
+- Deleting an agent that runs on its own provider process, such as an agent with "Workspace only" access or a second provider account, now stops that process first. Before, on Windows the delete could fail and the agent came back until you restarted OpenBot.
+- When a delete fails after the agent is already gone, the agent no longer comes back in the list until a restart.
+- In a channel, an agent that posts its task result no longer shows a second short reply, such as "Yes.", under it. Before, the text that the agent wrote after the result showed as a separate message. Now it shows in the steps of the turn.
+- The agent's browser `evaluate` tool no longer times out on pages with an ad frame that does not run its timers, such as Amazon product pages.
+- On a server, agent builds no longer take all the CPU and memory and drop your connection. Before,
+  a build such as `next build` started one worker for each CPU of the host, not of the server's
+  limit, the server stopped answering, and the apps reconnected every few minutes. Agent processes
+  now run at a lower CPU priority, and Node programs of agents see the server's CPU limit.
+- When a server is almost out of memory, OpenBot now stops leftover agent processes first, such as
+  preview servers and build workers that stayed after their job ended. Before, they kept their memory
+  until the kernel stopped a process or the server restarted.
+- Routine wake-up commands now run also when the long command fails, so an agent learns that its job
+  stopped.
+- OpenBot now starts the Codex app server again when it stops answering. Before, a hung Codex process stayed in use, and every agent turn and routine run failed until you stopped codex.exe yourself.
+- When Codex does not answer, a message now fails with that reason. Before, it failed with "OpenBot could not register MCP servers in the Codex configuration", although `config.toml` was correct.
+- Usage now shows the token cost of OpenCode turns, including OpenCode Go. Before, the OpenCode cost was always "Unavailable". The cost is the session cost that OpenCode reports, at API-equivalent rates, not the subscription charge. When earlier turns of a session have no cost, as in a session that started before this release, the first turn with a cost has no cost.
+- Two reads of the history of one Claude session at the same time no longer fail with "database is locked". Before, this error could show when an agent continued on its backup model while OpenBot read the session history after a start.
+- Connecting Firecrawl, or another plugin that starts with `npx`, no longer fails with "The server did
+  not answer in 10 seconds" on its first start. A local server now has 60 seconds to download its
+  package and answer. A server at a web address still has 10 seconds.
+- When you drag a channel to a new place in a sidebar section, it now stays where the sidebar showed it would go. Before, the first drag after you moved a channel or an agent into the section with "Move to", or made a new one, could put the agents above the channels or put the channel in a different place. On a team server, the server must also have this version.
+- The model picker for a new agent no longer starts on Claude when Claude is not installed or not
+  signed in. It now starts on a provider that can run the agent, as the server already does.
+- When an agent runs on a custom endpoint and the endpoint does not answer, the waiting notice and the error now name your endpoint. Before, they said "OpenCode has sent no update" and "OpenCode stopped responding", so it looked as if OpenCode's own models were in use.
+- A message that you steer into a running DeepSeek or Pi agent now goes into the running turn also while Pi compacts its context. When Pi refuses a steer, only the steer fails: the agent keeps working, and the message waits in the queue. Before, the refusal stopped the turn in the chat while Pi kept working, and the next messages failed with "Agent is already processing".
+- A "Could not steer the agent" error no longer stays below the last reply after the turn ends. Before, it stayed at the end of the chat until you sent the next message, so it looked like a new message.
+- When you sign in a provider account of a joined server in this computer's browser, the dialog no
+  longer says "This sign-in ended" while the server completes the sign-in. After the browser returns,
+  the dialog shows the progress until the server gives the result.
+- A channel whose agent waits for your answer, your approval, or you in the browser now moves to
+  "Needs you" at the top of the sidebar, with the same badge and tooltip as an agent. Before, only
+  the channel conversation showed it, so a request in a channel was easy to miss.
+- Gemini (Antigravity) agents in a channel get only the messages they have not read. Before, each channel turn sent the complete channel history again into the same session, so usage grew with each message. Long channel sessions are now also compacted.
+- A change to MCP servers or skills keeps the conversations of Claude agents. Before, each Claude agent started a new session on its next turn, with a summary of the history and no prompt cache.
+- Agents in a channel report their result with fewer model requests. Before, an agent such as Grok searched for the channel tools first, and each search step sent the whole conversation again.
+- An "always allow" approval for an MCP tool keeps the conversations of Codex agents. Before, each Codex agent that used that server started a new session on its next turn.
+
+## [0.50.0] - 2026-10-25
+
+### Added
+
+- Show a storage card at the bottom of the sidebar when the disk of the selected server is almost full. A ring shows the used part of the disk. "Free up space" opens Server settings › Storage. You can close the card while the disk is almost full; it comes back, in red, when the disk is full. Only an owner or admin of the server sees it.
+- "Open in new window" in the menu of an agent in the sidebar opens its chat in a window of its own, for example on a second display. Both windows show the same live chat, and a window mark beside the agent's name shows which chats have a window. Closing the window keeps the chat in the main window.
+- A message that an agent sends to or gets from another agent now opens in the chat. Click the arrow on its line to read the text, and the message it answers.
+- You can add more than one Google account to Gemini. Select Add account on the Gemini row, as for Codex, Claude and Grok, and choose the account for each agent. Each account keeps its own sign-in and usage. A saved Gemini API key applies only to the first account. This needs Gemini runtime 1.4.0 or later. On a joined server, the sign-in page opens in the server's browser, and you use it through the live view.
+- Grok agents can now be steered. A message that you send in Steer mode while a Grok agent works
+  goes into the running turn, and Grok reads it after its current step. Before, the message waited
+  in the queue until the turn ended. A Grok CLI without this feature keeps the message in the queue.
+- Settings › Agents sets the defaults of the agents on this computer: Local scripts, Agent starts new chats, Show the plan before long tasks, and Steer agents while they work. Each setting shows which agents have it on. Its page changes the default, the value of one agent, or the value of all agents with Set all.
+- An agent that has no value of its own follows the default. The defaults start off, so no agent changes until you change a default.
+- Give one server a custom member limit, such as for an enterprise customer. The limit replaces the
+  limit of the server's plan.
+- The Claude page in Server settings › Providers has a "Prompt cache" setting: 1 hour or 5 minutes.
+  An owner or admin can set it for this computer and for a joined server.
+- Korean interface. Choose 한국어 in Settings > General > Language, or keep System default on a
+  computer that uses Korean. The web client uses it too.
+- A custom ACP agent can have a usage command, such as `/usage`. OpenBot sends it at most every 5 minutes, and the agent's logo in the rail shows the last answer when you hover it. Use a command that the agent answers itself: other text starts a model turn each time.
+- Server settings has a Vault page, after General. Save logins, payment cards and contact info on
+  this computer, encrypted by the operating system. Agents sign in with the saved logins, fill a
+  saved card on a checkout page, also in the card frames of payment providers, and type the saved
+  contact info. An agent sees only the card name and its last four digits, never a password, a card
+  number or a security code. Import logins from a password export in CSV format. The Vault is on the
+  local server only.
+- The first time an agent fills a saved card on a site, the server owner approves it. Later fills
+  on that site need no approval. Remove a site from the card in the Vault.
+- Agents can add and change contact info in the Vault, change the username of a login and the
+  name and expiry of a card, and delete items. The chat shows each change, and the Vault shows
+  which agent added an item. On the secure password card, Save to Vault keeps the password that you
+  type.
+- openbot.run has provider pages for Muse Code, Pi, Inception and ACP agents such as Goose, Qwen
+  Code and GitHub Copilot CLI.
+- The steps row above an agent's answer now opens a trace of the turn. Each thought, tool call and
+  subagent is a bar on one timeline, with the duration, cost and tokens of the turn. You can search
+  the steps with ⌘F (Ctrl+F), fold an agent's steps, replay the turn at up to 10× speed, and move
+  between the rows with the arrow keys. A click on a step shows it in the chat.
+- The steps row now looks like the subagents header above it. It shows the time of the turn and how
+  many steps failed.
+- Simplified Chinese for the desktop app and the web client. Select 简体中文 in Settings, or use a
+  Chinese system language.
+- The usage list shows each Gemini limit on its own line, such as Gemini Models, Gemini 4 Argon, and
+  Claude and GPT models. The warning above the message box uses the limit of the agent's model.
+- Claude can use an Anthropic API key. Open the Claude page in Server settings → Providers and select
+  Add key. The key shows as an "API key" account. To bill an agent to the key, select the API key
+  account in the agent's model menu. Other agents keep the Claude plan. When Claude has no sign-in,
+  all agents use the key. A joined server shows the key when the server also has this version.
+- Add Cloudflare to the Apps catalog. After you sign in to your Cloudflare account and choose Read only
+  (or more) on its consent page, agents can work with Workers, DNS, R2, D1 and KV, query Workers logs and search
+  the docs.
+- A Workflows page in the page rail. Draw a workflow on a canvas with agent, model, condition, approval and output steps, and connect them. The workflow saves while you edit it.
+- Run a workflow, or one step of it. You see each step's status and answer on the canvas, and you can stop, retry or approve a step.
+- A condition step asks a model a yes or no question. Only the steps on that branch run.
+- A workflow can loop: connect a step back to an earlier step, and the steps between them run again with the new answer. The canvas marks each loop, and warns when no condition can end it.
+- An output step shows a notification or posts the result to a connected messaging place. Only an owner or admin can choose the place.
+- A workflow can start on a schedule or from a signed webhook request.
+- Version history: preview an earlier version of a workflow and restore it. Undo gets back the canvas from before.
+- Members of a joined server can open and run the workflows whose agents they can use. To change, delete or restore a workflow, a member needs “Can manage” on each of its agents; otherwise the canvas is read-only.
+- Usage shows the tokens of workflow model and condition steps in one Workflows row. Steps that use an agent count under that agent.
+- Consecutive model and condition steps reuse one started provider for 5 minutes, so they start faster. Each step still starts with no earlier text.
+- When analytics is on, OpenBot counts workflow actions and runs: the kind of action, the outcome, the duration and the step counts. It never sends a workflow name, step text or graph.
+
+### Changed
+
+- The Linux docs and the Linux download page on openbot.run now name Ubuntu 26.04 LTS. OpenBot
+  0.48.1 runs on Ubuntu 26.04 with the Electron sandbox on.
+- When nothing comes from the provider for a minute during a turn, the activity line says "Waiting for {provider}…" and stops its shine. A notice above the message box says how long the provider has sent no update. Before, the line looked busy the whole time, also with no internet.
+- When the computer has no network during a turn and nothing comes from the provider for 5 seconds, a "No internet connection" notice shows above the message box, and the activity line says that it waits.
+- On a joined server, Add account for Codex and Claude opens the sign-in page in the browser of your computer, as the first account does. Before, the page opened in the server's browser, and you used it through the live view. That was slow, and a magic link or a CAPTCHA could stop the sign-in. A server on an older version still uses the live view.
+- On a very wide window, such as an ultrawide monitor, the chat now stops at a 1440 px column in the
+  center of the pane. Before, the user's messages were at the right edge of the pane and the agent's
+  replies at the left edge. A laptop window shows the chat at full width, as before.
+- When you try to turn off a provider that an agent uses, a toast now tells you why the switch stays on. Before, the row showed red text with the names of all the agents. When more than one agent uses the provider, the toast gives their number.
+- "Steer agents while they work" moved from Settings › General to Settings › Agents.
+- The sidebar no longer shows a presence dot on a person's avatar. The dot sat outside the shape of avatars with no photo. The conversation header still shows whether the person is online.
+- The app demo on the home page now shows a team of four agents, each on a different provider: Claude, Gemini, ChatGPT and Grok. The lead agent plans a launch, sends work to its teammates, asks you a question and answers with a table and a diagram. Each teammate plays its own short scene when you open it, and a message that you type gets a reply. The sidebar groups the chats in sections and shows a launch channel with a chat history.
+- Claude agents now keep the prompt cache for 1 hour by default, also with an Anthropic API key,
+  for subagents, and on a subscription that uses extra usage. Before, these used 5 minutes, so a
+  turn that started later sent the full context again at the full price. A 1-hour cache write costs
+  more than a 5-minute write; choose "5 minutes" to go back to Claude Code's own choice. A `promptCacheTtl` in the Claude settings, or
+  `CLAUDE_CODE_PROMPT_CACHE_TTL`, still sets the time.
+- In a channel, the activity row now shows the name of each agent that works, before the activity
+  text and in the colour of the agent's messages. Before, it showed only their faces.
+- Agents now follow your user-level `CLAUDE.md` or `AGENTS.md`, and the one at the root of the agent
+  workspace, when these files set the persona, reply length and format, delegation, or group-chat
+  behavior. Before, OpenBot's built-in style guidance and your files gave the agent two rule sets for
+  the same decision. Files in cloned repositories do not get this priority. The rules for tools,
+  memory, approvals, secrets, private details, safety checks and the browser do not change.
+- A focused field shows a grey border, and a focused button shows a thin grey ring. They no longer
+  show a blue glow.
+- The comparison pages on openbot.run now list all the providers that OpenBot runs, including Muse
+  Code, Pi, Inception and ACP agents, and 11 app languages. New rows compare backup models and
+  logins and payments, and most pages also compare voice and Slack, Discord and Telegram.
+- The home page and `llms.txt` on openbot.run now name the new providers and backup models.
+
+### Fixed
+
+- An agent set to switch to a backup model without asking now switches when its provider is overloaded or down. Before, it showed the error and stayed on the failing model for Claude's "529 Overloaded" errors, Codex's server, overload and retry-limit errors, Gemini's UNAVAILABLE status, and dropped connections.
+- A channel message that stopped because the channel had no lead now continues when you choose a lead. The new lead routes it. Before, it stayed stopped until you clicked Continue.
+- Channel members now know which member is the lead.
+- The x64 remote desktop runtime now starts on Ubuntu 26.04 LTS. Before, it needed
+  `libminiupnpc.so.17` and `libicuuc.so.74`, which Ubuntu 26.04 does not have, and the Docker image
+  with `BASE=ubuntu:26.04` did not build.
+- Remote desktop now starts in the Docker image on Ubuntu 24.04. Before, Sunshine stopped because
+  `libnuma1` was not installed. The server install now also installs it.
+- When a Grok turn fails after it used tokens, the error now shows the reason that Grok gives, such as `empty response from model (reasoning_only)`, and not only `Internal error`. The routine run history keeps the same reason (#2980).
+- When you stop a sign-in that a joined server relays to your computer, the provider list now shows the change at once. Before, a new account that you stopped stayed in the list for some seconds.
+- An app that an agent suggests in a chat, such as Linear, now shows a green Connected button with a check after you connect it. Before, the card kept its Connect button.
+- When an agent asks another agent for help, the "Waiting for replies" list now shows when that agent waits for your approval, your answer, the browser, or a usage limit. A button opens its chat, where you can answer. Before, the list showed "Working" until the wait ended.
+- The agent usage page now counts all Gemini tokens. Antigravity 1.4.3 sends the tokens of each
+  turn, but OpenBot added them as a session total, so a turn smaller than an earlier turn in the
+  same session counted as 0. Gemini thinking tokens now also count as output. Usage that was
+  recorded before this fix does not change.
+- The app demo on the home page no longer shows a time zone prompt, an update card or a helper agent from another server. Its dates now show today.
+- On a phone, the app demo on the home page now shows all four agents in one row and the chat under them. Before, only one agent showed and the chat area was empty.
+- Support service usernames with uppercase characters in server setup and update scripts.
+- Gemini now shows the Claude and GPT models that your Google plan includes, such as Claude Sonnet
+  and Claude Opus. Before, the model menu showed only Gemini models.
+- Claude agents use less of the Claude plan. A sidebar move or a teammate rename no longer starts
+  the Claude conversation again with a new system prompt: the list of section teammates now goes
+  with the next message, as the saved memories do. Before, the full conversation was sent to the
+  model again and written to the prompt cache.
+- A Claude conversation no longer restarts when it is opened again with the same settings after a
+  model or effort change.
+- Claude, ChatGPT and Muse channel members use less of their plan. A member's next assignment in
+  the same conversation gives only the channel messages that it has not read. Before, each
+  assignment sent the recent channel history again, up to 60,000 characters. The first assignment
+  after a start of OpenBot, a new conversation, a provider change, or a compaction still sends the
+  complete history.
+- A provider account that you add now shows its usage rings in the page rail when its sign-in ends. Before, the rings showed only after a reload or the next usage refresh, up to 5 minutes later.
+- On a joined server, the usage rings no longer go away when the host resets the usage of a provider account.
+- When two or more notifications were open, you could not reach a notification under the first one.
+  The stack closed when the pointer moved onto it, because the notifications were over the part of
+  the window that moves the window. Only the buttons of the first notification responded.
+- The waiting block, the queue, a reply and the notices above the message box are now one card,
+  with a line between each part. Before, each part was a separate card, with gaps and cut edges
+  between them.
+- An agent can click a choice, such as a payment method, when a decorative layer of its label covers
+  the radio button.
+- The first Claude turn after OpenBot starts again now has a cost in Analytics and in the turn trace.
+  OpenBot estimates it from Anthropic's list prices, because Claude does not report the cost of that
+  turn.
+- The Live Activity updates that OpenBot sends to your iPhone cut a long code span with emoji at the
+  correct length. Before, the cut could split an emoji into half a character, and an emoji counted
+  as two characters, so the text stopped too early.
+- The Live Activity updates that OpenBot sends to your iPhone show a reply that starts with inline
+  code in three backticks, such as ```` ```npm install``` first ````. Before, the update read that
+  line as the start of a code block: the line disappeared and the next lines showed as code.
+- Gemini usage now follows the limit of the model that an agent uses. Google can give a model, such
+  as Gemini 4 Argon, a weekly limit of its own. Before, OpenBot put all Gemini limits together, so a
+  spent Argon limit could show for Gemini 3.8 Flash, or Argon could show room that it did not have.
+- Stop showing a "Provider error" when Codex completes a credential storage fallback. Keep the redacted diagnostic in the provider log. Authentication and storage failures still report errors.
+- A sign-in to a Google MCP server, such as Gmail, Calendar or Drive, now keeps working after the
+  first hour. OpenBot asks Google for a refresh token. **Sign in to these servers again after you
+  upgrade.**
+- A custom provider with a base URL on `api.anthropic.com` now uses Anthropic's Messages API, so
+  OpenCode adds prompt cache breakpoints. Before, it used Anthropic's OpenAI-compatible endpoint, which
+  does not cache, so each turn paid the full input price.
+- Usage and cost for OpenCode turns now count the uncached input, the cache reads and writes, and the
+  thinking tokens of each turn. Before, a turn could show no uncached input.
+- Analytics now records why a provider download failed, for example no disk space or a failed
+  checksum. Before, each failure was recorded as `unknown`.
+- When you save or remove a provider API key, agents that a usage limit held now continue at once.
+  Before, they waited for the old plan's limit to reset, which could take days.
+- Sign in to an MCP server again when OpenBot cannot read the saved sign-in file. Before, Connect
+  stopped with "The MCP sign-in file is unreadable" until the file was deleted, which dropped every
+  saved MCP session.
+- Restart now closes turn rows that stayed `running` although no thread names them as its active turn. Before, such rows stayed `running` for good, as the follow-up data on #2214 showed.
+- An OpenCode agent with more than one chat keeps its OpenBot tools. Before, about 10 minutes after
+  its other chat went idle, every OpenBot tool call failed with `{"error":"unauthorized"}`, including
+  routines, teammates and the browser, until OpenCode restarted. Each tool call also runs in the chat
+  that made it, when two chats of the agent work at the same time.
+- A long channel keeps working when its history summary comes back too long. OpenBot now asks the lead for a
+  shorter summary, and asks once more when the result is still too long. Before, every new assignment in that
+  channel failed with "The history summary is invalid" and "The provider could not start this assignment".
+
+## [0.49.0] - 2026-10-24
+
+### Added
+
+- You can change the key of the server on this computer in Server settings › General › Server key. Computers with this version or later, the web client and webhook routes stay connected. Before, a new key showed "Server identity changed" on each device, and each phone had to scan a new code. Older versions of OpenBot and the current phone app still show "Server identity changed". Do this if the key file was copied or exposed.
+- The website compares OpenBot with Viktor at /compare/viktor: models and price, where agents work, what each one reads, who holds your data, teams, approvals and integrations.
+- Connect Bitwarden or a self-hosted Vaultwarden on a joined server. In Server settings › Connectors, an owner or admin enters the server address, the personal API key and the master password. The server signs in with its own Bitwarden CLI, downloads it when it has none, and unlocks again by itself after a restart. Agents on that server can then sign in to sites with the logins in the folder Shared with OpenBot. This works from the desktop app and the browser client.
+- The website compares OpenBot with Paperclip at /compare/paperclip: setup, phones and remote access, how you work with agents, price, and license.
+- When a task needs an API key or a token, the agent now shows a secure form in the chat, as it does for passwords. The key is saved for that agent on the computer or server that runs OpenBot, outside its workspace, and the agent reads it from a file. It does not go into the chat, the logs or a tool argument, and you do not need to connect to the server to give it. Only the server owner or an admin can enter a key. To remove a key, ask the agent to remove it. Deleting the agent deletes its keys.
+- Mobile Connect settings can keep chats and files on a private network. Choose "Private network", and phones, other computers and team members connect to this computer only over Tailscale or the same Wi-Fi. They still sign in with OpenBot, but chats and files never go through OpenBot servers. Settings shows when Tailscale is connected.
+- Let an owner or admin of a connected server, self-hosted servers included, change "Tasks at once"
+  for each agent of that server in the agent's Advanced settings. The server saves and applies the
+  limit. Before, only agents on this computer had the setting.
+- While an agent works, a chevron on its activity line opens the steps of the turn: its thinking, its tool steps, its memory searches and the skills it uses.
+- A finished answer has a closed "N steps" row above it with the same steps, and the memories that the turn saved, updated or forgot. Tool steps stay until the app closes; thinking and memory changes stay after a restart.
+- The "Show agent steps" setting (Settings > General, and Preferences in the web client) opens the steps by default on that device.
+- A light theme on the desktop and in the web client. Settings > General > Theme has System, Light and Dark. Dark stays the default, so the app does not change after the update. In the web client, the choice is in Preferences and this browser keeps it.
+- On macOS, Settings > General has a Transparent window switch under Theme. When it is on, the main window shows the blurred desktop behind its frame and pages. Dialogs, menus and cards stay solid. While it is on, visited websites and the native menus use the app theme, not the computer's setting.
+- A visual reply has a full-screen button. The page keeps its state when it goes full screen and back. Esc or a click outside the page closes the full-screen view.
+- A click on an image in a visual reply opens the image in the image viewer.
+- Search, Settings and the server number shortcuts work while a visual reply has the focus.
+- A visual reply can answer the agent. A button in the page puts text in the message box, and you send it. The page cannot send a message itself.
+- A visual reply can give the agent its current state. A button in the page puts the state in the message box as a quote of the page, and your next message sends it.
+- A new chat with an agent is no longer blank. It shows the agent, its description, and a faint sample turn: the agent's own routine is asked, and the steps of the turn fill in one at a time. With reduced motion, the sample turn stands still.
+- Named browser profiles. In agent settings > Advanced, an agent can use the shared profile or a named profile. Agents in one named profile share its sign-ins, so two agents can work in one account while other agents use other accounts on the same site.
+- "New profile" at the end of the browser profile list makes a named profile and gives it to the agent in one step. Server settings > Browser profiles shows the shared profile and adds, renames, clears and deletes the named profiles. "Manage" in agent settings opens it. A deleted profile's agents change to the shared profile.
+- The browser toolbar shows the profile of a tab that is not in the shared profile.
+- On a joined server, an owner or admin manages the server's browser profiles and chooses each agent's profile, on desktop and on the web. Each member sees the profile of the server's tabs. This needs no setup: the controls show when the server runs this version or later.
+- Each named profile has a color, and the shared profile is gray. The browser profile list, the browser toolbar and a line under each tab show it, so the tabs of different accounts look different. A new profile gets a color that no other profile uses, if one is free. Server settings > Browser profiles changes it.
+- The Tasks page before the first task is no longer blank. It shows a short pitch, the composer under it, and a faint sample list: a task arrives in Waiting, moves to Working, then to Needs you as Answered, and fades. With reduced motion, the list stands still.
+- Back and Forward arrows in the sidebar top bar open the chats that you opened before, as in a browser. The keys are ⌘[ and ⌘] on macOS and Alt+← and Alt+→ on Windows and Linux. The side buttons of a mouse also work. The history stays in memory for the open server.
+- On macOS and Windows, the "Keep this computer awake" setting (Settings > General) stops the idle sleep of the computer while it is connected to power, so routines run on time. It is off by default. On battery, the computer sleeps as usual, unless you also turn on "Also on battery". The display can still turn off, and a closed laptop lid or a sleep that you select still sleeps the computer.
+
+### Changed
+
+- Each plugin page on openbot.run now shows what an agent can do with the plugin, how to connect it to OpenBot, common questions, and the sources for each statement.
+- The guides "OpenBot 101" and "WTF Is OpenBot?" now have the titles "How to Use OpenBot: Set Up Your First AI Agent" and "What Is OpenBot? Models, Providers and Agents Explained". Their addresses did not change.
+- A message that you send no longer shows "Sending…" or turns grey. Only a failed send shows: "Not sent" and its reason beside the time, with Retry, Edit and Dismiss buttons.
+- Product analytics on turns sends how the turn is paid for: a plan, an API key, a free model, or your own endpoint. It does not send keys or accounts. The privacy policy lists the new data.
+- The web client and the desktop app on Windows and Linux show the OpenBot logo in the top-left corner of the window. Before, this corner was empty, because only macOS shows window buttons there. In the web client, the logo opens the OpenBot site.
+- On these windows, the server menu starts at the same left edge as the search field and the sidebar rows.
+- A schedule with no routines now shows a faint month where sample runs land and write a short note of what they did, with "Set it once. Wake up to it done." The "Create Routine" button asks which agent to use when the server has more than one, and opens that agent's routine settings on a new routine.
+- An agent or a channel with no memories now shows a faint memory list that fills in by itself: each sample memory writes itself in handwriting, then becomes a normal row. The title says "Tell it once. It will remember.", and an "Add memory" button opens the editor.
+- An empty "Pending invitations" list in server settings now shows faint sample invitations that appear one at a time, and an "Invite people" button that opens the email invite field. Before, it showed only "No pending invitations."
+- An agent's routine canvas with no routine shows how a routine works. A faint sample diagram builds itself, and one run goes through it. "Create Routine" opens the agent's settings on a new routine. With reduced motion, the canvas shows the finished run and does not move.
+- The "Own browser session" switch in agent settings is removed. An agent that uses its own session keeps it, and the browser profile list shows it as "Only this agent" until you choose another profile. Use a named profile for a new agent.
+
+### Fixed
+
+- An hourly routine can now run between two times that cross midnight, for example from 8:00 PM to 10:00 AM. Before, the routine form showed "End time must be after start time" and did not save the routine. A run after midnight uses the days of its own date: with Monday to Friday, a run at 2:00 AM on Saturday does not occur.
+- A long chat keeps the older messages that you scrolled back to when a new message, a routine
+  update or a reaction arrives. Before, the chat showed only its latest 100 messages again, and a
+  message that you opened from search jumped to the end of the chat.
+- Fold the thinking of a channel member into steps, as in an agent chat: under the activity line
+  while the member works, and above the member's answer after. The unread count of a channel no
+  longer counts this thinking. Before, each part of the thinking showed as a message, and a model
+  that sends all its reasoning, such as DeepSeek, showed a very long message.
+- Keep a failed Codex tool call, such as an image generation that fails, out of the ChatGPT
+  provider error notice. Before, the notice stayed on screen in each chat that you opened, also in
+  chats of other providers. The agent still gets the error as the tool's result.
+- After an in-app update installs, OpenBot deletes the downloaded update file when the new version starts. Before, a copy of the full update stayed in the updater cache on macOS and Windows. A downloaded update that is newer than the running version stays until you restart.
+- A long preview in an agent's confirm card now has a "Show all" button that opens the full text, and "Show less" closes it again. Before, the preview stopped at a fixed height with no visible sign that more text was there.
+- **On macOS, sign in to Gemini again after you upgrade.**
+- On macOS, a Gemini agent with Workspace only access now uses the Google sign-in. Before, it stopped with "Gemini did not return an authenticated account" while Settings showed Gemini as connected.
+- The web client connects to a server again in seconds after a connection stops working. Before, on a server that uses a relay, it could wait up to a minute when it still received data from the server.
+- In a channel, Open on a "Complete the step" browser card now opens the page in the chat of the agent that asked. Before, Open did nothing, and the card showed "Browser page" with no preview.
+
+## [0.48.2] - 2026-10-23
+
+### Added
+
+- In Server settings > Roles, a role and Everyone have a **Set all** menu. It gives one access level
+  to all agents at once, so you do not set each agent one by one.
+- Voice prompts and read-aloud replies work on Linux (x64 and arm64), as on macOS and Windows.
+  Before, the Linux app showed no microphone and no Voice settings.
+- You can now duplicate a whole sidebar section from its menu, in the desktop app and the web
+  client. OpenBot makes a "copy" section right after the first one and copies every agent in it.
+  Each copy keeps its settings and files, and starts with no messages. If one agent cannot be
+  copied, for example because it is busy, the copy stops and keeps the agents it already made.
+- "Send test event" signs an event that matches the routine and receives it as a real request. The
+  routine runs once, and the editor says whether the run started or why it did not. A joined server
+  must also run this version.
+- The Marketplace has the Dr. Eggbot agent. It designs focused agents, then creates them and checks
+  the result. It installs with pstack, five skills of its own, and two paused healthcheck routines:
+  a weekday scan of agent chats for friction and a Monday audit of routines for token waste.
+- An agent can now give several agents the same provider, model, reasoning effort, access,
+  Computer Use, or notifications setting in one step, for example when you ask it to move your
+  team to a new model. It tells you the result for each agent, and a failure for one agent does
+  not stop the others. As before, an agent can only restrict access and Computer Use.
+- Agents can see the accounts of each provider, and read and set which account an agent uses and
+  its backup models, with their accounts, when you ask them. Agents see the account names, never the
+  credentials.
+- When an agent's backup models are set to Automatic, a provider error now moves the agent to the next backup model too. This covers a spent balance, an unavailable provider, a rate limit, a sign-in error and a network error. The message runs again on the backup when the agent had not started to write, and the agent goes back to its own model after 10 minutes. Before, only a usage limit moved the agent.
+- `read_agent` now says when a provider error, not a usage limit, keeps an agent on a backup model.
+- Show the Cursor plan usage next to the other providers' usage. The Cursor ring shows the usage of Cursor's own models and of all other models for the billing cycle. OpenBot reads the Cursor CLI's sign-in to ask Cursor for this usage.
+- Right-click a message to reply to it, copy it, react to it or read it aloud. React opens all
+  reactions in a submenu. Shift+F10 opens the menu from the keyboard. Over selected text or a link,
+  right-click still opens the menu that copies them.
+- An agent can now mark its routine run as failed when the task could not be done, for example when
+  a server it checks is down. The run history shows the run as failed, with the reason. The answer
+  still shows in the chat and still goes to the routine's result destination. In a routine flow, the
+  agents after a failed step are skipped.
+- On Windows, the installer lets you choose the disk and folder for OpenBot. Before, it always
+  installed to `%LOCALAPPDATA%\Programs\OpenBot`. Updates keep the folder that you chose.
+- A channel member can now change its channel when a person asks for it in the channel: add or
+  remove a member, change the channel instructions, and make, change or delete the channel's
+  routines. Each change shows in the channel with the agent and the person who asked. A routine run
+  or an agent's own request cannot make these changes.
+- Agent settings have a new switch, "Own browser session". When it is on, the agent's browser tabs keep their own cookies, sign-ins and site data, apart from other agents. Two agents can then use different accounts on the same site, such as WhatsApp Web or Gmail. The switch is off by default, so agents keep the shared session and its sign-ins. A change closes the agent's open tabs. Deleting an agent deletes its own browser session.
+- Reset the usage limits of a Codex account from Settings > Providers. When Codex gave the account a usage reset credit, the account's ⋯ menu shows **Reset usage**. OpenBot asks for confirmation, spends one credit, shows the result, and starts the agents that the limit held. This works for each Codex account, also on a joined server where you are an owner or admin.
+- Sign in to a site for a server's browser on this computer. In the browser's page menu, select
+  "Sign in on this computer" and sign in in the window that opens. When the sign-in is complete,
+  OpenBot sends only that site's sign-in to the server, the tab loads again signed in, and the window
+  closes. If the window stays open, select Done. This helps with sites such as X
+  that refuse a sign-in from a server address. The server must run this version.
+- When a site refuses a sign-in from the server, the agent shows a card that says so. In the desktop
+  app, the card has one main button, "Sign in on this computer". After the sign-in, the card shows
+  that you are signed in, and the agent continues.
+- The website has a privacy policy at openbot.run/privacy-policy. The "Privacy policy" link in the
+  site footer opens it. Before, the footer linked to the privacy notes on GitHub.
+
+### Changed
+
+- When you open an agent, the cursor goes into its message box, so you can type immediately.
+  Before, the focus stayed on the item that you clicked.
+- An agent needs fewer steps before it uses a tool, so a run, such as a routine, sends fewer input
+  tokens. A tool search now also gives the schema and guidance of its best matches.
+- When you type `@` and part of a name, the agents whose name matches show first, then the agents
+  whose title matches, then the agents whose description matches. The match ignores accents, so
+  `e` finds `é`. Before, the list kept its order for all matches.
+- OpenCode answers now appear while the model writes them, not only when the answer is complete.
+- In the desktop app, the error above the message box now names the provider and model of the run that failed, so you can report it.
+- A webhook routine now shows its setup as three steps: copy the endpoint, add the signing secret to
+  the sender, and send a test event. A new routine has a "Save and get the endpoint" button, and
+  "How to sign a request" shows a curl example. Schedule and Webhook are now two buttons above the
+  trigger, not an item in a menu.
+- The agent and channel settings panel opens wider, so routine settings have more room.
+- Save now tells you what is missing, under the name, the instruction or the filter, instead of
+  staying unavailable.
+- On Windows, Restart and install updates OpenBot with no installer window, then opens it again.
+  **The update from 0.48.1 or older still shows the installer window once. Select Finish to open
+  OpenBot again.** Your settings, agents and chats stay.
+- The Starter plan of hosted servers is sold out. The add-server dialog shows it as sold out, and a new server must use the Standard or Pro plan. Servers that have the Starter plan keep it.
+- A server with 5 GiB of memory or less, such as the Starter plan, now runs at most 2 turns at the same time. Other messages wait in the queue for a free slot. Before, 4 turns could start together and show a low-memory notice on a server that still had memory.
+- Voice recording warns you before its 2-minute limit. The last 15 seconds count down in the recording bar, two short pips play at 10 seconds left, and a chime plays when it stops. Before, the recording stopped without a sound and you could keep speaking without knowing. A notice above the message box now says why the recording stopped.
+- The model picker now shows only the providers that can run: in a conversation, when you create an agent, on the routine canvas, and in the Slack and Telegram settings. If you can manage providers, a plus button in the picker opens the provider settings so you can add one.
+- In the full browser view, you now answer an agent's questions and approvals in the dock over the
+  page. Before, the dock only told you to go back to the chat.
+- On the browser takeover card, Cancel is now on the left, and "I'm done" is the main button on the
+  right. On a server, "Sign in on this computer" is next to "I'm done".
+
+### Fixed
+
+- An agent now uses its browser tabs for a web service that has no tool of its own, such as mail.
+  Before, a routine run in its own session could not find a tool for the service and reported that
+  it had no access, although a signed-in tab was open.
+- When an agent makes or changes a routine, it now writes an instruction that a run can follow
+  without the chat: the service, the tool or browser tab, the account, the steps, and when to
+  report. A run starts with only the newest chat messages, so an instruction such as "check the
+  mail as before" did not tell it how.
+- Gemini Reconnect now opens the Google sign-in page, so you can sign in again or use a different
+  Google account. Before, it checked the saved sign-in and nothing seemed to happen.
+- A long message in a card that asks if the agent can send it now scrolls, so you can read all of
+  the message before you answer. Before, the card showed only the first lines.
+- A Codex chat now starts when `~/.codex/config.toml` has an MCP server with the same name as an
+  OpenBot MCP server of the other type, such as a local `github` server and the GitHub connection.
+  Before, Codex showed "url is not supported for stdio" and did not load its configuration. The
+  OpenBot server now goes to Codex as `openbot_<name>`, and your own server stays as you wrote it.
+- An OpenCode 2.1 turn that failed in OpenCode's local service now says so and tells you to try again or reconnect OpenCode. Before, the chat showed only "Internal error: Internal service failure".
+- A provider error that is not tied to a chat, such as a provider that did not start, now names the provider in its title, for example "OpenCode error". Before, the title was "Provider error", so you could not tell which provider failed.
+- An OpenCode turn that stops sending anything now ends after 5 minutes with an error that says so. Before, the chat could show "Working on it…" for an hour, and each message you sent again waited behind it. This also applies to Cursor, Cline, Grok and custom ACP agents. A running tool call or a question that waits for you does not count.
+- Stop now ends an OpenCode turn also when OpenCode does not stop it. Before, the turn could stay active after you pressed Stop.
+- An MCP server with a space or another special character in its name no longer stops Gemini and other ACP agents. Before, each task failed with `invalid params`. OpenBot now changes these characters to `_` when it gives the server to the agent.
+- A reminder routine now sends its message in the chat when it runs. Before, the agent could decide
+  that the reminder had nothing new to report, and the run completed with no message.
+- Show why channel routing failed, for example when the lead's model is unavailable, the lead did not
+  answer in time, or the lead could not route the message. Before, the channel showed only "Routing
+  failed. Choose a member or try again.", and no log recorded the cause.
+- A file link in a channel now opens the file in the preview panel, in the desktop app and the web
+  client. Before, a click on a link to a shared file or to a file of an agent's workspace did
+  nothing. A workspace link opens the file from the workspace of the agent that wrote the message.
+  A quote of that file in a channel opens the same file again.
+- GPT-6 models in ChatGPT (Codex CLI) now call the tools of your MCP servers, such as Composio.
+  Before, the server test found the tools, but the model did not see them and asked for another
+  message. Existing conversations get the fix on their next message and keep their history.
+- Pi now shows as connected soon after you sign in with `/login` in Pi on the host computer, also
+  over SSH on a server. Before, it stayed signed out until OpenBot restarted.
+- A hosted server that nobody uses for 10 days now starts for a short time and then goes back to sleep. This keeps its data: the hosting provider deletes the disk of a server that stays stopped for 14 days.
+- OpenBot no longer quits on macOS when an agent opens a page that redirects to another page while it loads, such as a sign-in or consent page.
+
+### Security
+
+- MCP servers that OpenBot starts with its own Bun now use Bun 1.4.4. It has security fixes for
+  TLS, HTTP, WebSocket and `fetch`. OpenBot downloads it when an MCP server needs it.
+
+## [0.48.1] - 2026-10-22
+
+### Fixed
+
+- Route channel messages again when the lead agent uses a free OpenCode model. Before, every
+  message stopped with "Routing failed. Choose a member or try again.", because OpenCode refused the
+  routing request. Agent profiles that a free OpenCode model writes work again too.
+
+## [0.48.0] - 2026-10-22
+
+### Added
+
+- In Server settings → Providers → Custom, each saved endpoint on this computer has an Edit button.
+  You can change its name, base URL, API key, models and headers. Leave the API key and the header
+  rows empty to keep the saved key and headers. Headers that you type replace all the saved headers.
+  To use a different server address, type the saved key and headers again. The provider ID does not
+  change. A joined server's endpoints do not have Edit yet.
+- Settings → Voice has a Remove button for each downloaded dictation model and for the speech model
+  that reads replies aloud. Remove deletes the model files from this computer. A dictation model
+  that you use downloads again at the next dictation. Replies are not read aloud until you download
+  the speech model again.
+- Settings → General → Appearance has an Interface size control, from 67% to 200%. It changes the
+  size of text and controls in OpenBot, and OpenBot keeps it after a restart. ⌘ + and ⌘ − (Ctrl on
+  Windows and Linux) also change it, and ⌘ 0 sets it back to 100%. The View menu has Actual Size,
+  Zoom In and Zoom Out.
+- You can choose a GIF as an agent picture, a profile picture or a server logo. An animated GIF
+  stays animated. OpenBot stores it as an animated WebP.
+- The home page of openbot.run has the LaserFlow light beam from React Bits again. It falls onto the
+  app preview and spreads along the top of the preview, in a soft violet haze. The light moves toward
+  the pointer. The app preview has no shadow or glow around it.
+- The beam has a different colour, width, spread, haze and smoke on each visit. The smoke can be
+  soft, or sharp with fine wisps. The colour is a blue, violet, pink or red, such as #3847ff, and
+  is never yellow or green. With the reduced motion setting, the beam does not move.
+- The beam waits until the app preview has loaded, then falls in. The preview appears as the beam
+  hits it. On a slow GPU, the beam uses a smaller canvas.
+- On a wide window, the beam falls through the Download button in the site header, and the button
+  rim has the colour of the beam. The Community and App buttons in the site header and the
+  "Available on" label in the hero are frosted glass. The App button is after the Download button.
+- The React Bits license does not let a public repository contain the beam, so it is in a private
+  repository. A build from the public source code has no beam.
+- In a voice conversation, speak while the agent thinks or reads its reply to interrupt it. The
+  reply stops, and what you say becomes your next message. The Stop button still works too.
+- Channels are back. The host offers channels to the web client again, and agents in a channel can
+  assign work, transfer a task, post a result and read the channel history. Channels that the
+  earlier release archived stay archived.
+- Agent import offers group chats as channels again.
+- In a channel, agents can show a plan card, an `ask_ui` block and an HTML page, and can capture the
+  screen. Each screen capture in a channel asks first, also with Full access, and the request names
+  the channel.
+- The desktop app and the web client notify you when an agent replies in a channel that you do not
+  have in front of you. A click opens the channel.
+- A question, an approval or a browser step in a channel names the channel in its notification, and
+  a click opens the channel.
+- The desktop app shows channels again on a server that offers them. Create one from the "+" menu
+  in the sidebar.
+- Restore a deleted channel from its row menu in Deleted channels, on desktop and web. This also
+  brings back the channels that the earlier release archived.
+- When OpenBot closes by itself, it now leaves a local record of the reason: a `Quitting` line in
+  `logs/main/main.log`, an `exit` line and immediate process exit lines in `logs/trace.ndjson`, and
+  a crash dump in the `Crashpad` folder when a process crashes. Nothing is uploaded. Do not attach a
+  crash dump publicly: it can hold secrets.
+- Agents can list their open waits with `openbot.list_waits`, with each wait ID, note, open time and
+  the routine that wakes it, and close a finished wait by ID. Before, an agent at the limit of 20
+  open waits could not find the IDs, so it could not open new waits.
+- `openbot.list_agents` shows the number of open waits of each agent. An agent can list and close
+  the waits of another local agent with `agentId`.
+- When an agent is close to the wait limit, a new wait tells it to close finished waits. At the
+  limit, the refusal lists the open waits.
+- Owners and admins of a joined server can now set an agent's backup models from the desktop app
+  and the web client. Before, only the computer that runs the agent showed the setting, so a hosted
+  server had no way to set it. Members do not see it. The server must also run this version.
+- You can install OpenBot with Nix on x64 or arm64 Linux and on Apple silicon:
+  `nix run github:nightly-labs/openbot`. Nix installs OpenBot updates. A copy that Nix installed does
+  not update itself; Settings shows that Nix installs its updates.
+- Gemini agents now show how full their context is, next to the send button. When the context is
+  80% full, OpenBot compacts it: the agent continues in a new session that starts from the recent
+  conversation. The agent, its chat and its files stay.
+- The context popover has a "Compact now" action for Gemini and Codex agents. It compacts the
+  context at once, below 80% too.
+- The Usage panel shows how much of your Gemini weekly limit is left, and when it resets. This
+  needs a Google sign-in and Antigravity 1.4.1 or later: install the update that the Gemini provider
+  page offers. Before, Gemini always showed "Not reported".
+- When a saved Gemini API key runs your Gemini agents, the Gemini provider page says so. A saved key
+  always comes before your Google sign-in, so the work uses the key's project and not your Google AI
+  plan, and the Usage panel shows no Gemini limit.
+- When your device's time zone changes, OpenBot asks if you want to move your routines to the new zone. It asks for this computer and for each joined server where you are an owner or admin, in the desktop app and the browser client. The routines keep their clock times, IDs and run history. Before, a routine always kept the zone it was made in, so after a trip it ran at the wrong local time.
+- A joined server now lets its owners and admins choose, from the mobile app, where an agent
+  routine sends its answers: Slack, Discord or Telegram. The server must run this version.
+- You can ask an agent in chat to make a webhook routine, for example "start when my CI sends a
+  failed build". The agent makes the routine and gives you its URL and the request format. A card
+  in the chat shows the URL, and you make the signing secret there. The agent never gets the
+  secret. The routine shows in the Routines settings with the other routines.
+- You can change which events start a webhook routine from the chat. Ask the agent, for example
+  "only for the main branch", or change the event type and the filters on the card and press Save.
+  The URL and the secret stay the same.
+
+### Changed
+
+- **Check agent** for a custom ACP agent now also shows the agent's models, so you can see what the
+  agent offers before you save it. An agent that lists its models only after sign-in still passes
+  the check.
+- A joined server can now show you agents on providers that your OpenBot does not know yet. The
+  agent stays in your list and you can chat with it. Its provider and model choices are disabled
+  and show "Update OpenBot to use" and the provider name.
+- New providers no longer need a new Team API version. Older OpenBot versions do not see agents
+  on providers that they do not know.
+- Tasks opens in the main pane, as Routines does, and the server menu stays at the top. The agent list is hidden until you click the panel button in the Tasks header. A click on an agent opens it, and a click on Tasks goes back to the tasks.
+- Channel work holds only the agent that does it. Other agents and their tasks keep working, and an
+  agent's own tasks run beside its channel turn. Only tasks that declare the same browser or folder
+  run one after the other.
+- A channel in the desktop app now opens in the same chat view as an agent. Plan cards, visual
+  replies, questions with choices and approvals show in the channel, and each message names its
+  agent once for each run of messages.
+- A channel in the web client now opens in the same chat view as an agent, with plan cards, visual
+  replies, questions with choices and approvals.
+- The Usage tab now shows tokens without cache reads in its total, chart, shares and daily data.
+  Before, the total also counted cache reads. Each model request in a turn reads the whole cached
+  conversation again, so cache reads made the total about ten times larger than the new tokens.
+  Totals still show cache reads as Cached input, and the estimated cost does not change. For a
+  remote server, the token chart shows one total line instead of one line for each provider.
+- Agents on ACP providers (such as OpenCode, Grok and custom agents) and on Muse now get their
+  instructions once per session, not with each message. The instructions are 20,000 to 30,000
+  characters, so each message used thousands of extra input tokens. OpenBot sends the instructions
+  again when they change, such as after a new memory, after the agent compacts its context, after a
+  failed message and after a restart. An agent that does not report its context size gets them
+  again every 10 messages.
+- A routine run in an agent's own chat now starts its own provider session, so it uses fewer
+  tokens. Before, each run sent the whole chat context again. The run reads the newest chat
+  messages, and its answer still shows in the chat. The agent reads the answer with its next
+  message. A task, channel or messaging routine runs as before.
+- A phone notification of a question, an approval or a browser step in a channel names the agent
+  and the channel, as on desktop. Before, it named only the agent. A phone app from before channels
+  came back still gets the agent name.
+
+### Fixed
+
+- Images that an agent on a remote server attaches to a reply now show one by one. Before, a group of
+  large images stayed as empty gray tiles until all of them arrived, and on a slow connection they
+  sometimes did not show. A tile now shows a spinner while its image loads.
+- An agent now says that Marketplace has no app for a service, such as Whoop. Before, the agent said
+  that it left a card to connect the app, but the chat showed no card.
+- Find and start a Codex CLI that npm, Volta, Bun or pnpm installed when you open OpenBot from
+  Finder, the Dock, or a login item. Before, OpenBot reported that Codex was not found or could not
+  start, because the CLI did not get your shell `PATH`. OpenBot now reads the `PATH` of the shell in
+  `$SHELL`, such as bash or fish, not only zsh.
+- Say whether the downloaded copy or your own copy of Codex or Claude could not start, instead of
+  always asking you to reinstall OpenBot.
+- On Windows, pick a runnable file when `where` finds a Claude, Codex or other CLI with more than
+  one extension.
+- Usage analytics now count the tokens and the estimated cost of task turns. Before, a turn in a
+  task stored no usage, for all providers. A Codex task that started before this version counts
+  from its next request. A Grok task from before this version can count its earlier usage on its
+  next turn.
+- Codex usage now includes cache writes at the cache-write price. Before, a cache write counted as
+  uncached input.
+- A Codex request with 200,000 or more input tokens now gets an estimated cost. A request with more
+  than 272,000 input tokens uses the long-context price.
+- A Grok update with less than 200,000 input tokens now gets an estimated cost when the session has
+  more. Before, the session total had to be less than 200,000.
+- GPT-6.1 Sol, GPT-6 Sol and GPT-5.5 now have an estimated cost.
+- Delete an agent on Windows on the first try. Before, a delete often failed with "The agent data
+  could not be removed completely" when the agent had saved a memory or had a profile change in the
+  last 10 minutes, or when its Claude process took more than 1.5 seconds to stop.
+- Agent chats stay at the latest message while a turn runs. Before, the view jumped up and down, and the bottom was hard to reach.
+- A chat link to a folder in the shared directory now shows the folder in the file manager. Before,
+  the link showed "Shared path is not a file." On a remote server, the error now says that the
+  path is a folder (#2700).
+- An agent question that lets you pick more than one option now shows check boxes and a Submit answer button. Before, the first option that you clicked sent the answer. This works in the desktop app, in a joined desktop and in the web client of a server with this version.
+- An agent question that waits for your answer now shows again after the window reloads. Before, the question card went away and the agent waited with no way to answer.
+- A channel task moves to the agent's backup model at a usage limit, as the agent's chat does. The
+  channel shows the model switch.
+- After a provider change, an agent's channel conversations get a handoff on the new provider.
+- A hidden lead no longer routes channel work, and hiding an agent gives its queued channel work
+  back to the channel.
+- When an OpenCode model needs a sign-in that its provider does not have, the chat no longer shows
+  only "Authentication required: provider authentication required". The error names the provider
+  and tells you what to do: choose a model with the Free label, paste an OpenCode Go key in the
+  OpenCode settings, or run `opencode auth login` in a terminal. The README says which OpenCode
+  models need no sign-in.
+- When ChatGPT refuses requests because they come too fast, the agent now shows "Too many requests.
+  Wait a moment, then try again." The raw Codex text "exceeded retry limit, last status: 429 Too
+  Many Requests" no longer shows.
+- On Windows and Linux, Ctrl+W in the main window no longer closes OpenBot when no browser tab is
+  open. With "Keep OpenBot running in the background" off, it quit the app with no question.
+- Answer the approval cards that already wait for an agent when you give it Full access, press
+  Always allow, or an admin changes its permission from another computer. Before, those cards stayed
+  open until you answered each one.
+- Run a Codex MCP tool without a card when the agent has Full access, also when the tool is set to ask
+  every time in Codex. Computer Use still asks.
+- Stop showing `thread not loaded` in a Codex chat at each start. OpenBot now reads the history of an
+  agent on a second Codex account through that account, and ignores a session that Codex has no saved
+  history for.
+- Start a new Codex session when Codex has no saved history for the old one. Before, each message to
+  that chat failed.
+- Agent and channel instructions longer than 2,000 characters no longer get cut silently. Before,
+  a long paste dropped the rest of the text with no warning. Now the field keeps all the text, shows
+  a character count near the limit, and shows an error when the text is too long. The instructions
+  are not saved until you shorten them.
+- Claude usage now counts each turn once. Before, the first turn after OpenBot resumed a Claude
+  session, such as after a restart or 10 minutes of idle time, counted all the earlier turns of the
+  session again. The Usage view and its estimated cost showed too many tokens for Claude agents.
+  Usage that was recorded before this version stays as it is. The first turn after a resume has no
+  estimated cost.
+- When Google reports that a Gemini usage limit is reached, OpenBot no longer calls it a rate limit
+  and no longer tells you to wait a few minutes. The message now says that the limit can be for one
+  model, so the usage page of your plan can still show room, and it keeps the reset time from Google.
+- The menu that changes a routine's trigger now fits the space in the window and scrolls. Before, on
+  a short window, such as one close to the Windows taskbar, the bottom of the menu was cut off and
+  you could not reach Webhook.
+- Only the owner and admins can restore a deleted channel from another device, as they are the only
+  people who can delete one. Before, the computer let a member restore it.
+
+## [0.47.1] - 2026-10-21
+
+### Added
+
+- Settings > Voice has a new local dictation model: **Underdog Bark 3.0 Plus**. It is fast and
+  recognizes English only. It writes mostly lowercase text, with little punctuation. OpenBot
+  downloads it (about 685 MB) only when you select it.
+- Roles in Server settings let an owner or admin choose the agents that members can use. Each role gives each agent one level: No access, Can view, Can chat or Can manage. A member gets the highest level of Everyone and of their roles. Owners and admins can use all agents. The role menu of each member on the Members page gives the roles and the server role.
+- Import your Hermes Agent profiles in Server settings › Import. Each profile becomes an agent with its persona, memories, skills and scheduled jobs. There are three ways, as for Grok Bot:
+  - **Read this computer:** OpenBot reads the Hermes folder and shows every item, and why an item stays in Hermes, before anything changes. Skills with scripts and MCP servers import only when you allow them, and MCP servers are added turned off. When you import a profile again, its agent is updated, and no second agent is added.
+  - **Install with a command:** type the `/skills install` command in a Hermes chat, send `/openbot-export`, and choose the `.zip` file that Hermes saves.
+  - **Set it up yourself:** add the export skill file to Hermes by hand, then do the same steps.
+- Keys in `.env` and `auth.json` are never copied.
+- Server settings › Import now starts with where your agents are now: Hermes Agent, Grok Bot, or another OpenBot computer.
+- Select text in a file that the side panel shows, then quote it or ask the agent to change it. The quote names the file and, in a text file, the lines. Click the quote to open the file at the quoted passage.
+- Oh My Pi (`omp acp`) is now in the list of known agents when you add a custom agent, and the
+  agent scan finds an installed `omp` command.
+- Ask an agent to add an MCP server, for example "Add this MCP server: https://example.com/mcp". The agent connects to it, tells you its tools or the error, and you approve each change unless the agent has Full access. When the server needs a sign-in, a Sign in card shows in the chat; press Continue after you sign in, and the agent tests the server again. Keys stay in Server settings, MCP: the agent never asks for them in the chat. Agents can also turn MCP servers on or off, test them and remove them when you ask.
+
+### Changed
+
+- Settings > Providers is now a short list in two groups, Connected and Other providers, with a search field. Each row shows one line, and a badge only when the provider needs you.
+- Each provider has its own page with its accounts, sign-in, API key, version, restart, diagnostics and on/off switch. Open it from the list; "Providers ›" in the title goes back.
+- An account that is low on usage shows a badge with the amount left. Click it to see all of its limits.
+- The default provider for new agents is now one menu at the top of the list.
+- Custom endpoints have their own page, where you add and remove them.
+- A member can no longer change an agent's settings when a role gives that member less than Can manage. On a server with no roles, members can use all agents, as before.
+- The Quote button in the selection bar shows its shortcut in its tooltip.
+
+### Fixed
+
+- The Tasks page keeps the agent that you chose last on each server. Before, it went back to the first agent each time you opened the page.
+- The agent menu on the Tasks page scrolls when a server has many agents. Before, agents below the bottom of the window could not be chosen.
+- Icons in buttons with text are now the size of the text, not larger.
+- OpenBot now offers new Pi releases. Before, the update check could not read Pi's release tags, so
+  Pi stayed on the version that came with OpenBot.
+- In Discord, the agent now gets the images and files of earlier messages. A new conversation also
+  gets the channel's messages from the 15 minutes before it. Before, "@OpenBot make an issue" after
+  an image that another person posted without a mention did not see that image, and the agent could
+  act on an older request.
+- Keep each agent's provider session when OpenBot stops through a signal, as a terminal, `systemd` or Docker sends it. The Computer Use driver stopped from the same signal and made every agent start a new provider session at the next launch, which lost the provider's own context.
+- The Composio listing now connects with a Composio Connect link (`https://connect.composio.dev/mcp`) and its API key. Before, the key went in a header that Composio Connect does not read, and the connection failed with "This server asks for a sign-in".
+- A server that refuses a pasted key now says to check the key. Before, it said to sign in.
+
+## [0.47.0] - 2026-10-21
+
+### Added
+
+- The model picker has a **Fast** switch for Codex models that have a fast service tier. When it is
+  on, the agent asks Codex for the fast tier and the picker shows "Fast" next to the model.
+- Attach ZIP archives in chat. The agent gets the archive unchanged and can extract it. An agent can
+  also send a ZIP archive back, and you can download it from the chat. A remote host must run this
+  version of OpenBot to accept ZIP archives.
+- Add Inception as a provider, with the Mercury 3, 2.5 and 2 models. Select Connect on the Inception
+  row and save an Inception API key. Inception runs in the Pi CLI that OpenBot downloads, so download
+  Pi first. OpenBot keeps the key encrypted on this computer and does not change Pi's own settings.
+  Inception agents stay on this computer and are not shown to team members.
+- The desktop app and the web app show a notification when an agent needs you to finish a step in the browser, such as a sign-in or a code. Before, only the phone and the MacBook notch showed it, and the phone stayed quiet while you used the desktop app.
+- A message or a routine run that cannot start now shows a notification on desktop, web and phone, as a turn that stopped with an error does.
+- Read the SKILL.md of a skill on a joined server and in the web client. The text comes from the
+  host. Before, a local skill or a folder skill showed only its description, and a skill that was
+  changed on the host showed the marketplace text.
+- On a joined server, a skill marker in the chat opens that skill in the agent settings.
+
+### Changed
+
+- OpenBot now installs OpenCode 2 (2.1.1) as its own OpenCode CLI. Your threads keep their OpenCode
+  sessions.
+- When you mute this computer's server, or set its notifications to Nothing or Only when it needs me, your phone now gets the events that the desktop does not show. Before, these events reached no device while you used the computer.
+- Mute and the notification level of a server now also stop the agent sounds on desktop, as they do on web.
+- You can change the model and effort of an agent while it works. The running turn keeps its model,
+  and the new model starts with the next turn. An "After this turn" badge beside the model picker
+  shows that a change waits. Before, the picker was locked until the work finished. A change of
+  provider or account still waits for the work to finish.
+- Server settings: **Publish this server** is now in **Members**, above the invitations. General
+  keeps the server name, logo, and preferences. The server address row is removed: people join with
+  an invitation, not an address.
+- You can publish a server before you name it. OpenBot gives it a name from your account, such as
+  "Ann’s server". You can change the name in General.
+- When product analytics is on, a completed agent turn now also sends the token counts that the
+  provider reported for that turn: uncached input, cached input, cache write, output, and total.
+  It also sends these counts for each provider and model that the turn used, such as a subagent's
+  model.
+  When the provider reported no usage, it sends that the usage is unknown, not 0. No message
+  content is sent. You can turn product analytics off in Settings → General → Permissions → Share
+  product analytics.
+- Product analytics now also counts the hosted server plans, plan and member limits, license
+  steps, contact sales links, provider usage limits, setup steps, connectors, agent templates,
+  phone connection, channels, server export and import, help links and the Usage view. It sends no
+  names, message text, IDs, links, prices or email addresses.
+- Licenses now appear in the billing analytics of the account service, with the number of users.
+- The web app at `openbot.run/app` now sends the same product analytics as the desktop app. Its
+  setting is now **Share product analytics** in account settings.
+- When you turn off **Share product analytics**, the app sends one last event that records the
+  change. Then it stops all analytics.
+
+### Fixed
+
+- Center the hero of the openbot.run download page, as on the other site pages. The title is now
+  the same size as the other page titles, so it shows on one line on a wide screen.
+- A remote session stays connected when Signal restarts and the account service is slow to answer.
+  Before, the session closed and the device showed it as offline.
+- After a Signal restart, OpenBot computers and devices no longer all connect again at the same time.
+- OpenCode setup no longer fails with "could not activate the managed CLI" on a computer where
+  OpenCode 2 is already installed. When OpenBot uses an older OpenCode CLI that cannot open the
+  database of OpenCode 2, setup now tells you to update OpenCode to version 2 or later.
+- With OpenCode 2, an OpenCode thread opens again after a restart, also while OpenCode is still
+  starting.
+- With OpenCode 2, the model picker shows the OpenCode, OpenCode Go and custom endpoint groups by
+  their names.
+- Remote chats no longer show a permanent chat error when a background queue refresh times out. The last queue stays visible until the next update. Failed queue actions still show an error.
+- The Voice select in Settings → Voice → Spoken replies now shows the voice you choose. Before, it kept the name of the previous voice until Settings opened again.
+- Sign in to an MCP server now reports an error when the sign-in information of the server cannot
+  be read. Before, the press ended with no page and no words, and the row kept the result of the
+  earlier test.
+- A reply quote on desktop shows the Markdown of the original message: headings, bold text, code,
+  lists, links and code blocks. Before, it showed the raw marks, such as `##` and backticks, on one
+  line. The quote now shows up to four lines, in the composer and in the sent message.
+- On a phone, the web side panel shows its tabs in a row under the chat header. Before, the tab row
+  covered the agent name, the model picker and the side panel button, and with the pane list open
+  the side panel button did not respond.
+- A Codex chat no longer shows the error "Falling back from WebSockets to HTTPS transport" when Codex changes its connection. The reply continues. If the reply then fails, the chat still shows the error.
+- Center the agent avatars in the connectors list of Server settings and on the Slack, Discord and
+  Telegram connector pages. Before, each avatar stood about 3 pixels lower than the row text and
+  the arrow.
+- OpenBot now keeps your sign-in, API keys and other secrets on Linux desktops such as Hyprland,
+  Sway, i3 and LXQt when a Secret Service (such as GNOME Keyring) runs. Before, it asked you to sign
+  in on every start, and it could not save a pasted API key.
+- Keep your Codex and ChatGPT thread lists clean. When OpenBot starts a new Codex session for an
+  agent, for example after you change its tools or reset its context, it now archives the session
+  that the new one replaces. Before, each replaced session stayed in your Codex history as a row
+  that starts with "Continue this OpenBot conversation." The agent's conversation in OpenBot does not
+  change.
+- Pi agents keep their OpenBot tools, browser included, in new conversations. Pi also shows the
+  OpenBot tools with their real names, so a model can find them.
+- A routine run in the chat now animates once. Before, its row and its steps, such as "Invoked" and
+  "Started", could animate again when the run changed state, when two runs overlapped, or after a
+  reload.
+- When an OpenCode model cannot read a file or image in the chat, OpenBot now tells you to choose a
+  model that can read files, in a yellow notice. Before, a red error said that the provider failed
+  and that you must try again later, but each new message failed again until you changed the model.
+- A task that needs your approval no longer looks stuck in "Making the requested changes…". The task panel
+  on desktop and on the web shows the approval with Allow and Deny, and the task says "Waiting for your
+  approval". An approval of a task no longer hides an approval of the agent's chat.
+- On Discord, OpenBot reads the images and files of the message that you reply to. Before, it read
+  only the text of that message, and a message with only an image gave no context.
+- A notification for a question, an approval or a browser step now goes away when the request is answered or cancelled, also from another device. Before, it stayed in the Notification Center.
+- When the ChatGPT sign-in of a server had expired, a sign-in with a code from the web client or the phone stopped a few seconds after the code appeared. The code now stays valid until you enter it.
+- Failure reports from the desktop app and the local host were dropped before they were sent.
+  They now reach the analytics service.
+- Check saved secondary ChatGPT and Claude accounts when their provider starts, so accounts can reconnect after an app reload or CLI update without removal and a new sign-in.
+
+## [0.46.0] - 2026-10-20
+
+### Added
+
+- OpenBot can read replies aloud on this computer. Turn on Read replies aloud in Settings › Voice ›
+  Spoken replies. When you dictate a message, its reply is read aloud in the language of the reply,
+  in 31 languages. Dictate again, or send a new message, to stop it. Choose one of ten voices and
+  press Listen to hear a sample. The Supertonic 3 voice model downloads once, about 145 MB, and no
+  text or audio leaves the computer.
+- A bar above the composer shows the reply that is read aloud, with a Stop button.
+- Each agent message has a Read aloud button. Press it again to stop reading.
+- Talk to an agent in the Voice pane of the side panel. Open it from the side panel or from the "+"
+  menu of the composer. Speak, and stop talking to send the message. The agent reads its reply
+  aloud, and then the pane listens again. The first time, the pane downloads the voice models. A waveform under the agent moves with your voice, so you
+  can see that it hears you, and with the agent's voice while it speaks. Mute, Interrupt and End
+  control the conversation.
+- A message that you speak in the Voice pane has a voice player in its bubble, with the waveform
+  and length of your recording. Play, pause, or click the waveform to go to a different part. The
+  agent gets only the text, and the recording stays on this computer. The reply to a spoken message
+  has a player too: it reads the reply aloud with a timer, and you can pause and resume it. After
+  one full reading, the reply keeps its audio until you close OpenBot: its player shows the waveform
+  and length, plays again at once, and you can click the waveform to go to a different part.
+- The Voice pane works with an agent on a remote server. The spoken reply runs on this computer,
+  speech recognition uses the voice model you chose in Settings › Voice, and only the text goes to the
+  server. A message that you speak to a remote agent
+  has no voice player.
+- When the server of the agent disconnects, the Voice pane stops listening and tells you. It listens
+  again when the server connects. When a spoken message cannot be sent, the pane tells you and
+  listens again; the message stays in the chat with Retry, Edit and Dismiss.
+- Voice recordings use WebM/Opus, about 4 KB a second. They show in the Storage tab of Server
+  Settings, where you can delete them, and they are part of a data export.
+- The production desktop app sends OpenPanel events for the Voice pane, spoken replies, the voice
+  model download and the spoken reply settings: counts, times, lengths and results only. It never
+  sends what you said, the reply, or audio.
+- Invite users to the OpenBot community from a card at the bottom of the sidebar, in the desktop app
+  and the web client. "Join the Discord" opens the Discord server, and the X button opens the OpenBot
+  account on X. The card stays closed after you dismiss it. On desktop, it shows after you dismiss
+  the mobile app card.
+
+### Changed
+
+- Set "Memories per agent" only in Server settings → General → Agents, for this computer and for
+  joined servers. App Settings no longer shows it. Before, the App Settings value applied only to
+  agents on your computer, so a server's agents could stop at 64 memories while App Settings showed
+  a higher limit. Global search also finds "Memories per agent".
+- The top of the openbot.run home page no longer shows a grid behind the title.
+- In the web app, an account with no server now sees Create a hosted server as the first action.
+  Download OpenBot and Join with invitation are still there.
+- Show the License section in Billing also when licenses are not for sale. A purchase then shows a
+  message with the address to contact: licenses@openbot.run.
+
+### Fixed
+
+- Keep the saved account sign-in when OpenBot cannot read or save it at one start. Before, OpenBot
+  deleted it, and you had to sign in with an email code again after the next restart or update.
+  OpenBot now writes the reason to `logs/account/account.log` in its data folder.
+- Keep a question from a ChatGPT agent open until you answer it. Before, with GPT-6 models the
+  question often expired after about 20 seconds.
+- On Windows and Linux, "Keep OpenBot running in the background" now works. When it is on, closing
+  the window hides OpenBot, and an icon in the system tray opens it again or quits it. Before, the
+  window closed OpenBot, and the switch was off again after a restart.
+- "Launch OpenBot at login" now opens OpenBot when you sign in to your computer. Before, the switch
+  did nothing and was on again after a restart.
+- OpenCode agents no longer fail on each message with "OpenCode service failure" when OpenCode
+  cannot read the agent's session, for example a session that another OpenCode version wrote. The
+  agent now continues in a new session with its conversation.
+
+## [0.45.0] - 2026-10-20
+
+### Added
+
+- One OpenBot server can connect more than one Slack workspace or Discord server. Settings › Connectors shows "Add workspace" or "Add Discord server" after the first one is set up. One Slack Orchestrator answers every Slack workspace, and one Discord Orchestrator answers every Discord server, as one Telegram Orchestrator already answers every Telegram chat.
+- You can choose which Discord roles can use OpenBot in each Discord server. OpenBot ignores a mention from a member who has none of the roles. With no role chosen, everyone can mention OpenBot, as before.
+- The context meter in the composer has a New chat button. The earlier messages stay visible, and
+  each new message sends less context.
+- An agent can start a new chat for itself with the `start_new_chat` tool, for example from a
+  routine. It saves notes first. Turn on "Agent starts new chats" in the agent's settings to allow
+  it. It is off by default.
+- Ask side questions in the web client and on joined servers. Before, side questions worked only on
+  the computer that runs the agent. The server must have this version of OpenBot.
+- An agent can show its plan before a long task. Turn on "Show the plan before long tasks" in the
+  agent's settings. The agent then posts a short card with its plan and Start, Cancel, and sometimes
+  a smaller option. The agent starts after 10 s if nobody answers. It does not show the card for
+  quick answers. The setting is off by default.
+- The chat shows the subagents that a Claude or Codex agent starts. One card for each turn shows how
+  many subagents finished, what each one does now, and how long it took. Click a subagent to see its
+  task and all of its steps in the side panel.
+- When you make a routine on this computer or on your own remote computer, OpenBot offers an OpenBot
+  server, which runs routines 24/7. The offer shows after an agent's turn ends, at most once in 30
+  days. The routine list and the offline notice of a remote computer also show the offer. "Not now"
+  hides it for longer each time.
+- Settings → Billing has a License section for work at a company. Buy a license for 5 to 25 users,
+  in EUR, USD or PLN. See who uses it, change the number of users, update the payment method, or
+  cancel it. A larger team can contact us.
+- A license limits the people on the owner's servers. When it is full, a new person cannot join. The
+  server owner sees the extra price at a new invite and can add 1 user.
+- A member of a server whose owner has a license sees that the license covers them.
+
+### Fixed
+
+- On Windows, OpenBot now finds an OpenCode that you installed with the OpenCode installer or WinGet. Before, it said that OpenCode was not downloaded.
+- On Windows, the Download button of a provider works again after a shutdown or sign-out that was cancelled. Before, each click failed and showed nothing.
+- In Settings, a provider download that fails now shows why. Before, the Download button did nothing.
+- The Cline model picker shows Cline's free models, such as MiniMax M3.1 Flash, MiMo V2.6 Flash and Muse Spark 1.3 Contributor. Before, only the Cline CLI showed them.
+- A Cline agent runs on the model that you select. Before, the agent stayed on Cline's default model.
+- Steer on a remote server now shows why it did not steer when the provider, such as OpenCode or
+  Grok, cannot steer a running turn. Before, it showed only "Request failed". The message still
+  stays in the queue.
+- When you mention OpenBot in a Discord reply to someone else's message, OpenBot now reads the message you replied to. Before, OpenBot said that it could not see what "this" was.
+- The delete server dialog keeps its height and position when you change between "At period end"
+  and "Immediately". Before, it moved because the description and details have different lengths.
+- A Claude agent now makes a routine in OpenBot when you ask for one. Before, it sometimes used
+  Claude's own `schedule` skill and made a claude.ai cloud routine that OpenBot did not show.
+  Claude's own scheduling tools are now off in OpenBot.
+- A chat with unread messages now opens at the "NEW" divider, with the last read message above it.
+  The divider stays while you read and goes when you leave the chat. Before, the chat opened at the
+  newest message and the divider went away at once, because the open chat marked the messages read.
+- An OpenCode agent now uses the OpenCode Go key that you paste into OpenBot. Before, an old key that `opencode auth login` saved took its place, so a turn failed with "This API key has expired" again after you replaced the key.
+- An expired OpenCode key now shows "Your OpenCode API key expired" with an Update key button that opens the provider settings. Before, the chat showed "Internal error".
+- A Workspace-only agent now uses a new provider key on its next turn. Before, it could keep the old key until it was idle for 10 minutes.
+- A cloud server that started again soon after it stopped sometimes stayed at "Starting Cloud
+  server" with `signal/host_unavailable`. The machine continued from memory, and OpenBot did not
+  start on it. The account server now starts OpenBot after such a start.
+- The update banner now shows the full button label in every language. Before, a long label such
+  as "Uruchom ponownie" (Restart) in Polish went past the button and the banner cut it off. In
+  Polish, the button now says "Restart". In Turkish, the "managed by host" button now says "Ana
+  makine yönetiyor".
+- Renew in Settings → Billing works again for a server plan that you cancelled. Stripe refused the
+  request before.
+
+## [0.44.3] - 2026-10-19
+
+### Changed
+
+- The rail on the right side of a long chat now shows your messages, not the days. Point at the rail
+  and select a message to go to it and to the replies under it. The rail is there when a chat has
+  two or more of your messages.
+- The rail of a long chat stays in view when you do not scroll. When you point at it, the chat behind
+  the titles is blurred, so the titles are easier to read.
+
+### Fixed
+
+- The results of the settings search now show their text on the left. Before, the section name and
+  the row title of each result were in the center of the row.
+- The rail of a long chat no longer shows days out of order or the same day two times.
+- The rail of a long chat stays smooth while you scroll, and its titles no longer come in slowly in
+  a long list.
+- "Side question" in the composer "+" menu now opens the side question pane. Before, a click with
+  the mouse closed the menu and did nothing.
+- An agent template that contains the OpenBot skills `openbot-data`, `openbot-site-hosting` or
+  `openbot-skill-creator` installs again. Before, the install stopped with an error, because the new
+  agent already has these skills. A new publish no longer adds these skills to the template.
+
+## [0.44.2] - 2026-10-19
+
+### Fixed
+
+- Show the whole tab menu in the browser view. Before, a right-click on a tab showed only the first
+  rows of the menu, and the page covered the other rows. Now the page is hidden while a menu of the
+  browser view or the address suggestions are open, and it comes back when the menu closes.
+- The page of a shared agent, and the dialogs that add or publish an agent in the desktop app and the web app, show headings, lists and links in the agent's instructions. Before, they showed the Markdown marks, such as `##` and `-`, as text, and the page centered the instructions.
+- You can now scroll up in a chat while the agent works on a reply. Before, a short scroll up with a
+  trackpad or a mouse wheel moved the chat back to the newest text each time the reply grew, so the
+  chat jumped and you could not read the earlier messages. The chat follows the reply again when
+  you scroll back to the bottom or send a message.
+- Let an agent open pull requests and post comments with `gh` when GitHub is not connected. Before,
+  the agent refused and asked for GitHub MCP tools that it did not have.
+
+## [0.44.1] - 2026-10-19
+
+### Added
+
+- Set "Memories per agent" for a joined server in Server settings → General → Agents. Before, the
+  setting in App Settings applied only to agents on your computer, and agents on a self-hosted
+  server kept the limit of 64. You must be an owner or admin, and the server must run this version.
+
+### Fixed
+
+- Start OpenBot when a power loss left the joined server list or the team server settings file
+  empty. Before, the start stopped with the error "Unexpected token '". The damaged file stays
+  beside the new one with a `.corrupt-<time>` name. OpenBot also flushes each settings file to the
+  disk before it replaces the old one, so a power loss cannot empty the file.
+- Name the damaged file when a settings file stops the start. Before, the error quoted the start
+  of the file and did not say which file it was.
+- Open the file panel for a local file link over 100 MB. Before, a click on the link showed the
+  error "The file exceeds the 100 MB limit." and no panel opened, so you could not open the file,
+  show it in the folder or save it. Now the panel shows that no preview is available and gives
+  these actions. OpenBot does not read the file to show the panel.
+- Let Claude agents run tools from Homebrew, `~/.local/bin` and other folders of your shell `PATH`
+  when you open OpenBot from Finder, the Dock, or a login item. Before, the Bash tool and hooks
+  reported `command not found`. An `env.PATH` in your Claude settings still wins.
+- Keep the server and its members connected when an owner or admin changes the role of a member.
+  Before, each change to Admin or Member disconnected the host and every connected member, and the
+  server showed as offline until it connected again. Now only the member whose role changed
+  connects again, with the new role.
+- Show the full day tooltip on the status page. Before, the card cut off the tooltip of the first
+  and last days.
+- Run a message again to its end after the provider refused its first turn. Before, the second run
+  of the message showed as interrupted while a Claude, ACP or Pi agent still worked on it. A Claude
+  agent then refused each new message with "The Claude thread already has an active turn." until
+  OpenBot restarted.
+- Move the window by dragging the top row of the Tasks page. Before, only a thin strip beside the
+  "Tasks" title moved the window.
+- Open Settings again. In 0.44.0, Settings showed an empty page and the app stopped responding
+  until it restarted.
+- Update a provider CLI while the provider works on a turn. Before, Update and Retry showed
+  "Update failed" with "The Claude CLI is working on a turn. Wait for it to finish, then update.",
+  and you had to press Retry again later. Now the provider row shows "Waiting" and the update
+  starts by itself when the current turn ends. New turns of that provider wait for the update.
+  Cancel stops the wait.
+- Let a Claude agent answer again after you switch it to OpenCode and back. Before, each message
+  failed with "--resume requires a valid session ID", also after a restart. An agent that has this
+  fault now starts a new Claude session and keeps its conversation.
+- A provider account that is signing in now says to finish the sign-in in the browser, and its menu has Cancel sign-in. Before, the account showed "Connecting" with only Rename and Remove until the sign-in timed out.
+- A new account sign-in on a joined server's host now stops the earlier one. Before, the earlier account could stay "Connecting" for up to 10 minutes, and Cancel could not stop it.
+- Show the answer of a scheduled, script or webhook routine run one time in the chat of a Claude
+  agent. Before, after OpenBot restarted, the chat showed the same answer two times in the run.
+
+## [0.44.0] - 2026-10-18
+
+### Added
+
+- Agents can ask with interactive blocks: a confirmation with buttons, reply chips, a list to choose from, or a short form. The agent waits for your answer, as it does for a question. Every provider can use them, Claude too. The blocks show as cards in the desktop app and the web app, and you can skip one as you skip a question. Only the server owner or an admin can press a dangerous button, or answer a block that has one in words. A form can ask for a password or a key: the agent gets it, but OpenBot does not keep it on the card or in your answer. The agent can still repeat it in its reply or its thinking. If you cannot hold a button, press it and confirm in a second step. An app or a mobile app that does not show the blocks yet shows them as an ordinary question that you can answer.
+- Settings > Profile shows the activity of this computer in the past year: a calendar of active days, the tokens, the messages, the peak day, the streaks, the providers, the models and the teammates that you use most.
+- Share in Settings > Profile makes an image of your last six months. You can copy the image or save it as a file. The image stays on your computer until you send it.
+- Add a Tasks page to the page rail, on desktop and on the web. Write a task, choose the agent, and send it; you can undo the send for 6 seconds. The page groups the tasks of all agents by what they need: Needs you, Working, Waiting and Closed. Click a task to open its conversation beside the list. On desktop, you can also dictate a task. A joined server shows the page when it supports tasks.
+- Take over a browser tab from its agent at any time, and give it back with "I'm done". The agent waits while
+  you control the page, then continues from a fresh look at the page.
+- Right-click a browser tab to open a new tab to its right, duplicate it, move it, or close the tabs to its left,
+  to its right, or all other tabs. Reopen a closed tab at its old place.
+- The address bar suggests open tabs, pages you visited in this session, and a search as you type, and it
+  completes a visited address.
+- Stop a page that loads from the address bar. Back and Forward are off when the tab has no page to go to.
+- In the full browser view, the keys of other browsers work: new tab, close, reopen, select a tab by number,
+  next and previous tab, address bar, reload, back and forward.
+
+### Changed
+
+- Signing out of an MCP server, or removing it, now asks the server's authorization service to revoke the tokens.
+- Agents no longer get the OAuth token of an MCP server that you signed in to. They reach the server through a local address in OpenBot, which adds the token to each call.
+- Save on a new HTTP MCP server now tests it first. When the server asks for a sign-in, OpenBot signs in and then saves. When the server refuses the typed credentials, OpenBot does not save and goes to Headers.
+- A web address pasted or typed into "Command to launch" now moves to Server URL and selects Streamable HTTP.
+- Profile is now the second tab in Settings, after General.
+- You change your photo and your display name in one Edit profile dialog, in the desktop app and in the web client.
+- Reply on a message in a chat or a channel now puts the caret at the end of the message box, so you can type at once. Before, you had to click the message box first. Text that you selected in the message box stays selected.
+- Agents with a long message history start queued work faster.
+- The web app uses less memory when you open many long conversations.
+- The full browser view shows every tab in its top row, with the address bar above the page. In a narrow window,
+  one button with the tab count opens the list of tabs.
+- The composer, the queue and the agent status float over the page in the full browser view, so you can talk to
+  the agent of the tab while you look at the page. The agent's reply shows over the page and closes by itself.
+- Select a tab of a different agent in the full browser view to open that agent's chat. The page stays open,
+  and the floating composer sends to the agent of the tab.
+- The card where an agent asks for a code or a password has a new design.
+
+### Fixed
+
+- Open the sign-in page when you click **Sign in** for an MCP server that shows its tools without a
+  sign-in, such as the Google Sheets and Google Chat MCP servers. Before, the click did nothing, and
+  the server stayed signed out.
+- Connected devices in Mobile Connect now shows only the phones that can open this computer. A phone that you connected to a joined server no longer shows on a computer that it cannot open.
+- Keep messages with unknown code language labels visible when a label is `constructor` or `__proto__`.
+- Wrap a long agent reply inside its bubble when it names a file by a long path. Before, the text ran
+  past the right edge of the bubble and was cut off, and the chat column could grow wider than the
+  window.
+- Remove temporary instance transfer ZIP files left after a restart when the next upload or export starts.
+- Complete marketplace skill installation and refresh the agent runtime when the install receipt request fails after local files and the skill lock are saved.
+- Prevent service restarts from interrupting a teammate file download while its input stream is still being written to disk.
+- Routines now use the earliest next scheduled time when clocks move back. Some schedules skipped a run in the first occurrence of a repeated hour or missed a run when the clock moved back several hours.
+- Reject malformed custom cron list and step syntax when saving a new or changed routine schedule. Keep saved schedules readable and editable.
+- Keep all attached files when the file system treats different filenames as equal. Previously, one attachment could overwrite another and become unavailable.
+- An MCP server that refuses a saved sign-in now shows "Sign-in needed" with a Sign in button. Before, its row looked signed in until a test failed.
+- A background token renewal no longer registers a new OAuth client with the MCP server.
+- Agents no longer get an MCP token that the server has already refused.
+- An MCP token that expires during a long agent session is now renewed. Before, the agent kept the old token until its session restarted.
+- After you sign out of an MCP server, or the server ends the sign-in, an agent that calls one of its tools now gets a message that tells it to sign in again in OpenBot.
+- After you cancel a checkout from the desktop app, the billing page now says that the checkout was
+  cancelled and that nothing was charged. Before, it said "Billing updated".
+- The form to report a hosted site now has the site style and shows a clear result or error. Before,
+  it had no style and showed raw data after you sent it. You can now type the site address when the
+  form opens without one.
+- "New URL" and "Turn off" for the routine calendar feed now ask before they stop the current URL.
+  The panel also shows a loading state, a Retry button after a failed load, and a note when the
+  agents cannot load.
+- The routine calendar no longer shows channel routines that cannot open. Before, a click on one
+  could leave a pane that loaded without end.
+- The first-agent setup screen and the side-question panel now show in your language.
+- When a side question gets no answer, the panel now says that it failed and has a Retry button.
+- Reject custom cron numbers that are not plain decimal digits, such as `0x5`, `1e1`, `+5` or `5.0`, when saving a new or changed routine schedule. Keep saved schedules readable and editable.
+- Complete the installation of a marketplace agent when the install receipt request fails after the agent is saved.
+- When a setting does not save, a message now tells you why the switch went back. When settings do
+  not load, the settings page says so and has a Retry button. Before, it showed default values.
+- When OpenBot cannot read your saved setup at start, it now shows Retry. Before, it opened first-run
+  setup.
+- 1Password, Bitwarden, Slack, Discord and Telegram now show "Unknown" and Retry when their status
+  does not load. Before, they showed "Not set up". A failed "Open app" for 1Password now shows an
+  error.
+- Slack and Discord now have Pause, as Telegram does.
+- Disconnect for an account session now asks first.
+- You can undo the delete of one memory.
+- Each routine in the list now has Pause or Resume. "Delete now" shows that it is in progress.
+- Failed actions in the browser picture-in-picture controls, the What's New link and the routine
+  webhook status now show an error.
+- The join, Slack, Discord, billing, site report and error pages on the website now have the same
+  header, card and footer. The page-not-found page has its own title.
+- The Slack and Discord connect pages now say what went wrong for each error and offer "Try again"
+  and help when OpenBot does not open.
+- The join page now says "server", explains how invitation links work, and has link previews.
+- Download links on the website now open the download page. The footer now links to Teams and
+  Contact.
+- A shared agent that is no longer shared now shows a clear page, not a generic error.
+- Hosted sites now show a branded error page in the browser, and their report link uses the correct
+  account service address.
+- The web app can now create a hosted server when you have no server to connect to.
+- Stop the provider processes when OpenBot quits while it changes a provider key, updates a provider CLI or reconnects a provider. Before, the new process, or the process that it replaced, could continue to run after OpenBot stopped.
+- The app and the web app now use "server" for a computer that you connect to or join. Before, they
+  also said "host" or "computer".
+- Error labels in a conversation now say what failed, for example "Could not send your answer".
+  Agent errors now tell you what to do next.
+- Errors in the agent registry now name the action that failed: search, install, update, remove or
+  cancel. Before, all of them said "The registry operation failed".
+- The join, Slack, Discord, billing, site report and error pages on the website now show in the
+  language of your browser.
+- More text in the web app, the sidebar, the marketplace and the Cobrain listing now shows in your
+  language.
+- Settings search now finds settings on every tab. A result opens the tab and marks the setting.
+- Icon button tooltips now use the app style and close with Escape. Before, some used the plain
+  system tooltip.
+- A button that is busy now keeps keyboard focus.
+- All dialogs now use the same dimmed background.
+- The web client and a joined desktop can now read the queue of an agent with a long history on a server. Before, after some weeks of use, the queue answer was too large for the connection, and the chat showed a "response too large" error (#2368).
+- Show the correct reason when a direct message cannot go to its recipient, for example when the
+  member left the team or is disabled. Before, the server answered "Request failed." and wrote an
+  error to its log.
+- A message no longer stays "running" after its turn ended with an error. Before, a failure at the end of a turn or during the recovery after a restart could keep the message running, and the agent's next messages waited in the queue. Stop did not clear it. Now the message ends as interrupted or failed, the next message starts, and Stop clears a message that no provider runs.
+- `PRIVACY.md` now lists the hosted site files, marketplace skill bundles and site reports that the account service stores.
+- Opening a server invitation link again no longer disconnects every member of the server. A
+  member keeps their role, and a removed member cannot join again with an old link.
+- When a provider process stops, agents on other processes keep their browser controls, and a
+  compaction of the stopped process shows as failed instead of staying hidden.
+- Signing out, or ending a session from a phone or the web, now also closes the live browser view
+  of that session.
+- The Live Activity updates that OpenBot sends to your iPhone show a link that an agent reply writes
+  in angle brackets, such as `<https://example.com>`. Before, the update removed the link.
+
+### Security
+
+- An MCP sign-in now stops an OAuth answer that is larger than 1 MiB or slower than 20 seconds.
+- A public MCP server can no longer send its sign-in to an OAuth endpoint on a private network.
+- A member that the owner or an admin removed could rejoin a server with an invitation or a team link from before the removal. Now that member needs a new invitation or a reactivation. A member who left by their own choice can still rejoin with an earlier invitation. A member who left before 18 October 2026 needs a new invitation, because OpenBot did not record before then who ended a membership.
+- An invitation from an admin stayed valid after the admin left, was removed or was demoted. Now it closes, and it no longer counts against the invitation limits.
+- If the public ticket key set had a private key by mistake, `/.well-known/jwks.json` published the private key. Now it publishes only the public members.
+- A checkout return address that starts with `//` or `/\` could send the browser to another site. The account server never made such an address, but now it refuses one.
+- A hosted site address such as `/constructor` made the site router read storage for a file that does not exist. Now the router finds only the files of the site.
+- A request with no Cloudflare client address got its rate limit key from `X-Forwarded-For`, which the client sets. Now only the Cloudflare address sets the key.
+- An IPv6 client got a new per-address rate limit for each address in its /64. Now all addresses of one /64 share a limit.
+- Signal read the full body of a Slack request or an account event before it checked the size. Now it stops reading at the limit and answers 413.
+
+## [0.43.0] - 2026-10-17
+
+### Added
+
+- Add "Join the Discord" to the Help menu of the page rail, on desktop and in the web app. It opens
+  the OpenBot Discord community in the browser.
+- You can hide an agent that you do not use now, and keep it. Select "Hide agent" in the agent menu. The agent moves to the "Hidden" section at the end of the agent list. Its thread, files, memories, settings, section and pin stay. A hidden agent does not run its routines and does not get new messages. Messages that are already in its queue wait. Select "Restore" to put the agent back in its section. Routine runs that it missed while it was hidden do not run. The hidden state is the same on each device that shows the server. On a joined server, only an owner or an admin can hide or restore an agent.
+- Add a Month view to the Schedule page. It shows the runs of each day of a month in whole weeks,
+  with three runs on each day and a count of the other runs. Select a day or the count to open
+  that day.
+- Add a "Provider runtimes" item to Clean up on the Storage page of this computer. It removes old
+  provider CLI versions at once, and it does not wait for the automatic cleanup.
+- Show what fills a Claude agent's context in the context popover of the composer: the system
+  prompt, memory files, tools, skills and subagents, tool calls and results, messages, and free
+  space. The counts are Claude's own estimates and need no extra model request. Other providers
+  still show only the total. (#1635)
+- On the website, when the agent network fills the frame, click an agent to grow a new network
+  from it.
+- On the website, click the OpenBot logo in the agent network to send a signal to the agents.
+  Each click shows one of three signals at random.
+- On the website, the agent network has easter eggs. Type "hello", "party", "sudo" or the Konami
+  code, click the hub quickly many times, or leave the page alone until the agents fall asleep.
+  Each reaction chooses its words and signals at random. Reduced motion turns the easter eggs off.
+- On the website, agents in the network chat about their work when you click the hub, and when a
+  network that you regrow is complete.
+- Set the size of the virtual display that computer use reads on a self-hosted server, with
+  `--display-size` at the install or `OPENBOT_DISPLAY_SIZE` in `/opt/OpenBot/hosted/openbot.env`,
+  and in Docker with the `OPENBOT_DISPLAY_SIZE` variable. The default stays 1280x800.
+- Ask the agent a side question from the composer "+" menu. The agent reads the chat and answers in the side panel. The question and the answer do not go into the chat, and closing the tab deletes them. Side questions work only on the computer that runs the agent.
+- Add a public status page at status.openbot.run. It shows the state of sign-in, connections,
+  hosted servers, desktop update downloads and the Marketplace, 90 days of history, incidents and
+  planned maintenance. It has an RSS feed, and the site footer links to it.
+- Click the quote in a reply to go to the original message. The chat scrolls to it, loads older
+  history first when necessary, and highlights the message for a moment. "Back to the reply" takes
+  you back. When the original was deleted, the reply says "Original message not available".
+- Quote selected text from a chat message in a new message. Select the text and choose Quote, or press
+  ⌘⇧. on macOS or Ctrl+Shift+. on Windows and Linux. The quote goes into the composer as a chip at the
+  caret, and one message can have more than one quote. Click a quote to go to the quoted text, which
+  shows highlighted. The agent gets each quote as a Markdown block quote.
+- The status page sends signed webhooks for new incidents, updates, maintenance and service check
+  changes to the tools of the OpenBot team, with retries for 11 hours. Slack and Discord formats
+  are available. The feed stays the public way to follow the page. (#2335)
+- `openbot-cli` runs a task on an agent from a terminal or a script and can wait for the answer. It also changes an agent's model, reasoning effort or provider account, and starts a new chat with an agent. It uses the Local scripts API, so only agents with **Local scripts** on can be used. When OpenBot restarts during a wait, the command continues the wait. See `docs/automation.md`. Thanks to @NatanPimentel.
+- The Local scripts API has three new routes: `GET /v1/agents/:agentId/deliveries/:deliveryId` gives the state of a sent message and the turn's answer, `POST /v1/agents/:agentId/settings` changes the model, reasoning effort, provider or provider account, and `POST /v1/agents/:agentId/context/clear` starts a new chat, the same as **New chat** in the agent's settings. A change that the agent's state or the listed models refuse answers `409` with the reason.
+
+### Changed
+
+- Show a honeycomb of animated agent faces on the website, behind "Meet your first teammate" at the
+  end of the home, news, guide, article and changelog pages. A blur under the text keeps it easy to
+  read. Each face blinks, and the face under the pointer looks at it.
+- Message search in a chat and in the global search is faster on a long chat history. It reads the stored messages one time per search, not two times.
+- Published sites open faster. The site server now reads the block state and the site address list
+  at the same time. Before, it read them one after the other on each request.
+- The app demo on the home page and the web client download only the language that they show. Before, they downloaded all ten languages, about 1 MB, before they started.
+- The home page loads less code from other pages of the site, so it shows sooner on a slow connection.
+- The Marketplace opens as a page of the window, as Schedule, Usage and Settings do. Its title is in
+  the top row and the page rail shows that it is open. Escape goes back one view, or closes the page.
+- The buttons of the page rail show their names in a tooltip at their right. The tooltip opens and
+  closes with the motion of a submenu, and it also opens when you move to a button with the keyboard.
+- When you move the pointer along the page rail, one tooltip moves from button to button, as a
+  submenu does. The usage card of a provider moves in the same way.
+- In the web app, Settings and Server settings now open as pages of the window, the same as in the desktop app. The page rail marks the page that is open.
+- The web app page rail now has Schedule. It shows the routine calendar of the connected server.
+- The Help menu of the web app now shows the newest release notes.
+- Delete the Slack, Discord or Telegram Orchestrator when you disconnect its connector. Before, the
+  orchestrator stayed in the sidebar with no connector. The Telegram Orchestrator goes with the last
+  linked chat. When no agent is left in the Integrations section, the section goes too. The
+  disconnect dialog tells you this before you confirm.
+- On the website, some agents in the agent network are larger leads with a team of small agents
+  around them.
+- Shorten button, tab, menu and badge labels in all 9 translations, so that each label fits on one
+  line. For example, "Retry" is now "Wiederholen" in German and "Ponów" in Polish.
+- Translate the text that showed in English in all 9 translations, such as the task panel and
+  settings transfer.
+- Admins can now change a member's role, remove a member and end a member's session, as the owner
+  can. Nobody can change or remove the owner.
+- The web app downloads less code before it shows the sign-in page and the workspace. It loads math formulas, Schedule, routines and server setup only when you open them.
+- A streamed reply in the web app uses less processor time in a long conversation. When you go back to the web app window, it no longer reads the whole server again if it read it in the last 30 seconds.
+- The web app uploads and shows large attachments faster.
+- On Windows and Linux, the main window no longer shows the menu bar under the title bar. Menu
+  shortcuts work as before, and the Alt key shows the menu bar.
+- Set what an agent may do with one Permissions setting in its agent settings: Workspace only, Ask
+  first or Full access. Ask first gives the agent full reach, and it asks you before it uses an
+  OpenBot tool or publishes a site, and when its provider asks for approval. A new Claude agent
+  shows Workspace only and Full access, because Claude does not ask for approval with full reach.
+  On a joined server, an owner or admin can change the Permissions of its agents.
+- Full access agents now publish, update and delete public sites and use built-in tools without
+  asking, as Turbo mode did before. Before, only Turbo mode let an agent do this without asking.
+- A Claude agent with Auto approve off shows Ask first. It asks before it uses an OpenBot tool or
+  publishes a site, as before, but Claude's own tools run without asking. Select Full access or
+  Workspace only to change it.
+- "Always allow" on an approval card shows only at Ask first, and moves the agent to Full access.
+- Make agent avatars do less rendering work when the pointer is outside the window. They no longer
+  force a page layout on every animation frame.
+- Open the app about 1 to 2 seconds faster. At start, OpenBot no longer reads and checks every
+  installed provider CLI again when no file of it changed since the last check passed. A changed,
+  added or removed file still gets the full check.
+- Make long chats scroll and open with less work. A message that is not streaming no longer makes
+  the app recalculate the page style when it comes into view.
+
+### Removed
+
+- The Usage page no longer shows the plan limits of each provider. The limit rings on the page rail still show them.
+- Remove Turbo mode from General settings and the Auto approve switch from the model menu. Each agent
+  keeps what it could do: an agent with Turbo mode on before the upgrade has Full access.
+
+### Fixed
+
+- Messages save faster in a large history. Before, each save read all the saved command records, so it became slower over time.
+- Show no "Provider error" message when Grok cannot read its usage. Before, the message came back
+  on each usage refresh. The usage still shows as unavailable.
+- Keep queue updates fast when an agent has received many messages. Before, each queue change
+  searched all mailbox messages once for each message of the agent, so the app became slower as the
+  history grew.
+- The daily billing snapshot reads only open subscriptions from Stripe. Before, it also read every
+  canceled subscription, and one subscription with bad data stopped all snapshots. Now the snapshot
+  counts such a subscription in `skipped_subscriptions` and leaves it out.
+- A chat update finds the attachments of each changed message from an index. Before, each changed
+  message read every attachment in the database, so a large mailbox sync or a long chat slowed OpenBot.
+- Long chats stream replies more smoothly. Before, a closed chat search read the full chat again for each streamed part of a reply.
+- Keep the browser client fast while an agent writes a reply. Before, each part of the reply made
+  every message in the chat again, so long chats became slow.
+- Send each sign-out and account change to connected apps once. Before, the account service could
+  send the same change two times, and a slow connection service could stop the cloud server check
+  for minutes.
+- Read Claude session history faster at start and after a provider reconnect. Before, OpenBot wrote
+  each message of the selected conversation to its history index in a separate transaction, so a
+  long session took seconds to read.
+- The Y axis of the daily usage chart shows each amount at its grid line. Before, the top amount was below its line and the zero amount did not show.
+- A provider with no known cost shows its tokens only. Before, its row said "Unavailable of known cost".
+- Start faster when agents have a long chat history. Before, each start and each provider
+  reconnect imported the full provider history of all agent sessions again. Now OpenBot imports
+  only new or changed turns, and does not read a replaced session again after one complete import.
+- Stop the database growth from agent list writes. Before, each message and each turn end added a
+  full copy of the agent list to `openbot.db`, and the old copies stayed. The first write after the
+  update removes them. Model changes that one agent made to another agent stay recorded.
+- The routine flow check after each turn and queue change reads only the runs it can move. Before, it
+  read every routine run and flow step of the last 7 days each time, so a routine that runs often
+  slowed OpenBot.
+- The home page title, text and buttons no longer move down when the font loads on a slow connection.
+- A reply that streams finds the earlier parts of its message from an index. Before, each update of a
+  streaming reply read every earlier event of the chat, so a long chat streamed more slowly over time.
+- The server menu no longer shows Usage and Schedule for each server. The page rail opens them, as the 0.42.0 notes say.
+- The global search command for the routine calendar is now named Open schedule, the same as the Schedule page.
+- Keep only the provider CLI version in use and one older version that works. Before, OpenBot kept
+  a copy of each update for 30 days, and this could use more than 5 GB. OpenBot now removes old
+  versions within a few hours while it runs, not only when it starts.
+- Show provider runtimes as a separate part of the Storage bar. Before, they were part of
+  "App data", which was then almost all of the storage.
+- Keep the usage rings of the side rail and their usage card on screen while models load. Before,
+  the rings went away and came back each time a provider finished its check, so the card blinked.
+- The Schedule now loads when you change to a different server while it is open. Before, it stayed on loading until you closed it and opened it again.
+- On a phone, the web app now shows Usage, Schedule and the settings pages when you open them from the rail. The settings page puts its sections above the panel.
+- The side panel tabs are one tab stop. The arrow keys, Home and End select a tab, and Delete closes it. Screen readers announce them as tabs.
+- When Settings or Server settings opens, the focus moves to the page heading. When Settings closes, the focus goes back to the Settings button.
+- The settings search tells screen readers how many settings match.
+- Show local workspace and shared HTML files as pages in the sidebar when their links open. Keep the source
+  view and external open option, using the same isolated page preview as HTML attachments.
+- The pstack skill now shows in the Marketplace. The 0.38.1 notes added it, but the Marketplace did not have it.
+- Grok agents answer again with Grok CLI 1.0.60. Before, every new Grok session failed with
+  `Invalid params: additionalDirectories is not supported`, also when an agent switched to Grok.
+- The log now records a message that did not start because the provider refused the session or
+  the turn.
+- Gemini connects on Windows when its server takes longer than 30 s to start. After a sign-in, a
+  key change, or a start that did not finish in time, OpenBot waits up to 3 minutes for the next
+  start. Before, OpenBot stopped the server while it unpacked, and each try failed with "ACP
+  initialization timed out." The error now says which step did not finish: the start or the model
+  list. The log records when each provider process starts, first answers, and ends.
+- On the website, the agent network fades out at the bottom of its section. Before, the agents
+  were cut off at the bottom edge.
+- Fix translations with the wrong meaning, a mixed term or a mixed form of address. Before, the
+  Polish mobile app showed some Russian text.
+- Show an ellipsis at the end of a long label in most badges and menu items. Before, the text stopped at the
+  edge with no mark. Tab labels no longer go onto a second line.
+- Keep the side panel tabs when you go back to a chat from another page. Before, the open pane showed with no tabs.
+- Show what the agent works on in Computer Use screenshots and remote desktop on hosted and
+  self-hosted servers and in the Docker image. Before, they showed the OpenBot window. Agents now
+  get their own screen, and OpenBot moves to a hidden one.
+- Use the GPU again on Linux. Before, OpenBot always rendered on the CPU on Linux, so dialogs and
+  panels with a blurred background were slow on computers whose GPU works. If the GPU process
+  crashes, or a start stops before it is complete, later starts use software rendering, as before,
+  until an update with a new Chromium version. A server (`OPENBOT_SERVER=1` or a hosted server)
+  always uses software rendering. Set `OPENBOT_DISABLE_GPU=1` to always use software rendering, or
+  `OPENBOT_DISABLE_GPU=0` to try the GPU again.
+- An agent now sees why a browser file upload failed, for example a selector that matches two file
+  inputs or a file that does not exist, and can try again with a better target. Before, a Codex
+  agent saw only "dynamic tool request failed", and OpenBot showed a "Provider error" message.
+- When the server reads its member list, it now disconnects a member that was removed or got
+  another role. Before, the open session could continue with the old role until it ended.
+- Update the Claude plan limits while an agent works. Before, the limits changed only on the next
+  refresh.
+- Read the Claude plan limits faster when the computer has a large Claude history. Before, the
+  read could time out.
+- Keep a record when an agent delete fails. Before, a host on Windows kept no record of the step that
+  failed. Now `logs/agents/agents.log` shows the step and its error code, with no file paths.
+- Muse turns no longer fail when the workspace appears more than once in the writable roots.
+- Keep MCP servers such as Vercel signed in after their access token expires. Before, OpenBot did not
+  ask for a refresh token, so the server refused agents one hour after each sign-in.
+- Show "Sign-in needed" for an MCP server whose access token expired and cannot be refreshed. Before,
+  the row also showed "Signed in".
+- **Sign in to Vercel and other OAuth MCP servers again after you upgrade.**
+- In the desktop app, the name of a rail button now moves to the next button when the pointer moves down the rail. Before, the name closed between two buttons and opened again.
+- Keep a routine open in agent settings while the agent works. Before, each new turn or status
+  update of the agent closed the routine and went back to the agent settings, and the edit in
+  progress was lost. Memories, Skills, Tables and Files in agent settings also stay open now.
+- Fix spreadsheet previews for January and February 1900. Keep Excel's February 29, 1900 compatibility date and the correct time in date-and-time cells.
+- An OpenCode agent no longer fails each message and routine run with "The request contains invalid parameters" after a model change or in a long chat. OpenBot now starts a new OpenCode session with the chat history and sends the message again.
+- A Muse agent no longer fails each message with "MCP startup audit failed; MCP is disabled for this runtime" after an MCP server, such as Computer Use, did not start once. OpenBot now starts a new Muse session with the chat history and sends the message again.
+- GIF and AVIF attachments keep their image format when sent through ACP, Muse and Pi.
+- Keep quoted currency and text prefixes in spreadsheet number previews.
+- The Antigravity model picker shows each Gemini model one time, with its efforts in the Effort menu. The model and effort that you select now apply to the session. An agent saved on a Gemini model with an effort in its name keeps that model and effort.
+- A message that you send while Codex compacts the context now waits in the queue and runs after the compaction. Before, Codex refused it and the message failed. When a compaction takes too long, OpenBot now asks Codex to stop it before the queue continues. Thanks to @Johnny-xuan for the report and the first fix (#1766).
+
+### Security
+
+- Open an attachment with its default app only when it is an image, audio, video, document or
+  plain text file. Other files, such as scripts, web pages, programs and old Office files that can hold
+  macros, show in the file manager.
+  Before, Open on a file from a remote server or from a team member could run it.
+- Remove characters that are not permitted in a file name from the name of a file that a remote
+  server sends, before OpenBot keeps a copy to open it.
+- Limit the downloads of a page in the browser to 4 at one time and to 2 GB each. Before, a page
+  could download files until the disk was full.
+- Make the remote connection service safer. It now closes a connection that does not sign in within
+  30 seconds, and it gives the same relay credentials again when a device asks for new ones too
+  frequently. Before, an idle connection stayed open for up to one day, and each request made new
+  credentials.
+- Stop the relay server from sending data to more reserved network ranges, such as NAT64 and
+  benchmark ranges.
+- Remove more types of secrets from logs, diagnostics and exports: JSON Web Tokens, private keys,
+  every cookie in a cookie header, credential values in web addresses, and Google, GitLab, npm,
+  Hugging Face, Groq, AWS session and Stripe keys. Before, a secret of these types from a provider
+  message could stay in a log.
+- Disable and remove members correctly when an admin uses a team app on a server with an OpenBot
+  account. Before, the change was only in the team file of the server: the account kept the
+  membership, and the member stayed connected. Now the account changes, and the server closes each
+  session of that member. This also applies to a change from the desktop app.
+- Count failed sign-in attempts for each connected device. Before, all devices that connect through
+  the account service used one count, so one member could stop password sign-in to a user name for
+  all other members.
+- Count sign-in attempts for a user name with spaces around it as attempts for that user name.
+- Send a server invitation email only for an open invitation that an owner or admin of that server
+  made for that address. Before, any signed-in account could send an OpenBot invitation email to
+  any address.
+- Show "OpenBot user" in the skill and agent marketplaces for a creator with no display name, and
+  do not search creators by email. Before, the marketplaces showed the email address of such a
+  creator.
+
 ## [0.42.0] - 2026-10-16
 
 ### Added

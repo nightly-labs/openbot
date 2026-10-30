@@ -1,0 +1,4 @@
+{
+  "provider": "pi",
+  "model": "anthropic/claude-sonnet-5-5"
+}

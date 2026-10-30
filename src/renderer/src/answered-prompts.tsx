@@ -23,7 +23,8 @@ import { createSimpleContext } from "./simple-context";
  * `resolvedPrompts` marker as soon as the scope stops reporting the prompt as
  * pending, which is exactly when the scope is being torn down.
  *
- * Keyed by server id, then by agent id, and never pruned: a marker is cleared by
+ * Keyed by server id, then by agent id (a side thread's submitted marker by its
+ * `attentionKey`), and never pruned: a marker is cleared by
  * the snapshot that resolves it, and a server the user leaves keeps at most the
  * handful of prompts that were still in flight when they left. Deliberately
  * dependency-free, like `server-switch.tsx`, so it can be mounted anywhere above

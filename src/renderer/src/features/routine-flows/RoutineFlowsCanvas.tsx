@@ -53,6 +53,8 @@ export interface RoutineFlowsCanvasProps {
   newAgentModels?: DiagramModelChoice | undefined;
   /** Creates an agent from the canvas's right-click menu. Without it, the menu offers only existing agents. */
   createAgent?: ((draft: DiagramNewAgentDraft) => Promise<{ id: string }>) | undefined;
+  /** Opens the agent's routine settings on a new routine, from the empty canvas. */
+  onCreateRoutine?: ((agentId: string) => void) | undefined;
 }
 
 export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
@@ -134,7 +136,7 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
           draft.webhookConnected = status.connected;
         }),
       )
-      .catch(() => undefined);
+      .catch(failed(t("routine.webhook.statusFailed")));
     const stopEvents = host().onEvent((event) => {
       if (event.type === "routine-flows-changed") {
         if (event.agentId === agentId()) reloadSoon();
@@ -274,6 +276,7 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
               owner={props.agent}
               assistant={assistantOf(props.agent)}
               connectsWithinRoutine
+              onCreateRoutine={props.onCreateRoutine ? () => props.onCreateRoutine?.(canvasAgentId) : undefined}
               onMoveNode={(nodeId, position) => {
                 setState((draft) => {
                   draft.moved[nodeId] = position;

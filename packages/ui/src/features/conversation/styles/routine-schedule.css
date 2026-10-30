@@ -8,23 +8,16 @@
   padding: 0;
 }
 
-/* Keyboard focus is a muted ring, as on the row box: accent rings look like a selection here. */
-.routine-schedule-picker,
-.routine-popover,
-.routine-chip-select-content {
-  --routine-focus-ring: 0 0 0 1px var(--openbot-text-muted);
-  /* A light item hides a ring that touches it, so the ring has a gap of the popover colour. */
-  --routine-focus-ring-on-selected: 0 0 0 2px var(--openbot-bg-control), 0 0 0 3px var(--openbot-text-muted);
-}
-
-/* The same weight as the accent outline rule in auth.css, which loads earlier. */
+/* Keyboard focus uses the shared focus ring, as the other controls do. The ring is a box shadow, so
+   the native outline goes. This rule has the same weight as the accent outline rule in auth.css,
+   which loads earlier. */
 :is(.routine-schedule-picker, .routine-popover, .routine-chip-select-content)
 :is(button, input, textarea):focus-visible {
   outline: 0;
 }
 
 :is(.routine-schedule-picker, .routine-popover) .ui-button:focus-visible {
-  box-shadow: var(--routine-focus-ring);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 .routine-schedule-picker {
@@ -168,7 +161,7 @@
 }
 
 .routine-chip:focus-visible {
-  box-shadow: var(--routine-focus-ring);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 .routine-chip:is([aria-expanded="true"], [data-expanded]) {
@@ -251,7 +244,7 @@
 }
 
 .routine-day-item:has(:focus-visible) .routine-day {
-  box-shadow: var(--routine-focus-ring);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 /* The strip is short, so an unselected day can look like a button. A month grid stays plain. */
@@ -272,9 +265,8 @@
   color: var(--openbot-bg-canvas);
 }
 
-.routine-day.routine-day-selected:focus-visible,
-.routine-day-item:has(:focus-visible) .routine-day.routine-day-selected {
-  box-shadow: var(--routine-focus-ring-on-selected);
+.routine-day.routine-day-selected:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
 }
 
 /* Time */
@@ -293,15 +285,6 @@
   font-size: var(--openbot-text-lg);
   font-variant-numeric: tabular-nums;
   text-align: center;
-}
-
-.routine-clock-segment.ui-input:focus-visible {
-  box-shadow: var(--routine-focus-ring);
-}
-
-.routine-cron-input.ui-input:focus-visible {
-  border-color: var(--openbot-text-muted);
-  box-shadow: none;
 }
 
 .routine-clock-separator {
@@ -339,13 +322,7 @@
 }
 
 .routine-segmented-item:has(:focus-visible) .routine-segmented-control {
-  box-shadow: var(--routine-focus-ring);
-}
-
-.routine-segmented-item:has(:focus-visible) .routine-segmented-control[data-checked] {
-  box-shadow:
-    0 0 0 2px var(--openbot-bg-control-active),
-    0 0 0 3px var(--openbot-text-muted);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 /* Hours window: a two-option list and, for "Between hours", the times beside it. */
@@ -391,7 +368,7 @@
 }
 
 .routine-window-option:has(:focus-visible) .routine-window-option-control {
-  box-shadow: var(--routine-focus-ring);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -473,7 +450,7 @@
 }
 
 .routine-calendar-day:focus-visible {
-  box-shadow: var(--routine-focus-ring);
+  box-shadow: var(--openbot-focus-ring);
 }
 
 .routine-calendar-day[aria-current="date"]:not(.routine-day-selected) {
@@ -687,7 +664,7 @@ code.routine-webhook-secret {
 
 .routine-webhook-events-toggle:focus-visible {
   outline: 0;
-  box-shadow: var(--routine-focus-ring, 0 0 0 1px var(--openbot-text-muted));
+  box-shadow: var(--openbot-focus-ring);
 }
 
 .routine-webhook-events-toggle > svg {
@@ -716,6 +693,107 @@ code.routine-webhook-secret {
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-2);
+}
+
+/* In a chat card the rows are one block, so the card gap does not split them, and they line up
+ * with the card title. */
+.routine-webhook-card-endpoint {
+  display: grid;
+  border-bottom: 1px solid var(--openbot-border);
+}
+
+.routine-webhook-card-endpoint > .routine-webhook-field,
+.routine-webhook-card-endpoint > .routine-webhook-note {
+  padding-left: 0;
+}
+
+/* The setup steps: a number, or a check when done, beside each step. */
+.routine-webhook-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.routine-webhook-steps > li {
+  display: grid;
+  grid-template-columns: var(--openbot-control-sm) minmax(0, 1fr);
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3);
+}
+
+.routine-webhook-step-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-1-5);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.routine-webhook-step-body > strong {
+  font-weight: var(--openbot-weight-medium);
+}
+
+.routine-webhook-steps > li[data-disabled] .routine-webhook-step-body > strong {
+  color: var(--openbot-text-muted);
+}
+
+.routine-webhook-step-marker {
+  display: inline-grid;
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  place-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.routine-webhook-step-marker[data-done] {
+  border-color: var(--openbot-success);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success-text);
+}
+
+.routine-webhook-step-check {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* A value row inside a step has its own border. */
+.routine-webhook-inset {
+  min-width: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-sm);
+}
+
+.routine-webhook-inset > .routine-webhook-field {
+  border-top: 0;
+}
+
+.routine-webhook-step-button {
+  justify-self: start;
+}
+
+.routine-webhook-disclosure {
+  justify-self: start;
+  margin-inline-start: calc(var(--openbot-space-2) * -1);
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: inherit;
+}
+
+.routine-webhook-disclosure-icon {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.routine-webhook-filter {
+  display: grid;
+  gap: var(--openbot-space-1);
 }
 
 .routine-webhook-events {
@@ -768,10 +846,11 @@ code.routine-webhook-secret {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The trigger menu: a name and one line that tells when the routine runs. */
+/* The trigger menu: a name and one line that tells when the routine runs. It is taller than a short
+ * window, so it fits the space left and scrolls; the webhook row stays reachable. */
 .routine-trigger-menu {
   width: 300px;
-  max-height: min(70vh, 560px);
+  max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
   overflow-y: auto;
 }
 

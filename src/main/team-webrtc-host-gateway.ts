@@ -9,6 +9,8 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
   renewSignal?: (hostId: string) => Effect.Effect<{ signalUrl: string; ticket: string }, RemoteWorkflowError>;
   /** `reason` names the last Signal close or error code for the log, never its text. */
   onSignalRecoveryFailure?: (error: Error, reason: string) => void;
+  /** Whether devices may connect only over a private network, such as the Wi-Fi or Tailscale. */
+  privateNetwork?: () => boolean;
 }
 
 const logger = createOpenBotLogger("team-webrtc-host");
@@ -24,6 +26,7 @@ class HostSignal extends Context.Service<
     bridge: TeamWebRtcBridge,
     scope: Scope.Scope,
     pendingConnections: Set<Fiber.Fiber<void, RemoteWorkflowError>>,
+    privateNetwork: () => boolean,
   ) {
     return Layer.succeed(
       HostSignal,
@@ -46,12 +49,16 @@ class HostSignal extends Context.Service<
             }),
             () =>
               Effect.gen(function* () {
+                // The route is read after the bridge starts: a change before that finds no port to post to.
                 const connecting = yield* Effect.forkIn(
-                  bridge
-                    .connect({ peerId, signalUrl, token, peer: "host" })
-                    .pipe(
-                      Effect.tapError((error) => Effect.sync(() => Deferred.doneUnsafe(ready, Effect.fail(error)))),
+                  bridge.start().pipe(
+                    Effect.andThen(
+                      Effect.suspend(() =>
+                        bridge.connect({ peerId, signalUrl, token, peer: "host", privateNetwork: privateNetwork() }),
+                      ),
                     ),
+                    Effect.tapError((error) => Effect.sync(() => Deferred.doneUnsafe(ready, Effect.fail(error)))),
+                  ),
                   scope,
                   { startImmediately: false },
                 );
@@ -102,7 +109,12 @@ export class TeamWebRtcHostGateway {
     this.#options = options;
     this.#bridge = options.bridge;
     this.#runtime = ManagedRuntime.make(
-      HostSignal.layer(options.bridge, this.#connectionScope, this.#pendingConnections),
+      HostSignal.layer(
+        options.bridge,
+        this.#connectionScope,
+        this.#pendingConnections,
+        () => options.privateNetwork?.() ?? false,
+      ),
     );
     this.#bridge.on("incoming", this.#onIncoming);
     this.#bridge.on("disconnected", this.#onDisconnected);
@@ -163,6 +175,11 @@ export class TeamWebRtcHostGateway {
       ),
     );
   }, Effect.uninterruptible).bind(this);
+
+  /** Applies a changed network route to the connected host. A later connection reads it itself. */
+  readonly applyNetworkRoute = Effect.fn("HostGateway.applyNetworkRoute")(function* (this: TeamWebRtcHostGateway) {
+    if (this.#hostId) yield* this.#bridge.setPrivateNetwork(this.#hostId, this.#options.privateNetwork?.() ?? false);
+  }).bind(this);
 
   readonly revokeSession = Effect.fn("HostGateway.revokeSession")((sessionId: string) =>
     Effect.forEach([...this.#peers.values()], (peer) => peer.revokeSession(sessionId), {

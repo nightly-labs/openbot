@@ -1,16 +1,20 @@
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentSummary,
   AgentWait,
+  ConversationPlanStep,
   ConversationSnapshot,
-  QueueDeliveryStatus,
+  QueueDelivery,
   RoutineRun,
 } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
+import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
-import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL } from "./routine-quiet-runs";
+import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 
 export function responseAttachmentMessageId(threadId: string, turnId: string, callId: string): string {
   const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
@@ -45,7 +49,11 @@ export function conversationContentSignature(snapshot: ConversationSnapshot): st
   return createHash("sha256").update(content).digest("base64");
 }
 
-export function routineStatusForDelivery(status: QueueDeliveryStatus) {
+/**
+ * A completed delivery with an error is a run whose agent answered and reported that the task failed
+ * (`routine_report_failure`). Its delivery stays completed; the run fails.
+ */
+export function routineStatusForDelivery({ status, error }: Pick<QueueDelivery, "status" | "error">) {
   switch (status) {
     case "queued":
     case "starting":
@@ -53,7 +61,7 @@ export function routineStatusForDelivery(status: QueueDeliveryStatus) {
     case "running":
       return "running";
     case "completed":
-      return "succeeded";
+      return error === null ? "succeeded" : "failed";
     case "failed":
       return "failed";
     case "interrupted":
@@ -76,7 +84,7 @@ export interface DeliveryPromptSources {
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
-  executionText?: string;
+  executionText?: string | undefined;
 }
 
 const TEAMMATE_HEADER = "Message from OpenBot teammate";
@@ -198,7 +206,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ? [
           "This is a reply to a message you sent earlier.",
           "Surface or summarize the result naturally for the user, and start with the name of the teammate.",
-          "When the reply reports blocked work, do not repeat that work with the same tools. Give the user the blocker and the action from its Unblock line. When OpenBot has a plugin for the service and that plugin is not in your tools, end your answer with the plugin sentence from your instructions.",
+          "When the reply reports blocked work, do not repeat that work with the same tools. Give the user the blocker and the action from its Unblock line. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app and end your answer as its guidance says.",
           "Reply to the teammate only when the message requests another action, or when you have new information that unblocks its work. Do not send it the same request again. Otherwise do not send an acknowledgement and avoid reply loops.",
         ]
       : delivery.expectsReply === false
@@ -210,7 +218,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : [
             `After completing the request, send a concise result back to ${senderName} with openbot.send_message.`,
             `Use recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", and expectsReply false.`,
-            "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When Status is blocked, add a fourth line, Unblock: <the one action that unblocks the task>. When OpenBot has a plugin for the service and that plugin is not in your tools, that action is the plugin sentence from your instructions.",
+            "Format the reply as three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When Status is blocked, add a fourth line, Unblock: <the one action that unblocks the task>. When OpenBot has a plugin for the service and that plugin is not in your tools, call openbot.suggest_marketplace_app, and that action is the plugin sentence from its guidance.",
             "Do not acknowledge without a Status line. Do not leave the sender waiting for a result.",
           ];
     text = [
@@ -237,9 +245,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       "The routine already exists, and its schedule is already configured.",
       "Do not create, update, delete, list, or test routines during this run.",
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
+      "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
-        : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+        : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+      `When the task could not be done, call the ${ROUTINE_REPORT_FAILURE_TOOL} tool with a short reason, then give your answer as usual.`,
       "--- routine task ---",
       displayText,
     ].join("\n");
@@ -248,6 +258,33 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   }
   if (managedAttachments.length) {
     text += `${ATTACHED_FILES_HEADER}${managedAttachments.map((item) => `- ${item.name}: ${item.path}`).join("\n")}`;
+  }
+  if (context.resumeAfterUsageLimit) {
+    const continuationState = context.resumeAfterUsageLimit;
+    const progress = redactText(
+      snapshot.messages
+        .filter(
+          (message) =>
+            message.turnId !== undefined &&
+            continuationState.previousTurnIds.includes(message.turnId) &&
+            message.author === "assistant" &&
+            message.itemType !== "commentary",
+        )
+        .map((message) => renderHandoffMessage(message, agentNames))
+        .join("\n\n"),
+    );
+    const continuation = [
+      HANDOFF_START,
+      "The previous provider reached its usage limit after starting this task.",
+      "Continue the unfinished task from the conversation and captured work steps. The request below is the original goal, not a new task. Do not repeat completed actions. Check the outcome of any interrupted action before you retry it. If the task is already complete, report the result.",
+      ...(progress ? ["--- interrupted task progress ---", progress.slice(-8000)] : []),
+      "--- captured work steps ---",
+      redactText(continuationState.workSteps) ||
+        "Captured work steps are unavailable. Inspect the saved work before you repeat an action.",
+      "These excerpts can be incomplete. Read more history or inspect the saved work when needed.",
+      HANDOFF_END,
+    ].join("\n\n");
+    text = `${continuation}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   }
   return [
     { type: "text", text },
@@ -258,6 +295,20 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/**
+ * The input of an automatic continuation: the turn ended while the agent's own plan had open steps.
+ * The request is already in the provider session, so only this note goes in. The steps come from the
+ * stored plan, which is already in its bounds.
+ */
+export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
+    ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
 }
 
 /**
@@ -289,14 +340,31 @@ export function displayMessageReferences(
   text: string,
   attachments: Array<{ id: string; name: string }>,
   agentNames: ReadonlyMap<string, string>,
+  options: { fileHeadings: boolean } = { fileHeadings: true },
 ): string {
   const names = new Map(attachments.map((attachment) => [attachment.id, attachment.name]));
   return expandAttachmentReferences(
-    expandChatTagReferences(text, (reference) =>
-      reference.kind === "agent" ? agentNames.get(reference.id) : undefined,
+    expandChatTagReferences(
+      text,
+      (reference) =>
+        reference.kind === "agent"
+          ? agentNames.get(reference.id)
+          : reference.kind === "skill" && options.fileHeadings
+            ? homeSkillTagName(reference.id, reference.name)
+            : undefined,
+      options,
     ),
     (reference) => names.get(reference.attachmentId),
   );
+}
+
+/**
+ * A `$` tag of a skill in `~/.agents/skills` names its `SKILL.md` for the provider, because not every
+ * CLI loads that folder. A person reads the name alone.
+ */
+function homeSkillTagName(id: string, name: string): string | undefined {
+  const slug = homeSkillTagSlug(id);
+  return slug === null ? undefined : `${name} at ${join(homeSkillRoot(), slug, "SKILL.md")}`;
 }
 
 export function agentNamesById(agents: AgentSummary[]): ReadonlyMap<string, string> {

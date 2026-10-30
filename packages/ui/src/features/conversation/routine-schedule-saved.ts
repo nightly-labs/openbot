@@ -22,7 +22,6 @@ export const ROUTINE_SAVED_DRAFT_KINDS = ROUTINE_DRAFT_KINDS.filter((option) => 
 export const ROUTINE_LOCAL_DRAFT_KINDS = ROUTINE_DRAFT_KINDS;
 
 const PROBLEM_TEXT = {
-  endBeforeStart: "routine.problem.endBeforeStart",
   invalidDate: "routine.problem.invalidDate",
   cronRequired: "routine.problem.cronRequired",
   cronTooLong: "routine.problem.cronTooLong",

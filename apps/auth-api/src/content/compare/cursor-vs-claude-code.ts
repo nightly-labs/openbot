@@ -89,7 +89,7 @@ export const CURSOR_VS_CLAUDE_CODE: MatchupComparison = {
   intro:
     "Cursor is an AI code editor from Anysphere, which SpaceX bought in August 2026. Claude Code is Anthropic's coding agent for the terminal, the IDE, the desktop and the web. Both run agents that edit files and run commands, locally or in the cloud, and both read AGENTS.md-style rules, MCP servers, hooks and skills. The difference is the shape of the tool. Cursor is the editor, with many models. Claude Code plugs into the tools you already have, with Claude's models.",
   bothInOpenBot:
-    "OpenBot runs Cursor CLI and Claude Code on your computer, each signed in with your own plan: Cursor CLI with your Cursor plan or a Cursor API key, Claude Code with Claude. Give each one a job. They pass work to each other in a shared channel, and you can follow along from your phone. Move an agent from one to the other and it keeps its role, workspace and conversation.",
+    "OpenBot runs Cursor CLI and Claude Code on your computer, each signed in with your own plan: Cursor CLI with your Cursor plan or a Cursor API key, Claude Code with Claude. Give each one a job. They pass work to each other in a shared channel, and you can follow along from your phone. When one plan hits its limit, the agent can move to a backup model on the other. Move an agent from one to the other and it keeps its role, workspace and conversation.",
   sections: [
     {
       title: "Models and the plans you pay for",

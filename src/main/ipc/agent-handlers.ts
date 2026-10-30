@@ -3,12 +3,17 @@ import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import {
+  BROWSER_SECRET_VAULT_CAPABILITY,
+  BROWSER_SECRET_VAULT_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 // An agent's core surface: status, agents, conversations, the queue and the prompts
 // a turn can raise. Memories, routines and attachments are their own registrars.
 // Every one of these routes to the local service or to a remote server by the
 // `serverId` in the request.
 
 import {
+  type AgentTaskInput,
   analyticsQuery,
   assertAnalyticsScope,
   assertHostAnalyticsScope,
@@ -22,26 +27,44 @@ import {
   decodeSaveAgentProfileResult,
   hostAnalyticsQuery,
   isAgentModelOption,
+  LOCAL_SERVER_ID,
   parseAgentAnalyticsInput,
   parseAskSideQuestion,
-  parseBrowserSecretResponse,
   parseChannelCommand,
   parseChannelRead,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
+  parseLocalBrowserSecretResponse,
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
   parseSetAgentHiddenInput,
+  parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
+  remoteBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_FILES_CAPABILITY,
+  AGENT_THREAD_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import {
+  AGENT_THREAD_READS_CAPABILITY,
+  AGENT_THREAD_READS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_ROUTES,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
@@ -63,9 +86,13 @@ import {
   decodeInstalledSkillsFromHost,
   decodeQueuedMessageReceipt,
   decodeQueueSnapshot,
+  decodeRemoteAgentTask,
+  decodeRemoteAgentTasks,
+  decodeRemoteTaskConversation,
+  decodeRemoteTaskReadState,
   decodeSidebarLayoutSnapshot,
 } from "../remote-agent-decoding";
-import { acceptEmpty, decodeVoid } from "../remote-host-decoding";
+import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
@@ -80,7 +107,9 @@ import {
   parseChannelId,
   parseCreateAgent,
   parseInterrupt,
+  parseMarkAgentTaskRead,
   parseMarkConversationRead,
+  parseMarkConversationUnread,
   parseMessageReaction,
   parseOpenMessageLink,
   parseOptionalAgentId,
@@ -88,6 +117,7 @@ import {
   parsePromptResponse,
   parseQueueEdit,
   parseReadConversationPage,
+  parseRenameAgentTask,
   parseReorderQueue,
   parseRunQueuedMessageAsTask,
   parseSearchConversationFiles,
@@ -106,16 +136,32 @@ import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 /** Its lines also go to the provider log. See `PROVIDER_LOG_PREFIXES`. */
 const modelLogger = createOpenBotLogger("provider-models");
 
+/** A joined server without `agent-tasks-v1`, or a task request that it cannot carry, fails with a reason. */
+function taskRemoteUnsupported(): never {
+  throw new Error(sourceText("error.backend.threadRemoteUnsupported"));
+}
+
+/**
+ * The body of an `agent-tasks-v1` request: the agent, with the task, the text of a start or message, or
+ * both. Only the `agent-thread-files-v1` routes carry `attachmentDraftIds`.
+ */
+interface RemoteTaskBody {
+  agentId: string;
+  taskId?: string;
+  text?: string;
+  attachmentDraftIds?: string[];
+  clientMessageId?: string;
+}
+
+function agentTaskBody(input: AgentTaskInput): AgentTaskInput {
+  return { agentId: input.agentId, taskId: input.taskId };
+}
+
 /**
  * Names each member of a model list that fails `isAgentModelOption`, and returns the list unchanged.
  * The preload refuses the whole list for one such member and has no log of its own, so without this
  * the window shows "Invalid agent model response." and nothing records which model it was.
  */
-/** A joined server has no task route, so a task control there fails with a reason. */
-function taskRemoteUnsupported(): never {
-  throw new Error(sourceText("error.backend.taskRemoteUnsupported"));
-}
-
 function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
   if (!Array.isArray(models)) return models;
   for (const model of models) {
@@ -135,7 +181,7 @@ export interface AgentIpcDependencies {
   host: HostService;
   remoteServers: RemoteServerManager;
   skills: SkillMarketplaceService;
-  messageLinks: Pick<MessageLinkRelay, "open" | "paste" | "cancel">;
+  messageLinks: MessageLinkRelay;
   openExternal: (url: string) => Promise<void>;
 }
 
@@ -148,12 +194,30 @@ export function agentIpcHandlers({
   messageLinks,
   openExternal,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
+  const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
+    if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
+    // `agent-tasks-v1` carries text only; a host with `agent-thread-files-v1` takes files on its own routes.
+    if (body.attachmentDraftIds?.length && !remoteServers.supportsCapability(serverId, AGENT_THREAD_FILES_CAPABILITY))
+      taskRemoteUnsupported();
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  };
+  const remoteThreadRequest = (serverId: string, path: string, body: AgentTaskInput & { title?: string }) => {
+    if (!remoteServers.supportsCapability(serverId, AGENT_THREADS_CAPABILITY)) taskRemoteUnsupported();
+    return runCauseEffect(remoteServers.request(serverId, path, acceptEmpty, { method: "POST", body }));
+  };
   return {
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
         remote: (serverId) =>
           runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)),
+      }),
+      getRuntimeSnapshot: scopedQueryHandler({
+        local: () => service.getRuntimeSnapshot(),
+        remote: async () => {
+          await runCauseEffect(remoteServers.refreshRuntimeSnapshots());
+          return null;
+        },
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
         local: (input) => service.getHostAnalytics(input),
@@ -264,6 +328,15 @@ export function agentIpcHandlers({
           );
         },
       }),
+      // The manager keeps the levels of each server, so the server list shows the level that they set.
+      listAgentNotificationLevels: scopedQueryHandler({
+        local: () => remoteServers.cachedNotificationLevels(LOCAL_SERVER_ID),
+        remote: (serverId) => runCauseEffect(remoteServers.notificationLevels(serverId)),
+      }),
+      setAgentNotificationLevel: scopedHandler(parseSetAgentNotificationLevelInput, {
+        local: (input) => runCauseEffect(remoteServers.setAgentNotificationLevel(LOCAL_SERVER_ID, input)),
+        remote: (input, serverId) => runCauseEffect(remoteServers.setAgentNotificationLevel(serverId, input)),
+      }),
       listAgents: scopedQueryHandler({
         local: () => service.listAgents(),
         remote: (serverId) =>
@@ -346,8 +419,21 @@ export function agentIpcHandlers({
       }),
       askSideQuestion: scopedHandler(parseAskSideQuestion, {
         local: (input) => runCauseEffect(service.askSideQuestion(input)),
-        remote: () => {
-          throw new Error(sourceText("error.agent.sideQuestionLocalOnly"));
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY))
+            throw new Error(sourceText("error.team.sideQuestionUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
+              method: "POST",
+              // The wire fields only, so that a new IPC field does not cross the frozen contract.
+              body: {
+                agentId: input.agentId,
+                question: input.question,
+                earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+              },
+              timeoutMs: 150_000,
+            }),
+          );
         },
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
@@ -371,7 +457,12 @@ export function agentIpcHandlers({
           ),
       }),
       duplicateAgent: scopedHandler(parseAgentId, {
-        local: (agentId) => runCauseEffect(duplicateAgentIntoLayout(service, sidebarLayout, agentId)),
+        local: (agentId) =>
+          runCauseEffect(
+            duplicateAgentIntoLayout(service, sidebarLayout, agentId, undefined, (copyId) =>
+              host.copyAgentAccess(agentId, copyId),
+            ),
+          ),
         remote: (agentId, serverId) => runCauseEffect(remoteServers.duplicateAgent(agentId, serverId)),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
@@ -387,10 +478,19 @@ export function agentIpcHandlers({
           if (input.allowAutomation !== undefined) {
             throw new Error(sourceText("error.agent.automationLocalOnly"));
           }
+          if (input.allowNewChat !== undefined) {
+            throw new Error(sourceText("error.agent.newChatLocalOnly"));
+          }
+          if (input.quickAcknowledgement !== undefined) {
+            throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
+          }
+          if (input.fastMode !== undefined) {
+            throw new Error(sourceText("error.agent.settingsLocalOnly"));
+          }
           if (input.busyMessageMode !== undefined) {
             throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
           }
-          // A server runs tasks only on its own computer: the Team API has no task route.
+          // The released agent route does not carry the task limit; the renderer sends it on `agent-task-limit-v1`.
           if (input.taskLimit !== undefined) {
             throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
           }
@@ -455,19 +555,25 @@ export function agentIpcHandlers({
           await openHttpLink(url, openExternal);
           return null;
         },
-        remote: ({ agentId, url }, serverId) => messageLinks.open(serverId, agentId, url),
+        remote: ({ agentId, url }, serverId) => runCauseEffect(messageLinks.open(serverId, agentId, url)),
       }),
       pasteMessageLink: scopedHandler(parsePasteMessageLink, {
         local: () => Promise.reject(new Error(sourceText("error.mcp.relayEnded"))),
-        remote: ({ url, address }, serverId) => messageLinks.paste(serverId, url, address),
+        remote: ({ url, address }, serverId) => runCauseEffect(messageLinks.paste(serverId, url, address)),
       }),
       cancelMessageLink: scopedHandler(parseCancelMessageLink, {
         local: async () => undefined,
-        remote: ({ url }, serverId) => messageLinks.cancel(serverId, url),
+        remote: ({ url }, serverId) => runCauseEffect(messageLinks.cancel(serverId, url)),
       }),
       searchConversationMessages: scopedHandler(parseSearchConversationMessages, {
         local: (parsed) =>
-          host.searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit),
+          host.searchAgentConversationMessages(
+            parsed.query,
+            parsed.agentId,
+            parsed.cursor,
+            parsed.limit,
+            parsed.includeSideThreads,
+          ),
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.searchAgentConversationMessages(
@@ -490,10 +596,30 @@ export function agentIpcHandlers({
         local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
         remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
       }),
+      markConversationUnread: scopedHandler(parseMarkConversationUnread, {
+        local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
+        remote: () => {
+          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        },
+      }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),
         remote: (input, serverId) => {
-          if (input.taskId) throw new Error(sourceText("error.backend.taskRemoteUnsupported"));
+          if (input.taskId) {
+            const files = input.attachmentDraftIds?.length ? { attachmentDraftIds: input.attachmentDraftIds } : null;
+            return remoteTaskRequest(
+              serverId,
+              files ? AGENT_THREAD_FILES_ROUTES.send : AGENT_TASKS_ROUTES.send,
+              decodeQueuedMessageReceipt,
+              {
+                agentId: input.agentId,
+                taskId: input.taskId,
+                text: input.text,
+                ...files,
+                ...(input.clientMessageId === undefined ? {} : { clientMessageId: input.clientMessageId }),
+              },
+            );
+          }
           return runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
               method: "POST",
@@ -529,34 +655,87 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.backend.agentWaitRemoteUnsupported"));
         },
       }),
-      // Tasks are local only: the Team API has no task route. A joined server shows no task.
+      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task.
       listTasks: scopedHandler(parseAgentId, {
         local: (agentId) => service.listTasks(agentId),
-        remote: (agentId) => ({ agentId, tasks: [], limit: 1 }),
+        remote: (agentId, serverId) =>
+          remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, {
+                  method: "POST",
+                  body: { agentId },
+                }),
+              )
+            : { agentId, tasks: [], limit: 1 },
       }),
       readTask: scopedHandler(parseAgentTask, {
         local: (parsed) => service.readTask(parsed.agentId, parsed.taskId),
-        remote: taskRemoteUnsupported,
+        remote: (parsed, serverId) =>
+          remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
       }),
       startTask: scopedHandler(parseStartAgentTask, {
         local: (input) => runCauseEffect(service.startTask(input, host.conversationSender())),
-        remote: taskRemoteUnsupported,
+        remote: (input, serverId) => {
+          const files = input.attachmentDraftIds?.length ? { attachmentDraftIds: input.attachmentDraftIds } : null;
+          return remoteTaskRequest(
+            serverId,
+            files ? AGENT_THREAD_FILES_ROUTES.start : AGENT_TASKS_ROUTES.start,
+            decodeRemoteAgentTask,
+            {
+              agentId: input.agentId,
+              text: input.text,
+              ...files,
+              ...(input.clientMessageId === undefined ? {} : { clientMessageId: input.clientMessageId }),
+            },
+          );
+        },
       }),
+      // Local only: `agent-tasks-v1` does not move a queued message into a task.
       runQueuedMessageAsTask: scopedHandler(parseRunQueuedMessageAsTask, {
         local: (parsed) => runCauseEffect(service.runQueuedMessageAsTask(parsed)),
         remote: taskRemoteUnsupported,
       }),
       stopTask: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.stopTask(parsed)),
-        remote: taskRemoteUnsupported,
+        remote: (parsed, serverId) =>
+          remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.stop, acceptEmpty, agentTaskBody(parsed)),
       }),
       closeTask: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.closeTask(parsed)),
-        remote: taskRemoteUnsupported,
+        remote: (parsed, serverId) =>
+          remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.close, acceptEmpty, agentTaskBody(parsed)),
       }),
       reopenTask: scopedHandler(parseAgentTask, {
         local: (parsed) => service.reopenTask(parsed),
-        remote: taskRemoteUnsupported,
+        remote: (parsed, serverId) =>
+          remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.reopen, acceptEmpty, agentTaskBody(parsed)),
+      }),
+      // A joined server renames and deletes through `agent-threads-v1`; `agent-tasks-v1` has neither.
+      renameTask: scopedHandler(parseRenameAgentTask, {
+        local: (parsed) => service.renameTask(parsed, parsed.title),
+        remote: (parsed, serverId) =>
+          remoteThreadRequest(serverId, AGENT_THREADS_ROUTES.rename, {
+            agentId: parsed.agentId,
+            taskId: parsed.taskId,
+            title: parsed.title,
+          }),
+      }),
+      deleteTask: scopedHandler(parseAgentTask, {
+        local: (parsed) => runCauseEffect(service.deleteTask(parsed)),
+        remote: (parsed, serverId) => remoteThreadRequest(serverId, AGENT_THREADS_ROUTES.delete, agentTaskBody(parsed)),
+      }),
+      // A joined server keeps the member's read marks through `agent-thread-reads-v1`.
+      markTaskRead: scopedHandler(parseMarkAgentTaskRead, {
+        local: (parsed) => host.markAgentTaskRead(parsed),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_READS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_READS_ROUTES.mark, decodeRemoteTaskReadState, {
+              method: "POST",
+              body: { agentId: parsed.agentId, taskId: parsed.taskId, throughMessageId: parsed.throughMessageId },
+            }),
+          );
+        },
       }),
       acknowledgeFailedTurn: scopedHandler(parseAcknowledgeFailedTurn, {
         local: (parsed) => service.acknowledgeFailedTurn(parsed.agentId, parsed.turnId),
@@ -648,6 +827,19 @@ export function agentIpcHandlers({
           );
         },
       }),
+      // Local only: the Team API has no route, and a joined server's agent shows no context ring.
+      compactContext: scopedHandler(parseAgentId, {
+        local: (agentId) => runCauseEffect(service.compactAgentContext(agentId)),
+        remote: () => {
+          throw new Error(sourceText("error.team.contextCompactUnsupported"));
+        },
+      }),
+      compactTaskContext: scopedHandler(parseAgentTask, {
+        local: (parsed) => runCauseEffect(service.compactTaskContext(parsed)),
+        remote: () => {
+          throw new Error(sourceText("error.team.contextCompactUnsupported"));
+        },
+      }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
         local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
         remote: (parsed, serverId) =>
@@ -668,12 +860,26 @@ export function agentIpcHandlers({
             }),
           ),
       }),
-      respondToBrowserSecret: scopedHandler(parseBrowserSecretResponse, {
+      respondToBrowserSecret: scopedHandler(parseLocalBrowserSecretResponse, {
         local: (parsed) => runCauseEffect(service.respondToBrowserSecret(parsed)),
-        remote: (parsed, serverId) =>
-          runCauseEffect(
-            remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
-          ),
+        remote: (parsed, serverId) => {
+          // A save goes to the Vault of the joined server, on the route that only its owner or an admin can use.
+          if (parsed.decision !== "submit" || !parsed.saveToVault)
+            return runCauseEffect(
+              remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, {
+                method: "POST",
+                body: remoteBrowserSecretResponse(parsed),
+              }),
+            );
+          if (!remoteServers.supportsCapability(serverId, BROWSER_SECRET_VAULT_CAPABILITY))
+            throw new Error(sourceText("error.team.vaultUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, BROWSER_SECRET_VAULT_ROUTES.respond, acceptEmpty, {
+              method: "POST",
+              body: remoteBrowserSecretResponse(parsed),
+            }),
+          );
+        },
       }),
       respondToBrowserTakeover: scopedHandler(parseBrowserTakeoverResponse, {
         local: (parsed) => runCauseEffect(service.respondToBrowserTakeover(parsed)),

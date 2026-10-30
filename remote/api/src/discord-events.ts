@@ -8,10 +8,13 @@
 import {
   DISCORD_ATTACHMENTS_LIMIT,
   DISCORD_CUSTOM_ID_PREFIX,
+  DISCORD_QUOTE_TEXT_LIMIT,
+  DISCORD_ROLES_LIMIT,
   type DiscordDelivery,
   type DiscordInboundAttachment,
   type DiscordInboundInteraction,
   type DiscordInboundMessage,
+  type DiscordInboundQuote,
 } from "@openbot/contracts/signal-protocol/discord-api";
 import {
   GatewayDispatchEvents,
@@ -30,6 +33,24 @@ const DIRECT_REPLY_INTERVAL_MILLISECONDS = 60 * 60_000;
 const MAXIMUM_DIRECT_REPLIES = 10_000;
 const ATTACHMENT_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
 
+type DiscordAttachmentData = {
+  id: string;
+  filename: string;
+  content_type?: string | undefined;
+  size: number;
+  url: string;
+};
+
+/** The text and files of a message, and of a forwarded message in `message_snapshots`. */
+type DiscordBodyData = {
+  content?: string | undefined;
+  attachments?: DiscordAttachmentData[] | undefined;
+  message_reference?: { type?: number | undefined; message_id?: string | undefined } | undefined;
+  message_snapshots?:
+    | { message: { content?: string | undefined; attachments?: DiscordAttachmentData[] | undefined } }[]
+    | undefined;
+};
+
 /** The fields of a Gateway or REST message that Signal reads. */
 export interface DiscordMessageData {
   id: string;
@@ -39,11 +60,17 @@ export interface DiscordMessageData {
   timestamp: string;
   webhook_id?: string;
   author: { id: string; username: string; global_name?: string | null; bot?: boolean };
-  member?: { nick?: string | null };
+  member?: { nick?: string | null; roles?: string[] };
   mentions: { id: string }[];
   message_reference?: { type?: number; message_id?: string };
-  referenced_message?: { id: string; author: { id: string }; message_reference?: { message_id?: string } } | null;
-  attachments: { id: string; filename: string; content_type?: string; size: number; url: string }[];
+  referenced_message?:
+    | (DiscordBodyData & {
+        id: string;
+        timestamp?: string;
+        author: { id: string; username?: string; global_name?: string | null };
+      })
+    | null;
+  attachments: DiscordAttachmentData[];
 }
 
 /** What the Gateway adapter does for one event. */
@@ -62,12 +89,15 @@ interface StoredInteraction {
 }
 
 /** The display name of a message author: the guild nickname, the global name, or the user name. */
-export function discordAuthorName(message: Pick<DiscordMessageData, "author" | "member">): string {
+export function discordAuthorName(message: {
+  author: { username: string; global_name?: string | null | undefined };
+  member?: { nick?: string | null | undefined } | undefined;
+}): string {
   return message.member?.nick ?? message.author.global_name ?? message.author.username;
 }
 
 /** Removes each mention of the bot user: a host does not know the bot user ID. */
-export function stripBotMention(content: string, botUserId: string | null): string {
+function stripBotMention(content: string, botUserId: string | null): string {
   if (!botUserId) return content.trim();
   return content.split(`<@${botUserId}>`).join("").split(`<@!${botUserId}>`).join("").trim();
 }
@@ -89,10 +119,26 @@ function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): 
       messageId: repliedId,
       authorIsBot,
       rootId: authorIsBot ? (referenced?.message_reference?.message_id ?? null) : null,
+      quote: authorIsBot || !referenced ? null : quoteOf(referenced, botUserId),
     };
   }
+  return {
+    id: message.id,
+    channelId: message.channel_id,
+    authorId: message.author.id,
+    authorName: discordAuthorName(message),
+    authorRoleIds: message.member?.roles?.slice(0, DISCORD_ROLES_LIMIT) ?? null,
+    content: stripBotMention(message.content, botUserId),
+    replyTo,
+    attachments: attachmentsOf(message.attachments),
+    sentAt: message.timestamp,
+  };
+}
+
+/** The attachments on Discord's CDN, up to Discord's limit. */
+function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[] {
   const attachments: DiscordInboundAttachment[] = [];
-  for (const attachment of message.attachments) {
+  for (const attachment of list) {
     if (attachments.length >= DISCORD_ATTACHMENTS_LIMIT) break;
     if (!isDiscordCdnUrl(attachment.url)) continue;
     attachments.push({
@@ -103,15 +149,44 @@ function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): 
       url: attachment.url,
     });
   }
+  return attachments;
+}
+
+/**
+ * The text and files of a message. A forward has none of its own: Discord gives the forwarded
+ * message's in its snapshot.
+ */
+export function messageBody(
+  message: DiscordBodyData,
+  botUserId: string | null,
+): { content: string; attachments: DiscordInboundAttachment[]; forwarded: boolean } {
+  const forwarded = message.message_reference?.type === MessageReferenceType.Forward;
+  const body = forwarded ? (message.message_snapshots?.[0]?.message ?? {}) : message;
   return {
-    id: message.id,
-    channelId: message.channel_id,
-    authorId: message.author.id,
-    authorName: discordAuthorName(message),
-    content: stripBotMention(message.content, botUserId),
-    replyTo,
+    content: stripBotMention(body.content ?? "", botUserId),
+    attachments: attachmentsOf(body.attachments ?? []),
+    forwarded,
+  };
+}
+
+/**
+ * The replied-to message of a person, or null when Discord gave neither text nor attachments:
+ * without the Message Content intent, Discord gives them only for a message that mentions the bot.
+ * A forward is kept without them, so that the host can say that its content is not available.
+ */
+function quoteOf(
+  referenced: NonNullable<DiscordMessageData["referenced_message"]>,
+  botUserId: string,
+): DiscordInboundQuote | null {
+  const { content, attachments, forwarded } = messageBody(referenced, botUserId);
+  if ((!content && attachments.length === 0 && !forwarded) || !referenced.timestamp) return null;
+  return {
+    authorId: referenced.author.id,
+    authorName: referenced.author.global_name ?? referenced.author.username ?? referenced.author.id,
+    content: content.slice(0, DISCORD_QUOTE_TEXT_LIMIT),
+    sentAt: referenced.timestamp,
     attachments,
-    sentAt: message.timestamp,
+    forwarded,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   Input,
   RadioGroup,
   Server,
+  StableLabel,
   Text,
   Trash2,
 } from "@openbot/ui";
@@ -60,10 +61,14 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
     format.date(new Date(props.paidThrough), { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
   const dateLabel = () => t("billing.lifecycle.dateUtc", { date: date() });
   const deletesNow = () => props.action === "delete" && props.deletionTiming === "now";
+  // Both deletion timings take the size of the larger text, so the dialog does not move when the timing changes.
+  const timingText = (periodEnd: string, now: string) => (
+    <StableLabel labels={[periodEnd, now]} active={deletesNow() ? 1 : 0} />
+  );
   const confirmLabel = () => {
     if (props.action === "keep") return t("billing.lifecycle.keep");
     if (props.action === "cancel") return t("billing.lifecycle.cancelRenewal");
-    return t(deletesNow() ? "billing.lifecycle.deleteNow" : "billing.lifecycle.schedule");
+    return timingText(t("billing.lifecycle.schedule"), t("billing.lifecycle.deleteNow"));
   };
   const title = () => {
     if (props.action === "keep") return t("billing.lifecycle.keepTitle", { name: props.name });
@@ -74,7 +79,7 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
     if (props.action === "keep")
       return t(props.scheduled ? "billing.lifecycle.keepDescription" : "billing.lifecycle.resumeDescription");
     if (props.action === "cancel") return t("billing.lifecycle.cancelDescription");
-    return t(deletesNow() ? "billing.lifecycle.deleteDescription" : "billing.lifecycle.scheduleDescription");
+    return timingText(t("billing.lifecycle.scheduleDescription"), t("billing.lifecycle.deleteDescription"));
   };
 
   return (
@@ -255,20 +260,18 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
                     : "billing.lifecycle.deletionLabel",
               )}
             </Text>
-            <Text variant="label-sm">{deletesNow() ? t("billing.lifecycle.immediately") : dateLabel()}</Text>
+            <Text variant="label-sm">
+              {props.action === "delete" ? timingText(dateLabel(), t("billing.lifecycle.immediately")) : dateLabel()}
+            </Text>
           </div>
           <div>
             <Text variant="caption" tone="muted">
               {t("billing.lifecycle.billingLabel")}
             </Text>
             <Text variant="label-sm">
-              {t(
-                props.action === "keep"
-                  ? "billing.lifecycle.automatic"
-                  : deletesNow()
-                    ? "billing.lifecycle.noRefund"
-                    : "billing.lifecycle.noRenewal",
-              )}
+              {props.action === "delete"
+                ? timingText(t("billing.lifecycle.noRenewal"), t("billing.lifecycle.noRefund"))
+                : t(props.action === "keep" ? "billing.lifecycle.automatic" : "billing.lifecycle.noRenewal")}
             </Text>
           </div>
         </div>

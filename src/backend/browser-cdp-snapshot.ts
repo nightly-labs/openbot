@@ -23,8 +23,8 @@ const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
 /** How much page text a text wait scans for its needle. */
 const MAX_SCANNED_TEXT = 100_000;
 /**
- * The page text a snapshot returns. Each action returns a fresh snapshot to the model, so this is
- * paid again on every step; the text in the viewport comes first, and a truncated snapshot says so.
+ * The page text a snapshot returns. The model pays for it on each page read; the text in the viewport
+ * comes first, and a truncated snapshot says so.
  */
 const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;
@@ -53,7 +53,7 @@ const ACTIONABLE_ROLES = new Set([
 
 export interface TargetRecord {
   backendNodeId: number;
-  targetId?: string;
+  targetId?: string | undefined;
   element: BrowserElement;
   visibleText: string;
 }
@@ -66,8 +66,8 @@ export interface SnapshotTarget {
 
 export interface SemanticMatch {
   backendNodeId: number;
-  sessionId?: string;
-  targetId?: string;
+  sessionId?: string | undefined;
+  targetId?: string | undefined;
   role: string;
   name: string;
 }
@@ -104,7 +104,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
-    if (remainingElements <= 0) break;
+    if (remainingElements <= 0) continue;
     const candidates =
       capture.sessionId && deadline === undefined
         ? yield* collectActionableNodesEffect(send, capture, remainingElements).pipe(
@@ -137,7 +137,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
       elements.push(element);
       targets.set(ref, {
         backendNodeId: candidate.backendNodeId,
-        targetId: capture.targetId,
+        ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
         element,
         visibleText: candidate.visibleText,
       });
@@ -504,8 +504,8 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
       if (!matched) continue;
       matches.push({
         backendNodeId,
-        sessionId: capture.sessionId,
-        targetId: capture.targetId,
+        ...(capture.sessionId === undefined ? {} : { sessionId: capture.sessionId }),
+        ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
         role,
         name,
       });
@@ -731,10 +731,25 @@ function actionableNodesExpression(limit: number): string {
     const roles = new Set(${JSON.stringify([...ACTIONABLE_ROLES])});
     const roots = [document];
     const seenRoots = new Set();
-    const matches = [];
+    // Controls in the viewport come first: on a long page, the controls above the scroll position
+    // would otherwise fill the budget. Offscreen controls fill what is left.
+    const inView = [];
+    const outside = [];
     let scanned = 0;
+    const isInView = node => {
+      const view = node.ownerDocument.defaultView;
+      const width = view?.innerWidth ?? 0;
+      const height = view?.innerHeight ?? 0;
+      return [...node.getClientRects()].some(rect => rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width);
+    };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
+      // The walk can visit every scanned node, so the cheap tag and role check runs before the style walk.
+      const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
+      const tag = node.localName;
+      const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
+        tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
+      if (!semantic && !roles.has(explicitRole)) return false;
       let element = node;
       while (element) {
         if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
@@ -747,29 +762,27 @@ function actionableNodesExpression(limit: number): string {
           element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
         }
       }
-      const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
-      const tag = node.localName;
-      const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
-        tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
-      if (!semantic && !roles.has(explicitRole)) return false;
       return node.getClientRects().length > 0;
     };
-    while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && matches.length < ${Math.max(0, limit)}) {
+    const limit = ${Math.max(0, limit)};
+    while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
       let node;
-      while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && matches.length < ${Math.max(0, limit)}) {
+      while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;
         if (node.shadowRoot) roots.push(node.shadowRoot);
         if (node.localName === 'iframe' || node.localName === 'frame') {
           try { if (node.contentDocument) roots.push(node.contentDocument); } catch {}
         }
-        if (isCandidate(node)) matches.push(node);
+        if (!isCandidate(node)) continue;
+        if (isInView(node)) inView.push(node);
+        else if (outside.length < limit) outside.push(node);
       }
     }
-    return matches;
+    return [...inView, ...outside].slice(0, limit);
   })()`;
 }
 
@@ -830,4 +843,62 @@ function nodeAttributes(value: unknown): Record<string, string> {
     if (name !== undefined && attribute !== undefined) result[name.toLowerCase()] = attribute;
   }
   return result;
+}
+
+const HIDDEN_SECURITY_CODE = "•••";
+
+/**
+ * Hides the card values that `fill_card` typed from what an agent reads of the page: snapshots, tab
+ * titles and URLs, and the text of a target or a wait. A page can copy a field anywhere, so every
+ * string goes through it. The number stays hidden for the life of the tab. A security code is three
+ * or four digits and also hides prices and dates, so it stays hidden only until the filled document
+ * goes. Logs do not use it: the main process registers the number with the log redaction.
+ */
+export class CardValueScrub {
+  readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
+  #securityCodes = new Map<string, RegExp>();
+
+  add(number: string, securityCode: string): void {
+    const digits = number.replace(/[^0-9]/gu, "");
+    if (digits.length >= 12 && !this.#numbers.has(digits)) {
+      // Pages group the digits with spaces, dashes or dots.
+      this.#numbers.set(digits, {
+        pattern: new RegExp(`(?<![0-9])${[...digits].join("[\\s.\\-]*")}(?![0-9])`, "gu"),
+        replacement: `•••• ${digits.slice(-4)}`,
+      });
+    }
+    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#securityCodes.has(securityCode))
+      this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+  }
+
+  /** The filled document was replaced: its security code is no longer on the page. */
+  endDocument(): void {
+    this.#securityCodes = new Map();
+  }
+
+  get active(): boolean {
+    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+  }
+
+  text(value: string): string {
+    let result = value;
+    for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
+    for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
+    return result;
+  }
+
+  /** Whether `value` names a hidden value. A target or a wait with one would tell the agent the value. */
+  reveals(value: string): boolean {
+    return this.active && this.text(value) !== value;
+  }
+
+  /** A copy of `snapshot` with each string scrubbed, within the serialized size limit. */
+  snapshot(snapshot: BrowserSnapshot): BrowserSnapshot {
+    if (!this.active) return snapshot;
+    const scrubbed: BrowserSnapshot = JSON.parse(JSON.stringify(snapshot), (_key, value: unknown) =>
+      typeof value === "string" ? this.text(value) : value,
+    );
+    boundSerializedSnapshot(scrubbed);
+    return scrubbed;
+  }
 }

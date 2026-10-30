@@ -147,7 +147,8 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
 ) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
-  let destination = "/billing/return";
+  // Only a server plan Checkout has a return token, so the fallback page names that kind.
+  let destination = "/billing/return?kind=plan";
   if (token && bindings.DB && bindings.OPENPANEL_CLIENT_ID && bindings.OPENPANEL_CLIENT_SECRET) {
     const sales = new BillingSales({
       database: bindings.DB,
@@ -165,10 +166,14 @@ const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function
         ),
       )) ?? destination;
   }
+  // Stripe opens this endpoint only as the cancel URL of Checkout. The stored return URL already has
+  // the flag; the fallback page needs it too, so that it does not say that billing changed.
+  const location = new URL(destination, url.origin);
+  location.searchParams.set("cancelled", "1");
   return new Response(null, {
     status: 303,
     headers: {
-      Location: new URL(destination, url.origin).href,
+      Location: location.href,
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
     },
@@ -198,12 +203,13 @@ function tickHostedServers(
       authEvents = delivery;
     },
   });
-  // The cron waits for the analytics sends itself. They never reject.
+  // The cron waits for the analytics sends and server start commands itself. They never reject.
   const sends: Effect.Effect<void>[] = [];
   return Effect.gen(function* () {
     const result = yield* createHostedBilling(bindings, {
       removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
       planChanged: (hostId) => remote.planChanged(hostId),
+      licenseChanged: (userId) => remote.licenseChanged(userId),
       schedule: (send) => sends.push(send),
     }).hosting.tick(now);
     return result;
@@ -254,7 +260,7 @@ function serveLocalHostedSite(
   hostedUrl.port = "";
   return routeHostedSiteRequest(
     new Request(hostedUrl, request),
-    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true" },
+    { SITES: bindings.SITES, SITE_SERVE_ENABLED: "true", ACCOUNT_ORIGIN: configuredOrigin.origin },
     Date.now(),
   );
 }

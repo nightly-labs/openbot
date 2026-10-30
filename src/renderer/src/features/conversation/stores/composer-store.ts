@@ -20,8 +20,13 @@ export interface ComposerStoreDeps {
   seenMessageIds: Set<string>;
 }
 
+/** The agent, or for a channel the channel, that owns the drafts, errors and panels of the view. */
+export function conversationOwnerId(props: ConversationProps): string | undefined {
+  return props.channel?.id ?? props.agent?.id;
+}
+
 export function currentConversationTarget(props: ConversationProps): ConversationTarget | undefined {
-  const agentId = props.agent?.id;
+  const agentId = conversationOwnerId(props);
   return agentId ? { agentId, serverId: props.server?.id ?? "local" } : undefined;
 }
 
@@ -59,7 +64,7 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   });
 
   const markMessageSeen = (messageId: string): boolean => {
-    const key = `${deps.props.agent?.id ?? "none"}:${messageId}`;
+    const key = `${conversationOwnerId(deps.props) ?? "none"}:${messageId}`;
     if (deps.seenMessageIds.has(key)) return false;
     deps.seenMessageIds.add(key);
     return true;

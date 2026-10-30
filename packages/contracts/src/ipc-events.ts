@@ -152,6 +152,18 @@ export interface EventActivity {
   occurredAt: string;
 }
 
+/**
+ * The answer to a test event. The host makes an event that matches the routine's event type and
+ * filters, signs it with the routine secret, and receives it as it receives a relayed request.
+ */
+export interface WebhookTestResult {
+  /** The type of the event that the host sent. */
+  eventType: string;
+  status: "started" | "ignored";
+  reason: WebhookReceiptReason | null;
+  runId: string | null;
+}
+
 function isEventStatus(value: unknown): value is EventStatus {
   return isDynamicRecord(value) && typeof value.supported === "boolean" && typeof value.connected === "boolean";
 }
@@ -275,6 +287,19 @@ export function isEventActivity(value: unknown): value is EventActivity {
   );
 }
 
+function isWebhookTestResult(value: unknown): value is WebhookTestResult {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.eventType) &&
+    (value.status === "started" || value.status === "ignored") &&
+    (value.reason === null ||
+      value.reason === "event-type" ||
+      value.reason === "filter" ||
+      value.reason === "inactive") &&
+    isNullableString(value.runId)
+  );
+}
+
 function decodeList<T>(guard: (value: unknown) => value is T, message: string): (value: unknown) => T[] {
   return (value) => {
     if (!Array.isArray(value) || !value.every(guard)) throw new Error(message);
@@ -294,6 +319,7 @@ export const decodeEventActivity = decodeList(isEventActivity, "Invalid event ac
 export const decodeEventRoutines = decodeList(isEventRoutine, "Invalid event routine response.");
 export const decodeSaveEventRoutineResult = decodeOne(isSaveEventRoutineResult, "Invalid event routine response.");
 export const decodeWebhookSecret = decodeOne(isWebhookSecret, "Invalid webhook secret response.");
+export const decodeWebhookTestResult = decodeOne(isWebhookTestResult, "Invalid webhook test response.");
 function isEventRoutineRun(value: unknown): value is EventRoutineRun {
   return (
     isRoutineRunFields(value) &&

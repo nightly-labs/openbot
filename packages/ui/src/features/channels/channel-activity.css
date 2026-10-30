@@ -14,6 +14,27 @@
   margin-left: calc(-1 * var(--openbot-space-2));
 }
 
+/* Who works, before what the work is. The working rings reach about 10px past a face, so the names
+   start after them rather than under them. Each name takes its agent's message colour. */
+.channel-activity-names {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: var(--openbot-space-2);
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channel-activity-name {
+  color: var(--channel-activity-name-color, var(--openbot-text-muted));
+}
+/* In a narrow pane, long names end in an ellipsis before the short label wraps. */
+.channel-activity-content .agent-activity-label {
+  flex-shrink: 0;
+}
+
 /* Reserve space outside the transcript. Only the panel's padded lower edge sits behind the composer.
    The top edge is pulled over the transcript's own bottom padding, so messages pass behind the glass
    as the reader scrolls while that padding still clears the last one at rest. */

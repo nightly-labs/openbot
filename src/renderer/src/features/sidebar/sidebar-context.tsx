@@ -56,12 +56,17 @@ const Sidebar = createSimpleContext({
         : Promise.resolve(defaultSidebarLayout());
     }
 
-    async function mutateSidebarLayout(action: SidebarLayoutAction): Promise<void> {
+    async function applySidebarLayoutAction(action: SidebarLayoutAction): Promise<SidebarLayoutSnapshot> {
       if (!activeServerSupportsCapability("sidebar-layout")) {
         throw new Error(currentText().t("sidebar.section.layoutUnsupported"));
       }
       const layout = await sidebarPort().agent.mutateSidebarLayout(action);
       setSidebarLayout(layout);
+      return layout;
+    }
+
+    async function mutateSidebarLayout(action: SidebarLayoutAction): Promise<void> {
+      await applySidebarLayoutAction(action);
     }
 
     function reorderSidebarPeople(memberIds: string[]): void {
@@ -81,6 +86,7 @@ const Sidebar = createSimpleContext({
       setSidebarLayout,
       loadLayout,
       mutateSidebarLayout,
+      applySidebarLayoutAction,
       ...preferences,
       sidebarPeopleOrder,
       reorderSidebarPeople,

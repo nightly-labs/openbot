@@ -6,12 +6,32 @@ import type {
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
+import { desktopAnalytics } from "../../../analytics";
 import type { CustomProvidersEndpointApi } from "../custom-providers-port";
 
 interface CustomProvidersState {
   providers: CustomProviderSummary[];
   /** False until the first list arrives, so an empty list is not read as "none saved". */
   loaded: boolean;
+}
+
+/** Runs a change of the list and records its result. The endpoint's name and address are not sent. */
+async function tracked<T>(
+  action: "custom_provider_saved" | "custom_provider_removed",
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    const result = await run();
+    desktopAnalytics.track("provider_action", { action, result: "succeeded" });
+    return result;
+  } catch (error) {
+    desktopAnalytics.track("provider_action", {
+      action,
+      result: "failed",
+      failure_code: action === "custom_provider_saved" ? "update_failed" : "delete_failed",
+    });
+    throw error;
+  }
 }
 
 /**
@@ -57,7 +77,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersEndpointApi
   async function saveCustomProvider(input: SaveCustomProviderInput): Promise<CustomProviderRestart> {
     const group = api();
     if (!group) throw new Error(currentText().t("customProvider.saveUnavailable"));
-    const result = await group.save(input);
+    const result = await tracked("custom_provider_saved", () => group.save(input));
     apply(result.providers);
     return result.restart;
   }
@@ -66,7 +86,8 @@ export function createCustomProvidersStore(api: () => CustomProvidersEndpointApi
   async function updateCustomProvider(input: UpdateCustomProviderInput): Promise<CustomProviderRestart> {
     const group = api();
     if (!group?.update) throw new Error(currentText().t("customProvider.saveUnavailable"));
-    const result = await group.update(input);
+    const update = group.update;
+    const result = await tracked("custom_provider_saved", () => update(input));
     apply(result.providers);
     return result.restart;
   }
@@ -74,7 +95,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersEndpointApi
   async function deleteCustomProvider(id: string): Promise<CustomProviderRestart> {
     const group = api();
     if (!group) throw new Error(currentText().t("customProvider.removeUnavailable"));
-    const result = await group.delete({ id });
+    const result = await tracked("custom_provider_removed", () => group.delete({ id }));
     apply(result.providers);
     return result.restart;
   }

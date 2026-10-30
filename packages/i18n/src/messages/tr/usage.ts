@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Sağlayıcıya göre günlük tahmini maliyet (USD). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
   "usage.chart.tokensDescription":
-    "Sağlayıcıya göre günlük işlenen token'lar. Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
+    "Sağlayıcıya göre günlük token'lar (önbellek okumaları hariç). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
   "usage.chart.costLabel": "Sağlayıcıya göre günlük tahmini maliyet (USD)",
-  "usage.chart.tokensLabel": "Sağlayıcıya göre günlük işlenen token'lar",
+  "usage.chart.tokensLabel": "Sağlayıcıya göre günlük token'lar (önbellek okumaları hariç)",
   "usage.column.cost": "Maliyet",
   "usage.column.share": "Pay",
   "usage.column.tokens": "Token'lar",
@@ -28,7 +28,7 @@ export const messages = {
   "usage.summary": "Kullanım özeti",
   "usage.sessions": { one: "{sessions} oturum", other: "{sessions} oturum" },
   "usage.costEstimate": "API tahmini · USD",
-  "usage.knownTokens": "Bilinen işlenen token'lar",
+  "usage.knownTokens": "Bilinen token'lar (önbellek okumaları hariç)",
   "usage.provider.shareOfCost": "Bilinen maliyetin payı: {share}",
   "usage.provider.shareOfTokens": "Bilinen token'ların payı: {share}",
   "usage.dailyTrend": "Günlük eğilim",
@@ -36,7 +36,8 @@ export const messages = {
   "usage.dailyTokens": "Günlük token'lar",
   "usage.viewDailyData": "Günlük verileri gör",
   "usage.totals.title": "Toplamlar",
-  "usage.totals.processedTokens": "İşlenen token'lar",
+  "usage.totals.tokens": "Önbellek okumaları hariç token'lar",
+  "usage.totals.processedTokens": "İşlenen token'lar (önbellek okumaları dahil)",
   "usage.totals.cachedInput": "Önbelleğe alınan girdi",
   "usage.totals.uncachedInput": "Önbelleğe alınmayan girdi",
   "usage.totals.cacheCreation": "Önbellek oluşturma",
@@ -57,9 +58,12 @@ export const messages = {
   "usage.about.title": "Bu tahminler hakkında",
   "usage.about.body":
     "USD cinsinden API eşdeğeri token maliyeti. Bu bir tahmindir, abonelik ücreti değildir. Ayrı araç ve medya ücretleri hesaplanmaz. Bilinmeyen fiyatlar ve eksik kullanımlar kullanılamaz durumda kalır. Paylar yalnızca bilinen miktarları kullanır; kısmi veriler toplamları olduğundan düşük gösterebilir.",
+  "usage.about.tokens":
+    "Token sayıları önbellek okumalarını içermez. Bir turdaki her model isteği önbellekteki konuşmayı yeniden okur, bu yüzden önbellek okumaları diğer token'ların katları kadar olabilir. Toplamlar bunları “Önbelleğe alınan girdi” olarak gösterir.",
   "usage.panel.label": "Ajan kullanımı",
   "usage.panel.title": "Kullanım",
   "usage.panel.allAgents": "Tüm ajanlar",
+  "usage.panel.workflows": "İş akışları",
   "usage.panel.agents": "Kullanım ajanları",
   "usage.panel.metric": "Kullanım metriği",
   "usage.panel.period": "Kullanım dönemi",

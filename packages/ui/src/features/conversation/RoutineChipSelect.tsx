@@ -7,13 +7,13 @@ interface RoutineChipSelectProps {
   value: string;
   options: RoutineSelectOption[];
   onChange: (value: string) => void;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** Shown in place of the selected option's label, when the chip says more than the menu. */
-  valueLabel?: string;
+  valueLabel?: string | undefined;
   /** A value chip that can cut its label short when the row is too narrow. */
   flexible?: boolean;
   /** The element that holds the list. A select inside a modal popover opens in it, or the popover hides the list. */
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
   /** A pick is complete: the menu closed, or a key chose a value while the menu was closed. */
   onClose?: () => void;
 }
@@ -30,7 +30,7 @@ export function RoutineChipSelect(props: RoutineChipSelectProps) {
       value={selected()}
       optionValue="value"
       optionTextValue="label"
-      disabled={props.disabled}
+      disabled={props.disabled ?? false}
       sameWidth={false}
       placement="bottom-start"
       gutter={6}

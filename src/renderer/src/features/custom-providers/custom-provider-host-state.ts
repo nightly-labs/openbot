@@ -1,12 +1,20 @@
-import type { CustomProviderRestart, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import type {
+  CustomProviderRestart,
+  CustomProviderSummary,
+  SaveCustomProviderInput,
+  UpdateCustomProviderInput,
+} from "@openbot/contracts/ipc";
 import { customAgentRestartKey } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
+import { customProviderUpdate } from "@openbot/ui/features/custom-providers/custom-provider-form";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 import { customProviderRestartMessage } from "./custom-provider-restart";
 
 interface CustomProviderHostState {
-  /** The form that describes a new endpoint. */
+  /** The form that describes a new endpoint, or the saved one in `editing`. */
   open: boolean;
+  /** The saved endpoint that the open form edits. Null for a new endpoint. */
+  editing: CustomProviderSummary | null;
   /** The list of saved endpoints, where one is removed. */
   manageOpen: boolean;
   saving: boolean;
@@ -22,10 +30,14 @@ interface CustomProviderHostOptions {
   /** Absent, or absent for this host's props, leaves the state alone: no note and no error. */
   onAdd?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart> | undefined;
   onDelete?: (id: string) => Promise<CustomProviderRestart> | undefined;
+  /** This computer only: the Team API has no edit route. */
+  onUpdate?: (input: UpdateCustomProviderInput) => Promise<CustomProviderRestart> | undefined;
   /** Onboarding selects the endpoint it has just saved, and its first model with it. */
   onSaved?: (value: SaveCustomProviderInput) => void;
   /** Onboarding drops a model whose endpoint is gone. The saved list is already up to date here. */
   onRemoved?: (id: string) => void;
+  /** Settings drops a default model that the edit took out. */
+  onUpdated?: (input: UpdateCustomProviderInput) => void;
 }
 
 /**
@@ -40,6 +52,7 @@ interface CustomProviderHostOptions {
 export function createCustomProviderHostState(options: CustomProviderHostOptions) {
   const [state, setState] = createStore<CustomProviderHostState>({
     open: false,
+    editing: null,
     manageOpen: false,
     saving: false,
     submitError: null,
@@ -50,6 +63,16 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
   function openForm(): void {
     setState((current) => {
       current.open = true;
+      current.editing = null;
+      current.manageOpen = false;
+      current.submitError = null;
+    });
+  }
+
+  function openEdit(provider: CustomProviderSummary): void {
+    setState((current) => {
+      current.open = true;
+      current.editing = provider;
       current.manageOpen = false;
       current.submitError = null;
     });
@@ -87,12 +110,14 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
       current.note = null;
     });
     try {
-      const restart = await options.onAdd?.(value);
+      const update = state.editing ? customProviderUpdate(value) : null;
+      const restart = update ? await options.onUpdate?.(update) : await options.onAdd?.(value);
       setState((current) => {
         current.open = false;
         current.note = restart ? customProviderRestartMessage("Saved", restart, currentText().t) : null;
       });
-      options.onSaved?.(value);
+      if (update) options.onUpdated?.(update);
+      else options.onSaved?.(value);
     } catch (error) {
       setState((current) => {
         const text = currentText();
@@ -142,5 +167,5 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     });
   }
 
-  return { state, openForm, closeForm, openList, closeList, submit, remove, showSaved };
+  return { state, openForm, openEdit, closeForm, openList, closeList, submit, remove, showSaved };
 }

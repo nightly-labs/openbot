@@ -245,6 +245,7 @@ export class AcpRegistry {
         command: prepared.command,
         args: prepared.args,
         env: Object.entries(prepared.env).map(([name, value]) => ({ name, value })),
+        usagePrompt: old?.usagePrompt ?? null,
       };
       const record: Installed = {
         registryId: entry.id,
@@ -304,6 +305,7 @@ export class AcpRegistry {
             command: old.command,
             args: old.args,
             env: old.envNames.map((name) => ({ name, value: null })),
+            usagePrompt: old.usagePrompt ?? null,
           },
           current,
         );

@@ -28,9 +28,9 @@ Rules:
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
 /** The facts the orchestrator starts with, for the workspace it was added to. */
-export function slackOrchestratorMemories(workspaceName: string): string[] {
+export function slackOrchestratorMemories(): string[] {
   return [
-    `The OpenBot user connected the Slack workspace ${workspaceName}. Its members send me requests.`,
+    "The OpenBot user connected Slack workspaces. Their members send me requests, and each request names its workspace.",
     "In Slack, everyone sees my answers as OpenBot, not as me or my teammates.",
     "A teammate's answer to my send_message request comes back to the same Slack thread as a new turn of mine.",
     "Only a request to one teammate returns to Slack, so I send each request to one teammate.",

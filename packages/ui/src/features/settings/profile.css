@@ -1,0 +1,630 @@
+/* The Profile tab of Settings: the header, the year of activity, and its two dialogs. */
+
+.profile-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-6);
+}
+
+/* ─── Header ─── */
+
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.profile-hero-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(var(--openbot-space-8) * 1.75);
+  aspect-ratio: 1;
+  border-radius: var(--openbot-radius-pill);
+  overflow: hidden;
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-hover);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.profile-hero-avatar > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  outline: 1px solid var(--openbot-image-outline);
+  outline-offset: -1px;
+  border-radius: inherit;
+}
+
+.profile-hero-text {
+  min-width: 0;
+}
+
+.profile-hero-text h3 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  color: var(--openbot-text-primary);
+}
+
+.profile-hero-text p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-secondary);
+}
+
+.profile-hero-actions {
+  display: flex;
+  flex: none;
+  gap: var(--openbot-space-2);
+  margin-inline-start: auto;
+}
+
+/* ─── Cards ─── */
+
+/* The surface of a settings card (`.settings-modal-card`), for content that is not a row list. */
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  padding: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+/* Lists of rows: the rows give the rhythm, as the rows of a settings card do. */
+.profile-card.profile-facts,
+.profile-card.profile-ranking,
+.profile-card.profile-bars {
+  row-gap: 0;
+  padding: var(--openbot-space-1) var(--openbot-space-4);
+}
+
+.profile-activity-placeholder {
+  align-items: flex-start;
+}
+
+.profile-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--openbot-space-4);
+  align-items: start;
+}
+
+.profile-columns > .ui-settings-section {
+  height: 100%;
+  grid-template-rows: auto 1fr;
+}
+
+.profile-facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.profile-facts > div,
+.profile-ranking li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  min-height: calc(var(--openbot-space-8) + var(--openbot-space-3));
+  border-top: 1px solid var(--openbot-border);
+  font-size: var(--openbot-text-sm);
+}
+
+.profile-facts > div:first-child,
+.profile-ranking li:first-child {
+  border-top: 0;
+}
+
+.profile-facts dt {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  transition: color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.profile-facts dd {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.profile-ranking {
+  list-style: none;
+}
+
+.profile-ranking li {
+  justify-content: flex-start;
+  color: var(--openbot-text-primary);
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.profile-ranking-avatar {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+  flex: none;
+}
+
+.profile-ranking-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-ranking strong,
+.profile-bar-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* ─── Bars ─── */
+
+/*
+ * The label column is as wide as the longest model name, up to a limit, so every bar starts at the
+ * same place. A longer name ends with an ellipsis.
+ */
+.profile-bars {
+  display: grid;
+  grid-template-columns: fit-content(45%) 1fr auto;
+  column-gap: var(--openbot-space-4);
+  margin: 0;
+  list-style: none;
+}
+
+.profile-bars li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: calc(var(--openbot-space-8) + var(--openbot-space-1));
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-primary);
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.profile-bar-label {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.profile-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-bar-track {
+  height: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 7%, var(--openbot-transparent));
+  overflow: hidden;
+}
+
+.profile-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.profile-bar-value {
+  text-align: end;
+  color: var(--openbot-text-secondary);
+}
+
+/* ─── Heatmap ─── */
+
+.profile-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+}
+
+.profile-heatmap-months,
+.profile-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--profile-columns), minmax(0, 1fr));
+  column-gap: var(--openbot-space-0-5);
+}
+
+.profile-heatmap-months {
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-muted);
+}
+
+.profile-heatmap-months span {
+  white-space: nowrap;
+}
+
+.profile-heatmap-grid {
+  grid-template-rows: repeat(7, auto);
+  grid-auto-flow: column;
+  row-gap: var(--openbot-space-0-5);
+}
+
+.profile-heat-cell {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--openbot-radius-xs);
+  background: color-mix(in srgb, var(--openbot-text-primary) 7%, var(--openbot-transparent));
+}
+
+.profile-heat-cell[data-empty] {
+  background: var(--openbot-transparent);
+}
+
+.profile-heat-cell[data-level="1"] {
+  background: color-mix(in srgb, var(--openbot-accent) 32%, var(--openbot-transparent));
+}
+
+.profile-heat-cell[data-level="2"] {
+  background: color-mix(in srgb, var(--openbot-accent) 55%, var(--openbot-transparent));
+}
+
+.profile-heat-cell[data-level="3"] {
+  background: color-mix(in srgb, var(--openbot-accent) 78%, var(--openbot-transparent));
+}
+
+.profile-heat-cell[data-level="4"] {
+  background: var(--openbot-accent);
+}
+
+.profile-heatmap-grid .profile-heat-cell[data-active] {
+  outline: 1px solid var(--openbot-text-primary);
+  outline-offset: 1px;
+}
+
+/* One label for the whole year. It is fixed to the viewport, so a card that clips its content
+   does not cut it. In a dialog it mounts in the dialog, above the overlay. */
+.profile-heat-tooltip {
+  position: fixed;
+  z-index: var(--openbot-layer-toast);
+  transform: translate(-50%, calc(-100% - var(--openbot-space-2)));
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: var(--openbot-shadow-raised);
+}
+
+.profile-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-muted);
+}
+
+.profile-heatmap-legend .profile-heat-cell {
+  width: var(--openbot-space-3);
+}
+
+/* ─── Dialogs ─── */
+
+.profile-dialog {
+  width: min(880px, 100%);
+  max-height: calc(100dvh - 2 * var(--openbot-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow: auto;
+  padding: var(--openbot-space-6);
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  border: 1px solid var(--openbot-dialog-ring);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.profile-dialog-header,
+.profile-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.profile-dialog-footer {
+  justify-content: flex-end;
+}
+
+.profile-dialog-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.profile-share-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--openbot-radius-card);
+  box-shadow: var(--openbot-shadow-card);
+}
+
+.profile-share-placeholder {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1200 / 690;
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-surface);
+}
+
+.profile-edit {
+  width: min(440px, 100%);
+}
+
+.profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+.profile-edit-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.profile-edit-photo .profile-edit-photo-trigger {
+  width: calc(var(--openbot-space-8) * 2.5);
+  height: calc(var(--openbot-space-8) * 2.5);
+  overflow: visible;
+}
+
+.profile-edit-photo .profile-edit-avatar {
+  font-size: var(--openbot-text-xl);
+}
+
+.profile-edit-photo-badge {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  display: grid;
+  place-items: center;
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+}
+
+.profile-edit-photo-badge > svg {
+  width: var(--openbot-space-3);
+  height: var(--openbot-space-3);
+}
+
+/* ─── Tiles (last, so that their descendant rules do not override the ones above) ─── */
+
+.profile-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--openbot-space-2);
+  margin: 0;
+}
+
+.profile-tile {
+  --profile-step: calc(var(--openbot-duration-fast) / 3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  transition: background-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.profile-tile dt {
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-secondary);
+}
+
+.profile-tile dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+  margin: 0;
+}
+
+.profile-tile strong {
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--openbot-text-primary);
+}
+
+.profile-tile dd > span {
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-muted);
+}
+
+/* ─── Motion ─── */
+
+/* Colour-only hovers stay for every user. Movement is only for users who allow it. */
+
+.profile-tile:hover {
+  background: linear-gradient(var(--openbot-hover), var(--openbot-hover)), var(--openbot-bg-surface);
+}
+
+.profile-tile-value {
+  white-space: pre;
+}
+
+.profile-tile .profile-tile-value.is-animating .t-digit {
+  animation-delay: calc(
+    var(--profile-i, 0) *
+    var(--profile-step) *
+    1.5 +
+    var(--profile-c, 0) *
+    var(--profile-step) /
+    2
+  );
+}
+
+.profile-facts > div:hover dt {
+  color: var(--openbot-text-primary);
+}
+
+/* The row under the pointer stays bright; the other rows step back. */
+.profile-ranking:hover li:not(:hover),
+.profile-bars:hover li:not(:hover) {
+  opacity: 0.45;
+}
+
+.profile-bars li:hover .profile-bar-value {
+  color: var(--openbot-text-primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .profile-panel {
+    --profile-step: calc(var(--openbot-duration-fast) / 3);
+  }
+
+  /* The page builds from the top: each block rises one step after the block above it. */
+  .profile-panel > * {
+    animation: profile-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+  }
+
+  .profile-panel > :nth-child(2) {
+    animation-delay: var(--profile-step);
+  }
+
+  .profile-panel > :nth-child(3) {
+    animation-delay: calc(var(--profile-step) * 2);
+  }
+
+  .profile-panel > :nth-child(4) {
+    animation-delay: calc(var(--profile-step) * 3);
+  }
+
+  .profile-panel > :nth-child(n + 5) {
+    animation-delay: calc(var(--profile-step) * 4);
+  }
+
+  .profile-hero-avatar {
+    animation: profile-pop var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+  }
+
+  .profile-tile {
+    transition:
+      background-color var(--openbot-duration-normal) var(--openbot-ease-out),
+      transform var(--openbot-duration-normal) var(--openbot-ease-out);
+  }
+
+  .profile-tile:hover {
+    transform: translateY(calc(var(--openbot-space-0-5) * -1));
+  }
+
+  /* The year fills in as a wave from the oldest week to this week. */
+  .profile-heatmap-grid .profile-heat-cell {
+    animation: profile-cell-in var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
+    animation-delay: calc(var(--profile-col, 0) * var(--openbot-duration-fast) / 15);
+    transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+  }
+
+  .profile-heatmap-grid .profile-heat-cell[data-active] {
+    position: relative;
+    z-index: 1;
+    transform: scale(1.35);
+  }
+
+  /* The label fades in once, then glides from day to day. */
+  .profile-heat-tooltip {
+    animation: profile-tip-in var(--openbot-duration-normal) var(--openbot-ease-out) backwards;
+    transition:
+      left var(--openbot-duration-fast) var(--openbot-ease-out),
+      top var(--openbot-duration-fast) var(--openbot-ease-out);
+  }
+
+  .profile-ranking li {
+    animation: profile-slide-in var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+    animation-delay: calc(var(--openbot-duration-slow) + var(--profile-i, 0) * var(--profile-step));
+  }
+
+  .profile-ranking-avatar {
+    transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+  }
+
+  .profile-ranking li:hover .profile-ranking-avatar {
+    transform: scale(1.12) rotate(-6deg);
+  }
+
+  .profile-bar-fill {
+    transform-origin: left center;
+    animation: profile-grow calc(var(--openbot-duration-overlay) * 2.5) var(--openbot-ease-out) backwards;
+    animation-delay: calc(var(--openbot-duration-overlay) + var(--profile-i, 0) * var(--profile-step) * 2);
+  }
+
+  .profile-hero-actions svg {
+    transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+  }
+
+  .profile-hero-actions button:hover .profile-icon-share {
+    transform: translateY(calc(var(--openbot-space-0-5) * -1));
+  }
+
+  .profile-hero-actions button:hover .profile-icon-edit {
+    transform: rotate(-14deg);
+  }
+}
+
+@keyframes profile-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--openbot-space-2));
+  }
+}
+
+@keyframes profile-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes profile-cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@keyframes profile-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - var(--openbot-space-1)));
+  }
+}
+
+@keyframes profile-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--openbot-space-2) * -1));
+  }
+}
+
+@keyframes profile-grow {
+  from {
+    transform: scaleX(0);
+  }
+}

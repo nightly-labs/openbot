@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -28,7 +28,6 @@ export function QueuedMessageEditScreen() {
   const { t } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
-  const navigation = useNavigation();
   const held = queue?.edit?.delivery ?? null;
   const delivery = held?.id === deliveryId ? held : queue?.queued.find((item) => item.id === deliveryId);
   const edit = queue?.edit ?? null;
@@ -95,8 +94,8 @@ export function QueuedMessageEditScreen() {
     },
     [queue, exitAfter],
   );
-  usePreventRemove(Boolean(edit) && !leaving, ({ data }) => {
-    const go = () => navigation.dispatch(data.action);
+  usePreventRemove(Boolean(edit) && !leaving, ({ repeat }) => {
+    const go = repeat;
     const release = () =>
       releaseThenExit(go, () => {
         void haptics.notification("error");

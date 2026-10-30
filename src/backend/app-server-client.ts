@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber } from "effect";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
@@ -64,6 +65,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #ending: Fiber.Fiber<void> | null = null;
   #nextId = 1;
   #stopping = false;
+  #probing = false;
 
   /** Added to the inherited environment, such as the `CODEX_HOME` of an account after the first. */
   readonly #extraEnv: Readonly<Record<string, string>> | undefined;
@@ -159,6 +161,24 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   });
 
   /**
+   * Moves a replaced thread out of the list that the Codex app and ChatGPT show. Without this, each
+   * replacement session adds a row that starts with the OpenBot handoff to the user's own Codex
+   * history.
+   *
+   * `thread/archive` moves the rollout to `archived_sessions` and unloads the thread when it is
+   * loaded. `thread/turns/list` and `thread/items/list` still read it, so a history import works,
+   * and a resume unarchives it first (`ThreadLifecycle.resumeThread`). A thread that is already
+   * archived, or that has no rollout, answers `no rollout found`.
+   */
+  readonly archiveThread = Effect.fn("CodexAppServer.archiveThread")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    if (!this.running) return;
+    yield* this.request("thread/archive", { threadId }, decodeRecordResponse);
+  });
+
+  /**
    * Reads Codex history without asking the app server for the legacy full thread snapshot.
    *
    * The app server returns turns newest first. Items are read one turn at a time in ascending
@@ -248,6 +268,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     timeoutMs = this.#requestTimeoutMs,
   ) {
     const id = this.#nextId++;
+    const child = this.#process;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
       this.#pending.set(id, {
         resolve: (value) =>
@@ -273,7 +294,11 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       Effect.timeoutOrElse({
         duration: timeoutMs,
         orElse: () =>
-          Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+          Effect.sync(() => this.#checkAnswering(child, timeoutMs)).pipe(
+            Effect.andThen(
+              Effect.fail(new ProviderClientOperationError({ cause: new RequestTimeoutError("Codex", method) })),
+            ),
+          ),
       }),
       Effect.ensuring(Effect.sync(() => this.#pending.delete(id))),
     );
@@ -366,6 +391,37 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       this.#toolRequests.delete(id);
       request.controller.abort();
     }
+  }
+
+  /**
+   * Ends a process that stopped answering, so the runtime starts a new one as it does after an exit.
+   * Without this a hung app server stays the shared client, and the requests of every agent time out
+   * until the user kills it.
+   *
+   * One request that timed out is not enough: `account/rateLimits/read` waits on the network. So one
+   * `config/read` probes the process. That request is local, and every thread start needs it. A
+   * process that does not answer it in the request timeout is ended, also when it still sends events:
+   * it takes no new work. A request with a shorter timeout, such as a `model/list` that may be slow,
+   * starts no probe.
+   */
+  #checkAnswering(child: ChildProcessWithoutNullStreams | null, timeoutMs: number): void {
+    if (this.#probing || !child || this.#process !== child || timeoutMs < this.#requestTimeoutMs) return;
+    this.#probing = true;
+    Effect.runFork(
+      this.request("config/read", { includeLayers: false }, decodeRecordResponse).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            if (this.#process !== child || !(failure.cause instanceof RequestTimeoutError)) return;
+            this.#fail(new Error(sourceText("error.provider.codexUnresponsive")), child);
+          }),
+        ),
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#probing = false;
+          }),
+        ),
+      ),
+    );
   }
 
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {

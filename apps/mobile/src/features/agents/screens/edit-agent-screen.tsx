@@ -8,7 +8,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -21,7 +21,7 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
-import { AgentNewChatSection, AgentNotificationsRow } from "@/features/agents/components/agent-chat-settings";
+import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
 import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
@@ -29,7 +29,9 @@ import { AgentPublish } from "@/features/agents/components/agent-publish";
 import { AgentRuntimeFields, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
 import { AgentSessionSettingsSection } from "@/features/agents/components/agent-session-settings";
 import { AgentSharedTables } from "@/features/agents/components/agent-shared-tables";
+import { AgentTasksRow } from "@/features/agents/components/agent-tasks-row";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
+import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import {
   type MobileAgent,
@@ -107,16 +109,18 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
   // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
   const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
-  const showNotifications = agent.notifications !== undefined;
+  // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
+  // is the one place that changes notifications, so the agent has no switch of its own here.
+  const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
     Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
-  const navigation = useNavigation();
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -158,16 +162,21 @@ function AgentForm({
     (Boolean(name.trim()) &&
       name.length <= INPUT_LIMITS.agentName &&
       title.length <= INPUT_LIMITS.agentTitle &&
-      description.length <= INPUT_LIMITS.agentDescription);
+      !instructionsTooLong(description));
 
-  usePreventRemove(dirty || saving || pickingPhoto, ({ data }) => {
+  // Discard turns prevention off before it repeats the action, so the hook does not warn.
+  const [discarding, setDiscarding] = useState(false);
+  usePreventRemove(!discarding && (dirty || saving || pickingPhoto), ({ repeat }) => {
     if (pending.current || pickingPhoto) return;
     Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
       { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
       {
         text: t("mobile.agent.discard.discard"),
         style: "destructive",
-        onPress: () => navigation.dispatch(data.action),
+        onPress: () => {
+          setDiscarding(true);
+          repeat();
+        },
       },
     ]);
   });
@@ -317,11 +326,11 @@ function AgentForm({
             appearance="soft"
             placeholder={t("mobile.agent.edit.instructionsPlaceholder")}
             multiline
-            maxLength={INPUT_LIMITS.agentDescription}
             value={description}
             editable={!saving}
             onChangeText={(value) => change({ description: value })}
           />
+          <InstructionsLimit text={description} />
         </>
       ) : null}
       {page === "appearance" ? (
@@ -346,6 +355,7 @@ function AgentForm({
           available={available}
           saving={saving}
           provider={provider}
+          foreignProvider={edits.provider === undefined ? agent.foreignProvider : undefined}
           model={edits.model ?? agent.model}
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           accounts={providerAccounts}
@@ -468,6 +478,7 @@ function AgentForm({
             ) : null}
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.does")}>
+            <AgentTasksRow agent={agent} />
             <SettingsRow
               onPress={() =>
                 router.push({
@@ -504,10 +515,10 @@ function AgentForm({
           {host && canAdministerServer(host.role) ? (
             <AgentSessionSettingsSection key={`${agent.serverId}:${agent.id}`} agent={agent} available={available} />
           ) : null}
-          {showPermissions || showNotifications || showAdvanced ? (
+          {showPermissions || showNotificationLevel || showAdvanced ? (
             <SettingsSection
               title={t("mobile.agent.groups.rules")}
-              footer={showNotifications ? t("mobile.agent.notifications.footer") : undefined}
+              footer={showNotificationLevel ? t("mobile.agent.notificationLevel.footer") : undefined}
             >
               {showPermissions ? (
                 <SettingsRow
@@ -522,7 +533,7 @@ function AgentForm({
                   <Typography.Paragraph>{t("mobile.agent.permissions.title")}</Typography.Paragraph>
                 </SettingsRow>
               ) : null}
-              {showNotifications ? <AgentNotificationsRow agent={agent} available={available} /> : null}
+              {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} /> : null}
               {showAdvanced ? (
                 <SettingsRow
                   onPress={() =>

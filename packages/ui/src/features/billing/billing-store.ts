@@ -38,62 +38,30 @@ export function createBillingStore(calls: () => BillingCalls | undefined, isActi
     pending: null,
     billing: null,
   });
-  let reloadRequested = false;
-  let loadPromise: Promise<void> | null = null;
-
-  function load(): Promise<void> {
-    if (!calls()) return Promise.resolve();
-    reloadRequested = true;
-    if (loadPromise) return loadPromise;
-    loadPromise = Promise.resolve().then(async () => {
+  const load = createStripeReturnLoad({
+    available: () => calls() !== undefined,
+    isActive,
+    setLoading: (loading) =>
+      setState((draft) => {
+        draft.loading = loading;
+        if (loading) draft.error = null;
+      }),
+    loadOnce: async () => {
       try {
-        while (reloadRequested) {
-          reloadRequested = false;
-          setState((draft) => {
-            draft.loading = true;
-            draft.error = null;
-          });
-          try {
-            const api = calls();
-            if (api) {
-              const billing = await api.getState();
-              setState((draft) => {
-                draft.billing = billing;
-              });
-            }
-          } catch (error) {
-            setState((draft) => {
-              const text = currentText();
-              draft.error = text.errorMessage(error, text.t("billing.loadFailed"));
-            });
-          }
-        }
-      } finally {
-        loadPromise = null;
+        const api = calls();
+        if (!api) return;
+        const billing = await api.getState();
         setState((draft) => {
-          draft.loading = false;
+          draft.billing = billing;
+        });
+      } catch (error) {
+        setState((draft) => {
+          const text = currentText();
+          draft.error = text.errorMessage(error, text.t("billing.loadFailed"));
         });
       }
-    });
-    return loadPromise;
-  }
-
-  createEffect(
-    () => isActive() && calls() !== undefined,
-    (shouldLoad) => {
-      if (!shouldLoad) return;
-      untrack(() => void load());
-      const reload = () => {
-        if (document.visibilityState !== "hidden") void load();
-      };
-      window.addEventListener("focus", reload);
-      document.addEventListener("visibilitychange", reload);
-      return () => {
-        window.removeEventListener("focus", reload);
-        document.removeEventListener("visibilitychange", reload);
-      };
     },
-  );
+  });
 
   async function openPortal(request: BillingPortalRequest): Promise<void> {
     const api = calls();
@@ -122,3 +90,57 @@ export function createBillingStore(calls: () => BillingCalls | undefined, isActi
 }
 
 export type BillingStore = ReturnType<typeof createBillingStore>;
+
+/**
+ * The load loop of a panel that a Stripe page changes. It loads when the panel shows, and again on
+ * window focus while it shows, because the Stripe page is in another window or tab and the webhook can
+ * arrive after the reader comes back. A load that is asked for during a load runs once after it.
+ */
+export function createStripeReturnLoad(options: {
+  available: () => boolean;
+  isActive: () => boolean;
+  setLoading: (loading: boolean) => void;
+  /** One load. It records its own result and its own failure. */
+  loadOnce: () => Promise<void>;
+}): () => Promise<void> {
+  let reloadRequested = false;
+  let loadPromise: Promise<void> | null = null;
+
+  function load(): Promise<void> {
+    if (!options.available()) return Promise.resolve();
+    reloadRequested = true;
+    if (loadPromise) return loadPromise;
+    loadPromise = Promise.resolve().then(async () => {
+      try {
+        while (reloadRequested) {
+          reloadRequested = false;
+          options.setLoading(true);
+          await options.loadOnce();
+        }
+      } finally {
+        loadPromise = null;
+        options.setLoading(false);
+      }
+    });
+    return loadPromise;
+  }
+
+  createEffect(
+    () => options.isActive() && options.available(),
+    (shouldLoad) => {
+      if (!shouldLoad) return;
+      untrack(() => void load());
+      const reload = () => {
+        if (document.visibilityState !== "hidden") void load();
+      };
+      window.addEventListener("focus", reload);
+      document.addEventListener("visibilitychange", reload);
+      return () => {
+        window.removeEventListener("focus", reload);
+        document.removeEventListener("visibilitychange", reload);
+      };
+    },
+  );
+
+  return load;
+}

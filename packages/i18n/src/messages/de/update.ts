@@ -16,6 +16,7 @@ export const messages = {
   "update.provider.checking": "Updates für {name} werden gesucht",
   "update.provider.available": "Update für {name} verfügbar",
   "update.provider.updating": "{name} wird aktualisiert",
+  "update.provider.waiting": "Update von {name} wartet",
   "update.provider.failed": "Update für {name} fehlgeschlagen",
   "update.provider.settingUp": "Wird eingerichtet",
   "update.provider.failedRetry": "Das Update ist fehlgeschlagen. Versuche es erneut.",
@@ -61,5 +62,6 @@ export const messages = {
   "update.whatsNew.empty.body":
     "Für diese Version gibt es hier keine Hinweise. Das vollständige Änderungsprotokoll zeigt alle Änderungen.",
   "update.whatsNew.changelog": "Alle Änderungen",
+  "update.whatsNew.changelogFailed": "OpenBot konnte das Änderungsprotokoll nicht öffnen.",
   "update.whatsNew.done": "Verstanden",
 } as const satisfies PartialTranslation<typeof source>;

@@ -13,13 +13,13 @@ export const messages = {
   "remoteDesktop.disconnect": "Bağlantıyı kes",
   "remoteDesktop.viewerTitle": "Sunshine uzak masaüstü",
   "remoteDesktop.viewerLoadFailed": "Moonlight görüntüleyicisi yüklenemedi.",
-  "remoteDesktop.streamNotReady": "Ana makine akışı başlatmadı. Sunshine ana makinede durmuş olabilir. Tekrar deneyin.",
-  "remoteDesktop.hostOfflineTitle": "Ana makine çevrim dışı",
-  "remoteDesktop.hostOfflineMessage": "Masaüstünü açmadan önce ana makineye yeniden bağlanın.",
+  "remoteDesktop.streamNotReady": "Sunucu akışı başlatmadı. Sunshine sunucuda durmuş olabilir. Tekrar deneyin.",
+  "remoteDesktop.hostOfflineTitle": "Sunucu çevrim dışı",
+  "remoteDesktop.hostOfflineMessage": "Masaüstünü açmadan önce sunucuya yeniden bağlanın.",
   "remoteDesktop.openFailed": "Masaüstü açılamadı",
   "remoteDesktop.notSharingTitle": "{name} ekranını paylaşmıyor",
   "remoteDesktop.notSharingDescription":
-    "Ana makine OpenBot'un ekranını kaydetmesini engelliyor. O bilgisayarda Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı bölümünü açın, OpenBot'u etkinleştirin ve burada tekrar deneyin.",
+    "Sunucu OpenBot'un ekranını kaydetmesini engelliyor. O sunucuda Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı bölümünü açın, OpenBot'u etkinleştirin ve burada tekrar deneyin.",
   "remoteDesktop.setup.check.screenRecording": "Ekran Kaydı",
   "remoteDesktop.setup.check.accessibility": "Erişilebilirlik",
   "remoteDesktop.setup.check.service": "Sunshine hizmeti",
@@ -40,7 +40,7 @@ export const messages = {
   "remoteDesktop.setup.startFailed": "Uzak masaüstü testi başlatılamadı.",
   "remoteDesktop.setup.connectionLost": "Test bağlantısı kesildi.",
   "remoteDesktop.setup.hostUpdateRequired":
-    "İzinleri kontrol etmek ve uzak masaüstünü test etmek için ana makinedeki OpenBot'u güncelleyin.",
+    "İzinleri kontrol etmek ve uzak masaüstünü test etmek için sunucudaki OpenBot'u güncelleyin.",
   "remoteDesktop.setup.permissions": "İzinler",
   "remoteDesktop.setup.checked": "Denetlendi",
   "remoteDesktop.setup.checkAgain": "Tekrar denetle",
@@ -54,7 +54,7 @@ export const messages = {
   "remoteDesktop.setup.liveTest": "Canlı bağlantı testi",
   "remoteDesktop.setup.liveTestLocal": "Bu Mac'te görüntüyü, fareyi ve klavyeyi test edin.",
   "remoteDesktop.setup.liveTestRemote":
-    "Test, ana makinede geçici bir panel açar. Önce diğer uzak oturumlar sonlandırılmalıdır. Girdi panelin içinde kalır.",
+    "Test, sunucuda geçici bir panel açar. Önce diğer uzak oturumlar sonlandırılmalıdır. Girdi panelin içinde kalır.",
   "remoteDesktop.setup.testSummary": "Video: {video} · Görüntü: {picture} · Fare: {mouse} · Klavye: {keyboard}",
   "remoteDesktop.setup.received": "alındı",
   "remoteDesktop.setup.notReceived": "alınmadı",
@@ -66,7 +66,7 @@ export const messages = {
   "remoteDesktop.setup.testRemote": "Uzak masaüstünü test et",
   "remoteDesktop.setup.videoFailed": "Test video bağlantısı başarısız oldu.",
   "remoteDesktop.setup.inputInstructions":
-    "Ana makine hedefine tıklayın, ardından {code} yazın. Fare: {mouse}. Klavye: {keyboard}.",
+    "Test panelindeki hedefe tıklayın, ardından {code} yazın. Fare: {mouse}. Klavye: {keyboard}.",
   "remoteDesktop.setup.videoOnly":
     "Yalnızca video testi. Fare ve klavye testi, güncellenmiş Sunshine çalışma zamanını gerektirir.",
   "remoteDesktop.setup.pictureConfirmed": "Görüntü onaylandı",

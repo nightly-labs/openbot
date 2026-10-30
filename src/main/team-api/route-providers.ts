@@ -1,10 +1,24 @@
 import {
   agentProviderName,
+  isKeyOnlyProvider,
   isManagedRuntimeProvider,
+  MANAGED_RUNTIME_PROVIDERS,
+  MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
-import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import {
+  type CustomProviderModel,
+  type CustomProviderResult,
+  type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  type ProviderRuntimeSnapshot,
+  type ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import {
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -26,6 +40,7 @@ import {
   PROVIDERS_V5_ROUTES,
   PROVIDERS_V5_RUNTIME_PROVIDERS,
 } from "@openbot/contracts/team-protocol/providers-v5";
+import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText, registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -35,6 +50,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
+import { isObject } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -47,8 +63,8 @@ const RUNTIME_MESSAGE_LIMIT = 1024;
  * The providers of this computer, managed from a joined server: sign-in with a device code, provider
  * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`, by
  * `providers-v2` for the runtime routes that include Gemini, by `providers-v3` for the Claude
- * and Grok sign-in on another device, and by `providers-v4` for the runtimes and sign-in of Cursor
- * and Cline.
+ * and Grok sign-in on another device, by `providers-v4` for the runtimes and sign-in of Cursor
+ * and Cline, and by `providers-v8`, which names a provider by any id and lists the runtimes as rows.
  *
  * `requireAdmin` runs on every route. A key or a header value only arrives here; no response
  * carries one, and no error message quotes the request.
@@ -60,15 +76,19 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  const capability = V5_ROUTES.has(url.pathname)
-    ? PROVIDERS_V5_CAPABILITY
-    : V4_ROUTES.has(url.pathname)
-      ? PROVIDERS_V4_CAPABILITY
-      : V3_ROUTES.has(url.pathname)
-        ? PROVIDERS_SIGN_IN_V3_CAPABILITY
-        : V2_ROUTES.has(url.pathname)
-          ? PROVIDERS_RUNTIMES_V2_CAPABILITY
-          : PROVIDERS_ADMIN_CAPABILITY;
+  const capability = HARNESS_ROUTES.has(url.pathname)
+    ? CUSTOM_PROVIDER_HARNESS_CAPABILITY
+    : V8_ROUTES.has(url.pathname)
+      ? PROVIDERS_V8_CAPABILITY
+      : V5_ROUTES.has(url.pathname)
+        ? PROVIDERS_V5_CAPABILITY
+        : V4_ROUTES.has(url.pathname)
+          ? PROVIDERS_V4_CAPABILITY
+          : V3_ROUTES.has(url.pathname)
+            ? PROVIDERS_SIGN_IN_V3_CAPABILITY
+            : V2_ROUTES.has(url.pathname)
+              ? PROVIDERS_RUNTIMES_V2_CAPABILITY
+              : PROVIDERS_ADMIN_CAPABILITY;
   if (!providers || !capabilities.has(capability))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
@@ -101,6 +121,27 @@ export async function routeProviders(
       case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginCancel:
         await runCauseEffect(service.cancelProviderCodeLogin(parsed(signInProvider, body)));
         return json(200, {});
+      // A provider id that this host does not know gets a 400. The sign-in service refuses a known
+      // provider that has no code sign-in.
+      case PROVIDERS_V8_ROUTES.codeLoginStart:
+        return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(hostProvider, body))));
+      case PROVIDERS_V8_ROUTES.codeLoginSubmit: {
+        // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
+        const input = parsed(codeSubmitInputV8, body);
+        service.submitProviderCodeLogin(input.provider, input.code);
+        return json(200, {});
+      }
+      case PROVIDERS_V8_ROUTES.codeLoginCancel:
+        await runCauseEffect(service.cancelProviderCodeLogin(parsed(hostProvider, body)));
+        return json(200, {});
+      case PROVIDERS_V8_ROUTES.runtimesStatus:
+        return json(200, wireSnapshotV8(runtimes.getStatus()));
+      case PROVIDERS_V8_ROUTES.runtimesDownload:
+        return json(200, wireSnapshotV8(await runCauseEffect(runtimes.download(parsed(managedProviderV8, body)))));
+      case PROVIDERS_V8_ROUTES.runtimesCancel:
+        return json(200, wireSnapshotV8(await runCauseEffect(runtimes.cancel(parsed(managedProviderV8, body)))));
+      case PROVIDERS_V8_ROUTES.runtimesCheck:
+        return json(200, wireSnapshotV8(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_V5_ROUTES.codeLoginStart:
       case PROVIDERS_V4_ROUTES.codeLoginStart:
         return json(200, await runCauseEffect(service.startProviderCodeLogin(parsed(signInProviderV4, body))));
@@ -131,33 +172,52 @@ export async function routeProviders(
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.cancel(parsed(managedProviderV4, body)))));
       case PROVIDERS_V4_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV4(await runCauseEffect(runtimes.checkForUpdates())));
+      case PROVIDERS_V8_ROUTES.apiKeyState:
       case PROVIDERS_V5_ROUTES.apiKeyState:
       case PROVIDERS_ADMIN_ROUTES.apiKeyState:
         return json(200, {
-          status: credentials.status(parsed(V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider, body)),
+          status: credentials.status(
+            parsed(
+              V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
+              body,
+            ),
+          ),
         });
+      case PROVIDERS_V8_ROUTES.apiKeySet:
       case PROVIDERS_V5_ROUTES.apiKeySet:
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {
-        const input = parsed(V5_ROUTES.has(url.pathname) ? parseProviderApiKeyInput : wireApiKeyInput, body);
-        // The same step as the local handler: the key and the process that uses it change together.
-        await runCauseEffect(
-          service.changeProviderCredential(input.provider, () =>
-            credentials
-              .set(input.provider, input.key)
-              .pipe(
-                Effect.mapError(
-                  (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
-                ),
-              ),
-          ),
+        const input = parsed(
+          V8_ROUTES.has(url.pathname)
+            ? parseProviderApiKeyInput
+            : V5_ROUTES.has(url.pathname)
+              ? peerApiKeyInput
+              : wireApiKeyInput,
+          body,
         );
+        const save = () =>
+          credentials
+            .set(input.provider, input.key)
+            .pipe(
+              Effect.mapError(
+                (error) => new AgentLifecycleFailed({ operation: "changeProviderCredential", cause: error.cause }),
+              ),
+            );
+        // A key-only provider runs on Pi. The download outlasts the request, so the route only starts it.
+        // Until Pi is ready no process uses the key, so only the key changes; Pi then starts the provider.
+        const piPending = await runCauseEffect(runtimes.startKeyProviderCli(input.provider));
+        // Otherwise the same step as the local handler: the key and the process that uses it change together.
+        await runCauseEffect(piPending ? save() : service.changeProviderCredential(input.provider, save));
         return json(200, {});
       }
+      case PROVIDERS_V8_ROUTES.apiKeyClear:
       case PROVIDERS_V5_ROUTES.apiKeyClear:
       case PROVIDERS_ADMIN_ROUTES.apiKeyClear: {
-        const id = parsed(V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider, body);
+        const id = parsed(
+          V8_ROUTES.has(url.pathname) ? keyProviderV8 : V5_ROUTES.has(url.pathname) ? managedProviderV5 : provider,
+          body,
+        );
         await runCauseEffect(
-          service.changeProviderCredential(id, () =>
+          service.clearProviderCredential(id, () =>
             credentials
               .clear(id)
               .pipe(
@@ -186,11 +246,24 @@ export async function routeProviders(
       case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCheck:
         return json(200, wireSnapshotV2(await runCauseEffect(runtimes.checkForUpdates())));
       case PROVIDERS_ADMIN_ROUTES.customList:
-        return json(200, customProviders.list());
+        return json(200, customProviders.list().map(wireCustomProvider));
+      case CUSTOM_PROVIDER_HARNESS_ROUTES.customList:
+        return json(200, customProviders.list().map(wireHarnessCustomProvider));
       case PROVIDERS_ADMIN_ROUTES.customSave:
-        return json(200, await runCauseEffect(customProviders.save(parsed(parseSaveCustomProvider, body))));
+      case CUSTOM_PROVIDER_HARNESS_ROUTES.customSave: {
+        const result = await runCauseEffect(
+          customProviders.save(parsed(parseSaveCustomProvider, releasedSaveBody(body))),
+        );
+        return json(200, wireResult(url.pathname, result));
+      }
       default:
-        return json(200, await runCauseEffect(customProviders.remove(parsed(parseDeleteCustomProvider, body).id)));
+        return json(
+          200,
+          wireResult(
+            url.pathname,
+            await runCauseEffect(customProviders.remove(parsed(parseDeleteCustomProvider, body).id)),
+          ),
+        );
     }
   } catch (error) {
     if (error instanceof HttpError) throw error;
@@ -205,16 +278,64 @@ const V2_ROUTES = new Set<string>(Object.values(PROVIDERS_RUNTIMES_V2_ROUTES));
 const V3_ROUTES = new Set<string>(Object.values(PROVIDERS_SIGN_IN_V3_ROUTES));
 const V5_ROUTES = new Set<string>(Object.values(PROVIDERS_V5_ROUTES));
 const V4_ROUTES = new Set<string>(Object.values(PROVIDERS_V4_ROUTES));
+const V8_ROUTES = new Set<string>(Object.values(PROVIDERS_V8_ROUTES));
+const HARNESS_ROUTES = new Set<string>(Object.values(CUSTOM_PROVIDER_HARNESS_ROUTES));
 const ROUTES = new Set<string>([
   ...Object.values(PROVIDERS_ADMIN_ROUTES),
   ...V2_ROUTES,
   ...V3_ROUTES,
   ...V4_ROUTES,
   ...V5_ROUTES,
+  ...V8_ROUTES,
+  ...HARNESS_ROUTES,
 ]);
 
 function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
+}
+
+/**
+ * The `providers-v1` endpoint summary: the header names, the harness and the model context windows
+ * stay on this computer, as they did.
+ */
+function wireCustomProvider({
+  headerNames: _headerNames,
+  harness: _harness,
+  ...provider
+}: CustomProviderSummary): CustomProviderSummary {
+  return { ...provider, models: provider.models.map(wireCustomModel) };
+}
+
+/**
+ * A `providers-v1` or `custom-provider-harness-v1` save names the endpoint and each model by its
+ * released fields only. A field that the protocol does not have is removed before the parse, so that
+ * it cannot refuse a save the host used to accept, and a peer always adds an endpoint on OpenCode.
+ */
+function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): DynamicRecord {
+  if (!Array.isArray(body.models)) return body;
+  return {
+    ...body,
+    models: body.models.map((model: unknown) => {
+      if (!isObject(model)) return model;
+      const { contextWindow: _contextWindow, ...released } = model;
+      return released;
+    }),
+  };
+}
+
+function wireCustomModel({ id, name }: CustomProviderModel): CustomProviderModel {
+  return { id, name };
+}
+
+/** The `custom-provider-harness-v1` summary: the `providers-v1` one, and the harness that runs the endpoint. */
+function wireHarnessCustomProvider(provider: CustomProviderSummary): CustomProviderSummary {
+  return { ...wireCustomProvider(provider), harness: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS };
+}
+
+/** A save or a delete answers with the summaries of the protocol that the route belongs to. */
+function wireResult(route: string, result: CustomProviderResult): CustomProviderResult {
+  const wire = HARNESS_ROUTES.has(route) ? wireHarnessCustomProvider : wireCustomProvider;
+  return { ...result, providers: result.providers.map(wire) };
 }
 
 /**
@@ -268,6 +389,13 @@ function signInProviderV4(body: DynamicRecord): SignInProviderIdV4 {
 
 function codeSubmitInputV4(body: DynamicRecord): { provider: SignInProviderIdV4; code: string } {
   return { provider: signInProviderV4(body), code: pastedCode(body) };
+}
+
+// `providers-v5` does not name Inception, DeepSeek or OpenRouter; `providers-v8` sets their keys.
+function peerApiKeyInput(body: DynamicRecord) {
+  const input = parseProviderApiKeyInput(body);
+  if (isKeyOnlyProvider(input.provider)) throw new Error("Unknown provider.");
+  return input;
 }
 
 function wireApiKeyInput(body: DynamicRecord) {
@@ -369,5 +497,35 @@ function wireSnapshotV5(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnaps
   return {
     ...wire,
     providers: { ...wire.providers, pi: wireStatus(snapshot.providers.pi), muse: wireStatus(snapshot.providers.muse) },
+  };
+}
+
+/** A `providers-v8` provider: any provider of this host. The wire accepts an id that this host does not know. */
+function hostProvider(body: DynamicRecord) {
+  return parseProviderId(body.provider);
+}
+
+function codeSubmitInputV8(body: DynamicRecord) {
+  return { provider: hostProvider(body), code: pastedCode(body) };
+}
+
+function managedProviderV8(body: DynamicRecord): ManagedProviderId {
+  const id = hostProvider(body);
+  if (!isManagedRuntimeProvider(id)) throw new Error(sourceText("error.team.providerNotManaged"));
+  return id;
+}
+
+/** A `providers-v8` provider whose key this host keeps: a managed runtime, or a key-only provider on Pi. */
+function keyProviderV8(body: DynamicRecord) {
+  const id = hostProvider(body);
+  return isKeyOnlyProvider(id) ? id : managedProviderV8(body);
+}
+
+/** The `providers-v8` runtime snapshot: one row for each managed runtime, keyed by `id`. */
+function wireSnapshotV8(snapshot: ProviderRuntimeSnapshot) {
+  return {
+    revision: snapshot.revision,
+    providers: MANAGED_RUNTIME_PROVIDERS.map((id) => ({ id, ...wireStatus(snapshot.providers[id]) })),
+    toolRuntimes: MANAGED_TOOL_RUNTIMES.map((id) => ({ id, ...wireStatus(snapshot.toolRuntimes[id]) })),
   };
 }

@@ -1,5 +1,5 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
-import type { Comparison } from "./comparison";
+import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
 // Every statement about Claude Cowork here is taken from claude.com, the Claude help
 // center, Anthropic's privacy center and its terms, and each page used is in `sources`.
@@ -14,7 +14,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
   answer:
     "Choose OpenBot if you want your agents on your own computer, with Claude and the other AI plans you already pay for, such as ChatGPT, Gemini or Grok: the app is free. Choose Claude Cowork if you use only Claude, and you want an agent in Anthropic's cloud that keeps working with no computer of yours on.",
   chooseOpenBot: [
-    "You want Claude, ChatGPT, Gemini, Grok and Cursor agents in one team, or your own model.",
+    "You want Claude, ChatGPT, Gemini, Grok, Cursor, Cline, Muse Code and Pi agents in one team, or your own model.",
     "Your files and chats must stay on your own computer, not in Anthropic's cloud.",
     "You want a team of agents that give work to each other, each with its own job.",
     "You want a free app, and source code that you can read.",
@@ -30,8 +30,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       icon: "cpu",
       topic: "Models and plans",
-      openbot:
-        "Use the plans you already have: ChatGPT, Claude, Gemini, Grok or Cursor. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
+      openbot: OPENBOT_TEXT.models,
       rival:
         "Claude models only, with your paid Claude plan. Companies can also use Claude through Amazon Bedrock, Google Cloud or Microsoft Foundry.",
       better: "openbot",
@@ -47,23 +46,51 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       icon: "cloud",
       topic: "When your computer is off",
-      openbot:
-        "Agents keep working on the computer or server that runs OpenBot, and routines start them on a schedule. If you do not want to keep a computer on, use a hosted OpenBot server in the EU, from €20 or $25 a month.",
+      openbot: OPENBOT_TEXT.offline,
       rival: "Cloud sessions keep working when you close your laptop, and scheduled tasks run with no device online.",
     },
     {
       icon: "phone",
       topic: "Remote access",
-      openbot:
-        "Apps for iPhone and Android connect from anywhere. Chats and files go over an encrypted connection between your devices, with no VPN, and no cloud stores them.",
+      openbot: OPENBOT_TEXT.remote,
       rival:
         "Start, steer and review tasks from the Claude apps for iPhone and Android or the web, in beta. Sessions and files are saved to your Claude account.",
     },
     {
+      icon: "refresh",
+      topic: "Backup models",
+      openbot: OPENBOT_TEXT.backupModels,
+      rival:
+        "Claude models only. Claude changes the model only when a safety check flags a message. When you reach a limit, you wait or pay for usage credits.",
+      better: "openbot",
+    },
+    {
+      icon: "key",
+      topic: "Logins and payments",
+      openbot: OPENBOT_TEXT.logins,
+      rival:
+        "The built-in browser can import your saved logins, site by site. Claude in Chrome cannot make purchases or handle card data.",
+      better: "openbot",
+    },
+    {
+      icon: "mic",
+      topic: "Voice",
+      openbot: OPENBOT_TEXT.voice,
+      rival:
+        "Cowork tasks take dictation, but not voice mode. In the new Claude app, voice mode works in any conversation, and Claude speaks back. Anthropic does not say where it processes speech.",
+    },
+    {
+      icon: "contact",
+      topic: "Chat apps",
+      openbot: OPENBOT_TEXT.chatApps,
+      rival:
+        "Cowork has no chat app. Claude Tag, a separate Anthropic product for Team and Enterprise plans, works in Slack.",
+      better: "openbot",
+    },
+    {
       icon: "users",
       topic: "Teams",
-      openbot:
-        "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
+      openbot: OPENBOT_TEXT.teams,
       rival:
         "Claude can split a task across sub-agents that work in parallel. You cannot share a session, but you can share what it makes, and Team and Enterprise plans can share projects.",
     },
@@ -88,15 +115,14 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       icon: "globe",
       topic: "Where you can use it",
-      openbot:
-        "In any country: OpenBot has no region lock. The desktop app is in English, French, Japanese and Turkish, and hosted servers run in the EU. Each AI provider sets the countries for its own plan.",
+      openbot: OPENBOT_TEXT.regions,
       rival:
         "In the countries where Anthropic offers Claude, which include the US, the EU, the UK and Switzerland, but not China or Russia. The app is in 11 languages.",
     },
     {
       icon: "devices",
       topic: "Apps",
-      openbot: "macOS, Windows and Linux, and mobile apps for iPhone and Android.",
+      openbot: OPENBOT_TEXT.apps,
       rival:
         "The Claude desktop app for macOS and Windows, and Linux in beta. The Claude apps for iPhone and Android and the web, in beta.",
     },
@@ -114,31 +140,27 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
   sections: [
     {
       title: "Models and the plans you pay for",
-      openbot:
-        "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, and Cursor CLI with your Cursor plan or a Cursor API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
+      openbot: OPENBOT_TEXT.plansSection,
       rival:
         "Claude Cowork runs on Claude models, and it is available on the paid Claude plans: Pro, Max, Team and Enterprise. Companies can also use it through Amazon Bedrock, Google Cloud or Microsoft Foundry. Anthropic describes no way to use models from other companies. Cowork uses your plan's limits faster than chat.",
       better: "openbot",
     },
     {
       title: "Where the work happens",
-      openbot:
-        "OpenBot runs on the computer that hosts it. Agent workspaces, conversations and app data stay on that computer, so it must stay on while its agents work. Run it on a desktop or a server that stays on, and your agents keep working while your laptop is closed. If you do not want to keep a computer on, use a hosted OpenBot server. It is a Linux server in the EU (Germany, Finland or France), from €20 or $25 a month, and it keeps the workspaces and chats of its agents. Local-first is not offline: an agent that uses a hosted provider still sends its requests to that provider.",
+      openbot: OPENBOT_TEXT.workSection,
       rival:
         "Claude Cowork sessions run in the cloud by default: the agent loop and the code run on Anthropic's servers, and sessions and files are saved to your Claude account. They keep working when you close your laptop, and scheduled tasks run with no device online. Existing desktop setups can still run sessions locally, in a Linux virtual machine on your computer, but from 6 October 2026, new tasks on Pro and Max run only in the cloud. On Team plans, cloud sessions are on by default; on Enterprise, an owner turns them on.",
       better: "openbot",
     },
     {
       title: "Phones and remote access",
-      openbot:
-        "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. You set up no VPN or tunnel. Remote access needs an OpenBot account.",
+      openbot: OPENBOT_TEXT.phonesSection,
       rival:
         "Claude Cowork runs on the web and in the Claude apps for iPhone and Android, in beta, on Pro, Max and Team plans, and on Enterprise plans where an admin turns it on. You start a task on one device, steer it from another, and pick up the result anywhere, because the session runs in Anthropic's cloud.",
     },
     {
       title: "How agents work as a team",
-      openbot:
-        "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI, Cursor CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
+      openbot: OPENBOT_TEXT.teamSection,
       rival:
         "Claude Cowork is one agent that can break a complex task into smaller parts and give them to sub-agents that work at the same time. You cannot share a session with other people, but you can share the artifacts it makes. On Team and Enterprise plans, members can share projects, and owners can turn Cowork off for the organisation.",
     },
@@ -165,7 +187,7 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     {
       question: "Can I use my Claude plan with OpenBot?",
       answer:
-        "Yes. OpenBot runs Claude Code with your own Claude plan, so the Claude plan that you pay for works in OpenBot too. Next to it, Codex uses your ChatGPT plan, Gemini a Google AI Pro or Ultra plan, Grok CLI your Grok account or an xAI API key, and Cursor CLI your Cursor plan. OpenBot adds no charge of its own.",
+        "Yes. OpenBot runs Claude Code with your own Claude plan, so the Claude plan that you pay for works in OpenBot too. Next to it, Codex uses your ChatGPT plan, Gemini a Google AI Pro or Ultra plan, Grok CLI your Grok account or an xAI API key, Cursor CLI your Cursor plan, Cline your Cline account, and Muse Code your Meta account. When a plan reaches its limit, an agent can move to a backup model on another provider. OpenBot adds no charge of its own.",
     },
     {
       question: "Is Claude Cowork still a separate product?",
@@ -236,6 +258,24 @@ export const CLAUDE_COWORK_COMPARISON: Comparison = {
     },
     { label: "Anthropic consumer terms", url: "https://www.anthropic.com/legal/consumer-terms" },
     { label: "Claude knowledge work plugins", url: "https://github.com/anthropics/knowledge-work-plugins" },
+    {
+      label: "Why Claude switched models",
+      url: "https://support.claude.com/en/articles/17161993-why-claude-switched-models-in-your-conversation-with-sonnet-5-5",
+    },
+    {
+      label: "Claude usage credits",
+      url: "https://support.claude.com/en/articles/12429409-manage-usage-credits-for-paid-claude-plans",
+    },
+    {
+      label: "The built-in browser in Claude Cowork",
+      url: "https://support.claude.com/en/articles/16607400-use-the-built-in-browser-in-claude-cowork",
+    },
+    {
+      label: "Claude in Chrome permissions",
+      url: "https://support.claude.com/en/articles/12902446-claude-in-chrome-permissions-guide",
+    },
+    { label: "Claude voice mode", url: "https://support.claude.com/en/articles/11101966-use-voice-mode" },
+    { label: "Claude Tag overview", url: "https://claude.com/docs/claude-tag/overview" },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],

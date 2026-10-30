@@ -1,17 +1,23 @@
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, lstat, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { parse as parseYaml } from "yaml";
+import { isMissingFileError } from "../src/backend/file-errors";
 
 const logger = createOpenBotLogger("verify-windows-package");
 
 const FUSE_DISABLED = 48;
 const FUSE_ENABLED = 49;
+
+// Each launch step ends on a state or an event. This limit only turns a real hang into a clear failure:
+// a slow release runner can need much more time than usual to start the first instance.
+const launchStepLimitMs = 5 * 60_000;
 
 if (process.platform !== "win32") {
   throw new Error("The Windows package verifier must run on Windows.");
@@ -32,6 +38,7 @@ const voiceRuntimeFiles = [
   "onnxruntime_providers_shared.dll",
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
+const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
 
 await Promise.all([
   access(executablePath),
@@ -43,9 +50,12 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Underdog-Bark-3.0-Plus-LICENSE")),
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceHostPath),
+  access(speechHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),
@@ -58,6 +68,12 @@ await Promise.all([
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/web-server.exe")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/streamer.exe")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/static/stream.html")),
+  access(
+    resolve(
+      resourcesPath,
+      "remote-desktop-runtime/win32/x64/assets/shaders/directx/convert_yuv420_packed_uv_type0_ps.hlsl",
+    ),
+  ),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/SHA256SUMS.txt")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/LICENSE.md")),
@@ -68,10 +84,14 @@ await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-win32-x64"));
 
-// The Parakeet and Whisper models are downloaded on demand.
+// The Parakeet, Bark, Whisper and Supertonic models are downloaded on demand.
 if (
-  ["voice/model", "voice/whisper-turbo-int8"].some((path) => existsSync(resolve(resourcesPath, path))) ||
-  ["encoder.int8.onnx", "turbo-encoder.int8.onnx"].some((name) => existsSync(resolve(voiceRuntimePath, name)))
+  ["voice/model", "voice/bark-3.0-plus-int8", "voice/whisper-turbo-int8", "voice/supertonic-3-int8"].some((path) =>
+    existsSync(resolve(resourcesPath, path)),
+  ) ||
+  ["encoder.int8.onnx", "turbo-encoder.int8.onnx", "vocoder.int8.onnx"].some((name) =>
+    existsSync(resolve(voiceRuntimePath, name)),
+  )
 ) {
   throw new Error("The on-demand voice models must not be in the application.");
 }
@@ -233,18 +253,39 @@ async function verifyLaunch(executable: string): Promise<void> {
     stderr = `${stderr}${chunk}`.slice(-4_000);
   });
 
+  const launchExit = new Promise<never>((_, reject) => {
+    child.once("exit", (code, signal) => {
+      reject(
+        new Error(`Packaged OpenBot exited during launch (${signal ?? `code ${String(code)}`}): ${stderr.trim()}`),
+      );
+    });
+  });
+
   try {
-    await Promise.race([
-      new Promise<never>((_, reject) => {
-        child.once("exit", (code, signal) => {
-          reject(
-            new Error(`Packaged OpenBot exited during launch (${signal ?? `code ${String(code)}`}): ${stderr.trim()}`),
-          );
-        });
-      }),
-      new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 3_000)),
-    ]);
-    await verifySecondInstanceExits(executable, userDataPath);
+    // Chromium on Windows keeps `lockfile` in userData open while main holds its single-instance lock. A
+    // second instance that starts before that does not forward to the first one: it takes the lock and stays open.
+    await waitForFirstInstance(
+      launchExit,
+      () => pathExists(join(userDataPath, "lockfile")),
+      "take its lock",
+      () => stderr,
+    );
+    // The lock is not enough. The second instance waits about 20 seconds for the first one to answer, and
+    // the answer needs a free main thread; with no answer, Chromium can kill the first instance. Main
+    // answers only after its start, and a launch that stops during the start must fail here. So this
+    // waits until the window has loaded and called main (`trace.ndjson`, see `rendererCalledMain`).
+    await waitForFirstInstance(
+      launchExit,
+      () => rendererCalledMain(userDataPath),
+      "load its window",
+      () => stderr,
+    );
+    await verifySecondInstanceExits(executable, userDataPath, launchExit);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `Packaged OpenBot exited when a second instance started (${child.signalCode ?? `code ${String(child.exitCode)}`}): ${stderr.trim()}`,
+      );
+    }
   } finally {
     terminateProcessTree(child.pid);
     await Promise.race([
@@ -268,7 +309,59 @@ function terminateProcessTree(pid: number | undefined): void {
   }
 }
 
-async function verifySecondInstanceExits(executable: string, userDataPath: string): Promise<void> {
+/** Waits for a state of the first instance. It fails immediately when the first instance exits. */
+async function waitForFirstInstance(
+  launchExit: Promise<never>,
+  reached: () => Promise<boolean>,
+  step: string,
+  stderr: () => string,
+): Promise<void> {
+  const stop = new AbortController();
+  const waitForState = async () => {
+    const limit = Date.now() + launchStepLimitMs;
+    while (!(await reached())) {
+      if (Date.now() > limit) {
+        throw new Error(`Packaged OpenBot did not ${step} in 5 minutes: ${stderr().trim()}`);
+      }
+      await delay(200, undefined, { signal: stop.signal });
+    }
+  };
+  try {
+    await Promise.race([launchExit, waitForState()]);
+  } finally {
+    stop.abort();
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Whether the window of the first instance has called main. The renderer asks main for `getAppInfo` when
+ * it mounts (src/renderer/src/platform.tsx), main records each trusted call in `logs/trace.ndjson`
+ * (`setIpcCallObserver` in src/main/index.ts), and a main-thread timer writes the line about one second later.
+ */
+async function rendererCalledMain(userDataPath: string): Promise<boolean> {
+  try {
+    return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+}
+
+async function verifySecondInstanceExits(
+  executable: string,
+  userDataPath: string,
+  launchExit: Promise<never>,
+): Promise<void> {
   const second = spawn(executable, [`--user-data-dir=${userDataPath}`], {
     env: {
       ...process.env,
@@ -278,22 +371,35 @@ async function verifySecondInstanceExits(executable: string, userDataPath: strin
       OPENBOT_CLAUDE_PATH: join(userDataPath, "missing-claude.exe"),
       OPENBOT_GROK_PATH: join(userDataPath, "missing-grok.exe"),
     },
-    stdio: "ignore",
+    stdio: ["ignore", "ignore", "pipe"],
     windowsHide: true,
   });
-  const result = await Promise.race([
-    new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
-      second.once("exit", (code, signal) => resolveExit({ code, signal }));
-    }),
-    new Promise<null>((resolveDelay) => setTimeout(() => resolveDelay(null), 3_000)),
-  ]);
-  if (!result) {
-    second.kill();
-    throw new Error("A second OpenBot instance did not exit.");
-  }
-  if (result.code !== 0 || result.signal) {
-    throw new Error(
-      `A second OpenBot instance exited unexpectedly (${result.signal ?? `code ${String(result.code)}`}).`,
-    );
+  let stderr = "";
+  second.stderr.setEncoding("utf8");
+  second.stderr.on("data", (chunk: string) => {
+    stderr = `${stderr}${chunk}`.slice(-4_000);
+  });
+  const stop = new AbortController();
+  try {
+    // The second instance exits only after the first one accepts its arguments. A busy first instance
+    // accepts them later, so this waits for the exit and not for a fixed time.
+    const result = await Promise.race([
+      new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
+        second.once("exit", (code, signal) => resolveExit({ code, signal }));
+      }),
+      launchExit,
+      delay(launchStepLimitMs, null, { signal: stop.signal }),
+    ]);
+    if (!result) {
+      throw new Error(`A second OpenBot instance did not exit in 5 minutes: ${stderr.trim()}`);
+    }
+    if (result.code !== 0 || result.signal) {
+      throw new Error(
+        `A second OpenBot instance exited unexpectedly (${result.signal ?? `code ${String(result.code)}`}): ${stderr.trim()}`,
+      );
+    }
+  } finally {
+    stop.abort();
+    if (second.exitCode === null && second.signalCode === null) terminateProcessTree(second.pid);
   }
 }

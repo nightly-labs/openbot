@@ -1,0 +1,91 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/webClient";
+
+export const messages = {
+  "webClient.loading": "OpenBot laden…",
+  "webClient.loadingLine.wake": "De agents wakker maken…",
+  "webClient.loadingLine.coffee": "Koffie inschenken voor de agents…",
+  "webClient.loadingLine.tokens": "Tokens tellen op de vingers…",
+  "webClient.loadingLine.prompts": "De prompts ontwarren…",
+  "webClient.loadingLine.sleepy": "De slaapkop vriendelijk vragen…",
+  "webClient.loadingLine.almost": "Bijna klaar. Waarschijnlijk.",
+  "webClient.login.failed": "Inloggen mislukt.",
+  "webClient.login.requestFailed": "Het accountverzoek is mislukt.",
+  "webClient.login.sessionFailed": "Kan deze sessie niet controleren.",
+  "webClient.login.wait": "Wacht even voordat je een nieuwe code aanvraagt.",
+  "webClient.login.accountInvalid": "Het antwoord van de accountdienst is ongeldig.",
+  "webClient.login.responseInvalid": "Het antwoord op het inloggen is ongeldig.",
+  "webClient.pane.navigation": "Navigatie in werkruimte",
+  "webClient.pane.chat": "Chat",
+  "webClient.pane.routines": "Routines",
+  "webClient.pane.workspace": "Werkruimte",
+  "webClient.notice.connecting": "Verbinden met je server",
+  "webClient.notice.findingHosts": "Je servers zoeken",
+  "webClient.notice.hostsFailed": "Kan je servers niet laden",
+  "webClient.notice.connectComputer": "Verbind een server",
+  "webClient.connect.description":
+    "Draai OpenBot op je computer om vanuit deze browser met je agents te chatten. Je kunt ook lid worden van een server met een uitnodiging.",
+  "webClient.connect.descriptionHosted":
+    "Maak een gehoste server om vanuit deze browser met je agents te chatten. Je kunt OpenBot ook op je computer draaien, of lid worden van een server met een uitnodiging.",
+  "webClient.connect.stepInstall": "Installeer en open OpenBot op je computer.",
+  "webClient.connect.stepSignIn": "Log in met je e-mailadres.",
+  "webClient.connect.stepRemote": "Zet toegang op afstand aan.",
+  "webClient.notice.download": "OpenBot downloaden",
+  "webClient.notice.createServer": "Gehoste server maken",
+  "webClient.notice.join": "Lid worden met uitnodiging",
+  "webClient.notice.refreshHosts": "Servers vernieuwen",
+  "webClient.agent.modelsFailed": "Kan de modellen van de server niet laden.",
+  "webClient.agent.refreshFailed":
+    "De agent is gemaakt, maar de werkruimte kan niet worden vernieuwd. Laad opnieuw voordat je het nog eens probeert.",
+  "webClient.agent.unconfirmed":
+    "Het resultaat is niet bevestigd. Sluit dit formulier en controleer de server voordat je het opnieuw probeert.",
+  "webClient.error.usageOffline": "Maak verbinding met je server om het gebruik te bekijken.",
+  "webClient.error.desktopOnly": "Deze actie is beschikbaar in de desktop-app.",
+  "webClient.settings.preferences.title": "Voorkeuren",
+  "webClient.settings.preferences.description": "Kies de taal en geluiden van OpenBot in deze browser.",
+  "webClient.error.checkConversation": "Controleer het gesprek voordat je opnieuw verstuurt.",
+  "webClient.error.hostReported": "De server meldde een fout. Controleer het gesprek en de serverstatus.",
+  "webClient.error.requestFailed": "Het verzoek is mislukt.",
+  "webClient.error.accessEnded": "De toegang tot deze server is beëindigd.",
+  "webClient.error.hostsFailed": "Kan je servers niet laden.",
+  "webClient.error.enterInvitation": "Vul een uitnodigingslink in.",
+  "webClient.error.invitationOffline":
+    "De uitnodiging is geaccepteerd, maar de server is offline. Probeer het opnieuw.",
+  "webClient.error.otherConversation": "De server gaf een ander gesprek terug.",
+  "webClient.error.messageTooLong": "Het bericht is te lang.",
+  "webClient.error.deliveryUnconfirmed":
+    "De bezorging van het bericht is niet bevestigd. Vernieuw en controleer het gesprek voordat je opnieuw verstuurt.",
+  "webClient.error.sidebarLayout": "Deze server ondersteunt geen wijzigingen in de indeling van de zijbalk.",
+  "webClient.error.deleteOffline": "Maak verbinding met je server voordat je een agent verwijdert.",
+  "webClient.error.attachmentLimit": "Een bericht kan maximaal {limit} bijlagen hebben.",
+  "webClient.error.linkBlocked": "Deze link kan niet worden geopend.",
+  "webClient.error.fileTransfer": "Bestandsoverdracht mislukt.",
+  "webClient.error.noLocks":
+    "Deze browser kan de serververbinding niet beschermen. Gebruik een actuele desktopbrowser.",
+  "webClient.error.otherTab":
+    "Deze server is geopend in een ander tabblad. Sluit die verbinding voordat je het opnieuw probeert.",
+  "webClient.error.connectionClosed": "De browserverbinding is gesloten.",
+  "webClient.error.hostChanged": "De gekozen server is gewijzigd.",
+  "webClient.error.requestIncomplete":
+    "De server kan dit verzoek niet voltooien. Vernieuw voordat je het opnieuw probeert.",
+  "webClient.error.viewEnded": "De browserweergave is beëindigd.",
+  "webClient.error.viewChanged": "De browserweergave is gewijzigd.",
+  "webClient.error.connectionChanging": "De serververbinding verandert.",
+  "webClient.error.identityChanged": "De identiteit van de server is gewijzigd. Verbinding geweigerd.",
+  "webClient.error.connectionUnavailable": "De serververbinding is niet beschikbaar.",
+  "webClient.error.incompatible":
+    "Deze server is niet compatibel met OpenBot web. Werk de server bij en laad deze pagina opnieuw.",
+  "webClient.error.sendUnconfirmed":
+    "De bezorging van het bericht is niet bevestigd. Vernieuw voordat je het opnieuw verstuurt.",
+  "webClient.error.fileType": "Werk de server bij om dit bestandstype bij te voegen.",
+  "webClient.error.uploadCancelled": "Het uploaden van de bijlage is geannuleerd.",
+  "webClient.error.duplication": "Deze server ondersteunt het dupliceren van agents niet.",
+  "webClient.error.connectServerFirst": "Maak eerst verbinding met deze server.",
+  "webClient.error.agentInstallNotAllowed":
+    "Alleen een eigenaar of beheerder kan hier een agent toevoegen, en de server moet een actuele versie van OpenBot draaien.",
+  "webClient.error.linkDesktopOnly": "Deze link opent alleen in de desktop-app.",
+  "webClient.error.saveEndpointOffline": "Maak verbinding met je server om een endpoint op te slaan.",
+  "webClient.error.removeEndpointOffline": "Maak verbinding met je server om een endpoint te verwijderen.",
+  "webClient.error.hostNotConnected": "De server is niet verbonden.",
+  "webClient.error.memberNotFound": "Het lid bestaat niet.",
+} as const satisfies PartialTranslation<typeof source>;

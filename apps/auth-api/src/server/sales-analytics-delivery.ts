@@ -1,6 +1,13 @@
+import { HOSTED_SERVER_ENTRY_POINTS } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
-import { ACCOUNT_ANALYTICS_SCHEMA_VERSION, FIRST_TOUCH_PROPERTIES } from "./account-analytics";
+import {
+  ACCOUNT_ANALYTICS_SCHEMA_VERSION,
+  BILLING_PRODUCTS,
+  FIRST_TOUCH_PROPERTIES,
+  isAnalyticsLicenseUsers,
+  PLAN_CHANGE_DIRECTIONS,
+} from "./account-analytics";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const SEND_TIMEOUT_MS = 5_000;
@@ -58,7 +65,11 @@ type SalesAnalyticsEventName = (typeof SALES_ANALYTICS_EVENT_NAMES)[number];
 const SALES_ANALYTICS_EVENT_PROPERTIES = {
   billing_action: [
     "action",
+    "product",
     "plan",
+    "users",
+    "direction",
+    "entry_point",
     "interval",
     "currency",
     "amount",
@@ -82,7 +93,9 @@ const SALES_ANALYTICS_EVENT_PROPERTIES = {
     "original_currency",
     "fx_rate",
     "fx_date",
+    "product",
     "plan",
+    "users",
     "interval",
     "payment_kind",
     "recovery",
@@ -103,6 +116,11 @@ const SALES_ANALYTICS_EVENT_PROPERTIES = {
     "checkout_converted_accounts",
     "checkout_pending_accounts",
     "skipped_subscriptions",
+    "license_mrr",
+    "license_accounts",
+    "licensed_users",
+    "total_mrr",
+    "total_arr",
   ],
 } as const satisfies Record<SalesAnalyticsEventName, readonly string[]>;
 
@@ -415,6 +433,11 @@ function eventPropertyValuesAreValid(properties: SalesAnalyticsProperties): bool
           "checkout_converted_accounts",
           "checkout_pending_accounts",
           "skipped_subscriptions",
+          "license_mrr",
+          "license_accounts",
+          "licensed_users",
+          "total_mrr",
+          "total_arr",
           "as_of",
           "reported_at",
         ].includes(key)
@@ -422,8 +445,13 @@ function eventPropertyValuesAreValid(properties: SalesAnalyticsProperties): bool
         if (!Number.isSafeInteger(value) || value < 0) return false;
       }
       if (["fx_rate"].includes(key) && value <= 0) return false;
+      if (key === "users" && !isAnalyticsLicenseUsers(value)) return false;
       continue;
     }
+    if (key === "users") return false;
+    if (key === "product" && !isOneOf(BILLING_PRODUCTS, value)) return false;
+    if (key === "direction" && !isOneOf(PLAN_CHANGE_DIRECTIONS, value)) return false;
+    if (key === "entry_point" && !isOneOf(HOSTED_SERVER_ENTRY_POINTS, value)) return false;
     if (key === "action" && !isOneOf(BILLING_ACTIONS, value)) return false;
     if (key === "plan" && !isOneOf(BILLING_PLANS, value)) return false;
     if (key === "interval" && !isOneOf(BILLING_INTERVALS, value)) return false;

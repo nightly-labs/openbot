@@ -175,8 +175,19 @@
 
 .browser-takeover-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+.browser-takeover-finish {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--openbot-space-2);
 }
 

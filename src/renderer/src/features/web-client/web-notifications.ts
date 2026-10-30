@@ -1,6 +1,11 @@
-import type { AgentEvent, AgentSummary, ServerNotificationLevel } from "@openbot/contracts/ipc";
+import type { AgentEvent, ClientAgentSummary, ServerNotificationLevel } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { notificationForAgentEvent } from "@openbot/team-client/agent-notifications";
+import {
+  type AgentNotificationChannel,
+  notificationForAgentEvent,
+  notificationRequestKey,
+} from "@openbot/team-client/agent-notifications";
+import type { ChannelNotificationContent } from "@openbot/team-client/channel-notifications";
 
 const PERMISSION_ASKED_KEY = "openbot.web.notification-permission-asked";
 /** The tab of this browser that has focus. The tab that speaks for a host is often in the background. */
@@ -86,28 +91,97 @@ function browserFocused(): boolean {
   return Boolean(record && record.until > Date.now());
 }
 
+/** The shown notifications that wait for an answer, by request, as on desktop. */
+const requestNotifications = new Map<string, Notification>();
+/** As many as the desktop keeps. */
+const REQUEST_NOTIFICATION_LIMIT = 50;
+
+/** Closes the notification of a request that was answered or cancelled, on any device. */
+export function withdrawWebAgentNotification(hostId: string, event: AgentEvent): void {
+  if (event.type !== "agent-input-resolved" && event.type !== "browser-takeover-resolved") return;
+  const key = notificationRequestKey(hostId, event);
+  const notification = key && requestNotifications.get(key);
+  if (!key || !notification) return;
+  requestNotifications.delete(key);
+  notification.close();
+}
+
 /**
  * Shows a host's agent event as a browser notification while no tab of the app has focus, as the
  * desktop does while its window does not have focus. One tab speaks for each host, so no tag is needed.
  */
 export function showWebAgentNotification(options: {
+  hostId: string;
   event: AgentEvent;
-  agents: AgentSummary[];
+  agents: ClientAgentSummary[];
   level: ServerNotificationLevel;
   translate: AppTranslate;
-  onOpen(agentId: string): void;
+  /** The channel whose thread the event came from, or null. */
+  channel: AgentNotificationChannel | null;
+  onOpen(agentId: string, channelId: string | undefined): void;
 }): void {
   if (typeof Notification === "undefined" || Notification.permission !== "granted" || browserFocused()) return;
-  const content = notificationForAgentEvent(options.event, options.agents, options.translate, options.level);
+  const content = notificationForAgentEvent(
+    options.event,
+    options.agents,
+    options.translate,
+    options.level,
+    null,
+    options.channel,
+  );
   if (!content) return;
+  const key = notificationRequestKey(options.hostId, options.event);
   try {
     const notification = new Notification(content.title, { body: content.body });
+    if (key) {
+      // A provider can use a request id again. The newest notification replaces the one before it.
+      requestNotifications.get(key)?.close();
+      requestNotifications.set(key, notification);
+      // A lost connection can drop the answer of a request, so the oldest entries go.
+      for (const oldest of requestNotifications.keys()) {
+        if (requestNotifications.size <= REQUEST_NOTIFICATION_LIMIT) break;
+        requestNotifications.delete(oldest);
+      }
+      notification.addEventListener("close", () => {
+        if (requestNotifications.get(key) === notification) requestNotifications.delete(key);
+      });
+    }
     notification.addEventListener("click", () => {
       window.focus();
       notification.close();
-      options.onOpen(content.agentId);
+      options.onOpen(content.agentId, content.channelId);
     });
   } catch {
     // Some mobile browsers show notifications only from a service worker.
+  }
+}
+
+/** The shown reply notification of each channel, by host. A newer reply in the channel replaces it. */
+const channelNotifications = new Map<string, Notification>();
+
+/** Shows channel replies as browser notifications while no tab of the app has focus, as the desktop does. */
+export function showWebChannelNotifications(options: {
+  hostId: string;
+  replies: readonly ChannelNotificationContent[];
+  onOpen(channelId: string): void;
+}): void {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted" || browserFocused()) return;
+  for (const reply of options.replies) {
+    const key = `${options.hostId}\n${reply.channelId}`;
+    try {
+      const notification = new Notification(reply.title, { body: reply.body });
+      channelNotifications.get(key)?.close();
+      channelNotifications.set(key, notification);
+      notification.addEventListener("close", () => {
+        if (channelNotifications.get(key) === notification) channelNotifications.delete(key);
+      });
+      notification.addEventListener("click", () => {
+        window.focus();
+        notification.close();
+        options.onOpen(reply.channelId);
+      });
+    } catch {
+      // As above.
+    }
   }
 }

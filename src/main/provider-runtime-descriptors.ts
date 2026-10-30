@@ -169,8 +169,8 @@ const stageBunx = Effect.fn("ProviderRuntime.stageBunx")((binary: string, bunx: 
   ),
 );
 
-/** The npm package that lists OpenCode's platform packages and carries its LICENSE. */
-export const OPENCODE_UMBRELLA_PACKAGE = "opencode-ai";
+/** The npm package that lists the platform packages of OpenCode 2. It carries no LICENSE. */
+export const OPENCODE_CLI_PACKAGE = "@opencode/cli";
 
 interface NpmPackageCheck {
   name: string;
@@ -390,11 +390,12 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       downloadSmallFile,
     }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
       const artifact = lock.opencode.artifacts[spec.target];
-      // The platform tarball carries no licence. The umbrella package on the same registry does, so
-      // an install needs no host other than npm. `verify` checks its hash against the lock. It is
+      // No OpenCode 2 tarball carries the licence. The OpenCode 1 package that the lock names does,
+      // so an install needs no host other than npm. `verify` checks its hash against the lock. It is
       // fetched first because it is small: a failed request stops before the binary is unpacked.
+      const license = lock.opencode.licensePackage;
       const umbrella = yield* downloadSmallFile(
-        `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/-/${OPENCODE_UMBRELLA_PACKAGE}-${spec.version}.tgz`,
+        `${lock.opencode.registry}/${license.name}/-/${license.name}-${license.version}.tgz`,
         null,
       );
       yield* withNpmPackage(
@@ -433,7 +434,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       );
       // A directory beside the staging one, so the sweep of abandoned staging removes it after a crash.
       const umbrellaRoot = `${staging}.umbrella`;
-      const umbrellaPath = join(umbrellaRoot, `${OPENCODE_UMBRELLA_PACKAGE}.tgz`);
+      const umbrellaPath = join(umbrellaRoot, `${license.name}.tgz`);
       yield* Effect.acquireUseRelease(
         runtimeIO(() => mkdir(umbrellaRoot, { recursive: true })),
         () =>
@@ -443,8 +444,8 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
               umbrellaPath,
               staging,
               {
-                name: OPENCODE_UMBRELLA_PACKAGE,
-                version: spec.version,
+                name: license.name,
+                version: license.version,
                 archivePathError: sourceText("error.provider.opencodeArchivePath"),
                 mismatchError: sourceText("error.provider.opencodePackageMismatch"),
               },

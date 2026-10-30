@@ -38,7 +38,8 @@ export interface OutboxDelivery {
   beforeStore: (repeatSafe: boolean) => Promise<void>;
 }
 
-export type OutboxDeliveryResult = { messageId: string };
+/** A channel message has no message ID: the channel history shows it once the host stored it. */
+export type OutboxDeliveryResult = { messageId: string | null };
 
 type OutboxDeliverer = (message: OutboxMessage, delivery: OutboxDelivery) => Promise<OutboxDeliveryResult>;
 
@@ -495,7 +496,14 @@ export class OutboxStore {
       return;
     }
     this.finishUpload(clientMessageId);
-    this.update(clientMessageId, { state: "sent", messageId: result.messageId });
+    if (result.messageId !== null) {
+      this.update(clientMessageId, { state: "sent", messageId: result.messageId });
+    } else {
+      // A channel send waited for the history of an open channel: the chat already draws the host's row.
+      this.messages = this.messages.filter((message) => message.clientMessageId !== clientMessageId);
+      this.publish();
+      void this.forget(clientMessageId);
+    }
     void this.persist();
     this.pump();
   }

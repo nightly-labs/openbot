@@ -1,11 +1,16 @@
-import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
+import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, Tooltip, X } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { SidebarAgentState, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
+import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_HINT, SIDEBAR_WAIT_TITLE } from "./sidebar-filtering";
+import type { SidebarAgentState, SidebarChannelWait, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
+
+/** Long enough that moving the pointer down the list does not flash every waiting row's tooltip. */
+const SIDEBAR_WAIT_TOOLTIP_OPEN_DELAY = 350;
 
 export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | undefined }) {
   const { t } = useText();
@@ -92,6 +97,53 @@ export function SidebarWaitIcon(props: { reason: SidebarWaitReason }) {
         <MousePointer2 aria-hidden="true" />
       </Show>
     </>
+  );
+}
+
+/** The chip in the time slot of a waiting row: what the user does next. */
+export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
+  const { t } = useText();
+  return (
+    <span class="agent-row-wait-chip">
+      <SidebarWaitIcon reason={props.reason} />
+      <span class="agent-row-wait-chip-label">{t(SIDEBAR_WAIT_ACTION[props.reason])}</span>
+    </span>
+  );
+}
+
+/**
+ * The tooltip of a row in "Needs you": what the chat waits for, the question or the command, and what
+ * selecting the row does. It stays closed while the row's context menu is open.
+ */
+export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: boolean; children: JSX.Element }) {
+  const { t } = useText();
+  const [open, setOpen] = createSignal(false);
+  return (
+    <Tooltip.Root
+      open={open() && !props.menuOpen}
+      onOpenChange={setOpen}
+      placement="right"
+      gutter={10}
+      openDelay={SIDEBAR_WAIT_TOOLTIP_OPEN_DELAY}
+      closeDelay={0}
+      skipDelayDuration={300}
+    >
+      <Tooltip.Trigger as="div" class="sidebar-agent-tooltip-trigger">
+        {props.children}
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="sidebar-wait-tooltip">
+          <span class="sidebar-wait-tooltip-title">
+            <SidebarWaitIcon reason={props.wait.reason} />
+            {t(SIDEBAR_WAIT_TITLE[props.wait.reason])}
+          </span>
+          <Show when={props.wait.detail}>
+            {(detail) => <span class="sidebar-wait-tooltip-detail">{detail()}</span>}
+          </Show>
+          <span class="sidebar-wait-tooltip-hint">{t(SIDEBAR_WAIT_HINT[props.wait.reason])}</span>
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

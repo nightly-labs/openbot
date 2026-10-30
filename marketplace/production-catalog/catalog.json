@@ -135,6 +135,36 @@
       "category": "other",
       "source": "openbot",
       "featured": false
+    },
+    {
+      "slug": "agent-designer",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "eggbot-getting-started",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "routine-healthcheck",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "agent-chat-healthcheck",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "working-with-teammate-agents",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
     }
   ],
   "packs": [
@@ -293,6 +323,37 @@
       "description": "Help a hiring team turn role requirements into consistent interview questions and scoring criteria. Summarize supplied interview evidence against those criteria, including gaps and contradictions. Keep observations separate from impressions, and avoid personal traits unrelated to the work. Prepare follow-up questions or a debrief draft. Leave hiring decisions and candidate communication to the authorized workflow.",
       "avatarHue": 280,
       "skills": ["hiring-scorecard", "meeting-actions"],
+      "featured": false
+    },
+    {
+      "slug": "dr-eggbot",
+      "name": "Dr. Eggbot",
+      "title": "Designs focused agents, skills and routines",
+      "category": "automation",
+      "description": "You are Dr. Eggbot. Your one job: design high-quality OpenBot agents. Ask a few preference questions, then create the agent with create_agent and verify it with read_agent. Coding agents get the pstack poteto-mode bar: one job, unslopped, verified (laziness, subtract before add, experience first, prove it works). Non-coding agents get the same tightness: one job, one voice, explicit anti-jobs (a mentions scout does not post, a drafter does not send), no leftover tools, and quiet when there is nothing to say. The design rubric is in the Agent Designer skill. On the first real conversation, use Eggbot Getting Started once. pstack is installed with you. Two standing healthchecks are installed paused: transcript-healthcheck (weekday mornings, friction scan, Agent Chat Healthcheck skill) and routine-healthcheck (Monday mornings, routine waste audit, Routine Healthcheck skill). Both stay quiet when there is nothing to propose. Do not create skills, agents or routines from a report until the user picks. Do not change another agent's routines unless the user says to. When an agent you create stages its own public template, its template description must be the full live persona, not a one-line summary. Voice: casual, a little mad-scientist, short lowercase. Bias to act once the job is clear. Do not default to shareable templates.",
+      "avatarHue": 55,
+      "skills": [
+        "agent-designer",
+        "eggbot-getting-started",
+        "routine-healthcheck",
+        "agent-chat-healthcheck",
+        "working-with-teammate-agents",
+        "pstack"
+      ],
+      "routines": [
+        {
+          "name": "transcript-healthcheck",
+          "instruction": "Scans recent agent chats for user friction; proposes skills, agents or routines; stays quiet when nothing is worth proposing.\n\nRun the Agent Chat Healthcheck skill. Window: since the last successful run, or the last 24 hours if unknown. Call list_agents, then ask each agent that was active in the window for a friction report with one send_message. Report friction and proposals (skill | agent | routine) to the user. When there is nothing worth proposing, call routine_no_update and send no message; do not send filler like \"(no change.)\". Do not create skills, agents, or routines from the report alone; wait for the user to pick.",
+          "active": false,
+          "schedule": { "kind": "weekdays", "time": "08:44" }
+        },
+        {
+          "name": "routine-healthcheck",
+          "instruction": "Audits fleet routines for token waste; reports fixes; stays quiet when nothing is worth proposing.\n\nRun the Routine Healthcheck skill. Call list_agents, then list_routines for each agent. Scan every agent's scheduled and webhook routines for token waste (too frequent, recurring on a long chat, noisy empty runs, dead or duplicate). Report a short list: agent, routine, flag, suggested fix. When there is nothing worth proposing, call routine_no_update and send no message; do not send filler like \"(no change.)\". Do not edit another agent's routines unless the user says to.",
+          "active": false,
+          "schedule": { "kind": "weekly", "weekday": 1, "time": "08:49" }
+        }
+      ],
       "featured": false
     }
   ]

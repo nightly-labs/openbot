@@ -153,7 +153,7 @@ export function WtfIsOpenBot() {
       <p>
         If you want to see how it works in practice, start with{" "}
         <Link to="/guides/$slug" params={{ slug: "openbot-101" }}>
-          OpenBot 101
+          How to Use OpenBot
         </Link>
         . To see how it differs from an agent app that runs in the cloud, read{" "}
         <Link to="/compare/$slug" params={{ slug: "grok-bot" }}>

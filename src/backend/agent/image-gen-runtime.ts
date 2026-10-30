@@ -170,7 +170,7 @@ export class ImageGenRuntime {
     message.itemType = "image_generation";
     message.text = "";
     message.imageGeneration = {
-      prompt,
+      ...(prompt === undefined ? {} : { prompt }),
       resolution,
       aspectRatio,
       ...(failure ? { error: failure } : {}),

@@ -14,13 +14,13 @@ export const messages = {
   "remoteDesktop.viewerTitle": "Sunshine リモートデスクトップ",
   "remoteDesktop.viewerLoadFailed": "Moonlight ビューアーを読み込めませんでした。",
   "remoteDesktop.streamNotReady":
-    "ホストがストリームを開始しませんでした。ホストで Sunshine が停止した可能性があります。もう一度お試しください。",
-  "remoteDesktop.hostOfflineTitle": "ホストはオフラインです",
-  "remoteDesktop.hostOfflineMessage": "デスクトップを開く前にホストに再接続してください。",
+    "サーバーがストリームを開始しませんでした。サーバーで Sunshine が停止した可能性があります。もう一度お試しください。",
+  "remoteDesktop.hostOfflineTitle": "サーバーはオフラインです",
+  "remoteDesktop.hostOfflineMessage": "デスクトップを開く前にサーバーに再接続してください。",
   "remoteDesktop.openFailed": "デスクトップを開けませんでした",
   "remoteDesktop.notSharingTitle": "{name} は画面を共有していません",
   "remoteDesktop.notSharingDescription":
-    "ホストが OpenBot による画面収録をブロックしています。そのコンピューターで「システム設定」→「プライバシーとセキュリティ」→「画面収録」を開き、OpenBot をオンにしてから、ここでもう一度お試しください。",
+    "サーバーが OpenBot による画面収録をブロックしています。そのサーバーで「システム設定」→「プライバシーとセキュリティ」→「画面収録」を開き、OpenBot をオンにしてから、ここでもう一度お試しください。",
   "remoteDesktop.setup.check.screenRecording": "画面収録",
   "remoteDesktop.setup.check.accessibility": "アクセシビリティ",
   "remoteDesktop.setup.check.service": "Sunshine サービス",
@@ -41,7 +41,7 @@ export const messages = {
   "remoteDesktop.setup.startFailed": "リモートデスクトップのテストを開始できませんでした。",
   "remoteDesktop.setup.connectionLost": "テスト接続が切れました。",
   "remoteDesktop.setup.hostUpdateRequired":
-    "権限を確認してリモートデスクトップをテストするには、ホストの OpenBot をアップデートしてください。",
+    "権限を確認してリモートデスクトップをテストするには、サーバーの OpenBot をアップデートしてください。",
   "remoteDesktop.setup.permissions": "権限",
   "remoteDesktop.setup.checked": "確認日時",
   "remoteDesktop.setup.checkAgain": "もう一度確認",
@@ -55,7 +55,7 @@ export const messages = {
   "remoteDesktop.setup.liveTest": "ライブ接続テスト",
   "remoteDesktop.setup.liveTestLocal": "この Mac で映像、マウス、キーボードをテストします。",
   "remoteDesktop.setup.liveTestRemote":
-    "テストではホストに一時的なパネルが開きます。先にほかのリモートセッションを終了する必要があります。入力はパネル内に限られます。",
+    "テストではサーバーに一時的なパネルが開きます。先にほかのリモートセッションを終了する必要があります。入力はパネル内に限られます。",
   "remoteDesktop.setup.testSummary": "ビデオ: {video} · 映像: {picture} · マウス: {mouse} · キーボード: {keyboard}",
   "remoteDesktop.setup.received": "受信済み",
   "remoteDesktop.setup.notReceived": "未受信",
@@ -67,7 +67,7 @@ export const messages = {
   "remoteDesktop.setup.testRemote": "リモートデスクトップをテスト",
   "remoteDesktop.setup.videoFailed": "テスト用のビデオ接続に失敗しました。",
   "remoteDesktop.setup.inputInstructions":
-    "ホストのターゲットをクリックしてから {code} と入力してください。マウス: {mouse}。キーボード: {keyboard}。",
+    "テストパネルのターゲットをクリックしてから {code} と入力してください。マウス: {mouse}。キーボード: {keyboard}。",
   "remoteDesktop.setup.videoOnly":
     "ビデオのテストのみです。マウスとキーボードのテストには、アップデートされた Sunshine ランタイムが必要です。",
   "remoteDesktop.setup.pictureConfirmed": "映像を確認しました",

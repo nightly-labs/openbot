@@ -12,6 +12,10 @@
       "zone_name": "openbot.site"
     }
   ],
+  "vars": {
+    // The account service origin. The report route `/_openbot/report` and the links on error pages use it.
+    "ACCOUNT_ORIGIN": "https://openbot.run"
+  },
   "r2_buckets": [
     {
       "binding": "SITES",

@@ -18,7 +18,7 @@ import {
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { estimateUsageCost } from "../agent/usage-pricing";
 import type { DatabaseCore } from "./database-core";
-import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
+import { databaseRow, databaseRows, optionalNumberColumn, requiredStringColumn } from "./database-rows";
 
 export interface UsageSample {
   agentId: string;
@@ -31,9 +31,29 @@ export interface UsageSample {
   baseline: boolean;
   reportedCost?: number | null;
   occurredAt?: string;
-  pricingInputTokens?: number | null;
+  /** The prompt of the last request in this update, when the provider reports it. */
+  lastRequestInputTokens?: number | null;
+  /** The smallest prompt of all the requests in this update, when the provider reports each request. */
+  smallestRequestInputTokens?: number | null;
+  /**
+   * The provider's totals before this update. A counter with no checkpoint starts from them, so its
+   * first update records only the new requests.
+   */
+  previousTokens?: UsageTokens | null;
+  /**
+   * The counter whose checkpoint keeps `reportedCost`, when the provider reports tokens per prompt but
+   * cost for the whole session. Without one, the cost is kept with the tokens.
+   */
+  costCounterId?: string;
 }
 const TOKEN_KEYS = ["uncachedInput", "cachedInput", "cacheCreation", "output"] as const;
+
+/** The tokens one model used in a turn. */
+export interface TurnModelUsage {
+  provider: string;
+  model: string;
+  tokens: UsageTokens;
+}
 
 /** Owns numeric analytics and cumulative checkpoints. Conversation deletion does not erase usage. */
 export class AgentUsage {
@@ -79,9 +99,28 @@ export class AgentUsage {
             .prepare("SELECT tokens_json FROM agent_usage_checkpoints WHERE agent_id = ? AND counter_id = ?")
             .get(sample.agentId, sample.counterId),
         );
-        const previousValue = previous ? databaseRow(JSON.parse(requiredStringColumn(previous, "tokens_json"))) : null;
+        const costCheckpoint = sample.costCounterId
+          ? databaseRow(
+              db
+                .prepare("SELECT tokens_json FROM agent_usage_checkpoints WHERE agent_id = ? AND counter_id = ?")
+                .get(sample.agentId, sample.costCounterId),
+            )
+          : previous;
+        const previousValue = costCheckpoint
+          ? databaseRow(JSON.parse(requiredStringColumn(costCheckpoint, "tokens_json")))
+          : null;
         const previousCost = previousValue?.reportedCost;
-        const before = previous ? decodeUsageTokens(JSON.parse(requiredStringColumn(previous, "tokens_json"))) : null;
+        const reportedCost =
+          sample.reportedCost == null
+            ? typeof previousCost === "number"
+              ? previousCost
+              : null
+            : Math.max(sample.reportedCost, typeof previousCost === "number" ? previousCost : 0);
+        const before = previous
+          ? decodeUsageTokens(JSON.parse(requiredStringColumn(previous, "tokens_json")))
+          : sample.baseline
+            ? null
+            : (sample.previousTokens ?? null);
         const delta: UsageTokens = { ...tokens };
         for (const key of TOKEN_KEYS) {
           const current = tokens[key];
@@ -100,35 +139,38 @@ export class AgentUsage {
         ).run(
           sample.agentId,
           sample.counterId,
-          JSON.stringify({
-            ...tokens,
-            reportedCost:
-              sample.reportedCost == null
-                ? typeof previousCost === "number"
-                  ? previousCost
-                  : null
-                : Math.max(sample.reportedCost, typeof previousCost === "number" ? previousCost : 0),
-          }),
+          JSON.stringify(sample.costCounterId ? tokens : { ...tokens, reportedCost }),
         );
+        // A session that has records but no cost checkpoint ran before its costs were kept. Its
+        // first cost report also counts that earlier use, so the report is only the start.
+        const costStartUnknown =
+          sample.costCounterId && sample.reportedCost != null && typeof previousCost !== "number"
+            ? databaseRow(
+                db
+                  .prepare("SELECT 1 FROM agent_usage_records WHERE agent_id = ? AND session_id = ? LIMIT 1")
+                  .get(sample.agentId, sample.sessionId),
+              ) !== null
+            : false;
+        if (sample.costCounterId && sample.reportedCost != null)
+          db.prepare(
+            "INSERT INTO agent_usage_checkpoints VALUES (?, ?, ?) ON CONFLICT(agent_id, counter_id) DO UPDATE SET tokens_json = excluded.tokens_json",
+          ).run(sample.agentId, sample.costCounterId, JSON.stringify({ reportedCost }));
         if ((!before && sample.baseline) || sample.turnId === "baseline") return null;
-        const estimate =
-          sample.reportedCost !== undefined && sample.reportedCost !== null
-            ? {
-                cost:
-                  before && typeof previousCost !== "number"
-                    ? null
-                    : Math.max(0, sample.reportedCost - (typeof previousCost === "number" ? previousCost : 0)),
+        // A resumed Claude process reports its cost from 0, so the cost of its first turn is unknown.
+        // That turn, and a Claude report with no cost, are priced from list rates instead.
+        const reported =
+          sample.reportedCost === undefined ||
+          sample.reportedCost === null ||
+          costStartUnknown ||
+          (!sample.costCounterId && before && typeof previousCost !== "number")
+            ? null
+            : {
+                cost: Math.max(0, sample.reportedCost - (typeof previousCost === "number" ? previousCost : 0)),
                 basis:
-                  "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
-              }
-            : sample.provider === "claude"
-              ? { cost: null, basis: null }
-              : estimateUsageCost(
-                  sample.provider,
-                  sample.model,
-                  delta,
-                  sample.pricingInputTokens ?? (tokens.uncachedInput ?? 0) + (tokens.cachedInput ?? 0),
-                );
+                  sample.provider === "opencode"
+                    ? "OpenCode session cost report; API-equivalent rates, not subscription charges"
+                    : "Claude SDK list-price estimate; https://platform.claude.com/docs/en/about-claude/pricing; verified 2026-09-07",
+              };
         const turn = databaseRow(
           db
             .prepare("SELECT occurred_at FROM agent_usage_activity WHERE agent_id = ? AND activity_id = ?")
@@ -136,6 +178,16 @@ export class AgentUsage {
         );
         const occurredAt =
           sample.occurredAt ?? (turn ? requiredStringColumn(turn, "occurred_at") : new Date().toISOString());
+        const estimate =
+          reported ??
+          estimateUsageCost(
+            sample.provider,
+            sample.model,
+            delta,
+            sample.lastRequestInputTokens ?? null,
+            sample.smallestRequestInputTokens ?? null,
+            occurredAt,
+          );
         db.prepare("INSERT INTO agent_usage_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
           sample.agentId,
           digest,
@@ -158,6 +210,64 @@ export class AgentUsage {
     this.#core.connection
       .prepare("INSERT OR IGNORE INTO agent_usage_activity VALUES (?, ?, ?, ?, ?, ?, 'turn', ?)")
       .run(agentId, `turn:${sessionId}:${turnId}`, sessionId, turnId, provider, model, new Date().toISOString());
+  }
+
+  /**
+   * The token counts of one turn by provider and model, summed over its records. An empty list
+   * means the provider reported none. A count is `null` when one record lacks it, so a partial sum
+   * never reads as complete. `since` bounds the read to the agent's recent rows on `agent_usage_date`.
+   */
+  readTurn(agentId: string, turnId: string, since: string): TurnModelUsage[] {
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          "SELECT provider, model, tokens_json FROM agent_usage_records WHERE agent_id = ? AND occurred_at >= ? AND turn_id = ?",
+        )
+        .all(agentId, since, turnId),
+    );
+    const models = new Map<string, TurnModelUsage>();
+    for (const row of rows) {
+      const provider = requiredStringColumn(row, "provider");
+      const model = requiredStringColumn(row, "model");
+      const key = JSON.stringify([provider, model]);
+      let entry = models.get(key);
+      if (!entry) {
+        entry = { provider, model, tokens: { uncachedInput: 0, cachedInput: 0, cacheCreation: 0, output: 0 } };
+        models.set(key, entry);
+      }
+      const tokens = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
+      for (const key of TOKEN_KEYS) {
+        const value = tokens[key];
+        const total = entry.tokens[key];
+        entry.tokens[key] = value === null || total === null ? null : total + value;
+      }
+    }
+    return [...models.values()];
+  }
+
+  /**
+   * All the tokens of one turn and its cost, summed over its records, or `null` when the provider
+   * reported none. The tokens add the known counts, as the analytics total does. The cost is `null`
+   * when one record has no cost, so a partial sum never reads as complete.
+   */
+  readTurnTotals(agentId: string, turnId: string, since: string): { tokens: number; costUsd: number | null } | null {
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          "SELECT tokens_json, estimated_cost_usd FROM agent_usage_records WHERE agent_id = ? AND occurred_at >= ? AND turn_id = ?",
+        )
+        .all(agentId, since, turnId),
+    );
+    if (rows.length === 0) return null;
+    let tokens = 0;
+    let costUsd: number | null = 0;
+    for (const row of rows) {
+      const counts = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
+      for (const key of TOKEN_KEYS) tokens += counts[key] ?? 0;
+      const cost = optionalNumberColumn(row, "estimated_cost_usd");
+      costUsd = costUsd === null || cost === null ? null : costUsd + cost;
+    }
+    return { tokens, costUsd };
   }
 
   read(raw: AgentAnalyticsInput): AgentAnalytics {
@@ -228,7 +338,7 @@ export class AgentUsage {
       const cellKey = JSON.stringify([date, provider]);
       let cell = providerDays.get(cellKey);
       if (!cell) {
-        cell = { date, provider, processedTokens: 0, estimatedCostUsd: null };
+        cell = { date, provider, processedTokens: 0, cachedInput: null, estimatedCostUsd: null };
         providerDays.set(cellKey, cell);
       }
       return { targets: [totals, day, entry.bucket, agentEntry], cell };
@@ -256,6 +366,7 @@ export class AgentUsage {
       const cell = scope.cell;
       if (cell) {
         for (const key of TOKEN_KEYS) if (tokens[key] !== null) cell.processedTokens += tokens[key];
+        if (tokens.cachedInput !== null) cell.cachedInput = (cell.cachedInput ?? 0) + tokens.cachedInput;
         if (typeof row.estimated_cost_usd === "number")
           cell.estimatedCostUsd = (cell.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
       }

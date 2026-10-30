@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
-import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 import type {
   IdleRestart,
   ScheduledUpdateRestart,
@@ -34,7 +34,7 @@ export type UpdateCheckOutcome = {
 
 /**
  * The subset of electron-updater this service drives. Four behaviours of the installed version are
- * load bearing here, none of them public API, all verified against 6.8.9. Verify them again when
+ * load bearing here, none of them public API, all verified against 6.8.11. Verify them again when
  * electron-updater changes:
  *
  * 1. `MacUpdater.updateDownloaded` only calls `nativeUpdater.checkForUpdates()` - the call that makes
@@ -93,12 +93,14 @@ interface UpdateServiceOptions {
   enabled: boolean;
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
-  checkSiblingInstances?: () => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>;
+  checkSiblingInstances?: (() => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>) | undefined;
   /** The uid of this process. It tells a refusal in this account apart from another account. */
-  currentUid?: number;
+  currentUid?: number | undefined;
   platform?: NodeJS.Platform;
   logDirectory?: string;
-  shipItDirectory?: string;
+  shipItDirectory?: string | undefined;
+  /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
+  updaterCacheDirectory?: string | undefined;
   initialCheckDelayMs?: number;
   checkIntervalMs?: number;
   checkTimeoutMs?: number;
@@ -162,6 +164,18 @@ export function supportsInstalledUpdates(
   return platform === "darwin" || platform === "win32";
 }
 
+/**
+ * Whether Nix installed this copy. The Nix store is read-only, and Nix replaces the whole package on
+ * an update, so the app must not write a new version over itself.
+ */
+export function isNixStoreInstall(executablePath: string = process.execPath): boolean {
+  return executablePath.startsWith("/nix/store/");
+}
+
+function unsupportedMessage(): string {
+  return sourceText(isNixStoreInstall() ? "error.update.managedByNix" : "error.update.unsupported");
+}
+
 export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   readonly #updater: UpdateAdapter;
   readonly #options: Required<
@@ -169,7 +183,12 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   > &
     Pick<
       UpdateServiceOptions,
-      "beforeInstall" | "checkSiblingInstances" | "currentUid" | "logDirectory" | "shipItDirectory"
+      | "beforeInstall"
+      | "checkSiblingInstances"
+      | "currentUid"
+      | "logDirectory"
+      | "shipItDirectory"
+      | "updaterCacheDirectory"
     > & {
       phaseTimeoutsMs: Record<UpdateBusyPhase, number>;
     };
@@ -220,7 +239,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       availableVersion: null,
       progress: null,
       checkedAt: null,
-      message: options.enabled ? null : sourceText("error.update.unsupported"),
+      message: options.enabled ? null : unsupportedMessage(),
       errorCode: null,
     };
     this.on("diagnostic", (event) => {
@@ -255,7 +274,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       // native updater for the ZIP on demand, so the restart action is available immediately.
       this.#markReady(info.version);
     });
-    this.#updater.on("error", () => {
+    this.#updater.on("error", (error: Error) => {
       // Both awaited calls reject on failure, so this only has to cover errors raised outside them,
       // and only for an operation still in flight. An abandoned operation reporting late must not
       // replace the state the user is now looking at.
@@ -267,6 +286,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         // so the app cannot install again; it reports the failure and asks to be relaunched.
         this.#installGeneration += 1;
         this.#activeInstall = null;
+        logUpdateFailure("OpenBot update install failed.", error);
         this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
         return;
       }
@@ -277,6 +297,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
     if (this.#options.platform === "darwin" && this.#options.shipItDirectory) {
       this.#fork(pruneShipItLogs(this.#options.shipItDirectory));
+    }
+    if (this.#options.updaterCacheDirectory) {
+      this.#fork(pruneInstalledUpdate(this.#options.updaterCacheDirectory, this.#options.currentVersion));
     }
 
     if (scheduleChecks && this.#options.enabled) {
@@ -506,6 +529,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           ),
         );
         if (Result.isFailure(result) && this.#downloadGeneration === generation) {
+          logUpdateFailure("OpenBot update download failed.", result.failure.cause);
           this.#activeDownload = null;
           this.#setError("download_failed");
         }
@@ -561,11 +585,15 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           if (this.#checkRequest) yield* Deferred.await(this.#checkRequest).pipe(Effect.catch(() => Effect.void));
           if (this.#installGeneration !== generation) return;
           this.#installHandedOver = true;
-          yield* updateSync(() => this.#updater.quitAndInstall(false, true));
+          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
+          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
+          // from `autoRunAppAfterInstall`, which is also `true`.
+          yield* updateSync(() => this.#updater.quitAndInstall(true, true));
           this.#armPhaseTimer();
         }),
       );
       if (Result.isFailure(installed) && this.#installGeneration === generation) {
+        logUpdateFailure("OpenBot update install failed.", installed.failure.cause);
         this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.restartFailed")) });
       }
@@ -610,6 +638,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       const request = Deferred.makeUnsafe<UpdateCheckOutcome | null, UpdateOperationFailure>();
       this.#checkRequest = request;
       return yield* updateIO(() => this.#updater.checkForUpdates()).pipe(
+        // Logged once per request, here, because joined callers and the status keep only a message.
+        Effect.tapError(({ cause }) => Effect.sync(() => logUpdateFailure("OpenBot update check failed.", cause))),
         Effect.onExit((exit) =>
           Effect.gen({ self: this }, function* () {
             yield* Deferred.done(request, exit);
@@ -659,6 +689,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return Effect.gen({ self: this }, function* () {
       if (this.#cancellationToken && !this.#cancellationToken.cancelled) return this.#cancellationToken;
       const checked = yield* Effect.result(updateIO(() => this.#updater.checkForUpdates()));
+      if (Result.isFailure(checked)) logUpdateFailure("OpenBot update check failed.", checked.failure.cause);
       this.#cancellationToken = Result.isSuccess(checked) ? (checked.success?.cancellationToken ?? null) : null;
       return this.#cancellationToken;
     });
@@ -850,6 +881,24 @@ function describeCheckFailure(error: unknown) {
   return errorMessage("check_failed");
 }
 
+/**
+ * The status and `update.log` keep only a failure code. electron-updater puts its own code and the
+ * HTTP status on the error, outside its message, so they are logged apart. The stack is left out:
+ * an offline app fails a check each interval, and electron-updater already puts the stack of the
+ * cause in the message.
+ */
+function logUpdateFailure(text: string, error: unknown): void {
+  const fields = typeof error === "object" && error !== null ? error : {};
+  logger.warn(
+    text,
+    toLogValue({
+      code: "code" in fields ? fields.code : undefined,
+      statusCode: "statusCode" in fields ? fields.statusCode : undefined,
+      message: error instanceof Error ? error.message : error,
+    }),
+  );
+}
+
 function errorMessage(code: UpdateFailureCode) {
   if (code === "download_failed") return sourceText("error.update.downloadFailed");
   if (code === "install_failed") return INSTALL_FAILED_MESSAGE;
@@ -883,6 +932,31 @@ function pruneShipItLogs(directory: string): Effect.Effect<void, UpdateOperation
       concurrency: "unbounded",
       discard: true,
     });
+  }).pipe(Effect.catch(() => Effect.void));
+}
+
+const decodePendingUpdateInfo = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Struct({ fileName: Schema.String })),
+);
+
+/**
+ * electron-updater keeps the download in `pending` after the install, which leaves a full release
+ * artifact on disk until the next download (issue #2939). This removes it once the running version
+ * has caught up, and keeps a newer download that still waits for its restart. `update.zip` beside it
+ * stays: it is the base of the next differential download on macOS.
+ */
+function pruneInstalledUpdate(directory: string, currentVersion: string): Effect.Effect<void, never> {
+  return Effect.gen(function* () {
+    const pending = join(directory, "pending");
+    const text = yield* updateIO(() => readFile(join(pending, "update-info.json"), "utf8"));
+    const { fileName } = yield* decodePendingUpdateInfo(text);
+    // electron-builder.yml names each artifact `${productName}-${version}-${arch}.${ext}`.
+    const version = /-(\d+\.\d+\.\d+)-/u.exec(fileName)?.[1];
+    if (version === undefined || isNewerRelease(version, currentVersion)) return;
+    // The marker goes last: when Windows still locks the installer, the next start tries again.
+    // Only these two files go, so a download that this session has started keeps its temp file.
+    yield* updateIO(() => rm(join(pending, basename(fileName)), { force: true }));
+    yield* updateIO(() => rm(join(pending, "update-info.json"), { force: true }));
   }).pipe(Effect.catch(() => Effect.void));
 }
 

@@ -9,6 +9,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
+import { savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 
@@ -44,6 +45,9 @@ export function AgentPhoto({
       if (!agentId || !serverId || !avatarUrl) throw new Error("The agent avatar is unavailable.");
       return workspace().loadAgentAvatar(agentId, avatarUrl, serverId);
     },
+    // A saved photo shows at once, also before the server connects.
+    initialData: () =>
+      agentId && serverId && avatarUrl ? (savedAgentAvatar(serverId, agentId, avatarUrl) ?? undefined) : undefined,
     staleTime: Infinity,
   });
   const uri = imageUrl === undefined ? photo.data : imageUrl;

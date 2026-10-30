@@ -5,10 +5,21 @@ import { z } from "zod";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
-import { AgentWaitError, type AgentWaitStore } from "./agent-wait-store";
+import { AgentWaitError, AgentWaitLimitError, type AgentWaitStore } from "./agent-wait-store";
 
 export const AWAIT_EVENT_TOOL = "await_event";
 export const CLOSE_WAIT_TOOL = "close_wait";
+export const LIST_WAITS_TOOL = "list_waits";
+
+/** Close to the limit, a new wait reminds the agent to close the waits it finished. */
+const NEAR_LIMIT_MARGIN = 3;
+
+const waitOwnerSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(INPUT_LIMITS.identifier)
+  .describe("Stable id from list_agents. Omit it for your own waits.");
 
 export const awaitEventToolSchema = z.strictObject({
   note: z.string().trim().min(1).max(INPUT_LIMITS.agentWaitNote),
@@ -17,7 +28,10 @@ export const awaitEventToolSchema = z.strictObject({
 
 export const closeWaitToolSchema = z.strictObject({
   waitId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
+  agentId: waitOwnerSchema.optional(),
 });
+
+export const listWaitsToolSchema = z.strictObject({ agentId: waitOwnerSchema.optional() });
 
 export interface AgentWaitsHooks {
   emit(event: AgentEvent): void;
@@ -25,6 +39,8 @@ export interface AgentWaitsHooks {
   ownsRoutine(agentId: string, routineId: string): boolean;
   /** Whether this agent has a routine: only a routine run wakes a wait. */
   hasRoutine(agentId: string): boolean;
+  /** Throws when no local agent has this id. */
+  requireKnownAgent(agentId: string): void;
 }
 
 export interface AgentWaitsOptions {
@@ -42,8 +58,8 @@ export interface AgentWaitCaller {
 
 /**
  * Open waits: work an agent stopped because it waits for something outside the turn. The agent
- * opens and closes them with two tools; the user cancels them from the chat; a routine run of the
- * agent wakes them. The input of the run that wakes a wait repeats the request and the note, so
+ * opens, lists and closes them with three tools, and another local agent can list and close them
+ * with `agentId`; the user cancels them from the chat; a routine run of the agent wakes them. The input of the run that wakes a wait repeats the request and the note, so
  * the agent can continue the request after its context lost it.
  *
  * It never imports the agent service facade.
@@ -85,16 +101,23 @@ export class AgentWaits {
     this.#changed(run.agentId);
   }
 
+  /** The number of open waits of each agent that has one. */
+  countByAgent(): Map<string, number> {
+    return this.#store.countByAgent();
+  }
+
   /** The waits that the run of this delivery continues, read when the run starts. */
   wokenBy(deliveryId: string): AgentWait[] {
     return this.#store.wokenBy(deliveryId);
   }
 
-  /** Answers `await_event` and `close_wait`; null for every other tool. */
+  /** Answers `await_event`, `close_wait` and `list_waits`; null for every other tool. */
   handleTool(params: DynamicToolCallParams, caller: AgentWaitCaller): OpenBotToolResponse | null {
-    if (params.tool !== AWAIT_EVENT_TOOL && params.tool !== CLOSE_WAIT_TOOL) return null;
     try {
-      return params.tool === AWAIT_EVENT_TOOL ? this.#awaitEvent(params, caller) : this.#closeWait(params, caller);
+      if (params.tool === AWAIT_EVENT_TOOL) return this.#awaitEvent(params, caller);
+      if (params.tool === CLOSE_WAIT_TOOL) return this.#closeWait(params, caller);
+      if (params.tool === LIST_WAITS_TOOL) return this.#listWaits(params, caller);
+      return null;
     } catch (error) {
       if (error instanceof AgentWaitError) return openBotToolFailure(error.message);
       throw error;
@@ -122,16 +145,42 @@ export class AgentWaits {
       return openBotToolFailure(sourceText("error.backend.agentWaitRoutineGone"));
     if (!this.#hooks.hasRoutine(caller.agentId))
       return openBotToolFailure(sourceText("error.backend.agentWaitNoRoutine"));
-    const wait = this.#store.open({
-      agentId: caller.agentId,
-      requestMessageId: request.delivery.id,
-      requestText: request.delivery.text,
-      note,
-      routineId: routineId ?? null,
-    });
+    let wait: AgentWait;
+    try {
+      wait = this.#store.open({
+        agentId: caller.agentId,
+        requestMessageId: request.delivery.id,
+        requestText: request.delivery.text,
+        note,
+        routineId: routineId ?? null,
+      });
+    } catch (error) {
+      if (!(error instanceof AgentWaitLimitError)) throw error;
+      // The open waits come with the refusal, so the agent can close the finished ones at once.
+      return {
+        success: false,
+        contentItems: [
+          {
+            type: "inputText",
+            text: JSON.stringify({
+              error: error.message,
+              waits: this.#store.list(caller.agentId).map(waitSummary),
+            }),
+          },
+        ],
+      };
+    }
     this.#changed(caller.agentId);
+    const openWaits = this.#store.count(caller.agentId);
     return openBotToolResult({
       waitId: wait.id,
+      openWaits,
+      limit: INPUT_LIMITS.agentWaits,
+      ...(openWaits >= INPUT_LIMITS.agentWaits - NEAR_LIMIT_MARGIN
+        ? {
+            nearLimit: `You are close to the limit of open waits. Call openbot.${LIST_WAITS_TOOL} and close the waits whose request is done.`,
+          }
+        : {}),
       wakes: wait.routineId
         ? `The next run of routine ${wait.routineId} wakes this wait, or a script event that names it.`
         : "The next run of any of your routines wakes this wait, or a script event that names it.",
@@ -142,10 +191,34 @@ export class AgentWaits {
 
   #closeWait(params: DynamicToolCallParams, caller: AgentWaitCaller): OpenBotToolResponse {
     const parsed = closeWaitToolSchema.safeParse(params.arguments);
-    if (!parsed.success || !this.#store.delete(caller.agentId, parsed.data.waitId))
+    if (!parsed.success) return openBotToolFailure(z.prettifyError(parsed.error));
+    const agentId = this.#waitOwner(parsed.data.agentId, caller);
+    if (!this.#store.delete(agentId, parsed.data.waitId))
       return openBotToolFailure(sourceText("error.backend.agentWaitGone"));
-    this.#changed(caller.agentId);
+    this.#changed(agentId);
     return openBotToolResult({ closed: parsed.data.waitId });
+  }
+
+  #listWaits(params: DynamicToolCallParams, caller: AgentWaitCaller): OpenBotToolResponse {
+    const parsed = listWaitsToolSchema.safeParse(params.arguments ?? {});
+    if (!parsed.success) return openBotToolFailure(z.prettifyError(parsed.error));
+    const agentId = this.#waitOwner(parsed.data.agentId, caller);
+    return openBotToolResult({
+      agentId,
+      limit: INPUT_LIMITS.agentWaits,
+      waits: this.#store.list(agentId).map(waitSummary),
+    });
+  }
+
+  /** The agent whose waits a tool call reads or closes. An unknown agent is a request the model can correct. */
+  #waitOwner(agentId: string | undefined, caller: AgentWaitCaller): string {
+    if (agentId === undefined || agentId === caller.agentId) return caller.agentId;
+    try {
+      this.#hooks.requireKnownAgent(agentId);
+    } catch (error) {
+      throw new AgentWaitError(error instanceof Error ? error.message : String(error));
+    }
+    return agentId;
   }
 
   #isPending(deliveryId: string): boolean {
@@ -156,6 +229,17 @@ export class AgentWaits {
   #changed(agentId: string): void {
     this.#hooks.emit({ type: "waits-changed", snapshot: this.list(agentId) });
   }
+}
+
+/** A wait as the list tools show it. The request text stays out: it can be long, and it is the user's. */
+function waitSummary(wait: AgentWait) {
+  return {
+    waitId: wait.id,
+    note: wait.note,
+    openedAt: wait.createdAt,
+    routineId: wait.routineId,
+    wokenAt: wait.wokenAt,
+  };
 }
 
 /** The part of a run's input that continues its woken waits. */

@@ -41,7 +41,7 @@ export const messages = {
   "mcp.status.didNotStart": "Non avviato",
   "mcp.status.unreachable": "Irraggiungibile",
   "mcp.server.providerLimitNote":
-    "Solo Claude: un server con una cartella di lavoro non viene dato agli altri provider.",
+    "Solo Claude e Codex: un server con una cartella di lavoro non viene dato agli altri provider.",
   "mcp.server.runtimeDownloading":
     "Download del runtime con cui parte un server STDIO. Alcuni potrebbero non avviarsi finché non finisce.",
   "mcp.server.runtimeDownloadingProgress":
@@ -83,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Rimuovi variabile inoltrata {position}",
   "mcp.panel.workingDirectory": "Cartella di lavoro",
   "mcp.panel.workingDirectoryDescription":
-    "Gli agenti Claude e il test di connessione avviano il server qui. Lascia vuoto per dare questo server a ogni provider: nessun altro provider può impostare una cartella, quindi salta un server che ne indica una.",
+    "Gli agenti Claude e Codex e il test di connessione avviano il server qui. Lascia vuoto per dare questo server a ogni provider: gli altri provider non possono impostare una cartella, quindi saltano un server che ne indica una.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Ogni provider può usare un server MCP HTTP.",
   "mcp.panel.serverUrl": "URL del server",

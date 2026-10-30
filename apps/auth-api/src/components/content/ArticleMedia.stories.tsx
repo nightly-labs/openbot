@@ -20,9 +20,9 @@ import { ArticleImage } from "./ArticleMedia";
 // The string the mount's colours are drawn from. A real article passes its own
 // title, so a mounted picture matches the artwork on the card the reader arrived
 // from; here it is a control, so the colour families can be compared.
-const ARTICLE_TITLE = "OpenBot 101";
+const ARTICLE_TITLE = "How to Use OpenBot: Set Up Your First AI Agent";
 const GUIDE = GUIDES_COLLECTION.articles.find((article) => article.slug === "openbot-101");
-if (!GUIDE) throw new Error("OpenBot 101 must be in the guides registry.");
+if (!GUIDE) throw new Error("The openbot-101 guide must be in the guides registry.");
 
 const meta = {
   title: "Site/Article media",
@@ -237,7 +237,12 @@ export const MountPad: Story = {
 export const ColourFamilies: Story = {
   render: () => (
     <ProseColumn>
-      {["OpenBot 101", "WTF Is OpenBot?", "One agent, many providers", "Run the team server yourself"].map((title) => (
+      {[
+        "How to Use OpenBot: Set Up Your First AI Agent",
+        "What Is OpenBot? Models, Providers and Agents Explained",
+        "One agent, many providers",
+        "Run the team server yourself",
+      ].map((title) => (
         <ArticleImage
           src={pickAModel}
           alt="The model picker open on the ChatGPT tab, showing the installed Codex CLI version and a list of GPT models."

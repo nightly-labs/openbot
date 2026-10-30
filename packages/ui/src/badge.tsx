@@ -32,20 +32,13 @@ export const badgeVariants = cva("z-badge", {
   },
 });
 
-export type BadgeSize = "sm" | "md";
-export type BadgeRadius = "rounded" | "pill";
-
 type BadgeProps<T extends ValidComponent = "span"> = PolymorphicProps<T, BadgeRootProps<T>> &
   VariantProps<typeof badgeVariants> & {
-    /** @deprecated Zaidan badges use one compact size. */
-    size?: BadgeSize;
-    /** @deprecated Zaidan badges use a pill shape. */
-    shape?: BadgeRadius;
     role?: JSX.HTMLAttributes<HTMLElement>["role"];
   } & Partial<Pick<ComponentProps<T>, "class" | "children">>;
 
 export function Badge<T extends ValidComponent = "span">(props: BadgeProps<T>): JSX.Element {
-  const others = omit(props, "class", "variant", "size", "shape", "children", "role");
+  const others = omit(props, "class", "variant", "children", "role");
   // biome-ignore lint/nursery/noUnsafeTypeAssertion: Solid 2's omit cannot preserve Kobalte's generic polymorphic props.
   const rootProps = others as PolymorphicProps<T, BadgeRootProps<T>>;
   const variant = () => props.variant ?? "secondary";
@@ -55,8 +48,6 @@ export function Badge<T extends ValidComponent = "span">(props: BadgeProps<T>): 
       class={cx(badgeVariants({ variant: variant() }), props.class)}
       data-slot="badge"
       data-variant={variant()}
-      data-size={props.size}
-      data-shape={props.shape}
       role={props.role ?? "presentation"}
       {...rootProps}
     >

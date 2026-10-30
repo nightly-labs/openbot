@@ -9,7 +9,13 @@ export const messages = {
   "notification.needsBrowserStep": "Vous devez terminer une étape dans le navigateur.",
   "notification.needsApprovalFor": "Nécessite votre approbation : {action}",
   "notification.finished": "Travail terminé.",
+  // A workflow step that waits for a person to approve or reject it.
+  "notification.workflowApproval": "Une étape attend votre approbation.",
+  // A workflow output step that tells the user its result.
+  "notification.workflowOutput": "Un workflow a un nouveau résultat.",
   "notification.failed": "Arrêté à cause d’une erreur.",
+  "notification.channelTitle": "{agent} dans {channel}",
+  "notification.channelMessage": "A envoyé un message.",
   "notification.usageLimit.title": "Le compte {provider} a atteint sa limite",
   "notification.usageLimit.body": {
     one: "{count} agent attend. OpenBot réessaiera plus tard.",
@@ -19,6 +25,10 @@ export const messages = {
     one: "{count} agent attend. La limite se réinitialise {reset}.",
     other: "{count} agents attendent. La limite se réinitialise {reset}.",
   },
+  "notification.machineAlert.disk": "{server} : disque plein à {percent}",
+  "notification.machineAlert.memory": "{server} : mémoire utilisée à {percent}",
+  "notification.machineAlert.cpu": "{server} : CPU occupé à {percent}",
+  "notification.machineAlert.body": "Le seuil d’alerte de {level} est dépassé. Voir Réglages du serveur > Stockage.",
   "notification.test": "Les notifications fonctionnent.",
   "notification.welcome": "OpenBot vous préviendra ici quand un agent aura besoin de vous.",
   // The toast region in each window.

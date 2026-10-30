@@ -62,8 +62,9 @@ export function sidebarMessageTime(value: string, format: AppFormat): string {
   const date = new Date(value);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) {
+    // A 12-hour clock drops the leading zero: "오후 04:11" is too wide for the row and clips its badge.
     return format.date(date, {
-      hour: "2-digit",
+      hour: format.hour12 ? "numeric" : "2-digit",
       minute: "2-digit",
     });
   }

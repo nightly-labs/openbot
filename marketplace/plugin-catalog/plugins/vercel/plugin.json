@@ -4,7 +4,7 @@
   "tagline": "Deployments, build logs and projects",
   "description": "Vercel lets agents list projects and recent deployments, read build and runtime logs, and find why a build failed. Each user signs in to their own Vercel account through the browser and chooses the teams that agents can use. In those teams, agents get the same rights as the user's account. They can also change environment variables, domains, DNS records and deployments, and buy domains.",
   "category": "coding",
-  "creatorName": "vercel.com",
+  "creatorName": "Vercel",
   "iconUrl": "https://vercel.com/favicon.ico",
   "version": "1.0.0",
   "prompts": [

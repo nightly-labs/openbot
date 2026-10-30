@@ -1,5 +1,5 @@
-// Provider marks as plain data, so that a canvas can draw the same mark that
-// `ProviderLogo` draws as SVG: the comparisons in apps/auth-api do.
+// Provider marks as plain data, so that a canvas, the desktop SVG and the mobile app draw the same
+// mark. The comparisons in apps/auth-api draw them on a canvas.
 
 // The path of claude.ai/favicon.svg, on a 248 by 248 grid.
 
@@ -13,3 +13,102 @@ export const CODEX_PATH =
 // The Cursor cube in one colour, on a 24 by 24 grid, from Simple Icons (CC0): https://simpleicons.org/?q=cursor
 export const CURSOR_PATH =
   "M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23";
+
+// The Gemini spark in one colour, from Simple Icons (CC0): https://simpleicons.org/?q=googlegemini
+const GEMINI_PATH =
+  "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81";
+
+// The Cline mark in one colour, from Simple Icons (CC0): https://simpleicons.org/?q=cline
+const CLINE_PATH =
+  "m23.365 13.556-1.442-2.895V8.994c0-2.764-2.218-5.002-4.954-5.002h-2.464c.178-.367.276-.779.276-1.213A2.77 2.77 0 0 0 12.018 0a2.77 2.77 0 0 0-2.763 2.779c0 .434.098.846.276 1.213H7.067c-2.736 0-4.954 2.238-4.954 5.002v1.667L.64 13.549c-.149.29-.149.636 0 .927l1.472 2.855v1.667C2.113 21.762 4.33 24 7.067 24h9.902c2.736 0 4.954-2.238 4.954-5.002V17.33l1.44-2.865c.143-.286.143-.622.002-.91m-12.854 2.36a2.27 2.27 0 0 1-2.261 2.273 2.27 2.27 0 0 1-2.261-2.273v-4.042A2.27 2.27 0 0 1 8.249 9.6a2.267 2.267 0 0 1 2.262 2.274zm7.285 0a2.27 2.27 0 0 1-2.26 2.273 2.27 2.27 0 0 1-2.262-2.273v-4.042A2.267 2.267 0 0 1 15.535 9.6a2.267 2.267 0 0 1 2.261 2.274z";
+
+// The DeepSeek whale in one colour, on a 24 by 24 grid, from LobeHub Icons (MIT):
+// https://github.com/lobehub/lobe-icons
+const DEEPSEEK_PATH =
+  "M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z";
+
+// The OpenRouter mark in one colour, on a 24 by 24 grid, from Simple Icons (CC0):
+// https://simpleicons.org/?q=openrouter
+const OPENROUTER_PATH =
+  "M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z";
+
+// OpenBot's own mark for a custom ACP agent: a command prompt. No third-party mark stands for all of
+// them.
+const ACP_PROMPT_PATH =
+  "M4.3 6.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 1 1-1.4-1.4L8.6 12 4.3 7.7a1 1 0 0 1 0-1.4Z";
+
+const ACP_CURSOR_PATH = "M12 17a1 1 0 0 1 1-1h7a1 1 0 1 1 0 2h-7a1 1 0 0 1-1-1Z";
+
+// A neutral ring for a provider that this build does not know. It is no provider's mark.
+const UNKNOWN_PATH = "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z";
+
+// The Grok mark in one colour, on a 24 by 24 grid.
+const GROK_PATHS = [
+  "M9.26905 15.284 17.2479 9.36086c.3912-.29039.9502-.17712 1.1366.27392.981 2.37872.5427 5.23732-1.409 7.20012-1.9517 1.9627-4.6673 2.3931-7.1494 1.4128L7.1146 19.5102c3.8891 2.6732 8.6117 2.0121 11.5628-.9577 2.3408-2.354 3.0658-5.5628 2.3879-8.4564l.0061.0062c-.983-4.25087.2417-5.94997 2.7504-9.424387L24 .428711l-3.3013 3.319949v-.0103L9.267 15.2861",
+  "M7.62249 16.7237c-2.79136-2.6815-2.31009-6.8315.07168-9.22465 1.76124-1.77119 4.64683-2.49408 7.16583-1.43137l2.7053-1.2563c-.4874-.35424-1.112-.73525-1.8288-1.00299-3.2399-1.34075-7.1187-.67347-9.75237 1.97302-2.53332 2.54763-3.32998 6.46489-1.96194 9.80749 1.02193 2.4982-.6533 4.2652-2.34082 6.0488C1.08337 22.2699.483318 22.9022 0 23.5716l7.62045-6.8459",
+];
+
+export type ProviderLogoVariant =
+  | "codex"
+  | "claude"
+  | "grok"
+  | "opencode"
+  | "antigravity"
+  | "cursor"
+  | "cline"
+  | "acp"
+  | "pi"
+  | "muse"
+  | "inception"
+  | "deepseek"
+  | "openrouter"
+  | "unknown";
+
+export interface ProviderLogoPath {
+  d: string;
+  opacity?: number;
+  evenOdd?: boolean;
+}
+
+/** The view box and paths of a provider mark, for an SVG on desktop and on mobile. */
+export interface ProviderLogoShape {
+  viewBox: string;
+  paths: readonly ProviderLogoPath[];
+}
+
+const GRID_24 = "0 0 24 24";
+
+export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoShape {
+  switch (provider) {
+    case "claude":
+      return { viewBox: "0 0 248 248", paths: [{ d: CLAUDE_PATH }] };
+    case "codex":
+      return { viewBox: "0 0 256 260", paths: [{ d: CODEX_PATH }] };
+    case "opencode":
+      // Official mark: https://github.com/anomalyco/opencode/blob/dev/packages/console/app/src/asset/brand/opencode-logo-dark.svg
+      return {
+        viewBox: "0 0 240 300",
+        paths: [{ d: "M180 240H60V120H180V240Z", opacity: 0.3 }, { d: "M180 60H60V240H180V60ZM240 300H0V0H240V300Z" }],
+      };
+    case "grok":
+      return { viewBox: GRID_24, paths: GROK_PATHS.map((d) => ({ d })) };
+    case "antigravity":
+      return { viewBox: GRID_24, paths: [{ d: GEMINI_PATH }] };
+    case "cursor":
+      return { viewBox: GRID_24, paths: [{ d: CURSOR_PATH }] };
+    case "cline":
+      return { viewBox: GRID_24, paths: [{ d: CLINE_PATH }] };
+    case "deepseek":
+      return { viewBox: GRID_24, paths: [{ d: DEEPSEEK_PATH, evenOdd: true }] };
+    case "openrouter":
+      return { viewBox: GRID_24, paths: [{ d: OPENROUTER_PATH }] };
+    // Native CLI providers use the neutral terminal mark.
+    case "acp":
+    case "pi":
+    case "muse":
+    case "inception":
+      return { viewBox: GRID_24, paths: [{ d: ACP_PROMPT_PATH }, { d: ACP_CURSOR_PATH }] };
+    case "unknown":
+      return { viewBox: GRID_24, paths: [{ d: UNKNOWN_PATH, evenOdd: true }] };
+  }
+}

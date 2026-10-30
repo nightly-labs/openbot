@@ -24,7 +24,7 @@ export const ChartTooltip = Tooltip;
 export function ChartTooltipContent(
   props: Partial<TooltipContentProps> & {
     formatValue: (value: number) => string;
-    series?: (key: string) => { name: string; mark?: JSX.Element };
+    series?: ((key: string) => { name: string; mark?: JSX.Element }) | undefined;
     total?: boolean;
   },
 ) {

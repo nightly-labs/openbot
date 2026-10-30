@@ -14,6 +14,8 @@ import { INSTINCT_COMPARISON } from "./instinct";
 import { MANUS_COMPARISON } from "./manus";
 import { MUSE_COMPARISON } from "./muse";
 import { OPENCLAW_COMPARISON } from "./openclaw";
+import { PAPERCLIP_COMPARISON } from "./paperclip";
+import { VIKTOR_COMPARISON } from "./viktor";
 
 export const COMPARISONS: Readonly<Record<string, ComparePage>> = {
   "best-ai-agent-apps": BEST_AI_AGENT_APPS,
@@ -29,4 +31,6 @@ export const COMPARISONS: Readonly<Record<string, ComparePage>> = {
   manus: MANUS_COMPARISON,
   muse: MUSE_COMPARISON,
   openclaw: OPENCLAW_COMPARISON,
+  paperclip: PAPERCLIP_COMPARISON,
+  viktor: VIKTOR_COMPARISON,
 };

@@ -1,5 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { BROWSER_TAKEOVER_REASONS, VAULT_TEXT_LIMIT, type VaultContactFields } from "@openbot/contracts/ipc";
 import { z } from "zod";
+import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import {
   BROWSER_FILL_FIELDS_MAX_FIELDS,
   BROWSER_FILL_FIELDS_MAX_TEXT_BYTES,
@@ -31,10 +33,10 @@ const browserTargetSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
-    name: nonBlankString(500).optional(),
-    exact: z.boolean().optional(),
+    name: nonBlankString(500).exactOptional(),
+    exact: z.boolean().exactOptional(),
   }),
-  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().optional() }),
+  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional() }),
   z.object({ kind: z.literal("css"), selector: nonBlankString(2_000) }),
   z.object({
     kind: z.literal("point"),
@@ -42,6 +44,24 @@ const browserTargetSchema = z.discriminatedUnion("kind", [
     y: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
   }),
 ]);
+
+const vaultText = z.string().max(VAULT_TEXT_LIMIT).optional();
+
+const vaultContactShape = {
+  fullName: vaultText.describe("Contact: the full name."),
+  address: vaultText.describe("Contact: the street address."),
+  address2: vaultText.describe("Contact: the apartment, suite or floor."),
+  city: vaultText.describe("Contact: the city."),
+  region: vaultText.describe("Contact: the state, province or region."),
+  postalCode: vaultText.describe("Contact: the postal code."),
+  country: z
+    .string()
+    .regex(/^[A-Za-z]{2}$|^$/u)
+    .optional()
+    .describe("Contact: the ISO 3166-1 alpha-2 country code, such as US or DE."),
+  phone: vaultText.describe("Contact: the phone number."),
+  email: vaultText.describe("Contact: the email address."),
+} satisfies { [Key in Exclude<keyof VaultContactFields, "label">]: z.ZodType };
 
 function browserTool<const Name extends string, Shape extends z.ZodRawShape>(definition: {
   name: Name;
@@ -83,7 +103,88 @@ const legacyActionSchema = z.discriminatedUnion("type", [
   z.object({ ...legacyActionFields, type: z.literal("reload") }),
 ]);
 
-const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout };
+/** Input tools return a short status. The model reads the page with `snapshot` when it needs to. */
+const ACTION_RESULT = "Returns a status; pass snapshot: true for a snapshot.";
+const actionSnapshot = z.boolean().optional();
+const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout, snapshot: actionSnapshot };
+
+// The fields of the tools that the `run_script` helpers also take as steps. A step names its tool
+// in `action` and acts on the tab of the call, so these fields leave out `tabId`.
+const navigateFields = {
+  url: requiredString(INPUT_LIMITS.browserUrl).optional(),
+  direction: z.enum(["back", "forward", "reload"]).optional(),
+  timeoutMs: timeout,
+};
+const clickFields = {
+  target: browserTargetSchema,
+  timeoutMs: timeout,
+  button: z.enum(["left", "middle", "right"]).optional(),
+  clickCount: z.number().int().min(1).max(2).optional(),
+  modifiers,
+};
+const typeFields = {
+  target: browserTargetSchema.optional(),
+  timeoutMs: timeout,
+  text: z.string().max(INPUT_LIMITS.browserActionText),
+  mode: z.enum(["replace", "append"]).optional(),
+  submit: z.boolean().optional(),
+};
+const pressFields = { key: requiredString(128), target: browserTargetSchema.optional(), timeoutMs: timeout };
+const hoverFields = { target: browserTargetSchema, timeoutMs: timeout };
+const scrollFields = {
+  target: browserTargetSchema.optional(),
+  deltaX: z.number().min(-100_000).max(100_000).optional(),
+  deltaY: z.number().min(-100_000).max(100_000).optional(),
+  timeoutMs: timeout,
+};
+const selectOptionFields = { ...hoverFields, values: z.array(z.string().max(1_000)).min(1).max(100) };
+const setCheckedFields = { ...hoverFields, checked: z.boolean() };
+const waitForFields = {
+  target: browserTargetSchema.optional(),
+  text: requiredString(2_000).optional(),
+  url: requiredString(INPUT_LIMITS.browserUrl).optional(),
+  state: z.enum(["load", "domcontentloaded", "dom-quiet"]).optional(),
+  timeoutMs: timeout,
+};
+const evaluateFields = {
+  expression: z
+    .string()
+    .min(1)
+    .max(64_000)
+    .refine((value) => value.trim().length > 0, {
+      message: "expression must not be blank",
+    }),
+  awaitPromise: z.boolean().optional(),
+  timeoutMs: timeout,
+};
+
+export const BROWSER_SCRIPT_MAX_STEPS = 200;
+const BROWSER_SCRIPT_MAX_CHARS = 20_000;
+export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
+const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
+
+const browserStepSchema = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("navigate"), ...navigateFields }),
+  z.strictObject({ action: z.literal("click"), ...clickFields }),
+  z.strictObject({ action: z.literal("type"), ...typeFields }),
+  z.strictObject({ action: z.literal("press"), ...pressFields }),
+  z.strictObject({ action: z.literal("hover"), ...hoverFields }),
+  z.strictObject({ action: z.literal("scroll"), ...scrollFields }),
+  z.strictObject({ action: z.literal("select_option"), ...selectOptionFields }),
+  z.strictObject({ action: z.literal("set_checked"), ...setCheckedFields }),
+  z.strictObject({ action: z.literal("wait_for"), ...waitForFields }),
+  z.strictObject({ action: z.literal("evaluate"), ...evaluateFields }),
+  z.strictObject({ action: z.literal("snapshot") }),
+]);
+
+export type BrowserStep = z.infer<typeof browserStepSchema>;
+
+/** Steps from a `run_script` sandbox are untrusted values, so each one is decoded before it runs. */
+export function parseBrowserStep(value: unknown): BrowserStep {
+  const result = browserStepSchema.safeParse(value);
+  if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
+  return result.data;
+}
 
 const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
@@ -105,13 +206,13 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "snapshot",
     description:
-      "Read the current semantic page and obtain revision-bound element references. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more.",
+      'Read the current semantic page and obtain element refs. Refs stay valid until a navigation or the next snapshot. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more. Each element is a line: ref, role, "name", then <tag>, value=, description= and states when present. diagnostics and actions list only new entries, without successful requests and plain successful actions.',
     shape: { tabId, image },
   }),
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payments.",
+      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
     shape: {
       tabId,
       method: z
@@ -150,59 +251,106 @@ const BROWSER_TOOL_DEFINITIONS = [
         .describe(
           "For password or authenticator: the id of a saved login from list_logins. OpenBot fills its password or current code without asking the user.",
         ),
+      username: z
+        .string()
+        .max(VAULT_TEXT_LIMIT)
+        .optional()
+        .describe(
+          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password in the OpenBot Vault from the card, the login gets this username.",
+        ),
     },
   }),
   browserTool({
     name: "list_logins",
     description:
-      "List the logins that the user shared with OpenBot for the tab's current HTTPS site: id, title, username, and whether it has an authenticator code. Passwords and codes are never returned. Type the username yourself, then call submit_secret with loginId.",
+      "List 1Password, Bitwarden and OpenBot Vault logins for the tab's HTTPS site: id, title, username and hasOneTimePassword. Use it to log in with a password manager. No passwords or codes. Type the username, then call submit_secret with loginId.",
     shape: { tabId },
+  }),
+  browserTool({
+    name: "list_vault_items",
+    description:
+      "List what the user saved in the OpenBot Vault, not 1Password or Bitwarden. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
+    shape: {},
+  }),
+  browserTool({
+    name: "save_vault_item",
+    description:
+      "Add contact info to the OpenBot Vault, or change a saved item. A contact without id is new; with id, it changes. A login or a card needs its id from list_vault_items (not from list_logins). A login changes only its username; a card changes only fields that are not secret. You cannot set a password, a website, a card number or a security code. An omitted field keeps its value. Returns the id, kind and name, never a secret.",
+    shape: {
+      kind: z.enum(["contact", "login", "card"]),
+      id: identifier.optional().describe("The item to change. Omit it to add a contact."),
+      label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
+      ...vaultContactShape,
+      username: vaultText.describe("Login: the username or email."),
+      nameOnCard: vaultText.describe("Card: the name on the card."),
+      expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
+      expYear: z.number().int().min(2000).max(2099).optional().describe("Card: the four-digit expiry year."),
+      billingContactId: identifier
+        .nullable()
+        .optional()
+        .describe("Card: the id of the contact for the billing address, or null for none."),
+    },
+  }),
+  browserTool({
+    name: "delete_vault_item",
+    description:
+      "Delete a login, card or contact from the OpenBot Vault by its id from list_vault_items (not from list_logins). A card that uses a deleted contact for billing keeps no billing address. This cannot be undone: ask first unless you added the item or the user asked for the delete.",
+    shape: { id: identifier },
+  }),
+  browserTool({
+    name: "fill_card",
+    description:
+      "Type a saved card from list_vault_items into card fields from one fresh snapshot: the number, and any of the security code, a single expiry field or month and year fields (inputs or native selects), and the name on the card. Fields can be on the HTTPS page or in an HTTPS payment frame. You never see the number or the security code: snapshots hide them. Does not submit. The first fill of a card on a site waits for the server owner's approval. Returns the filled field names and a fresh snapshot. Screenshots, evaluate and recording are unavailable until the page navigates.",
+    shape: {
+      tabId,
+      cardId: identifier,
+      targets: z
+        .strictObject({
+          number: browserTargetSchema,
+          securityCode: browserTargetSchema.optional(),
+          expiry: browserTargetSchema.optional().describe("One field for month and year, such as MM/YY."),
+          expMonth: browserTargetSchema.optional(),
+          expYear: browserTargetSchema.optional(),
+          nameOnCard: browserTargetSchema.optional(),
+        })
+        .refine((targets) => !(targets.expiry && (targets.expMonth || targets.expYear)), {
+          message: "Use expiry, or expMonth and expYear, not both.",
+        }),
+      timeoutMs: timeout,
+    },
   }),
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation, or when secure password/code handoff is unavailable.",
-    shape: { tabId },
+      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation such as 3-D Secure, or when secure password/code handoff or card fill is unavailable.",
+    shape: {
+      tabId,
+      reason: z
+        .enum(BROWSER_TAKEOVER_REASONS)
+        .optional()
+        .describe("sign-in-blocked: the site refused the sign-in from the browser's network address."),
+    },
   }),
   browserTool({
     name: "navigate",
     description:
       "Navigate to an HTTP(S) URL, history entry, or reload, wait for the page to settle, and return a fresh snapshot.",
-    shape: {
-      tabId,
-      url: requiredString(INPUT_LIMITS.browserUrl).optional(),
-      direction: z.enum(["back", "forward", "reload"]).optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...navigateFields },
   }),
   browserTool({
     name: "click",
-    description:
-      "Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input and return a fresh snapshot.",
-    shape: {
-      ...targetAction,
-      button: z.enum(["left", "middle", "right"]).optional(),
-      clickCount: z.number().int().min(1).max(2).optional(),
-      modifiers,
-    },
+    description: `Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input. ${ACTION_RESULT}`,
+    shape: { tabId, ...clickFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "type",
-    description:
-      "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the snapshot's focus field says where those keystrokes will land. Mode applies only to an element target.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      timeoutMs: timeout,
-      text: z.string().max(INPUT_LIMITS.browserActionText),
-      mode: z.enum(["replace", "append"]).optional(),
-      submit: z.boolean().optional(),
-    },
+    description: `Enter text in a unique target using trusted CDP input. ${ACTION_RESULT} Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the focus field says where those keystrokes will land. Mode applies only to an element target.`,
+    shape: { tabId, ...typeFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "fill_fields",
     description:
-      "Replace 1 to 16 already inspected ordinary main-frame text fields from one fresh snapshot, with at most 16 KiB combined UTF-8 text. Performs one queued operation and returns one final snapshot. Does not submit. Refuses known password, code, and payment fields. Partial results report confirmed and uncertain zero-based indices. Read the page before continuing; never automatically retry or undo a partial fill.",
+      "Replace 1 to 16 already inspected ordinary main-frame text fields from one fresh snapshot, with at most 16 KiB combined UTF-8 text. Performs one queued operation and returns one final snapshot. Does not submit. Refuses known password, code, and payment fields: use fill_card for card fields. Partial results report confirmed and uncertain zero-based indices. Read the page before continuing; never automatically retry or undo a partial fill.",
     shape: {
       tabId,
       revision,
@@ -222,44 +370,43 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "press",
-    description: "Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P and return a fresh snapshot.",
-    shape: { tabId, key: requiredString(128), target: browserTargetSchema.optional(), timeoutMs: timeout },
+    description: `Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P. ${ACTION_RESULT}`,
+    shape: { tabId, ...pressFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "hover",
-    description: "Hover a unique target with trusted CDP pointer input and return a fresh snapshot.",
-    shape: targetAction,
+    description: `Hover a unique target with trusted CDP pointer input. ${ACTION_RESULT}`,
+    shape: { tabId, ...hoverFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "scroll",
-    description: "Scroll the page or a target container by X/Y pixels and return a fresh snapshot.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      deltaX: z.number().min(-100_000).max(100_000).optional(),
-      deltaY: z.number().min(-100_000).max(100_000).optional(),
-      timeoutMs: timeout,
-    },
+    description: `Scroll the page or a target container by X/Y pixels. ${ACTION_RESULT}`,
+    shape: { tabId, ...scrollFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "select_option",
-    description: "Select one or more native select options by value or label and return a fresh snapshot.",
-    shape: { ...targetAction, values: z.array(z.string().max(1_000)).min(1).max(100) },
+    description: `Select one or more native select options by value or label. ${ACTION_RESULT}`,
+    shape: { tabId, ...selectOptionFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "set_checked",
-    description: "Set a checkbox or radio target to the requested checked state and return a fresh snapshot.",
-    shape: { ...targetAction, checked: z.boolean() },
+    description: `Set a checkbox or radio target to the requested checked state. ${ACTION_RESULT}`,
+    shape: { tabId, ...setCheckedFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "drag",
-    description: "Drag from one unique target to another with trusted CDP pointer input and return a fresh snapshot.",
-    shape: { tabId, source: browserTargetSchema, target: browserTargetSchema, timeoutMs: timeout },
+    description: `Drag from one unique target to another with trusted CDP pointer input. ${ACTION_RESULT}`,
+    shape: {
+      tabId,
+      source: browserTargetSchema,
+      target: browserTargetSchema,
+      timeoutMs: timeout,
+      snapshot: actionSnapshot,
+    },
   }),
   browserTool({
     name: "upload_files",
-    description:
-      "Set local files readable by OpenBot on a file input after validating paths, then return a fresh snapshot.",
+    description: `Set local files on a file input or the file chooser a clicked target opens. ${ACTION_RESULT}`,
     shape: {
       ...targetAction,
       paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),
@@ -269,31 +416,13 @@ const BROWSER_TOOL_DEFINITIONS = [
     name: "wait_for",
     description:
       "Wait for a URL, text, semantic target, load state, or DOM quiet condition, then return a fresh snapshot.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      text: requiredString(2_000).optional(),
-      url: requiredString(INPUT_LIMITS.browserUrl).optional(),
-      state: z.enum(["load", "domcontentloaded", "dom-quiet"]).optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...waitForFields },
   }),
   browserTool({
     name: "evaluate",
     description:
       "Evaluate JavaScript in the main frame's own page context, with the same access to page scripts, DOM and cookies as the page itself. Prefer snapshots and semantic actions; use this for inspection or unsupported interactions. Returns only a JSON-serializable value up to 64 KB.",
-    shape: {
-      tabId,
-      expression: z
-        .string()
-        .min(1)
-        .max(64_000)
-        .refine((value) => value.trim().length > 0, {
-          message: "expression must not be blank",
-        }),
-      awaitPromise: z.boolean().optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...evaluateFields },
   }),
   browserTool({
     name: "set_environment",
@@ -332,8 +461,20 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "screenshot",
-    description: "Capture the visible page as a separate image content item.",
-    shape: { tabId },
+    description:
+      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
+    shape: { tabId, ref: identifier.optional() },
+  }),
+  browserTool({
+    name: "run_script",
+    description:
+      "Run a short JavaScript program that drives one tab in one call and returns one final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+    shape: {
+      tabId,
+      script: requiredString(BROWSER_SCRIPT_MAX_CHARS),
+      finalSnapshot: z.boolean().optional(),
+      timeoutMs: z.number().int().min(1_000).max(BROWSER_SCRIPT_MAX_TIMEOUT_MS).optional(),
+    },
   }),
   browserTool({
     name: "close_tab",
@@ -351,7 +492,7 @@ export const BROWSER_DYNAMIC_TOOLS = [
       type: "function" as const,
       name: definition.name,
       description: definition.description,
-      inputSchema: z.toJSONSchema(definition.schema, { target: "draft-7", unrepresentable: "any" }),
+      inputSchema: advertisedJsonSchema(definition.schema),
     })),
   },
 ];

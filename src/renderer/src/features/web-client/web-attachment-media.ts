@@ -26,6 +26,7 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "image/avif",
   "audio/mpeg",
   "video/quicktime",
+  "video/mp4",
 ]);
 
 export interface WebAttachmentMedia extends AttachmentMediaSource {

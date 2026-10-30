@@ -19,10 +19,10 @@ The payload binding types make `(input: unknown) => Result` incompatible with th
 `() => Result` form. This requires an explicit decoder. Decoding follows sender validation so an
 untrusted frame cannot reach a parser.
 
-`ipc-channel-coverage.test.ts` restricts the name `ipcMain` to `ipc/define-ipc-group.ts`. An aliased
-import elsewhere could otherwise register a handler without a sender check. The test restricts the
-trusted wrapper names to that file too: the wrappers accept string channels, so direct use could
-create an endpoint outside the declared groups. Direct `IPC_ENDPOINTS.group.name` references keep
+`ipc-channel-coverage.test.ts` restricts the name `ipcMain` to `trusted-ipc.ts`, which holds the
+sender check. An aliased import elsewhere could otherwise register a handler without a sender check.
+The test restricts the trusted wrapper names to `ipc/define-ipc-group.ts`: the wrappers accept string
+channels, so direct use could create an endpoint outside the declared groups. Direct `IPC_ENDPOINTS.group.name` references keep
 renderer sends visible to the same coverage checks.
 
 `index.ts` calls `app.setPath`, `app.enableSandbox` and
@@ -118,5 +118,6 @@ methods remain on `RemoteTeamDirectory` because they contact a different server 
 
 `ipc-channel-coverage.test.ts` checks a name bijection between `decode*FromHost` under `src/main`
 and `decode*FromMain` in the preload. This prevents deleting one side and redirecting its callers
-to the other, which could apply trusted-main validation to a remote server. The test only checks
-names: review must still detect two names that refer to one decoder.
+to the other, which could apply trusted-main validation to a remote server. A second test rejects a
+decoder that is a bare alias of its twin. Review must still detect a wrapper that calls the other
+decoder.

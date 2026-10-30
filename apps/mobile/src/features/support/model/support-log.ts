@@ -79,11 +79,16 @@ export function createSupportLog(
   now: () => number = Date.now,
   defer: (run: () => void) => void = (run) => void setTimeout(run, 0),
 ) {
-  let entries: readonly SupportLogEntry[] = [];
+  // New entries go to the end of `kept`, which drops its oldest entries only after it passes the
+  // limit by a quarter. So one request costs no copy of the whole log.
+  let kept: SupportLogEntry[] = [];
+  // Readers get the same array until the log changes, as `useSyncExternalStore` needs.
+  let snapshot: readonly SupportLogEntry[] | null = [];
   const listeners = new Set<() => void>();
   let pending = false;
   let nextId = 0;
   const notify = () => {
+    snapshot = null;
     if (pending) return;
     pending = true;
     defer(() => {
@@ -93,21 +98,24 @@ export function createSupportLog(
   };
   return {
     add(level: SupportLogLevel, source: SupportLogSource, text: string): void {
-      const entry = { id: nextId++, time: now(), level, source, message: supportLogMessage(text) };
-      entries = [...entries.slice(-(MAX_ENTRIES - 1)), entry];
+      kept.push({ id: nextId++, time: now(), level, source, message: supportLogMessage(text) });
+      if (kept.length > MAX_ENTRIES + MAX_ENTRIES / 4) kept = kept.slice(-MAX_ENTRIES);
       notify();
     },
     /** Puts entries from an earlier launch before the ones this launch already added. */
     restore(previous: Omit<SupportLogEntry, "id">[]): void {
       const restored = previous.map((entry) => ({ ...entry, id: nextId++ }));
-      entries = [...restored, ...entries].slice(-MAX_ENTRIES);
+      kept = [...restored, ...kept].slice(-MAX_ENTRIES);
       notify();
     },
     clear(): void {
-      entries = [];
+      kept = [];
       notify();
     },
-    entries: () => entries,
+    entries: (): readonly SupportLogEntry[] => {
+      snapshot ??= kept.slice(-MAX_ENTRIES);
+      return snapshot;
+    },
     subscribe(listener: () => void): () => void {
       listeners.add(listener);
       return () => listeners.delete(listener);

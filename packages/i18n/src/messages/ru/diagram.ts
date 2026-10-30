@@ -4,8 +4,37 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "Схема {name}",
   "diagram.board.label": "Холст {name}",
-  "diagram.board.emptyTitle": "Начните с регулярной задачи",
-  "diagram.board.emptyBody": "Добавьте регулярную задачу, которая запускает работу, затем подключите к ней агентов.",
+  "diagram.board.emptyLead": "Нарисуйте один раз.",
+  "diagram.board.emptyTitle": "Потом смотрите, как она {run}.",
+  "diagram.board.emptyRun": "работает",
+  "diagram.board.emptyStart": "Регулярная задача запускает работу.",
+  "diagram.board.emptyHandoff": "Каждый агент передаёт свой ответ следующему.",
+  "diagram.board.sample.routine": "Утренняя сводка",
+  "diagram.board.sample.instruction":
+    "Соберите, что изменилось со вчерашнего дня на рынке и в воронке продаж, и превратите это в приоритеты на сегодня.",
+  "diagram.board.sample.researchName": "Исследователь",
+  "diagram.board.sample.researchTitle": "Партнёр по исследованиям",
+  "diagram.board.sample.researchTask":
+    "Соберите новости рынка и продуктов со вчерашнего дня, с источником для каждого пункта.",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind снизила цены на API на 20%.\n2. Руководство ЕС для моделей общего назначения утверждено.\n3. Два конкурента на этой неделе выпустили холсты для агентов.",
+  "diagram.board.sample.salesName": "Продажи",
+  "diagram.board.sample.salesTitle": "Специалист по исходящим продажам",
+  "diagram.board.sample.salesTask":
+    "Перечислите сделки, которые со вчерашнего дня сменили этап, и следующий шаг для каждой.",
+  "diagram.board.sample.salesOutput":
+    "- Contoso перешла к переговорам. Следующий шаг: отправить обзор безопасности.\n- Fabrikam стоит 9 дней. Следующий шаг: позвонить сторонникам сделки.",
+  "diagram.board.sample.writerName": "Автор",
+  "diagram.board.sample.writerTitle": "Автор сводки",
+  "diagram.board.sample.writerTask": "Напишите одну сводку по исследованию и воронке. Не более 200 слов.",
+  "diagram.board.sample.writerOutput":
+    "Northwind снизила цены на API, руководство ЕС утверждено, а Contoso близка к сделке. Fabrikam нужно позвонить сегодня.",
+  "diagram.board.sample.chiefName": "Шеф",
+  "diagram.board.sample.chiefTitle": "Руководитель аппарата",
+  "diagram.board.sample.chiefTask":
+    "Прочитайте сводку, выберите три приоритета на сегодня и опубликуйте их для команды.",
+  "diagram.board.sample.chiefOutput":
+    "Приоритеты на сегодня:\n1. Отправить обзор безопасности в Contoso.\n2. Ответить на снижение цен Northwind.\n3. Позвонить в Fabrikam.",
   "diagram.menu.label": "Холст",
   "diagram.menu.addAgent": "Добавить агента сюда",
   "diagram.menu.noAgents": "Все агенты уже на холсте",

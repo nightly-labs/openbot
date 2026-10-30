@@ -27,6 +27,18 @@ export interface PendingSend {
   error: string | null;
   /** The host drops a second send with the same `clientMessageId`, so Retry cannot store it twice. */
   retrySafe: boolean;
+  /** What the user said, for a voice message: a local draft that Retry sends again and Dismiss discards. */
+  voiceRecordingDraftId: string | null;
+  /**
+   * Sent while the agent worked. The host shows such a message in the queue panel, not in the chat,
+   * so the chat shows it only when it fails.
+   */
+  queued: boolean;
+  /**
+   * Sent while the agent was idle, and answered a moment ago. The host queues each message before it
+   * starts it, so for a short time the chat keeps this row and the queue panel does not show it.
+   */
+  starting: boolean;
 }
 
 export type DeliverPendingSend = (send: PendingSend) => Promise<SendMessageResult>;
@@ -36,6 +48,9 @@ export type DeliverPendingSend = (send: PendingSend) => Promise<SendMessageResul
  * the message; half of that leaves room for a client clock that differs from the host's.
  */
 const RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+/** How long a send made while the agent was idle may wait to start before the queue panel shows it. */
+const START_GRACE_MS = 3000;
 
 /** Whether Retry cannot store the message twice: the host drops a repeat, and its window is still open. */
 export function pendingSendRetrySafe(send: PendingSend, now = Date.now()): boolean {
@@ -76,8 +91,11 @@ export function createPendingSendStore() {
     publish(key);
     void deliver({ ...next })
       .catch((error: unknown) => {
+        // An error with no message of its own leaves the reason empty; the status label says enough.
         const { t, errorMessage } = currentText();
-        return { error: errorMessage(error, t("chat.send.failed")) };
+        const fallback = t("chat.send.failed");
+        const message = errorMessage(error, fallback);
+        return { error: message === fallback ? null : message };
       })
       .then((result) => {
         // Dismissed while in flight: nothing is left to update.
@@ -86,6 +104,13 @@ export function createPendingSendStore() {
           deliverers.delete(next.clientMessageId);
           next.state = "sent";
           next.messageId = result.messageId;
+          next.starting = !next.queued;
+          if (next.starting)
+            window.setTimeout(() => {
+              if (find(key, next.clientMessageId) !== next) return;
+              next.starting = false;
+              publish(key);
+            }, START_GRACE_MS);
         } else {
           next.state = "failed";
           next.error = result.error;
@@ -97,12 +122,16 @@ export function createPendingSendStore() {
 
   function add(
     target: ConversationTarget,
-    input: Pick<PendingSend, "draft" | "text" | "retrySafe">,
+    input: Pick<PendingSend, "draft" | "text" | "retrySafe"> &
+      Partial<Pick<PendingSend, "voiceRecordingDraftId" | "queued">>,
     deliver: DeliverPendingSend,
   ): void {
     const key = composerDraftKey(target);
     const send: PendingSend = {
+      voiceRecordingDraftId: null,
+      queued: false,
       ...input,
+      starting: false,
       clientMessageId: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       state: "waiting",

@@ -1665,7 +1665,7 @@ export class HostedSiteService {
       let cursor: string | undefined;
       do {
         const listed = yield* siteCall(() =>
-          bucket.list({ prefix: hostedSiteDeploymentPrefix(siteId, deploymentId), cursor }),
+          bucket.list({ prefix: hostedSiteDeploymentPrefix(siteId, deploymentId), ...(cursor ? { cursor } : {}) }),
         );
         if (listed.objects.length) yield* siteCall(() => bucket.delete(listed.objects.map((object) => object.key)));
         cursor = listed.truncated ? listed.cursor : undefined;

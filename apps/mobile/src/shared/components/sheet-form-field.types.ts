@@ -15,10 +15,13 @@ export interface SheetFormFieldProps {
   multiline?: boolean;
   appearance?: "default" | "soft";
   hideLabel?: boolean;
-  textAlign?: TextInputProps["textAlign"];
+  /** React Native 0.88 adds `start` and `end`, which the iOS field does not take. */
+  textAlign?: "left" | "center" | "right";
   onChangeText: (value: string) => void;
   onSubmitEditing?: () => void;
   placeholder?: string;
   returnKeyType?: TextInputProps["returnKeyType"];
+  /** Hides the text, for a key or a password. */
+  secureTextEntry?: boolean;
   value: string;
 }

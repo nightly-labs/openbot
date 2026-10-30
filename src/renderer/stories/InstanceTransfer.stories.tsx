@@ -1,5 +1,3 @@
-import { Settings, Tabs } from "@openbot/ui";
-import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { InstanceTransferView } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
@@ -11,7 +9,7 @@ import {
   INSTANCE_TRANSFER_SUMMARY,
   INSTANCE_TRANSFER_WARNINGS,
 } from "./instance-transfer-fixtures";
-import { SettingsPageStory } from "./settings-page-story";
+import { ServerSettingsStory, serverSettingsArgs } from "./server-settings-story";
 
 const meta = {
   title: "Settings/Transfer",
@@ -46,38 +44,27 @@ const viewArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs => ({
   ...overrides,
 });
 
-/** The Settings dialog with the Transfer tab open. The screen buttons work. */
+/** The view alone. The screen buttons work. */
 function Stage(props: { args: ViewArgs }) {
   const [screen, setScreen] = createSignal(props.args.screen);
   return (
-    <SettingsPageStory title="Settings">
-      {(page) => (
-        <Tabs.Root value="transfer" orientation="vertical" class="settings-modal-tabs-root">
-          <SettingsDialogShell
-            class="app-settings-modal-shell"
-            open
-            page={page()}
-            title="Transfer"
-            description="Move your agents and settings to another computer."
-            contentKey="transfer"
-            sidebar={
-              <Tabs.List class="settings-modal-nav" aria-label="Settings sections">
-                <Tabs.Trigger class="settings-modal-nav-item" value="transfer">
-                  <Settings aria-hidden="true" />
-                  <span>Transfer</span>
-                </Tabs.Trigger>
-              </Tabs.List>
-            }
-          >
-            <Tabs.Content value="transfer" class="settings-modal-tab-panel" data-tab="transfer">
-              <InstanceTransferView {...props.args} screen={screen()} onScreenChange={setScreen} />
-            </Tabs.Content>
-          </SettingsDialogShell>
-        </Tabs.Root>
-      )}
-    </SettingsPageStory>
+    <main class="files-story-stage">
+      <div class="files-story-page">
+        <InstanceTransferView {...props.args} screen={screen()} onScreenChange={setScreen} />
+      </div>
+    </main>
   );
 }
+
+/** Server settings > Transfer for this computer. The preview exports and imports. */
+export const InServerSettings: Story = {
+  name: "Server settings",
+  render: () => (
+    <ServerSettingsStory
+      settings={{ ...serverSettingsArgs(), instanceTransfer: { onSignIn: fn() }, initialSection: "transfer" }}
+    />
+  ),
+};
 
 export const Home: Story = { name: "Which computer", render: () => <Stage args={viewArgs()} /> };
 

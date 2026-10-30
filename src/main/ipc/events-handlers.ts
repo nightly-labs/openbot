@@ -5,12 +5,14 @@ import {
   decodeEventStatus,
   decodeSaveEventRoutineResult,
   decodeWebhookSecret,
+  decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
 import { EVENTS_CAPABILITY, EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
+import { WEBHOOK_TESTS_CAPABILITY, WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -31,7 +33,7 @@ import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 interface EventsRemoteServers {
   supportsCapability(
     serverId: string,
-    capability: typeof EVENTS_CAPABILITY | typeof ROUTINE_RECOVERY_CAPABILITY,
+    capability: typeof EVENTS_CAPABILITY | typeof ROUTINE_RECOVERY_CAPABILITY | typeof WEBHOOK_TESTS_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -96,6 +98,14 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       rotateSecret: scopedHandler(parseEventRoutineRef, {
         local: (input) => runCauseEffect(events.rotateSecret(input)),
         remote: (input, serverId) => remote(serverId, EVENTS_ROUTES.rotateSecret, decodeWebhookSecret, input),
+      }),
+      sendTestEvent: scopedHandler(parseEventRoutineRef, {
+        local: (input) => runCauseEffect(events.sendTestEvent(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WEBHOOK_TESTS_CAPABILITY))
+            throw new Error(sourceText("error.backend.eventsUnavailable"));
+          return remote(serverId, WEBHOOK_TESTS_ROUTES.send, decodeWebhookTestResult, input);
+        },
       }),
       listActivity: scopedHandler(parseListEventActivity, {
         local: (input) => runCauseEffect(events.listActivity(input)),

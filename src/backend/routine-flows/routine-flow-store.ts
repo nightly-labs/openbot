@@ -16,7 +16,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { databaseRow, databaseRows } from "../database/database-rows";
+import { databaseRow, databaseRows, placeholders } from "../database/database-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-graph";
 
@@ -354,10 +354,6 @@ function strandedLinks(owner: string | null, links: readonly RoutineFlowLink[]):
   if (!owner) return [];
   const reached = routineFlowDepths(owner, links);
   return links.filter((link) => !reached.has(link.fromAgentId));
-}
-
-function placeholders(values: readonly unknown[]): string {
-  return values.map(() => "?").join(", ");
 }
 
 function nullableString(value: unknown): string | null {

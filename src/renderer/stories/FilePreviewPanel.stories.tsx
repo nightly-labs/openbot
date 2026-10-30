@@ -12,6 +12,7 @@ import {
   SOURCE_PREVIEW,
   TEXT_PREVIEW,
   UNSUPPORTED_PREVIEW,
+  XLSX_LITERAL_PREFIXES_PREVIEW,
   XLSX_PREVIEW,
 } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
@@ -101,6 +102,11 @@ export const Audio: Story = {
 /** An XLSX workbook rendered as a scrollable table with sheet tabs. */
 export const Spreadsheet: Story = {
   args: { preview: XLSX_PREVIEW },
+};
+
+/** Quoted prefixes, percent scaling, a suffix, and number format controls in a real XLSX file. */
+export const SpreadsheetLiteralPrefixes: Story = {
+  args: { preview: XLSX_LITERAL_PREFIXES_PREVIEW },
 };
 
 const HTML_BYTES = new TextEncoder().encode(INLINE_SVG_CHART);

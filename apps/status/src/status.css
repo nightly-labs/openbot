@@ -402,10 +402,6 @@
   margin-top: clamp(40px, 5vw, 56px);
 }
 
-.status-services {
-  overflow: hidden;
-}
-
 .status-service {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -488,7 +484,7 @@
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.6);
   pointer-events: none;
-  transform: translateX(-50%);
+  transform: translateX(calc(var(--status-tooltip-at) * -100%));
 }
 
 .status-tooltip-date {

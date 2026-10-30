@@ -1,6 +1,12 @@
-import type { AvatarImageInput, CentralAuthUser, MobileConnectedDevice, UpdateStatus } from "@openbot/contracts/ipc";
+import type {
+  AvatarImageInput,
+  CentralAuthUser,
+  MobileConnectedDevice,
+  ServerSummary,
+  UpdateStatus,
+} from "@openbot/contracts/ipc";
 import { Button, Toaster, toast } from "@openbot/ui";
-import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
+import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -12,6 +18,15 @@ import type { MockVoiceOptions } from "../src/preview/mock-voice";
 import { createMockOpenBot } from "./mock-openbot";
 import { SettingsPageStory } from "./settings-page-story";
 import { previewStorySoundSettings } from "./sound-feedback-fixture";
+
+/** A packaged Windows run, which offers every switch that the defaults hide. */
+const storyGeneralSettings: GeneralSettingsValue = {
+  ...DEFAULT_GENERAL_SETTINGS,
+  launchAtLogin: true,
+  keepRunningInBackground: false,
+  keepAwake: false,
+  keepAwakeOnBattery: false,
+};
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;
 const storyAccount: CentralAuthUser = {
@@ -50,7 +65,8 @@ function SettingsModalStory(props: {
   onCleanup(() => {
     mock.dispose();
     toast.dismiss();
-    window.openbot = previousApi;
+    // Storybook can render the story again before it cleans up the first render. That render's API stays.
+    if (window.openbot === mock.api) window.openbot = previousApi;
   });
   const hostedServersApi = {
     ...mock.api.hostedServers,
@@ -60,13 +76,18 @@ function SettingsModalStory(props: {
     },
   };
   const [open, setOpen] = createSignal(props.initialOpen);
-  const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
+  const [value, setValue] = createSignal({ ...storyGeneralSettings });
   const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(
     props.scheduledRestart
       ? { ...storyUpdateStatus, phase: "ready", availableVersion: "0.3.0", scheduledRestart: props.scheduledRestart }
       : storyUpdateStatus,
   );
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
+  // The notification level and the mute of each server, as the server list of the app keeps them.
+  const [servers, setServers] = createSignal<readonly ServerSummary[]>(STORY_SERVERS);
+  const updateServer = (serverId: string, change: Partial<ServerSummary>): void => {
+    setServers((list) => list.map((server) => (server.id === serverId ? { ...server, ...change } : server)));
+  };
   const [mobileDevices, setMobileDevices] = createSignal<MobileConnectedDevice[]>([
     {
       sessionId: "11111111-1111-4111-8111-111111111111",
@@ -101,7 +122,24 @@ function SettingsModalStory(props: {
     setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
   }
 
+  /** A phone scans the code and signs in a few seconds after the code shows. */
+  let scanTimer: number | undefined;
+  onCleanup(() => window.clearTimeout(scanTimer));
   async function createMobileConnect(): Promise<{ qrData: string; expiresAt: number }> {
+    window.clearTimeout(scanTimer);
+    scanTimer = window.setTimeout(() => {
+      setMobileDevices((current) => [
+        ...current,
+        {
+          sessionId: crypto.randomUUID(),
+          name: "Work iPhone",
+          platform: "ios",
+          connectedAt: Date.now(),
+          lastActiveAt: Date.now(),
+          via: "code",
+        },
+      ]);
+    }, 6_000);
     return {
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",
@@ -132,7 +170,16 @@ function SettingsModalStory(props: {
               setValue(next);
             }}
             appInfo={storyAppInfo}
-            servers={STORY_SERVERS}
+            servers={servers()}
+            onSetServerNotificationLevel={async (serverId, level) =>
+              updateServer(serverId, { notificationLevel: level })
+            }
+            onSetServerMuted={async (serverId, muted, durationMs) =>
+              updateServer(serverId, {
+                notificationsMuted: muted,
+                notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
+              })
+            }
             updateStatus={updateStatus()}
             onCancelScheduledRestart={async () => {
               const { scheduledRestart: _cancelled, ...rest } = updateStatus();
@@ -142,7 +189,10 @@ function SettingsModalStory(props: {
             onUpdateAccountName={updateAccountName}
             onUpdateAccountAvatar={updateAccountAvatar}
             onCreateMobileConnect={createMobileConnect}
-            onCancelMobileConnect={mock.api.auth.cancelMobileConnect}
+            onCancelMobileConnect={async () => {
+              window.clearTimeout(scanTimer);
+              await mock.api.auth.cancelMobileConnect();
+            }}
             onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
             onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
             onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}
@@ -152,6 +202,8 @@ function SettingsModalStory(props: {
             onRevokeMobileConnectedDevice={async (sessionId) => {
               setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
             }}
+            onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
+            onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
             onUpdateAction={runUpdateAction}
             billingApi={billingApi}
             hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
@@ -169,7 +221,7 @@ const meta = {
   component: SettingsModal,
   args: {
     open: false,
-    value: DEFAULT_GENERAL_SETTINGS,
+    value: storyGeneralSettings,
     onValueChange: fn(),
     appInfo: storyAppInfo,
     updateStatus: storyUpdateStatus,
@@ -217,6 +269,10 @@ export const Narrow: Story = {
   parameters: { viewport: { defaultViewport: "settingsNarrow" } },
 };
 
+export const Profile: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="profile" />,
+};
+
 export const Notifications: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="notifications" />,
 };
@@ -234,6 +290,17 @@ export const VoiceWhisperHungarian: Story = {
         voiceModelsReady: ["parakeet-tdt-0.6b-v3", "whisper-turbo"],
         voiceSettings: { modelId: "whisper-turbo", language: "hu" },
       }}
+    />
+  ),
+};
+
+/** Downloaded models, and the speech model, each with Remove. */
+export const VoiceModelsDownloaded: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="voice"
+      voice={{ voiceModelsReady: ["parakeet-tdt-0.6b-v3", "bark-3.0-plus"], speechModelReady: true }}
     />
   ),
 };

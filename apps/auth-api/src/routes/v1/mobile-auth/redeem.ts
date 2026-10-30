@@ -3,7 +3,8 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { runApiResponse } from "../../../server/effect-runtime";
 import { readJsonObject } from "../../../server/json-body";
-import { apiError, authErrorResponse, json, requestAuthService, requestSourceIp } from "../../../server/request-auth";
+import { apiError, authErrorResponse, json, requestAuthService } from "../../../server/request-auth";
+import { requestSourceIp } from "../../../server/source-ip";
 
 export const Route = createFileRoute("/v1/mobile-auth/redeem")({
   server: {

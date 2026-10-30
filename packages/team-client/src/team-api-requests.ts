@@ -9,10 +9,15 @@ import {
   type AgentImportPreview,
   type AgentMemory,
   type AgentMemorySelectionState,
+  type AgentTask,
+  type AgentTaskInput,
+  type AgentTaskReadState,
+  type AgentTasksSnapshot,
   type ApplyAgentImportInput,
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
   type CancelQueuedMessageInput,
+  type ConversationSnapshot,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelMemory,
@@ -28,26 +33,32 @@ import {
   type InstalledSkill,
   isAgentMemory,
   isAgentMemorySelectionState,
+  isAgentTask,
+  isAgentTaskReadState,
+  isAgentTasksSnapshot,
   isAttachmentSummary,
+  isConversationSnapshot,
+  isQueuedMessageReceipt,
   isRoutine,
   isRoutineFlowCanvas,
   isRoutineFlowLink,
   isRoutineRun,
+  type LocalBrowserSecretResponse,
+  type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
+  type QueuedMessageReceipt,
   type RemoteAgentImportResult,
+  type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
-  type RespondToBrowserSecretInput,
   type RespondToBrowserTakeoverInput,
-  type Routine,
-  type RoutineRun,
+  remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
+  type StartAgentTaskInput,
   type SteerQueuedMessageInput,
-  type TestRoutineInput,
   type UpdateQueuedMessageInput,
-  type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { guardedDecoder } from "@openbot/contracts/ipc-decoding";
+import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -57,6 +68,11 @@ import {
   AGENT_MEMORY_INCLUSION_ROUTE,
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
+import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
+import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
@@ -157,6 +173,135 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
   return yield* teamCall(() => request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId }));
 });
 
+const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");
+const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
+const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
+const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
+
+/**
+ * The tasks of one agent. Send them only to a host that serves `agent-tasks-v1`. A start and a
+ * message carry text only: the caller refuses attachments before it calls them.
+ */
+export const listAgentTasks = Effect.fn("TeamClient.listAgentTasks")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<AgentTasksSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.list, decodeAgentTasks, { agentId }));
+});
+
+export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId }: AgentTaskInput,
+): Effect.fn.Return<ConversationSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
+});
+
+/**
+ * Starts a task. With files it uses `agent-thread-files-v1`, so send files only to a host that serves
+ * it; `agent-tasks-v1` carries text only.
+ */
+export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
+  request: TeamApiRequest,
+  { agentId, text, attachmentDraftIds, clientMessageId }: StartAgentTaskInput,
+): Effect.fn.Return<AgentTask, TeamRequestError> {
+  return yield* teamCall(() =>
+    attachmentDraftIds?.length
+      ? request("POST", AGENT_THREAD_FILES_ROUTES.start, decodeAgentTask, {
+          agentId,
+          text,
+          attachmentDraftIds,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        })
+      : request("POST", AGENT_TASKS_ROUTES.start, decodeAgentTask, {
+          agentId,
+          text,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        }),
+  );
+});
+
+/** Sends to a task. With files it uses `agent-thread-files-v1`, as `startAgentTask` does. */
+export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")(function* (
+  request: TeamApiRequest,
+  {
+    agentId,
+    taskId,
+    text,
+    attachmentDraftIds,
+    clientMessageId,
+  }: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId?: string },
+): Effect.fn.Return<QueuedMessageReceipt, TeamRequestError> {
+  return yield* teamCall(() =>
+    attachmentDraftIds?.length
+      ? request("POST", AGENT_THREAD_FILES_ROUTES.send, decodeTaskReceipt, {
+          agentId,
+          taskId,
+          text,
+          attachmentDraftIds,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        })
+      : request("POST", AGENT_TASKS_ROUTES.send, decodeTaskReceipt, {
+          agentId,
+          taskId,
+          text,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        }),
+  );
+});
+
+/** Stops the running turn of a task, closes the task, or reopens it. */
+export const agentTaskControl = Effect.fn("TeamClient.agentTaskControl")(function* (
+  request: TeamApiRequest,
+  action: "stop" | "close" | "reopen",
+  { agentId, taskId }: AgentTaskInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES[action], ignoreResponse, { agentId, taskId }));
+});
+
+/** Renames a side thread. Send it only to a host that serves `agent-threads-v1`. */
+export const renameAgentThread = Effect.fn("TeamClient.renameAgentThread")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, title }: RenameAgentTaskInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREADS_ROUTES.rename, ignoreResponse, { agentId, taskId, title }),
+  );
+});
+
+/** Deletes a side thread for good. Send it only to a host that serves `agent-threads-v1`. */
+export const deleteAgentThread = Effect.fn("TeamClient.deleteAgentThread")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId }: AgentTaskInput,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", AGENT_THREADS_ROUTES.delete, ignoreResponse, { agentId, taskId }));
+});
+
+const decodeThreadReadState = guardedDecoder(isAgentTaskReadState, "thread read state");
+const decodeThreadReads = guardedDecoder(
+  (value: unknown): value is { reads: AgentTaskReadState[] } =>
+    isDynamicRecord(value) && Array.isArray(value.reads) && value.reads.every(isAgentTaskReadState),
+  "thread read states",
+);
+
+/** The person's read mark of each open side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
+export const listAgentThreadReads = Effect.fn("TeamClient.listAgentThreadReads")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<AgentTaskReadState[], TeamRequestError> {
+  const answer = yield* teamCall(() => request("POST", AGENT_THREAD_READS_ROUTES.list, decodeThreadReads, { agentId }));
+  return answer.reads;
+});
+
+/** Moves the person's read mark of a side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
+export const markAgentThreadRead = Effect.fn("TeamClient.markAgentThreadRead")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, throughMessageId }: MarkAgentTaskReadInput,
+): Effect.fn.Return<AgentTaskReadState, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_READS_ROUTES.mark, decodeThreadReadState, { agentId, taskId, throughMessageId }),
+  );
+});
+
 /** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */
 export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(function* (
   request: TeamApiRequest,
@@ -218,9 +363,15 @@ export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTa
 
 export const respondToBrowserSecret = Effect.fn("TeamClient.respondToBrowserSecret")(function* (
   request: TeamApiRequest,
-  input: RespondToBrowserSecretInput,
+  input: LocalBrowserSecretResponse,
 ): Effect.fn.Return<void, TeamRequestError> {
-  return yield* teamCall(() => request("POST", BROWSER_SECRET_RESPONSE_PATH, ignoreResponse, { ...input }));
+  // The released route carries only the released fields. A save goes on `browser-secret-vault-v1`, which
+  // the caller offers only to an owner or admin of a host that serves it.
+  const path =
+    input.decision === "submit" && input.saveToVault
+      ? BROWSER_SECRET_VAULT_ROUTES.respond
+      : BROWSER_SECRET_RESPONSE_PATH;
+  return yield* teamCall(() => request("POST", path, ignoreResponse, { ...remoteBrowserSecretResponse(input) }));
 });
 
 /** The channel calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
@@ -266,31 +417,36 @@ export function teamChannelsApi(request: TeamApiRequest): TeamChannelsApi {
 
 const decodeRoutine = guardedDecoder(isRoutine, "routine");
 const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run");
+const decodeRoutines = guardedListDecoder(isRoutine, "routine list");
+const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine run list");
 
-/** Changes an agent routine, such as its instruction. Every host serves this frozen v1 route. */
-export const updateAgentRoutine = Effect.fn("TeamClient.updateAgentRoutine")(function* (
-  request: TeamApiRequest,
-  input: UpdateRoutineInput,
-): Effect.fn.Return<Routine, TeamRequestError> {
-  return yield* teamCall(() =>
-    request(
-      "PATCH",
-      TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-      decodeRoutine,
-      decodeTeamProtocolV2Json(input),
-    ),
-  );
-});
+/** The agent routine calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
+export type TeamAgentRoutinesApi = Pick<
+  OpenBotDesktopApi["agent"],
+  "listRoutines" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "listRoutineRuns"
+>;
 
-/** Runs an agent routine now. Every host serves this frozen v1 route. */
-export const testAgentRoutine = Effect.fn("TeamClient.testAgentRoutine")(function* (
-  request: TeamApiRequest,
-  { agentId, routineId }: TestRoutineInput,
-): Effect.fn.Return<RoutineRun, TeamRequestError> {
-  return yield* teamCall(() =>
-    request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), decodeRoutineRun),
-  );
-});
+/** The frozen v1 agent routine routes. Every host serves them. */
+export function teamAgentRoutinesApi(request: TeamApiRequest): TeamAgentRoutinesApi {
+  return {
+    listRoutines: (agentId) => request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+    createRoutine: (input) =>
+      request("POST", TEAM_API_ROUTES.agent.routines(input.agentId), decodeRoutine, decodeTeamProtocolV2Json(input)),
+    updateRoutine: (input) =>
+      request(
+        "PATCH",
+        TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+        decodeRoutine,
+        decodeTeamProtocolV2Json(input),
+      ),
+    deleteRoutine: ({ agentId, routineId }) =>
+      request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse),
+    testRoutine: ({ agentId, routineId }) =>
+      request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), decodeRoutineRun),
+    listRoutineRuns: ({ agentId, routineId, limit }) =>
+      request("GET", `${TEAM_API_ROUTES.agent.routineRuns(agentId, routineId)}?limit=${limit}`, decodeRoutineRuns),
+  };
+}
 
 /** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
 export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];

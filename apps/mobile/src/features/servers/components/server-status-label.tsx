@@ -8,7 +8,6 @@ export function ServerStatusLabel({ server, prefix = "" }: { server: MobileServe
   const label = serverStatusLabel(server, t);
   return (
     <Typography.Paragraph
-      type="body-xs"
       accessibilityLabel={`${server.name}: ${label}`}
       accessibilityLiveRegion="polite"
       className={
@@ -16,7 +15,7 @@ export function ServerStatusLabel({ server, prefix = "" }: { server: MobileServe
           ? "text-success-text"
           : server.state === "error"
             ? "text-danger-text"
-            : "text-text-secondary"
+            : "text-grouped-secondary"
       }
     >
       {prefix}

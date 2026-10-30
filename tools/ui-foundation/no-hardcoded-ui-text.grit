@@ -9,16 +9,29 @@ language js(typescript)
 // category `plugin`.
 //
 // The attribute arm checks the attribute name first. Without it, the long regex runs on every JSX
-// attribute, and that one arm used about 16 of the rule's 23 CPU-seconds in a full lint.
+// attribute, and that one arm used about 16 of the rule's 23 CPU-seconds in a full lint. Keep the
+// names in a group: Grit anchors a regex as `^a|b$`, so without the group `label` also matches
+// `aria-labelledby` and `labelledBy`.
+//
+// An untagged template literal in a named attribute is matched by syntax, not by regex. The rule
+// examines only the literal chunks: a letter in a chunk, as in `Open ${name}`, is matched. Text in
+// a `${...}` placeholder is code, so `${name} · ${count}` and `${t("key")}: ${name}` are not
+// matched. A tagged template is a function call, so it is not matched.
 
 or {
   JsxText() as $text where {
     $text <: r"(?s).*\p{L}.*",
     register_diagnostic(span=$text, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
-  JsxAttribute(name=$name) as $attr where {
-    $name <: r"aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint",
-    $attr <: r"(?s)(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)=(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*'|\{\s*\"[^\"]*\p{L}[^\"]*\"\s*\}|\{\s*'[^']*\p{L}[^']*'\s*\}|\{\s*`[^`$]*\p{L}[^`$]*`\s*\})",
+  JsxAttribute(name=$name, initializer=$value) as $attr where {
+    $name <: r"(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)",
+    or {
+      $attr <: r"(?s)(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)=(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*'|\{\s*\"[^\"]*\p{L}[^\"]*\"\s*\}|\{\s*'[^']*\p{L}[^']*'\s*\})",
+      and {
+        $value <: JsxAttributeInitializerClause(value=JsxExpressionAttributeValue(expression=JsTemplateExpression(tag=., elements=$elements))),
+        $elements <: some JsTemplateChunkElement() as $chunk where { $chunk <: r"(?s).*\p{L}.*" }
+      }
+    },
     register_diagnostic(span=$attr, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
   JsxExpressionChild() as $child where {

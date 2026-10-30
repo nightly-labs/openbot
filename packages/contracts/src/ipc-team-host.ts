@@ -1,11 +1,16 @@
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
+import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
 // beside the types they share instead of being retyped at each comparison.
 export const LOCAL_SERVER_ID = "local";
+
+// The most servers that a user can create on this computer, in addition to "Local". Each one is a
+// full OpenBot process that runs all the time, so main refuses one more and the dialog says why.
+export const LOCAL_SERVER_LIMIT = 5;
 
 export type ServerConnectionState = "online" | "connecting" | "offline" | "error" | "incompatible";
 export type TeamRole = "owner" | "admin" | "member";
@@ -86,6 +91,11 @@ export interface ServerSummary {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /**
+   * A local server: a second server on this computer, which this app runs as its child process. It
+   * is reached as a joined server, so `kind` stays `"remote"`. Absent for every other server.
+   */
+  thisComputer?: true;
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
@@ -226,7 +236,7 @@ export interface DirectConversationSnapshot {
   otherMemberId: string;
   messages: DirectMessage[];
   revision: number;
-  readState?: DirectConversationReadState;
+  readState?: DirectConversationReadState | undefined;
 }
 
 export type DirectConversationPageAnchor =
@@ -248,11 +258,11 @@ export interface DirectConversationPage {
   pageInfo: {
     hasOlder: boolean;
     olderCursor: string | null;
-    /** As in `ConversationPageInfo`: the unloaded length, for the day rail. Absent from a remote host. */
+    /** As in `ConversationPageInfo`: the unloaded length, for the scroll rail. Absent from a remote host. */
     olderCount?: number;
     oldestAt?: string;
   };
-  readState?: DirectConversationReadState;
+  readState?: DirectConversationReadState | undefined;
 }
 
 export interface DirectConversationReadState {
@@ -299,7 +309,8 @@ export type TeamRealtimeEvent =
       recipientMemberId: string;
       typing: boolean;
     }
-  | HostRestartEvent;
+  | HostRestartEvent
+  | MachineAlertEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;
 

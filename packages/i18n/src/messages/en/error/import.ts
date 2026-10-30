@@ -41,6 +41,18 @@ export const messages = defineMessages("error.import", {
   "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
   "error.import.skillKept":
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
+  // Hermes Agent import from a folder on this computer.
+  "error.import.hermesNoProfiles":
+    "This folder has no Hermes profiles. Choose the Hermes folder, which holds config.yaml or SOUL.md.",
+  "error.import.hermesClosed": "The Hermes profiles are no longer open. Read them again.",
+  "error.import.hermesProfileMissing": "The selection names a Hermes profile that was not read.",
+  "error.import.hermesSoulLong":
+    "{name}: SOUL.md is longer than {limit} characters, so the instructions keep its start. The full file is in imported/hermes/SOUL.md.",
+  "error.import.hermesSkillSkipped": '{name}: the skill "{skill}" is skipped. {reason}',
+  "error.import.hermesSkillCodeAdded":
+    "It has code that it did not have when the profiles were read. Read them again to allow it.",
+  "error.import.hermesLinkNotSaved":
+    "{name}: OpenBot could not save which agent came from this profile, so the next import adds it as a new agent.",
   // Instance transfer between two OpenBot computers.
   "error.import.transferRemoteTooLarge":
     "A transfer file for a joined server must be under 100 MB. Turn off workspace files, or export fewer agents.",

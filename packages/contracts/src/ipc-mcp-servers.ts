@@ -168,6 +168,11 @@ export interface SignOutMcpServerInput {
 export interface McpSignInState {
   mcpServerId: string;
   signedIn: boolean;
+  /**
+   * The server refused the stored sign-in, so the user must sign in again. Only this computer
+   * reports it: `mcp-sign-in-v1` carries `signedIn` alone, so a joined host never sets it.
+   */
+  needsSignIn?: boolean;
 }
 
 /**
@@ -437,7 +442,12 @@ function isMcpSignInApp(value: unknown): value is McpSignInApp {
 }
 
 function isMcpSignInState(value: unknown): value is McpSignInState {
-  return isDynamicRecord(value) && isBounded(value.mcpServerId, INPUT_LIMITS.identifier) && isBoolean(value.signedIn);
+  return (
+    isDynamicRecord(value) &&
+    isBounded(value.mcpServerId, INPUT_LIMITS.identifier) &&
+    isBoolean(value.signedIn) &&
+    (value.needsSignIn === undefined || isBoolean(value.needsSignIn))
+  );
 }
 
 /**

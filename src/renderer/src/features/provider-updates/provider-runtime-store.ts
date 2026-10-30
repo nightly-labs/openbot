@@ -6,6 +6,7 @@ import {
   type ProviderRuntimeSnapshot,
   type ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
+import { matchingSourceKeys } from "@openbot/i18n";
 import {
   type ProviderUpdate,
   providerUpdateAvailable,
@@ -24,6 +25,38 @@ import {
 } from "./provider-update-toast";
 
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
+
+/**
+ * The runtime calls a joined server's host serves too. Removing a download is this computer's only,
+ * so the store does not need it.
+ */
+export type ProviderRuntimeSource = Omit<ProviderRuntimesDesktopApi, "measureDownload" | "removeDownload">;
+
+/** The analytics code of each catalog reason that the runtime manager shows for a failed download. */
+const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
+  "error.provider.diskSpace": "disk_space",
+  "error.provider.downloadHttp": "download_http",
+  "error.provider.downloadIntegrity": "download_integrity",
+  "error.provider.downloadSize": "download_size",
+  "error.provider.claudeArchivePath": "archive_invalid",
+  "error.provider.claudePackageMismatch": "archive_invalid",
+  "error.provider.claudeChecksum": "checksum_failed",
+  "error.provider.runtimeChecksum": "checksum_failed",
+  "error.provider.installRecordMismatch": "checksum_failed",
+  "error.provider.unexpectedVersion": "version_mismatch",
+  "error.provider.cliUpdateFailed": "cli_update_failed",
+  "error.provider.cliActivateFailed": "cli_activate_failed",
+  "error.provider.cliSelectFailed": "cli_select_failed",
+  "error.provider.cliSigningIn": "cli_signing_in",
+  "error.provider.off": "provider_off",
+  "status.provider.downloadStopped": "download_stopped",
+};
+
+/** The status message holds catalog text only, so its key names the reason without a path or a secret. */
+function downloadFailureCode(message: string | null): string {
+  const key = message === null ? undefined : matchingSourceKeys(message)[0];
+  return (key && DOWNLOAD_FAILURE_CODES[key]) ?? "runtime_download_failed";
+}
 
 export interface ProviderCliOwners {
   /** The version of the CLI the user installed for this provider, or `null` for a managed one. */
@@ -54,7 +87,7 @@ export interface ProviderCliOwners {
  * snapshot, so nothing from the previous computer is shown for the next one.
  */
 export function createProviderRuntimeStore(
-  api: () => ProviderRuntimesDesktopApi | undefined,
+  api: () => ProviderRuntimeSource | undefined,
   owners: ProviderCliOwners = {},
 ) {
   const [providerRuntimeSnapshot, setProviderRuntimeSnapshot] =
@@ -173,11 +206,23 @@ export function createProviderRuntimeStore(
           provider,
           action: "download_completed",
           result: "failed",
-          failure_code: "runtime_download_failed",
+          failure_code: downloadFailureCode(snapshot.providers[provider].message),
         });
       }
     }
     setProviderRuntimeSnapshot(snapshot);
+    // Main updates the managed CLIs on its own after an app upgrade, with no notification. Only
+    // its failure is shown, with a Retry. A first install has no version and shows its own failure.
+    // The crossing into the failure, not out of a download: an update that fails at once can fail
+    // before the window gets its first snapshot.
+    for (const provider of MANAGED_RUNTIME_PROVIDERS) {
+      if (updating.has(provider) || !isLocalServer()) continue;
+      const next = snapshot.providers[provider];
+      if (next.phase !== "download-error" || next.version === null) continue;
+      if (current.providers[provider].phase === "download-error") continue;
+      showProviderUpdateToast(providerUpdate(provider, snapshot), () => void downloadProviderRuntime(provider));
+      failed.add(provider);
+    }
     for (const provider of updating) {
       const update = providerUpdate(provider, snapshot);
       if (update.runtime.phase === "not-downloaded" || (update.runtime.phase === "ready" && update.availableVersion))
@@ -202,7 +247,7 @@ export function createProviderRuntimeStore(
   }
 
   /** Drops an answer that arrives after `api` moved to another computer. */
-  function applyFrom(source: ProviderRuntimesDesktopApi, snapshot: ProviderRuntimeSnapshot): void {
+  function applyFrom(source: ProviderRuntimeSource, snapshot: ProviderRuntimeSnapshot): void {
     if (source === api()) applyProviderRuntimeSnapshot(snapshot);
   }
 
@@ -217,7 +262,7 @@ export function createProviderRuntimeStore(
       updating.add(provider);
       failed.delete(provider);
       showProviderUpdateToast(
-        { ...update, runtime: { ...update.runtime, phase: "downloading", progress: 0 } },
+        { ...update, runtime: { ...update.runtime, phase: "downloading", progress: 0, message: null } },
         () => void downloadProviderRuntime(provider),
       );
     }
@@ -286,6 +331,15 @@ export function createProviderRuntimeStore(
       // A remote workspace announces nothing, and leaves the record of what was announced alone:
       // it says what the user was told about this computer, which the open server does not change.
       if (!next) return;
+      // An offer that main takes back with no update running, as for a provider the user turned off,
+      // takes its notification down: its Update button could only say "up to date".
+      for (const update of next) {
+        const previous = announced.find((entry) => entry.provider === update.provider);
+        if (!previous || !providerUpdateAvailable(previous.runtime, previous.availableVersion)) continue;
+        if (update.availableVersion !== null || updating.has(update.provider) || failed.has(update.provider)) continue;
+        if (update.runtime.phase === "ready" || update.runtime.phase === "not-downloaded")
+          hideProviderUpdateToast(update.provider);
+      }
       for (const update of providerUpdatesToAnnounce(announced, next)) {
         // A closed notification stays closed, including across the server switch that rebuilds this
         // store: the record of it is kept by the notification module, which outlives the switch.

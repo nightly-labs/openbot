@@ -1,7 +1,7 @@
 // Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the remote and route tickets, the generic webhook headers, the hello deadline, the reuse of
+// events, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the generic webhook headers, the hello deadline, the reuse of
 // TURN credentials, and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
 import { type ChildProcess, spawn } from "node:child_process";
@@ -53,6 +53,9 @@ const WEBHOOK_ROUTE = "route-e2e";
 const LINK_HOST_ID = "host-link-e2e";
 const LINK_CHAT = "-500";
 const LINK_CODE = randomBytes(32).toString("base64url");
+// The account service fails for the sessions of this host, and calls the sessions of the next one inactive.
+const UNAVAILABLE_HOST_ID = "host-unavailable-e2e";
+const INACTIVE_HOST_ID = "host-inactive-e2e";
 
 interface Check {
   name: string;
@@ -99,6 +102,8 @@ function hmac(secret: string, text: string, encoding: "hex" | "base64url") {
 // The account service that Signal asks. It confirms every route that a ticket names, and records
 // whether each request carried a valid service signature.
 const controlPlaneCalls: Array<{ path: string; signed: boolean }> = [];
+// The Telegram chat and the `wake` flag of each route-wake request.
+const routeWakes: Array<{ chatId: string; wake: boolean }> = [];
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolveBody, reject) => {
     const chunks: Buffer[] = [];
@@ -123,13 +128,19 @@ function startControlPlane(port: number): Promise<Server> {
       response.end(value === undefined ? "" : JSON.stringify(value));
     };
     if (!signed) return answer(401);
-    if (path === "/v2/remote/resume/validate") return answer(200, { valid: true });
+    if (path === "/v2/remote/resume/validate") {
+      if (payload.hostId === UNAVAILABLE_HOST_ID) return answer(503);
+      return answer(200, { valid: payload.hostId !== INACTIVE_HOST_ID });
+    }
     if (path === "/v2/remote/telegram-route/validate") return answer(200, { chats: payload.chats });
     // Only the one link code of this run links a chat, to the host of the link check.
     if (path === "/v2/remote/telegram-route/link")
       return payload.code === LINK_CODE ? answer(200, { hostId: LINK_HOST_ID, linkedAt: Date.now() }) : answer(404);
     // With route wakes, Signal keeps events for a host. No route here is of a hosted server.
-    if (path === "/v2/remote/route-wake") return answer(200, { hostId: null, state: "not_hosted" });
+    if (path === "/v2/remote/route-wake") {
+      if (payload.route?.platform === "telegram") routeWakes.push({ chatId: payload.route.chatId, wake: payload.wake });
+      return answer(200, { hostId: null, state: "not_hosted" });
+    }
     if (path === "/v2/remote/webhook-route/validate")
       return answer(200, { routes: payload.routes.map((route: { id: string }) => route.id) });
     return answer(404);
@@ -434,6 +445,77 @@ try {
     return "the next socket got the kept link with linked=true, and the next update of the chat";
   });
 
+  await check("Only a Telegram update that can address OpenBot asks to start a hosted server", async () => {
+    // Each case uses its own chat that no socket holds, so Signal asks the account service once for it.
+    const message = <Fields extends object>(fields: Fields) => ({ message_id: 1, from: { id: 5 }, ...fields });
+    const cases: Array<{ chatId: string; wake: boolean; body: object }> = [
+      { chatId: "-600", wake: false, body: { message: message({ chat: { id: -600, type: "group" }, text: "hi" }) } },
+      {
+        chatId: "-601",
+        wake: false,
+        body: { message: message({ chat: { id: -601, type: "supergroup" }, caption: "photo", photo: [] }) },
+      },
+      {
+        chatId: "-602",
+        wake: true,
+        body: {
+          message: message({
+            chat: { id: -602, type: "group" },
+            text: "@bot hi",
+            entities: [{ type: "mention", offset: 0, length: 4 }],
+          }),
+        },
+      },
+      {
+        chatId: "-603",
+        wake: true,
+        body: {
+          message: message({
+            chat: { id: -603, type: "group" },
+            caption: "@bot",
+            caption_entities: [{ type: "mention", offset: 0, length: 4 }],
+          }),
+        },
+      },
+      {
+        chatId: "-604",
+        wake: true,
+        body: {
+          message: message({ chat: { id: -604, type: "group" }, text: "ok", reply_to_message: { message_id: 0 } }),
+        },
+      },
+      {
+        chatId: "-605",
+        wake: true,
+        body: { message: message({ chat: { id: -605, type: "supergroup" }, text: "ok", message_thread_id: 9 }) },
+      },
+      { chatId: "606", wake: true, body: { message: message({ chat: { id: 606, type: "private" }, text: "hi" }) } },
+      {
+        chatId: "-607",
+        wake: true,
+        body: { message: message({ chat: { id: -607, type: "group" }, new_chat_title: "T" }) },
+      },
+      {
+        chatId: "-608",
+        wake: true,
+        body: { callback_query: { id: "q-608", data: "s:x", message: { message_id: 1, chat: { id: -608 } } } },
+      },
+    ];
+    for (const { chatId, body } of cases) {
+      const response = await postUpdate(JSON.stringify({ update_id: 1, ...body }));
+      expect(response.status === 200, `chat ${chatId}: ${response.status}`);
+    }
+    const deadline = Date.now() + 5_000;
+    while (cases.some(({ chatId }) => !routeWakes.some((call) => call.chatId === chatId)) && Date.now() < deadline)
+      await new Promise((next) => setTimeout(next, 20));
+    const wrong = cases.filter(({ chatId, wake }) => routeWakes.find((call) => call.chatId === chatId)?.wake !== wake);
+    expect(
+      wrong.length === 0,
+      `wrong wake: ${wrong.map(({ chatId }) => `${chatId}=${routeWakes.find((call) => call.chatId === chatId)?.wake}`).join(", ")}`,
+    );
+    return "plain text and caption: wake=false; mention, caption mention, reply, thread, direct, rename, button: wake=true";
+  });
+
   // 2. Signed account events: Signal acts only on an event that the account service signed now.
   await check("An account event with a bad or stale signature gets 401; a signed one revokes the route", async () => {
     const body = JSON.stringify({ type: "telegram-route-revoked", botId: BOT_ID, chatId: ROUTED_CHAT, through: 2_000 });
@@ -530,6 +612,37 @@ try {
     return "bad 401, stale 401, unknown secret 401, other app 401, valid challenge 200";
   });
 
+  // A body with no declared length: Signal must stop at its limit, so it answers before the body ends.
+  await check("A Slack request or an account event with a body that does not end gets 413", async () => {
+    const endless = () => {
+      const chunk = new Uint8Array(16 * 1024).fill(0x20);
+      let sent = 0;
+      return new ReadableStream<Uint8Array>({
+        pull(controller) {
+          // Past 1 MiB the stream sends nothing more and does not end.
+          if (sent >= 1024 * 1024) return new Promise<void>(() => {});
+          sent += chunk.byteLength;
+          controller.enqueue(chunk);
+        },
+      });
+    };
+    const post = (path: string, headers: Record<string, string>) =>
+      withDeadline(fetch(`${base}${path}`, { method: "POST", headers, body: endless() }), path);
+    const event = await post("/internal/auth-events", {
+      "Content-Type": "application/json",
+      "OpenBot-Timestamp": nowSeconds(),
+      "OpenBot-Signature": "v1=bad",
+    });
+    const slack = await post(SLACK_EVENTS_PATH, {
+      "Content-Type": "application/json",
+      "X-Slack-Request-Timestamp": nowSeconds(),
+      "X-Slack-Signature": "v0=bad",
+    });
+    expect(event.status === 413, `account event: ${event.status}`);
+    expect(slack.status === 413, `Slack: ${slack.status}`);
+    return "account event 413, Slack 413";
+  });
+
   // 5. Remote tickets: a host connects only with a current ticket that the account service signed.
   await helloFails("A ticket signed by another key is refused", await remoteTicket({}, foreignKey));
   await helloFails(
@@ -543,6 +656,67 @@ try {
       protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION + 1,
     }),
   );
+  // After a restart, Signal asks the account service about each session. A failed account service
+  // must not end a session that can still be active; an inactive session still ends.
+  await check("A session that the account service cannot check is closed with 1013 and no error", async () => {
+    const peer = await connect(signalUrl);
+    peer.socket.send(
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "host",
+        token: await remoteTicket({ hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` }),
+      }),
+    );
+    const code = await withDeadline(peer.closed, "close after an unchecked hello");
+    expect(code === 1013, `close code: ${code}`);
+    expect(peer.frames.length === 0, `frames: ${peer.frames.join(" ").slice(0, 200)}`);
+    return `closed with ${code} and no frame`;
+  });
+  await check("A revoked session that the account service cannot check is still refused", async () => {
+    const body = JSON.stringify({ type: "remote-auth-changed", hostId: UNAVAILABLE_HOST_ID, authEpoch: 2 });
+    const timestamp = nowSeconds();
+    const revoked = await postAuthEvent(
+      body,
+      timestamp,
+      hmac(AUTH_WEBHOOK_SECRET, `${timestamp}.${body}`, "base64url"),
+    );
+    expect(revoked.status === 204, `signed revoke: ${revoked.status}`);
+    const peer = await connect(signalUrl);
+    peer.socket.send(
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "host",
+        token: await remoteTicket({ hostId: UNAVAILABLE_HOST_ID, membershipId: `${UNAVAILABLE_HOST_ID}:host` }),
+      }),
+    );
+    const code = await withDeadline(peer.closed, "close after a revoked unchecked hello");
+    expect(code === 1008, `close code: ${code}`);
+    expect(
+      peer.frames.some((frame) => frame.includes('"code":"authentication_required"')),
+      `frames: ${peer.frames.join(" ").slice(0, 200)}`,
+    );
+    return `closed with ${code} and an authentication_required error`;
+  });
+  await check("A session that the account service calls inactive is refused", async () => {
+    const peer = await connect(signalUrl);
+    peer.socket.send(
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "host",
+        token: await remoteTicket({ hostId: INACTIVE_HOST_ID, membershipId: `${INACTIVE_HOST_ID}:host` }),
+      }),
+    );
+    const code = await withDeadline(peer.closed, "close after an inactive hello");
+    expect(code === 1008, `close code: ${code}`);
+    expect(
+      peer.frames.some((frame) => frame.includes('"code":"authentication_required"')),
+      `frames: ${peer.frames.join(" ").slice(0, 200)}`,
+    );
+    return `closed with ${code} and an authentication_required error`;
+  });
   await check("An ingress hello without a route ticket is refused", async () => {
     const peer = await connect(signalUrl);
     peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "ingress", token: await remoteTicket() }));

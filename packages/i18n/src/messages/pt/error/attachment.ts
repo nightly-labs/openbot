@@ -11,5 +11,9 @@ export const messages = {
     "Este servidor não oferece suporte a anexos MP3 ou MOV. Atualize o OpenBot no computador anfitrião e tente novamente.",
   "error.attachment.emlUnsupported":
     "Este servidor não oferece suporte a anexos EML. Atualize o OpenBot no computador anfitrião e tente novamente.",
+  "error.attachment.zipUnsupported":
+    "Este servidor não oferece suporte a anexos ZIP. Atualize o OpenBot no computador anfitrião e tente novamente.",
+  "error.attachment.mp4Unsupported":
+    "Este servidor não oferece suporte a anexos MP4. Atualize o OpenBot no computador anfitrião e tente novamente.",
   "error.attachment.previewTooLarge": "O arquivo excede o limite de 100 MB.",
 } as const satisfies PartialTranslation<typeof source>;

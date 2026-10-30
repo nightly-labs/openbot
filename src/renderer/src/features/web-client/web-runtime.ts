@@ -3,12 +3,12 @@ import {
   attachmentFileExtension,
   supportedAttachmentExtensions,
 } from "@openbot/contracts/attachment-files";
+import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
   AgentEvent,
-  AgentModelOption,
+  AgentNotificationLevelsSnapshot,
   AgentStatus,
-  AgentSummary,
   AttachmentSummary,
   AvatarImageInput,
   BrowserLiveViewEvent,
@@ -17,6 +17,8 @@ import type {
   BrowserPreview,
   BrowserTab,
   CancelQueuedMessageInput,
+  ClientAgentModelOption,
+  ClientAgentSummary,
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -25,15 +27,17 @@ import type {
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
   InvitePreview,
+  LocalBrowserSecretResponse,
   QueueSnapshot,
   ReorderQueueInput,
   RespondToApprovalInput,
-  RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  ServerNotificationLevel,
   SetAgentHiddenInput,
+  SetAgentNotificationLevelInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -51,9 +55,9 @@ import {
   canAdministerServer,
   decodeWorkspaceDirectory,
   isAccountUsage,
-  isAgentModelOption,
   isAgentStatus,
-  isAgentSummary,
+  isClientAgentModelOption,
+  isClientAgentSummary,
   isConversationMessage,
   isConversationReadState,
   isConversationWithReadState,
@@ -65,6 +69,17 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  BROWSER_PAGE_STATE_CAPABILITY,
+  BROWSER_PAGE_STATE_ROUTES,
+  decodeBrowserPageStateSnapshot,
+} from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_USER_CONTROL_CAPABILITY,
+  BROWSER_USER_CONTROL_ROUTES,
+  decodeBrowserUserControlSnapshot,
+} from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -77,7 +92,7 @@ import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routi
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -85,6 +100,7 @@ import {
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
+import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import {
   RemoteDirectoryError,
   RemoteTeamDirectoryClient,
@@ -99,7 +115,14 @@ import {
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
-import { listHiddenAgents, setAgentHidden, setAgentProviderAccount } from "@openbot/team-client/team-admin-requests";
+import {
+  listAgentNotificationLevels,
+  listHiddenAgents,
+  setAgentHidden,
+  setAgentNotificationLevel,
+  setAgentProviderAccount,
+  setOwnServerNotificationLevel,
+} from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
   deleteAgent,
@@ -112,10 +135,9 @@ import {
   type TeamApiRequest,
   type TeamChannelsApi,
   type TeamRoutineFlowsApi,
+  teamAgentRoutinesApi,
   teamChannelsApi,
   teamRoutineFlowsApi,
-  testAgentRoutine,
-  updateAgentRoutine,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -128,6 +150,7 @@ import {
   createWebHostConnections,
   type WebHostConnections,
   type WebHostNotice,
+  type WebHostNotificationSettings,
   WebHostRequestError,
 } from "./web-host-connections";
 import {
@@ -165,8 +188,13 @@ export interface WebWorkspaceRuntime {
   openBrowserTab(input: BrowserOpenInput): Promise<BrowserTab>;
   navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
   reloadBrowserTab(tabId: string): Promise<void>;
+  /** Behind `browser-page-state`. */
+  stopBrowserTab(tabId: string): Promise<void>;
   closeBrowserTab(tabId: string): Promise<void>;
-  respondToBrowserSecret?: (input: RespondToBrowserSecretInput) => Promise<void>;
+  /** Behind `browser-user-control`: the owning agent waits on the tab until the release. */
+  takeBrowserControl(tabId: string): Promise<void>;
+  releaseBrowserControl(tabId: string): Promise<void>;
+  respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
   /** The host's channel routes. A channel page arrives without host file URLs. */
@@ -182,7 +210,7 @@ export interface WebWorkspaceRuntime {
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost): Promise<string[]>;
   disconnect(): Promise<void>;
-  listAgents(): Promise<AgentSummary[]>;
+  listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
   conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
@@ -231,12 +259,36 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /**
+   * The user's own level for each agent of a host: the open host, or a host with a status connection.
+   * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
+   */
+  listAgentNotificationLevels?: (hostId: string) => Promise<AgentNotificationLevelsSnapshot>;
+  /** Sets the user's own level for one agent of the open host. Needs `agent-notification-levels-v1`. */
+  setAgentNotificationLevel?: (input: SetAgentNotificationLevelInput) => Promise<AgentNotificationLevelsSnapshot>;
+  /**
+   * The agents and the user's own levels of a host, for the notification settings: the open host, or
+   * a host with a status connection. `levels` is null on a host without `agent-notification-levels-v1`.
+   */
+  notificationSettings?: (hostId: string) => Promise<WebHostNotificationSettings>;
+  /** Sets the user's own level for one agent of a host. Needs `agent-notification-levels-v1`. */
+  setHostAgentNotificationLevel?: (
+    hostId: string,
+    input: SetAgentNotificationLevelInput,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
+  /** Sets the user's own level of a host, for all of their devices. Needs `agent-notification-levels-v1`. */
+  setOwnServerNotificationLevel?: (
+    hostId: string,
+    level: ServerNotificationLevel | null,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
-  models(): Promise<AgentModelOption[]>;
+  /** The agent image as a data URL. The browser cannot open the host's `openbot-avatar:` URL. */
+  agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
+  models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
   accountUsage?: () => Promise<AccountUsage>;
-  createAgent(input: CreateAgentInput): Promise<AgentSummary>;
+  createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
@@ -259,7 +311,7 @@ export interface WebRuntimeEvents {
   /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
   /** An event of a host this tab has not opened that a notification can show. */
-  hostNotice?(hostId: string, event: WebHostNotice, agents: AgentSummary[]): void;
+  hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
 
 /** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
@@ -322,6 +374,7 @@ export function createWebWorkspaceRuntime(
     fetch: accountFetch,
     // `bun run dev:api` serves this page and the account service from `http://localhost:<port>`.
     inviteLinks: { allowLocalDevelopmentApiUrl: import.meta.env.DEV },
+    verifyHostKeySignature: verifyEd25519Base64Url,
     hostKeys: {
       get: async (id) => localStorage.getItem(`openbot.web.host-key:${accountId}:${id}`),
       set: async (id, key) => localStorage.setItem(`openbot.web.host-key:${accountId}:${id}`, key),
@@ -391,7 +444,7 @@ export function createWebWorkspaceRuntime(
         // Without a listener, the status connections read no agent list.
         ...(events.hostNotice
           ? {
-              onNotice: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) =>
+              onNotice: (hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) =>
                 events.hostNotice?.(hostId, event, agents),
             }
           : {}),
@@ -465,14 +518,16 @@ export function createWebWorkspaceRuntime(
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
+    const timeoutMs =
+      method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path);
     const result = await peer.execute({
       id: crypto.randomUUID(),
       type: "request",
       method,
       path,
       body,
-      upload,
-      timeoutMs: method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path),
+      ...(upload === undefined ? {} : { upload }),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
@@ -519,7 +574,7 @@ export function createWebWorkspaceRuntime(
     team: {
       async getPresence() {
         const value = await request("GET", TEAM_API_ROUTES.team.presence);
-        if (!isTeamPresenceSnapshot(value)) throw new Error("The host returned invalid presence.");
+        if (!isTeamPresenceSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
         return value;
       },
       listMembers,
@@ -576,6 +631,7 @@ export function createWebWorkspaceRuntime(
     return teamApi(method, path, decode, body);
   }
   const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
+  const agentRoutines = teamAgentRoutinesApi(teamApi);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -642,7 +698,7 @@ export function createWebWorkspaceRuntime(
           currentText().t("webClient.error.connectionUnavailable"),
           result.ok ? null : (result.reference ?? null),
         );
-      const support = decodeTeamProtocolSupportV7Base(await request("GET", TEAM_API_ROUTES.compatibility));
+      const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
       const updateDirection = teamProtocolUpdateDirection(
         { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
         support.protocol,
@@ -701,8 +757,24 @@ export function createWebWorkspaceRuntime(
     },
     async browserTabs() {
       const value = await request("GET", TEAM_API_ROUTES.browser.tabs);
-      if (!Array.isArray(value)) throw new Error("The host returned an invalid tab list.");
-      return value.map(decodeWebBrowserTab);
+      if (!Array.isArray(value)) throw new Error(currentText().t("error.remote.invalidData"));
+      // The frozen tab list has no field for a person's control or the history state, so the host
+      // answers on their own routes.
+      const held = capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY)
+        ? new Set(decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.state, {})).tabIds)
+        : new Set<string>();
+      const pageStates = capabilities.includes(BROWSER_PAGE_STATE_CAPABILITY)
+        ? new Map(
+            decodeBrowserPageStateSnapshot(await request("POST", BROWSER_PAGE_STATE_ROUTES.state, {})).tabs.map(
+              ({ tabId, ...state }) => [tabId, state],
+            ),
+          )
+        : new Map<string, { canGoBack: boolean; canGoForward: boolean }>();
+      return value.map(decodeWebBrowserTab).map((tab) => ({
+        ...tab,
+        ...(held.has(tab.id) ? { userControl: true as const } : {}),
+        ...pageStates.get(tab.id),
+      }));
     },
     async openBrowserTab(input) {
       return decodeWebBrowserTab(await request("POST", TEAM_API_ROUTES.browser.open, { ...input }));
@@ -721,20 +793,35 @@ export function createWebWorkspaceRuntime(
     async reloadBrowserTab(tabId) {
       await request("POST", TEAM_API_ROUTES.browser.reload, { tabId });
     },
+    async stopBrowserTab(tabId) {
+      if (!capabilities.includes(BROWSER_PAGE_STATE_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserStopUnsupported"));
+      decodeBrowserPageStateSnapshot(await request("POST", BROWSER_PAGE_STATE_ROUTES.stop, { tabId }));
+    },
     async closeBrowserTab(tabId) {
       await request("POST", TEAM_API_ROUTES.browser.close, { tabId });
+    },
+    async takeBrowserControl(tabId) {
+      if (!capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserUserControlUnsupported"));
+      decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.take, { tabId }));
+    },
+    async releaseBrowserControl(tabId) {
+      if (!capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserUserControlUnsupported"));
+      decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.release, { tabId }));
     },
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
     async getSidebarLayout() {
       const value = await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
-      if (!isSidebarLayoutSnapshot(value)) throw new Error("The host returned an invalid sidebar layout.");
+      if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     async mutateSidebarLayout(action) {
       const value = await request("POST", TEAM_API_ROUTES.sidebarLayout.actions, { ...action });
-      if (!isSidebarLayoutSnapshot(value)) throw new Error("The host returned an invalid sidebar layout.");
+      if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     channels: {
@@ -765,7 +852,7 @@ export function createWebWorkspaceRuntime(
     },
     async currentMemberId() {
       const value = await request("GET", TEAM_API_ROUTES.me);
-      if (!isDynamicRecord(value)) throw new Error("The host returned an invalid team member.");
+      if (!isDynamicRecord(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return requiredString(value, "id");
     },
     respondToBrowserSecret: (input) =>
@@ -833,7 +920,7 @@ export function createWebWorkspaceRuntime(
       }
     },
     async listAgents() {
-      return guardedListDecoder(isAgentSummary, "teammates")(await request("GET", TEAM_API_ROUTES.agents.all));
+      return guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all));
     },
     async conversation(id, before) {
       if (!capabilities.includes("conversation-pagination")) {
@@ -850,7 +937,7 @@ export function createWebWorkspaceRuntime(
     },
     async markRead(id, throughMessageId) {
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
-      if (!isConversationReadState(value)) throw new Error("The host returned an invalid read state.");
+      if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     async focusUse() {
@@ -882,6 +969,22 @@ export function createWebWorkspaceRuntime(
         {},
         { name: "avatar", mimeType: image.mimeType, base64: bytesToBase64(image.bytes) },
       );
+    },
+    async agentAvatar(agentId, avatarUrl) {
+      const version = new URL(avatarUrl).searchParams.get("v");
+      if (!version) throw new Error(currentText().t("error.remote.invalidData"));
+      const value = await request(
+        "GET",
+        `${TEAM_API_ROUTES.agent.avatar(agentId)}?${new URLSearchParams({ v: version })}`,
+      );
+      if (
+        !isDynamicRecord(value) ||
+        !isString(value.mimeType) ||
+        !isAvatarMimeType(value.mimeType) ||
+        !isString(value.base64)
+      )
+        throw new Error(currentText().t("error.remote.invalidData"));
+      return `data:${value.mimeType};base64,${value.base64}`;
     },
     async send(id, text, attachmentDraftIds, replyToMessageId = null, clientMessageId) {
       const result = await request("POST", TEAM_API_ROUTES.agent.messages(id), {
@@ -924,6 +1027,8 @@ export function createWebWorkspaceRuntime(
       const supported = supportedAttachmentExtensions({
         eml: capabilities.includes("eml-attachments"),
         media: capabilities.includes("media-attachments"),
+        zip: capabilities.includes("zip-attachments"),
+        mp4: capabilities.includes("mp4-attachments"),
       });
       if (extension && !supported.includes(extension)) throw new Error(currentText().t("webClient.error.fileType"));
       if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(currentText().t("error.remote.attachmentTooLarge"));
@@ -976,29 +1081,74 @@ export function createWebWorkspaceRuntime(
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
     routineFlows,
-    updateRoutine: (input) =>
-      runTeamEffect(updateAgentRoutine(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
-    testRoutine: (input) =>
-      runTeamEffect(testAgentRoutine(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    updateRoutine: agentRoutines.updateRoutine,
+    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    async listAgentNotificationLevels(hostId) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.agentNotificationLevels(hostId);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { server: null, agents: [] };
+      return runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async setAgentNotificationLevel(input) {
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async notificationSettings(hostId) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.notificationSettings(hostId);
+      }
+      const [agents, levels] = await Promise.all([
+        guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all)),
+        capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+          ? runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)))
+          : null,
+      ]);
+      return { agents, levels };
+    },
+    async setHostAgentNotificationLevel(hostId, input) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.setAgentNotificationLevel(hostId, input);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async setOwnServerNotificationLevel(hostId, level) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.setOwnServerNotificationLevel(hostId, level);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setOwnServerNotificationLevel(teamApi, level).pipe(Effect.mapError((error) => error.cause)));
+    },
     async models() {
-      return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));
+      return guardedListDecoder(
+        isClientAgentModelOption,
+        "models",
+      )(await request("GET", TEAM_API_ROUTES.agents.models));
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);
-      if (!isAgentStatus(value)) throw new Error("The host returned an invalid status.");
+      if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     async accountUsage() {
       const value = await request("GET", TEAM_API_ROUTES.agents.usage);
-      if (!isAccountUsage(value)) throw new Error("The host returned invalid account usage.");
+      if (!isAccountUsage(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     async createAgent(input) {
       const value = await request("POST", TEAM_API_ROUTES.agents.all, { ...input });
-      if (!isAgentSummary(value)) throw new Error("The host returned an invalid teammate.");
+      if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;
     },
     async duplicateAgent(agentId) {
@@ -1007,8 +1157,8 @@ export function createWebWorkspaceRuntime(
       const operationId = duplicateOperationIds.get(operationKey) ?? crypto.randomUUID();
       duplicateOperationIds.set(operationKey, operationId);
       const value = await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), { operationId });
-      if (!isDynamicRecord(value) || !isAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
-        throw new Error("The host returned an invalid duplicated agent.");
+      if (!isDynamicRecord(value) || !isClientAgentSummary(value.agent) || !isSidebarLayoutSnapshot(value.layout))
+        throw new Error(currentText().t("error.remote.invalidData"));
       duplicateOperationIds.delete(operationKey);
       return { agent: value.agent, layout: value.layout } satisfies DuplicateAgentResult;
     },
@@ -1046,10 +1196,10 @@ export function createWebWorkspaceRuntime(
         typeof value.total !== "number" ||
         (value.nextCursor !== null && typeof value.nextCursor !== "string")
       )
-        throw new Error("The host returned invalid search results.");
+        throw new Error(currentText().t("error.remote.invalidData"));
       const results = value.results.map((item) => {
         if (!isDynamicRecord(item) || typeof item.agentId !== "string" || !isConversationMessage(item.message))
-          throw new Error("The host returned an invalid search result.");
+          throw new Error(currentText().t("error.remote.invalidData"));
         return { agentId: item.agentId, message: item.message };
       });
       return { results, total: value.total, nextCursor: value.nextCursor };
@@ -1076,7 +1226,7 @@ export function createWebWorkspaceRuntime(
 }
 
 function decodeWebFile(value: unknown): WebFile {
-  if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
+  if (!isDynamicRecord(value)) throw new Error(currentText().t("error.remote.invalidData"));
   const base64 = requiredString(value, "base64");
   if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
     throw new Error(currentText().t("error.remote.attachmentTooLarge"));
@@ -1135,7 +1285,7 @@ function decodeWebBrowserTab(tab: unknown): BrowserTab {
     (tab.ownerThreadId !== null && typeof tab.ownerThreadId !== "string") ||
     (tab.ownerAgentId !== null && typeof tab.ownerAgentId !== "string")
   )
-    throw new Error("The host returned an invalid tab.");
+    throw new Error(currentText().t("error.remote.invalidData"));
   return {
     id: requiredString(tab, "id"),
     title: requiredString(tab, "title"),
@@ -1161,12 +1311,12 @@ function decodeWebBrowserPreview(value: unknown): BrowserPreview {
     value.height < 1 ||
     value.height > 600
   )
-    throw new Error("The host returned an invalid browser preview.");
+    throw new Error(currentText().t("error.remote.invalidData"));
   return { dataUrl: value.dataUrl, width: value.width, height: value.height };
 }
 
 function decodeWebConversationSnapshot(value: unknown): ConversationPage {
-  if (!isConversationWithReadState(value)) throw new Error("The host returned an invalid conversation.");
+  if (!isConversationWithReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
   return { ...value, references: {}, pageInfo: { hasOlder: false, olderCursor: null } };
 }
 
@@ -1180,10 +1330,10 @@ function decodeWebConversationPage(value: unknown): ConversationPage {
     (value.pageInfo.hasOlder && !value.pageInfo.olderCursor) ||
     !isDynamicRecord(value.references)
   )
-    throw new Error("The host returned an invalid conversation page.");
+    throw new Error(currentText().t("error.remote.invalidData"));
   const references: ConversationPage["references"] = {};
   for (const [id, message] of Object.entries(value.references)) {
-    if (!isConversationMessage(message)) throw new Error("The host returned an invalid referenced message.");
+    if (!isConversationMessage(message)) throw new Error(currentText().t("error.remote.invalidData"));
     references[id] = message;
   }
   return {

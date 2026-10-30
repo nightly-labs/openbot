@@ -33,7 +33,7 @@ const TOPICS = [
   "the onboarding flow for a second provider account",
 ];
 
-/** Messages over several days, each day a different length, so the segments differ. */
+/** Messages over several days, with a message from the reader on every third row, so the segments differ. */
 function storyRows(days: number[], start = 0): StoryRow[] {
   const rows: StoryRow[] = [];
   days.forEach((count, dayIndex) => {
@@ -57,7 +57,7 @@ function storyRows(days: number[], start = 0): StoryRow[] {
   return rows;
 }
 
-/** A transcript with the same scroll container, virtualizer and day rule as the chats. */
+/** A transcript with the same scroll container, virtualizer and section rule as the chats. */
 function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory }) {
   const { t, format } = useText();
   const [scrollElement, setScrollElement] = createSignal<HTMLDivElement>();
@@ -73,6 +73,7 @@ function RailTranscript(props: { rows: StoryRow[]; unloaded?: UnloadedHistory })
   });
   const rail = createChatScrollRail({
     rows: () => props.rows,
+    question: (row) => (row.own ? row.text : undefined),
     unloaded: () => props.unloaded,
     virtualizer,
     onLoadOlder: () => {},
@@ -156,7 +157,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** 150 messages over six days: the list is virtualized, so most days have no rendered row. */
+/** 150 messages over six days, 52 of them from the reader: the list is virtualized, so most have no rendered row. */
 export const SeveralDays: Story = {};
 
 /** Fewer than 100 messages: every row renders. */
@@ -175,12 +176,12 @@ export const OlderHistoryNotLoaded: Story = {
   },
 };
 
-/** Forty days: more than the rail holds, so its list scrolls and keeps the current day in view. */
-export const ManyDays: Story = {
+/** More messages from the reader than the rail holds, so its list scrolls and keeps the current one in view. */
+export const ManyMessages: Story = {
   args: { rows: storyRows(Array.from({ length: 40 }, (_, index) => 2 + (index % 4))) },
 };
 
-/** Two days: no rail, because the transcript is short enough to read through. */
-export const TwoDays: Story = {
-  args: { rows: storyRows([30, 30]) },
+/** One message from the reader and a long reply: no rail, because there is no other place to go to. */
+export const OneMessage: Story = {
+  args: { rows: storyRows([1]).concat(storyRows([30], 1).filter((row) => !row.own)) },
 };

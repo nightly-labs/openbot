@@ -1,7 +1,7 @@
 .account-login-screen,
 .initial-setup-screen {
   position: absolute;
-  z-index: 100;
+  z-index: var(--openbot-layer-dialog);
   inset: 0;
   min-height: 100vh;
   display: grid;
@@ -193,7 +193,6 @@
 .account-login-form input:not(.otp-input-native):focus {
   border-color: var(--openbot-border-focus);
   background: var(--openbot-bg-surface);
-  box-shadow: 0 0 0 3px var(--openbot-accent-soft);
 }
 
 .account-login-form input:not(.otp-input-native)[aria-invalid="true"] {
@@ -221,7 +220,9 @@
 }
 
 .account-login-primary:disabled,
-.account-login-code-action:disabled {
+.account-login-primary[aria-disabled="true"],
+.account-login-code-action:disabled,
+.account-login-code-action[aria-disabled="true"] {
   cursor: default;
   opacity: 0.48;
 }
@@ -257,7 +258,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .account-login-primary:hover:not(:disabled) {
+  .account-login-primary:hover:not(:disabled, [aria-disabled="true"]) {
     background: var(--openbot-text-primary);
   }
 
@@ -267,7 +268,7 @@
   }
 }
 
-.account-login-primary:active:not(:disabled) {
+.account-login-primary:active:not(:disabled, [aria-disabled="true"]) {
   transform: scale(0.98);
 }
 
@@ -594,7 +595,7 @@
   padding-inline: var(--openbot-space-2);
 }
 
-.ui-button.provider-picker-refresh:hover:not(:disabled) {
+.ui-button.provider-picker-refresh:hover:not(:disabled, [aria-disabled="true"]) {
   color: var(--openbot-text-primary);
 }
 
@@ -1246,8 +1247,8 @@ button {
 }
 
 button:not(.ui-button):focus-visible,
-input:focus-visible,
-textarea:focus-visible {
+input:not(.ui-input):focus-visible,
+textarea:not(.ui-textarea):focus-visible {
   outline: 2px solid var(--openbot-border-focus);
   outline-offset: 2px;
 }
@@ -1343,8 +1344,6 @@ body,
 
 .panel-edge,
 .direct-conversation-header,
-.browser-panel-header,
-.browser-toolbar,
 .remote-desktop-header,
 .settings-panel,
 .browser-panel,
@@ -1354,7 +1353,6 @@ body,
 }
 
 .search-field,
-.browser-address-bar input,
 .composer,
 .direct-composer,
 .settings-field input,
@@ -1369,7 +1367,6 @@ body,
 }
 
 .search-field:focus-within,
-.browser-address-bar input:focus,
 .composer:focus-within,
 .direct-composer:focus-within,
 .settings-field input:focus,
@@ -1383,7 +1380,6 @@ body,
 }
 
 .search-field input::placeholder,
-.browser-address-bar input::placeholder,
 .composer-editor-placeholder,
 .direct-composer textarea::placeholder,
 .settings-field input::placeholder,
@@ -1395,8 +1391,7 @@ body,
 }
 
 .provider-picker-option-selected,
-.provider-model-option-selected,
-.browser-tab-controlled .browser-tab {
+.provider-model-option-selected {
   border-color: var(--openbot-border-focus);
   background: var(--openbot-accent-soft);
   color: var(--openbot-text-primary);
@@ -1428,7 +1423,7 @@ body,
 .voice-button:hover,
 .voice-button-active:hover,
 .initial-setup-save:hover:not(:disabled),
-.account-login-primary:hover:not(:disabled) {
+.account-login-primary:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--openbot-text-primary);
   color: var(--openbot-text-on-light);
 }

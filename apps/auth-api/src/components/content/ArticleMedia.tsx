@@ -66,9 +66,9 @@ export function ArticleImage(props: ArticleImageProps) {
 }
 
 function figureMount(props: ArticleMediaBase): {
-  caption?: JSX.Element;
-  mountOn?: string;
-  mountPad?: ArticleMountPad;
+  caption?: JSX.Element | undefined;
+  mountOn?: string | undefined;
+  mountPad?: ArticleMountPad | undefined;
   wide: boolean;
 } {
   return {
@@ -80,9 +80,9 @@ function figureMount(props: ArticleMediaBase): {
 }
 
 function ArticleFigure(props: {
-  caption?: JSX.Element;
-  mountOn?: string;
-  mountPad?: ArticleMountPad;
+  caption?: JSX.Element | undefined;
+  mountOn?: string | undefined;
+  mountPad?: ArticleMountPad | undefined;
   wide?: boolean;
   children: JSX.Element;
 }) {

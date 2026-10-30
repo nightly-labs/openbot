@@ -10,8 +10,11 @@ export const SOUND_PREVIEW_KEY = "openbotSoundPreview";
  * service of the app.
  */
 export interface PushNotificationsNative {
-  /** Reads the permission, and asks once when the phone has not asked yet. */
-  permission(): Promise<NotificationPermission>;
+  /**
+   * Reads the permission, and asks once when the phone has not asked yet. `asked` receives the answer
+   * only when the phone showed its prompt.
+   */
+  permission(asked?: (answer: NotificationPermission) => void): Promise<NotificationPermission>;
   /**
    * The push token of the app, or `null` when the phone gives none: the APNs token as lowercase hex on
    * iOS, the Firebase Cloud Messaging token on Android.
@@ -28,4 +31,12 @@ export interface PushNotificationsNative {
   removeKeys(): void;
   /** Plays `sound` as a notification plays it. In silent mode the phone plays it as it plays a notification. */
   previewSound(sound: NotificationSound): Promise<void>;
+}
+
+/** What a notification names: its agent, and the server and thread of the event. */
+export interface NotificationTarget {
+  agentId: string;
+  serverId: string | null;
+  /** The thread of the event. A thread of a channel opens the channel. */
+  threadId: string | null;
 }

@@ -14,7 +14,6 @@ export const messages = defineMessages("skill", {
   "skill.emptyEnabled": "This agent has no enabled skills.",
   "skill.emptyAssigned": "This agent has no assigned skills yet.",
   "skill.folderSkill": "OpenBot did not install this skill. Edit or remove it in {location}.",
-  "skill.localOnHost": "This local skill is stored on the host. Open its details on that computer.",
   "skill.moreFor": "More for {name}",
   "skill.update": "Update",
   "skill.updateName": "Update {name}",
@@ -69,4 +68,12 @@ export const messages = defineMessages("skill", {
   "skill.preview.examplePrompt": "Help me use this skill.",
   "skill.preview.try": "Try skill",
   "skill.preview.linkFailed": "Could not open the link.",
+
+  // The Skills tab of the Marketplace. {agents} is a list of agent names.
+  "skill.marketplace.changed": { one: "{name} changed on {count} agent.", other: "{name} changed on {count} agents." },
+  "skill.marketplace.updated": { one: "{name} updated on {count} agent.", other: "{name} updated on {count} agents." },
+  "skill.marketplace.undone": "The change to {name} is undone.",
+  "skill.marketplace.confirmAgents": "Agents: {agents}.",
+  "skill.marketplace.limitReason": "An agent can have up to {limit} skills.",
+  "skill.marketplace.cannotRemove": "OpenBot cannot remove a built-in skill or a skill that it did not install.",
 });

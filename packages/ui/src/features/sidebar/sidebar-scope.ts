@@ -46,7 +46,7 @@ export function createSidebarScope(props: SidebarProps) {
     userHiddenSince,
     visiblePinnedKeys,
     visibleSectionIds,
-    waitingAgents,
+    waitingChats,
   } = createSidebarDataStore({ props, dragActive: () => dragActive() });
   const {
     cancelSectionEditor,
@@ -71,7 +71,7 @@ export function createSidebarScope(props: SidebarProps) {
 
   const dragState = createSidebarDragStateStore({ chatKind, sectionAcceptsChat });
   dragActive = () => dragState.draggingKind() !== undefined;
-  const { assignChatSection, commitSidebarDrop, movePersonByKeyboard, movePinnedItem, moveSection } =
+  const { assignChatSection, commitSidebarDrop, duplicateSection, movePersonByKeyboard, movePinnedItem, moveSection } =
     createSidebarLayoutActions({
       announce,
       announceError,
@@ -123,7 +123,7 @@ export function createSidebarScope(props: SidebarProps) {
   });
 
   createEffect(
-    () => [resolvedPinnedItems(), waitingAgents(), filteredChats(), orderedPeople(), userHiddenAgentList()],
+    () => [resolvedPinnedItems(), waitingChats(), filteredChats(), orderedPeople(), userHiddenAgentList()],
     () => {
       scrollFades.remeasure();
     },
@@ -158,6 +158,7 @@ export function createSidebarScope(props: SidebarProps) {
     draggedPinnedKey: dragState.draggedPinnedKey,
     draggingKind: dragState.draggingKind,
     dropSidebarNativeDrag,
+    duplicateSection,
     emptyPinnedDropVisible: dragState.emptyPinnedDropVisible,
     endChatDragging,
     filteredAgents,
@@ -197,7 +198,7 @@ export function createSidebarScope(props: SidebarProps) {
     userHiddenAgentList,
     userHiddenSince,
     visibleSectionIds,
-    waitingAgents,
+    waitingChats,
   };
 }
 

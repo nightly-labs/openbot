@@ -78,3 +78,30 @@ export const Cancelled: Story = {
 export const TabUnavailable: Story = {
   args: { tab: undefined, preview: null, previewStatus: "failed" },
 };
+
+/** On a remote server, the desktop app offers a sign-in on this computer for a site that refuses the server. */
+export const SignInOnThisComputer: Story = {
+  args: {
+    tab: { ...tab, title: "Log in to X / X", url: "https://x.com/i/flow/login" },
+    onSignInLocally: fn(),
+  },
+};
+
+const blockedTab: BrowserTab = { ...tab, title: "Log in to X / X", url: "https://x.com/i/flow/login" };
+
+/** The agent found that the site refused the sign-in from the server: the card asks only for that sign-in. */
+export const SignInBlocked: Story = {
+  args: { tab: blockedTab, onSignInLocally: fn(), signInBlocked: { server: "Hello", signingIn: false } },
+};
+
+export const SignInBlockedWaiting: Story = {
+  args: { tab: blockedTab, onSignInLocally: fn(), signInBlocked: { server: "Hello", signingIn: true } },
+};
+
+export const SignInBlockedCompleted: Story = {
+  args: { tab: blockedTab, decision: "complete", signInBlocked: { server: "Hello", signingIn: false } },
+};
+
+export const SignInBlockedCancelled: Story = {
+  args: { tab: blockedTab, decision: "cancel", signInBlocked: { server: "Hello", signingIn: false } },
+};

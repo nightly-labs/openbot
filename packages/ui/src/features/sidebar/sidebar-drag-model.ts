@@ -190,7 +190,7 @@ export function pointInRect(point: SidebarDragPoint, rect: DOMRect | null, scrol
   );
 }
 
-export function closestVerticalSlot<T extends { bottom: number; centerY: number; top: number }>(
+export function closestVerticalSlot<T extends { bottom: number; top: number }>(
   slots: Iterable<T>,
   clientY: number,
   scrollDelta: number,
@@ -206,7 +206,9 @@ export function closestVerticalSlot<T extends { bottom: number; centerY: number;
     const bottom = slot.bottom - scrollDelta;
     extentTop = Math.min(extentTop, top);
     extentBottom = Math.max(extentBottom, bottom);
-    const distance = Math.abs(slot.centerY - scrollDelta - clientY);
+    // Distance to the slot's edges, not its center: a point inside a tall section is closer to the
+    // center of a short neighbour, and would land there.
+    const distance = Math.max(top - clientY, clientY - bottom, 0);
     if (distance <= closestDistance) {
       closest = slot;
       closestDistance = distance;

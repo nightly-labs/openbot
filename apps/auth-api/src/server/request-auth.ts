@@ -61,7 +61,7 @@ export function requestAuthService(): AuthService {
   const analytics = accountAnalytics(bindings);
   return new AuthService({
     repository: new D1AuthRepository(bindings.DB),
-    delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings),
+    delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
     // The revocation is already written and the cron redelivers it, so the answer does not wait.
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
@@ -289,13 +289,13 @@ export function requestContactMessageServices(): ContactMessageServices {
   return {
     repository: new D1AuthRepository(bindings.DB),
     now: () => Date.now(),
-    delivery: () => createContactMessageDelivery(bindings),
+    delivery: () => createContactMessageDelivery(bindings, accountAnalytics(bindings)),
   };
 }
 
 export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null {
   const bindings = requireWorkerBindings(env);
-  return createTeamInviteEmailDelivery(bindings);
+  return createTeamInviteEmailDelivery(bindings, accountAnalytics(bindings));
 }
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
@@ -314,6 +314,7 @@ function requestHostedBilling(developerKey: string | null = null) {
     removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
     developerKey,
     planChanged: (hostId) => remote.planChanged(hostId),
+    licenseChanged: (userId) => remote.licenseChanged(userId),
     schedule,
   });
 }
@@ -372,12 +373,6 @@ export function requestRemoteSignalUrl(): string {
   if (!value)
     throw new RemoteControlPlaneError(503, "remote_not_configured", "The Remote Signal URL is not configured.");
   return value;
-}
-
-export function requestSourceIp(request: Request): string {
-  return (
-    request.headers.get("CF-Connecting-IP") ?? request.headers.get("X-Forwarded-For")?.split(",")[0] ?? "127.0.0.1"
-  );
 }
 
 export function bearerToken(request: Request): string | null {

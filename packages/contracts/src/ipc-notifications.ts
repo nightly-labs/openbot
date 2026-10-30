@@ -11,4 +11,6 @@ export interface NotificationOpenedEvent {
   serverId: string;
   agentId: string;
   threadId: string | null;
+  /** The channel of a channel notification. The renderer opens the channel, not the agent chat. */
+  channelId?: string;
 }

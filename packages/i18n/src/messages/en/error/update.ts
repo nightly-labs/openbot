@@ -15,6 +15,7 @@ export const messages = defineMessages("error.update", {
     "The update service did not answer. OpenBot tries again on its own in a few minutes.",
   "error.update.checkNoRelease":
     "No published update was found for this platform. OpenBot tries again on its own in a few minutes.",
+  "error.update.managedByNix": "Nix installs updates for this copy of OpenBot. Update it with Nix.",
   "error.update.managedByHost":
     "Updates on this Mac are installed by the host. The update stays ready until the host's maintenance runs.",
   "error.update.siblingSession":

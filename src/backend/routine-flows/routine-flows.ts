@@ -36,6 +36,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { nextValidRoutineOccurrence, routineOnceInstant } from "@openbot/team-client/routine-schedule";
 import { Context, Effect, Exit, Layer, ManagedRuntime, Schema, Scope, Semaphore } from "effect";
+import { coalescedPasses } from "../coalesced-passes";
 import { routineFlowDepths } from "./routine-flow-graph";
 import { RoutineFlowError, type RoutineFlowRun, type RoutineFlowStore } from "./routine-flow-store";
 
@@ -110,9 +111,6 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         const lock = yield* Semaphore.make(1);
         const { store } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
-        /** A sweep running, and whether another was asked for while it ran. */
-        let sweeping = false;
-        let again = false;
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineFlowFailed({ cause }) });
@@ -249,6 +247,9 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           const delivery = dependencies.delivery(step.deliveryId);
           if (!delivery)
             return store.settleStep(step.id, "failed", null, sourceText("error.backend.routineFlowLinkGone"));
+          // An error on a completed delivery is a failure the agent reported (`routine_report_failure`).
+          if (delivery.status === "completed" && delivery.error !== null)
+            return store.settleStep(step.id, "failed", null, delivery.error);
           if (delivery.status === "completed") {
             const output = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             return store.settleStep(step.id, "succeeded", output, null);
@@ -365,27 +366,14 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           if (changed.size > 0) dependencies.changed([...changed]);
         });
 
-        const sweep = Effect.fn("RoutineFlows.sweep")(function* () {
-          if (sweeping) {
-            again = true;
-            return;
-          }
-          sweeping = true;
-          try {
-            do {
-              again = false;
-              yield* lock
-                .withPermit(sweepOnce())
-                .pipe(
-                  Effect.catchCause((cause) =>
-                    Effect.sync(() => logger.warn("A routine flow sweep failed.", { cause: String(cause) })),
-                  ),
-                );
-            } while (again);
-          } finally {
-            sweeping = false;
-          }
-        });
+        const sweep = coalescedPasses(() =>
+          lock.withPermit(sweepOnce()).pipe(
+            Effect.catchCause((cause) =>
+              Effect.sync(() => logger.warn("A routine flow sweep failed.", { cause: String(cause) })),
+            ),
+            Effect.withSpan("RoutineFlows.sweep"),
+          ),
+        );
 
         const notice = Effect.fn("RoutineFlows.notice")(function* (event: AgentEvent) {
           if (event.type !== "turn-completed" && event.type !== "queue-changed" && event.type !== "routines-changed")

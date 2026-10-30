@@ -3,8 +3,13 @@ import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime
 import type { ChatMessage } from "./chat-messages";
 import type { ImageDimensions } from "./image-dimensions";
 
-/** Where an outbox message goes. */
-export type OutboxTarget = { kind: "agent"; serverId: string; agentId: string };
+/**
+ * Where an outbox message goes. A channel message keeps the member it names at its start, as the
+ * person saw the channel when they wrote it.
+ */
+export type OutboxTarget =
+  | { kind: "agent"; serverId: string; agentId: string }
+  | { kind: "channel"; serverId: string; channelId: string; recipientAgentId: string | null };
 
 /**
  * `waiting` has not reached the host: the server is offline, or an earlier message of the chat
@@ -24,6 +29,7 @@ export interface OutboxFile {
 }
 
 export interface OutboxMessage {
+  /** The `clientMessageId` of an agent message, and the `operationId` of a channel message. */
   clientMessageId: string;
   target: OutboxTarget;
   text: string;
@@ -35,7 +41,7 @@ export interface OutboxMessage {
   /** Whether the host answers a repeat of that request with its first receipt and stores nothing. */
   repeatSafe: boolean;
   state: OutboxState;
-  /** The host's id for a sent message. */
+  /** The host's id for a sent agent message. */
   messageId: string | null;
   /** Why the last attempt failed, in the reader's language. */
   error: string | null;
@@ -46,8 +52,9 @@ export interface OutboxMessage {
 }
 
 /**
- * How long Retry of a message stays safe. The host answers a repeated `clientMessageId` for a day
- * after it stored the message; half of that leaves room for a clock that differs from the host's.
+ * How long Retry of an agent message stays safe. The host answers a repeated `clientMessageId` for
+ * a day after it stored the message; half of that leaves room for a clock that differs from the
+ * host's. A channel keeps the receipt of an operation with the channel history.
  */
 const OUTBOX_RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
 
@@ -86,19 +93,23 @@ export function outboxChatMessage(
 }
 
 /** One chat's key. The order of messages with the same key is their send order. */
-export function outboxChatKey(target: { kind: "agent"; serverId: string; id: string }): string {
+export function outboxChatKey(target: { kind: "agent" | "channel"; serverId: string; id: string }): string {
   return `${target.kind}:${target.serverId}:${target.id}`;
 }
 
 export function outboxTargetKey(target: OutboxTarget): string {
-  return outboxChatKey({ kind: target.kind, serverId: target.serverId, id: target.agentId });
+  return outboxChatKey({
+    kind: target.kind,
+    serverId: target.serverId,
+    id: target.kind === "agent" ? target.agentId : target.channelId,
+  });
 }
 
 /** Whether a send of this message cannot store it twice. */
 export function outboxRetrySafe(message: OutboxMessage, now: number): boolean {
   if (message.firstAttemptAt === null) return true;
   if (!message.repeatSafe) return false;
-  return now - Date.parse(message.firstAttemptAt) < OUTBOX_RETRY_WINDOW_MS;
+  return message.target.kind === "channel" || now - Date.parse(message.firstAttemptAt) < OUTBOX_RETRY_WINDOW_MS;
 }
 
 /** The file this phone keeps. A message that the host may have stored is gone from it on load. */
@@ -135,11 +146,22 @@ function isTimestamp(value: unknown): value is string {
   return isString(value) && Number.isFinite(Date.parse(value));
 }
 
-/** A message that an older app version saved for a channel is not readable, so the list is kept aside. */
 function decodeTarget(value: unknown): OutboxTarget | null {
   if (!isDynamicRecord(value) || !isString(value.serverId) || !value.serverId) return null;
   if (value.kind === "agent" && isString(value.agentId) && value.agentId)
     return { kind: "agent", serverId: value.serverId, agentId: value.agentId };
+  if (
+    value.kind === "channel" &&
+    isString(value.channelId) &&
+    value.channelId &&
+    isNullableString(value.recipientAgentId)
+  )
+    return {
+      kind: "channel",
+      serverId: value.serverId,
+      channelId: value.channelId,
+      recipientAgentId: value.recipientAgentId,
+    };
   return null;
 }
 

@@ -3,7 +3,7 @@
  *
  * Its last few hundred lines are a theme layer, not app-shell content: fourteen
  * grouped rules assign the palette to selectors from every domain at once, and
- * some of those selectors - .browser-tab, .message-action-button,
+ * some of those selectors - .message-action-button,
  * .composer-button, .choice-card - are not even declared in this file. Splitting
  * the sidebar or remote-desktop rules out means either duplicating those
  * declarations into a second file, which is the one thing the shared palette
@@ -89,12 +89,6 @@
 .remote-compatibility-details dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
-}
-
-.global-search-overlay {
-  position: fixed;
-  z-index: var(--openbot-layer-dialog);
-  inset: 0;
 }
 
 .global-search-dialog {
@@ -754,7 +748,7 @@
 }
 
 .server-rail-tooltip {
-  z-index: var(--openbot-layer-popover);
+  z-index: var(--openbot-layer-tooltip);
   max-width: min(240px, calc(100vw - 16px));
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-sm);
@@ -888,6 +882,7 @@ textarea {
   justify-content: space-between;
   gap: var(--openbot-space-2);
   border-bottom: 1px solid var(--openbot-border);
+  /* The logo of the page rail (`page-rail.css`) has the same top padding, to stay on this center line. */
   padding: 2px 3px 0 10px;
 }
 
@@ -985,15 +980,14 @@ textarea {
       var(--left-header-height) no-repeat;
   }
 
-  /* A side panel is the right part of the window card. Its pseudo-element is the line to the chat. The
-   * tabbed browser covers the whole window, so it stays as it is. */
+  /* A side panel is the right part of the window card. Its pseudo-element is the line to the chat. */
   .app-frame-edge .settings-panel,
-  .app-frame-edge .browser-panel:not(.browser-panel-expanded) {
+  .app-frame-edge .browser-panel {
     isolation: isolate;
   }
 
   .app-frame-edge .settings-panel::before,
-  .app-frame-edge .browser-panel:not(.browser-panel-expanded)::before {
+  .app-frame-edge .browser-panel::before {
     position: absolute;
     z-index: -1;
     content: "";
@@ -1325,6 +1319,21 @@ textarea {
   stroke-width: var(--openbot-icon-stroke);
 }
 
+.sidebar-history-button > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+/* No chat to open in that direction. The arrow stays in its place, so the bar does not move. */
+.sidebar-history-button:disabled,
+.sidebar-history-button:disabled:hover {
+  background: transparent;
+  color: var(--openbot-text-muted);
+  cursor: default;
+  opacity: 0.4;
+}
+
 .sidebar-update-button,
 .sidebar-update-button:hover {
   color: var(--openbot-accent-text);
@@ -1500,6 +1509,22 @@ textarea {
 .sidebar-section-agent-drop-target {
   background: var(--openbot-accent-soft);
   box-shadow: inset 0 0 0 1px var(--openbot-accent-strong);
+}
+
+/* The tint is clear, so the outline takes the colour the tint makes over the surface under it. A
+   color-mix blends a clear colour and does not lay it over the other, but for a tint of alpha a, a share
+   of 1 / (2 - a) made opaque gives the same colour. 54% is within two steps of that for the 12% and
+   16% tints. A row with its own fill sets the outline again. */
+:is(.sidebar-section-agent-drop-target, .sidebar-pinned-group-agent-drop-target) {
+  --agent-avatar-outline-tinted: color-mix(
+    in srgb,
+    var(--openbot-accent-soft) 54%,
+    var(--agent-avatar-outline, transparent)
+  );
+}
+
+:is(.sidebar-section-agent-drop-target, .sidebar-pinned-group-agent-drop-target) > * {
+  --agent-avatar-outline: color(from var(--agent-avatar-outline-tinted) srgb r g b / 1);
 }
 
 .sidebar-section-drop-before::before,
@@ -1767,11 +1792,15 @@ textarea {
 }
 
 .agent-row.sidebar-agent-drag-preview {
+  --agent-avatar-outline: var(--openbot-bg-surface-raised);
+
   background: var(--openbot-bg-surface-raised);
   transition: none;
 }
 
 .agent-row.sidebar-person-drag-preview {
+  --agent-avatar-outline: var(--openbot-bg-surface-raised);
+
   background: var(--openbot-bg-surface-raised);
   transition: none;
 }
@@ -1872,7 +1901,7 @@ textarea {
 .sidebar-pinned-empty-drop {
   display: flex;
   width: 100%;
-  height: 104px;
+  height: 112px;
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--openbot-border-strong);
@@ -1926,9 +1955,11 @@ textarea {
 }
 
 .agent-row.sidebar-pinned-row {
+  --sidebar-pinned-avatar-size: 56px;
+
   width: 72px;
-  height: 94px;
-  min-height: 94px;
+  height: 102px;
+  min-height: 102px;
   flex-direction: column;
   justify-content: flex-start;
   gap: 4px;
@@ -1942,15 +1973,15 @@ textarea {
 }
 
 .agent-row.sidebar-pinned-row .sidebar-pinned-avatar {
-  width: 48px;
-  height: 48px;
-  flex-basis: 48px;
+  width: var(--sidebar-pinned-avatar-size);
+  height: var(--sidebar-pinned-avatar-size);
+  flex-basis: var(--sidebar-pinned-avatar-size);
 }
 
 .agent-row.sidebar-pinned-row .agent-avatar,
 .agent-row.sidebar-pinned-row.person-row .person-avatar {
-  width: 48px;
-  height: 48px;
+  width: var(--sidebar-pinned-avatar-size);
+  height: var(--sidebar-pinned-avatar-size);
 }
 
 .sidebar-pinned-copy {
@@ -1982,10 +2013,13 @@ textarea {
 .sidebar-pinned-title {
   box-sizing: border-box;
   max-width: 100%;
+  height: 18px;
+  min-height: 18px;
   flex: 0 0 16px;
   border-color: var(--openbot-border);
   border-radius: var(--openbot-radius-xs);
   background: var(--openbot-hover);
+  padding: 0 var(--openbot-space-1);
   color: var(--openbot-text-readable);
   font-weight: 400;
 }
@@ -2049,21 +2083,6 @@ textarea {
   object-fit: cover;
 }
 
-.person-avatar > i {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--openbot-bg-sidebar);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control-hover);
-}
-
-.person-avatar.online > i {
-  background: var(--openbot-success);
-}
-
 .person-avatar.large {
   width: 48px;
   height: 48px;
@@ -2095,10 +2114,12 @@ textarea {
 }
 
 .agent-row {
+  --agent-row-avatar-size: 46px;
+
   display: flex;
   width: 100%;
-  height: 54px;
-  min-height: 54px;
+  height: 62px;
+  min-height: 62px;
   align-items: center;
   gap: 8px;
   border: 0;
@@ -2126,15 +2147,17 @@ textarea {
 }
 
 .agent-row-active {
+  --agent-avatar-outline: var(--openbot-bg-surface);
+
   background: var(--openbot-bg-surface);
 }
 
 .agent-row-avatar {
   position: relative;
   display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
+  width: var(--agent-row-avatar-size);
+  height: var(--agent-row-avatar-size);
+  flex: 0 0 var(--agent-row-avatar-size);
   place-items: center;
   transform: translateX(0);
   transition: transform var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
@@ -2285,7 +2308,7 @@ textarea {
 }
 
 .sidebar-wait-tooltip {
-  z-index: var(--openbot-layer-popover);
+  z-index: var(--openbot-layer-tooltip);
   display: grid;
   max-width: min(260px, calc(100vw - 16px));
   gap: 2px;
@@ -2388,8 +2411,24 @@ textarea {
   translate: var(--agent-avatar-optical-offset-x, 0) var(--agent-avatar-optical-offset, 0);
 }
 
+/* The outline: a ring in the colour of the surface under the avatar, so a face that overlaps another
+   face, a badge or a row edge reads as cut out of it. The surface sets `--agent-avatar-outline` where
+   it sets its background; under any other the ring stays transparent, because a ring that misses the
+   colour behind it shows as a halo. The ring is a stroke on the silhouette the Bloub paints first, the
+   paper under its eyes. It is drawn behind that fill, so only the outer half shows, and it does not
+   scale with the drawing, so the width is in pixels at every avatar size. */
+.bloub-avatar-svg > g:nth-of-type(2) > path:first-child {
+  stroke: var(--agent-avatar-outline, transparent);
+  stroke-width: calc(var(--agent-avatar-outline-width, 1.5px) * 2);
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+  vector-effect: non-scaling-stroke;
+}
+
+/* A photo has no silhouette to stroke, so the same ring is an outline on its circle. */
 .agent-avatar-custom {
   overflow: hidden;
+  outline: var(--agent-avatar-outline-width, 1.5px) solid var(--agent-avatar-outline, transparent);
   background: var(--openbot-hover);
   box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
@@ -2442,6 +2481,12 @@ textarea {
   filter: drop-shadow(0 0 3px var(--openbot-danger));
 }
 
+/* The glow would start outside the outline and leave a dark line round the face. A glowing face is
+   never in a group, so it has nothing to be cut out of. */
+.agent-avatar:is([data-mood="waiting"], [data-mood="failed"]) {
+  --agent-avatar-outline: transparent;
+}
+
 .agent-avatar[data-mood="asleep"] {
   opacity: 0.6;
 }
@@ -2465,21 +2510,21 @@ textarea {
 }
 
 .agent-row .agent-avatar {
-  --agent-avatar-optical-offset: -4px;
+  --agent-avatar-optical-offset: -5px;
 
-  width: 36px;
-  height: 36px;
+  width: var(--agent-row-avatar-size);
+  height: var(--agent-row-avatar-size);
 }
 
 .person-row .person-avatar {
-  width: 36px;
-  height: 36px;
+  width: var(--agent-row-avatar-size);
+  height: var(--agent-row-avatar-size);
 }
 
 .avatar-editor {
   position: relative;
-  z-index: 50;
-  width: min(284px, calc(var(--settings-panel-width, 296px) - 30px));
+  z-index: var(--openbot-layer-popover);
+  width: min(284px, calc(var(--settings-panel-width, 360px) - 30px));
   max-width: calc(100vw - 24px);
   margin: 0;
   overflow: hidden;
@@ -2805,6 +2850,8 @@ textarea {
 .agent-role-badge {
   min-width: 0;
   max-width: 100%;
+  height: 18px;
+  min-height: 18px;
   overflow: hidden;
   flex: 0 1 auto;
   justify-self: start;
@@ -2837,6 +2884,18 @@ textarea {
   white-space: nowrap;
 }
 
+/* At the default width and below, the wait chip keeps only its icon so that a long name keeps its
+   space. The row's label and tooltip still name the action. */
+@container (max-width: 300px) {
+  .agent-row-wait-chip:has(.agent-row-wait-chip-label) {
+    padding: 1px 5px;
+  }
+
+  .agent-row-wait-chip-label {
+    display: none;
+  }
+}
+
 /* Narrow panel: name and badge win over time and date. The time element keeps
    no reserved width, so long names get the space instead of truncating to a
    few characters beside a date. */
@@ -2860,7 +2919,7 @@ textarea {
 }
 
 /* The reference list extends agent tiles beyond the chat-list inset while the
-   shared row anatomy supplies its 54px row and 36px avatar proportions. */
+   shared row anatomy supplies its 62px row and 46px avatar proportions. */
 .sidebar:not(.sidebar-compact) .agent-row {
   width: calc(100% + var(--openbot-space-2));
   margin-inline: calc(var(--openbot-space-1) * -1);
@@ -2905,7 +2964,7 @@ textarea {
 
 .account-usage-popover {
   position: relative;
-  z-index: 80;
+  z-index: var(--openbot-layer-tooltip);
   display: grid;
   width: min(300px, calc(100vw - var(--openbot-space-4)));
   max-height: min(60vh, 420px);
@@ -3202,11 +3261,15 @@ textarea {
   padding-inline: 8px;
 }
 
+/* The avatar and the gap after it are wider than the 48px inside a compact row, so the centred
+   content starts 3px early. The offset puts the 46px avatar in the middle of the 64px row. */
 .sidebar-compact .agent-row-avatar {
-  transform: translateX(6px);
+  transform: translateX(4px);
 }
 
 .sidebar-compact .agent-row.sidebar-pinned-row {
+  --sidebar-pinned-avatar-size: 48px;
+
   width: 60px;
   height: 60px;
   min-height: 60px;
@@ -3230,59 +3293,6 @@ textarea {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-8px);
-}
-
-.agent-tasks-row {
-  display: grid;
-  width: 100%;
-  height: var(--openbot-control-md);
-  align-items: center;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: transparent;
-  padding: 0 var(--openbot-space-2);
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  gap: var(--openbot-space-2);
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  letter-spacing: -0.01em;
-  text-align: left;
-  transition: background-color var(--openbot-duration-hover) ease;
-}
-
-.agent-tasks-row:hover:not(:disabled) {
-  background: var(--openbot-bg-control-hover);
-  color: var(--openbot-text-primary);
-}
-
-.agent-tasks-row:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.agent-tasks-row:focus-visible {
-  outline: 0;
-  background: var(--openbot-bg-control-hover);
-  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
-}
-
-.agent-tasks-row small {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.agent-tasks-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--openbot-icon-stroke);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  color: var(--openbot-text-primary);
 }
 
 .icon-spinning {
@@ -3339,6 +3349,10 @@ textarea {
   background: var(--openbot-bg-sidebar);
 }
 
+.sidebar {
+  --agent-avatar-outline: var(--openbot-bg-sidebar);
+}
+
 .server-rail-monogram,
 .server-rail-action .server-rail-monogram {
   border-color: var(--openbot-border);
@@ -3346,14 +3360,8 @@ textarea {
   color: var(--openbot-text-secondary);
 }
 
-.person-avatar.online > i {
-  background: var(--openbot-success);
-}
-
 .sidebar-icon-button:hover,
 .header-panel-toggle:hover,
-.browser-tab:hover,
-.browser-new-tab:hover,
 .browser-toolbar-button:hover:not(:disabled),
 .message-action-button:hover,
 .message-action-button:focus-visible,
@@ -3363,7 +3371,6 @@ textarea {
 .reaction-picker-row button[aria-checked="true"],
 .composer-button:hover,
 .composer-attachment > button:hover,
-.agent-tasks-row:hover,
 .agent-context-menu button:hover,
 .agent-context-menu button:focus-visible {
   background: var(--openbot-bg-control-hover);
@@ -3380,15 +3387,21 @@ textarea {
 }
 
 .agent-row:hover {
+  --agent-avatar-outline: var(--openbot-bg-control);
+
   background: var(--openbot-bg-control);
 }
 
 .agent-list[data-sidebar-dragging] .agent-row:hover {
+  --agent-avatar-outline: inherit;
+
   background: transparent;
 }
 
 .agent-list[data-sidebar-dragging] .agent-row.agent-row-active,
 .agent-list[data-sidebar-dragging] .agent-row.agent-row-active:hover {
+  --agent-avatar-outline: var(--openbot-bg-surface);
+
   background: var(--openbot-bg-surface);
 }
 

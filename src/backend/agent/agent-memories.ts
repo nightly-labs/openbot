@@ -4,6 +4,7 @@ import type {
   AgentEvent,
   AgentMemory,
   AgentMemorySelectionState,
+  ConversationMemoryChange,
   CreateAgentMemoryInput,
   DeleteAgentMemoryInput,
   SetAgentMemoryInclusionInput,
@@ -22,6 +23,7 @@ import type { AgentStore } from "../agent-store";
 import { normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { MemoryReviewOperation } from "./memory-review-prompt";
 import { listMemoriesInput, searchMemoriesInput, setMemoryInclusionInput } from "./memory-tool-inputs";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
@@ -56,6 +58,14 @@ type PendingMemoryMutation =
       expectedUpdatedAt: string;
       expectedSelectionRevision: number;
     };
+
+/** The memories that a background review read, and the epoch it read them in. */
+export interface MemoryReviewBase {
+  epoch: number;
+  limit: number;
+  essentialBytes: number;
+  memories: { memory: AgentMemory; inclusion: "essential" | "searchable"; userControlled: boolean }[];
+}
 
 export interface AgentMemoriesOptions {
   store: AgentStore;
@@ -165,6 +175,85 @@ export class AgentMemories {
     this.#memories.duplicate(sourceAgentId, targetAgentId);
   }
 
+  /** The memories that a background review reads, with the epoch that its changes must still match. */
+  reviewBase(agentId: string): MemoryReviewBase {
+    const selections = new Map(this.#memories.listSelections(agentId).map((entry) => [entry.memoryId, entry]));
+    const memories = this.#memories.list(agentId).map((memory) => ({
+      memory,
+      inclusion: selections.get(memory.id)?.inclusion ?? ("searchable" as const),
+      userControlled: selections.get(memory.id)?.userControlled ?? false,
+    }));
+    return {
+      epoch: this.#epoch(agentId),
+      limit: this.#memories.limit(),
+      essentialBytes: essentialMemoryBytes(
+        memories.filter((entry) => entry.inclusion === "essential").map((entry) => entry.memory),
+      ),
+      memories,
+    };
+  }
+
+  /**
+   * Commits the changes of a background review as one turn of the agent, through the checks of the
+   * memory tools: the cap, the essential budget, duplicates and the user's choices. A review changes
+   * only the memories that the agent saved, and only while they hold the text that the review read.
+   * A clear since `reviewBase` drops every change.
+   */
+  applyReview(
+    agentId: string,
+    base: MemoryReviewBase,
+    operations: readonly MemoryReviewOperation[],
+    turnId: string,
+  ): ConversationMemoryChange[] {
+    if (base.epoch !== this.#epoch(agentId)) return [];
+    const read = new Map(base.memories.map((entry) => [entry.memory.id, entry]));
+    // Forgets first, so that the adds find the room they free.
+    const ordered = [
+      ...operations.filter((operation) => operation.type === "forget"),
+      ...operations.filter((operation) => operation.type === "update"),
+      ...operations.filter((operation) => operation.type === "add"),
+    ];
+    const changed = new Set(operations.flatMap((operation) => (operation.type === "add" ? [] : [operation.memoryId])));
+    const saved = new Set(
+      this.#memories
+        .list(agentId)
+        .filter((memory) => !changed.has(memory.id))
+        .map((memory) => memory.text),
+    );
+    ordered.forEach((operation, index) => {
+      // An add of a saved text would only change that memory's inclusion, which can be the user's choice.
+      if (operation.type === "add" && saved.has(normalizeMemoryText(operation.text))) return;
+      if (operation.type !== "add") {
+        const entry = read.get(operation.memoryId);
+        const current = this.#memories.get(agentId, operation.memoryId);
+        if (
+          !entry ||
+          entry.userControlled ||
+          entry.memory.origin === "manual" ||
+          current?.updatedAt !== entry.memory.updatedAt
+        )
+          return;
+      }
+      this.handleTool(
+        {
+          threadId: "",
+          turnId,
+          callId: `${turnId}:${index}`,
+          namespace: null,
+          tool: operation.type === "forget" ? "forget_memory" : "remember",
+          arguments:
+            operation.type === "forget"
+              ? { memoryId: operation.memoryId }
+              : operation.type === "update"
+                ? { memoryId: operation.memoryId, text: operation.text }
+                : { text: operation.text, inclusion: operation.inclusion },
+        },
+        agentId,
+      );
+    });
+    return this.finishTurn(turnId, "completed").get(agentId) ?? [];
+  }
+
   /** Return expected memory failures to the agent without exposing database errors or memory text. */
   handleTool(
     params: DynamicToolCallParams,
@@ -188,12 +277,19 @@ export class AgentMemories {
     if (params.tool === "search_memories") {
       const parsed = searchMemoriesInput.safeParse(params.arguments);
       if (!parsed.success) return openBotToolFailure(sourceText("error.backend.memorySearchQuery"));
-      return memoryRecallResult(this.#memories.search(senderAgentId, parsed.data.query, parsed.data.limit), redact);
+      const result = memoryRecallResult(
+        this.#memories.search(senderAgentId, parsed.data.query, parsed.data.limit),
+        redact,
+      );
+      this.#emitRecallProgress(params, senderAgentId, result.count);
+      return result.response;
     }
     if (params.tool === "list_memories") {
       const parsed = listMemoriesInput.safeParse(params.arguments);
       if (!parsed.success) return openBotToolFailure("after must be a memory ID or null.");
-      return memoryRecallResult(this.#memories.listPage(senderAgentId, parsed.data.after ?? null), redact);
+      const result = memoryRecallResult(this.#memories.listPage(senderAgentId, parsed.data.after ?? null), redact);
+      this.#emitRecallProgress(params, senderAgentId, result.count);
+      return result.response;
     }
     if (params.tool === "set_memory_inclusion") {
       const parsed = setMemoryInclusionInput.safeParse(params.arguments);
@@ -347,11 +443,17 @@ export class AgentMemories {
     return null;
   }
 
-  /** Commits a turn's staged mutations, or discards them when the turn did not complete. */
-  finishTurn(turnId: string, status: string): void {
+  /**
+   * Commits a turn's staged mutations, or discards them when the turn did not complete. Answers the
+   * memories that the commit saved, updated and forgot, by agent. A mutation that another turn made
+   * stale, such as a change of a memory that a parallel thread changed first, is `notChanged`, so the
+   * thread that made it can show it. A mutation that its text already holds is not in it.
+   */
+  finishTurn(turnId: string, status: string): Map<string, ConversationMemoryChange[]> {
     const pending = this.#pending.get(turnId) ?? [];
     this.#pending.delete(turnId);
-    if (status !== "completed" || pending.length === 0) return;
+    const changes = new Map<string, ConversationMemoryChange[]>();
+    if (status !== "completed" || pending.length === 0) return changes;
 
     const affectedAgents = new Set<string>();
     const createdMemories = new Set<string>();
@@ -366,6 +468,14 @@ export class AgentMemories {
       if (mutation.epoch !== this.#epoch(mutation.agentId)) continue;
       const before = this.#storedState(mutation.agentId);
       const previousSelections = this.#memories.listSelections(mutation.agentId);
+      const previousMemory =
+        mutation.type === "selection" || !mutation.memoryId
+          ? null
+          : this.#memories.get(mutation.agentId, mutation.memoryId);
+      const previousIds =
+        mutation.type === "remember" && !mutation.memoryId
+          ? new Set(this.#memories.list(mutation.agentId).map((memory) => memory.id))
+          : null;
       try {
         if (mutation.type === "selection")
           this.#memories.setInclusions(
@@ -412,6 +522,7 @@ export class AgentMemories {
           this.#memories.delete(mutation.agentId, mutation.memoryId, mutation.expectedUpdatedAt);
       } catch (error) {
         this.#emitError("memory_commit_failed", error, mutation.agentId);
+        addChanges(changes, mutation.agentId, this.#refusedChanges(mutation, previousMemory));
         continue;
       }
       for (const selection of this.#memories.listSelections(mutation.agentId)) {
@@ -426,9 +537,52 @@ export class AgentMemories {
         revisions.set(previous.revision, selection.revision);
         ownRevisions.set(key, revisions);
       }
-      if (this.#storedState(mutation.agentId) !== before) affectedAgents.add(mutation.agentId);
+      if (this.#storedState(mutation.agentId) === before) {
+        addChanges(changes, mutation.agentId, this.#refusedChanges(mutation, previousMemory));
+        continue;
+      }
+      affectedAgents.add(mutation.agentId);
+      addChanges(changes, mutation.agentId, this.#committedChanges(mutation, previousMemory, previousIds));
     }
     for (const agentId of affectedAgents) this.stateChanged(agentId);
+    return changes;
+  }
+
+  /**
+   * The change that a skipped mutation did not make. A save or update whose text the agent already
+   * holds, and a forget of a memory that is gone, lost nothing.
+   */
+  #refusedChanges(mutation: PendingMemoryMutation, previous: AgentMemory | null): ConversationMemoryChange[] {
+    if (mutation.type === "selection") return [];
+    if (mutation.type === "forget") {
+      if (!previous || !this.#memories.get(mutation.agentId, mutation.memoryId)) return [];
+      return [{ memoryId: previous.id, action: "notChanged", text: previous.text }];
+    }
+    if (this.#memories.list(mutation.agentId).some((memory) => memory.text === mutation.text)) return [];
+    const memoryId = mutation.memoryId ?? mutation.duplicate?.memoryId ?? `unsaved-${mutation.callId}`;
+    return [{ memoryId: memoryId.slice(0, INPUT_LIMITS.identifier), action: "notChanged", text: mutation.text }];
+  }
+
+  /** What one committed mutation did to the memory texts. A change of inclusion only is not shown. */
+  #committedChanges(
+    mutation: PendingMemoryMutation,
+    previous: AgentMemory | null,
+    previousIds: ReadonlySet<string> | null,
+  ): ConversationMemoryChange[] {
+    if (mutation.type === "selection") return [];
+    if (mutation.type === "forget") {
+      if (!previous || this.#memories.get(mutation.agentId, mutation.memoryId)) return [];
+      return [{ memoryId: previous.id, action: "forgotten", text: previous.text }];
+    }
+    if (previous) {
+      const current = this.#memories.get(mutation.agentId, previous.id);
+      if (!current || current.text === previous.text) return [];
+      return [{ memoryId: current.id, action: "updated", text: current.text, previousText: previous.text }];
+    }
+    return this.#memories
+      .list(mutation.agentId)
+      .filter((memory) => !previousIds?.has(memory.id))
+      .map((memory) => ({ memoryId: memory.id, action: "saved" as const, text: memory.text }));
   }
 
   /** Reserve prompt space for this turn's staged changes, without making them visible to search. */
@@ -610,6 +764,17 @@ export class AgentMemories {
     return memories;
   }
 
+  /** A step of the turn's activity, so the chat shows that the agent looked in its memory. */
+  #emitRecallProgress(params: DynamicToolCallParams, agentId: string, count: number): void {
+    this.#emit({
+      type: "turn-progress",
+      agentId,
+      threadId: this.#conversation.publicThreadId(agentId, params.threadId),
+      turnId: params.turnId,
+      detail: sourceText("status.agent.memoriesSearched", { count }),
+    });
+  }
+
   #stage(turnId: string, mutation: PendingMemoryMutation): void {
     const pending = this.#pending.get(turnId) ?? [];
     if (!pending.some((candidate) => candidate.callId === mutation.callId)) pending.push(mutation);
@@ -625,7 +790,7 @@ export class AgentMemories {
 function memoryRecallResult(
   result: AgentMemorySearchResult | AgentMemoryListPage,
   redact: (value: string) => string,
-): OpenBotToolResponse {
+): { response: OpenBotToolResponse; count: number } {
   while (
     Buffer.byteLength(redact(JSON.stringify(result)), "utf8") > AGENT_MEMORY_CONTEXT_BUDGET_BYTES &&
     result.memories.length > 0
@@ -634,5 +799,17 @@ function memoryRecallResult(
     result.hasMore = true;
     if ("nextCursor" in result) result.nextCursor = result.memories.at(-1)?.id ?? null;
   }
-  return { success: true, contentItems: [{ type: "inputText", text: redact(JSON.stringify(result)) }] };
+  return {
+    response: { success: true, contentItems: [{ type: "inputText", text: redact(JSON.stringify(result)) }] },
+    count: result.memories.length,
+  };
+}
+
+function addChanges(
+  changes: Map<string, ConversationMemoryChange[]>,
+  agentId: string,
+  added: readonly ConversationMemoryChange[],
+): void {
+  if (added.length === 0) return;
+  changes.set(agentId, [...(changes.get(agentId) ?? []), ...added]);
 }

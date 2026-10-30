@@ -42,7 +42,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
   }
   if (transports.github) set.github = createGitHubConnector(transports.github, options.hostName);
   if (transports.onePassword) set.onepassword = createOnePasswordConnector(transports.onePassword, options.hostName);
-  if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden);
+  if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden, options.hostName);
   return set;
 }
 
@@ -50,7 +50,7 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
  * One connector on one server. `unsupported`: the server could run it, but this build or its host
  * cannot, such as GitHub with no GitHub App. `loading`: that is not known before the first read.
  */
-export type ConnectorEntry =
+type ConnectorEntry =
   | { id: ConnectorId; access: "available"; controller: ConnectorController }
   | { id: ConnectorId; access: "local-only" | "hidden" | "unsupported" | "loading" };
 

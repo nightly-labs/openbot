@@ -1,7 +1,7 @@
 import type { AgentModelId } from "./ipc-agent-identity";
-import type { AgentAuthState } from "./ipc-agent-status";
+import type { AccountUsageLimit, AgentAuthState } from "./ipc-agent-status";
 import type { ExternalDestination } from "./ipc-app-auth";
-import { isOneOf } from "./runtime-values";
+import { isOneOf, isString } from "./runtime-values";
 
 /**
  * The coding agents OpenBot can drive, and everything about one that is the same wherever it is
@@ -29,12 +29,54 @@ export const AGENT_PROVIDERS = [
   "cline",
   "pi",
   "muse",
+  "inception",
+  "deepseek",
+  "openrouter",
   "acp",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
 export function isAgentProvider(value: unknown): value is AgentProviderId {
   return isOneOf(AGENT_PROVIDERS, value);
+}
+
+/** The form of every provider id, including one that a newer host adds. */
+export const PROVIDER_ID_PATTERN = /^[a-z][a-z0-9-]{0,63}$/u;
+
+declare const FOREIGN_PROVIDER: unique symbol;
+/**
+ * A provider that a newer host runs and this OpenBot does not know. Only client data holds one: the
+ * host's own agents, database and drivers use `AgentProviderId`.
+ */
+export type ForeignProviderId = string & { readonly [FOREIGN_PROVIDER]: true };
+/** The provider of an agent or a model that a client reads from a host. */
+export type AgentProviderRef = AgentProviderId | ForeignProviderId;
+
+export function isForeignProviderId(value: unknown): value is ForeignProviderId {
+  return isString(value) && PROVIDER_ID_PATTERN.test(value) && !isAgentProvider(value);
+}
+
+export function isAgentProviderRef(value: unknown): value is AgentProviderRef {
+  return isAgentProvider(value) || isForeignProviderId(value);
+}
+
+/** Whether this OpenBot can set up, sign in and pick models for the provider. */
+export function isKnownAgentProvider(provider: AgentProviderRef): provider is AgentProviderId {
+  return isAgentProvider(provider);
+}
+
+/** The provider when this build does not know it, else undefined. */
+export function foreignProvider(provider: AgentProviderRef): ForeignProviderId | undefined {
+  return isKnownAgentProvider(provider) ? undefined : provider;
+}
+
+/**
+ * The provider name to put in front of a user. A foreign provider shows the name its host sends,
+ * else its id.
+ */
+export function providerDisplayName(provider: AgentProviderRef, hostLabel?: string): string {
+  if (isAgentProvider(provider)) return agentProviderName(provider);
+  return hostLabel?.trim() || provider;
 }
 
 export interface AgentProviderDescriptor {
@@ -86,6 +128,15 @@ export interface AgentProviderDescriptor {
    */
   readonly skillFolders: readonly [string, ...string[]];
   /**
+   * How the CLI gets the user's skills in `~/.agents/skills`. `native`: the CLI reads that folder by
+   * itself. `plugin`: OpenBot gives the folder to Claude as a session plugin
+   * (`claudeHomeSkillPlugin`). `instructions`: the CLI does not read it, so the developer instructions
+   * name each skill and its `SKILL.md`. Sources: the strings and docs of the installed Codex, Grok,
+   * OpenCode, Cursor, Cline and Pi CLIs; the Antigravity ACP server reads only `$GEMINI_HOME`; Muse
+   * and a custom ACP agent are not known to read it.
+   */
+  readonly homeSkills: "native" | "plugin" | "instructions";
+  /**
    * How a Workspace only agent is held to its folders. `tool-sandbox`: the client checks each tool
    * and asks before an edit. `command-sandbox`: the CLI runs each command in a sandbox.
    * `confined-process`: the CLI runs in a sandboxed process of its own (`process-confinement.ts`).
@@ -93,8 +144,9 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step. `deferred`: the protocol has no steer request (ACP), so the message can wait until the
-   * turn ends. Only a `native` provider steers a message sent in `steer` mode; the others queue it.
+   * step (Grok through its `x.ai/interject` ACP extension). `deferred`: the protocol has no steer
+   * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
+   * message sent in `steer` mode; the others queue it.
    */
   readonly steer: "native" | "deferred";
   /**
@@ -107,7 +159,7 @@ export interface AgentProviderDescriptor {
    * Whether OpenBot can read the plan's remaining usage. `false`: the CLI exposes no usage reading,
    * so the dock says the provider does not report usage instead of waiting for a reading. Declared
    * here because the renderer cannot see the drivers; set it to `true` with a driver's usage read
-   * (Codex and Claude read it themselves, Grok and OpenCode through `readRateLimits`).
+   * (Codex and Claude read it themselves, Grok, OpenCode, Antigravity and Cursor through `readRateLimits`).
    */
   readonly reportsUsage: boolean;
   /**
@@ -117,6 +169,13 @@ export interface AgentProviderDescriptor {
    * to ask.
    */
   readonly approvalsInFullAccess: boolean;
+  /**
+   * Whether the added folders apply in Full access too. `true`: the CLI's own file tools reach only
+   * the workspace, the shared folder and the added folders in every access level, so the user can add
+   * folders in Full access. Antigravity 1.4.5 limits them to `cwd` and `additionalDirectories` for
+   * every session that is not a Google admin session (#3843).
+   */
+  readonly foldersInFullAccess: boolean;
 }
 
 /**
@@ -138,11 +197,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "command-sandbox",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   claude: {
     id: "claude",
@@ -158,11 +219,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
+    homeSkills: "plugin",
     workspaceEnforcement: "tool-sandbox",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: false,
+    foldersInFullAccess: false,
   },
   grok: {
     id: "grok",
@@ -178,11 +241,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   opencode: {
     id: "opencode",
@@ -200,11 +265,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
   // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
@@ -222,11 +289,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],
+    homeSkills: "instructions",
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
-    reportsUsage: false,
+    reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: true,
   },
   // The Cursor CLI (`cursor-agent acp`) with the user's Cursor plan. Sign-in is the ACP
   // `cursor_login` method, which opens a browser. `CURSOR_API_KEY` in the environment also signs in.
@@ -244,11 +313,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
-    reportsUsage: false,
+    reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // The Cline CLI (`cline --acp`). Sign-in is the ACP `cline` method, which opens a browser. A Cline
   // account runs the free models; `CLINE_API_KEY` in the environment also signs in.
@@ -266,11 +337,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   pi: {
     id: "pi",
@@ -286,11 +359,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
+    homeSkills: "native",
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   muse: {
     id: "muse",
@@ -306,11 +381,85 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: "device",
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
+    homeSkills: "instructions",
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // Inception's Mercury models run in the Pi CLI that OpenBot downloads for Pi, with a key the user
+  // saves here. Pi's own sign-in and models stay on the Pi row.
+  inception: {
+    id: "inception",
+    displayName: "Inception",
+    cliName: "Pi CLI",
+    onboardingDescription: "Mercury models with an Inception API key",
+    signInMessage: "Add an Inception API key to continue.",
+    installGuideLink: null,
+    defaultModel: "mercury-3",
+    legacyModelPrefix: null,
+    authKind: "inception",
+    pickerOrder: 9,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // DeepSeek's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in DeepSeek
+  // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
+  deepseek: {
+    id: "deepseek",
+    displayName: "DeepSeek",
+    cliName: "Pi CLI",
+    onboardingDescription: "DeepSeek models with a DeepSeek API key",
+    signInMessage: "Add a DeepSeek API key to continue.",
+    installGuideLink: null,
+    defaultModel: "deepseek-v4-pro",
+    legacyModelPrefix: null,
+    authKind: "deepseek",
+    pickerOrder: 10,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
+  // OpenRouter's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in OpenRouter
+  // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
+  openrouter: {
+    id: "openrouter",
+    displayName: "OpenRouter",
+    cliName: "Pi CLI",
+    onboardingDescription: "Many models with an OpenRouter API key",
+    signInMessage: "Add an OpenRouter API key to continue.",
+    installGuideLink: null,
+    defaultModel: "anthropic/claude-sonnet-5.5",
+    legacyModelPrefix: null,
+    authKind: "openrouter",
+    pickerOrder: 11,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
@@ -329,11 +478,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     localCodeSignIn: null,
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
+    homeSkills: "instructions",
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 
@@ -343,6 +494,14 @@ export const AGENT_PROVIDER_DESCRIPTORS: readonly AgentProviderDescriptor[] = AG
 
 export function agentProviderDescriptor(provider: AgentProviderId): AgentProviderDescriptor {
   return AGENT_PROVIDER_DESCRIPTOR_TABLE[provider];
+}
+
+/**
+ * Whether the provider can take a queued message into its running turn. A provider that this build
+ * does not know can: its host decides, and refuses the message when it cannot.
+ */
+export function providerSteersTurns(provider: AgentProviderRef): boolean {
+  return !isKnownAgentProvider(provider) || agentProviderDescriptor(provider).steer === "native";
 }
 
 /** The provider name to put in front of a user. */
@@ -390,8 +549,9 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
- * 5, Cursor and Cline from protocol 6. A joined server's settings list one only when the host's status
- * names it.
+ * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
+ * from protocol 8.
+ * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
   "antigravity",
@@ -399,11 +559,25 @@ export const LOCAL_ONLY_PROVIDERS = [
   "cline",
   "pi",
   "muse",
+  "inception",
+  "deepseek",
+  "openrouter",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 
 export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
   return isOneOf(LOCAL_ONLY_PROVIDERS, provider);
+}
+
+/**
+ * The providers that sign in only with an API key that the user saves in OpenBot. They run in the Pi
+ * CLI, so their Connect and Reconnect open the key dialog.
+ */
+export const KEY_ONLY_PROVIDERS = ["inception", "deepseek", "openrouter"] as const satisfies readonly AgentProviderId[];
+export type KeyOnlyProviderId = (typeof KEY_ONLY_PROVIDERS)[number];
+
+export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOnlyProviderId {
+  return isOneOf(KEY_ONLY_PROVIDERS, provider);
 }
 
 /**
@@ -503,7 +677,52 @@ export function isFreeOpencodeModel(id: string, name: string): boolean {
 /**
  * Whether the provider's account quota limits this model. OpenCode reports only the Go quota, and
  * OpenCode also runs free, custom and own-sign-in models that the Go quota does not limit.
+ * Antigravity's own reading is a Gemini quota group; its Claude and GPT models share another group,
+ * which only the named groups (`usageGroupForModel`) show. Gemini model ids can be code names, so only
+ * a Claude or GPT id is left out.
  */
 export function accountUsageCoversModel(provider: AgentProviderId, model: string | null | undefined): boolean {
-  return provider !== "opencode" || Boolean(model?.toLowerCase().startsWith("opencode-go/"));
+  if (provider === "opencode") return Boolean(model?.toLowerCase().startsWith("opencode-go/"));
+  if (provider === "antigravity") return !/^(?:claude|gpt)/iu.test(model ?? "");
+  return true;
+}
+
+/**
+ * The windows that limit the model: the quota group that lists it when the reading lists the models
+ * of its groups, or else the reading itself. Undefined when no group lists the model.
+ */
+export function usageQuotaForModel(
+  limit: AccountUsageLimit,
+  model: string | null | undefined,
+): Pick<AccountUsageLimit, "primary" | "secondary"> | undefined {
+  return model && limit.groups?.some((group) => group.models.length > 0)
+    ? usageGroupForModel(limit.groups, model)
+    : limit;
+}
+
+/**
+ * The quota group that lists the model. Antigravity lists families ("Gemini Flash", "Gemini 4 Argon")
+ * and the model ID adds a version and an effort (`gemini-3.8-flash-high`), so each word of a listed
+ * name must be a word of the ID. The longest such name wins: "Gemini Flash Lite" before "Gemini Flash".
+ */
+export function usageGroupForModel<Group extends { models: readonly string[] }>(
+  groups: readonly Group[],
+  model: string,
+): Group | undefined {
+  const id = new Set(modelWords(model));
+  let best: { group: Group; length: number } | undefined;
+  for (const group of groups)
+    for (const listed of group.models) {
+      const words = modelWords(listed);
+      if (words.length > (best?.length ?? 0) && words.every((word) => id.has(word)))
+        best = { group, length: words.length };
+    }
+  return best?.group;
+}
+
+function modelWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9.]+/u)
+    .filter(Boolean);
 }

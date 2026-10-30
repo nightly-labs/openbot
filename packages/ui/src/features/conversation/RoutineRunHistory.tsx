@@ -10,7 +10,7 @@ import {
 import type { EventActivity, EventRoutineRef, ListEventActivityInput } from "@openbot/contracts/ipc-events";
 import type { AppMessages, AppTextKey } from "@openbot/i18n";
 import { Button, Check, CirclePause, Clock3, Minus, Text, TriangleAlert, X } from "@openbot/ui";
-import { createEffect, createSignal, For, Match, Show, Switch, untrack } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, Match, Show, Switch, untrack } from "solid-js";
 import { type TextValue, useText } from "../../text";
 
 /** The webhook activity of an event routine. Its ignored requests join the runs. */
@@ -188,17 +188,29 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string)
     return t("routine.history.manualRun", { time });
   };
   const late = () => lateStart(props.run);
+  const failure = () => (props.run.status === "failed" && props.run.error ? text.sourceText(props.run.error) : null);
+  // The link's label replaces its text, so a screen reader gets the reason as the description.
+  const reasonId = createUniqueId();
   const content = (
     <>
-      <Show when={late()} fallback={<span>{label()}</span>}>
-        {(startedAt) => (
-          <span class="agent-routine-run-text">
-            <span>{label()}</span>
-            <span class="agent-routine-run-note">
-              {t("routine.history.ranLate", { time: formatLateStart(props.run.scheduledFor, startedAt(), text) })}
-            </span>
-          </span>
-        )}
+      <Show when={late() || failure()} fallback={<span>{label()}</span>}>
+        <span class="agent-routine-run-text">
+          <span>{label()}</span>
+          <Show when={late()}>
+            {(startedAt) => (
+              <span class="agent-routine-run-note">
+                {t("routine.history.ranLate", { time: formatLateStart(props.run.scheduledFor, startedAt(), text) })}
+              </span>
+            )}
+          </Show>
+          <Show when={failure()}>
+            {(reason) => (
+              <span id={reasonId} class="agent-routine-run-note" title={reason()}>
+                {reason()}
+              </span>
+            )}
+          </Show>
+        </span>
       </Show>
       <RoutineRunStatus status={props.run.status} />
     </>
@@ -214,6 +226,7 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string)
           type="button"
           class="agent-routine-run-row agent-routine-run-link"
           aria-label={t("routine.history.openRun", { run: label() })}
+          aria-describedby={failure() ? reasonId : undefined}
           data-cuelume-tap="navigate"
           onClick={() => props.onOpenRun?.(messageId())}
         >
@@ -225,8 +238,9 @@ function RunRow(props: { run: RoutineRunFields; onOpenRun?: ((messageId: string)
 }
 
 /**
- * The delivery's status is not the run's: the run succeeded when its agent answered. A delivery that
- * ended without a sure post can go again; a sent one cannot, so a click does not post it twice.
+ * The delivery's status is not the run's: a run gets one when its agent answered, also a run that
+ * failed. A delivery that ended without a sure post can go again; a sent one cannot, so a click does
+ * not post it twice.
  */
 function DeliveryRow(props: { delivery: RoutineResultDelivery; onResend: (runId: string) => Promise<void> }) {
   const { t, errorMessage } = useText();

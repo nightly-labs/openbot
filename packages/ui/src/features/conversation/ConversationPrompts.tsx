@@ -4,12 +4,24 @@ import type {
   BrowserPreview,
   BrowserTab,
   BrowserTakeoverRequest,
-  RespondToBrowserSecretInput,
+  LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
-import { Badge, Button, Check, Input, LoaderCircle, Maximize2, Monitor, RadioGroup, toast, X } from "@openbot/ui";
+import {
+  Badge,
+  Button,
+  Check,
+  Input,
+  LoaderCircle,
+  LogIn,
+  Maximize2,
+  Monitor,
+  RadioGroup,
+  toast,
+  X,
+} from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
-import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
+import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
@@ -51,7 +63,7 @@ export function ChoiceCard(props: {
         class="choice-options"
         aria-label={props.title}
         value={selectedChoice()}
-        disabled={props.pending}
+        disabled={props.pending ?? false}
         onChange={(choice) => {
           if (choice === props.customChoice) {
             setAnswer("");
@@ -66,7 +78,7 @@ export function ChoiceCard(props: {
       >
         <For each={props.choices}>
           {(choice, index) => (
-            <RadioGroup.Item class="choice-option-item" value={choice} disabled={props.pending}>
+            <RadioGroup.Item class="choice-option-item" value={choice} disabled={props.pending ?? false}>
               <RadioGroup.ItemInput aria-label={choice} />
               <RadioGroup.ItemControl
                 class={[
@@ -121,9 +133,9 @@ export function ApprovalCard(props: {
    * other level, and where the user may not change the agent's Permissions. The card then reads
    * exactly as it did before this option existed.
    */
-  onAlwaysAllow?: () => Promise<boolean>;
+  onAlwaysAllow?: (() => Promise<boolean>) | undefined;
   /** The agent this grant would cover, for the confirmation the grant deserves. */
-  agentName?: string;
+  agentName?: string | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
   const [submitting, setSubmitting] = createSignal(false);
@@ -239,7 +251,7 @@ export function ApprovalCard(props: {
 }
 
 interface BrowserTakeoverCardProps {
-  request?: BrowserTakeoverRequest;
+  request?: BrowserTakeoverRequest | undefined;
   agentName: string;
   tab: BrowserTab | undefined;
   preview: BrowserPreview | null;
@@ -248,9 +260,18 @@ interface BrowserTakeoverCardProps {
   onOpen?: () => void;
   onComplete: () => Promise<boolean>;
   onCancel: () => Promise<boolean>;
+  /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */
+  onSignInLocally?: (() => void) | undefined;
+  /**
+   * The agent found that the page refused the sign-in from `server`. The card then asks only for the
+   * sign-in on this computer; `signingIn` is true while that sign-in is open.
+   */
+  signInBlocked?: { server: string; signingIn: boolean } | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
-    onRespond: (input: RespondToBrowserSecretInput) => Promise<void>;
+    /** Offer "Save to Vault" for a password. */
+    vault?: BrowserSecretVault | undefined;
+    onRespond: (input: LocalBrowserSecretResponse) => Promise<void>;
   };
 }
 
@@ -267,6 +288,7 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
             request={request()}
             onOpen={props.onOpen}
             loadPreview={actions.loadPreview}
+            vault={actions.vault}
             onRespond={actions.onRespond}
           />
         );
@@ -287,8 +309,44 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
         ? "prompt.browser.label.complete"
         : cancelled()
           ? "prompt.browser.label.cancelled"
-          : "prompt.browser.label.pending",
+          : props.signInBlocked
+            ? "prompt.browser.signInBlocked.label"
+            : "prompt.browser.label.pending",
     );
+  const title = () => {
+    const host = pageDetails().host;
+    const blocked = props.signInBlocked;
+    if (!blocked)
+      return t(
+        completed()
+          ? "prompt.browser.title.complete"
+          : cancelled()
+            ? "prompt.browser.title.cancelled"
+            : "prompt.browser.title.pending",
+        { host },
+      );
+    if (completed()) return t("browser.signIn.sent", { site: host, server: blocked.server });
+    if (cancelled()) return t("prompt.browser.signInBlocked.cancelledTitle", { host });
+    return t("prompt.browser.signInBlocked.title", { host, server: blocked.server });
+  };
+  const body = () => {
+    const blocked = props.signInBlocked;
+    if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
+    if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
+    return blocked
+      ? t("prompt.browser.signInBlocked.body", {
+          host: pageDetails().host,
+          server: blocked.server,
+          name: props.agentName,
+        })
+      : t("prompt.browser.pendingBody", { name: props.agentName });
+  };
+  const pageHost = () => {
+    const blocked = props.signInBlocked;
+    return blocked
+      ? t("prompt.browser.signInBlocked.page", { host: pageDetails().host, server: blocked.server })
+      : pageDetails().host;
+  };
   const submit = async (decision: "complete" | "cancel") => {
     if (submitting() || props.decision) return;
     setSubmitting(decision);
@@ -304,16 +362,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
       aria-busy={submitting() ? "true" : undefined}
     >
       <header class="browser-takeover-header conversation-interaction-header">
-        <h2>
-          {t(
-            completed()
-              ? "prompt.browser.title.complete"
-              : cancelled()
-                ? "prompt.browser.title.cancelled"
-                : "prompt.browser.title.pending",
-            { host: pageDetails().host },
-          )}
-        </h2>
+        <h2>{title()}</h2>
         <Show
           when={!props.decision}
           fallback={
@@ -331,7 +380,9 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
         >
           <Badge variant="warning-light" class="conversation-interaction-status" role="status">
             <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-            {t("prompt.browser.actionRequired")}
+            {props.signInBlocked?.signingIn
+              ? t("prompt.browser.signInBlocked.waiting")
+              : t("prompt.browser.actionRequired")}
           </Badge>
         </Show>
       </header>
@@ -339,20 +390,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
         <p>{t("prompt.browser.reload")}</p>
       </Show>
       <div class="browser-takeover-copy">
-        <p>
-          {completed()
-            ? t("prompt.browser.continuing", { name: props.agentName })
-            : cancelled()
-              ? t("prompt.browser.cancelledBody")
-              : t("prompt.browser.pendingBody", { name: props.agentName })}
-        </p>
+        <p>{body()}</p>
       </div>
 
       <figure class="browser-takeover-preview">
         <figcaption class="browser-takeover-preview-bar">
           <Monitor aria-hidden="true" />
           <span title={pageDetails().title}>{pageDetails().title}</span>
-          <small title={pageDetails().host}>{pageDetails().host}</small>
+          <small title={pageHost()}>{pageHost()}</small>
         </figcaption>
         <Show
           when={props.onOpen}
@@ -385,19 +430,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
       <Show when={!props.decision}>
         <footer class="browser-takeover-actions">
           <Button
-            variant="default"
-            size="sm"
-            type="button"
-            class="approval-button"
-            loading={submitting() === "complete"}
-            loadingLabel={t("prompt.browser.returning")}
-            disabled={Boolean(submitting())}
-            onClick={() => void submit("complete")}
-          >
-            {t("prompt.browser.done")}
-          </Button>
-          <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             type="button"
             class="approval-button"
@@ -409,6 +442,57 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
           >
             {t("common.cancel")}
           </Button>
+          <div class="browser-takeover-finish">
+            <Show
+              when={props.signInBlocked && props.onSignInLocally}
+              fallback={
+                <>
+                  <Show when={props.onSignInLocally}>
+                    {(signIn) => (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        type="button"
+                        class="approval-button"
+                        disabled={Boolean(submitting())}
+                        onClick={() => signIn()()}
+                      >
+                        {t("browser.signIn.local")}
+                      </Button>
+                    )}
+                  </Show>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    type="button"
+                    class="approval-button"
+                    loading={submitting() === "complete"}
+                    loadingLabel={t("prompt.browser.returning")}
+                    disabled={Boolean(submitting())}
+                    onClick={() => void submit("complete")}
+                  >
+                    {t("prompt.browser.done")}
+                  </Button>
+                </>
+              }
+            >
+              {(signIn) => (
+                <Button
+                  variant="default"
+                  size="sm"
+                  type="button"
+                  class="approval-button"
+                  loading={props.signInBlocked?.signingIn}
+                  loadingLabel={t("prompt.browser.signInBlocked.waitingButton")}
+                  disabled={Boolean(submitting()) || props.signInBlocked?.signingIn}
+                  onClick={() => signIn()()}
+                >
+                  <LogIn data-icon="inline-start" aria-hidden="true" />
+                  {t("browser.signIn.local")}
+                </Button>
+              )}
+            </Show>
+          </div>
         </footer>
       </Show>
     </section>

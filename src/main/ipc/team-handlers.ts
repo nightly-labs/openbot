@@ -153,6 +153,7 @@ export function teamIpcHandlers({
       getStatus: handler(() => host.getStatus()),
       configure: payloadHandler(parseHostConfig, (config) => runCauseEffect(host.configure(config))),
       updateIdentity: payloadHandler(parseHostIdentity, (identity) => runCauseEffect(host.updateIdentity(identity))),
+      rotateIdentityKey: handler(() => runCauseEffect(host.rotateIdentityKey())),
       getPresence: handler(() => host.getPresence()),
       start: handler(() => runCauseEffect(host.start())),
       stop: handler(() => runCauseEffect(host.stop())),

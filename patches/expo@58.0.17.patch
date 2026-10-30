@@ -1,0 +1,32 @@
+diff --git a/build/dom/webview-wrapper.js b/build/dom/webview-wrapper.js
+index 02f713b..918c262 100644
+--- a/build/dom/webview-wrapper.js
++++ b/build/dom/webview-wrapper.js
+@@ -49,7 +49,9 @@ const RawWebView = /*#__PURE__*/ React.forwardRef((props, ref)=>{
+     const [containerStyle, setContainerStyle] = React.useState(null);
+     const { debugZeroHeightStyle, debugOnLayout } = useDebugZeroHeight(dom);
+     const emit = React.useCallback((detail)=>{
+-        webviewRef.current?.injectJavaScript(getInjectEventScript(detail));
++        // Android rejects when the native view is not mounted yet or was removed. The DOM side asks
++        // for the props again when it is ready, and a removed view has no listener.
++        Promise.resolve(webviewRef.current?.injectJavaScript(getInjectEventScript(detail))).catch(()=>{});
+     }, [
+         webviewRef
+     ]);
+diff --git a/src/dom/webview-wrapper.tsx b/src/dom/webview-wrapper.tsx
+index c9d79a4..8762b3b 100644
+--- a/src/dom/webview-wrapper.tsx
++++ b/src/dom/webview-wrapper.tsx
+@@ -81,7 +81,11 @@ const RawWebView = React.forwardRef<object, Props>((props, ref) => {
+ 
+   const emit = React.useCallback(
+     (detail: BridgeMessage<any>) => {
+-      webviewRef.current?.injectJavaScript(getInjectEventScript(detail));
++      // Android rejects when the native view is not mounted yet or was removed. The DOM side asks
++      // for the props again when it is ready, and a removed view has no listener.
++      Promise.resolve(webviewRef.current?.injectJavaScript(getInjectEventScript(detail))).catch(
++        () => {}
++      );
+     },
+     [webviewRef]
+   );

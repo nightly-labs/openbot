@@ -1,0 +1,67 @@
+/*
+ * Everything above the input is one card: the waiting block, the open waits, the queue, the reply
+ * and the notices. The stack draws the one border and the one radius, and tucks its lower edge
+ * under the input the way the queue did on its own. The cards inside keep their content, but lose
+ * their own margins, corners and tucks, so they sit flush with a hairline between them.
+ *
+ * Each card pulls up by 1px over its own top line. The first card's line goes under the clip, so
+ * the stack's own border is the only edge at the top, and every later line divides two cards.
+ *
+ * The stack only has a frame when something shows in it: the queue slot stays in the DOM while
+ * closed, and a frame round an empty slot would be a line over the input.
+ */
+.composer-stack {
+  --composer-stack-inset: var(--openbot-space-3);
+}
+
+/* A narrow pane gives the rows the width the side margins took. */
+@media (max-width: 620px) {
+  .composer-stack {
+    --composer-stack-inset: 2px;
+  }
+}
+
+.composer-stack:has(> :not(.agent-queue-slot), > .agent-queue-slot > .agent-queue-slot-inner > *) {
+  --composer-stack-overlap: 14px;
+
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  margin: 0 var(--composer-stack-inset) calc(-1 * var(--composer-stack-overlap));
+  border: 1px solid var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-queue-surface);
+  padding-bottom: var(--composer-stack-overlap);
+}
+
+.composer-stack :is(.awaiting-replies, .agent-queue-panel, .composer-notice, .composer-reply-preview) {
+  z-index: auto;
+  margin: -1px 0 0;
+  border: 0;
+  border-top: 1px solid var(--openbot-queue-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The stack tucks under the input now, so no card inside keeps room for a tuck of its own. */
+.composer-stack :is(.awaiting-replies, .agent-queue-panel) {
+  padding-bottom: 0;
+}
+
+.composer-stack .composer-notice {
+  padding-bottom: var(--notice-inset);
+}
+
+/*
+ * A compaction notice that leaves when it is the only card takes the frame with it: the frame drops
+ * behind the input the way the notice did on its own. The notice keeps its own exit animation,
+ * because its `onAnimationEnd` removes it. With reduced motion the notice fades in 1ms, so the frame
+ * does not move.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .composer-stack:has(> .context-compaction-notice[data-leaving]):not(
+    :has(> :not(.agent-queue-slot, [data-leaving]), > .agent-queue-slot > .agent-queue-slot-inner > *)
+  ) {
+    animation: context-compaction-notice-out var(--openbot-duration-toast-exit) var(--openbot-ease-in-out) forwards;
+  }
+}

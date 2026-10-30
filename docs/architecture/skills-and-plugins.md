@@ -11,17 +11,17 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor, Cline |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini, Cursor, Cline, Pi, Muse, custom agents |
 | `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode, Cursor |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
 | `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
 | `<workspace>/.cursor/skills/` | the user, the agent | Cursor |
 | `<workspace>/.cline/skills/`, `<workspace>/.clinerules/skills/` | the user, the agent | Cline |
-| `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
-| `~/.claude/skills/` | the user | Claude Code, OpenCode |
+| `~/.agents/skills/` | the user | Codex, Grok, OpenCode, Cursor, Cline, Pi; Claude through OpenBot (see below) |
+| `~/.claude/skills/` | the user | Claude Code, OpenCode, Grok, Cursor |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
 
-A confined agent (Grok, OpenCode, Gemini, Cursor or Cline, not in Full access) cannot write the workspace
+A confined agent (Grok, OpenCode, Gemini, Cursor, Cline, Pi, Muse or a custom agent, not in Full access) cannot write the workspace
 skill folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
@@ -38,8 +38,32 @@ folder that the agent's provider does not read. An agent keeps its workspace whe
 changes, so a skill in `.agents/skills` stops working after a change to Claude Code. A skill with a
 problem is not offered as a chat tag.
 
-OpenBot does not list the home-directory folders. They hold the host user's skills, which are the
-same for every agent, and each provider CLI changes its home-folder rules without notice.
+OpenBot does not show the home-directory folders in the Skills panel. They hold the host user's
+skills, which are the same for every agent, and each provider CLI changes its home-folder rules
+without notice. `~/.agents/skills` is the one exception, because it is the folder that the Agent
+Skills tools share, so every provider gets it. `src/backend/home-skills.ts` reads it and never writes
+to it; it lists each folder with a valid `SKILL.md`, at most 200. `homeSkills` in the provider
+descriptor says how each CLI gets these skills:
+
+- `native`: the CLI reads the folder by itself. OpenBot gives it nothing.
+- `plugin` (Claude Code): `claudeHomeSkillPlugin` (`src/backend/claude-workspace-sandbox.ts`) makes a
+  plugin named `agents` in the provider state folder, with one link for each skill, and each session
+  gets it. A skill whose folder name is also in `$CLAUDE_CONFIG_DIR/skills` (else `~/.claude/skills`)
+  or in `.claude/skills` of the workspace is left out, because `npx skills` links a skill into both
+  folders. Each set of skills has its own folder, named by its hash and never changed, so a running
+  query keeps its links. Claude lists a skill as `agents:<name>`.
+- `instructions` (Antigravity, Muse, custom ACP agents): these CLIs do not read the folder and have no
+  option for one. `ThreadLifecycle` gives the developer instructions a list of the skills, at most
+  100, with the first 300 characters of each description and the path of its `SKILL.md`, and the
+  model reads the file when a task matches. A skill whose folder name is in a workspace skill folder
+  of the provider is left out. Whether the model uses a skill depends on the model.
+
+The `$` list (`listInstalledForChatTags`) adds these skills after the others, with the id
+`home:<slug>` and the existing `workspace` origin, so older clients decode them. A slug that the list
+already has is left out. The desktop read-only Skills view reads the same route and leaves out the
+`home:` ids (`isHomeSkillId`), and so does the analytics skill count. The phone shows them in agent
+info with their `~/.agents/skills/<slug>` location. The provider text of a `home:<slug>` tag names the skill's `SKILL.md`
+(`displayMessageReferences`); a person, and the released Team API adapters, see the name alone.
 
 MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
 whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
@@ -87,17 +111,41 @@ The session key can decrypt the wider vault; the folder limit is enforced by Ope
 All local agents share this grant. Prompt injection can still use an approved account on its own
 site; this feature does not authorize or constrain actions after sign-in.
 
+API keys that a task needs, such as for a script or a service, use `openbot.request_api_key`. The
+router builds a `form` UI block with one required secret field (`apiKeyFormSpec` in
+`src/backend/agent/prompts.ts`), so every client that shows `ask_ui` shows it; no IPC or Team API
+contract changed. When the user submits it, `AttentionRegistry` saves the value with `AgentApiKeys`
+(`src/backend/agent-api-keys.ts`) before the prompt resolves, as `<userData>/agent-api-keys/<agentId>/<NAME>`:
+a 0600 file in a 0700 folder, outside every workspace, and not encrypted. The agent gets only the name
+and the path, and reads the file in its own command. Only the server owner or an admin can answer. The
+value is registered for log redaction when it is saved and at startup, and the stored block keeps no
+secret field value. `list_api_keys` and `remove_api_key` are the reverse actions, and deleting the agent
+deletes its folder. The form is refused in Slack, Discord and Telegram chats.
+
 `password-vault-router.ts` joins metadata from both managers and prefixes Bitwarden ids with
 `bitwarden:`. Existing 1Password ids stay unchanged. A failed list stops automatic account selection
 rather than hiding a source and selecting a different account. Main returns only connection state
 through the local Bitwarden IPC group. The shared panel is used in desktop Marketplace and server
-settings; remote web and mobile clients do not manage this local connection.
+settings.
+
+A session key from one computer cannot open the vault of another, so a joined server signs in with
+its own CLI (`bitwarden-connector-v1`, see [integrations](integrations.md#bitwarden-on-a-joined-server)).
+An owner or admin enters the server address (Bitwarden or a self-hosted Vaultwarden, `https:` only),
+the personal API key (`client_id`, `client_secret`) and the master password in the desktop or browser
+client. The host keeps them in `openbot-bitwarden-connector-v1.json`, encrypted with `safeStorage`,
+and its CLI data in `<userData>/provider-state/bitwarden-host` (`BITWARDENCLI_APPDATA_DIR`), apart from
+any `bw` configuration of the user. Without `bw` on `PATH`, it downloads the release that
+`src/main/bitwarden-cli-installer.ts` pins, with a SHA-256 per target, into
+`<userData>/provider-state/bitwarden-cli`. It runs `bw config server`, `bw login --apikey` and
+`bw unlock --passwordenv`; the secrets go to `bw` only in its environment. After a restart or eight
+idle hours, the next vault call unlocks again from the stored record. Disconnect removes the record and
+the CLI data. The phone shows the connector with no action.
 
 The GitHub connector is built in and has no SQLite row. `src/main/github-connector-service.ts` signs
 in to the `openbotgit` GitHub App with the device flow, which needs only the public Client ID, and keeps
 the tokens in `openbot-github-connector-v1.json`, encrypted with `safeStorage`. While it is
 connected, `McpGateway.enabled()` adds the `openbot-github` server (`api.githubcopilot.com/mcp/`),
-and `authorization()` gives it a fresh bearer at each hand-off. An enabled server that the user added
+and `mcpAuthorization()` gives it a fresh bearer at each hand-off. An enabled server that the user added
 with the name `github` wins. For `gh` and `git`, the service writes the token to
 `<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
 `GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
@@ -137,4 +185,4 @@ The backend local skill tools derive the agent from the calling provider session
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
 
-See [plugin distribution and sharing](../plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Apps tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, generated from `marketplace/plugin-catalog/`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
+See [plugin distribution and sharing](../plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Three parts of that design run today. The Apps tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is one of the link kinds that `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, generated from `marketplace/plugin-catalog/`, because a listing that said one thing on the page and another in the app would be two catalogs. The Apps tab also uninstalls a listing. The catalog files, the Worker routes that serve them, and the cache in the main process are still design.

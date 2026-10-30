@@ -40,12 +40,43 @@ export interface BillingPlan {
   relativeSpeed: number;
 }
 
-/** The storage, members and speed of each plan. The amounts are Stripe Prices, not code. */
+/** The storage, members and speed of each plan. A buyer pays the Stripe Prices; see `billingListPrices`. */
 export const BILLING_PLANS: readonly BillingPlan[] = [
-  { id: "starter", storageGb: 12, memberLimit: DEFAULT_TEAM_MEMBER_LIMIT, siteLimit: 3, relativeSpeed: 1 },
-  { id: "standard", storageGb: 50, memberLimit: 10, siteLimit: 10, relativeSpeed: 2 },
-  { id: "pro", storageGb: 100, memberLimit: 25, siteLimit: 50, relativeSpeed: 4 },
+  { id: "starter", storageGb: 12, memberLimit: 1, siteLimit: 3, relativeSpeed: 1 },
+  { id: "standard", storageGb: 50, memberLimit: 5, siteLimit: 10, relativeSpeed: 2 },
+  { id: "pro", storageGb: 100, memberLimit: 10, siteLimit: 50, relativeSpeed: 4 },
 ];
+
+/**
+ * The active member limit of each plan for a server made before the limits of `BILLING_PLANS`. Such a
+ * server keeps the limit that it had when the owner bought it.
+ */
+export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {
+  starter: DEFAULT_TEAM_MEMBER_LIMIT,
+  standard: 10,
+  pro: 25,
+};
+
+/**
+ * The monthly list price of each plan, in minor units (cents, grosze). Each amount divides by 5, so a
+ * year (12 months less 20%) is a whole number.
+ */
+const BILLING_PLAN_MONTHLY_PRICES: Readonly<Record<BillingPlanId, Readonly<Record<BillingCurrency, number>>>> = {
+  starter: { eur: 2000, usd: 2500, pln: 8000 },
+  standard: { eur: 5000, usd: 6000, pln: 20000 },
+  pro: { eur: 10000, usd: 12000, pln: 40000 },
+};
+
+/**
+ * The list price of a plan for one interval, in minor units. `scripts/stripe-bootstrap.ts` sets the
+ * Stripe Prices to these amounts. The account server and the app read the Stripe Prices.
+ */
+export function billingListPrices(plan: BillingPlanId, interval: BillingInterval): Record<BillingCurrency, number> {
+  const monthly = BILLING_PLAN_MONTHLY_PRICES[plan];
+  if (interval === "month") return { ...monthly };
+  const year = (amount: number) => (amount * 12 * 4) / 5;
+  return { eur: year(monthly.eur), usd: year(monthly.usd), pln: year(monthly.pln) };
+}
 
 /** The active member limit of a server with this plan, or with no plan. */
 export function memberLimitForPlan(plan: BillingPlanId | null): number {

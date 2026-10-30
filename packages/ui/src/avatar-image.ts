@@ -1,10 +1,17 @@
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
+import { AVATAR_MIME_TYPES } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import type { AvatarImageInput } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { currentText } from "./text";
 
 const OUTPUT_SIZES = [512, 448, 384, 320] as const;
 const OUTPUT_QUALITIES = [0.88, 0.82, 0.76, 0.7] as const;
+
+/**
+ * The files a person can choose. A GIF is not a stored avatar type: it is read here and stored as
+ * a WebP, as every other avatar is.
+ */
+const AVATAR_SOURCE_TYPES = [...AVATAR_MIME_TYPES, "image/gif"] as const;
 
 interface AnimationFrame {
   /** The ALPH, VP8 and VP8L chunks of one resized frame. */
@@ -13,18 +20,20 @@ interface AnimationFrame {
 }
 
 export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput> {
-  if (!isAvatarMimeType(file.type)) throw new Error(currentText().t("app.avatar.type"));
+  if (!isOneOf(AVATAR_SOURCE_TYPES, file.type)) throw new Error(currentText().t("app.avatar.type"));
   if (file.size > AVATAR_IMAGE_LIMITS.sourceBytes) {
     throw new Error(currentText().t("app.avatar.size"));
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const source = isAnimatedWebp(bytes) ? null : await createImageBitmap(file);
+  // Without ImageDecoder (Safari before 26), a GIF keeps only its first frame.
+  const animated = isAnimatedWebp(bytes) || (file.type === "image/gif" && typeof ImageDecoder !== "undefined");
+  const source = animated ? null : await createImageBitmap(file);
   try {
     for (const [index, outputSize] of OUTPUT_SIZES.entries()) {
       const quality = OUTPUT_QUALITIES[index] ?? 0.7;
       const blob = source
         ? await renderAvatar(source, source.width, source.height, outputSize, quality)
-        : await renderAnimatedAvatar(bytes, outputSize, quality);
+        : await renderAnimatedAvatar(bytes, file.type, outputSize, quality);
       if (blob && blob.size <= AVATAR_IMAGE_LIMITS.storedBytes) {
         return {
           mimeType: "image/webp",
@@ -57,18 +66,26 @@ function isAnimatedWebp(bytes: Uint8Array): boolean {
 /**
  * Resizes each frame on its own, because a canvas keeps only the first frame of an animation.
  * Returns null as soon as the frames pass the stored size limit, so a large file does not encode
- * every frame again for each output size.
+ * every frame again for each output size. A file with one frame, such as a still GIF, stays a
+ * still WebP.
  */
-async function renderAnimatedAvatar(bytes: Uint8Array, outputSize: number, quality: number): Promise<Blob | null> {
-  const decoder = new ImageDecoder({ data: bytes, type: "image/webp" });
+async function renderAnimatedAvatar(
+  bytes: Uint8Array,
+  type: string,
+  outputSize: number,
+  quality: number,
+): Promise<Blob | null> {
+  const decoder = new ImageDecoder({ data: bytes, type });
   try {
     await decoder.tracks.ready;
+    const frameCount = decoder.tracks.selectedTrack?.frameCount ?? 0;
     const frames: AnimationFrame[] = [];
     let frameBytes = 0;
-    for (let frameIndex = 0; frameIndex < (decoder.tracks.selectedTrack?.frameCount ?? 0); frameIndex++) {
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
       const { image } = await decoder.decode({ frameIndex });
       try {
         const still = await renderAvatar(image, image.displayWidth, image.displayHeight, outputSize, quality);
+        if (frameCount === 1) return still;
         const data = await frameData(still);
         frameBytes += data.size;
         if (frameBytes > AVATAR_IMAGE_LIMITS.storedBytes) return null;

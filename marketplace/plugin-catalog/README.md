@@ -50,3 +50,58 @@ Troubleshooting:
   The server works on the file that is open.
 - A long session calls tools that do not exist: start a new thread. Paper
   gives this advice in <https://paper.design/docs/mcp>.
+
+## Obsidian
+
+The listing runs `npx -y obsidian-mcp-server@3.7.2`
+(<https://github.com/cyanheads/obsidian-mcp-server>). A third party publishes
+this package and it gets write access to the vault, so the listing names one
+version. Move it only in a reviewed commit, after you check that the release
+keeps `OBSIDIAN_API_KEY` and the `http://127.0.0.1:27123` default. The server talks to the
+Local REST API community plugin in the Obsidian app
+(<https://github.com/coddingtonbear/obsidian-local-rest-api>). The user types the
+plugin's API key in the connect dialog, and OpenBot gives it to the server as
+`OBSIDIAN_API_KEY`.
+
+The server uses `http://127.0.0.1:27123` by default. A listing cannot set other
+environment values, so the user turns on the plugin's HTTP server:
+
+1. In Obsidian, install and enable the Local REST API plugin (version 4 or later).
+2. Open Settings > Local REST API. Copy the API key.
+3. Turn on "Enable non-encrypted (HTTP) server". Keep the port at 27123.
+4. Keep Obsidian open while agents use the vault.
+
+Troubleshooting:
+
+- The connection is refused: Obsidian is closed, or the HTTP server is off.
+- The server replies 401: the API key is wrong. Copy it again from the plugin settings.
+
+## Apple apps
+
+The listing starts the community server `mcp-icloud`
+(<https://github.com/MrGo2/icloud-mcp>, MIT) through `npx`. The version is
+pinned because the server can read and send mail and iMessages. To update it,
+review the upstream changes, change the version in `args`, and increase the
+listing `version`. The server has no read-only mode and no setting that limits
+it to some apps.
+
+The listing uses local mode only: the server controls the apps on this Mac
+through AppleScript and needs no key. Its cloud mode needs
+`USE_LOCAL_MODE=false`, and a listing cannot set a fixed environment value.
+
+The app lists `macAutomation`: the Apple apps that the server drives. On a Mac
+that runs the server, the listing page shows a switch, on by default, that asks
+macOS for each app right after the install, and later an "Ask for access"
+button. OpenBot sends one harmless Apple Event (`count windows`) to each app, so
+macOS shows its Automation prompt then and not during an agent's task. An app
+that the request opened is quit again. macOS does not ask again for an app that
+the user refused.
+
+Troubleshooting:
+
+- An error `-1743` ("not authorized to send Apple events"): the user refused
+  the Automation prompt. Turn OpenBot on for the app in System Settings ›
+  Privacy & Security › Automation, or run `tccutil reset AppleEvents` to get
+  the prompts again.
+- Mail or Calendar tools time out: AppleScript is slow on large mailboxes and
+  on many subscribed calendars. Ask for one folder and a smaller count.

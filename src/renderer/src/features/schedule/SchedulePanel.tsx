@@ -31,8 +31,12 @@ interface ScheduleViewProps extends SchedulePanelProps {
   agents: RoutineCalendarAgent[];
   /** The channels of the server. A channel routine shows on the agents of its channel. */
   channels: readonly { id: string; members: readonly { agentId: string }[] }[];
+  /** False when this server cannot open channels; the calendar then leaves out channel routines. */
+  channelsSupported: boolean;
   onOpenAgent: (agentId: string) => void;
   onOpenRoutine: (routine: ScheduleRoutine) => void;
+  /** Opens the routine settings of the agent on a new routine. */
+  onCreateRoutine: (agentId: string) => void;
 }
 
 /**
@@ -83,14 +87,22 @@ export function SchedulePanel(props: SchedulePanelProps) {
     setSettingsRequest({ agentId, nonce: Date.now(), routine: { routineId: routine.id, name: routine.name } });
   }
 
+  function createRoutine(agentId: string): void {
+    if (agentSetupOpen() && creatingAgent()) return;
+    selectAgent(agentId);
+    setSettingsRequest({ agentId, nonce: Date.now(), routine: "new" });
+  }
+
   return (
     <ScheduleView
       {...props}
       source={desktopScheduleSource()}
       agents={agentList()}
       channels={channels.state.channels}
+      channelsSupported={channels.supported()}
       onOpenAgent={selectAgent}
       onOpenRoutine={openRoutine}
+      onCreateRoutine={createRoutine}
     />
   );
 }
@@ -132,11 +144,16 @@ export function ScheduleView(props: ScheduleViewProps) {
     }
   }
 
+  /** A channel routine that cannot open would leave its pane loading, so it does not show. */
+  const visibleRoutines = createMemo(() =>
+    (state.calendar?.routines ?? []).filter((routine) => props.channelsSupported || routine.owner.kind !== "channel"),
+  );
+
   const routines = createMemo<RoutineCalendarRoutine[]>(() => {
     const members = new Map(
       props.channels.map((channel) => [channel.id, channel.members.map((member) => member.agentId)]),
     );
-    return (state.calendar?.routines ?? []).map((routine) => ({
+    return visibleRoutines().map((routine) => ({
       id: routine.id,
       name: routine.name,
       agentIds: routine.owner.kind === "agent" ? [routine.owner.agentId] : (members.get(routine.owner.channelId) ?? []),
@@ -145,13 +162,15 @@ export function ScheduleView(props: ScheduleViewProps) {
   });
 
   const runs = createMemo(() => {
-    const active = new Map((state.calendar?.routines ?? []).map((routine) => [routine.id, routine.active]));
-    return (state.calendar?.runs ?? []).map((run) => ({
-      id: run.id,
-      routineId: run.routineId,
-      at: run.at,
-      status: calendarStatus(run.status, active.get(run.routineId) ?? false),
-    }));
+    const active = new Map(visibleRoutines().map((routine) => [routine.id, routine.active]));
+    return (state.calendar?.runs ?? [])
+      .filter((run) => active.has(run.routineId))
+      .map((run) => ({
+        id: run.id,
+        routineId: run.routineId,
+        at: run.at,
+        status: calendarStatus(run.status, active.get(run.routineId) ?? false),
+      }));
   });
 
   function openRoutine(routineId: string): void {
@@ -197,6 +216,7 @@ export function ScheduleView(props: ScheduleViewProps) {
         onOpenRoutine={openRoutine}
         onOpenAgent={props.onOpenAgent}
         onRetry={() => void load()}
+        onCreateRoutine={props.onCreateRoutine}
         onBack={props.onBack}
       />
     </div>

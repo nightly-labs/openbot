@@ -7,11 +7,10 @@ import {
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import type * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -226,20 +225,14 @@ export function useChatAttachments(
       mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
     else for (const asset of result.assets) await addFile(asset.uri, photoName(asset));
   }
-  function paste(data: Clipboard.PasteEventPayload, onText: (text: string) => void) {
-    if (data.type === "image")
-      return add({
-        name: "pasted-image.png",
-        mimeType: "image/png",
-        base64: data.data.slice(data.data.indexOf(",") + 1),
-      });
-    else if (data.text.length > LARGE_TEXT_LENGTH)
+  function pasteText(text: string, onText: (text: string) => void) {
+    if (text.length > LARGE_TEXT_LENGTH)
       return add({
         name: "pasted-text.txt",
         mimeType: "text/plain",
-        base64: base64(new TextEncoder().encode(data.text)),
+        base64: base64(new TextEncoder().encode(text)),
       });
-    else onText(data.text);
+    onText(text);
   }
   function reportFailures(failures: unknown[]) {
     mobileAnalytics.track("attachment_action", {
@@ -309,11 +302,7 @@ export function useChatAttachments(
         endPreparing();
       });
   }
-  return {
-    items,
-    preparing,
-    menuAnchor,
-    menuOpen: menuAnchor !== null,
+  const actions = {
     openMenu: (anchor: ChatAttachmentAnchor) => setMenuAnchor(anchor),
     closeMenu: () => setMenuAnchor(null),
     // Held after the card has left, so the file read, the base64 encode and
@@ -324,7 +313,7 @@ export function useChatAttachments(
     requestCamera,
     chooseFiles: () => report(chooseFiles),
     replace: (id: string) => report(() => replaceItem(id)),
-    paste,
+    pasteText,
     addShared,
     remove: (id: string) => {
       void report(() => persistItems(itemsRef.current.filter((item) => item.id !== id)));
@@ -338,6 +327,27 @@ export function useChatAttachments(
         ...files.map((file) => ({ ...file, id: `mobile-draft-attachment-${++sequence.current}` })),
       ]),
   };
+  const latestActions = useRef(actions);
+  latestActions.current = actions;
+  const [stableActions] = useState(() => ({
+    openMenu: (anchor: ChatAttachmentAnchor) => latestActions.current.openMenu(anchor),
+    closeMenu: () => latestActions.current.closeMenu(),
+    addPhoto: (uri: string) => latestActions.current.addPhoto(uri),
+    choosePhotos: () => latestActions.current.choosePhotos(),
+    requestCamera: () => latestActions.current.requestCamera(),
+    chooseFiles: () => latestActions.current.chooseFiles(),
+    replace: (id: string) => latestActions.current.replace(id),
+    pasteText: (text: string, onText: (text: string) => void) => latestActions.current.pasteText(text, onText),
+    addShared: (text: string, files: readonly { uri: string; name: string }[], onText: (text: string) => void) =>
+      latestActions.current.addShared(text, files, onText),
+    remove: (id: string) => latestActions.current.remove(id),
+    clear: () => latestActions.current.clear(),
+    restore: (files: readonly ChatAttachment[]) => latestActions.current.restore(files),
+  }));
+  return useMemo(
+    () => ({ items, preparing, menuAnchor, menuOpen: menuAnchor !== null, ...stableActions }),
+    [items, preparing, menuAnchor, stableActions],
+  );
 }
 
 export type ChatAttachments = ReturnType<typeof useChatAttachments>;

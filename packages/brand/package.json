@@ -9,14 +9,17 @@
     "./bloub-avatar-motion": "./src/bloub-avatar-motion.ts",
     "./logo.css": "./src/logo.css",
     "./tokens.css": "./src/tokens.css",
+    "./tokens-light.css": "./src/tokens-light.css",
     "./tokens-native.css": "./src/tokens-native.css",
     "./article-gradient": "./src/article-gradient.ts",
     "./file-reference": "./src/file-reference.ts",
     "./app-logo-shape": "./src/app-logo-shape.ts",
-    "./provider-logo-shape": "./src/provider-logo-shape.ts"
+    "./wordmark-shape": "./src/wordmark-shape.ts",
+    "./provider-logo-shape": "./src/provider-logo-shape.ts",
+    "./connector-mark-shape": "./src/connector-mark-shape.ts"
   },
   "scripts": {
-    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@norbert_bodziony/bloub": "catalog:",
@@ -24,7 +27,7 @@
   },
   "peerDependencies": {
     "@solidjs/web": "catalog:",
-    "solid-js": "2.0.0-rc.0"
+    "solid-js": "2.0.0-rc.18"
   },
   "devDependencies": {
     "typescript": "catalog:"

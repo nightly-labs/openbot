@@ -3,14 +3,19 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("customProvider", {
   "customProvider.registry.title": "ACP registry",
   "customProvider.registry.description":
-    "Install agents on this host. Remove runtime keeps agent settings, credentials, and conversations.",
+    "Install agents on this server. Remove runtime keeps agent settings, credentials, and conversations.",
   "customProvider.registry.search": "Search registry",
   "customProvider.registry.empty": "No agents match this search.",
   "customProvider.registry.agentId": "Custom agent ID",
   "customProvider.registry.install": "Install",
   "customProvider.registry.update": "Update",
   "customProvider.registry.remove": "Remove runtime",
-  "customProvider.registry.failed": "The registry operation failed.",
+  "customProvider.registry.searchFailed": "Could not search the registry. Try again.",
+  "customProvider.registry.statusFailed": "Could not check the install progress. OpenBot tries again.",
+  "customProvider.registry.installFailed": "Could not install the agent. Try again.",
+  "customProvider.registry.updateFailed": "Could not update the agent. Try again.",
+  "customProvider.registry.removeFailed": "Could not remove the runtime. Try again.",
+  "customProvider.registry.cancelFailed": "Could not cancel the install. Try again.",
   // Form validation. Each message names one field of the custom provider form.
   "customProvider.error.providerIdRequired": "Enter a provider ID.",
   "customProvider.error.providerIdPattern":
@@ -27,6 +32,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.error.modelIdRequired": "Enter a model ID.",
   "customProvider.error.modelIdDuplicate": "This provider already lists {id}.",
   "customProvider.error.modelIdInvalid": "This model ID cannot be used. Remove spaces, quotes and other punctuation.",
+  "customProvider.error.contextWindowInvalid": "Enter a whole number of tokens from {min} to {max}.",
   "customProvider.error.headerNameRequired": "Enter a header name.",
   "customProvider.error.headerNameInvalid": "Use a valid HTTP header name.",
   "customProvider.error.headerDuplicate": "This provider already sets {name}.",
@@ -38,15 +44,13 @@ export const messages = defineMessages("customProvider", {
   "customProvider.error.baseUrlProtocol": "Use an http:// or https:// URL.",
   "customProvider.error.baseUrlCredential": "Put the credential in a header, not in the URL.",
 
-  // The note after a save or a removal. It tells the user when OpenCode reads the new list.
+  // The note after a save or a removal. It tells the user when the provider reads the new list.
   "customProvider.saved.restarted": "Saved. OpenBot is loading the models.",
-  "customProvider.saved.skippedBusy":
-    "Saved. OpenCode reads the list after the current task stops. Press Connect then.",
-  "customProvider.saved.notRunning": "Saved. OpenCode reads the list when it next starts.",
+  "customProvider.saved.skippedBusy": "Saved. The provider reads the list after the current task stops.",
+  "customProvider.saved.notRunning": "Saved. The provider reads the list when it next starts.",
   "customProvider.removed.restarted": "Removed. OpenBot is loading the models.",
-  "customProvider.removed.skippedBusy":
-    "Removed. OpenCode reads the list after the current task stops. Press Connect then.",
-  "customProvider.removed.notRunning": "Removed. OpenCode reads the list when it next starts.",
+  "customProvider.removed.skippedBusy": "Removed. The provider reads the list after the current task stops.",
+  "customProvider.removed.notRunning": "Removed. The provider reads the list when it next starts.",
   "customProvider.saveFailed": "OpenBot could not save this endpoint.",
   "customProvider.removeFailed": "OpenBot could not remove {name}.",
   "customProvider.saveUnavailable": "This build cannot save an endpoint.",
@@ -54,6 +58,7 @@ export const messages = defineMessages("customProvider", {
 
   // The add dialog.
   "customProvider.form.title": "Add a custom provider",
+  "customProvider.form.editTitle": "Edit a custom provider",
   "customProvider.form.description": "Describe an OpenAI-compatible endpoint and the models it serves.",
   "customProvider.form.heading": "Custom provider",
   "customProvider.form.subtitle": "Any OpenAI-compatible endpoint.",
@@ -62,19 +67,24 @@ export const messages = defineMessages("customProvider", {
   "customProvider.field.displayName": "Display name",
   "customProvider.field.displayNamePlaceholder": "My Provider",
   "customProvider.field.baseUrl": "Base URL",
+  "customProvider.field.harness": "Runs on",
+  "customProvider.field.harnessHint": "The provider that sends the requests to this endpoint.",
   "customProvider.field.apiKey": "API key",
   "customProvider.field.apiKeyHint": "Optional. Leave empty if you manage auth via headers.",
-  "customProvider.field.apiKeyKeptHint": "A key is saved. Leave this empty to keep it and the saved headers.",
+  "customProvider.field.apiKeyKeptHint": "A key is saved. Leave this empty to keep it.",
   "customProvider.models": "Models",
   "customProvider.model.id": "Model {number} ID",
   "customProvider.model.name": "Model {number} display name",
   "customProvider.model.namePlaceholder": "Display Name",
+  "customProvider.model.contextWindow": "Model {number} context window",
+  "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.remove": "Remove model {number}",
   "customProvider.model.add": "Add model",
   "customProvider.headers": "Headers",
   "customProvider.header.name": "Header {number} name",
   "customProvider.header.value": "Header {number} value",
   "customProvider.header.valuePlaceholder": "value",
+  "customProvider.header.keptPlaceholder": "Saved. Leave empty to keep it.",
   "customProvider.header.remove": "Remove header {number}",
   "customProvider.header.add": "Add header",
   "customProvider.submit": "Submit",
@@ -94,7 +104,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.preset.title": "Add a provider or an agent",
   "customProvider.preset.description": "Choose a local model server, an endpoint, or an ACP agent.",
   "customProvider.preset.heading": "Add custom",
-  "customProvider.preset.subtitle": "Models for OpenCode, or an agent of its own.",
+  "customProvider.preset.subtitle": "Models for OpenCode or Pi, or an agent of its own.",
   "customProvider.preset.models": "Models",
   "customProvider.preset.agents": "Agents",
   "customProvider.preset.ollama": "Ollama",
@@ -158,6 +168,9 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.commandHint": "The program to start. OpenBot looks for it on your PATH.",
   "customProvider.acp.args": "Arguments",
   "customProvider.acp.argsHint": "Separate arguments with spaces. Put quotes around an argument that has spaces.",
+  "customProvider.acp.usagePrompt": "Usage command",
+  "customProvider.acp.usagePromptHint":
+    "OpenBot sends it at most every 5 minutes and shows the last answer. Use a command that the agent answers itself, such as /usage.",
   "customProvider.acp.env": "Environment variables",
   "customProvider.acp.env.name": "Variable {number} name",
   "customProvider.acp.env.value": "Variable {number} value",
@@ -170,6 +183,10 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.checkOk": "{name} answered",
   "customProvider.acp.checkOkVersion": "{name} {version} answered",
   "customProvider.acp.checkProtocol": "ACP version {version}",
+  "customProvider.acp.checkModels": {
+    one: "{count} model: {models}",
+    other: "{count} models: {models}",
+  },
   "customProvider.acp.checkFailed": "The agent did not answer",
   "customProvider.acp.trustTitle": "This command runs on your computer",
   "customProvider.acp.trustDescription":
@@ -185,6 +202,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.error.envDuplicate": "This agent already sets {name}.",
   "customProvider.acp.error.envValueRequired": "Enter a value for this variable.",
   "customProvider.acp.error.envValueLength": "Keep the value under {max} characters.",
+  "customProvider.acp.error.usagePromptInvalid": "Use one line of at most {max} characters.",
   "customProvider.acp.error.agentIdPattern":
     "Use lowercase letters, numbers or hyphens, starting with a letter or number. Use at most 40 characters.",
 
@@ -217,6 +235,8 @@ export const messages = defineMessages("customProvider", {
   "customProvider.list.empty": "No custom endpoints yet.",
   "customProvider.list.label": "Custom endpoints",
   "customProvider.list.apiKeySaved": "API key saved",
+  "customProvider.list.runsOn": "Runs on {name}",
+  "customProvider.list.editLabel": "Edit {name}",
   "customProvider.list.deleteLabel": "Delete {name}",
   "customProvider.list.confirmTitle": "Remove {name}?",
   "customProvider.list.confirmDescription":

@@ -4,7 +4,7 @@
   "tagline": "Private web search",
   "description": "Brave Search lets agents search the web and local results without tracking. An API key from the Brave Search API dashboard is passed to the local server as one environment variable.",
   "category": "research",
-  "creatorName": "brave.com",
+  "creatorName": "Brave",
   "iconUrl": "https://brave.com/favicon.ico",
   "version": "1.0.0",
   "prompts": [

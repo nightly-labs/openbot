@@ -156,10 +156,11 @@ export class RemoteViewerProxy {
     return yield* Effect.gen({ self: this }, function* () {
       const body =
         request.method === "GET" || request.method === "HEAD" ? undefined : yield* remoteCall(() => readBody(request));
+      const method = request.method === "HEAD" ? "GET" : request.method;
       const upstream = yield* this.#options.fetchResource(route.serverId, route.upstreamPath, {
-        method: request.method === "HEAD" ? "GET" : request.method,
+        ...(method === undefined ? {} : { method }),
         headers: { "Content-Type": request.headers["content-type"] ?? "application/octet-stream" },
-        body: body ? Uint8Array.from(body).buffer : undefined,
+        ...(body ? { body: Uint8Array.from(body).buffer } : {}),
       });
       if (upstream.status === 204) {
         response.writeHead(204, { "Cache-Control": "no-store" });

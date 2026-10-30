@@ -150,7 +150,9 @@ class TelegramAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     const [first = "", ...rest] = telegramChunks(markdown);
+    let firstId: string;
     if (replaceMessageId) {
+      firstId = replaceMessageId;
       const updated = yield* Effect.result(
         this.#answerPart(first, (text) => this.#editText(target, replaceMessageId, text)),
       );
@@ -159,10 +161,11 @@ class TelegramAdapter implements MessagingAdapter {
           chat_id: this.#chatNumber(target),
           message_id: Number(replaceMessageId),
         }).pipe(Effect.catch(() => Effect.void));
-        yield* this.#answerPart(first, (text) => this.#postText(target, text));
+        firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
       }
-    } else yield* this.#answerPart(first, (text) => this.#postText(target, text));
+    } else firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
     for (const chunk of rest) yield* this.#answerPart(chunk, (text) => this.#postText(target, text));
+    return firstId;
   });
 
   readonly upload = Effect.fnUntraced(function* (
@@ -282,10 +285,10 @@ class TelegramAdapter implements MessagingAdapter {
   }
 
   /** One part of an answer as HTML, or as plain text when Telegram cannot parse the HTML. */
-  #answerPart(
+  #answerPart<A>(
     markdown: string,
-    send: (text: { text: string; html: boolean }) => Effect.Effect<void, MessagingAdapterError>,
-  ): Effect.Effect<void, MessagingAdapterError> {
+    send: (text: { text: string; html: boolean }) => Effect.Effect<A, MessagingAdapterError>,
+  ): Effect.Effect<A, MessagingAdapterError> {
     const html = telegramHtml(markdown);
     const plain = () => send({ text: telegramPlainText(markdown), html: false });
     // Escapes make HTML longer than its text. Signal refuses a longer call and closes the socket.
@@ -307,7 +310,7 @@ class TelegramAdapter implements MessagingAdapter {
       link_preview_options: { is_disabled: true },
       ...telegramPlacement(target),
     });
-    yield* this.#posted(target, result.messageId);
+    return yield* this.#posted(target, result.messageId);
   });
 
   #editText(

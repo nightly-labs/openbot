@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "Cancelando…",
   "prompt.browser.pageFallback": "Página del navegador",
   "prompt.browser.hostFallback": "el navegador",
+  "prompt.browser.signInBlocked.label": "Inicio de sesión bloqueado",
+  "prompt.browser.signInBlocked.title": "{host} bloqueó el inicio de sesión desde {server}",
+  "prompt.browser.signInBlocked.cancelledTitle": "Inicio de sesión en {host} cancelado",
+  "prompt.browser.signInBlocked.body":
+    "Inicia sesión en este ordenador. OpenBot envía solo el inicio de sesión de {host} a {server}, y {name} continúa.",
+  "prompt.browser.signInBlocked.cancelledBody": "El inicio de sesión se canceló.",
+  "prompt.browser.signInBlocked.waiting": "Esperando el inicio de sesión",
+  "prompt.browser.signInBlocked.waitingButton": "Esperando el inicio de sesión…",
+  "prompt.browser.signInBlocked.page": "{host} en {server}",
   "prompt.inputRequiredAnnouncement": "Se necesita tu respuesta. {question}",
 } as const satisfies PartialTranslation<typeof source>;

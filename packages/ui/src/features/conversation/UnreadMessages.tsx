@@ -1,4 +1,5 @@
 import { Button } from "@openbot/ui";
+import { untrack } from "solid-js";
 import { useText } from "../../text";
 import { newMessagesLabel, preferredMessageScrollBehavior } from "./MessageNavigation";
 
@@ -37,10 +38,15 @@ export function UnreadMessagesBanner(props: {
   );
 }
 
-export function UnreadMessagesDivider(props: { elementRef?: (element: HTMLDivElement) => void }) {
+export function UnreadMessagesDivider(props: {
+  elementRef?: (element: HTMLDivElement) => void;
+  /** Asked once, when the line shows: true when it marks a new place, and then it animates in. */
+  animateIn?: (() => boolean) | undefined;
+}) {
   const { t } = useText();
+  const arrives = untrack(() => props.animateIn?.() === true);
   return (
-    <div class="unread-messages-divider" ref={props.elementRef}>
+    <div class="unread-messages-divider" data-arrive={arrives ? "" : undefined} ref={props.elementRef}>
       <hr aria-label={t("chat.unread.dividerLabel")} />
       <span>{t("chat.unread.dividerBadge")}</span>
       <hr />

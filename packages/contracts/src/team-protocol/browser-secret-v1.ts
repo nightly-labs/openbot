@@ -7,9 +7,21 @@ export function restoreBrowserSecretMetadata(
   projected: TeamProtocolV4BaseJsonValue,
   source: unknown,
 ): TeamProtocolV4BaseJsonValue {
+  return mapBrowserTakeoverRequests(projected, source, restoreRequest);
+}
+
+/**
+ * Applies `restore` to each takeover request of a `browser-takeover-requested` event or a
+ * `runtime-snapshot`, with the request of `source` that has the same id.
+ */
+export function mapBrowserTakeoverRequests(
+  projected: TeamProtocolV4BaseJsonValue,
+  source: unknown,
+  restore: (target: TeamProtocolV4BaseJsonValue, source: unknown) => TeamProtocolV4BaseJsonValue,
+): TeamProtocolV4BaseJsonValue {
   if (!isDynamicRecord(projected) || !isDynamicRecord(source)) return projected;
   if (projected.type === "browser-takeover-requested" && projected.request !== undefined)
-    return { ...projected, request: restoreRequest(projected.request, source.request) };
+    return { ...projected, request: restore(projected.request, source.request) };
   if (
     projected.type === "runtime-snapshot" &&
     isDynamicRecord(projected.snapshot) &&
@@ -24,7 +36,7 @@ export function restoreBrowserSecretMetadata(
           ...projected.snapshot,
           pendingBrowserTakeovers: targets.map((target) =>
             isDynamicRecord(target)
-              ? restoreRequest(
+              ? restore(
                   target,
                   originals.find((item) => isDynamicRecord(item) && item.requestId === target.requestId),
                 )

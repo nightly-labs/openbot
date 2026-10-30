@@ -185,6 +185,46 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(staleTab.id));
       }
     }
+    // A wrong target names itself and the reason, so the agent can correct the request.
+    for (const [targets, submitTarget, expected] of [
+      [
+        [{ kind: "css", selector: "#password" }],
+        { kind: "css", selector: "#missing-submit" },
+        "submitTarget: No element matches CSS selector: #missing-submit. Correct",
+      ],
+      [[{ kind: "css", selector: "#submit" }], { kind: "css", selector: "#submit" }, "The field target is not"],
+      [[{ kind: "css", selector: "#password" }], undefined, "submission=click needs submitTarget"],
+    ] as const) {
+      const wrongTab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/login", "secret-thread", "secret-agent"),
+      );
+      try {
+        const failure = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `wrong-${expected}`,
+            arguments: {
+              tabId: wrongTab.id,
+              method: "password",
+              targets,
+              submission: "click",
+              ...(submitTarget ? { submitTarget } : {}),
+            },
+          }),
+        ).then(
+          () => undefined,
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+        if (!failure?.includes(expected))
+          throw new Error(`A wrong authentication target gave an unclear error: ${failure ?? "none"}`);
+      } finally {
+        await runCauseEffect(browser.close(wrongTab.id));
+      }
+    }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {
     protocol.unhandle("https");

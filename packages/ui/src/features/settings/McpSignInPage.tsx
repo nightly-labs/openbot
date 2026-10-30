@@ -11,10 +11,12 @@
  * browse.
  */
 
-import { Alert, AlertDescription, Button, Dialog, Field, Input, ShieldCheck, Text } from "@openbot/ui";
+import { Alert, AlertDescription, Button, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import BrowserLiveView, { type BrowserViewRuntime } from "../browser/BrowserLiveView";
+import { WizardDialog } from "./IntegrationLayout";
+import { McpConnectMark } from "./McpConnectShell";
 
 /** The host tab with the sign-in page, and the way to watch it. */
 export interface McpSignInPageSource {
@@ -56,6 +58,8 @@ export function McpSignInPageNote(props: { hostName: string }) {
 export interface McpSignInPageDialogProps {
   /** The server the sign-in is for, as its row names it. */
   name: string;
+  /** The icon of the server, when its listing has one. */
+  iconUrl?: string | null | undefined;
   hostName: string;
   page: McpSignInPageSource;
   /**
@@ -75,32 +79,30 @@ export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
     props.onCancel();
   };
   return (
-    <Dialog.Root
+    <WizardDialog
       open
-      onOpenChange={(open) => {
-        if (!open) cancel();
-      }}
+      nested
+      wide
+      closeLabel={t("mcp.panel.cancelSignIn")}
+      onClose={cancel}
+      logo={<McpConnectMark iconUrl={props.iconUrl} />}
+      title={t("mcp.panel.signInTo", { name: props.name })}
+      description={t("mcp.signIn.pageDescription", { host: props.hostName })}
+      footer={<CancelSignIn cancelling={cancelling()} onCancel={cancel} />}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay class="mcp-connect-backdrop">
-          <Dialog.Content class="mcp-connect-dialog mcp-sign-in-page-dialog" as="section">
-            <header class="mcp-connect-header">
-              <Dialog.Title class="mcp-connect-title">{t("mcp.panel.signInTo", { name: props.name })}</Dialog.Title>
-              <Dialog.Description class="mcp-connect-description">
-                {t("mcp.signIn.pageDescription", { host: props.hostName })}
-              </Dialog.Description>
-            </header>
-            <McpSignInPage page={props.page} />
-            <footer class="mcp-sign-in-page-footer">
-              <McpSignInPageNote hostName={props.hostName} />
-              <Button type="button" variant="outline" loading={cancelling()} onClick={cancel}>
-                {t("mcp.panel.cancelSignIn")}
-              </Button>
-            </footer>
-          </Dialog.Content>
-        </Dialog.Overlay>
-      </Dialog.Portal>
-    </Dialog.Root>
+      <McpSignInPage page={props.page} />
+      <McpSignInPageNote hostName={props.hostName} />
+    </WizardDialog>
+  );
+}
+
+/** The one button of a sign-in that waits: it stops the sign-in. */
+function CancelSignIn(props: { cancelling: boolean; onCancel: () => void }) {
+  const { t } = useText();
+  return (
+    <Button type="button" size="sm" variant="ghost" loading={props.cancelling} onClick={props.onCancel}>
+      {t("mcp.panel.cancelSignIn")}
+    </Button>
   );
 }
 
@@ -126,6 +128,8 @@ export interface McpSignInRelayActions {
 
 export interface McpSignInRelayDialogProps extends McpSignInRelayActions {
   name: string;
+  /** The icon of the server, when its listing has one. */
+  iconUrl?: string | null | undefined;
   hostName: string;
   page: McpSignInRelaySource;
   onCancel: () => void;
@@ -217,31 +221,18 @@ export function McpSignInRelayDialog(props: McpSignInRelayDialogProps) {
     props.onCancel();
   };
   return (
-    <Dialog.Root
+    <WizardDialog
       open
-      onOpenChange={(open) => {
-        if (!open) cancel();
-      }}
+      nested
+      closeLabel={t("mcp.panel.cancelSignIn")}
+      onClose={cancel}
+      logo={<McpConnectMark iconUrl={props.iconUrl} />}
+      title={t("mcp.panel.signInTo", { name: props.name })}
+      description={t(relayDescriptionKey(props.page), { page: props.page.authorizeHost, host: props.hostName })}
+      footer={<CancelSignIn cancelling={cancelling()} onCancel={cancel} />}
     >
-      <Dialog.Portal>
-        <Dialog.Overlay class="mcp-connect-backdrop">
-          <Dialog.Content class="mcp-connect-dialog mcp-sign-in-relay-dialog" as="section">
-            <header class="mcp-connect-header">
-              <Dialog.Title class="mcp-connect-title">{t("mcp.panel.signInTo", { name: props.name })}</Dialog.Title>
-              <Dialog.Description class="mcp-connect-description">
-                {t(relayDescriptionKey(props.page), { page: props.page.authorizeHost, host: props.hostName })}
-              </Dialog.Description>
-            </header>
-            <McpSignInRelayControls page={props.page} onOpen={props.onOpen} onPaste={props.onPaste} />
-            <footer class="mcp-sign-in-page-footer">
-              <McpSignInPageNote hostName={props.hostName} />
-              <Button type="button" variant="outline" loading={cancelling()} onClick={cancel}>
-                {t("mcp.panel.cancelSignIn")}
-              </Button>
-            </footer>
-          </Dialog.Content>
-        </Dialog.Overlay>
-      </Dialog.Portal>
-    </Dialog.Root>
+      <McpSignInRelayControls page={props.page} onOpen={props.onOpen} onPaste={props.onPaste} />
+      <McpSignInPageNote hostName={props.hostName} />
+    </WizardDialog>
   );
 }

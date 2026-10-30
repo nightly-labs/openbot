@@ -47,12 +47,15 @@ function shortPath(path: string) {
 export function ChatApprovalCard({
   approval,
   agentName,
+  showAgentName,
   serverName,
   canAnswer,
   respond,
 }: {
   approval: PendingApproval;
   agentName: string;
+  /** In a channel, several agents can ask. In an agent's own chat, the name is the chat's. */
+  showAgentName: boolean;
   serverName: string;
   canAnswer: boolean;
   respond: (decision: ApprovalDecision) => Promise<void>;
@@ -105,94 +108,112 @@ export function ChatApprovalCard({
 
   return (
     <View
-      className="w-full gap-3 rounded-[30px] bg-control/60 p-4"
-      style={{ borderCurve: "circular" }}
+      className="w-full gap-2.5"
       accessibilityLabel={t("mobile.chat.approval.label")}
       accessibilityState={{ busy: pending !== null }}
     >
-      <View className="gap-1">
-        <View className="flex-row items-center gap-2">
-          <ShieldAlert color={String(warningText)} size={16} strokeWidth={2.2} />
-          <Typography.Paragraph weight="semibold" className="min-w-0 flex-1" accessibilityRole="header">
-            {approvalTitle(approval, t)}
-          </Typography.Paragraph>
+      <View
+        className="max-w-[88%] self-start gap-2.5 rounded-[30px] bg-control/60 px-4 py-3"
+        style={{ borderCurve: "circular" }}
+      >
+        <View className="gap-1">
+          {showAgentName ? (
+            <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
+              {t("mobile.chat.approval.from", { name: agentName })}
+            </Typography.Paragraph>
+          ) : null}
+          <View className="flex-row items-center gap-2">
+            <ShieldAlert color={String(warningText)} size={16} strokeWidth={2.2} />
+            <Typography.Paragraph weight="semibold" className="min-w-0 flex-1" accessibilityRole="header">
+              {approvalTitle(approval, t)}
+            </Typography.Paragraph>
+          </View>
+          {approval.reason ? <Typography.Paragraph>{sourceText(approval.reason)}</Typography.Paragraph> : null}
         </View>
-        {approval.reason ? (
-          <Typography.Paragraph type="body-sm" className="text-text-secondary">
-            {sourceText(approval.reason)}
-          </Typography.Paragraph>
-        ) : null}
-      </View>
 
-      {hasDetails ? (
-        <View className="gap-2 rounded-[18px] bg-control px-3 py-2.5" style={{ borderCurve: "continuous" }}>
-          {approval.command ? (
-            <Typography.Code
-              selectable
-              className="bg-transparent p-0"
-              style={{ color: foreground, fontSize: 13, lineHeight: 19 }}
-            >
-              {commandText(approval.command)}
-            </Typography.Code>
-          ) : null}
-          {approval.kind === "file-change" ? (
-            <View className="gap-0.5">
-              <Typography.Paragraph type="body-xs" className="text-muted">
-                {t("mobile.chat.approval.files")}
-              </Typography.Paragraph>
-              <Typography.Paragraph type="body-sm" weight="medium" selectable>
-                {approval.grantRoot ? shortPath(approval.grantRoot) : t("mobile.chat.approval.agentWorkspace")}
-              </Typography.Paragraph>
-            </View>
-          ) : null}
-          {permissionDetails.length ? (
-            <View className="gap-1" accessibilityLabel={t("mobile.chat.approval.permissions")}>
-              {permissionDetails.map((detail) => (
-                <Typography.Paragraph key={detail} type="body-sm" selectable>
-                  {detail}
+        {hasDetails ? (
+          <View className="gap-2 rounded-[18px] bg-control px-3 py-2.5" style={{ borderCurve: "continuous" }}>
+            {approval.command ? (
+              <Typography.Code
+                selectable
+                className="bg-transparent p-0"
+                style={{ color: foreground, fontSize: 13, lineHeight: 19 }}
+              >
+                {commandText(approval.command)}
+              </Typography.Code>
+            ) : null}
+            {approval.kind === "file-change" ? (
+              <View className="gap-0.5">
+                <Typography.Paragraph type="body-xs" className="text-muted">
+                  {t("mobile.chat.approval.files")}
                 </Typography.Paragraph>
-              ))}
-            </View>
-          ) : null}
-          {approval.command && approval.cwd ? (
-            <View className="flex-row items-center gap-1.5">
-              <Folder color={String(muted)} size={12} />
-              <Typography.Paragraph type="body-xs" className="min-w-0 flex-1 text-muted" numberOfLines={1} selectable>
-                {shortPath(approval.cwd)}
-              </Typography.Paragraph>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+                <Typography.Paragraph type="body-sm" weight="medium" selectable>
+                  {approval.grantRoot ? shortPath(approval.grantRoot) : t("mobile.chat.approval.agentWorkspace")}
+                </Typography.Paragraph>
+              </View>
+            ) : null}
+            {permissionDetails.length ? (
+              <View className="gap-1" accessibilityLabel={t("mobile.chat.approval.permissions")}>
+                {permissionDetails.map((detail) => (
+                  <Typography.Paragraph key={detail} type="body-sm" selectable>
+                    {detail}
+                  </Typography.Paragraph>
+                ))}
+              </View>
+            ) : null}
+            {approval.command && approval.cwd ? (
+              <View className="flex-row items-center gap-1.5">
+                <Folder color={String(muted)} size={12} />
+                <Typography.Paragraph type="body-xs" className="min-w-0 flex-1 text-muted" numberOfLines={1} selectable>
+                  {shortPath(approval.cwd)}
+                </Typography.Paragraph>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
-      <View className="gap-2.5">
-        <Typography.Paragraph type="body-xs" className="text-muted">
+        <Typography.Paragraph type="body-xs" className="text-text-secondary">
           {effect}
         </Typography.Paragraph>
-        <View className="flex-row gap-2">
-          <Button variant="tertiary" className="flex-1" isDisabled={disabled} onPress={() => void answer("decline")}>
-            <Button.Label>{pending === "decline" ? t("common.sending") : t("mobile.chat.approval.deny")}</Button.Label>
-          </Button>
-          {partial ? null : (
-            // The neutral action color, as on desktop: white in dark mode, black in light mode.
-            <Button className="flex-1 bg-action" isDisabled={disabled} onPress={() => void answer("accept")}>
-              <Button.Label className="text-action-foreground">
-                {pending === "accept" ? t("common.sending") : t("mobile.chat.approval.allow")}
-              </Button.Label>
-            </Button>
-          )}
-        </View>
-        {!canAnswer ? (
-          <Typography.Paragraph type="body-xs" className="text-text-secondary">
-            {t("mobile.chat.approval.reconnect", { server: serverName })}
-          </Typography.Paragraph>
-        ) : null}
-        {failed ? (
-          <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
-            {failed}
-          </Typography.Paragraph>
-        ) : null}
       </View>
+
+      {/* Answer pills under the bubble, as the quick replies of the chat design. */}
+      <View className="flex-row flex-wrap gap-2">
+        {partial ? null : (
+          <Button
+            size="sm"
+            variant="tertiary"
+            className="rounded-full"
+            isDisabled={disabled}
+            onPress={() => void answer("accept")}
+          >
+            <Button.Label className="font-sans font-semibold">
+              {pending === "accept" ? t("common.sending") : t("mobile.chat.approval.allow")}
+            </Button.Label>
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="tertiary"
+          className="rounded-full"
+          isDisabled={disabled}
+          onPress={() => void answer("decline")}
+        >
+          <Button.Label className="font-sans font-semibold">
+            {pending === "decline" ? t("common.sending") : t("mobile.chat.approval.deny")}
+          </Button.Label>
+        </Button>
+      </View>
+      {!canAnswer ? (
+        <Typography.Paragraph type="body-xs" className="text-text-secondary">
+          {t("mobile.chat.approval.reconnect", { server: serverName })}
+        </Typography.Paragraph>
+      ) : null}
+      {failed ? (
+        <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
+          {failed}
+        </Typography.Paragraph>
+      ) : null}
     </View>
   );
 }

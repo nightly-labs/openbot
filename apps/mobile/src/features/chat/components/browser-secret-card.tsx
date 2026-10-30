@@ -8,7 +8,9 @@ import KeyRound from "lucide-react-native/icons/key-round";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "@/shared/lib/haptics";
+import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
 /**
@@ -32,8 +34,9 @@ function BrowserRequestCard({
 }) {
   const { t } = useText();
   const muted = useThemeColor("muted");
+  const insets = useSafeAreaInsets();
   return (
-    <View className="px-4 pb-2">
+    <View className="pb-2" style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}>
       <View
         className="gap-3 rounded-[26px] bg-control py-3 pr-2 pl-4"
         style={{ borderCurve: "continuous" }}
@@ -192,6 +195,7 @@ export function BrowserSecretComposer({
     : request.secret?.method === "authenticator"
       ? t("mobile.chat.browserSecret.authenticatorCode")
       : t("mobile.chat.browserSecret.oneTimeCode");
+  const insets = useSafeAreaInsets();
   const ready = !pending && (password ? Boolean(value) : value.length === digits);
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
@@ -236,7 +240,14 @@ export function BrowserSecretComposer({
           </Typography.Paragraph>
         ) : null}
       </BrowserRequestCard>
-      <View style={{ paddingHorizontal: BAR_INSET, paddingTop: 8, paddingBottom: Math.max(bottomInset, 10) }}>
+      <View
+        style={{
+          paddingLeft: insets.left + BAR_INSET,
+          paddingRight: insets.right + BAR_INSET,
+          paddingTop: 8,
+          paddingBottom: Math.max(bottomInset, 10),
+        }}
+      >
         <GlassView
           glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
           style={{
@@ -257,7 +268,7 @@ export function BrowserSecretComposer({
             accessibilityLabel={title}
             placeholder={title}
             placeholderTextColor={String(muted)}
-            selectionColor={foreground}
+            {...selectionColorProps(foreground)}
             className="min-w-0 flex-1 font-sans text-foreground"
             style={{ fontSize: 16 }}
             secureTextEntry

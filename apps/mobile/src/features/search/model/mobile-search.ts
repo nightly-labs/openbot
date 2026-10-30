@@ -1,4 +1,5 @@
 import type {
+  ChannelSummary,
   ConversationFileSearchResult,
   ConversationMessage,
   ConversationSearchResult,
@@ -9,7 +10,15 @@ import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
 /** The filters of the desktop global search, in its order, and the settings pages of this app. */
-export const MOBILE_SEARCH_FILTERS = ["all", "agents", "messages", "files", "routines", "settings"] as const;
+export const MOBILE_SEARCH_FILTERS = [
+  "all",
+  "agents",
+  "channels",
+  "messages",
+  "files",
+  "routines",
+  "settings",
+] as const;
 export type MobileSearchFilter = (typeof MOBILE_SEARCH_FILTERS)[number];
 type MobileSearchSectionKey = Exclude<MobileSearchFilter, "all">;
 
@@ -25,6 +34,7 @@ export type MobileSearchSettingId =
   | "liveActivities"
   | "privacy"
   | "hiddenChats"
+  | "deletedChannels"
   | "support"
   | "about"
   | "serverOptions"
@@ -41,6 +51,7 @@ export interface MobileSearchSetting {
 
 export type MobileSearchResult =
   | { kind: "agent"; id: string; agent: MobileAgent }
+  | { kind: "channel"; id: string; channel: ChannelSummary }
   | {
       kind: "message";
       id: string;
@@ -55,7 +66,9 @@ export type MobileSearchResult =
       kind: "routine";
       id: string;
       routine: RoutineCalendarRoutine;
-      owner: { agent: MobileAgent; name: string };
+      owner:
+        | { kind: "agent"; agent: MobileAgent; name: string }
+        | { kind: "channel"; channel: ChannelSummary; name: string };
     };
 
 /** Who wrote a message. Another member of the server shows by name, as in the chat. */
@@ -159,6 +172,7 @@ export function mobileSearchView({
   filter,
   reader,
   agents,
+  channels,
   settings,
   routines,
   messages,
@@ -169,6 +183,8 @@ export function mobileSearchView({
   reader: MobileSearchReader;
   /** The agents this device shows. Messages, files and routines of other agents stay out. */
   agents: MobileAgent[];
+  /** The open channels this device shows. */
+  channels: ChannelSummary[];
   /** The settings pages this device has. */
   settings: MobileSearchSetting[];
   routines: { status: "idle" | "loading" | "error" | "ready"; items: RoutineCalendarRoutine[] };
@@ -177,16 +193,24 @@ export function mobileSearchView({
 }): MobileSearchView {
   const normalized = normalizeMobileSearchQuery(query);
   const agentsById = new Map(agents.map((agent) => [agent.id, agent]));
+  const channelsById = new Map(channels.map((channel) => [channel.id, channel]));
 
   const agentResults = agents
     .filter((agent) => matches(normalized, [agent.name, agent.title, agent.description, agent.preview]))
     .map((agent): MobileSearchResult => ({ kind: "agent", id: `agent:${agent.id}`, agent }));
+  const channelResults = channels
+    .filter((channel) => matches(normalized, [channel.name, channel.title]))
+    .map((channel): MobileSearchResult => ({ kind: "channel", id: `channel:${channel.id}`, channel }));
   const settingResults = settings
     .filter((setting) => matches(normalized, [setting.title, setting.detail]))
     .map((setting): MobileSearchResult => ({ kind: "setting", id: `setting:${setting.id}`, setting }));
   const routineOwner = (owner: RoutineCalendarOwner) => {
-    const agent = owner.kind === "agent" ? agentsById.get(owner.agentId) : undefined;
-    return agent ? { agent, name: agent.name } : null;
+    if (owner.kind === "agent") {
+      const agent = agentsById.get(owner.agentId);
+      return agent ? { kind: "agent" as const, agent, name: agent.name } : null;
+    }
+    const channel = channelsById.get(owner.channelId);
+    return channel ? { kind: "channel" as const, channel, name: channel.name } : null;
   };
   const routineResults = routines.items.flatMap((routine): MobileSearchResult[] => {
     const owner = routineOwner(routine.owner);
@@ -236,6 +260,9 @@ export function mobileSearchView({
     case "agents":
       sections = [full("agents", agentResults)];
       break;
+    case "channels":
+      sections = [full("channels", channelResults)];
+      break;
     case "messages":
       sections = [full("messages", messageResults)];
       loading = messageState.loading;
@@ -257,16 +284,17 @@ export function mobileSearchView({
       sections = [full("settings", settingResults)];
       break;
     case "all":
-      // Before the user types, All lists the agents, as on desktop.
+      // Before the user types, All lists the agents and the channels, as on desktop.
       sections = normalized
         ? [
             preview("agents", agentResults),
+            preview("channels", channelResults),
             preview("messages", messageResults, messageState.hasMore),
             preview("files", fileResults, fileState.hasMore),
             preview("routines", routineResults),
             preview("settings", settingResults),
           ]
-        : [full("agents", agentResults)];
+        : [full("agents", agentResults), full("channels", channelResults)];
       loading = messageState.loading || fileState.loading || routinesLoading;
       failed = messageState.failed || fileState.failed || routinesFailed;
       break;

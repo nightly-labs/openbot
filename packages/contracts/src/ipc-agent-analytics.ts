@@ -34,18 +34,35 @@ export interface AnalyticsModel extends AnalyticsTotals {
   model: string;
   share: number;
 }
+/**
+ * The usage row of workflow model and condition steps, beside the agents of a host report. No agent
+ * has this id: an agent id starts with `agent-`.
+ */
+export const WORKFLOWS_USAGE_ID = "openbot:workflows";
+
 export interface AnalyticsAgent extends AnalyticsTotals {
   agentId: string;
   share: number;
 }
-// One cell of the daily-by-provider grid. The chart reads exactly these two measures, so
-// the cell carries them rather than the eleven other fields of AnalyticsTotals: at the
+// One cell of the daily-by-provider grid. The chart reads exactly these measures, so
+// the cell carries them rather than the other fields of AnalyticsTotals: at the
 // 367-day cap a full-totals cell per provider is four times the payload for nothing.
+// The Team API carries a cell on the frozen host-analytics v1 wire, which has no `cachedInput`,
+// so a remote report decodes without it. Null means the provider reported no cache reads.
 export interface AnalyticsProviderDay {
   date: string;
   provider: string;
   processedTokens: number;
+  cachedInput?: number | null;
   estimatedCostUsd: number | null;
+}
+/**
+ * The tokens a report shows: processed tokens without cache reads. Each request of an agent
+ * turn reads the whole cached conversation again, so cache reads repeat the same context once
+ * per request and can be ten times the rest (#2747). Unknown cache reads subtract nothing.
+ */
+export function analyticsTokens(row: { processedTokens: number; cachedInput?: number | null }): number {
+  return Math.max(0, row.processedTokens - (row.cachedInput ?? 0));
 }
 export interface AgentAnalytics {
   agentId: string;
@@ -242,6 +259,7 @@ export function decodeAnalyticsProviderDays(value: unknown): AnalyticsProviderDa
       date: dateValue(cell.date),
       provider: cell.provider,
       processedTokens: number(cell.processedTokens),
+      ...(cell.cachedInput === undefined ? {} : { cachedInput: token(cell.cachedInput) }),
       estimatedCostUsd: nullableNumber(cell.estimatedCostUsd),
     };
   });

@@ -1,7 +1,9 @@
+import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 
-type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
+type SandboxedAgent = Pick<AgentSummary, "access" | "additionalFolders" | "provider" | "workspacePath">;
 
 /**
  * The sandbox mode sent with each thread. A `workspace` agent can write only in its workspace, the
@@ -17,9 +19,58 @@ export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "da
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
 }
 
-/** The folders a Workspace only agent may write, besides the temporary folders. */
-export function workspaceWritableRoots(agent: Pick<AgentSummary, "workspacePath">, sharedRoot: string) {
-  return [agent.workspacePath, sharedRoot];
+/** Whether each added folder was a folder at its last check. A folder not checked yet counts as missing. */
+const foundFolders = new Map<string, boolean>();
+
+/**
+ * Checks the agent's added folders on the disk. Run it before a session, a process or a turn starts:
+ * a synchronous check of a stale network share would stop the whole process.
+ */
+export const checkAgentFolders = Effect.fn("checkAgentFolders")(function* (
+  agent: Pick<AgentSummary, "additionalFolders">,
+) {
+  const folders = agent.additionalFolders ?? [];
+  const found = yield* Effect.promise(() =>
+    Promise.all(
+      folders.map((folder) =>
+        stat(folder).then(
+          (stats) => stats.isDirectory(),
+          () => false,
+        ),
+      ),
+    ),
+  );
+  for (const [index, folder] of folders.entries()) foundFolders.set(folder, found[index] === true);
+});
+
+/**
+ * The folders the user gave the agent (`additionalFolders`) that were on the disk at the last
+ * `checkAgentFolders`. A moved or deleted one is left out: a provider can refuse to start with a root
+ * that does not exist, and the instructions must not name a folder that the sandbox leaves out.
+ */
+export function existingAgentFolders(agent: Pick<AgentSummary, "additionalFolders">): string[] {
+  return (agent.additionalFolders ?? []).filter((folder) => foundFolders.get(folder) === true);
+}
+
+/**
+ * The folders a Workspace only agent may write, besides the temporary folders: its workspace, the
+ * shared folder, and the added folders that exist.
+ */
+export function workspaceWritableRoots(
+  agent: Pick<AgentSummary, "additionalFolders" | "workspacePath">,
+  sharedRoot: string,
+) {
+  return [agent.workspacePath, sharedRoot, ...existingAgentFolders(agent)];
+}
+
+/**
+ * The folders in those roots that a Workspace only agent must not change. Claude and the confined
+ * providers block writes there. Codex takes writable roots only and cannot deny a folder in one, so
+ * the instructions ask it instead. A folder that is not on the disk stays: the block also stops a
+ * new folder at that path.
+ */
+export function workspaceExcludedFolders(agent: Pick<AgentSummary, "access" | "excludedFolders">): string[] {
+  return workspaceAccessEnforced(agent) ? (agent.excludedFolders ?? []) : [];
 }
 
 export type CodexSandboxPolicy =

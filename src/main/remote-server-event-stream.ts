@@ -1,6 +1,7 @@
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
-import { decodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-protocol/v7-base-adapter";
+import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { Effect, Exit, Result, Scope } from "effect";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
@@ -72,10 +73,10 @@ export interface RemoteEventCompatibilitySource {
     refresh?: boolean,
   ): Effect.Effect<ServerCompatibility, RemoteWorkflowError>;
   requestProtocol(compatibility: ServerCompatibility): {
-    protocol?: number;
-    appVersion?: string;
-    capabilities?: readonly TeamCurrentCapability[];
-    preserveSemanticTags?: boolean;
+    protocol?: number | undefined;
+    appVersion?: string | undefined;
+    capabilities?: readonly TeamCurrentCapability[] | undefined;
+    preserveSemanticTags?: boolean | undefined;
   };
 }
 
@@ -113,6 +114,7 @@ export interface RemoteEventStreamOptions {
   onDirectMessage: (serverId: string, event: DirectMessageRealtimeEvent) => void;
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
   onHostRestart: (serverId: string, event: HostRestartEvent) => void;
+  onMachineAlert: (serverId: string, event: MachineAlertEvent) => void;
   onOffline: (serverId: string) => void;
   onChanged: () => void;
 }
@@ -121,6 +123,7 @@ export class RemoteEventStream {
   readonly #scope = Scope.makeUnsafe();
   readonly #appVersion: string | null;
   readonly #servers: RemoteServerDirectory;
+  #chatWindowServerIds: ReadonlySet<string> = new Set();
   readonly #client: RemoteEventCompatibilitySource;
   readonly #connections: RemoteEventConnectionSink;
   readonly #agents: RemoteEventAgentState;
@@ -130,6 +133,7 @@ export class RemoteEventStream {
   readonly #onDirectMessage: RemoteEventStreamOptions["onDirectMessage"];
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
   readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
+  readonly #onMachineAlert: RemoteEventStreamOptions["onMachineAlert"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
   readonly #onChanged: RemoteEventStreamOptions["onChanged"];
   readonly #controllers = new Map<string, AbortController>();
@@ -157,6 +161,7 @@ export class RemoteEventStream {
     this.#onDirectMessage = options.onDirectMessage;
     this.#onDirectTyping = options.onDirectTyping;
     this.#onHostRestart = options.onHostRestart;
+    this.#onMachineAlert = options.onMachineAlert;
     this.#onOffline = options.onOffline;
     this.#onChanged = options.onChanged;
   }
@@ -224,6 +229,15 @@ export class RemoteEventStream {
 
   syncScopes(): void {
     for (const [serverId, socket] of this.#sockets) this.#sendEventScope(serverId, socket);
+  }
+
+  /**
+   * A chat window stays on its server while the main window selects another (#2964), so the host
+   * of each such server also sends chat events.
+   */
+  setChatWindowServers(serverIds: ReadonlySet<string>): void {
+    this.#chatWindowServerIds = serverIds;
+    this.syncScopes();
   }
 
   // The transport reconnected on its own, so the backoff it earned no longer applies.
@@ -526,10 +540,10 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const optional = optionalTeamEvent(value);
+            const optional = optionalTeamEvent(value, { agentTaskUiBlocks: true });
             const decoded = optional
               ? { kind: "known" as const, event: optionalTeamEventToCurrent(optional) }
-              : decodeTeamProtocolV7BaseCurrentEvent(value);
+              : decodeTeamProtocolV8BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;
@@ -551,6 +565,8 @@ export class RemoteEventStream {
               this.#onDirectTyping(serverId, event);
             } else if (event.type === "host-restart") {
               this.#onHostRestart(serverId, event);
+            } else if (event.type === "machine-alert") {
+              this.#onMachineAlert(serverId, event);
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {
@@ -653,7 +669,7 @@ export class RemoteEventStream {
     socket.send(
       encodeTeamProtocolV1CurrentClientEvent({
         type: "agent-event-scope",
-        includeConversations: this.#servers.activeServerId === serverId,
+        includeConversations: this.#servers.activeServerId === serverId || this.#chatWindowServerIds.has(serverId),
         ...(this.#appVersion
           ? {
               capabilities: teamCapabilitiesForProtocol(

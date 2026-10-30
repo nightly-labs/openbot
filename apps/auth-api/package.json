@@ -18,7 +18,7 @@
     "stripe:bootstrap": "bun ../../scripts/run-development.ts stripe",
     "db:migrate:local": "wrangler d1 migrations apply openbot-auth --local",
     "db:migrate:remote": "wrangler d1 migrations apply openbot-auth --remote",
-    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
@@ -30,19 +30,19 @@
     "@paper-design/shaders": "catalog:",
     "@solidjs/signals": "catalog:",
     "@solidjs/web": "catalog:",
-    "@tanstack/solid-router": "2.0.0-rc.0",
-    "@tanstack/solid-start": "2.0.0-rc.0",
+    "@tanstack/solid-router": "2.0.0-rc.9",
+    "@tanstack/solid-start": "2.0.0-rc.9",
     "class-variance-authority": "catalog:",
     "fflate": "catalog:",
     "jose": "catalog:",
-    "solid-js": "2.0.0-rc.0",
+    "solid-js": "2.0.0-rc.18",
     "yaml": "catalog:",
     "zod": "catalog:",
     "@openbot/ui": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.52.1",
+    "@cloudflare/vite-plugin": "1.65.0",
     "@cloudflare/workers-types": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",

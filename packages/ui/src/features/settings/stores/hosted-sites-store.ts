@@ -41,8 +41,8 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
   let reloadRequested = false;
   let loadPromise: Promise<void> | null = null;
 
+  /** Reads props only after a microtask, so the effect callback that calls it reads none. */
   function load(): Promise<void> {
-    if (!props.hostedSitesApi) return Promise.resolve();
     reloadRequested = true;
     if (loadPromise) return loadPromise;
     loadPromise = Promise.resolve().then(async () => {

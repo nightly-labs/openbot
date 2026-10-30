@@ -1,9 +1,10 @@
 {
-  "version": "0.42.0",
+  "version": "0.55.0",
   "highlights": [
-    "A new page rail at the left of the window opens Agents, Routines, Schedule, Usage, Marketplace and Settings, and shows the plan limits of each provider.",
-    "Settings is now a page with a search. Open Server settings from the server menu.",
-    "One panel button in the chat header opens the side panel, with Browser, Files, Tasks and Agent settings as tabs.",
-    "A Help button in the page rail opens the newest release notes, the full changelog, the guides and Send feedback."
+    "In a Telegram group that you connected before this version, remove OpenBot from the group and connect the group again, or make OpenBot a group admin.",
+    "Settings › Notifications is now one table: choose All activity, Only when it needs me, or Nothing for each server and agent, on all your devices.",
+    "Create more servers on this computer, each a separate workspace with its own agents, chats and files.",
+    "In a channel, more than one agent can now answer the same request.",
+    "Connect your own OpenAI-compatible voice server for dictation and spoken replies, and Gemini no longer fills the memory of a server."
   ]
 }

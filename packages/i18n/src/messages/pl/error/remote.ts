@@ -180,6 +180,8 @@ export const messages = {
   "error.remote.directoryTimeout": "Usługa OpenBot nie odpowiedziała na czas. Spróbuj ponownie.",
   "error.remote.inviteAlreadyUsed": "To zaproszenie zostało już użyte. Poproś o nowe zaproszenie.",
   "error.remote.inviteNotFound": "To zaproszenie nie istnieje lub wygasło. Poproś o nowe zaproszenie.",
+  "error.remote.licenseUsersFull":
+    "Licencja właściciela serwera nie ma wolnego użytkownika. Poproś właściciela o dodanie użytkownika do licencji.",
   "error.remote.memberLimitReached": "Ten host osiągnął limit członków. Poproś właściciela o zwolnienie miejsca.",
   "error.remote.hostNotRegistered": "Ten host nie jest już zarejestrowany w usłudze OpenBot.",
   "error.remote.membershipEnded": "Nie jesteś już członkiem tego hosta. Poproś właściciela o nowe zaproszenie.",
@@ -187,5 +189,10 @@ export const messages = {
   "error.remote.hostOtherAccount": "Ten host należy do innego konta.",
   "error.remote.remoteNotConfigured": "Zdalne połączenia nie są skonfigurowane w tej usłudze OpenBot.",
   "error.remote.hostRefused": "Host odrzucił żądanie ({status}).",
+  "error.remote.formUnavailable": "Ten formularz nie jest już dostępny.",
   "error.remote.hostedServerRemoval": "Użyj sekcji Rozliczenia, aby usunąć hostowany serwer.",
+  "error.remote.channelsUnsupported": "Zaktualizuj ten serwer desktopowy, aby używać kanałów.",
+  "error.remote.channelDeleteUnsupported": "Zaktualizuj ten serwer desktopowy, aby usuwać kanały.",
+  "error.remote.historyRefreshFailed": "Wiadomość została wysłana, ale nie udało się odświeżyć historii czatu.",
+  "error.remote.taskHistoryRefreshFailed": "Zadanie zostało zmienione, ale nie udało się odświeżyć historii czatu.",
 } as const satisfies PartialTranslation<typeof source>;

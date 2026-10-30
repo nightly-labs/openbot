@@ -28,4 +28,11 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
   "error.connector.bitwardenFailed":
     "Could not read Bitwarden. Install the bw CLI, sign in, unlock it, and create one folder named Shared with OpenBot. Connect with a new session key.",
+  "error.connector.bitwardenHostInput":
+    "Enter an HTTPS server address, the API key client_id and client_secret, and the master password.",
+  "error.connector.bitwardenHostFailed":
+    "Could not open Bitwarden on this server. Check the server address, the API key and the master password, and make sure that one folder is named Shared with OpenBot. Then connect again.",
+  "error.connector.bitwardenCliInstallFailed":
+    "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
+  "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",
 });

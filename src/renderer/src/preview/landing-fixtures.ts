@@ -1,9 +1,17 @@
 import type {
-  AgentSummary,
+  AccountUsage,
+  AgentContextState,
+  AgentProviderStatus,
+  AgentRuntimeSnapshot,
+  AgentStatus,
   AttachmentSummary,
+  ChannelMessage,
+  ClientAgentSummary,
   ConversationMessage,
+  ConversationReadState,
   ConversationSnapshot,
   DirectConversationSnapshot,
+  DirectMessage,
   DirectThreadSummary,
   Routine,
   RoutineFlowLink,
@@ -11,354 +19,366 @@ import type {
   RoutineRun,
   RoutineSchedule,
   ServerSummary,
+  SidebarLayoutSnapshot,
+  TeamPresenceSnapshot,
+  UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V6 } from "@openbot/contracts/team-protocol/v6";
 import developmentLogoUrl from "../assets/openbot-logo-dev.png";
 import productionLogoUrl from "../assets/openbot-logo-production.png";
-import { STORY_PRESENCE } from "./fixtures";
+import { STORY_AGENT_STATUS, STORY_PRESENCE } from "./fixtures";
+import type { MockChannelSeed } from "./mock-channels";
 import type { MockOpenBotOptions } from "./mock-openbot";
 
-const LANDING_PREVIEW_NOW = "2026-08-21T10:00:00.000Z";
+/*
+ * The app demo on the home page: four agents, each on a different provider, that plan a launch
+ * together. Every time is an offset from the moment the page opens, so the demo always shows today.
+ */
 
-const LANDING_PREVIEW_AGENTS: AgentSummary[] = [
-  {
-    id: "chief",
-    provider: "codex",
-    name: "Chief",
-    title: "Chief of staff",
-    description: "Coordinates priorities, decisions, and handoffs across the team.",
-    notifications: true,
-    model: "gpt-5.6-luna",
-    reasoningEffort: "low",
-    threadId: "thread-chief",
-    workspacePath: "/mock/OpenBot/Agents/chief",
-    preview: "The launch plan is ready with owners, evidence, and next actions.",
-    updatedAt: LANDING_PREVIEW_NOW,
-    avatarSeed: "chief",
-    avatarHue: 245,
-    avatarUrl: null,
-  },
-  {
-    id: "research",
-    provider: "codex",
-    name: "Research",
-    title: "Research partner",
-    description: "Finds reliable sources and turns them into concise briefs.",
-    notifications: true,
-    model: "gpt-5.6-luna",
-    reasoningEffort: "low",
-    threadId: "thread-research",
-    workspacePath: "/mock/OpenBot/Agents/research",
-    preview: "The source review and evidence map are complete.",
-    updatedAt: "2026-08-21T09:48:00.000Z",
-    avatarSeed: "research",
-    avatarHue: 185,
-    avatarUrl: null,
-  },
-  {
-    id: "builder",
-    provider: "codex",
-    name: "Builder",
-    title: "Product engineer",
-    description: "Builds product changes and records clear technical decisions.",
-    notifications: true,
-    model: "gpt-5.6-luna",
-    reasoningEffort: "low",
-    threadId: "thread-builder",
-    workspacePath: "/mock/OpenBot/Agents/builder",
-    preview: "The implementation checklist includes tests and rollback steps.",
-    updatedAt: "2026-08-21T09:36:00.000Z",
-    avatarSeed: "builder",
-    avatarHue: 30,
-    avatarUrl: null,
-  },
-  {
-    id: "launch",
-    provider: "codex",
-    name: "Launch",
-    title: "Go-to-market lead",
-    description: "Prepares launch assets, messaging, and release checklists.",
-    notifications: true,
-    model: "gpt-5.6-luna",
-    reasoningEffort: "low",
-    threadId: "thread-launch",
-    workspacePath: "/mock/OpenBot/Agents/launch",
-    preview: "The launch brief is ready for final review.",
-    updatedAt: "2026-08-21T09:24:00.000Z",
-    avatarSeed: "launch",
-    avatarHue: 320,
-    avatarUrl: null,
-  },
-];
+const LANDING_PREVIEW_EMAIL = "norbertbodziony@gmail.com";
+const MINUTE_MS = 60_000;
 
-export const LANDING_PREVIEW_ATTACHMENTS: AttachmentSummary[] = [
-  {
-    id: "landing-launch-brief",
-    name: "launch-brief.md",
-    size: 2_048,
-    kind: "file",
-    mimeType: "text/markdown",
-    previewKind: "text",
-    previewUrl: null,
-  },
-  {
-    id: "landing-launch-metrics",
-    name: "launch-metrics.csv",
-    size: 1_024,
-    kind: "file",
-    mimeType: "text/csv",
-    previewKind: "text",
-    previewUrl: null,
-  },
-];
+export const LANDING_LEAD_AGENT_ID = "atlas";
 
-const LANDING_PREVIEW_CHIEF_MESSAGES: ConversationMessage[] = [
-  {
-    id: "landing-chief-request",
-    author: "user",
-    source: "user",
-    text: "Prepare the launch plan, tag @Research, and keep every decision traceable.",
-    createdAt: "2026-08-21T09:42:00.000Z",
-    status: "completed",
-  },
-  {
-    id: "landing-chief-plan",
-    author: "assistant",
-    source: "assistant",
-    text: [
-      "## Launch plan",
-      "",
-      "I asked @Research to verify the evidence and @Builder to check the rollout path.",
-      "",
-      "| Workstream | Owner | Status |",
-      "| --- | --- | --- |",
-      "| Product QA | @Builder | Ready |",
-      "| Evidence | @Research | In review |",
-      "| Release | @Launch | Ready |",
-      "",
-      "Next: confirm the rollback owner, then publish the release note.",
-    ].join("\n"),
-    createdAt: "2026-08-21T09:43:00.000Z",
-    status: "completed",
-    attachments: LANDING_PREVIEW_ATTACHMENTS,
-    reaction: "\u2705",
-  },
-  {
-    id: "landing-chief-exchange",
-    author: "system",
-    source: "system",
-    text: "",
-    createdAt: "2026-08-21T09:44:00.000Z",
-    status: "completed",
-    exchange: {
-      direction: "outgoing",
-      messageId: "landing-chief-exchange",
-      senderAgentId: "chief",
-      recipientAgentIds: ["research", "builder"],
-      replyToMessageId: "landing-chief-plan",
-      deliveries: [
-        {
-          id: "landing-delivery-research",
-          recipientAgentId: "research",
-          status: "completed",
-          position: null,
-          error: null,
-        },
-        {
-          id: "landing-delivery-builder",
-          recipientAgentId: "builder",
-          status: "completed",
-          position: null,
-          error: null,
-        },
-      ],
-    },
-  },
-  {
-    id: "landing-chief-ready",
-    author: "assistant",
-    source: "assistant",
-    text: "Research verified seven of eight claims. Builder added the test and rollback steps. The final review is ready.",
-    createdAt: "2026-08-21T09:45:00.000Z",
-    status: "completed",
-  },
-];
+export function landingAttachment(
+  id: string,
+  name: string,
+  size: number,
+  mimeType = "text/markdown",
+): AttachmentSummary {
+  return { id: `landing-${id}`, name, size, kind: "file", mimeType, previewKind: "text", previewUrl: null };
+}
 
-const LANDING_PREVIEW_SNAPSHOTS: Record<string, ConversationSnapshot> = Object.fromEntries(
-  LANDING_PREVIEW_AGENTS.map((agent) => [
-    agent.id,
-    {
-      agentId: agent.id,
-      threadId: agent.threadId,
-      activeTurnId: null,
-      revision: 1,
-      messages: agent.id === "chief" ? LANDING_PREVIEW_CHIEF_MESSAGES : [],
-    },
-  ]),
-);
-
-const LANDING_PREVIEW_SERVERS: ServerSummary[] = [
-  {
-    id: "local",
-    name: "Local",
-    logoUrl: developmentLogoUrl,
-    notificationsMuted: false,
-    notificationsMutedUntil: null,
-    notificationLevel: "all",
-    kind: "local",
-    state: "online",
-    apiUrl: null,
-    remoteDesktopAvailable: false,
-    role: null,
-    active: false,
-  },
-  {
-    id: "team",
-    name: "OpenBot team",
-    logoUrl: productionLogoUrl,
-    notificationsMuted: false,
-    notificationsMutedUntil: null,
-    notificationLevel: "all",
-    kind: "remote",
-    state: "online",
-    apiUrl: "https://team.example.com",
-    remoteDesktopAvailable: true,
-    role: "owner",
-    active: true,
-    compatibility: {
-      localAppVersion: "preview",
-      hostAppVersion: "preview",
-      localProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
-      hostProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
-      negotiatedProtocol: TEAM_PROTOCOL_V6,
-      capabilities: [...TEAM_CURRENT_CAPABILITIES],
-    },
-  },
-];
-
-const LANDING_PREVIEW_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapshot> = {
-  "member-alice": {
-    threadId: "direct-alice",
-    otherMemberId: "member-alice",
-    revision: 1,
-    readState: {
-      unreadCount: 1,
-      firstUnreadMessageId: "landing-direct-alice-3",
-      throughSequence: 2,
-    },
-    messages: [
-      {
-        id: "landing-direct-alice-1",
-        threadId: "direct-alice",
-        senderMemberId: "member-alice",
-        recipientMemberId: "member-self",
-        text: "I tightened the launch note and removed the unsupported review-time claim.",
-        createdAt: "2026-08-21T09:47:00.000Z",
-        sequence: 1,
-      },
-      {
-        id: "landing-direct-alice-2",
-        threadId: "direct-alice",
-        senderMemberId: "member-self",
-        recipientMemberId: "member-alice",
-        text: "Perfect. Please keep the verified setup metric and send the final copy to Launch.",
-        createdAt: "2026-08-21T09:49:00.000Z",
-        sequence: 2,
-      },
-      {
-        id: "landing-direct-alice-3",
-        threadId: "direct-alice",
-        senderMemberId: "member-alice",
-        recipientMemberId: "member-self",
-        text: "Done — the final wording is in release-note.md and Launch has the handoff.",
-        createdAt: "2026-08-21T09:52:00.000Z",
-        sequence: 3,
-      },
-    ],
-  },
-  "member-maya": {
-    threadId: "direct-maya",
-    otherMemberId: "member-maya",
-    revision: 1,
-    readState: {
-      unreadCount: 0,
-      firstUnreadMessageId: null,
-      throughSequence: 3,
-    },
-    messages: [
-      {
-        id: "landing-direct-maya-1",
-        threadId: "direct-maya",
-        senderMemberId: "member-self",
-        recipientMemberId: "member-maya",
-        text: "Can you confirm support coverage for the release window?",
-        createdAt: "2026-08-21T09:31:00.000Z",
-        sequence: 1,
-      },
-      {
-        id: "landing-direct-maya-2",
-        threadId: "direct-maya",
-        senderMemberId: "member-maya",
-        recipientMemberId: "member-self",
-        text: "Yes. I have the first two hours, and the EU handoff starts at 14:00 UTC.",
-        createdAt: "2026-08-21T09:34:00.000Z",
-        sequence: 2,
-      },
-      {
-        id: "landing-direct-maya-3",
-        threadId: "direct-maya",
-        senderMemberId: "member-self",
-        recipientMemberId: "member-maya",
-        text: "Great. I added both owners to the rollout checklist.",
-        createdAt: "2026-08-21T09:36:00.000Z",
-        sequence: 3,
-      },
-    ],
-  },
-  "member-jon": {
-    threadId: "direct-jon",
-    otherMemberId: "member-jon",
-    revision: 1,
-    readState: {
-      unreadCount: 0,
-      firstUnreadMessageId: null,
-      throughSequence: 3,
-    },
-    messages: [
-      {
-        id: "landing-direct-jon-1",
-        threadId: "direct-jon",
-        senderMemberId: "member-jon",
-        recipientMemberId: "member-self",
-        text: "The rollback drill passed on staging. Recovery took four minutes.",
-        createdAt: "2026-08-21T09:12:00.000Z",
-        sequence: 1,
-      },
-      {
-        id: "landing-direct-jon-2",
-        threadId: "direct-jon",
-        senderMemberId: "member-self",
-        recipientMemberId: "member-jon",
-        text: "Nice. Any open risk before Builder closes the checklist?",
-        createdAt: "2026-08-21T09:15:00.000Z",
-        sequence: 2,
-      },
-      {
-        id: "landing-direct-jon-3",
-        threadId: "direct-jon",
-        senderMemberId: "member-jon",
-        recipientMemberId: "member-self",
-        text: "Only the analytics alert. It is non-blocking and documented for the release window.",
-        createdAt: "2026-08-21T09:18:00.000Z",
-        sequence: 3,
-      },
-    ],
-  },
+const LANDING_CONTEXT_WINDOWS: Record<string, number> = {
+  atlas: 200_000,
+  scout: 1_000_000,
+  forge: 400_000,
+  pulse: 256_000,
 };
 
-const LANDING_PREVIEW_DIRECT_THREADS: DirectThreadSummary[] = Object.values(LANDING_PREVIEW_DIRECT_SNAPSHOTS).map(
-  (snapshot) => {
+/** The tokens in each agent's context window before and after its demo scene. */
+export const LANDING_CONTEXT_TOKENS: Record<string, { before: number; after: number }> = {
+  atlas: { before: 41_200, after: 96_800 },
+  scout: { before: 118_000, after: 212_000 },
+  forge: { before: 64_500, after: 121_000 },
+  pulse: { before: 22_400, after: 58_600 },
+};
+
+function landingContextState(agentId: string, usedTokens: number): AgentContextState {
+  const share = (part: number) => Math.round(usedTokens * part);
+  return {
+    agentId,
+    threadId: `thread-${agentId}`,
+    usage: {
+      usedTokens,
+      windowTokens: LANDING_CONTEXT_WINDOWS[agentId] ?? 200_000,
+      autoCompactAt: 0.9,
+      nativeManaged: true,
+      categories: [
+        { category: "systemPrompt", tokens: share(0.08) },
+        { category: "memoryFiles", tokens: share(0.06) },
+        { category: "tools", tokens: share(0.14) },
+        { category: "skills", tokens: share(0.04) },
+        { category: "toolResults", tokens: share(0.32) },
+        { category: "messages", tokens: share(0.36) },
+      ],
+    },
+    compaction: null,
+  };
+}
+
+/** A runtime snapshot with no turn running. It carries the context meter of each agent. */
+export function landingRuntimeSnapshot(
+  agents: readonly ClientAgentSummary[],
+  contextTokens: Record<string, number>,
+): AgentRuntimeSnapshot {
+  return {
+    contextStates: agents.map((agent) => landingContextState(agent.id, contextTokens[agent.id] ?? 0)),
+    agents: agents.map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      notifications: agent.notifications,
+      preview: agent.preview,
+      updatedAt: agent.updatedAt,
+      avatarSeed: agent.avatarSeed,
+      avatarHue: agent.avatarHue ?? null,
+      avatarUrl: agent.avatarUrl ?? null,
+    })),
+    activeTurns: [],
+    work: [],
+    latestMessages: [],
+    attentionComplete: true,
+    pendingPrompts: [],
+    pendingApprovals: [],
+    pendingBrowserTakeovers: [],
+    failedTurns: [],
+  };
+}
+
+type LandingAgentFields = Pick<
+  ClientAgentSummary,
+  "id" | "provider" | "name" | "title" | "description" | "model" | "reasoningEffort" | "preview"
+>;
+
+function landingAgents(at: (minutesAgo: number) => string): ClientAgentSummary[] {
+  const agent = (
+    fields: LandingAgentFields,
+    hue: NonNullable<ClientAgentSummary["avatarHue"]>,
+    minutesAgo: number,
+  ): ClientAgentSummary => ({
+    ...fields,
+    notifications: true,
+    threadId: `thread-${fields.id}`,
+    workspacePath: `/mock/OpenBot/Agents/${fields.id}`,
+    updatedAt: at(minutesAgo),
+    avatarSeed: fields.id,
+    avatarHue: hue,
+    avatarUrl: null,
+  });
+  return [
+    agent(
+      {
+        id: "atlas",
+        provider: "claude",
+        name: "Atlas",
+        title: "Team lead",
+        description: "Plans the work, splits it across the team, and keeps every decision in one place.",
+        model: "claude-opus-5-5",
+        reasoningEffort: "high",
+        preview: "Three things need you today: the pricing PR, the competitor brief, and the launch day.",
+      },
+      30,
+      94,
+    ),
+    agent(
+      {
+        id: "scout",
+        provider: "antigravity",
+        name: "Scout",
+        title: "Research",
+        description: "Searches the web, checks every claim against a source, and writes short briefs.",
+        model: "gemini-3.1-pro",
+        reasoningEffort: "high",
+        preview: "Two competitors changed their prices this week. The brief is attached.",
+      },
+      215,
+      78,
+    ),
+    agent(
+      {
+        id: "forge",
+        provider: "codex",
+        name: "Forge",
+        title: "Builder",
+        description: "Writes and ships the code, runs the tests, and opens the pull requests.",
+        model: "gpt-6-luna",
+        reasoningEffort: "medium",
+        preview: "PR #412 is ready: the pricing page reads its limits from the shared contract.",
+      },
+      150,
+      66,
+    ),
+    agent(
+      {
+        id: "pulse",
+        provider: "grok",
+        name: "Pulse",
+        title: "Signals",
+        description: "Watches social and market signals and reports what changed and why it matters.",
+        model: "grok-4.6",
+        reasoningEffort: "medium",
+        preview: "Mentions of agent teams are up 34% this week.",
+      },
+      280,
+      58,
+    ),
+  ];
+}
+
+function landingHistory(at: (minutesAgo: number) => string): Record<string, ConversationMessage[]> {
+  const user = (id: string, text: string, minutesAgo: number): ConversationMessage => ({
+    id: `landing-${id}`,
+    author: "user",
+    source: "user",
+    text,
+    createdAt: at(minutesAgo),
+    status: "completed",
+  });
+  const reply = (
+    id: string,
+    text: string,
+    minutesAgo: number,
+    fields: Pick<ConversationMessage, "attachments" | "reaction"> = {},
+  ): ConversationMessage => ({
+    id: `landing-${id}`,
+    author: "assistant",
+    source: "assistant",
+    itemType: "final_answer",
+    text,
+    createdAt: at(minutesAgo),
+    status: "completed",
+    ...fields,
+  });
+  return {
+    atlas: [
+      user("atlas-morning", "Morning! What needs me today?", 95),
+      reply(
+        "atlas-morning-reply",
+        [
+          "Three things need you today:",
+          "",
+          "1. **Review** Forge's pricing-page PR #412.",
+          "2. **Read** Scout's competitor brief. Two prices changed.",
+          "3. **Pick** the launch day. Friday works for the whole team.",
+        ].join("\n"),
+        94,
+        { reaction: "👍" },
+      ),
+    ],
+    scout: [
+      user("scout-pricing", "Track what changed in competitor pricing this week.", 80),
+      reply(
+        "scout-pricing-reply",
+        "Two competitors changed their prices this week. Both raised their team plans by $5 per seat. The sources and the full table are in the brief.",
+        78,
+        { attachments: [landingAttachment("competitor-brief", "competitor-brief.md", 4_096)] },
+      ),
+    ],
+    forge: [
+      user("forge-pricing", "Fix the plan limits on the pricing page.", 70),
+      reply(
+        "forge-pricing-reply",
+        "PR #412 is ready: the pricing page reads its limits from the shared contract, so the two can no longer differ. All 48 tests pass.",
+        66,
+      ),
+    ],
+    pulse: [
+      user("pulse-week", "What are people saying about agent teams this week?", 60),
+      reply(
+        "pulse-week-reply",
+        "Mentions of agent teams are up 34% this week. The top request is agents that keep their context when you switch tools or models.",
+        58,
+        { reaction: "🔥" },
+      ),
+    ],
+  };
+}
+
+function landingServers(): ServerSummary[] {
+  return [
+    {
+      id: "local",
+      name: "Local",
+      logoUrl: developmentLogoUrl,
+      notificationsMuted: false,
+      notificationsMutedUntil: null,
+      notificationLevel: "all",
+      kind: "local",
+      state: "online",
+      apiUrl: null,
+      remoteDesktopAvailable: false,
+      role: null,
+      active: false,
+    },
+    {
+      id: "team",
+      name: "OpenBot team",
+      logoUrl: productionLogoUrl,
+      notificationsMuted: false,
+      notificationsMutedUntil: null,
+      notificationLevel: "all",
+      kind: "remote",
+      state: "online",
+      apiUrl: "https://team.example.com",
+      remoteDesktopAvailable: true,
+      role: "owner",
+      active: true,
+      compatibility: {
+        localAppVersion: "preview",
+        hostAppVersion: "preview",
+        localProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
+        hostProtocol: { minimum: TEAM_PROTOCOL_V6, maximum: TEAM_PROTOCOL_V6 },
+        negotiatedProtocol: TEAM_PROTOCOL_V6,
+        capabilities: [...TEAM_CURRENT_CAPABILITIES],
+      },
+    },
+  ];
+}
+
+/** The two teammates of the demo: Alice and Maya. */
+const LANDING_MEMBER_IDS = new Set(["member-self", "member-alice", "member-maya"]);
+
+function landingPresence(at: (minutesAgo: number) => string): TeamPresenceSnapshot {
+  return {
+    ...STORY_PRESENCE,
+    updatedAt: at(0),
+    members: STORY_PRESENCE.members
+      .filter((member) => LANDING_MEMBER_IDS.has(member.id))
+      .map((member) => ({
+        ...member,
+        typingAgentId: null,
+        ...(member.id === "member-self" ? { email: LANDING_PREVIEW_EMAIL } : {}),
+      })),
+  };
+}
+
+type LandingDirectLine = [sender: "self" | "other", text: string, minutesAgo: number];
+
+function landingDirectSnapshots(at: (minutesAgo: number) => string): Record<string, DirectConversationSnapshot> {
+  const thread = (
+    memberId: string,
+    threadId: string,
+    lines: LandingDirectLine[],
+    unreadCount: number,
+  ): DirectConversationSnapshot => {
+    const messages: DirectMessage[] = lines.map(([sender, text, minutesAgo], index) => ({
+      id: `landing-${threadId}-${index + 1}`,
+      threadId,
+      senderMemberId: sender === "self" ? "member-self" : memberId,
+      recipientMemberId: sender === "self" ? memberId : "member-self",
+      text,
+      createdAt: at(minutesAgo),
+      sequence: index + 1,
+    }));
+    return {
+      threadId,
+      otherMemberId: memberId,
+      revision: 1,
+      readState: {
+        unreadCount,
+        firstUnreadMessageId: unreadCount > 0 ? (messages.at(-unreadCount)?.id ?? null) : null,
+        throughSequence: messages.length - unreadCount,
+      },
+      messages,
+    };
+  };
+  return {
+    "member-alice": thread(
+      "member-alice",
+      "direct-alice",
+      [
+        ["other", "Atlas says Friday works for everyone. Should I book the launch slot?", 34],
+        ["self", "Yes, please. I will ask Atlas for the full plan this morning.", 31],
+        ["other", "Booked for 10:00. I can own the launch post too.", 12],
+      ],
+      1,
+    ),
+    "member-maya": thread(
+      "member-maya",
+      "direct-maya",
+      [
+        ["self", "Can you cover support during the launch window?", 52],
+        ["other", "Yes. Pulse will flag anything urgent to me first.", 49],
+      ],
+      0,
+    ),
+  };
+}
+
+function landingDirectThreads(snapshots: Record<string, DirectConversationSnapshot>): DirectThreadSummary[] {
+  return Object.values(snapshots).map((snapshot) => {
     const lastMessage = snapshot.messages.at(-1);
     if (!lastMessage) throw new Error(`Landing direct thread ${snapshot.threadId} has no messages.`);
     return {
@@ -368,320 +388,369 @@ const LANDING_PREVIEW_DIRECT_THREADS: DirectThreadSummary[] = Object.values(LAND
       unreadCount: snapshot.readState?.unreadCount ?? 0,
       updatedAt: lastMessage.createdAt,
     };
-  },
-);
+  });
+}
 
-const LANDING_PREVIEW_EMAIL = "norbertbodziony@gmail.com";
-const LANDING_PREVIEW_PRESENCE = {
-  ...STORY_PRESENCE,
-  members: STORY_PRESENCE.members.map((member) =>
-    member.id === "member-self" ? { ...member, email: LANDING_PREVIEW_EMAIL } : member,
-  ),
-};
-
-// The routines of the dev seed (`scripts/seed-dev-state.ts`), with links and the steps of the last
-// runs, so the Routines canvas shows what each agent was asked and what it answered.
-const LANDING_ROUTINE_TIMEZONE = "UTC";
-
-function landingRoutine(
-  agentId: string,
-  id: string,
-  fields: Pick<Routine, "name" | "instruction" | "active"> & { schedule: RoutineSchedule; nextRunAt: string },
-): Routine {
-  const createdAt = "2026-08-03T08:00:00.000Z";
+function landingAgentStatus(): AgentStatus {
+  const row = (id: AgentProviderStatus["id"], version: string): AgentProviderStatus => ({
+    id,
+    state: "available" as const,
+    version,
+    message: null,
+    email: LANDING_PREVIEW_EMAIL,
+  });
   return {
+    ...STORY_AGENT_STATUS,
+    auth: { kind: "chatgpt", email: LANDING_PREVIEW_EMAIL },
+    providers: [row("claude", "2.1.231"), row("antigravity", "1.3.0"), row("codex", "0.144.1"), row("grok", "0.1.0")],
+  };
+}
+
+function landingUsage(nowMs: number): AccountUsage {
+  const resetsIn = (hours: number) => Math.round((nowMs + hours * 60 * MINUTE_MS) / 1_000);
+  return {
+    limits: [
+      {
+        id: "claude",
+        primary: { usedPercent: 34, windowDurationMins: 300, resetsAt: resetsIn(3) },
+        secondary: { usedPercent: 21, windowDurationMins: 10_080, resetsAt: resetsIn(96) },
+      },
+      {
+        id: "antigravity",
+        primary: { usedPercent: 18, windowDurationMins: 300, resetsAt: resetsIn(4) },
+        secondary: null,
+      },
+      {
+        id: "codex",
+        primary: { usedPercent: 27, windowDurationMins: 300, resetsAt: resetsIn(2) },
+        secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: resetsIn(120) },
+      },
+      {
+        id: "grok",
+        primary: null,
+        secondary: { usedPercent: 12, windowDurationMins: 10_080, resetsAt: resetsIn(140) },
+      },
+    ],
+  };
+}
+
+function landingUpdateStatus(at: (minutesAgo: number) => string): UpdateStatus {
+  return {
+    phase: "idle",
+    currentVersion: "0.49.0",
+    availableVersion: null,
+    progress: null,
+    checkedAt: at(5),
+    message: null,
+    errorCode: null,
+  };
+}
+
+type LandingRoutines = Required<
+  Pick<MockOpenBotOptions, "routines" | "routineRuns" | "routineFlowLinks" | "routineFlowSteps">
+>;
+
+/**
+ * The routines, with links and the steps of the last run, so the Routines canvas shows what each
+ * agent was asked and what it answered. They use the visitor's time zone, so the app does not offer
+ * to move them.
+ */
+function landingRoutines(at: (minutesAgo: number) => string, timezone: string): LandingRoutines {
+  const createdAt = at(14 * 24 * 60);
+  const routine = (
+    agentId: string,
+    id: string,
+    fields: Pick<Routine, "name" | "instruction" | "active"> & { schedule: RoutineSchedule; nextRunInMinutes: number },
+  ): Routine => ({
     id,
     agentId,
     name: fields.name,
     instruction: fields.instruction,
     active: fields.active,
-    timezone: LANDING_ROUTINE_TIMEZONE,
+    timezone,
     trigger: {
       id: `${id}-trigger`,
       routineId: id,
       schedule: fields.schedule,
-      nextRunAt: fields.nextRunAt,
+      nextRunAt: at(-fields.nextRunInMinutes),
       createdAt,
       updatedAt: createdAt,
     },
     createdAt,
     updatedAt: createdAt,
-  };
-}
-
-function landingRoutineRun(
-  routine: Routine,
-  id: string,
-  fields: Pick<RoutineRun, "kind" | "scheduledFor" | "status" | "error" | "updatedAt">,
-): RoutineRun {
-  return {
+  });
+  const run = (target: Routine, id: string, minutesAgo: number, durationMinutes: number): RoutineRun => ({
     id,
-    routineId: routine.id,
-    agentId: routine.agentId,
-    triggerId: fields.kind === "scheduled" ? routine.trigger.id : null,
+    routineId: target.id,
+    agentId: target.agentId,
+    triggerId: target.trigger.id,
     deliveryId: `${id}-delivery`,
-    routineName: routine.name,
-    instruction: routine.instruction,
-    createdAt: fields.scheduledFor,
-    ...fields,
+    routineName: target.name,
+    instruction: target.instruction,
+    kind: "scheduled",
+    status: "succeeded",
+    error: null,
+    scheduledFor: at(minutesAgo),
+    createdAt: at(minutesAgo),
+    updatedAt: at(minutesAgo - durationMinutes),
+  });
+  /** The message a linked agent gets, in the template of `handoffText` in `src/backend/routine-flows/routine-flows.ts`. */
+  const handoff = (routineName: string, from: string, answer: string, instruction: string) =>
+    `The routine "${routineName}" continues with you.\n\n${from} answered:\n\n${answer}\n\n${instruction}`;
+
+  const brief = routine("atlas", "landing-routine-morning-brief", {
+    name: "Morning launch brief",
+    instruction: "Summarize launch progress, blockers, owners, and the next decision in five bullets.",
+    active: true,
+    schedule: { kind: "weekdays", time: "09:00" },
+    nextRunInMinutes: 22 * 60,
+  });
+  const review = routine("atlas", "landing-routine-friday-review", {
+    name: "Friday launch review",
+    instruction: "Prepare the weekly launch review with decisions, risks, and open owners.",
+    active: true,
+    schedule: { kind: "weekly", weekday: 5, time: "16:00" },
+    nextRunInMinutes: 3 * 24 * 60,
+  });
+  const scan = routine("scout", "landing-routine-competitor-scan", {
+    name: "Daily competitor scan",
+    instruction: "Check competitor pricing and release pages, and report only what changed since yesterday.",
+    active: true,
+    schedule: { kind: "daily", time: "08:30" },
+    nextRunInMinutes: 21 * 60,
+  });
+  const dependencies = routine("forge", "landing-routine-dependency-check", {
+    name: "Dependency health check",
+    instruction: "Review dependency health and prepare a short risk report without changing the codebase.",
+    active: false,
+    schedule: { kind: "weekly", weekday: 1, time: "10:00" },
+    nextRunInMinutes: 5 * 24 * 60,
+  });
+  const signals = routine("pulse", "landing-routine-signals-digest", {
+    name: "Signals digest",
+    instruction: "List the three biggest changes in mentions, sentiment, and requests since the last digest.",
+    active: true,
+    schedule: { kind: "weekdays", time: "15:30" },
+    nextRunInMinutes: 5 * 60,
+  });
+
+  const briefRun = run(brief, "landing-run-morning-brief", 120, 6);
+  const scanRun = run(scan, "landing-run-competitor-scan", 150, 3);
+
+  const toScout = "Check each claim in the brief against a primary source. Mark it confirmed, changed, or unverified.";
+  const toPulse = "Add what people say about each item this week, with the strongest signal first.";
+  const scoutToForge = "Do not change code yet. List the changes the changed claims need, smallest first.";
+  const atlasAnswer = [
+    "- Progress: the pricing page fix is in review, and the launch post has a draft.",
+    "- Blocker: the demo video needs one more review.",
+    "- Owners: Forge has the PR, Scout has the comparison table, Pulse has the launch post.",
+    "- Risk: two competitor prices in the table are from last month.",
+    "- Next decision: launch on Friday at 10:00, or wait for the video.",
+  ].join("\n");
+  const scoutAnswer = [
+    "- Pricing page fix in review: confirmed, PR #412.",
+    "- Competitor prices: changed. Both raised their team plans by $5 per seat on Tuesday.",
+    "- Demo video: confirmed in the review thread.",
+  ].join("\n");
+  const pulseAnswer = [
+    "1. Agent teams: mentions up 34%, mostly positive.",
+    "2. Context that survives a model switch: the top request.",
+    "3. Pricing: two threads compare per-seat prices.",
+  ].join("\n");
+  const forgeAnswer = [
+    "1. Change the two competitor prices in `pricing-table.json`.",
+    "2. Run the pricing page tests again.",
+    "No other change is needed for the claims in this brief.",
+  ].join("\n");
+
+  const step = (
+    id: string,
+    agentId: string,
+    input: string,
+    output: string,
+    minutesAgo: number,
+    delivered: boolean,
+  ): RoutineFlowStep => ({
+    id: `landing-step-${id}`,
+    runId: briefRun.id,
+    agentId,
+    deliveryId: delivered ? `landing-step-${id}-delivery` : null,
+    input,
+    output,
+    status: "succeeded",
+    error: null,
+    createdAt: at(minutesAgo),
+    updatedAt: at(minutesAgo - 2),
+  });
+  const link = (id: string, fromAgentId: string, toAgentId: string, instruction: string): RoutineFlowLink => ({
+    id: `landing-link-${id}`,
+    routineId: brief.id,
+    fromAgentId,
+    toAgentId,
+    instruction,
+    createdAt,
+  });
+
+  return {
+    routines: { atlas: [brief, review], scout: [scan], forge: [dependencies], pulse: [signals] },
+    routineRuns: { [brief.id]: [briefRun], [scan.id]: [scanRun] },
+    routineFlowLinks: [
+      link("brief-scout", "atlas", "scout", toScout),
+      link("brief-pulse", "atlas", "pulse", toPulse),
+      link("scout-forge", "scout", "forge", scoutToForge),
+    ],
+    routineFlowSteps: [
+      step("brief-atlas", "atlas", brief.instruction, atlasAnswer, 120, false),
+      step("brief-scout", "scout", handoff(brief.name, "Atlas", atlasAnswer, toScout), scoutAnswer, 118, true),
+      step("brief-pulse", "pulse", handoff(brief.name, "Atlas", atlasAnswer, toPulse), pulseAnswer, 118, true),
+      step("brief-forge", "forge", handoff(brief.name, "Scout", scoutAnswer, scoutToForge), forgeAnswer, 116, true),
+    ],
   };
 }
 
-/** The message a linked agent gets, in the template of `handoffText` in `src/backend/routine-flows/routine-flows.ts`. */
-function landingHandoff(routineName: string, from: string, answer: string, instruction: string): string {
-  return `The routine "${routineName}" continues with you.\n\n${from} answered:\n\n${answer}\n\n${instruction}`;
+const LANDING_CHANNEL_ID = "channel-launch";
+
+type LandingChannelLine = [author: "member-self" | "atlas" | "pulse" | "scout", text: string, minutesAgo: number];
+
+/** The launch channel: you and the agents plan Friday together. */
+function landingChannels(at: (minutesAgo: number) => string): MockChannelSeed[] {
+  const authors = {
+    "member-self": { kind: "member", id: "member-self", name: "Norbert" },
+    atlas: { kind: "agent", id: "atlas", name: "Atlas" },
+    pulse: { kind: "agent", id: "pulse", name: "Pulse" },
+    scout: { kind: "agent", id: "scout", name: "Scout" },
+  } as const;
+  const lines: LandingChannelLine[] = [
+    ["member-self", "The launch is on Friday at 10:00. Let's keep the launch updates in this channel.", 52],
+    ["atlas", "Got it. I will split the work across the team and post the plan here when it is ready.", 51],
+    ["pulse", "I will watch what people say on launch day and post a summary at 12:00.", 49],
+    ["scout", "Nobody else launches on Friday morning. I will post here if that changes.", 47],
+  ];
+  const messages: ChannelMessage[] = lines.map(([authorId, text, minutesAgo], index) => {
+    const author = authors[authorId];
+    const id = `landing-launch-${index + 1}`;
+    return {
+      id,
+      channelId: LANDING_CHANNEL_ID,
+      sequence: index + 1,
+      author,
+      taskId: null,
+      superseded: false,
+      message: {
+        id,
+        author: author.kind === "member" ? "user" : "assistant",
+        ...(author.kind === "agent" ? { itemType: "final_answer" } : {}),
+        text,
+        createdAt: at(minutesAgo),
+        status: "completed",
+      },
+    };
+  });
+  return [
+    {
+      channel: {
+        id: LANDING_CHANNEL_ID,
+        name: "launch",
+        title: "Friday launch",
+        instructions: "Plan and run Friday's launch.",
+        members: [{ agentId: "atlas" }, { agentId: "scout" }, { agentId: "forge" }, { agentId: "pulse" }],
+        leadAgentId: "atlas",
+        archived: false,
+        revision: 1,
+        createdAt: at(60),
+      },
+      messages,
+    },
+  ];
 }
 
-const MORNING_BRIEF = landingRoutine("chief", "landing-routine-morning-brief", {
-  name: "Morning launch brief",
-  instruction: "Summarize launch progress, blockers, owners, and the next decision in five bullets.",
-  active: true,
-  schedule: { kind: "weekdays", time: "09:00" },
-  nextRunAt: "2026-08-24T09:00:00.000Z",
-});
-const FRIDAY_REVIEW = landingRoutine("chief", "landing-routine-friday-review", {
-  name: "Friday launch review",
-  instruction: "Prepare the weekly launch review with decisions, risks, and unresolved ownership gaps.",
-  active: true,
-  schedule: { kind: "weekly", weekday: 5, time: "16:00" },
-  nextRunAt: "2026-08-21T16:00:00.000Z",
-});
-const SOURCE_CHECK = landingRoutine("research", "landing-routine-source-check", {
-  name: "Daily source check",
-  instruction: "Recheck open launch claims against primary sources and report only material changes.",
-  active: true,
-  schedule: { kind: "daily", time: "08:30" },
-  nextRunAt: "2026-08-22T08:30:00.000Z",
-});
-const DEPENDENCY_CHECK = landingRoutine("builder", "landing-routine-dependency-check", {
-  name: "Dependency health check",
-  instruction: "Review dependency health and prepare a short risk report without changing the codebase.",
-  active: false,
-  schedule: { kind: "weekly", weekday: 1, time: "10:00" },
-  nextRunAt: "2026-08-24T10:00:00.000Z",
-});
-const READINESS_PULSE = landingRoutine("launch", "landing-routine-readiness-pulse", {
-  name: "Release readiness pulse",
-  instruction: "Check release assets, messaging, and approvals, then list anything blocking publication.",
-  active: true,
-  schedule: { kind: "weekdays", time: "15:30" },
-  nextRunAt: "2026-08-21T15:30:00.000Z",
-});
-
-const MORNING_BRIEF_RUN = landingRoutineRun(MORNING_BRIEF, "landing-run-morning-brief", {
-  kind: "scheduled",
-  scheduledFor: "2026-08-21T09:00:00.000Z",
-  status: "succeeded",
-  error: null,
-  updatedAt: "2026-08-21T09:06:00.000Z",
-});
-const FRIDAY_REVIEW_RUN = landingRoutineRun(FRIDAY_REVIEW, "landing-run-friday-review", {
-  kind: "manual",
-  scheduledFor: "2026-08-21T09:20:00.000Z",
-  status: "succeeded",
-  error: null,
-  updatedAt: "2026-08-21T09:23:00.000Z",
-});
-const SOURCE_CHECK_RUN = landingRoutineRun(SOURCE_CHECK, "landing-run-source-check", {
-  kind: "scheduled",
-  scheduledFor: "2026-08-21T08:30:00.000Z",
-  status: "failed",
-  error: "One source was temporarily unavailable.",
-  updatedAt: "2026-08-21T08:33:00.000Z",
-});
-
-const LANDING_PREVIEW_ROUTINES: Record<string, Routine[]> = {
-  chief: [MORNING_BRIEF, FRIDAY_REVIEW],
-  research: [SOURCE_CHECK],
-  builder: [DEPENDENCY_CHECK],
-  launch: [READINESS_PULSE],
-};
-
-const LANDING_PREVIEW_ROUTINE_RUNS: Record<string, RoutineRun[]> = {
-  [MORNING_BRIEF.id]: [MORNING_BRIEF_RUN],
-  [FRIDAY_REVIEW.id]: [FRIDAY_REVIEW_RUN],
-  [SOURCE_CHECK.id]: [SOURCE_CHECK_RUN],
-};
-
-const BRIEF_TO_RESEARCH =
-  "Check every claim in the brief against a primary source. Mark each one confirmed, changed, or unverified.";
-const BRIEF_TO_LAUNCH = "Turn the brief into today's release checklist, with one owner for each item.";
-const RESEARCH_TO_BUILDER = "Do not change code yet. List the changes that the changed claims need, smallest first.";
-const REVIEW_TO_LAUNCH = "Draft the stakeholder update from this review, in under 150 words.";
-
-const LANDING_PREVIEW_ROUTINE_LINKS: RoutineFlowLink[] = [
-  {
-    id: "landing-link-brief-research",
-    routineId: MORNING_BRIEF.id,
-    fromAgentId: "chief",
-    toAgentId: "research",
-    instruction: BRIEF_TO_RESEARCH,
-    createdAt: "2026-08-03T08:05:00.000Z",
-  },
-  {
-    id: "landing-link-brief-launch",
-    routineId: MORNING_BRIEF.id,
-    fromAgentId: "chief",
-    toAgentId: "launch",
-    instruction: BRIEF_TO_LAUNCH,
-    createdAt: "2026-08-03T08:06:00.000Z",
-  },
-  {
-    id: "landing-link-research-builder",
-    routineId: MORNING_BRIEF.id,
-    fromAgentId: "research",
-    toAgentId: "builder",
-    instruction: RESEARCH_TO_BUILDER,
-    createdAt: "2026-08-03T08:07:00.000Z",
-  },
-  {
-    id: "landing-link-review-launch",
-    routineId: FRIDAY_REVIEW.id,
-    fromAgentId: "chief",
-    toAgentId: "launch",
-    instruction: REVIEW_TO_LAUNCH,
-    createdAt: "2026-08-10T08:00:00.000Z",
-  },
-];
-
-const BRIEF_CHIEF_ANSWER = [
-  "- Progress: the landing page, pricing copy, and release notes are done; the demo video is in review.",
-  "- Blocker: the Windows installer signature fails on the build machine.",
-  "- Owners: Builder has the installer, Launch has the video, Research has the comparison table.",
-  "- Risk: the comparison table cites two competitor prices from July.",
-  "- Next decision: ship on Tuesday without Windows, or wait for the signed installer.",
-].join("\n");
-const BRIEF_RESEARCH_ANSWER = [
-  "- Landing page, pricing copy, release notes: confirmed in the repository.",
-  "- Demo video in review: confirmed in the review thread.",
-  "- Competitor prices: changed. One competitor raised its Pro plan from $20 to $25 on August 18.",
-  "- Windows signature failure: unverified. The last build log is from yesterday.",
-].join("\n");
-const BRIEF_LAUNCH_ANSWER = [
-  "1. Approve the demo video (Launch, by 12:00).",
-  "2. Update the comparison table price (Research, by 13:00).",
-  "3. Fix the Windows installer signature (Builder, by 15:00).",
-  "4. Decide the Tuesday ship scope (Chief, at the 16:00 review).",
-].join("\n");
-const BRIEF_BUILDER_ANSWER = [
-  "1. Change the competitor Pro price in `pricing-table.json` from 20 to 25.",
-  "2. Run the Windows build again to get a current signature log.",
-  "No other change is needed for the claims in this brief.",
-].join("\n");
-const REVIEW_CHIEF_ANSWER = [
-  "Decisions: ship on Tuesday; Windows follows when the installer is signed.",
-  "Risks: the competitor price change reaches the table late; the video needs one more review.",
-  "Ownership gaps: nobody owns the launch-day support inbox.",
-].join("\n");
-
-const LANDING_PREVIEW_ROUTINE_STEPS: RoutineFlowStep[] = [
-  {
-    id: "landing-step-brief-chief",
-    runId: MORNING_BRIEF_RUN.id,
-    agentId: "chief",
-    deliveryId: null,
-    input: MORNING_BRIEF.instruction,
-    output: BRIEF_CHIEF_ANSWER,
-    status: "succeeded",
-    error: null,
-    createdAt: "2026-08-21T09:00:00.000Z",
-    updatedAt: "2026-08-21T09:02:00.000Z",
-  },
-  {
-    id: "landing-step-brief-research",
-    runId: MORNING_BRIEF_RUN.id,
-    agentId: "research",
-    deliveryId: "landing-step-brief-research-delivery",
-    input: landingHandoff(MORNING_BRIEF.name, "Chief", BRIEF_CHIEF_ANSWER, BRIEF_TO_RESEARCH),
-    output: BRIEF_RESEARCH_ANSWER,
-    status: "succeeded",
-    error: null,
-    createdAt: "2026-08-21T09:02:00.000Z",
-    updatedAt: "2026-08-21T09:04:00.000Z",
-  },
-  {
-    id: "landing-step-brief-launch",
-    runId: MORNING_BRIEF_RUN.id,
-    agentId: "launch",
-    deliveryId: "landing-step-brief-launch-delivery",
-    input: landingHandoff(MORNING_BRIEF.name, "Chief", BRIEF_CHIEF_ANSWER, BRIEF_TO_LAUNCH),
-    output: BRIEF_LAUNCH_ANSWER,
-    status: "succeeded",
-    error: null,
-    createdAt: "2026-08-21T09:02:00.000Z",
-    updatedAt: "2026-08-21T09:03:00.000Z",
-  },
-  {
-    id: "landing-step-brief-builder",
-    runId: MORNING_BRIEF_RUN.id,
-    agentId: "builder",
-    deliveryId: "landing-step-brief-builder-delivery",
-    input: landingHandoff(MORNING_BRIEF.name, "Research", BRIEF_RESEARCH_ANSWER, RESEARCH_TO_BUILDER),
-    output: BRIEF_BUILDER_ANSWER,
-    status: "succeeded",
-    error: null,
-    createdAt: "2026-08-21T09:04:00.000Z",
-    updatedAt: "2026-08-21T09:06:00.000Z",
-  },
-  {
-    id: "landing-step-review-chief",
-    runId: FRIDAY_REVIEW_RUN.id,
-    agentId: "chief",
-    deliveryId: null,
-    input: FRIDAY_REVIEW.instruction,
-    output: REVIEW_CHIEF_ANSWER,
-    status: "succeeded",
-    error: null,
-    createdAt: "2026-08-21T09:20:00.000Z",
-    updatedAt: "2026-08-21T09:22:00.000Z",
-  },
-  {
-    id: "landing-step-review-launch",
-    runId: FRIDAY_REVIEW_RUN.id,
-    agentId: "launch",
-    deliveryId: "landing-step-review-launch-delivery",
-    input: landingHandoff(FRIDAY_REVIEW.name, "Chief", REVIEW_CHIEF_ANSWER, REVIEW_TO_LAUNCH),
-    output: null,
-    status: "failed",
-    error: "The provider plan limit was reached before Launch answered.",
-    createdAt: "2026-08-21T09:22:00.000Z",
-    updatedAt: "2026-08-21T09:23:00.000Z",
-  },
-];
-
-export const LANDING_PREVIEW_OPTIONS = {
-  authState: {
-    status: "signed_in",
-    user: {
-      id: "user-1",
-      email: LANDING_PREVIEW_EMAIL,
-      name: "Norbert",
-      avatarUrl: null,
+/** Two sections: the launch work, and the research that feeds it. */
+function landingSidebarLayout(): SidebarLayoutSnapshot {
+  return {
+    revision: 1,
+    sections: [
+      { id: "section-launch", name: "Launch" },
+      { id: "section-research", name: "Research" },
+    ],
+    order: ["section-launch", "section-research", SIDEBAR_UNASSIGNED_SECTION_ID],
+    agentAssignments: {
+      [LANDING_CHANNEL_ID]: "section-launch",
+      atlas: "section-launch",
+      forge: "section-launch",
+      pulse: "section-launch",
+      scout: "section-research",
     },
-  },
-  agents: LANDING_PREVIEW_AGENTS,
-  snapshots: LANDING_PREVIEW_SNAPSHOTS,
-  servers: LANDING_PREVIEW_SERVERS,
-  directThreads: LANDING_PREVIEW_DIRECT_THREADS,
-  directSnapshots: LANDING_PREVIEW_DIRECT_SNAPSHOTS,
-  presence: LANDING_PREVIEW_PRESENCE,
-  browserTabs: [],
-  browserControlState: { sessions: [] },
-  remoteDesktopSessions: [],
-  // The team server serves every capability, `host-update-v1` too; it is up to date, so no update notice shows.
-  hostUpdate: {
-    phase: "idle",
-    currentVersion: "0.24.0",
-    availableVersion: null,
-    progress: null,
-    errorCode: null,
-    remoteUpdates: "allowed",
-    autoDownload: true,
-    autoInstall: false,
-    restart: null,
-  },
-  routines: LANDING_PREVIEW_ROUTINES,
-  routineRuns: LANDING_PREVIEW_ROUTINE_RUNS,
-  routineFlowLinks: LANDING_PREVIEW_ROUTINE_LINKS,
-  routineFlowSteps: LANDING_PREVIEW_ROUTINE_STEPS,
-} satisfies MockOpenBotOptions;
+    agentOrder: [LANDING_CHANNEL_ID, "atlas", "forge", "pulse", "scout"],
+  };
+}
+
+/** Each chat starts read through its last message, so a reply that lands later shows as unread. */
+function landingConversationReads(
+  snapshots: Record<string, ConversationSnapshot>,
+): Record<string, ConversationReadState> {
+  return Object.fromEntries(
+    Object.values(snapshots).map((snapshot) => [
+      snapshot.agentId,
+      { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: snapshot.messages.at(-1)?.id ?? null },
+    ]),
+  );
+}
+
+export function createLandingPreviewOptions(now: Date): MockOpenBotOptions {
+  const nowMs = now.getTime();
+  const at = (minutesAgo: number) => new Date(nowMs - minutesAgo * MINUTE_MS).toISOString();
+  const agents = landingAgents(at);
+  const history = landingHistory(at);
+  const snapshots: Record<string, ConversationSnapshot> = Object.fromEntries(
+    agents.map((agent) => [
+      agent.id,
+      {
+        agentId: agent.id,
+        threadId: agent.threadId,
+        activeTurnId: null,
+        revision: 1,
+        messages: history[agent.id] ?? [],
+      },
+    ]),
+  );
+  const directSnapshots = landingDirectSnapshots(at);
+  const contextBefore = Object.fromEntries(
+    Object.entries(LANDING_CONTEXT_TOKENS).map(([agentId, tokens]) => [agentId, tokens.before]),
+  );
+  return {
+    authState: {
+      status: "signed_in",
+      user: { id: "user-1", email: LANDING_PREVIEW_EMAIL, name: "Norbert", avatarUrl: null },
+    },
+    agentStatus: landingAgentStatus(),
+    usage: landingUsage(nowMs),
+    updateStatus: landingUpdateStatus(at),
+    storyForeignAgent: false,
+    agents,
+    snapshots,
+    conversationReads: landingConversationReads(snapshots),
+    runtimeSnapshot: landingRuntimeSnapshot(agents, contextBefore),
+    servers: landingServers(),
+    directThreads: landingDirectThreads(directSnapshots),
+    directSnapshots,
+    presence: landingPresence(at),
+    channels: landingChannels(at),
+    sidebarLayout: landingSidebarLayout(),
+    browserTabs: [],
+    browserControlState: { sessions: [] },
+    remoteDesktopSessions: [],
+    // The team server serves every capability, `host-update-v1` too; it is up to date, so no update notice shows.
+    hostUpdate: {
+      phase: "idle",
+      currentVersion: "0.49.0",
+      availableVersion: null,
+      progress: null,
+      errorCode: null,
+      remoteUpdates: "allowed",
+      autoDownload: true,
+      autoInstall: false,
+      restart: null,
+    },
+    ...landingRoutines(at, Intl.DateTimeFormat().resolvedOptions().timeZone),
+  };
+}

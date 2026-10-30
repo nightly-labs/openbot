@@ -7,7 +7,6 @@ export const messages = {
   "plugin.link.terms": "利用規約",
   "plugin.copyLink": "リンクをコピー",
   "plugin.askPrompt": "{name} に質問: {prompt}",
-  "plugin.section.apps": "アプリ",
   "plugin.section.skills": "スキル",
   "plugin.section.information": "情報",
   "plugin.info.developer": "開発者",

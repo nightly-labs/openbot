@@ -1,6 +1,6 @@
 # OpenBot Mobile
 
-React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and Bun. The app uses Expo Continuous Native Generation, so native `ios/` and `android/` directories are intentionally not committed.
+React Native app built with Expo SDK 58, Expo Router, TypeScript 7, Biome, and Bun. The app uses Expo Continuous Native Generation, so native `ios/` and `android/` directories are intentionally not committed.
 
 ## Requirements
 
@@ -11,10 +11,8 @@ React Native app built with Expo SDK 57, Expo Router, TypeScript 7, Biome, and B
 ## Development
 
 The repository uses Bun’s hoisted linker so native Expo modules resolve to one installation.
-The root `postinstall` runs `bun run --cwd apps/mobile setup:skia` after dependency installation.
-Skia 2.6.2 needs this step to copy its packaged native libraries before CocoaPods runs;
-EAS and local installs use the same setup. `OPENBOT_SKIP_SKIA=1` skips the step for desktop and
-API work. If you installed with it, run `bun run --cwd apps/mobile setup:skia` before a native build.
+React Native Skia 2.14 needs no install step. CocoaPods copies its prebuilt libraries from the
+`react-native-skia-apple-*` packages, and Gradle reads them from `react-native-skia-android`.
 
 EAS profiles pin Bun 1.4.2 to match the root `packageManager`. Use the same Bun version
 locally: dependency paths and package patch metadata affect the runtime fingerprint.
@@ -23,36 +21,40 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
-Expo 57.0.24 is patched in `patches/expo@57.0.24.patch` so a DOM component ignores a props
+Expo 58.0.17 is patched in `patches/expo@58.0.17.patch` so a DOM component ignores a props
 message that it sends before Android mounts its web view, or after Android removes it. Android
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
-react-native-screens 4.26.2 is patched in `patches/react-native-screens@4.26.2.patch` with the
-Android fix from upstream PR #4498. A header update for a screen that its stack removed, such as a
-Save in a one-page sheet that closes the sheet, no longer throws
-`ScreenStackFragment added into a non-stack container`. Remove the patch when a release
-contains that fix.
+expo-splash-screen 58.0.11 is patched in `patches/expo-splash-screen@58.0.11.patch` so Android 12
+and 13 get no splash exit animation listener. With the listener, the platform hides the starting
+window on the first draw, and the app crashes when that window is already gone. Gradle links the
+prebuilt AAR of an Expo module and ignores a patch to its Kotlin source, so
+`expo.autolinking.android.buildFromSource` in `package.json` builds `expo-splash-screen` from source.
+A patch to the native code of another Expo module needs the same entry. iOS also links precompiled
+Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.ios.buildFromSource`.
 
-react-native-reanimated 4.5.1 is patched in `patches/react-native-reanimated@4.5.1.patch` with the
-Android fix from upstream PR #10435. On React Native 0.86, Reanimated applies all animated props
-again on each event during a draw pass, including the props of views that are already removed. Each
-of these updates threw, and Reanimated logged a full stack trace on the UI thread, hundreds of
-times per second while an SVG list scrolled. The patch skips views that no longer exist. Remove the
-patch when the Reanimated version that Expo supports contains that fix.
+@react-native-masked-view/masked-view 0.3.2 is patched in
+`patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch` to change only its TypeScript types. They
+extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
+valid JSX component. Remove the patch when a release fixes the types.
 
-Expo Router 57.0.20 is patched in `patches/expo-router@57.0.20.patch` to apply zoom dismissal
+react-native-uitextview 2.7.1 is patched in `patches/react-native-uitextview@2.7.1.patch` so the
+native selectable message text applies the same baseline offset as React Native `Text`. React Native
+centers each line in its `lineHeight`. Without the offset, the text view drew each line at the bottom
+of its line box, so iOS message bubbles had more space above the text than below it. Remove the
+patch when a release applies the offset.
+
+Expo Router 58.0.25 is patched in `patches/expo-router@58.0.25.patch` to apply zoom dismissal
 bounds when its enabler registers after the chat mounts. This keeps the avatar-to-header zoom
 interactive from the left edge without enabling dismissal from the middle of the chat.
-The same patch keeps navigation queue snapshots immutable so React observes every navigation
-action, including the first tap when reopening a chat after going back.
 If a row or pinned avatar is tapped during the native return transition, the app retains that
 tap until the list is focused and `transitionEnd` fires. It then invokes the original Link
 handler once, preserving its AppleZoom source without a fixed delay.
 Focus is read from the route's live `isFocused()` state; nested navigators do not always emit
 an initial `focus` event, so a first tap must not depend on receiving one.
 
-Keyboard Controller 1.21.9 is included in SDK 57 Expo Go. Custom development clients and
+Keyboard Controller 1.22.7 is the version that Expo SDK 58 pins for Expo Go. Custom development clients and
 standalone apps must be rebuilt after adding this native dependency; a JavaScript reload alone
 cannot add it to an existing binary. All channels use the fingerprint runtime policy, so these
 updates cannot target older app-version `1.0.0` binaries without Keyboard Controller. Build and
@@ -80,6 +82,24 @@ or `~/Applications`, or `ROCKETSIM_APP_PATH` set to its `.app` directory. If it 
 missing, the command stops with setup instructions. The standard command does not
 look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
 variable is set.
+
+The iOS commands keep the Xcode build in `ios/DerivedData`, not in
+`~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
+`ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
+installs the pods again. Metro keeps its
+caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
+
+`bun mobile:android` also applies the config plugins without clearing `android/`, then runs
+`expo run:android`. Three local settings make a build in a new worktree faster:
+
+- A release variant builds native code only for the ABIs of the connected devices and running
+  emulators, not for all four. Pass `--all-arch` to build every ABI.
+- The local `android/gradle.properties` gets `org.gradle.caching=true`. Worktrees share Gradle task
+  outputs in `~/.gradle/caches/build-cache-1`. The app config, fingerprint and EAS builds stay the
+  same.
+- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share the C++ results of the app CMake project
+  between worktrees. Install ccache with `brew install ccache`; React Native uses it when it is on
+  `PATH`.
 
 The local launcher enables RocketSim Connect in the local native project. The config plugin
 loads it before React Native starts, only in Debug builds on the iOS Simulator.
@@ -116,8 +136,9 @@ The native UI does not depend on a native WebRTC module. A hidden Expo DOM compo
 `RTCPeerConnection` and its authenticated DataChannels, then forwards validated commands and live
 events to React Native. This keeps the production transport identical while remaining testable in
 Expo Go without a development build. Expo Go on Android does not include `@expo/dom-webview`, so there
-the component uses `react-native-webview`. `react-native.config.js` keeps that package out of native
-builds.
+the component uses `react-native-webview`. Native builds link that package for HTML pages
+(`html-page-view.native.tsx`), and iOS also uses it for the PDF preview (`pdf-preview.ios.tsx`). An Android
+build from before it was linked shows HTML pages with no scripts.
 
 Remote connection recovery starts the first attempt immediately, then waits 10 seconds after each failure. After
 five failures it waits two minutes before starting a new series. The agent list shows `Reconnecting`
@@ -178,8 +199,9 @@ and hold on a waiting message opens the native context menu with Edit and Don't 
 history waits for the server, `Waiting for connection` shows under the reconnect status above the
 composer; in the chat that status shows only the attempt and the countdown. The outbox is saved per account in the app's documents,
 so it survives a restart. Each chat sends its messages one at a time and in order while its server is
-online. A message carries a `clientMessageId` when the host advertises `message-client-id-v1`, so a
-repeat after a lost reply stores the message once. A message that the host refused shows `Not sent`, and its menu adds Retry; it holds
+online. An agent message carries a `clientMessageId` when the host advertises `message-client-id-v1`,
+and a channel message uses the same id as its `operationId`, so a repeat after a lost reply stores
+the message once. A message that the host refused shows `Not sent`, and its menu adds Retry; it holds
 the later messages of its chat. A message that the host may have stored is not repeated when
 the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed`. This
 visual state is derived only in the mobile UI: it never changes the agent's synced avatar profile or
@@ -201,6 +223,23 @@ requests are shared; an invalidation during a request causes one follow-up after
 entry stops timers, and iOS system overlays do not restart them. Ordinary RTC failures do not reload
 the directory. Session revocation and membership actions still refresh it. A stored session is shown
 while startup validation runs; an invalid credential clears that login, while network failures retain it.
+
+The app lock (Settings > App lock) uses a 4-digit PIN, the phone's biometrics with the phone
+passcode as fallback (`expo-local-authentication`, Android strong biometrics only), or both. The
+settings are in the after-first-unlock Keychain items, so a start in the background reads them and
+starts locked. The PIN is stored as a salted PBKDF2-SHA256 hash, and the failed attempts are stored
+before each check, both in when-unlocked, this-device-only items. A 4-digit PIN cannot resist a
+person who reads the Keychain; the Keychain and the attempt limit protect it. After 4 failures each
+attempt waits longer, and the 10th failure signs out. Every change in App lock asks the owner to
+unlock first, unless the owner unlocked in the last 5 minutes. The local `modules/app-lock` native module
+measures the time away with a clock that counts during sleep and ignores changes of the phone's time.
+It reports a phone lock: iOS posts `protectedDataWillBecomeUnavailable` about 10 seconds after the lock,
+and only with a passcode, so the module asks for the short background time while it waits for that
+notification. Android reports `ACTION_SCREEN_OFF`. Android counts the app as away only when no activity
+of the app is visible, so permission and biometric dialogs do not lock it. On Android 13 and later the
+recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on iOS and in a `Modal` on
+Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
+the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
 ## Source structure
 
@@ -252,7 +291,9 @@ Mobile file attachments are currently disabled by `CHAT_ATTACHMENTS_ENABLED` in
 `use-chat-attachments.ts`. The plus button shows a native Coming soon dialog; large pasted text
 stays in the input. When enabled, the native menu on the plus button opens Files. The plus button and input share one row; there is
 no separate paste button. The native multiline input grows to five lines, then scrolls internally;
-its height limit follows the system font scale. Large text pasted into the input becomes a text attachment. Mobile uploads
+its height limit follows the system font scale. Large text pasted into the input becomes a text attachment.
+Photos, videos and other files pasted into the input become attachments through the local
+`modules/composer-paste` native module; Expo Go does not have it and pastes text only. Mobile uploads
 use the released file-transfer protocol and are limited to 10 MB per file. Sending dismisses the
 keyboard. The gesture area covers the chat and uses the measured composer height for dismissal.
 The installed Keyboard Controller content-inset hit-test workaround enables scrolling in blank space.
@@ -313,7 +354,7 @@ it to a tester group. Upload is manual; the command does not run EAS Submit.
 ### GitHub Actions TestFlight release
 
 The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
-`macos-26` runner with Xcode 26.6. Expo SDK 57 requires Xcode 26.4 or newer; the desktop release's
+`macos-26` runner with Xcode 26.6. Expo SDK 58 requires Xcode 26.4 or newer; the desktop release's
 `macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
 uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
 
@@ -437,6 +478,48 @@ To build a signed `.aab` on your computer, run `bun run mobile:android:build:loc
 and the Android SDK, and writes `/private/tmp/openbot-play.aab`.
 See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_play_store/).
 
+### Discord announcement
+
+Each mobile version gets one post in the OpenBot Discord, when the second store has it. Android is
+often available hours or days before iOS, so the post waits for both. The source is
+`apps/mobile/CHANGELOG.md`, not the stores. The `Announce mobile release on Discord` workflow
+(`mobile-release-announcement.yml`) runs on each push to `main` that changes the file. When the
+push gives a version its second store date, for example
+`## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, it posts the message. The desktop release
+has its own post and its own workflow (`docs/RELEASING.md#discord-announcement`).
+
+Before the second store has the build, select the 3 to 5 changes in the version section that have
+the largest effect on users, and write them with the version in `apps/mobile/release-announcement.json`:
+
+```json
+{ "version": "x.y.z", "highlights": ["...", "...", "..."] }
+```
+
+Use the highlight rules of the desktop announcement. Replace the highlights of the previous version;
+the file holds only one version. Run `bun scripts/discord-mobile-release-announcement.ts check x.y.z`
+to see the message. `bun run mobile:release:published` stops when it gives the version its second
+store and the file is not ready, and the Changelog workflow stops such a pull request.
+
+The message mentions the `Mobile Release Pings` role, then has the title
+`OpenBot vx.y.z is out on iOS and Android`, the highlights, and one line of links:
+`iOS · Android · Full Changelog`. The last link opens the version on the Mobile tab of
+`/changelog`. It notifies only that role.
+
+One-time setup:
+
+1. In GitHub repository settings, create the `release-mobile` environment. Under deployment branches
+   and tags, select only the `main` branch.
+2. In Discord, open the settings of the announcement channel, then Integrations > Webhooks. Make a
+   webhook named `OpenBot` with the OpenBot icon. Add its URL as the environment secret
+   `DISCORD_MOBILE_RELEASE_WEBHOOK_URL`. It can be the same channel as the desktop post.
+3. In Discord, turn on Developer Mode, open Server Settings > Roles, right-click `Mobile Release Pings`
+   and select Copy Role ID. Add the ID as the environment variable `DISCORD_MOBILE_RELEASE_ROLE_ID`.
+
+A failed post does not change the release: re-run the `Post on Discord` job. A re-run after a
+successful post posts the message again. To post a version again, or one that a push did not post,
+run `gh workflow run mobile-release-announcement.yml --ref main -f version=x.y.z`. Both stores must
+have the version in `apps/mobile/CHANGELOG.md`, and the file must be for that version.
+
 ## OpenPanel product analytics
 
 The app uses the official [`@openpanel/react-native` SDK](https://openpanel.dev/docs/sdks/react-native)
@@ -483,20 +566,20 @@ missing Client Secret, non-production environment, or web runtime disables the c
 blocking the app. Tests replace native modules and the HTTP transport; they do not contact OpenPanel.
 
 SDK 1.4.1 declares old peer ranges (`expo-application` 5–7 and `expo-constants` 14–18).
-Expo SDK 57 uses the SDK number for these package versions. Keep the Expo-compatible versions
+Expo SDK 58 uses the SDK number for these package versions. Keep the Expo-compatible versions
 installed by `expo install`; do not downgrade them to silence that peer warning. Native verification
 of both platforms is required before release.
 
 ### Event catalog
 
 Every event has `surface=mobile`, `platform=ios|android`, `environment=production`,
-`event_schema_version=2`, `app_version` and `build_number`. Operation outcomes use `result` and,
+`event_schema_version=3`, `app_version` and `build_number`. Operation outcomes use `result` and,
 where available, `duration_ms`. Failure codes are fixed categories, never raw error text.
 
 | Event | Meaning |
 | --- | --- |
 | `mobile_app_opened` | Cold start or return from background, with `signed_in`; iOS inactive overlays do not count as a new visit |
-| `mobile_pairing_action` | Sign-in scanner opened, camera permission result, QR redemption result, scanner cancelled |
+| `mobile_pairing_action` | Sign-in scanner opened, camera permission result, QR redemption result, scanner cancelled; `entry_point` is `qr` or `link` (a pairing link) |
 | `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage |
 | `conversation_opened` | One visible-visit outcome and time to readable conversation, including cached/offline reads; failures when no readable conversation is available |
 | `message_send` | Host receipt or failure, attachment count, reply flag, provider/model/reasoning metadata when known |
@@ -508,8 +591,19 @@ where available, `duration_ms`. Failure codes are fixed categories, never raw er
 | `search_action` | One summary when a search screen closes after using a query/filter; final result count, no query |
 | `team_action` | Select, join or leave a server |
 | `conversation_action` | Pin/unpin or hide/unhide, including preference-save failures |
-| `usage_viewed` | Open the agent Usage section |
+| `usage_viewed` | Open the agent Usage section or the server Usage page; `scope` is `agent` or `server` |
 | `account_sign_out` | Sign-out result under the initiating account |
+| `account_sign_in_started` | Email sign-in code request (also a resend); `method=email`, `result` is `code_sent` or `failed`, duration |
+| `account_sign_in_completed` | Email sign-in code check; `method=email`, result, duration |
+| `hosted_server_plans_action` | Hosted server plans sheet `viewed` and `closed`, or a server in setup opened (`setup_opened`); `entry_point` is `drawer` or `onboarding` when known. The mobile sheet has no purchase |
+| `onboarding_step` | First-run `step` (`hello`, `server`, `agent`, `look`, `name`, `role`, `task`, `ready`) with `action` `viewed`, `next`, `back` or `skipped` |
+| `onboarding_completed` | First run ended; `skipped` is true when the user skipped it |
+| `notification_settings_action` | Notifications turned on or off, preview or Live Activities switched (`enabled`), or the phone's permission prompt answered (`permission` is `granted`, `denied` or `undetermined`) |
+| `live_activity_action` | The app started or ended a Live Activity; updates are not counted |
+| `voice_conversation_action` | Voice mode `start`, or `end` with its duration and `turn_count`; `server_kind=remote` |
+| `voice_turn` | One dictation session: result, listening time in `audio_duration_seconds`, time from stop to final text in `duration_ms`, and `transcription` (`local` or `cloud`) when known; no words |
+| `agent_template_action` | Agent template install from a link; `action=installed`, `entry_point=deep_link`, result, duration |
+| `analytics_preference_changed` | `enabled=false`, sent once before collection stops when the user turns analytics off; the app waits at most 2 seconds for it |
 
 Use a mobile activation funnel from open → successful QR redemption → successful connection →
 conversation load or message send. Measure signed-in D1/D7 retention by OpenBot account ID. Eligible
@@ -543,6 +637,10 @@ for a write-only client in **Openbot**, then ship a build or compatible update w
 Mobile schema generation 2 adds safe error diagnostics. Native error alerts and chat send errors
 emit `notification_shown`; existing failed actions emit a separate `client_operation_failed`.
 Only fixed cause, source, operation, and provider/model fields are sent. No alert text is sent.
+
+Mobile schema generation 3 adds sign-in, hosted server plans, first-run, notification settings,
+Live Activity, voice, agent template and opt-out events, `entry_point` on pairing, and `scope` on
+`usage_viewed`. The generation comes from `ANALYTICS_GENERATIONS.mobile` in `@openbot/telemetry`.
 The file queue holds at most 1,000 reports, 1 MiB, and seven days, and sends only after a local
 write succeeds. Foreground and host reconnection trigger retries. Opt-out and account changes
 clear this queue. See [the analytics contract](../../ANALYTICS.md#reliable-error-reports).

@@ -4,6 +4,7 @@ import { useAuth } from "./features/account/account-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import { createLanguageStep } from "./features/onboarding/language-step";
 import { useSetup } from "./features/onboarding/onboarding-context";
+import { SetupReadError } from "./features/onboarding/SetupReadError";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
@@ -92,38 +93,40 @@ export function AppAccessGate() {
               when={setup.setupState()?.completed}
               fallback={
                 <Show when={scope.connection.hasContent} fallback={<WorkspaceShell account={account} />}>
-                  <Show
-                    when={setup.pendingInviteUrl().trim()}
-                    fallback={
+                  <Show when={!setup.setupReadFailed()} fallback={<SetupReadError />}>
+                    <Show
+                      when={setup.pendingInviteUrl().trim()}
+                      fallback={
+                        <Loading fallback={<LoadingScreen />}>
+                          <FirstRunFlow
+                            {...setupProviders}
+                            state={
+                              setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
+                            }
+                            platform={platform.appInfo()?.platform ?? "darwin"}
+                            onSave={setup.saveSetup}
+                            onProviderStepShown={detection.scanOnce}
+                            logoVariant={platform.appInfo()?.variant ?? "production"}
+                          />
+                        </Loading>
+                      }
+                    >
                       <Loading fallback={<LoadingScreen />}>
-                        <FirstRunFlow
+                        <InitialSetup
                           {...setupProviders}
                           state={
                             setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
                           }
                           platform={platform.appInfo()?.platform ?? "darwin"}
+                          accountEmail={account().email}
+                          inviteUrl={setup.pendingInviteUrl()}
                           onSave={setup.saveSetup}
-                          onProviderStepShown={detection.scanOnce}
-                          logoVariant={platform.appInfo()?.variant ?? "production"}
+                          onPreviewInvite={setup.previewInvite}
+                          onJoinRemote={joinRemoteDuringSetup}
+                          onLogout={auth.logoutCentralAccount}
                         />
                       </Loading>
-                    }
-                  >
-                    <Loading fallback={<LoadingScreen />}>
-                      <InitialSetup
-                        {...setupProviders}
-                        state={
-                          setup.setupState() ?? { completed: false, preferredProvider: null, preferredModel: null }
-                        }
-                        platform={platform.appInfo()?.platform ?? "darwin"}
-                        accountEmail={account().email}
-                        inviteUrl={setup.pendingInviteUrl()}
-                        onSave={setup.saveSetup}
-                        onPreviewInvite={setup.previewInvite}
-                        onJoinRemote={joinRemoteDuringSetup}
-                        onLogout={auth.logoutCentralAccount}
-                      />
-                    </Loading>
+                    </Show>
                   </Show>
                 </Show>
               }
@@ -135,6 +138,7 @@ export function AppAccessGate() {
       </Show>
       <WhatsNewOverlay
         ready={
+          !platform.chatWindow &&
           !splashShown() &&
           !!auth.visibleSignedInAccount() &&
           (setup.setupState()?.completed === true || !scope.connection.hasContent)

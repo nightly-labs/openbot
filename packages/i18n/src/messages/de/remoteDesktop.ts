@@ -15,13 +15,13 @@ export const messages = {
   "remoteDesktop.viewerTitle": "Sunshine-Remotedesktop",
   "remoteDesktop.viewerLoadFailed": "Der Moonlight-Viewer konnte nicht geladen werden.",
   "remoteDesktop.streamNotReady":
-    "Der Host hat den Stream nicht gestartet. Sunshine wurde möglicherweise auf dem Host beendet. Versuche es erneut.",
-  "remoteDesktop.hostOfflineTitle": "Host ist offline",
-  "remoteDesktop.hostOfflineMessage": "Verbinde dich erneut mit dem Host, bevor du seinen Desktop öffnest.",
+    "Der Server hat den Stream nicht gestartet. Sunshine wurde möglicherweise auf dem Server beendet. Versuche es erneut.",
+  "remoteDesktop.hostOfflineTitle": "Server ist offline",
+  "remoteDesktop.hostOfflineMessage": "Verbinde dich erneut mit dem Server, bevor du seinen Desktop öffnest.",
   "remoteDesktop.openFailed": "Desktop konnte nicht geöffnet werden",
   "remoteDesktop.notSharingTitle": "{name} gibt seinen Bildschirm nicht frei",
   "remoteDesktop.notSharingDescription":
-    "Der Host verhindert, dass OpenBot seinen Bildschirm aufnimmt. Öffne auf diesem Computer Systemeinstellungen → Datenschutz & Sicherheit → Bildschirmaufnahme, aktiviere OpenBot und versuche es hier erneut.",
+    "Der Server verhindert, dass OpenBot seinen Bildschirm aufnimmt. Öffne auf diesem Server Systemeinstellungen → Datenschutz & Sicherheit → Bildschirmaufnahme, aktiviere OpenBot und versuche es hier erneut.",
   "remoteDesktop.setup.check.screenRecording": "Bildschirmaufnahme",
   "remoteDesktop.setup.check.accessibility": "Bedienungshilfen",
   "remoteDesktop.setup.check.service": "Sunshine-Dienst",
@@ -42,7 +42,7 @@ export const messages = {
   "remoteDesktop.setup.startFailed": "Der Remotedesktop-Test konnte nicht gestartet werden.",
   "remoteDesktop.setup.connectionLost": "Die Testverbindung wurde unterbrochen.",
   "remoteDesktop.setup.hostUpdateRequired":
-    "Aktualisiere OpenBot auf dem Host, um Berechtigungen zu prüfen und den Remotedesktop zu testen.",
+    "Aktualisiere OpenBot auf dem Server, um Berechtigungen zu prüfen und den Remotedesktop zu testen.",
   "remoteDesktop.setup.permissions": "Berechtigungen",
   "remoteDesktop.setup.checked": "Geprüft",
   "remoteDesktop.setup.checkAgain": "Erneut prüfen",
@@ -56,7 +56,7 @@ export const messages = {
   "remoteDesktop.setup.liveTest": "Live-Verbindungstest",
   "remoteDesktop.setup.liveTestLocal": "Teste Bild, Maus und Tastatur auf diesem Mac.",
   "remoteDesktop.setup.liveTestRemote":
-    "Der Test öffnet ein temporäres Panel auf dem Host. Andere Remote-Sitzungen müssen zuerst beendet werden. Eingaben bleiben innerhalb des Panels.",
+    "Der Test öffnet ein temporäres Panel auf dem Server. Andere Remote-Sitzungen müssen zuerst beendet werden. Eingaben bleiben innerhalb des Panels.",
   "remoteDesktop.setup.testSummary": "Video: {video} · Bild: {picture} · Maus: {mouse} · Tastatur: {keyboard}",
   "remoteDesktop.setup.received": "empfangen",
   "remoteDesktop.setup.notReceived": "nicht empfangen",
@@ -68,7 +68,7 @@ export const messages = {
   "remoteDesktop.setup.testRemote": "Remotedesktop testen",
   "remoteDesktop.setup.videoFailed": "Die Test-Videoverbindung ist fehlgeschlagen.",
   "remoteDesktop.setup.inputInstructions":
-    "Klicke auf das Ziel auf dem Host und tippe dann {code}. Maus: {mouse}. Tastatur: {keyboard}.",
+    "Klicke auf das Ziel im Testpanel und tippe dann {code}. Maus: {mouse}. Tastatur: {keyboard}.",
   "remoteDesktop.setup.videoOnly":
     "Nur Videotest. Maus- und Tastaturtests benötigen die aktualisierte Sunshine-Laufzeitumgebung.",
   "remoteDesktop.setup.pictureConfirmed": "Bild bestätigt",

@@ -11,5 +11,9 @@ export const messages = {
     "Этот сервер не поддерживает вложения MP3 и MOV. Обновите OpenBot на хосте и повторите попытку.",
   "error.attachment.emlUnsupported":
     "Этот сервер не поддерживает вложения EML. Обновите OpenBot на хосте и повторите попытку.",
+  "error.attachment.zipUnsupported":
+    "Этот сервер не поддерживает вложения ZIP. Обновите OpenBot на хосте и повторите попытку.",
+  "error.attachment.mp4Unsupported":
+    "Этот сервер не поддерживает вложения MP4. Обновите OpenBot на хосте и повторите попытку.",
   "error.attachment.previewTooLarge": "Файл превышает лимит 100 МБ.",
 } as const satisfies PartialTranslation<typeof source>;

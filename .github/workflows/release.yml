@@ -72,6 +72,8 @@ jobs:
       - name: Validate release version
         id: release
         shell: bash
+        env:
+          DISCORD_RELEASE_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
         run: |
           package_version="$(bun -p 'require("./package.json").version')"
           tag_version="${GITHUB_REF_NAME#v}"
@@ -80,6 +82,11 @@ jobs:
             exit 1
           fi
           bun scripts/check-release-notes.ts
+          # The `discord-announce` job of a tag push needs the role, so stop before the release.
+          if [[ "$GITHUB_EVENT_NAME" == "push" && -z "$DISCORD_RELEASE_ROLE_ID" ]]; then
+            echo "DISCORD_RELEASE_ROLE_ID is not set. See docs/RELEASING.md#discord-announcement." >&2
+            exit 1
+          fi
           bun scripts/discord-release-announcement.ts check "$package_version"
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
@@ -107,7 +114,7 @@ jobs:
   host-signing:
     name: Check Host signing keychain
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     environment: release
     permissions:
@@ -252,7 +259,7 @@ jobs:
         include:
           - arch: arm64
             label: ARM64
-            os: macos-14
+            os: macos-15
             app_dir: mac-arm64
             suffix: macos
           - arch: x64
@@ -398,6 +405,8 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' \
             "$RUNNER_TEMP/openbot-entitlements.plist" | grep -Fx 'ZTRDTUL87R'
           /usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' \
+            "$RUNNER_TEMP/openbot-entitlements.plist" | grep -Fx 'true'
+          /usr/libexec/PlistBuddy -c 'Print :com.apple.security.automation.apple-events' \
             "$RUNNER_TEMP/openbot-entitlements.plist" | grep -Fx 'true'
           plutil -extract NSUserActivityTypes.0 raw "$app_path/Contents/Info.plist" \
             | grep -Fx 'NSUserActivityTypeBrowsingWeb'
@@ -570,8 +579,10 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      # The Linux job checks types with tsrs, as PR CI does. tsrs has no Windows binary, so a type check
+      # here would use `tsc` from another TypeScript version and could stop a release that CI passed.
       - name: Run Windows checks
-        run: bun run lint && bun run typecheck
+        run: bun run lint
 
       # Without a token, the GitHub API rate limit for the runner's address can refuse the release
       # lookup with HTTP 403.
@@ -738,6 +749,7 @@ jobs:
       contents: read
       id-token: write
     env:
+      GITHUB_TOKEN: ${{ github.token }}
       RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
     steps:
       - name: Check out tagged source
@@ -811,6 +823,35 @@ jobs:
           bun run verify:update-artifacts "$SUFFIX"
         env:
           SUFFIX: ${{ matrix.suffix }}
+
+      # Arch Linux and Omarchy have no libfuse.so.2. The AppImage runtime must be static and mount the
+      # AppImage with only `fusermount3`, as it does when a user starts the download.
+      - name: Mount the AppImage without libfuse2
+        run: |
+          set -euo pipefail
+          sudo apt-get install --no-install-recommends --yes fuse3
+          appImage=$(echo dist/*.AppImage)
+          headers=$(readelf --program-headers "$appImage")
+          if grep -Fq "program interpreter" <<<"$headers"; then
+            echo "The AppImage runtime is not static, so it needs system libraries such as libfuse.so.2." >&2
+            exit 1
+          fi
+          # The runtime prints the mount point and keeps the mount until it stops.
+          output=$(mktemp)
+          "$appImage" --appimage-mount >"$output" &
+          runtime=$!
+          for _ in $(seq 1 60); do
+            [ -s "$output" ] && break
+            sleep 1
+          done
+          mountPoint=$(head -n 1 "$output")
+          if [ -z "$mountPoint" ] || [ ! -x "$mountPoint/openbot" ]; then
+            echo "The AppImage did not mount with fusermount3, or its mount has no openbot executable." >&2
+            cat "$output" >&2
+            exit 1
+          fi
+          kill "$runtime" 2>/dev/null || true
+          wait "$runtime" || true
 
       - name: Generate checksums
         run: |
@@ -1062,6 +1103,7 @@ jobs:
       - name: Post the announcement
         env:
           DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          DISCORD_RELEASE_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
           RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
         run: bun scripts/discord-release-announcement.ts send "$RELEASE_VERSION"
 
@@ -1174,3 +1216,102 @@ jobs:
             jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] | sort == ["amd64", "arm64"]' \
               "$anonymous_config/manifest.json" >/dev/null
           done
+
+  # `nix/sources.json` names the release that the Nix flake installs. It can only name a published
+  # release, because its hashes come from the release's SHA256SUMS.txt. So the update goes to main in
+  # its own PR. The PR's own workflow runs wait for approval because GITHUB_TOKEN opened it, and the
+  # merge waits for them, so the job approves them. It also starts CI on the branch. The PR merges
+  # itself when the required checks pass.
+  nix-sources:
+    name: Open Nix sources PR
+    needs: [validate, publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out main
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Update nix/sources.json
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+        run: bun scripts/nix-sources.ts "$RELEASE_VERSION"
+
+      # Only this step gets the write token: the steps before it run dependency code, which can change
+      # the Git configuration and hooks of the checkout. So this step runs outside the checkout and
+      # makes the branch and the commit with the GitHub API, from the commit that the checkout fetched.
+      - name: Open the PR
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          BASE_SHA: ${{ steps.checkout.outputs.commit }}
+        run: |
+          set -euo pipefail
+          path=nix/sources.json
+          file="$GITHUB_WORKSPACE/$path"
+          current="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=$BASE_SHA")"
+          if jq -r .content <<<"$current" | base64 -d | cmp -s - "$file"; then
+            echo "$path needs no change."
+            exit 0
+          fi
+          branch="build/nix-sources-$RELEASE_VERSION"
+          created=false
+          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq 'length > 0' | grep -Fx true; then
+            echo "A Nix sources PR already exists."
+          else
+            created=true
+            # A rerun after a failed run can find the branch. No open PR uses it, so reset it.
+            if ! gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/heads/$branch" -f "sha=$BASE_SHA" >/dev/null; then
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" -f "sha=$BASE_SHA" -F force=true >/dev/null
+            fi
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/$path" \
+              -f "branch=$branch" \
+              -f "sha=$(jq -r .sha <<<"$current")" \
+              -f "message=build(nix): install OpenBot $RELEASE_VERSION" \
+              -f "content=$(base64 -w0 "$file")" >/dev/null
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --label no-changelog \
+              --title "build(nix): install OpenBot $RELEASE_VERSION" \
+              --body "Points the Nix flake at the published v$RELEASE_VERSION release. The hashes come from its \`SHA256SUMS.txt\`."
+          fi
+          # A failed call below gives a warning, so that the steps after it still run.
+          if ! gh pr merge "$branch" --repo "$GITHUB_REPOSITORY" --auto --squash; then
+            echo "::warning::Auto-merge is not on for the Nix sources PR. Merge it when its checks pass."
+          fi
+          head_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --jq .object.sha)"
+          waiting_runs() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$head_sha&event=pull_request&status=action_required" \
+              --jq '.workflow_runs[].id' || echo "::warning::Could not list the PR workflow runs." >&2
+          }
+          # The runs of a new PR can appear some seconds after the PR. The runs of an existing PR are there.
+          attempts=1
+          if [ "$created" = true ]; then attempts=12; fi
+          approved=0
+          for attempt in $(seq 1 "$attempts"); do
+            runs="$(waiting_runs)"
+            for run in $runs; do
+              if gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$run/approve" >/dev/null; then
+                approved=$((approved + 1))
+              fi
+            done
+            if [ -z "$runs" ] && { [ "$approved" -ge 1 ] || [ "$created" = false ]; }; then break; fi
+            if [ "$attempt" -lt "$attempts" ]; then sleep 5; fi
+          done
+          if [ -n "$(waiting_runs)" ] || { [ "$created" = true ] && [ "$approved" -eq 0 ]; }; then
+            echo "::warning::Some PR workflow runs were not approved. Approve the waiting runs on the PR so that it can merge."
+          fi
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"

@@ -86,6 +86,23 @@ export const messages = defineMessages("server", {
   "server.add.billing.monthly": "Monthly",
   "server.add.billing.yearly": "Yearly",
   "server.add.billing.save": "Save {percent}%",
+  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
+  "server.add.use.label": "Use",
+  "server.add.use.personal": "Personal",
+  "server.add.use.work": "Work",
+  // The row under the plans that sets the users of the license. It is disabled for personal use.
+  "server.add.license.people": "People at work",
+  // A toast when "Fewer members" is at the people who use the account's servers now. The license must include them.
+  "server.add.license.minimum": {
+    one: "{count} person uses your servers now, so you cannot choose fewer.",
+    other: "{count} people use your servers now, so you cannot choose fewer.",
+  },
+  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
+  "server.add.license.bundle": "Bundle −{percent}%",
+  // The plan summary for work: the price includes the license. {license} is the license line, such as
+  // "Team license, 5 members".
+  "server.add.license.included": "Includes {license}",
+  "server.add.license.includedTrial": "Includes {license}, free until {date}",
   "server.add.billedMonthly": "Billed monthly",
   "server.add.billedYearly": "{price} billed yearly",
   // {amount} is a formatted amount, such as "€120". It follows the yearly price.
@@ -98,8 +115,22 @@ export const messages = defineMessages("server", {
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
-  "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
+  "server.add.otherOptions": "Other options",
+  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
+  "server.local.createTitle": "New server on this computer",
+  "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
+  "server.local.nameLabel": "Server name",
+  "server.local.create": "Create server",
+  "server.local.creating": "Creating server…",
+  "server.local.createFailed": "Could not create the server.",
+  "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "server.local.deleteConfirmTitle": "Delete {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stops the server and moves its agents, chats and files to the trash.",
+  "server.local.deleting": "Deleting server…",
+  "server.local.deletedTitle": "Deleted {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -108,6 +139,29 @@ export const messages = defineMessages("server", {
   },
   // Opens the list of the account's hosted servers, where the user can delete one.
   "server.add.limit.manage": "Manage servers",
+  // The offer of a hosted server after a new routine that depends on the user's computer.
+  "server.upsell.modal.title": "Routines stop when your computer sleeps",
+  // {name} is the routine.
+  "server.upsell.modal.description":
+    "{name} runs only while your computer is on. An OpenBot server keeps it running 24/7.",
+  // Labels in the small picture above the modal text: a laptop and a server, each with a status.
+  "server.upsell.modal.computer": "Your computer",
+  "server.upsell.modal.server": "OpenBot server",
+  "server.upsell.modal.running": "Running",
+  "server.upsell.modal.stopped": "Stopped",
+  "server.upsell.notice.title.local": {
+    one: "{count} routine needs this computer on",
+    other: "{count} routines need this computer on",
+  },
+  "server.upsell.notice.title.remote": {
+    one: "{count} routine needs {server} on",
+    other: "{count} routines need {server} on",
+  },
+  "server.upsell.notice.description": "An OpenBot server runs them 24/7.",
+  // One line under the notice that the user's computer is offline.
+  "server.upsell.offline": "An OpenBot server stays on 24/7, so routines keep running.",
+  "server.upsell.seePlans": "See plans",
+  "server.upsell.notNow": "Not now",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
@@ -168,6 +222,8 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
+  // Added to the tooltip of a server that runs on this computer, after its name.
+  "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
   "server.rail.unmute": "Unmute server",
@@ -179,6 +235,10 @@ export const messages = defineMessages("server", {
   "server.rail.restart": "Restart server",
   "server.rail.leave": "Leave server",
   "server.rail.delete": "Delete server",
+  // Hides the server on this computer from the server list while the user has other servers.
+  "server.rail.hide": "Hide server",
+  // Brings the hidden server on this computer back to the server list. {name} is its name, "Local".
+  "server.rail.showLocal": "Show {name}",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",
@@ -205,9 +265,12 @@ export const messages = defineMessages("server", {
   "server.import.applyFailed": "The import did not finish.",
   "server.role.owner": "Owner",
   "server.settings.generalTitle": "General",
-  "server.settings.generalDescription": "Manage this server’s identity and published access.",
+  "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
+  "server.settings.vaultTitle": "Vault",
+  "server.settings.vaultDescription":
+    "Save logins, cards and contact info that every agent on this server can fill in.",
   "server.settings.membersTitle": "Members",
-  "server.settings.membersDescription": "Invite people and manage access to this server.",
+  "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
   "server.settings.desktopDescription": "Configure or connect to this server’s desktop.",
   "server.settings.mcpTitle": "MCP",
@@ -217,11 +280,9 @@ export const messages = defineMessages("server", {
   "server.settings.hostedSitesTitle": "Sites",
   "server.settings.hostedSitesDescription": "The static sites that agents on this server published to openbot.site.",
   "server.settings.importTitle": "Import",
-  "server.settings.importDescription": "Move your agents from Grok Bot to this server.",
+  "server.settings.importDescription": "Move your agents from Grok Bot or Hermes Agent to this server.",
   "server.settings.transferTitle": "Transfer",
   "server.settings.transferDescription": "Move this server's agents and server settings to or from a file.",
-  "server.settings.connectorsTitle": "Connectors",
-  "server.settings.connectorsDescription": "Connect accounts that every agent on this server can use.",
   "server.settings.routinesTitle": "Routines",
   "server.settings.routinesDescription": "Show the routine schedule of this computer in a calendar app.",
   "server.routineFeed.title": "Calendar feed",
@@ -238,6 +299,15 @@ export const messages = defineMessages("server", {
   "server.routineFeed.regenerate": "New URL",
   "server.routineFeed.regenerateLabel": "Make a new URL. The old URL stops working.",
   "server.routineFeed.turnOff": "Turn off",
+  "server.routineFeed.loading": "Loading the calendar feed",
+  "server.routineFeed.regenerateTitle": "Make a new URL?",
+  "server.routineFeed.regenerateDescription":
+    "The current URL stops working. Calendars that use it stop updating until you subscribe again with the new URL.",
+  "server.routineFeed.regenerateConfirm": "Make new URL",
+  "server.routineFeed.turnOffTitle": "Turn off the calendar feed?",
+  "server.routineFeed.turnOffDescription":
+    "The current URL stops working. If you turn the feed on again, it gets a new URL.",
+  "server.routineFeed.agentsLoadFailed": "Could not load the agents.",
   "server.settings.nameTooShort": "Enter at least {limit} characters.",
   "server.settings.nameTooLong": "Use no more than {limit} characters.",
   "server.settings.actionFailedTitle": "Server action failed",
@@ -265,31 +335,45 @@ export const messages = defineMessages("server", {
   "server.settings.access": "Access",
   "server.settings.publish": "Publish this server",
   "server.settings.published": "Server is published",
-  "server.settings.address": "Server address",
-  "server.settings.addressDescription": "Use this address to connect to the server.",
-  "server.settings.private": "Private",
-  "server.settings.copyAddress": "Copy server address",
   "server.settings.setUpDesktopTitle": "Set up remote desktop",
   "server.settings.setUpDesktopDescription": "View and control this Mac from another computer.",
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
-  "server.settings.notifications": "Notifications",
-  "server.settings.muteNotifications": "Mute notifications",
-  "server.settings.muteDescription": "Stop desktop notifications and MacBook notch updates from this server.",
-  "server.settings.mutedUntilDescription": "{until}. Turn off to unmute now.",
-  "server.settings.notifyAbout": "Notify me about",
-  "server.settings.notifyAboutDescription": "Which agent events show a desktop notification.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
     "New routines use this timezone when the message does not give the sender's timezone.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.memoryLimit": "Memories per agent",
+  "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
+  "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
+  "server.settings.memoryReview": "Memory review",
+  "server.settings.memoryReviewDescription":
+    "How often agents on this server save lasting facts from their chats in the background.",
+  "server.settings.memoryReviewOff": "Off",
+  "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
+  "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
+  "server.settings.rolesTitle": "Roles",
+  "server.settings.rolesDescription":
+    "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
   "server.settings.remoteOnline": "The host is online. Publication is controlled by its owner.",
   "server.settings.remoteOffline": "The host is offline. Publication is controlled by its owner.",
-  "server.settings.saveIdentityFirst": "Save the server identity before publishing.",
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
+  "server.settings.notPublished": "Not reachable online.",
+  // A name for a server that the user publishes before naming it. {name} is the first word of the account name.
+  "server.settings.generatedName": "{name}’s server",
+  "server.settings.hostKeyTitle": "Server key",
+  "server.settings.hostKeyRotate": "Change the server key",
+  "server.settings.hostKeyDescription":
+    "Make a new identity key for this server. Paired computers and phones, and webhook routes, stay connected.",
+  "server.settings.hostKeyRotateAction": "Change key",
+  "server.settings.hostKeyConfirmTitle": "Change the server key?",
+  "server.settings.hostKeyConfirmDescription":
+    "The current key and the new key both sign a handover. Apps of members change to the new key when they connect again. Do this if the key file was copied or exposed.",
+  "server.settings.hostKeyRotated": "Server key changed",
+  "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":
     "Remove this server from the account service for all members. Use this when its computer is no longer available.",
@@ -328,10 +412,6 @@ export const messages = defineMessages("server", {
   "server.members.removeTitle": "Remove {name}?",
   "server.members.removeDescription": "This person will lose access to the server and its shared conversations.",
   "server.members.remove": "Remove member",
-  "server.members.invitationsPaused": "Invitations are paused",
-  "server.members.setupRequired": "Server setup is required",
-  "server.members.publishToInvite": "Publish the server in General to invite new people.",
-  "server.members.saveIdentityFirst": "Save the server identity in General first.",
   "server.members.title": "Server members",
   "server.members.count": { one: "{count} member", other: "{count} members" },
   "server.members.limitCount": { other: "{count} of {limit} members" },
@@ -345,6 +425,31 @@ export const messages = defineMessages("server", {
   "server.members.makeAdminTitle": "Make {name} an admin?",
   "server.members.makeMemberTitle": "Make {name} a member?",
   "server.members.roleChangeDescription": "{name} can be disconnected from this server and must then connect again.",
+  "server.members.serverRole": "Server role",
+  "server.members.roles": "Roles",
+  "server.members.rolesOf": "Roles of {name}: {roles}",
+  "server.roles.everyone": "Everyone",
+  "server.roles.allMembers": "All members",
+  "server.roles.title": { other: "Roles – {count}" },
+  "server.roles.create": "Create role",
+  "server.roles.newRole": "New role",
+  "server.roles.delete": "Delete",
+  "server.roles.deleteTitle": "Delete {name}?",
+  "server.roles.deleteDescription": "Members with this role lose the agents that it gives them.",
+  "server.roles.name": "Role name",
+  "server.roles.agents": "Agents",
+  "server.roles.noAgents": "This server has no agents.",
+  "server.roles.open": "Open {name}",
+  "server.roles.memberCount": { one: "{count} member", other: "{count} members" },
+  "server.roles.agentList": "Agents: {names}",
+  "server.roles.agentLevel": "Access of {role} to {agent}",
+  "server.roles.setAll": "Set all",
+  "server.roles.setAllLabel": "Set all: access of {role} to all agents",
+  "server.roles.loadFailed": "Could not load the roles of this server.",
+  "server.agentAccess.level.none": "No access",
+  "server.agentAccess.level.view": "Can view",
+  "server.agentAccess.level.chat": "Can chat",
+  "server.agentAccess.level.manage": "Can manage",
   "server.invite.invalidEmail": "Enter a valid email address.",
   "server.invite.title": "Invite people",
   "server.invite.description":
@@ -368,7 +473,10 @@ export const messages = defineMessages("server", {
   "server.invite.showQr": "Show invitation QR code",
   "server.invite.permaHint":
     "Never expires and can be used many times. Anyone with this link can join; revoke it to disable.",
-  "server.invite.full": "This server has the maximum of {limit} members. Remove a member to invite a new person.",
+  "server.invite.full": {
+    one: "This server has the maximum of {count} member. Remove a member to invite a new person.",
+    other: "This server has the maximum of {count} members. Remove a member to invite a new person.",
+  },
   "server.invite.qrLabel": "Invitation QR code",
   "server.invite.qrDescription": "Scan this code in OpenBot Mobile to join this server.",
   "server.invite.accepted": "Invitation accepted",
@@ -381,6 +489,9 @@ export const messages = defineMessages("server", {
   "server.invite.pendingTitle": "Pending invitations",
   "server.invite.pendingCount": "{total} pending",
   "server.invite.noPending": "No pending invitations.",
+  // The empty pending list. {word} is the one handwritten word of the title.
+  "server.invite.emptyTitle": "Send the first {word}.",
+  "server.invite.emptyWord": "one",
   "server.invite.neverExpires": { one: "Never expires · {count} join", other: "Never expires · {count} joins" },
   "server.invite.expires": "Expires {date}",
   "server.invite.revoke": "Revoke",

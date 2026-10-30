@@ -1,4 +1,4 @@
-import { type AgentSummary, GROK_BOT_EXPORT_URL, resolveRemoteAgentImportResult } from "@openbot/contracts/ipc";
+import { type ClientAgentSummary, GROK_BOT_EXPORT_URL, resolveRemoteAgentImportResult } from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   applyAgentImport,
@@ -20,7 +20,9 @@ function readBase64(file: File): Promise<string> {
       const url = String(reader.result);
       resolve(url.slice(url.indexOf(",") + 1));
     });
-    reader.addEventListener("error", () => reject(reader.error ?? new Error("The file could not be read.")));
+    reader.addEventListener("error", () =>
+      reject(reader.error ?? new Error(currentText().t("server.import.readFailed"))),
+    );
     reader.readAsDataURL(file);
   });
 }
@@ -31,7 +33,7 @@ function readBase64(file: File): Promise<string> {
  */
 export function createWebAgentImportCalls(options: {
   request: (serverId: string) => TeamApiRequest;
-  listAgents: () => Promise<AgentSummary[]>;
+  listAgents: () => Promise<ClientAgentSummary[]>;
   saveFile: (file: { name: string; base64: string }) => void;
 }): AgentImportCalls {
   return {
@@ -61,12 +63,15 @@ export function createWebAgentImportCalls(options: {
       Effect.runPromise(
         discardAgentImport(options.request(serverId), token).pipe(Effect.mapError((error) => error.cause)),
       ),
-    async readSkill() {
-      const skill = await import("../../../../../resources/agent-import/grok-bot/SKILL.md?raw");
+    async readSkill(source) {
+      const skill =
+        source === "hermes-agent"
+          ? await import("../../../../../resources/agent-import/hermes-agent/SKILL.md?raw")
+          : await import("../../../../../resources/agent-import/grok-bot/SKILL.md?raw");
       return skill.default;
     },
-    async saveSkill() {
-      const text = await this.readSkill();
+    async saveSkill(source) {
+      const text = await this.readSkill(source);
       const bytes = new TextEncoder().encode(text);
       let binary = "";
       for (const byte of bytes) binary += String.fromCharCode(byte);

@@ -1,5 +1,4 @@
-import { AGENT_MEMORY_LIMITS, type AgentMemoryLimit, type AppVariant } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import { APP_INTERFACE_SIZES, type AppInterfaceSize, type AppVariant } from "@openbot/contracts/ipc";
 import {
   Item,
   ItemActions,
@@ -15,29 +14,25 @@ import {
   SettingsSection,
   SwitchField,
 } from "@openbot/ui";
+import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { LogoColorPicker } from "@openbot/ui/features/settings/LogoColorPicker";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
+import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
+import { useAppearanceChoice } from "../../appearance-choice";
 import { useI18n } from "../../i18n-context";
+import { useInterfaceSizeChoice } from "../../interface-size";
 import { useLogoColorChoice } from "../../logo-color";
+import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
-const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
-
-/**
- * The saved value is the English name, because it is what `app-settings.ts` persists and what the
- * main process compares against. Only the label a reader sees is translated.
- */
-const LINK_TARGET_KEYS = {
-  "Default browser": "settings.externalLinks.defaultBrowser",
-  OpenBot: "settings.externalLinks.openbot",
-} as const satisfies Record<GeneralSettingsValue["externalLinkTarget"], AppTextKey>;
+const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
 
 interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
   /** The device with the keyboard, naming ⌘ or Ctrl in the shortcut option. */
-  platform?: "darwin" | "win32" | "linux";
+  platform?: "darwin" | "win32" | "linux" | undefined;
   /** A dev or preview build keeps its own logo color, so the logo color row says so. */
   variant: AppVariant;
   /** The dialog element the Select popovers portal into, captured when the tab was created. */
@@ -48,14 +43,39 @@ interface SettingsGeneralTabProps {
 
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
-  const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
-    value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
+  const appearance = useAppearanceChoice();
   const logoColor = useLogoColorChoice();
+  const interfaceSize = useInterfaceSizeChoice();
+  const { format } = useText();
+  const interfaceSizeLabel = (value: AppInterfaceSize | undefined) =>
+    value === undefined ? "" : format.percent(value / 100);
   return (
     <>
       <SettingsSection title={i18n.t("settings.appearance.title")}>
         <ItemGroup class="settings-modal-card">
-          <Item class="settings-modal-row">
+          <Item data-settings-row="settings.appearance.theme.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.appearance.theme.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.appearance.theme.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <AppearanceSelect
+                value={appearance.appearance()}
+                onChange={appearance.changeAppearance}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <Show when={props.platform === "darwin"}>
+            <SwitchField
+              data-settings-row="settings.appearance.transparentWindow.title"
+              checked={appearance.transparentWindow()}
+              onChange={appearance.changeTransparentWindow}
+              label={i18n.t("settings.appearance.transparentWindow.title")}
+              description={i18n.t("settings.appearance.transparentWindow.description")}
+            />
+          </Show>
+          <Item data-settings-row="settings.language.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
@@ -64,7 +84,30 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
             </ItemActions>
           </Item>
-          <Item class="settings-modal-row settings-logo-color-row">
+          <Item data-settings-row="settings.interfaceSize.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.interfaceSize.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.interfaceSize.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select<AppInterfaceSize>
+                class="settings-modal-select"
+                options={interfaceSizeOptions}
+                value={interfaceSize.percent()}
+                onChange={(value) => value && interfaceSize.changePercent(value)}
+                placement="bottom-end"
+                itemComponent={(selectProps) => (
+                  <SelectItem item={selectProps.item}>{interfaceSizeLabel(selectProps.item.rawValue)}</SelectItem>
+                )}
+              >
+                <SelectTrigger size="sm" aria-label={i18n.t("settings.interfaceSize.title")}>
+                  <SelectValue<AppInterfaceSize>>{(state) => interfaceSizeLabel(state.selectedOption())}</SelectValue>
+                </SelectTrigger>
+                <SelectContent mount={props.selectMount} />
+              </Select>
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.logoColor.title" class="settings-modal-row settings-logo-color-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.logoColor.description")}</ItemDescription>
@@ -79,7 +122,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
       <SettingsSection title={i18n.t("settings.conversations.title")}>
         <ItemGroup class="settings-modal-card">
-          <Item class="settings-modal-row">
+          <Item data-settings-row="settings.sendShortcut.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.sendShortcut.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.sendShortcut.description")}</ItemDescription>
@@ -94,57 +137,24 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
             </ItemActions>
           </Item>
           <SwitchField
-            checked={props.value.busyMessageMode === "steer"}
-            onChange={(checked) => props.onUpdateSetting("busyMessageMode", checked ? "steer" : "queue")}
-            label={i18n.t("settings.busyMessage.title")}
-            description={i18n.t("settings.busyMessage.description")}
+            data-settings-row="settings.showAgentSteps.title"
+            checked={props.value.showAgentSteps}
+            onChange={(checked) => props.onUpdateSetting("showAgentSteps", checked)}
+            label={i18n.t("settings.showAgentSteps.title")}
+            description={i18n.t("settings.showAgentSteps.description")}
           />
-          <Item class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.agentMemoryLimit.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.agentMemoryLimit.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select<AgentMemoryLimit>
-                class="settings-modal-select"
-                options={[...AGENT_MEMORY_LIMITS]}
-                value={props.value.agentMemoryLimit}
-                onChange={(value) => value && props.onUpdateSetting("agentMemoryLimit", value)}
-                placement="bottom-end"
-                itemComponent={(selectProps) => (
-                  <SelectItem item={selectProps.item}>{String(selectProps.item.rawValue)}</SelectItem>
-                )}
-              >
-                <SelectTrigger size="sm" aria-label={i18n.t("settings.agentMemoryLimit.title")}>
-                  <SelectValue<AgentMemoryLimit>>{(state) => String(state.selectedOption() ?? "")}</SelectValue>
-                </SelectTrigger>
-                <SelectContent mount={props.selectMount} />
-              </Select>
-            </ItemActions>
-          </Item>
-          <Item class="settings-modal-row">
+          <Item data-settings-row="settings.externalLinks.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.externalLinks.description")}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Select<GeneralSettingsValue["externalLinkTarget"]>
-                class="settings-modal-select"
-                options={linkTargetOptions}
-                value={props.value.externalLinkTarget}
-                onChange={(value) => value && props.onUpdateSetting("externalLinkTarget", value)}
-                placement="bottom-end"
-                itemComponent={(selectProps) => (
-                  <SelectItem item={selectProps.item}>{linkTargetLabel(selectProps.item.rawValue)}</SelectItem>
-                )}
-              >
-                <SelectTrigger size="sm" aria-label={i18n.t("settings.externalLinks.title")}>
-                  <SelectValue<GeneralSettingsValue["externalLinkTarget"]>>
-                    {(state) => linkTargetLabel(state.selectedOption())}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent mount={props.selectMount} />
-              </Select>
+              <ExternalLinkSelect
+                target={props.value.externalLinkTarget}
+                platform={props.platform}
+                mount={props.selectMount}
+                onChange={(target) => props.onUpdateSetting("externalLinkTarget", target)}
+              />
             </ItemActions>
           </Item>
         </ItemGroup>
@@ -152,25 +162,50 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
 
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
+          <Show when={props.value.launchAtLogin !== null}>
+            <SwitchField
+              data-settings-row="settings.launchAtLogin.title"
+              checked={props.value.launchAtLogin === true}
+              onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
+              label={i18n.t("settings.launchAtLogin.title")}
+              description={i18n.t("settings.launchAtLogin.description")}
+            />
+          </Show>
           <SwitchField
-            checked={props.value.launchAtLogin}
-            onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
-            label={i18n.t("settings.launchAtLogin.title")}
-            description={i18n.t("settings.launchAtLogin.description")}
-          />
-          <SwitchField
+            data-settings-row="settings.keepRemoteSessions.title"
             checked={props.value.keepRemoteSessions}
             onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
             label={i18n.t("settings.keepRemoteSessions.title")}
             description={i18n.t("settings.keepRemoteSessions.description")}
           />
+          <Show when={props.value.keepRunningInBackground !== null}>
+            <SwitchField
+              data-settings-row="settings.keepRunning.title"
+              checked={props.value.keepRunningInBackground === true}
+              onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
+              label={i18n.t("settings.keepRunning.title")}
+              description={i18n.t("settings.keepRunning.description")}
+            />
+          </Show>
+          <Show when={props.value.keepAwake !== null}>
+            <SwitchField
+              data-settings-row="settings.keepAwake.title"
+              checked={props.value.keepAwake === true}
+              onChange={(checked) => props.onUpdateSetting("keepAwake", checked)}
+              label={i18n.t("settings.keepAwake.title")}
+              description={i18n.t("settings.keepAwake.description")}
+            />
+            <SwitchField
+              data-settings-row="settings.keepAwakeOnBattery.title"
+              checked={props.value.keepAwakeOnBattery === true}
+              disabled={props.value.keepAwake !== true}
+              onChange={(checked) => props.onUpdateSetting("keepAwakeOnBattery", checked)}
+              label={i18n.t("settings.keepAwakeOnBattery.title")}
+              description={i18n.t("settings.keepAwakeOnBattery.description")}
+            />
+          </Show>
           <SwitchField
-            checked={props.value.keepRunningInBackground}
-            onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-            label={i18n.t("settings.keepRunning.title")}
-            description={i18n.t("settings.keepRunning.description")}
-          />
-          <SwitchField
+            data-settings-row="settings.restoreWorkspace.title"
             checked={props.value.restoreLastWorkspace}
             onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
             label={i18n.t("settings.restoreWorkspace.title")}
@@ -182,6 +217,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
       <SettingsSection title={i18n.t("settings.permissions.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
+            data-settings-row="settings.analytics.title"
             checked={props.value.productAnalytics}
             onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
             label={i18n.t("settings.analytics.title")}

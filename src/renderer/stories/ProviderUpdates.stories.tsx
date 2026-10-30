@@ -1,5 +1,6 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Button, Checkbox, Heading, Text, Toaster, toast } from "@openbot/ui";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
@@ -80,6 +81,8 @@ function ProviderUpdateFlow(props: {
   failure?: string;
   /** Two other notifications open beside the update, so the stack has something to make room for. */
   companions?: boolean;
+  /** Each update first waits this long for the provider's turn to end, as main reports it. */
+  waitMs?: number;
 }) {
   const [runtimes, setRuntimes] = createSignal(readyRuntimes());
   const [provider, setProvider] = createSignal<AgentProviderId>("claude");
@@ -118,6 +121,16 @@ function ProviderUpdateFlow(props: {
     const update = updates().find((update) => update.provider === id);
     if (update) showProviderUpdateToast(update, () => startUpdate(id));
     running.add(id);
+    const waitMs = props.waitMs;
+    if (waitMs === undefined) {
+      runDownload(id);
+      return;
+    }
+    setRuntime(id, { phase: "downloading", progress: 0, message: sourceText("status.provider.updateWaiting") });
+    timers.add(window.setTimeout(() => runDownload(id), waitMs));
+  }
+
+  function runDownload(id: ManagedProviderId): void {
     setRuntime(id, { phase: "downloading", progress: 0, message: null });
     let progress = 0;
     const interval = window.setInterval(() => {
@@ -282,6 +295,11 @@ export const Playground: Story = {
 
 /** The offer, on both surfaces at once. */
 export const UpdateAvailable: Story = {};
+
+/** Press Update: Claude runs a turn, so the update waits for it on both surfaces, then downloads. */
+export const WaitsForTurn: Story = {
+  render: () => <ProviderUpdateFlow controls waitMs={3_000} />,
+};
 
 /**
  * Text that `userErrorMessage` lets through: under its length limit, with no path or stack trace,

@@ -5,10 +5,9 @@ Related to [#427](https://github.com/nightly-labs/openbot/issues/427) and
 
 ## Decision
 
-Keep Expo Camera for preview and capture, Reanimated for panel motion, and Skia for
-the existing sign-in background. Do not add WebGPU for these transitions. The
-camera is a native surface; replacing the decorative renderer does not remove
-camera startup or native layout work.
+Keep Expo Camera for preview and capture, and Reanimated for panel motion. Do not add
+WebGPU for these transitions. The camera is a native surface; replacing the decorative
+renderer does not remove camera startup or native layout work.
 
 Mount the camera at the requested preview size while the panel is hidden. Start
 opening only after Expo Camera reports `onCameraReady`. Keep the same camera
@@ -33,16 +32,12 @@ tap and the start of motion; it does not make camera hardware start faster. No
 camera is kept running before the user requests it. Permission controls and
 camera startup errors open without waiting for a live preview.
 
-The sign-in background and logo pause when the scanner button is pressed, before
-panel measurement and camera preparation. They resume after closing or a failed
-measurement. The background stays paused while the QR panel is present. Its frame
-callback also stops in the background and with reduced motion. If its Skia effect
-cannot compile, the screen uses its plain background. Keep system reduced motion
-on both panel animations.
-
-The QR panel still changes its clip bounds during the morph. Profile that path
-before replacing it with a transform or a canvas. This change does not tune photo
-quality, preview resolution, or frame rate without device evidence.
+The sign-in QR scanner does not morph a panel. It mounts the camera full screen under the
+stage block, which covers the screen while the camera starts. The block fades only after Expo
+Camera reports `onCameraReady` (or a mount error), and the stage's eyes become the scanner frame.
+Only transforms, opacity and colors animate, on the UI thread; no clip bounds change. When the app
+goes to the background, the camera unmounts and the block covers the screen until the next
+readiness report. Closing the scanner keeps the camera mounted until the block covers it again.
 
 ## Verification
 

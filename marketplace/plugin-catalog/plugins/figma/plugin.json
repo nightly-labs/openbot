@@ -4,7 +4,7 @@
   "tagline": "Designs and prototypes",
   "description": "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",
   "category": "design",
-  "creatorName": "figma.com",
+  "creatorName": "Figma",
   "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
   "version": "1.1.0",
   "prompts": [

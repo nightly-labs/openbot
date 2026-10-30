@@ -16,7 +16,11 @@ import { randomToken, sha256 } from "./crypto";
 import type { AuthStoreError } from "./d1-auth-repository";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
-import { EMAIL_CODE_DELIVERY_BUDGET_MS, RATE_LIMITED_DELIVERY_ERROR } from "./smtp-email-delivery";
+import {
+  AMBIGUOUS_DELIVERY_ERRORS,
+  EMAIL_CODE_DELIVERY_BUDGET_MS,
+  RATE_LIMITED_DELIVERY_ERROR,
+} from "./smtp-email-delivery";
 import type {
   AuthRepository,
   AuthUser,
@@ -36,7 +40,6 @@ const MOBILE_CONNECT_SERVER_ID = "00000000-0000-4000-8000-000000000002";
 // The host ID rule of `isMobileConnectHostBinding`.
 const MOBILE_CONNECT_HOST_ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/u;
 const RATE_WINDOW_MS = 15 * 60_000;
-const AMBIGUOUS_DELIVERY_ERRORS = new Set(["smtp_delivery_unknown", "email_delivery_unknown"]);
 // A provider sender limit frees again as its window rolls forward, so the client waits and retries
 // rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
 // capacity returns before the window ends, and a countdown of a whole hour reads like an outage.
@@ -690,11 +693,15 @@ export class AuthService {
     function* (
       this: AuthService,
       sessionToken: string,
+      hostId: string | null,
     ): Effect.fn.Return<MobileAuthDevice[], AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
+      if (hostId !== null && !MOBILE_CONNECT_HOST_ID_PATTERN.test(hostId)) {
+        return yield* new AuthServiceError(400, "invalid_mobile_host", "The Mobile Connect host ID is invalid.");
+      }
       const user = yield* this.authenticate(sessionToken);
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
-      return yield* dependencies.repository.listMobileAuthDevices(user.id, dependencies.now());
+      return yield* dependencies.repository.listMobileAuthDevices(user.id, dependencies.now(), hostId);
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);

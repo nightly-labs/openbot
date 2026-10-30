@@ -8,6 +8,19 @@ import { canAdministerServer } from "@openbot/contracts/ipc";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  BROWSER_PAGE_STATE_CAPABILITY,
+  BROWSER_PAGE_STATE_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_SIGN_IN_ROUTES,
+  decodeBrowserSignInImport,
+} from "@openbot/contracts/team-protocol/browser-sign-in-v1";
+import {
+  BROWSER_USER_CONTROL_CAPABILITY,
+  BROWSER_USER_CONTROL_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiBrowser, TeamApiBrowserView } from "./dependencies";
@@ -17,14 +30,14 @@ import { nullableString, parseBrowserBounds, pathIdentifier, readJson, stringFie
 
 export interface BrowserRouteDependencies {
   browser: TeamApiBrowser;
-  browserView?: TeamApiBrowserView;
+  browserView?: TeamApiBrowserView | undefined;
 }
 
 export async function routeBrowser(
   context: TeamApiRequestContext,
   { browser, browserView }: BrowserRouteDependencies,
 ): Promise<RouteOutcome> {
-  const { method, url, request, member, sessionId, json, empty } = context;
+  const { method, url, request, member, sessionId, capabilities, json, empty } = context;
   // A private tab holds an administrator's MCP sign-in (`mcp-sign-in-v1`). A member could watch the
   // password, or finish the sign-in with their own account, so to a member that tab does not exist.
   const hidden = (tabId: string) => !canAdministerServer(member.role) && browser.isPrivate(tabId);
@@ -108,10 +121,52 @@ export async function routeBrowser(
     await runCauseEffect(
       browser.setVisible({
         visible: body.visible,
-        bounds: body.bounds === undefined ? undefined : parseBrowserBounds(body.bounds),
+        ...(body.bounds === undefined ? {} : { bounds: parseBrowserBounds(body.bounds) }),
       }),
     );
     return empty(204);
+  }
+
+  // Behind `browser-user-control`. Any member who can see a tab takes or releases it; the answer is
+  // the whole list of held tabs that this member can see, as the event sends it.
+  if (method === "POST" && Object.values(BROWSER_USER_CONTROL_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_USER_CONTROL_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserUserControlUnsupported"));
+    const body = await readJson(request);
+    if (url.pathname === BROWSER_USER_CONTROL_ROUTES.take)
+      await runCauseEffect(browser.takeUserControl(tabId(body), { kind: "member", memberId: member.id, sessionId }));
+    if (url.pathname === BROWSER_USER_CONTROL_ROUTES.release) browser.releaseUserControl(tabId(body));
+    return json(200, {
+      tabIds: browser
+        .listTabs()
+        .filter((tab) => tab.userControl && !hidden(tab.id))
+        .map((tab) => tab.id),
+    });
+  }
+
+  // Behind `browser-page-state`. A stop ends the load now, before the queued tab operations; the
+  // answer is the history state of each tab that this member can see, as the event sends it.
+  if (method === "POST" && Object.values(BROWSER_PAGE_STATE_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_PAGE_STATE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserStopUnsupported"));
+    const body = await readJson(request);
+    if (url.pathname === BROWSER_PAGE_STATE_ROUTES.stop) await runCauseEffect(browser.stop(tabId(body)));
+    return json(200, {
+      tabs: browser
+        .listTabs()
+        .filter((tab) => !hidden(tab.id))
+        .map((tab) => ({ tabId: tab.id, canGoBack: tab.canGoBack === true, canGoForward: tab.canGoForward === true })),
+    });
+  }
+
+  // Behind `browser-sign-in`. Any member who can see a tab gives it the cookies of a sign-in made on
+  // their own device. The body holds cookie values: it is never logged, and the answer holds a count.
+  if (method === "POST" && url.pathname === BROWSER_SIGN_IN_ROUTES.import) {
+    if (!capabilities.has(BROWSER_SIGN_IN_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserSignInUnsupported"));
+    const body = await readJson(request);
+    const signIn = decodeBrowserSignInImport({ ...body, tabId: tabId(body) });
+    return json(200, { cookies: await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies)) });
   }
 
   // Behind `browser-view`. The session is only the agreement about which tab and who is watching;

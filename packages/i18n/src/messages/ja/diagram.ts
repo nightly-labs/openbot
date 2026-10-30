@@ -4,8 +4,35 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "ダイアグラム {name}",
   "diagram.board.label": "{name} のキャンバス",
-  "diagram.board.emptyTitle": "ルーティンから始めましょう",
-  "diagram.board.emptyBody": "作業を開始するルーティンを追加し、そこにエージェントを接続してください。",
+  "diagram.board.emptyLead": "一度描くだけです。",
+  "diagram.board.emptyTitle": "あとは{run}様子を見るだけです。",
+  "diagram.board.emptyRun": "動く",
+  "diagram.board.emptyStart": "ルーティンが作業を開始します。",
+  "diagram.board.emptyHandoff": "各エージェントが次のエージェントに回答を渡します。",
+  "diagram.board.sample.routine": "朝のブリーフィング",
+  "diagram.board.sample.instruction":
+    "昨日から市場と営業パイプラインで変わったことを集め、今日の優先事項にまとめてください。",
+  "diagram.board.sample.researchName": "リサーチ",
+  "diagram.board.sample.researchTitle": "リサーチパートナー",
+  "diagram.board.sample.researchTask": "昨日以降の市場と製品のニュースを、各項目に出典を付けて集めてください。",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind が API 価格を 20% 引き下げました。\n2. 汎用モデル向けの EU ガイダンスが確定しました。\n3. 競合 2 社が今週エージェントキャンバスを公開しました。",
+  "diagram.board.sample.salesName": "セールス",
+  "diagram.board.sample.salesTitle": "アウトバウンド担当",
+  "diagram.board.sample.salesTask": "昨日からステージが変わった商談と、それぞれの次のステップを挙げてください。",
+  "diagram.board.sample.salesOutput":
+    "- Contoso が交渉段階に進みました。次のステップ: セキュリティレビューを送る。\n- Fabrikam が 9 日間停滞しています。次のステップ: 推進者に電話する。",
+  "diagram.board.sample.writerName": "ライター",
+  "diagram.board.sample.writerTitle": "ブリーフィング担当",
+  "diagram.board.sample.writerTask":
+    "リサーチとパイプラインから 1 つのブリーフィングを書いてください。200 語以内です。",
+  "diagram.board.sample.writerOutput":
+    "Northwind が API 価格を引き下げ、EU ガイダンスが確定し、Contoso は成約間近です。Fabrikam には今日電話が必要です。",
+  "diagram.board.sample.chiefName": "チーフ",
+  "diagram.board.sample.chiefTitle": "チーフ・オブ・スタッフ",
+  "diagram.board.sample.chiefTask": "ブリーフィングを読み、今日の優先事項を 3 つ決めてチームに投稿してください。",
+  "diagram.board.sample.chiefOutput":
+    "今日の優先事項:\n1. Contoso にセキュリティレビューを送る。\n2. Northwind の値下げに対応する。\n3. Fabrikam に電話する。",
   "diagram.menu.label": "キャンバス",
   "diagram.menu.addAgent": "ここにエージェントを追加",
   "diagram.menu.noAgents": "すべてのエージェントがキャンバス上にあります",

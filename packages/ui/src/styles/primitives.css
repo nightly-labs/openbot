@@ -150,6 +150,20 @@
   padding-inline: var(--openbot-space-6);
 }
 
+/* A Lucide icon keeps width="24" when the caller sets no size, which is too large next to button
+   text. These rules have no specificity, so a size prop or a feature rule still wins. */
+:where(.ui-button > svg[width="24"]) {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+:where(.ui-button-size-xs > svg[width="24"], .ui-button-size-sm > svg[width="24"]) {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
 :where(.ui-button-variant-default) {
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
@@ -232,10 +246,6 @@
 
 :where(.ui-button-variant-destructive):focus-visible {
   border-color: var(--openbot-danger-focus);
-}
-
-:where(.ui-button-variant-destructive, .ui-button-variant-destructive-ghost):focus-visible {
-  box-shadow: 0 0 0 3px var(--openbot-danger-focus);
 }
 
 :where(.ui-button)[aria-invalid="true"] {
@@ -371,22 +381,6 @@
 
 :where(.z-badge):has(> [data-icon="inline-end"]) {
   padding-right: var(--openbot-space-1-5);
-}
-
-:where(.z-badge)[data-size="sm"] {
-  min-height: 18px;
-  height: 18px;
-  padding: 0 var(--openbot-space-1);
-  font-size: var(--openbot-text-sm);
-}
-
-:where(.z-badge)[data-size="md"] {
-  min-height: 22px;
-  padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
-}
-
-:where(.z-badge)[data-shape="rounded"] {
-  border-radius: var(--openbot-radius-sm);
 }
 
 :where(.z-badge-variant-default) {
@@ -602,9 +596,9 @@
   color: var(--openbot-text-placeholder);
 }
 
+/* A focused field gets a neutral border and no ring. */
 :where(.ui-input, .ui-textarea, .ui-native-select):focus-visible {
   border-color: var(--openbot-border-focus);
-  box-shadow: var(--openbot-focus-ring);
 }
 
 :where(.ui-input, .ui-textarea, .ui-native-select)[aria-invalid="true"] {
@@ -661,9 +655,8 @@
 }
 
 .ui-select .ui-select-trigger:focus-visible {
-  border-color: var(--openbot-border-strong);
+  border-color: var(--openbot-border-focus);
   outline: 0;
-  box-shadow: 0 0 0 3px var(--openbot-hover);
 }
 
 .ui-select-trigger[data-disabled] {
@@ -725,6 +718,64 @@
   margin: 0;
   padding: var(--openbot-space-1);
   outline: 0;
+}
+
+/* The search field stays at the top; only the rows scroll, so Kobalte scrolls the listbox. */
+.ui-search-select-content {
+  display: flex;
+  flex-direction: column;
+  width: max(var(--kb-popper-anchor-width, 0px), 240px);
+  overflow: hidden;
+  transform-origin: var(--kb-popover-content-transform-origin);
+}
+
+.ui-search-select-search {
+  position: relative;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-1);
+}
+
+.ui-search-select-search > svg {
+  position: absolute;
+  top: 50%;
+  left: var(--openbot-space-3);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.ui-search-select-input {
+  width: 100%;
+  padding-left: var(--openbot-space-8);
+}
+
+.ui-search-select-root {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.ui-search-select-content .ui-select-listbox {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.ui-search-select-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.ui-select-footer {
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-1);
 }
 
 .ui-select-item {
@@ -842,6 +893,11 @@
 
 .ui-field-description {
   color: var(--openbot-text-muted);
+}
+
+.ui-field-limit {
+  display: grid;
+  gap: var(--openbot-space-0-5);
 }
 
 .ui-switch {
@@ -1047,6 +1103,49 @@
 
 .ui-slider-thumb[data-dragging] {
   cursor: grabbing;
+}
+
+/* The seek slider draws its picture on the track; the playhead shows on hover, focus and drag. */
+.ui-seek-slider {
+  display: flex;
+  touch-action: none;
+}
+
+.ui-seek-slider-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.ui-seek-slider-picture {
+  display: flex;
+}
+
+.ui-seek-slider[data-disabled] .ui-seek-slider-track {
+  cursor: default;
+}
+
+.ui-seek-slider-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  display: block;
+  border-radius: var(--openbot-radius-pill);
+  outline: none;
+  background: var(--openbot-text-primary);
+  opacity: 0;
+}
+
+.ui-seek-slider-track:hover .ui-seek-slider-thumb,
+.ui-seek-slider-thumb:focus-visible,
+.ui-seek-slider-thumb[data-dragging] {
+  opacity: 1;
+}
+
+.ui-seek-slider-thumb:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
 }
 
 .ui-slider-field[data-disabled] {
@@ -1374,7 +1473,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--openbot-space-1);
-  color: var(--openbot-text-on-light);
+  color: var(--openbot-paper-text);
   visibility: hidden;
 }
 
@@ -1555,7 +1654,8 @@
   color: var(--openbot-text-primary);
 }
 
-.ui-toaster[data-sonner-toaster][data-sonner-theme="dark"] {
+/* Both themes: Sonner sets its own colors under `[data-sonner-theme]`, so this keeps the same weight. */
+.ui-toaster[data-sonner-toaster][data-sonner-theme] {
   z-index: var(--openbot-layer-toast);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
@@ -1878,7 +1978,7 @@
 
 .ui-tooltip {
   position: relative;
-  z-index: 80;
+  z-index: var(--openbot-layer-tooltip);
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-bg-canvas);
@@ -1916,6 +2016,44 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
+/* A tooltip without space above its control goes to another side. The arrow then points to the
+   control from that side. */
+.ui-tooltip[data-placement="bottom"] {
+  transform-origin: top center;
+}
+
+.ui-tooltip[data-placement="bottom"]::after {
+  top: -4px;
+  bottom: auto;
+  box-shadow: -1px -1px 0 var(--openbot-border-strong);
+}
+
+.ui-tooltip:is([data-placement="left"], [data-placement="right"])::after {
+  top: 50%;
+  bottom: auto;
+}
+
+.ui-tooltip[data-placement="left"] {
+  transform-origin: center right;
+}
+
+.ui-tooltip[data-placement="left"]::after {
+  right: -4px;
+  left: auto;
+  box-shadow: 1px -1px 0 var(--openbot-border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.ui-tooltip[data-placement="right"] {
+  transform-origin: center left;
+}
+
+.ui-tooltip[data-placement="right"]::after {
+  left: -4px;
+  box-shadow: -1px 1px 0 var(--openbot-border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ui-button,
   .ui-switch,
@@ -1938,10 +2076,20 @@
     animation: none;
   }
 }
+/* The one dialog overlay. Each Dialog.Overlay and AlertDialog.Overlay has this class. It covers the
+ * window on the dialog layer, centers the dialog that it holds, and fades in. A dialog changes only
+ * what is different for it, such as a nested layer. */
 .ui-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
   background: var(--openbot-dialog-overlay);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+  animation: ui-dialog-overlay-in var(--openbot-duration-overlay) var(--openbot-ease-out);
   /* The window swallows mouse events over a `-webkit-app-region: drag` area, such as the server rail
    * and the window headers, and hands them to the window manager instead. A click there while a
    * dialog was open started a window drag and never reached this overlay, so that side of the window
@@ -1979,16 +2127,12 @@
  * A confirmation always answers the surface that opened it, so it takes the top nested dialog step:
  * it also opens over the marketplace and skills modals on `--openbot-layer-dialog-host`. */
 .ui-confirm-dialog-overlay {
-  position: fixed;
   z-index: calc(var(--openbot-layer-dialog-host) + 2);
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
-  animation: ui-confirm-dialog-fade-in var(--openbot-duration-overlay) var(--openbot-ease-out);
 }
 
 .ui-dialog-content.ui-confirm-dialog {
+  --agent-avatar-outline: var(--openbot-bg-sidebar);
+
   width: min(460px, 100%);
   max-height: calc(100dvh - 2 * var(--openbot-space-6));
   display: flex;
@@ -2130,7 +2274,7 @@
   transform: scale(0.97);
 }
 
-@keyframes ui-confirm-dialog-fade-in {
+@keyframes ui-dialog-overlay-in {
   from {
     opacity: 0;
   }
@@ -2163,7 +2307,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ui-dialog-content.ui-confirm-dialog {
-    animation-name: ui-confirm-dialog-fade-in;
+    animation-name: ui-dialog-overlay-in;
   }
 
   .ui-confirm-dialog-actions .ui-button:active {
@@ -2423,4 +2567,14 @@ button.ui-bubble-content {
 /* Keep notification actions usable while a Kobalte modal blocks the page. */
 .ui-toast-layer {
   pointer-events: auto;
+}
+
+/* The toasts float over areas that move the window: the window headers, and the full window on the
+ * sign-in, setup, onboarding and loading screens. The window swallows mouse events over a
+ * `-webkit-app-region: drag` area, so a pointer on a toast left the stack and collapsed it, and only its
+ * buttons, which are `no-drag`, could be reached. The `::after` is the strip Sonner puts in the gap
+ * between expanded toasts, so the pointer can cross it. */
+.ui-toaster [data-sonner-toast],
+.ui-toaster [data-sonner-toast]::after {
+  -webkit-app-region: no-drag;
 }

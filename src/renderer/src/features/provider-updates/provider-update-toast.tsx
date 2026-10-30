@@ -9,7 +9,18 @@ import {
 } from "@openbot/ui/features/provider-updates/provider-update";
 import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createRoot, createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createRoot,
+  createSignal,
+  createUniqueId,
+  getOwner,
+  onSettled,
+  runWithOwner,
+  Show,
+  untrack,
+} from "solid-js";
 
 /**
  * The provider update, as one notification the user acts on and then watches.
@@ -186,6 +197,12 @@ const liveToasts = new Map<AgentProviderId, LiveProviderUpdateToast>();
 const dismissTimers = new Map<AgentProviderId, number>();
 const disposers = new Map<AgentProviderId, () => void>();
 /**
+ * The owner of every notification's root. The caller is an effect callback, which has no owner, and
+ * Solid refuses a root with no owner there: it halts the reactive system for the whole page. This
+ * root is made when the module loads, outside every effect, and lives as long as the module.
+ */
+const notificationsOwner = createRoot(() => getOwner());
+/**
  * The version each provider's notification was closed on by the user.
  *
  * It lives here because this module outlives the runtime store, which is rebuilt for every server
@@ -228,85 +245,87 @@ function liveToast(provider: AgentProviderId, update: ProviderUpdate): LiveProvi
   const open = liveToasts.get(provider);
   if (open) return open;
 
-  const parts = createRoot((dispose) => {
-    // The text is made here, not by the caller, so a language change while the toast is open
-    // translates it again. Main pushes one snapshot for every percent of every download, and each
-    // one is presented again for every update in flight. A presentation that says what is on screen
-    // already changes nothing.
-    const [latest, setLatest] = createSignal(update);
-    const current = createMemo(() => presentProviderUpdate(latest()), { equals: samePresentation });
-    // What changes the height of the toast: the lines it shows, not the percentage on one of them.
-    // "Setting up" keeps the title of the download before it and loses the percentage, so the words
-    // of the title alone are not enough.
-    const layout = createMemo(() => {
-      const { title, detail, busy, failed, progress, actionLabel } = current();
-      return JSON.stringify([title, detail, busy, failed, progress === null, actionLabel ?? null]);
-    });
-    // Whether the failure's sentence is cut off, and whether the user opened it. Both change the
-    // height of the toast, so they live here, where the title can read them.
-    const [clamped, setClamped] = createSignal(false);
-    const [expanded, setExpanded] = createSignal(false);
-    // Read at click time, so the button that offered the update is the button that retries it.
-    let act = (): void => {};
-    let offered: string | null = null;
+  const parts = runWithOwner(notificationsOwner, () =>
+    createRoot((dispose) => {
+      // The text is made here, not by the caller, so a language change while the toast is open
+      // translates it again. Main pushes one snapshot for every percent of every download, and each
+      // one is presented again for every update in flight. A presentation that says what is on screen
+      // already changes nothing.
+      const [latest, setLatest] = createSignal(update);
+      const current = createMemo(() => presentProviderUpdate(latest()), { equals: samePresentation });
+      // What changes the height of the toast: the lines it shows, not the percentage on one of them.
+      // "Setting up" keeps the title of the download before it and loses the percentage, so the words
+      // of the title alone are not enough.
+      const layout = createMemo(() => {
+        const { title, detail, busy, failed, progress, actionLabel } = current();
+        return JSON.stringify([title, detail, busy, failed, progress === null, actionLabel ?? null]);
+      });
+      // Whether the failure's sentence is cut off, and whether the user opened it. Both change the
+      // height of the toast, so they live here, where the title can read them.
+      const [clamped, setClamped] = createSignal(false);
+      const [expanded, setExpanded] = createSignal(false);
+      // Read at click time, so the button that offered the update is the button that retries it.
+      let act = (): void => {};
+      let offered: string | null = null;
 
-    const live: LiveProviderUpdateToast = {
-      present: (nextUpdate) => {
-        const previous = untrack(current);
-        const next = presentProviderUpdate(nextUpdate);
-        setLatest(nextUpdate);
-        // A retry closes the old failure, so the next one opens at its first lines. A retry that
-        // fails before it starts goes from one failure to the next, so new words close it too.
-        if (!next.failed || next.detail !== previous.detail) setExpanded(false);
-      },
-      setAct: (next) => {
-        act = next;
-      },
-      setOffer: (version) => {
-        offered = version;
-      },
-    };
-    liveToasts.set(provider, live);
-    disposers.set(provider, dispose);
+      const live: LiveProviderUpdateToast = {
+        present: (nextUpdate) => {
+          const previous = untrack(current);
+          const next = presentProviderUpdate(nextUpdate);
+          setLatest(nextUpdate);
+          // A retry closes the old failure, so the next one opens at its first lines. A retry that
+          // fails before it starts goes from one failure to the next, so new words close it too.
+          if (!next.failed || next.detail !== previous.detail) setExpanded(false);
+        },
+        setAct: (next) => {
+          act = next;
+        },
+        setOffer: (version) => {
+          offered = version;
+        },
+      };
+      liveToasts.set(provider, live);
+      disposers.set(provider, dispose);
 
-    return {
-      live,
-      offeredVersion: () => offered,
-      // The title is the one thing given as a function. Sonner re-measures the toast whenever the
-      // title or the description changes, and the other two are elements that keep their identity
-      // for the whole flow, so these reads are what keep the recorded height honest. Opening or
-      // cutting off the failure's sentence changes the height without changing the title's words,
-      // so the title reads those two as well.
-      //
-      // It does not read the percentage. A measurement sets the toast's height to `auto` for a
-      // moment, which stops the height transition of the stack, and a download measured on every
-      // percent made concurrent updates jump and spend the CPU on layout.
-      title: () => {
-        clamped();
-        expanded();
-        layout();
-        return untrack(current).title;
-      },
-      icon: providerIcon(provider),
-      description: (
-        <ProviderUpdateDetail
-          provider={provider}
-          presentation={current()}
-          expanded={expanded()}
-          clamped={clamped()}
-          onExpandedChange={setExpanded}
-          onClampedChange={setClamped}
-        />
-      ),
-      label: <ProviderUpdateActionLabel presentation={current()} />,
-      // Sonner deletes a toast after its action unless the click is defaultPrevented. Staying is
-      // what lets one notification carry the offer, the download and the outcome.
-      onClick: (event: MouseEvent) => {
-        event.preventDefault();
-        act();
-      },
-    };
-  });
+      return {
+        live,
+        offeredVersion: () => offered,
+        // The title is the one thing given as a function. Sonner re-measures the toast whenever the
+        // title or the description changes, and the other two are elements that keep their identity
+        // for the whole flow, so these reads are what keep the recorded height honest. Opening or
+        // cutting off the failure's sentence changes the height without changing the title's words,
+        // so the title reads those two as well.
+        //
+        // It does not read the percentage. A measurement sets the toast's height to `auto` for a
+        // moment, which stops the height transition of the stack, and a download measured on every
+        // percent made concurrent updates jump and spend the CPU on layout.
+        title: () => {
+          clamped();
+          expanded();
+          layout();
+          return untrack(current).title;
+        },
+        icon: providerIcon(provider),
+        description: (
+          <ProviderUpdateDetail
+            provider={provider}
+            presentation={current()}
+            expanded={expanded()}
+            clamped={clamped()}
+            onExpandedChange={setExpanded}
+            onClampedChange={setClamped}
+          />
+        ),
+        label: <ProviderUpdateActionLabel presentation={current()} />,
+        // Sonner deletes a toast after its action unless the click is defaultPrevented. Staying is
+        // what lets one notification carry the offer, the download and the outcome.
+        onClick: (event: MouseEvent) => {
+          event.preventDefault();
+          act();
+        },
+      };
+    }),
+  );
 
   toast(parts.title, {
     id: toastId(provider),

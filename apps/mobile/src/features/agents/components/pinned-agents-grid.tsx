@@ -21,8 +21,10 @@ import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import { isAndroid } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { typeScale } from "@/shared/lib/type-scale";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
@@ -36,10 +38,18 @@ const PINNED_EXIT = FadeOut.duration(140).easing(EASE_OUT).reduceMotion(ReduceMo
 const PINNED_COLUMNS = 4;
 const PINNED_PADDING_X = 12;
 
-export function PinnedAgentsGrid({ agents }: { agents: MobileAgent[] }) {
+/**
+ * The pinned agents, then `children`: the pinned channels. `animateLayout` false stops the grid from
+ * animating to a new place, while something above it changes height on every frame.
+ */
+export function PinnedAgentsGrid({
+  agents,
+  animateLayout = true,
+  children,
+}: PropsWithChildren<{ agents: MobileAgent[]; animateLayout?: boolean }>) {
   return (
-    <Animated.View layout={PINNED_LAYOUT}>
-      {agents.length > 0 ? (
+    <Animated.View layout={animateLayout ? PINNED_LAYOUT : undefined}>
+      {agents.length > 0 || children ? (
         <Animated.View exiting={PINNED_EXIT} style={{ width: "100%" }}>
           <View
             style={{
@@ -47,12 +57,14 @@ export function PinnedAgentsGrid({ agents }: { agents: MobileAgent[] }) {
               flexWrap: "wrap",
               rowGap: 18,
               paddingHorizontal: PINNED_PADDING_X,
-              paddingVertical: 22,
+              paddingTop: 14,
+              paddingBottom: 18,
             }}
           >
             {agents.map((agent) => (
               <PinnedAgentItem key={agent.id} agent={agent} />
             ))}
+            {children}
           </View>
         </Animated.View>
       ) : null}
@@ -83,7 +95,11 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
       onPressIn={agentChatPreview.onPressIn}
-      onLongPress={isAndroid ? () => setMenuKey((key) => key + 1) : undefined}
+      delayLongPress={longPressDelay}
+      onLongPress={() => {
+        void haptics.longPress();
+        if (isAndroid) setMenuKey((key) => key + 1);
+      }}
       style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
     >
       <ChatZoomSource>
@@ -107,11 +123,16 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
         </AgentPinAvatar>
       </ChatZoomSource>
       <View className="w-full gap-0.5">
-        <Typography.Paragraph type="body-xs" align="center" className="w-full text-text-secondary" numberOfLines={1}>
+        <Typography.Paragraph
+          align="center"
+          className="w-full text-text-secondary"
+          numberOfLines={1}
+          style={typeScale.small}
+        >
           {agent.name}
         </Typography.Paragraph>
         {agent.title.trim() ? (
-          <Typography.Paragraph type="body-xs" align="center" className="w-full text-muted" numberOfLines={1}>
+          <Typography.Paragraph align="center" className="w-full text-muted" numberOfLines={1} style={typeScale.small}>
             {agent.title.trim()}
           </Typography.Paragraph>
         ) : null}
@@ -137,7 +158,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   );
 });
 
-function PinnedChatItem({ children }: PropsWithChildren) {
+export function PinnedChatItem({ children }: PropsWithChildren) {
   return (
     <Animated.View
       entering={PINNED_ENTER}

@@ -1,7 +1,8 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.agent", {
-  "error.agent.historyUnavailable": "History is unavailable for this request. Read recent history again.",
+  "error.agent.historyUnavailable":
+    "History is unavailable for this request. Read recent history again, or use channel_history for channel work.",
   "error.agent.toolRequestInvalid":
     "Invalid tool discovery arguments. Use the declared schema and an original qualified tool name.",
   // Agent errors that the main process and the backend send.
@@ -45,6 +46,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.waitForTasksBeforeProviderChange":
     "Tasks of this agent are running. Wait for them to finish, or stop them, before changing provider.",
   "error.agent.waitBeforeClearContext": "Wait for the active turn and queue to finish before starting a new chat.",
+  "error.agent.waitBeforeCompactContext": "Wait for the active turn and queue to finish before compacting the context.",
+  "error.agent.compactContextUnavailable": "This agent cannot compact its context now.",
   "error.agent.unknown": "Unknown agent: {id}",
   "error.agent.onlyUserWidensSettings":
     "Only the user can give an agent Full access or turn Computer Use on. Ask the user to change it in the agent's settings.",
@@ -58,6 +61,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.duplicateIds": "Agent state contains duplicate agent ids; refusing to overwrite it.",
   "error.agent.copyNameFailed": "OpenBot could not create a unique agent copy name.",
   "error.agent.endpointRemoved": "The endpoint this agent used was removed. Choose another model for it.",
+  "error.agent.turnStalled":
+    "{provider} stopped responding, so OpenBot ended this turn. Send the message again, or choose another model.",
   "error.agent.selectedGone": "The selected agent no longer exists.",
   "error.agent.profileEndpointsChanged": "The custom endpoints changed while this was generating. Try again.",
   "error.agent.profileInvalid": "The provider returned an invalid profile. Try revising your prompt.",
@@ -84,7 +89,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
   "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",
-  "error.agent.sideQuestionLocalOnly": "Side questions work only on the computer that runs the agent.",
+  "error.agent.newChatLocalOnly": "Only the computer that runs the agent can let it start new chats.",
+  "error.agent.quickAcknowledgementLocalOnly": "Only the computer that runs the agent can change this setting.",
   "error.agent.sideQuestionBusy": "Too many side questions are running. Try again shortly.",
   "error.agent.sideQuestionFailed": "The agent could not answer the side question. Try again.",
   "error.agent.busyMessageModeLocalOnly":
@@ -106,12 +112,19 @@ export const messages = defineMessages("error.agent", {
     "This server is low on memory. Your message waits in the queue and starts when memory is free.",
   "error.agent.workspaceOnlyToolMissing":
     "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
+  "error.agent.claudeSandboxUnavailable":
+    "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
     "Screen capture is off for this agent. The user can turn on Computer Use in the agent settings.",
   "error.agent.screenCaptureUnavailable": "Screen capture is not available on this computer.",
   "error.agent.screenCaptureShared":
-    "Screen capture does not work in a channel or in a Slack, Discord or Telegram conversation, because other people get its files.",
+    "Screen capture does not work in a Slack, Discord or Telegram conversation, because other people get its files.",
   "error.agent.screenCaptureDeclined": "The user did not allow this screen capture. Nothing was captured.",
+  "error.agent.mcpServerDeclined": "The user did not allow this MCP server change. Nothing changed.",
+  "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
+  "error.agent.mcpServerKeysMove":
+    "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Server settings, MCP.",
+  "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",
   "error.agent.screenCaptureWindowMissing":
     "That window is not open now. Call list_capture_sources to get the current window ids.",
   "error.agent.screenCaptureDisplayMissing":

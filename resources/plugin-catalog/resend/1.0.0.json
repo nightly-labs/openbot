@@ -4,7 +4,7 @@
   "tagline": "Transactional email",
   "description": "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
   "category": "automation",
-  "creatorName": "resend.com",
+  "creatorName": "Resend",
   "iconUrl": "https://resend.com/static/favicons/favicon.ico",
   "version": "1.0.0",
   "prompts": [

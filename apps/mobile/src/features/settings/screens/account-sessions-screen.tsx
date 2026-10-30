@@ -93,7 +93,7 @@ export function AccountSessionsScreen() {
             void sessions.refetch();
           }}
         >
-          <Typography.Paragraph type="body-sm">
+          <Typography.Paragraph>
             {sessions.isFetching ? t("mobile.settings.sessions.loading") : t("mobile.settings.sessions.refresh")}
           </Typography.Paragraph>
         </SettingsRow>
@@ -141,7 +141,7 @@ export function AccountSessionsScreen() {
                     )
             }
           >
-            <Typography.Paragraph type="body-sm">{item.name}</Typography.Paragraph>
+            <Typography.Paragraph>{item.name}</Typography.Paragraph>
           </SettingsRow>
         ))}
       </SettingsSection>

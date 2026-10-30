@@ -1,23 +1,33 @@
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
-import type { CodexMcpServer } from "../mcp-provider-shapes";
+import {
+  CODEX_PLACEHOLDER_COMMAND,
+  CODEX_PLACEHOLDER_URL,
+  type CodexMcpServer,
+  type CodexOwnTransports,
+  codexOwnTransports,
+} from "../mcp-provider-shapes";
 import { decodeRecordResponse, getArray, getRecord, getString, isRecord } from "../protocol";
 import { ProviderClientOperationError } from "../provider-client-effects";
 
 // Agents share the Codex user file. Serialize registration so their first turns do not race.
 const registrationLock = Semaphore.makeUnsafe(1);
-const placeholderCommand = "openbot-mcp";
-const placeholderUrl = "http://127.0.0.1:1";
 
-/** Codex can save tool approvals only for servers present in a file-backed config layer. */
+/**
+ * Codex can save tool approvals only for servers present in a file-backed config layer.
+ *
+ * `servers` builds OpenBot's servers from the transports that Codex's own files declare, because
+ * those choose the keys that are registered.
+ */
 export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function* (
   client: AgentClient,
-  servers: Readonly<Record<string, CodexMcpServer>>,
+  servers: (own: CodexOwnTransports) => Readonly<Record<string, CodexMcpServer>>,
 ) {
-  const entries = Object.entries(servers);
-  const response = yield* client.request("config/read", { includeLayers: entries.length > 0 }, decodeRecordResponse);
-  if (entries.length === 0) return response;
+  const register = Object.keys(servers({})).length > 0;
+  const response = yield* client.request("config/read", { includeLayers: register }, decodeRecordResponse);
+  if (!register) return response;
+  const entries = Object.entries(servers(codexOwnTransports(getRecord(getRecord(response, "config"), "mcp_servers"))));
 
   const userLayer = getArray(response, "layers")
     .filter(isRecord)
@@ -36,13 +46,17 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
   const edits = [];
   for (const [name, server] of entries) {
     const registration =
-      "command" in server ? { command: placeholderCommand, enabled: false } : { url: placeholderUrl, enabled: false };
+      "command" in server
+        ? { command: CODEX_PLACEHOLDER_COMMAND, enabled: false }
+        : { url: CODEX_PLACEHOLDER_URL, enabled: false };
     const existing = getRecord(saved, name);
     // Codex merges file and thread transport fields. Update only our own placeholder when
     // the user changes transport, and keep the saved policies. Leave user entries unchanged.
     const changedTransport =
       existing?.enabled === false &&
-      ("command" in registration ? existing.url === placeholderUrl : existing.command === placeholderCommand);
+      ("command" in registration
+        ? existing.url === CODEX_PLACEHOLDER_URL
+        : existing.command === CODEX_PLACEHOLDER_COMMAND);
     if (saved && Object.hasOwn(saved, name) && !changedTransport) continue;
     const { command: _command, url: _url, ...settings } = existing ?? {};
     edits.push({

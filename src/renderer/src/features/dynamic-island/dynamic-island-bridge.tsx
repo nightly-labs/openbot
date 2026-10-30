@@ -7,6 +7,7 @@ import { withoutAgent } from "../../app-message-projection";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
+import { attentionByAgent, attentionEventKey, attentionOfAgent } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
 import { useConversation } from "../conversation/conversation-context";
 import { promptRequestKey } from "../conversation/conversation-keys";
@@ -44,7 +45,7 @@ export function DynamicIslandBridge() {
     setPendingPrompts,
     setSubmittedPromptRequests,
     pendingApprovals,
-    setPendingApprovals,
+    forgetApproval,
     failedTurns,
     setFailedTurns,
   } = useTurns();
@@ -71,7 +72,7 @@ export function DynamicIslandBridge() {
         liveMessages: Object.fromEntries(
           Object.entries(conversations).map(([id, conversation]) => [id, conversation.messages]),
         ),
-        pendingPrompts: pendingPrompts(),
+        pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
         pendingApprovals: pendingApprovals(),
         failedTurns: failedTurns(),
       };
@@ -127,9 +128,11 @@ export function DynamicIslandBridge() {
     if (action.type === "open-app" || action.type === "send-message" || action.type === "stop-agent") return;
     if (action.type === "answer-prompt") {
       dynamicIslandCoordinator.resolveAction(action);
-      const prompt = pendingPrompts()[action.agentId];
-      if (prompt?.type === "prompt" && String(prompt.requestId) === String(action.requestId)) {
-        setPendingPrompts((current) => ({ ...current, [action.agentId]: undefined }));
+      const prompt = attentionOfAgent(pendingPrompts(), action.agentId).find(
+        (event) => event.type === "prompt" && String(event.requestId) === String(action.requestId),
+      );
+      if (prompt?.type === "prompt") {
+        setPendingPrompts((current) => ({ ...current, [attentionEventKey(prompt)]: undefined }));
         setSubmittedPromptRequests((current) => ({
           ...current,
           [action.agentId]: promptRequestKey(prompt.turnId, prompt.requestId) ?? undefined,
@@ -140,12 +143,7 @@ export function DynamicIslandBridge() {
     }
     if (action.type === "respond-approval") {
       dynamicIslandCoordinator.resolveAction(action);
-      setPendingApprovals((current) => {
-        const approval = current[action.agentId];
-        return approval && String(approval.requestId) === String(action.requestId)
-          ? { ...current, [action.agentId]: undefined }
-          : current;
-      });
+      forgetApproval(action.agentId, action.requestId);
       publishDynamicIslandPresentation();
       return;
     }

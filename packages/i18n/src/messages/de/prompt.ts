@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "Wird abgebrochen…",
   "prompt.browser.pageFallback": "Browserseite",
   "prompt.browser.hostFallback": "dem Browser",
+  "prompt.browser.signInBlocked.label": "Anmeldung blockiert",
+  "prompt.browser.signInBlocked.title": "{host} hat die Anmeldung von {server} blockiert",
+  "prompt.browser.signInBlocked.cancelledTitle": "Anmeldung bei {host} abgebrochen",
+  "prompt.browser.signInBlocked.body":
+    "Melde dich auf diesem Computer an. OpenBot sendet nur die Anmeldung für {host} an {server}, und {name} fährt fort.",
+  "prompt.browser.signInBlocked.cancelledBody": "Die Anmeldung wurde abgebrochen.",
+  "prompt.browser.signInBlocked.waiting": "Warten auf die Anmeldung",
+  "prompt.browser.signInBlocked.waitingButton": "Warten auf die Anmeldung…",
+  "prompt.browser.signInBlocked.page": "{host} auf {server}",
   "prompt.inputRequiredAnnouncement": "Eingabe erforderlich. {question}",
 } as const satisfies PartialTranslation<typeof source>;

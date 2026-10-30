@@ -1,0 +1,33 @@
+{
+  "slug": "netlify",
+  "name": "Netlify",
+  "tagline": "Projects, deploys and request logs",
+  "description": "Netlify lets agents list projects and deploys, read edge request logs, create projects, and deploy code to an existing project. Each user signs in to their own Netlify account through the browser. Agents get the same access as the user's account: they can change environment variables, forms and visitor access, install or remove extensions, and delete form submissions and environment variables.",
+  "category": "coding",
+  "creatorName": "Netlify",
+  "iconUrl": "https://www.netlify.com/favicon/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-latest-deploy", "text": "What is the status of the latest deploy of each of my Netlify projects?" },
+    { "id": "prompt-errors", "text": "Which URLs of my site returned server errors in the last day?" },
+    { "id": "prompt-deploy", "text": "Deploy this folder to my existing Netlify project." }
+  ],
+  "apps": [
+    {
+      "id": "app-netlify-mcp",
+      "name": "Netlify",
+      "description": "Projects, deploys, request logs, and site settings, over Netlify's MCP server with browser sign-in.",
+      "iconUrl": "https://www.netlify.com/favicon/apple-touch-icon.png",
+      "server": {
+        "name": "netlify",
+        "transport": "http",
+        "url": "https://netlify-mcp.netlify.app/mcp",
+        "auth": [{ "id": "netlify-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.netlify.com",
+  "privacyPolicyUrl": "https://www.netlify.com/privacy/",
+  "termsUrl": "https://www.netlify.com/pdf/self-serve-subscription-agreement.pdf",
+  "skills": []
+}

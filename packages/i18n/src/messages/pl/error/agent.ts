@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
-  "error.agent.historyUnavailable": "Historia jest niedostępna dla tego żądania. Odczytaj ponownie najnowszą historię.",
+  "error.agent.historyUnavailable":
+    "Historia jest niedostępna dla tego żądania. Odczytaj ponownie najnowszą historię lub użyj channel_history do pracy z kanałem.",
   "error.agent.toolRequestInvalid":
     "Nieprawidłowe argumenty wyszukiwania narzędzi. Użyj zadeklarowanego schematu i oryginalnej kwalifikowanej nazwy narzędzia.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",
@@ -46,6 +47,8 @@ export const messages = {
     "Zadania tego agenta są uruchomione. Przed zmianą dostawcy poczekaj, aż się zakończą, albo je zatrzymaj.",
   "error.agent.waitBeforeClearContext":
     "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim rozpoczniesz nowy czat.",
+  "error.agent.waitBeforeCompactContext": "Zanim skompaktujesz kontekst, poczekaj na koniec aktywnej tury i kolejki.",
+  "error.agent.compactContextUnavailable": "Ten agent nie może teraz skompaktować kontekstu.",
   "error.agent.unknown": "Nieznany agent: {id}",
   "error.agent.onlyUserWidensSettings":
     "Tylko użytkownik może dać agentowi pełny dostęp lub włączyć Sterowanie komputerem. Poproś użytkownika o zmianę w ustawieniach agenta.",
@@ -60,6 +63,8 @@ export const messages = {
   "error.agent.duplicateIds": "Stan agentów zawiera zduplikowane identyfikatory agentów; odmowa nadpisania.",
   "error.agent.copyNameFailed": "OpenBot nie mógł utworzyć unikalnej nazwy kopii agenta.",
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
+  "error.agent.turnStalled":
+    "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
   "error.agent.profileEndpointsChanged": "Własne endpointy zmieniły się w trakcie generowania. Spróbuj ponownie.",
   "error.agent.profileInvalid": "Dostawca zwrócił nieprawidłowy profil. Spróbuj zmienić prompt.",
@@ -86,6 +91,10 @@ export const messages = {
   "error.agent.computerUseLocalOnly":
     "Sterowanie komputerem można zmienić tylko na komputerze, na którym działa agent.",
   "error.agent.automationLocalOnly": "Na lokalne skrypty można zezwolić tylko na komputerze, na którym działa agent.",
+  "error.agent.newChatLocalOnly": "Tylko komputer, na którym działa agent, może pozwolić mu rozpoczynać nowe czaty.",
+  "error.agent.quickAcknowledgementLocalOnly": "Tylko komputer, na którym działa agent, może zmienić to ustawienie.",
+  "error.agent.sideQuestionBusy": "Trwa zbyt wiele pytań pobocznych. Spróbuj ponownie za chwilę.",
+  "error.agent.sideQuestionFailed": "Agent nie mógł odpowiedzieć na pytanie poboczne. Spróbuj ponownie.",
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",
@@ -105,11 +114,13 @@ export const messages = {
     "Na tym serwerze brakuje pamięci. Twoja wiadomość czeka w kolejce i ruszy, gdy pamięć się zwolni.",
   "error.agent.workspaceOnlyToolMissing":
     "Tryb „Tylko obszar roboczy” wymaga narzędzia {tool}, którego OpenBot nie znalazł. Zainstaluj je lub wybierz pełny dostęp w ustawieniach agenta.",
+  "error.agent.claudeSandboxUnavailable":
+    "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze: {reason}. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
   "error.agent.screenCaptureOff":
     "Przechwytywanie ekranu jest wyłączone dla tego agenta. Użytkownik może włączyć Sterowanie komputerem w ustawieniach agenta.",
   "error.agent.screenCaptureUnavailable": "Przechwytywanie ekranu nie jest dostępne na tym komputerze.",
   "error.agent.screenCaptureShared":
-    "Przechwytywanie ekranu nie działa w kanale ani w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
+    "Przechwytywanie ekranu nie działa w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
   "error.agent.screenCaptureDeclined":
     "Użytkownik nie zezwolił na to przechwycenie ekranu. Nic nie zostało przechwycone.",
   "error.agent.screenCaptureWindowMissing":

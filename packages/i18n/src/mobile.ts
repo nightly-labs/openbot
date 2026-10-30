@@ -1,15 +1,7 @@
 import type { TranslatedLocale } from "./locale";
 import { createTranslate, type MessageParams, type Translate } from "./message";
-import { deMobile } from "./messages/de/mobile";
 import { type AppMobileMessages, enMobile } from "./messages/en/mobile";
-import { esMobile } from "./messages/es/mobile";
-import { frMobile } from "./messages/fr/mobile";
-import { itMobile } from "./messages/it/mobile";
-import { jaMobile } from "./messages/ja/mobile";
-import { plMobile } from "./messages/pl/mobile";
-import { ptMobile } from "./messages/pt/mobile";
-import { ruMobile } from "./messages/ru/mobile";
-import { trMobile } from "./messages/tr/mobile";
+import { mobileCatalog } from "./mobile-catalogs";
 
 /**
  * The mobile entry. It carries the shared keys, the source text and the mobile areas only, so the
@@ -20,19 +12,6 @@ export { type AppFormat, createFormat } from "./format";
 export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
 export { localizeSourceText, sourceText } from "./source-text";
 export type { AppMobileMessages };
-
-const catalogs = {
-  de: deMobile,
-  es: esMobile,
-  en: enMobile,
-  fr: frMobile,
-  it: itMobile,
-  ja: jaMobile,
-  pl: plMobile,
-  pt: ptMobile,
-  ru: ruMobile,
-  tr: trMobile,
-} as const;
 
 export type MobileTranslate = Translate<AppMobileMessages>;
 
@@ -46,7 +25,12 @@ const translators = new Map<TranslatedLocale, MobileTranslate>();
 export function mobileTranslateFor(locale: TranslatedLocale): MobileTranslate {
   const cached = translators.get(locale);
   if (cached) return cached;
-  const translate = createTranslate({ source: enMobile, translation: catalogs[locale], locale, sourceLocale: "en" });
+  const translate = createTranslate({
+    source: enMobile,
+    translation: mobileCatalog(locale),
+    locale,
+    sourceLocale: "en",
+  });
   translators.set(locale, translate);
   return translate;
 }

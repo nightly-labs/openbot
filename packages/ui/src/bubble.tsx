@@ -88,7 +88,7 @@ const bubbleReactionsVariants = cva("ui-bubble-reactions", {
 
 export interface BubbleReactionsProps extends JSX.HTMLAttributes<HTMLDivElement> {
   align?: "start" | "end";
-  overflowCount?: number;
+  overflowCount?: number | undefined;
   side?: "top" | "bottom";
 }
 

@@ -101,7 +101,7 @@ export class AgentInterruptTool {
       if (!ownedBy(deliveries, callerAgentId)) {
         return openBotToolFailure(sourceText("error.backend.interruptOtherWork"));
       }
-      if (!this.#store.activeProviderSession(agentId)) {
+      if (!this.#store.activeProviderSession(agentId) && !this.#conversation.routineSession(agentId)) {
         return openBotToolFailure(sourceText("error.backend.interruptNoSession"));
       }
     }

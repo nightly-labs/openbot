@@ -27,6 +27,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
 import { computerUsePort } from "./computer-use-port";
 
 export interface ComputerUseSetupProps {
@@ -88,6 +89,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     if (busyPermission()) return;
     setBusyPermission(permission);
     setError(null);
+    desktopAnalytics.track("computer_use_action", { action: "permission_opened", permission });
     try {
       const next = await computerUsePort().computerUse.openPermissionPane(permission);
       if (!disposed) setState(next);
@@ -196,6 +198,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
           fallback={<PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />}
         >
           <SettingsSection
+            data-settings-row="computerUse.permissions.title"
             title={t("computerUse.permissions.title")}
             description={t("computerUse.permissions.description")}
           >

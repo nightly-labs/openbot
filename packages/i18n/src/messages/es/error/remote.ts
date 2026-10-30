@@ -184,6 +184,8 @@ export const messages = {
   "error.remote.directoryTimeout": "El servicio de OpenBot no respondió a tiempo. Inténtalo de nuevo.",
   "error.remote.inviteAlreadyUsed": "Esta invitación ya se usó. Pide una nueva invitación.",
   "error.remote.inviteNotFound": "Esta invitación no existe o caducó. Pide una nueva invitación.",
+  "error.remote.licenseUsersFull":
+    "La licencia del propietario del servidor no tiene usuarios libres. Pide al propietario que añada un usuario a la licencia.",
   "error.remote.memberLimitReached": "Este host alcanzó su límite de miembros. Pide al propietario que libere espacio.",
   "error.remote.hostNotRegistered": "Este host ya no está registrado en el servicio de OpenBot.",
   "error.remote.membershipEnded": "Ya no eres miembro de este host. Pide al propietario una nueva invitación.",
@@ -191,5 +193,10 @@ export const messages = {
   "error.remote.hostOtherAccount": "Este host pertenece a otra cuenta.",
   "error.remote.remoteNotConfigured": "Las conexiones remotas no están configuradas en este servicio de OpenBot.",
   "error.remote.hostRefused": "El host rechazó la solicitud ({status}).",
+  "error.remote.formUnavailable": "Este formulario ya no está disponible.",
   "error.remote.hostedServerRemoval": "Usa Facturación para eliminar un servidor alojado.",
+  "error.remote.channelsUnsupported": "Actualiza este servidor de escritorio para usar canales.",
+  "error.remote.channelDeleteUnsupported": "Actualiza este servidor de escritorio para eliminar canales.",
+  "error.remote.historyRefreshFailed": "El mensaje se envió, pero no se pudo actualizar el historial del chat.",
+  "error.remote.taskHistoryRefreshFailed": "La tarea se cambió, pero no se pudo actualizar el historial del chat.",
 } as const satisfies PartialTranslation<typeof source>;

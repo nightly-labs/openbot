@@ -4,14 +4,20 @@ import type { messages as source } from "../en/customProvider";
 export const messages = {
   "customProvider.registry.title": "ACP-Registry",
   "customProvider.registry.description":
-    "Installiere Agenten auf diesem Host. „Laufzeit entfernen“ behält Agenteneinstellungen, Zugangsdaten und Unterhaltungen.",
+    "Installiere Agenten auf diesem Server. „Laufzeit entfernen“ behält Agenteneinstellungen, Zugangsdaten und Unterhaltungen.",
   "customProvider.registry.search": "Registry durchsuchen",
   "customProvider.registry.empty": "Keine Agenten entsprechen dieser Suche.",
   "customProvider.registry.agentId": "ID des benutzerdefinierten Agenten",
   "customProvider.registry.install": "Installieren",
   "customProvider.registry.update": "Aktualisieren",
   "customProvider.registry.remove": "Laufzeit entfernen",
-  "customProvider.registry.failed": "Der Registry-Vorgang ist fehlgeschlagen.",
+  "customProvider.registry.searchFailed": "Die Registry konnte nicht durchsucht werden. Versuche es erneut.",
+  "customProvider.registry.statusFailed":
+    "Der Installationsfortschritt konnte nicht geprüft werden. OpenBot versucht es erneut.",
+  "customProvider.registry.installFailed": "Der Agent konnte nicht installiert werden. Versuche es erneut.",
+  "customProvider.registry.updateFailed": "Der Agent konnte nicht aktualisiert werden. Versuche es erneut.",
+  "customProvider.registry.removeFailed": "Die Laufzeit konnte nicht entfernt werden. Versuche es erneut.",
+  "customProvider.registry.cancelFailed": "Die Installation konnte nicht abgebrochen werden. Versuche es erneut.",
   "customProvider.error.providerIdRequired": "Gib eine Anbieter-ID ein.",
   "customProvider.error.providerIdPattern":
     "Verwende Kleinbuchstaben, Zahlen, Bindestriche oder Unterstriche. Beginne mit einem Buchstaben oder einer Zahl.",
@@ -28,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Dieser Anbieter führt {id} bereits auf.",
   "customProvider.error.modelIdInvalid":
     "Diese Modell-ID kann nicht verwendet werden. Entferne Leerzeichen, Anführungszeichen und andere Satzzeichen.",
+  "customProvider.error.contextWindowInvalid": "Gib eine ganze Zahl von Tokens zwischen {min} und {max} ein.",
   "customProvider.error.headerNameRequired": "Gib einen Header-Namen ein.",
   "customProvider.error.headerNameInvalid": "Verwende einen gültigen HTTP-Header-Namen.",
   "customProvider.error.headerDuplicate": "Dieser Anbieter legt {name} bereits fest.",
@@ -40,17 +47,18 @@ export const messages = {
   "customProvider.error.baseUrlCredential": "Trage die Zugangsdaten in einen Header ein, nicht in die URL.",
   "customProvider.saved.restarted": "Gespeichert. OpenBot lädt die Modelle.",
   "customProvider.saved.skippedBusy":
-    "Gespeichert. OpenCode liest die Liste, sobald die aktuelle Aufgabe beendet ist. Drücke dann „Verbinden“.",
-  "customProvider.saved.notRunning": "Gespeichert. OpenCode liest die Liste beim nächsten Start.",
+    "Gespeichert. Der Anbieter liest die Liste, sobald die aktuelle Aufgabe beendet ist.",
+  "customProvider.saved.notRunning": "Gespeichert. Der Anbieter liest die Liste beim nächsten Start.",
   "customProvider.removed.restarted": "Entfernt. OpenBot lädt die Modelle.",
   "customProvider.removed.skippedBusy":
-    "Entfernt. OpenCode liest die Liste, sobald die aktuelle Aufgabe beendet ist. Drücke dann „Verbinden“.",
-  "customProvider.removed.notRunning": "Entfernt. OpenCode liest die Liste beim nächsten Start.",
+    "Entfernt. Der Anbieter liest die Liste, sobald die aktuelle Aufgabe beendet ist.",
+  "customProvider.removed.notRunning": "Entfernt. Der Anbieter liest die Liste beim nächsten Start.",
   "customProvider.saveFailed": "OpenBot konnte diesen Endpunkt nicht speichern.",
   "customProvider.removeFailed": "OpenBot konnte {name} nicht entfernen.",
   "customProvider.saveUnavailable": "Diese Version kann keinen Endpunkt speichern.",
   "customProvider.removeUnavailable": "Diese Version kann keinen Endpunkt entfernen.",
   "customProvider.form.title": "Eigenen Anbieter hinzufügen",
+  "customProvider.form.editTitle": "Eigenen Anbieter bearbeiten",
   "customProvider.form.description":
     "Beschreibe einen OpenAI-kompatiblen Endpunkt und die Modelle, die er bereitstellt.",
   "customProvider.form.heading": "Eigener Anbieter",
@@ -60,21 +68,25 @@ export const messages = {
   "customProvider.field.displayName": "Anzeigename",
   "customProvider.field.displayNamePlaceholder": "Mein Anbieter",
   "customProvider.field.baseUrl": "Basis-URL",
+  "customProvider.field.harness": "Läuft mit",
+  "customProvider.field.harnessHint": "Der Anbieter, der die Anfragen an diesen Endpunkt sendet.",
   "customProvider.field.apiKey": "API-Schlüssel",
   "customProvider.field.apiKeyHint":
     "Optional. Lass das Feld leer, wenn du die Authentifizierung über Header verwaltest.",
-  "customProvider.field.apiKeyKeptHint":
-    "Ein Schlüssel ist gespeichert. Lass dieses Feld leer, um ihn und die gespeicherten Header zu behalten.",
+  "customProvider.field.apiKeyKeptHint": "Ein Schlüssel ist gespeichert. Lass dieses Feld leer, um ihn zu behalten.",
   "customProvider.models": "Modelle",
   "customProvider.model.id": "ID von Modell {number}",
   "customProvider.model.name": "Anzeigename von Modell {number}",
   "customProvider.model.namePlaceholder": "Anzeigename",
+  "customProvider.model.contextWindow": "Kontextfenster von Modell {number}",
+  "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.remove": "Modell {number} entfernen",
   "customProvider.model.add": "Modell hinzufügen",
   "customProvider.headers": "Header",
   "customProvider.header.name": "Name von Header {number}",
   "customProvider.header.value": "Wert von Header {number}",
   "customProvider.header.valuePlaceholder": "Wert",
+  "customProvider.header.keptPlaceholder": "Gespeichert. Zum Beibehalten leer lassen.",
   "customProvider.header.remove": "Header {number} entfernen",
   "customProvider.header.add": "Header hinzufügen",
   "customProvider.submit": "Absenden",
@@ -90,7 +102,7 @@ export const messages = {
   "customProvider.preset.title": "Anbieter oder Agenten hinzufügen",
   "customProvider.preset.description": "Wähle einen lokalen Modellserver, einen Endpunkt oder einen ACP-Agenten.",
   "customProvider.preset.heading": "Eigenen hinzufügen",
-  "customProvider.preset.subtitle": "Modelle für OpenCode oder ein eigenständiger Agent.",
+  "customProvider.preset.subtitle": "Modelle für OpenCode oder Pi oder ein eigenständiger Agent.",
   "customProvider.preset.models": "Modelle",
   "customProvider.preset.agents": "Agenten",
   "customProvider.preset.ollama": "Ollama",
@@ -151,6 +163,9 @@ export const messages = {
   "customProvider.acp.args": "Argumente",
   "customProvider.acp.argsHint":
     "Trenne Argumente mit Leerzeichen. Setze Argumente mit Leerzeichen in Anführungszeichen.",
+  "customProvider.acp.usagePrompt": "Nutzungsbefehl",
+  "customProvider.acp.usagePromptHint":
+    "OpenBot sendet ihn höchstens alle 5 Minuten und zeigt die letzte Antwort an. Verwende einen Befehl, den der Agent selbst beantwortet, etwa /usage.",
   "customProvider.acp.env": "Umgebungsvariablen",
   "customProvider.acp.env.name": "Name von Variable {number}",
   "customProvider.acp.env.value": "Wert von Variable {number}",
@@ -163,6 +178,10 @@ export const messages = {
   "customProvider.acp.checkOk": "{name} hat geantwortet",
   "customProvider.acp.checkOkVersion": "{name} {version} hat geantwortet",
   "customProvider.acp.checkProtocol": "ACP-Version {version}",
+  "customProvider.acp.checkModels": {
+    one: "{count} Modell: {models}",
+    other: "{count} Modelle: {models}",
+  },
   "customProvider.acp.checkFailed": "Der Agent hat nicht geantwortet",
   "customProvider.acp.trustTitle": "Dieser Befehl wird auf deinem Computer ausgeführt",
   "customProvider.acp.trustDescription":
@@ -179,6 +198,7 @@ export const messages = {
   "customProvider.acp.error.envDuplicate": "Dieser Agent legt {name} bereits fest.",
   "customProvider.acp.error.envValueRequired": "Gib einen Wert für diese Variable ein.",
   "customProvider.acp.error.envValueLength": "Der Wert muss kürzer als {max} Zeichen sein.",
+  "customProvider.acp.error.usagePromptInvalid": "Verwende eine Zeile mit höchstens {max} Zeichen.",
   "customProvider.acp.error.agentIdPattern":
     "Verwende Kleinbuchstaben, Zahlen oder Bindestriche. Beginne mit einem Buchstaben oder einer Zahl. Verwende höchstens 40 Zeichen.",
   "customProvider.agents.title": "Eigene Agenten",
@@ -213,6 +233,8 @@ export const messages = {
   "customProvider.list.empty": "Noch keine eigenen Endpunkte.",
   "customProvider.list.label": "Eigene Endpunkte",
   "customProvider.list.apiKeySaved": "API-Schlüssel gespeichert",
+  "customProvider.list.runsOn": "Läuft mit {name}",
+  "customProvider.list.editLabel": "{name} bearbeiten",
   "customProvider.list.deleteLabel": "{name} löschen",
   "customProvider.list.confirmTitle": "{name} entfernen?",
   "customProvider.list.confirmDescription":

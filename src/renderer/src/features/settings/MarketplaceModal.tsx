@@ -1,13 +1,17 @@
+import { ConfirmDialog } from "@openbot/ui";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import type { MarketplaceApp } from "@openbot/ui/features/marketplace/marketplace-model";
 import { createMarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
-import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
-import { McpLocalDialog } from "@openbot/ui/features/settings/McpLocalDialog";
-import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
+import { McpConnectDialog } from "@openbot/ui/features/settings/McpConnectDialog";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
-import { createEffect, createSignal, Match, Show, Switch, untrack } from "solid-js";
-import { createMarketplaceController, type MarketplaceControllerProps } from "./marketplace-controller";
+import { useText } from "@openbot/ui/text";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
+import {
+  createMarketplaceController,
+  type MarketplaceControllerProps,
+  type PendingSkillConfirm,
+} from "./marketplace-controller";
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
   /**
@@ -26,14 +30,23 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
    * a second link to the same listing reads as a new request instead of no change.
    */
   onInitialPluginSlugConsumed?: (() => void) | undefined;
-  /** A dialog, or a page of the desktop window. */
-  variant?: "dialog" | "page" | undefined;
 }
 
 /** The Marketplace on this computer's or a joined server's data, with the dialogs it opens. */
 export function MarketplaceModal(props: MarketplaceModalProps) {
+  const { t } = useText();
   const nav = createMarketplaceNavigation();
   const controller = createMarketplaceController(props);
+  const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
+  const skillConfirmBody = (confirm: PendingSkillConfirm) =>
+    `${t(confirm.kind === "replace" ? "skill.confirm.replaceBody" : "skill.confirm.removeModifiedBody")} ${t(
+      "skill.marketplace.confirmAgents",
+      { agents: confirm.agents },
+    )}`;
+  const skillConfirmLabel = (confirm: PendingSkillConfirm) =>
+    t(confirm.kind === "replace" ? "skill.confirm.replace" : "skill.confirm.remove");
+  const skillConfirmTone = (confirm: PendingSkillConfirm) => (confirm.kind === "replace" ? "default" : "destructive");
   /**
    * A Connect press from a chat card. It runs when the listing is in the apps and their states are
    * read, so an installed app is not installed again.
@@ -53,11 +66,8 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     () => (props.open ? props.initialPluginSlug : undefined),
     (slug) => {
       if (!slug) return;
-      // A link replaces the page on screen.
+      // A link replaces the page on screen. The page opens on Apps.
       nav.reset();
-      nav.set((draft) => {
-        draft.tab = "apps";
-      });
       setConnectWhenReady(untrack(() => props.initialPluginConnect) === true ? slug : null);
       if (untrack(() => controller.model.apps().some((app) => app.id === slug))) {
         nav.go({ kind: "app", id: slug });
@@ -101,7 +111,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
   );
   // Slack, Discord and Telegram change with no event from main, so each available connector is
-  // followed while the window is open, as in Settings › Connectors.
+  // followed while the window is open.
   createEffect(
     () => (props.open ? props.connectors?.available() : undefined),
     (controllers) => {
@@ -121,13 +131,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
 
   return (
     <>
-      <Marketplace
-        model={controller.model}
-        nav={nav}
-        open={props.open}
-        onOpenChange={props.onOpenChange}
-        variant={props.variant}
-      />
+      <Marketplace model={controller.model} nav={nav} open={props.open} onOpenChange={props.onOpenChange} />
       {/* The confirmation and the connect step are beside the Marketplace: each is one decision
           over the page it was started from, not a part of that page. */}
       <Show when={controller.uninstalling()} keyed>
@@ -141,62 +145,51 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           />
         )}
       </Show>
+      <Show when={controller.skillConfirm()} keyed>
+        {(confirm) => (
+          <ConfirmDialog
+            open={true}
+            onCancel={() => confirm.settle(false)}
+            onConfirm={() => confirm.settle(true)}
+            title={skillConfirmTitle(confirm)}
+            description={skillConfirmBody(confirm)}
+            tone={skillConfirmTone(confirm)}
+            confirmLabel={skillConfirmLabel(confirm)}
+            initialFocus="cancel"
+          />
+        )}
+      </Show>
       <Show when={controller.connecting()} keyed>
         {(pending) => (
-          <Switch>
-            <Match when={pending.flow.kind === "link"}>
-              <McpSignInDialog
-                open={true}
-                subject={pending.subject}
-                onTest={controller.signInPluginApp}
-                onConnected={(config) => pending.settle(config)}
-                onCancel={() => pending.settle(null)}
-                hostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
-                onCancelSignIn={controller.cancelSignInRelay}
-              />
-              {/* The page opens in this computer's browser; the paste field is the way back when the
-                  browser cannot reach this computer's listener. */}
+          <McpConnectDialog
+            subject={pending.subject}
+            flow={pending.flow}
+            onTest={controller.testPluginApp}
+            onSignIn={controller.signInPluginApp}
+            onConnected={(config) => pending.settle(config)}
+            onCancel={() => pending.settle(null)}
+            onOpenUrl={controller.openPluginUrl}
+            hostName={props.pluginHostName}
+            signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
+            onCancelSignIn={controller.cancelSignIn}
+            signInExtra={
+              /* The page opens in this computer's browser; the paste field is the way back when the
+                 browser cannot reach this computer's listener. */
               <Show when={controller.signInRelayed()} keyed>
                 {(relay) => (
                   <McpSignInRelayDialog
                     name={pending.subject.name}
+                    iconUrl={pending.subject.iconUrl}
                     hostName={props.pluginHostName ?? ""}
                     page={relay.page}
                     onOpen={controller.openSignInRelay}
                     onPaste={controller.pasteSignInRelay}
-                    onCancel={controller.cancelSignInRelay}
+                    onCancel={controller.cancelSignIn}
                   />
                 )}
               </Show>
-            </Match>
-            <Match when={pending.flow.kind === "key" ? pending.flow : null} keyed>
-              {(flow) => (
-                <McpKeyDialog
-                  open={true}
-                  subject={pending.subject}
-                  flow={flow}
-                  onTest={controller.testPluginApp}
-                  onConnected={(config) => pending.settle(config)}
-                  onCancel={() => pending.settle(null)}
-                  onOpenUrl={controller.openPluginUrl}
-                  hostName={props.pluginHostName}
-                />
-              )}
-            </Match>
-            <Match when={pending.flow.kind === "local" ? pending.flow : null} keyed>
-              {(flow) => (
-                <McpLocalDialog
-                  open={true}
-                  subject={pending.subject}
-                  flow={flow}
-                  onTest={controller.testPluginApp}
-                  onConnected={(config) => pending.settle(config)}
-                  onCancel={() => pending.settle(null)}
-                  onOpenUrl={controller.openPluginUrl}
-                />
-              )}
-            </Match>
-          </Switch>
+            }
+          />
         )}
       </Show>
     </>

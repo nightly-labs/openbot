@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import {
   copyFile,
   type FileHandle,
@@ -49,9 +50,9 @@ export interface StoredGeneratedAttachment extends StoredAttachment {
 }
 
 export interface StoredDraft extends StoredAttachment {
-  ownerEditId?: string;
+  ownerEditId?: string | undefined;
   /** Released edit drafts can still belong to a durable composer backup. */
-  preserveOnRestart?: boolean;
+  preserveOnRestart?: boolean | undefined;
   createdAt: string;
 }
 
@@ -201,6 +202,8 @@ export class AttachmentFiles {
     this: AttachmentFiles,
     paths: string[],
     data: AttachmentDataInput[],
+    /** A voice recording is a WebM file, which the user cannot attach. It never reaches a provider. */
+    options: { voiceRecording?: boolean } = {},
   ): Effect.fn.Return<StoredDraft[], AttachmentOperationError> {
     if (paths.some((path) => !path || path.length > INPUT_LIMITS.path)) {
       return yield* attachmentFailure(new Error("An attachment path is invalid."));
@@ -267,7 +270,7 @@ export class AttachmentFiles {
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
           const name = sanitizeName(item.name || "pasted-image.png");
-          assertSupportedAttachmentName(name);
+          if (!options.voiceRecording) assertSupportedAttachmentName(name);
           const targetPath = join(targetDirectory, name);
           yield* attachmentCall(() => mkdir(targetDirectory, { recursive: true, mode: 0o700 })).pipe(
             Effect.uninterruptible,
@@ -326,10 +329,22 @@ export class AttachmentFiles {
         const attachments: StoredAttachment[] = [];
         let total = 0;
         for (const source of inspected) {
-          const name = uniqueName(sanitizeName(source.path), usedNames);
+          const sourceName = sanitizeName(source.path);
+          const name = yield* attachmentCall(async () => {
+            while (true) {
+              const candidate = uniqueName(sourceName, usedNames);
+              try {
+                await copyFile(source.path, join(temporaryRoot, candidate), constants.COPYFILE_EXCL);
+                return candidate;
+              } catch (error) {
+                if (error === null || typeof error !== "object" || !("code" in error) || error.code !== "EEXIST") {
+                  throw error;
+                }
+              }
+            }
+          }).pipe(Effect.uninterruptible);
           const id = randomUUID();
           const targetPath = join(temporaryRoot, name);
-          yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
           const copied = yield* attachmentCall(() => stat(targetPath));
           if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
           total += copied.size;
@@ -392,6 +407,11 @@ export class AttachmentFiles {
             );
           if (metadata.size > MAX_FILE_BYTES)
             return yield* attachmentFailure(new Error(`${basename(source.path)} exceeds the 100 MB limit.`));
+          // SVG is not an attachment type (see `attachmentMimeTypeForName`), but the chat shows a named one.
+          if (extname(source.path).toLowerCase() === ".svg")
+            return yield* attachmentFailure(
+              new Error(sourceText("error.backend.attachSvg", { name: basename(source.path) })),
+            );
           yield* attachmentSync(() => assertSupportedAttachmentName(source.path));
           return { ...source, size: metadata.size };
         }),
@@ -677,9 +697,11 @@ function attachmentMetadata(
   explicitMimeType?: string,
 ): { kind: AttachmentKind; mimeType: string; previewKind: AttachmentPreviewKind } {
   const inferred = attachmentMimeTypeForName(name);
-  // Media stays an opaque file even if an importer supplies a preview MIME type.
+  // Media and archives stay opaque files even if an importer supplies a preview MIME type.
   const mimeType =
-    inferred.startsWith("audio/") || inferred.startsWith("video/") ? inferred : explicitMimeType?.trim() || inferred;
+    inferred.startsWith("audio/") || inferred.startsWith("video/") || inferred === "application/zip"
+      ? inferred
+      : explicitMimeType?.trim() || inferred;
   const previewKind: AttachmentPreviewKind = mimeType.startsWith("image/")
     ? "image"
     : mimeType === "application/pdf"

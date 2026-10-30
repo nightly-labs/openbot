@@ -10,6 +10,8 @@ import type {
   AgentEvent,
   AgentSummary,
   ConnectTelegramChatInput,
+  DiscordAccess,
+  DiscordRoleList,
   MessagingConnection,
   MessagingConnectionState,
   MessagingConnectPage,
@@ -17,10 +19,11 @@ import type {
   MessagingOverview,
   MessagingPlatform,
   RespondToApprovalInput,
+  SetDiscordAccessInput,
   SidebarLayoutSnapshot,
   SidebarSection,
 } from "@openbot/contracts/ipc";
-import { MESSAGING_CONNECTION_STATES } from "@openbot/contracts/ipc";
+import { MESSAGING_CONNECTION_STATES, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { TELEGRAM_LINK_CODE_TTL_SECONDS } from "@openbot/contracts/signal-protocol/telegram-route";
 import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
@@ -48,6 +51,7 @@ import {
   type ConnectionIdentity,
   DiscordApiError,
   type InboundAction,
+  type InboundFile,
   type InboundMessage,
   type IngressAnswer,
   type IngressDelivery,
@@ -173,6 +177,8 @@ const SETTLE_RETRY_MS = 60_000;
 const FINAL_POST_ATTEMPTS = 5;
 /** How long a new message waits for the name of its author and its place. */
 const RECEIVE_NAME_DEADLINE_MS = 5_000;
+/** How long a new message waits for the files of the earlier messages; past it, it runs without them. */
+const RECEIVE_CONTEXT_DEADLINE_MS = 5_000;
 /** The marker `mention` uses. Text that did not come from the host has it taken out. */
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
 
@@ -326,12 +332,12 @@ export class MessagingService {
     for (const live of this.#live.values()) live.transport?.reconnect();
   }
 
-  /** The Slack workspaces of this computer, for Server settings > Connectors. A disconnected one is left out. */
+  /** The Slack workspaces of this computer, for Marketplace > Apps > Slack. A disconnected one is left out. */
   slackOverview(): MessagingOverview {
     return this.#overview("slack");
   }
 
-  /** The Discord guilds of this computer, for Server settings > Connectors. A disconnected one is left out. */
+  /** The Discord guilds of this computer, for Marketplace > Apps > Discord. A disconnected one is left out. */
   discordOverview(): MessagingOverview {
     return this.#overview("discord");
   }
@@ -388,8 +394,12 @@ export class MessagingService {
     input: AddMessagingOrchestratorInput,
   ) {
     const record = yield* messagingStep(() => this.#requireConnection(platform, input.workspaceId));
-    const current = this.#agents.listAgents().find((agent) => agent.id === record.orchestratorAgentId);
-    if (current) return { agentId: current.id, sectionId: null };
+    // One orchestrator answers every workspace of the platform, as for Telegram.
+    const current = this.#orchestrator(record) ?? this.#platformOrchestrator(platform);
+    if (current) {
+      this.#shareOrchestrator(platform, current);
+      return { agentId: current, sectionId: null };
+    }
     const discord = platform === "discord";
     const agent = yield* this.#agents
       .createAgentProfile({
@@ -400,11 +410,9 @@ export class MessagingService {
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
       })
       .pipe(toMessagingOperationFailed);
-    const memories = discord
-      ? discordOrchestratorMemories(record.workspaceName)
-      : slackOrchestratorMemories(record.workspaceName);
+    const memories = discord ? discordOrchestratorMemories() : slackOrchestratorMemories();
     for (const text of memories) this.#agents.createMemory({ agentId: agent.id, text });
-    this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agent.id });
+    this.#shareOrchestrator(platform, agent.id);
     // A sidebar it cannot reach leaves the agent where new agents go; the orchestrator still answers.
     const sectionId = yield* this.#placeInIntegrations(agent.id).pipe(
       Effect.catch((failure) => {
@@ -518,6 +526,8 @@ export class MessagingService {
       botUserId: opened.botUserId,
       appId: opened.appId,
       lastErrorCode: null,
+      // A workspace connected later is answered by the Slack Orchestrator that exists.
+      orchestratorAgentId: this.#orchestrator(record) ?? this.#platformOrchestrator("slack"),
     });
     const updated = this.#threads.store.connection(record.connectionId);
     if (updated) yield* this.#startConnection(updated);
@@ -549,6 +559,56 @@ export class MessagingService {
     this.#ingress?.reconnect();
     if (orphan) yield* this.#deleteOrchestrator(orphan);
   }, Effect.uninterruptible).bind(this);
+
+  /** The roles whose members can use OpenBot in a Discord server. Empty lets everyone. */
+  readonly discordAccess = Effect.fn("MessagingService.discordAccess")(function* (
+    this: MessagingService,
+    guildId: string,
+  ): Effect.fn.Return<DiscordAccess, MessagingOperationFailed> {
+    const record = yield* messagingStep(() => this.#requireConnection("discord", guildId));
+    return { allowedRoles: this.#threads.store.allowedRoles(record.connectionId) };
+  }).bind(this);
+
+  /** The roles of a running Discord server, to choose from. Signal reads them from Discord. */
+  readonly listDiscordRoles = Effect.fn("MessagingService.listDiscordRoles")(function* (
+    this: MessagingService,
+    guildId: string,
+  ): Effect.fn.Return<DiscordRoleList, MessagingOperationFailed> {
+    const record = yield* messagingStep(() => this.#requireConnection("discord", guildId));
+    const live = this.#live.get(record.connectionId);
+    const roles = live?.identity ? live.adapter.roles?.() : undefined;
+    if (!roles)
+      return yield* new MessagingOperationFailed({
+        cause: new Error(sourceText("error.messaging.discordRelayUnavailable")),
+      });
+    return {
+      roles: (yield* roles.pipe(
+        Effect.mapError((failure) => {
+          // An older Signal does not know the call.
+          const code = failure.cause instanceof DiscordApiError ? failure.cause.code : null;
+          return new MessagingOperationFailed({
+            cause: new Error(
+              sourceText(
+                code === "invalid_request"
+                  ? "error.messaging.discordRolesUnsupported"
+                  : "error.messaging.discordRelayUnavailable",
+              ),
+            ),
+          });
+        }),
+      )).map((role) => ({ id: role.id, name: roleName(role.name) })),
+    };
+  }).bind(this);
+
+  /** Replaces the roles whose members can use OpenBot in a Discord server. Disconnect keeps them. */
+  readonly setDiscordAccess = Effect.fn("MessagingService.setDiscordAccess")(function* (
+    this: MessagingService,
+    input: SetDiscordAccessInput,
+  ): Effect.fn.Return<DiscordAccess, MessagingOperationFailed> {
+    const record = yield* messagingStep(() => this.#requireConnection("discord", input.workspaceId));
+    yield* messagingStep(() => this.#threads.store.replaceAllowedRoles(record.connectionId, input.allowedRoles));
+    return { allowedRoles: this.#threads.store.allowedRoles(record.connectionId) };
+  }).bind(this);
 
   /**
    * Opens the OpenBot Discord app's install in the browser, or only returns it when `opensPage` is
@@ -586,6 +646,8 @@ export class MessagingService {
       workspaceName: opened.guildName,
       appId: opened.appId,
       lastErrorCode: null,
+      // A server connected later is answered by the Discord Orchestrator that exists.
+      orchestratorAgentId: this.#orchestrator(record) ?? this.#platformOrchestrator("discord"),
     });
     const updated = this.#threads.store.connection(record.connectionId);
     if (updated) yield* this.#startConnection(updated);
@@ -652,7 +714,7 @@ export class MessagingService {
       return yield* new MessagingOperationFailed({
         cause: new Error(sourceText("error.messaging.telegramNotConnected")),
       });
-    const current = this.#telegramOrchestrator();
+    const current = this.#platformOrchestrator("telegram");
     if (current) {
       this.#assignTelegramOrchestrator(current);
       return { agentId: current, sectionId: null };
@@ -861,7 +923,7 @@ export class MessagingService {
       botUserId: botId,
       appId: botId,
       lastErrorCode: null,
-      orchestratorAgentId: this.#orchestrator(record) ?? this.#telegramOrchestrator(),
+      orchestratorAgentId: this.#orchestrator(record) ?? this.#platformOrchestrator("telegram"),
     });
     const updated = this.#threads.store.connection(record.connectionId);
     if (updated) yield* this.#startConnection(updated);
@@ -877,13 +939,24 @@ export class MessagingService {
         .pipe(Effect.catch((failure) => Effect.sync(() => this.#warn(failure.cause))));
   }, Effect.uninterruptible);
 
-  /** The Telegram Orchestrator: one agent for every Telegram chat, or null until the user adds it. */
-  #telegramOrchestrator(): string | null {
+  /**
+   * The orchestrator of a platform: one agent for every Slack workspace, every Discord server, or every
+   * Telegram chat, or null until the user adds it. An earlier build gave each Slack workspace and
+   * Discord server its own; the first one that still exists answers the places added later.
+   */
+  #platformOrchestrator(platform: MessagingPlatform): string | null {
     const agents = new Set(this.#agents.listAgents().map((agent) => agent.id));
     for (const record of this.#threads.store.connections())
-      if (record.platform === "telegram" && record.orchestratorAgentId && agents.has(record.orchestratorAgentId))
+      if (record.platform === platform && record.orchestratorAgentId && agents.has(record.orchestratorAgentId))
         return record.orchestratorAgentId;
     return null;
+  }
+
+  /** Gives the orchestrator to each place of the platform that has none, and keeps the others' own. */
+  #shareOrchestrator(platform: MessagingPlatform, agentId: string): void {
+    for (const record of this.#threads.store.connections())
+      if (record.platform === platform && !this.#orchestrator(record))
+        this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agentId });
   }
 
   #assignTelegramOrchestrator(agentId: string): void {
@@ -1076,6 +1149,8 @@ export class MessagingService {
     message: InboundMessage,
   ) {
     if (!live.identity) return;
+    // A connection with a role list ignores everyone else, before anything shows the message was seen.
+    if (!this.#authorAllowed(live.record.connectionId, message)) return;
     // Before any await: a redelivered event can arrive while the first copy is still downloading its
     // files, before the mailbox holds its idempotency key. The mailbox key covers a restart.
     const store = this.#threads.store;
@@ -1099,7 +1174,7 @@ export class MessagingService {
     }
     const { adapter } = live;
     // A slow lookup must not hold the message: past the deadline, the id stands for the name.
-    const [authorName, mentioned, place] = yield* Effect.all(
+    const [authorName, mentioned, place, earlier] = yield* Effect.all(
       [
         adapter.authorName(message.authorId).pipe(
           toMessagingOperationFailed,
@@ -1108,7 +1183,9 @@ export class MessagingService {
             orElse: () => Effect.succeed(message.authorId),
           }),
         ),
-        mentionNames(message.mentionedUserIds, (userId) => adapter.authorName(userId)),
+        mentionNames([...message.mentionedUserIds, ...(message.replyTo?.mentionedUserIds ?? [])], (userId) =>
+          adapter.authorName(userId),
+        ),
         message.isDirect
           ? Effect.succeed(null)
           : adapter.placeName(message.platformChannelId).pipe(
@@ -1118,10 +1195,30 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
+        // Only Discord's earlier messages have files, such as an image that a person posted without a
+        // mention just before this message. The agent gets them with this message. Slack is not asked:
+        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
+        adapter.platform === "discord" && !message.isDirect
+          ? adapter
+              .history(
+                message.platformChannelId,
+                message.threadKey,
+                existing?.historyCursor ?? null,
+                message.platformMessageId,
+              )
+              .pipe(
+                Effect.timeoutOrElse({ duration: RECEIVE_CONTEXT_DEADLINE_MS, orElse: () => Effect.succeed([]) }),
+                Effect.catch(() => Effect.succeed([])),
+              )
+          : Effect.succeed([]),
       ],
       { concurrency: "unbounded" },
     );
     const named = withMentionNames(message.text, mentioned);
+    const quote = message.replyTo;
+    const replyTo = quote
+      ? { authorName: quote.authorName, text: withMentionNames(quote.text, mentioned), sentAt: quote.sentAt }
+      : null;
     // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
@@ -1147,8 +1244,34 @@ export class MessagingService {
       Effect.succeed(staging),
       () =>
         Effect.gen({ self: this }, function* () {
-          const { paths, skipped } = yield* this.#download(adapter, message, staging);
-          const text = skipped.length ? `${named}\n\n(Files that did not arrive: ${skipped.join(", ")})` : named;
+          // The message's own files first, then the newest earlier ones, within the attachment limits.
+          // An earlier message of this conversation that reached OpenBot gave its files with itself.
+          const earlierFiles = earlier
+            .filter(
+              (entry) =>
+                !existing ||
+                !this.#threads.received(
+                  `messaging:${live.record.connectionId}:${message.platformChannelId}:${entry.id}`,
+                ),
+            )
+            .toReversed()
+            .flatMap((entry) =>
+              (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
+            );
+          const { paths, skipped } = yield* this.#download(
+            adapter,
+            [...message.files, ...earlierFiles.map((item) => item.file)],
+            staging,
+          );
+          const given = earlierFiles.filter((item) => !skipped.includes(item.file)).map((item) => item.label);
+          const notGiven = earlierFiles.filter((item) => skipped.includes(item.file)).map((item) => item.label);
+          const missing = skipped.filter((file) => message.files.includes(file));
+          const notes = [
+            given.length ? `(Files of earlier messages, given with this one: ${given.join(", ")})` : "",
+            notGiven.length ? `(Files of earlier messages that were not given: ${notGiven.join(", ")})` : "",
+            missing.length ? `(Files that did not arrive: ${missing.map((file) => file.name).join(", ")})` : "",
+          ].filter(Boolean);
+          const text = notes.length ? `${named}\n\n${notes.join("\n")}` : named;
           const result = yield* this.#threads
             .receive({
               connectionId: live.record.connectionId,
@@ -1159,7 +1282,12 @@ export class MessagingService {
               title: message.isDirect ? authorName : `${place} · ${named.slice(0, 80) || authorName}`,
               text,
               sourcePaths: paths,
-              origin: { authorId: message.authorId, authorName, platformMessageId: message.platformMessageId },
+              origin: {
+                authorId: message.authorId,
+                authorName,
+                platformMessageId: message.platformMessageId,
+                ...(replyTo ? { replyTo } : {}),
+              },
               idempotencyKey: `messaging:${live.record.connectionId}:${message.dedupKey}`,
             })
             .pipe(toMessagingOperationFailed);
@@ -1202,28 +1330,36 @@ export class MessagingService {
     );
   }, Effect.uninterruptible);
 
+  /** Empty lets everyone. A list needs one of its roles, so an author whose roles are unknown is refused. */
+  #authorAllowed(connectionId: string, message: InboundMessage): boolean {
+    const allowed = this.#threads.store.allowedRoles(connectionId);
+    if (allowed.length === 0) return true;
+    const roles = new Set(message.authorRoleIds ?? []);
+    return allowed.some((role) => roles.has(role.id));
+  }
+
   #orchestrator(record: MessagingConnectionRecord): string | null {
     const id = this.#threads.store.connection(record.connectionId)?.orchestratorAgentId ?? null;
     return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
   }
 
-  /** Downloads the files of a message into `staging`, within the attachment limits. */
+  /** Downloads files into `staging`, in their order, within the attachment limits. */
   readonly #download = Effect.fn("MessagingService.download")(function* (
     this: MessagingService,
     adapter: MessagingAdapter,
-    message: InboundMessage,
+    files: readonly InboundFile[],
     staging: string,
   ) {
     const paths: string[] = [];
-    const skipped: string[] = [];
+    const skipped: InboundFile[] = [];
     let total = 0;
-    for (const [index, file] of message.files.entries()) {
+    for (const [index, file] of files.entries()) {
       if (
         paths.length >= INPUT_LIMITS.attachments ||
         file.size > ATTACHMENT_LIMITS.fileBytes ||
         total + file.size > ATTACHMENT_LIMITS.totalBytes
       ) {
-        skipped.push(file.name);
+        skipped.push(file);
         continue;
       }
       const downloaded = yield* Effect.result(
@@ -1237,7 +1373,7 @@ export class MessagingService {
           return destination;
         }),
       );
-      if (Result.isFailure(downloaded)) skipped.push(file.name);
+      if (Result.isFailure(downloaded)) skipped.push(file);
       else {
         total += file.size;
         paths.push(downloaded.success);
@@ -1309,9 +1445,15 @@ export class MessagingService {
         error: "A Telegram connection posts only in its own chat. Use the connection of that chat.",
         failure: "refused" as const,
       };
+    // A Discord workspace id is the guild id, which a link to the post needs.
+    const guildId = live.record.platform === "discord" ? live.identity.workspaceId : null;
     // The place is outside this computer, so a secret in the text must not reach it.
     return yield* live.adapter.postAnswer(target, redactText(markdown), null).pipe(
-      Effect.as({ posted: true as const }),
+      Effect.map((messageId) => ({
+        posted: true as const,
+        messageId,
+        ...(guildId ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${messageId}` } : {}),
+      })),
       Effect.catch((failure) =>
         Effect.succeed({
           error: `${refusal(failure)} A long text goes in more than one post, so a part of it can be posted already. Do not post it again only because of this error.`,
@@ -1784,6 +1926,16 @@ function refusal(failure: MessagingAdapterError): string {
       ? cause.code
       : "no_answer";
   return `The platform refused the call: ${code}. Check the connection and place ids with openbot.messaging_list_places.`;
+}
+
+/**
+ * Discord counts a role name's 100 characters by code point, and the IPC and Team limits count UTF-16
+ * units. A longer name is cut, without splitting a surrogate pair.
+ */
+function roleName(name: string): string {
+  if (name.length <= MESSAGING_LIMITS.roleName) return name;
+  const cut = name.slice(0, MESSAGING_LIMITS.roleName);
+  return /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut;
 }
 
 function token(): string {

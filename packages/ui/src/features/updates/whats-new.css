@@ -2,16 +2,6 @@
  * notes in a scroll area, and the actions in a footer. The groups use the colours of the
  * changelog page on openbot.run, so a reader sees the same notes in the same way. */
 
-.whats-new-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--openbot-layer-dialog);
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
-  animation: whats-new-fade-in var(--openbot-duration-overlay) var(--openbot-ease-out);
-}
-
 .whats-new-dialog {
   position: relative;
   display: flex;
@@ -243,12 +233,6 @@
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-3) var(--openbot-space-4);
   border-block-start: 1px solid var(--openbot-border);
-}
-
-@keyframes whats-new-fade-in {
-  from {
-    opacity: 0;
-  }
 }
 
 @media (max-width: 560px) {

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { TeamMemberSummary } from "@openbot/contracts/ipc";
+import type { AgentAccessLevel, TeamMemberSummary } from "@openbot/contracts/ipc";
 
 // What a route module says when it is asked about a request.
 //
@@ -34,6 +34,8 @@ export interface TeamApiRequestContext {
   readonly token: string;
   readonly sessionId: string;
   readonly sessionExpiresAt: string;
+  /** What the roles let the member do with one agent. Owners and admins always get `manage`. */
+  readonly agentLevel: (agentId: string) => AgentAccessLevel;
   readonly json: (status: number, value: object | null) => RouteOutcome;
   readonly empty: (status: number) => RouteOutcome;
 }

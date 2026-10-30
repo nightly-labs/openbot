@@ -23,7 +23,8 @@ import { STORY_AGENT, STORY_AGENTS } from "./fixtures";
  * - Claude supplies local context estimates and native compaction events. Its compacted-message
  *   count excludes system/tools, so it cannot supply a full-context before/after comparison.
  * - ACP agents can send `usage_update` (`used`, `size`) and `compaction` updates, both unstable in
- *   the protocol. An agent that sends neither shows no ring.
+ *   the protocol. An agent that sends neither shows no ring. Gemini (Antigravity) sends
+ *   `usage_update` only; OpenBot compacts it by starting a new session from the history handoff.
  */
 
 const MINUTE = 60_000;
@@ -54,6 +55,13 @@ const CLAUDE: ContextUsageView = {
   ],
 };
 
+const GEMINI: ContextUsageView = {
+  usedTokens: 312_500,
+  windowTokens: 1_048_576,
+  autoCompactAt: 0.8,
+  compacting: false,
+};
+
 const ACP_NO_SUMMARY: ContextUsageView = {
   usedTokens: 241_000,
   windowTokens: 256_000,
@@ -62,14 +70,22 @@ const ACP_NO_SUMMARY: ContextUsageView = {
 };
 
 /** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
-function ComposerToolbar(props: { usage: ContextUsageView }) {
+function ComposerToolbar(props: {
+  usage: ContextUsageView;
+  onStartNewChat?: (() => Promise<void>) | undefined;
+  onCompact?: (() => Promise<void>) | undefined;
+}) {
   return (
     <div class="composer-toolbar">
       <Button type="button" variant="ghost" class="composer-button" aria-label="Add">
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <ContextUsageMeter usage={props.usage} />
+        <ContextUsageMeter
+          usage={props.usage}
+          newChat={props.onStartNewChat ? { agent: STORY_AGENT, start: props.onStartNewChat } : undefined}
+          compact={props.onCompact}
+        />
         <Button type="button" variant="ghost" class="dictation-button" aria-label="Dictate">
           <Mic aria-hidden="true" />
         </Button>
@@ -81,7 +97,13 @@ function ComposerToolbar(props: { usage: ContextUsageView }) {
   );
 }
 
-function Composer(props: { usage: ContextUsageView; notice?: JSX.Element; width?: string }) {
+function Composer(props: {
+  usage: ContextUsageView;
+  notice?: JSX.Element;
+  width?: string;
+  onStartNewChat?: (() => Promise<void>) | undefined;
+  onCompact?: (() => Promise<void>) | undefined;
+}) {
   const [draft, setDraft] = createSignal("");
   return (
     <div class="composer-wrap" style={{ width: props.width ?? "560px", "max-width": "calc(100vw - 32px)" }}>
@@ -99,7 +121,7 @@ function Composer(props: { usage: ContextUsageView; notice?: JSX.Element; width?
             onValueChange={setDraft}
           />
         </div>
-        <ComposerToolbar usage={props.usage} />
+        <ComposerToolbar usage={props.usage} onStartNewChat={props.onStartNewChat} onCompact={props.onCompact} />
       </form>
     </div>
   );
@@ -162,6 +184,44 @@ export const ClaudeEstimate: Story = {
 export const CodexTotal: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
   render: (args) => <Composer usage={args.usage} />,
+};
+
+/** A local agent: the popover ends with a New chat row. The second ring shows a failed start. */
+export const NewChat: Story = {
+  args: { usage: { ...CODEX, usedTokens: 206_700 } },
+  render: (args) => (
+    <div style={{ display: "grid", gap: "20px" }}>
+      <Row label="Starts after a short wait">
+        <Composer usage={args.usage} onStartNewChat={() => new Promise((resolve) => setTimeout(resolve, 1500))} />
+      </Row>
+      <Row label="The agent is busy">
+        <Composer usage={args.usage} onStartNewChat={() => Promise.reject(new Error("The agent is busy."))} />
+      </Row>
+    </div>
+  ),
+};
+
+/** Gemini reports a total only. The popover offers Compact now; the second ring shows a refusal. */
+export const CompactNow: Story = {
+  args: { usage: GEMINI },
+  render: (args) => (
+    <div style={{ display: "grid", gap: "20px" }}>
+      <Row label="Compacts after a short wait">
+        <Composer
+          usage={args.usage}
+          onStartNewChat={() => Promise.resolve()}
+          onCompact={() => new Promise((resolve) => setTimeout(resolve, 1500))}
+        />
+      </Row>
+      <Row label="The agent is busy">
+        <Composer
+          usage={args.usage}
+          onStartNewChat={() => Promise.resolve()}
+          onCompact={() => Promise.reject(new Error("Wait for the active turn and queue to finish."))}
+        />
+      </Row>
+    </div>
+  ),
 };
 
 /** An ACP agent that reports usage but cannot compact: the ring turns red near full. */

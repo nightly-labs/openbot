@@ -17,6 +17,17 @@ editor. The host must be online to receive requests.
 
 Each webhook routine has its own URL and secret. A host can have at most 64 webhook routines.
 
+You can also ask an agent in chat to make a webhook routine. The agent calls
+`openbot.create_webhook_routine` and tells you the URL and the request format. It does not get the
+secret. A card in the chat shows the URL; press the regenerate button on the card to make the
+secret, then copy it. Only a person who can manage the host's webhook routines sees the card. When
+the agent makes the routine for another agent, get the secret in that agent's routine editor.
+
+To change the event type or the filters from the chat, ask the agent: it calls
+`openbot.update_webhook_routine`. You can also change them on the card and press **Save**. The URL
+and the secret stay the same. Only a person's message can start these tools: a routine run or
+another agent's message cannot make or change a webhook routine.
+
 To replace the secret, make a new one in the routine editor and update the sender. The old secret
 stops working immediately. A secret has the format `whsec_<43 base64url characters>`.
 
@@ -25,6 +36,14 @@ change it back to **Webhook**, the routine gets a new URL and a new secret.
 
 The URL also changes when you sign in to a different OpenBot account on the host. The secret stays
 the same. Copy the new URL into the sending service.
+
+### Send a test event
+
+In the routine editor, select **Send test event**. The host makes an event that matches the event
+type and the filters, signs it with the routine secret, and receives it as it receives a relayed
+request. The event type is `openbot.test` when the routine accepts all types. The test shows in the
+history, and a match starts one run. A paused routine does not run. The test does not go through
+the relay, so it does not show whether a sender can reach the URL.
 
 ## Send a request
 

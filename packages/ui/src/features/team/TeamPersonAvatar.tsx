@@ -10,14 +10,13 @@ export function TeamPersonAvatar(props: { member: TeamPresenceMember; large?: bo
   const avatarSeed = () => props.member.email ?? props.member.username ?? props.member.id;
 
   return (
-    <span class={["person-avatar", { large: Boolean(props.large), online: props.member.online }]} aria-hidden="true">
+    <span class={["person-avatar", { large: Boolean(props.large) }]} aria-hidden="true">
       <AgentAvatar
         seed={avatarSeed()}
         url={props.member.avatarUrl}
         motion={props.motion ?? "idle"}
         class="person-avatar-generated"
       />
-      <i />
     </span>
   );
 }

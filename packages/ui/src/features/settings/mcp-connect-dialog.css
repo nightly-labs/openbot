@@ -1,0 +1,143 @@
+/*
+ * The content of the plugin connect dialogs. The frame is the shared connect dialog,
+ * `WizardDialog` in `integration-layout.css`: the two logos, the title, and the buttons.
+ */
+
+/* One card of facts, its rows divided rather than spaced: a connection is one thing to read. */
+.mcp-connect-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-grouped);
+}
+
+.mcp-connect-row {
+  position: relative;
+  margin: 0;
+  padding: var(--openbot-space-3);
+}
+
+.mcp-connect-row + .mcp-connect-row {
+  border-top: 1px solid var(--openbot-border-grouped);
+}
+
+/* The steps that turn on a server another app runs. The heading leaves room for the setup link
+   that sits in the row's corner. */
+.mcp-local-heading {
+  margin: 0;
+  padding-right: var(--openbot-space-6);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: var(--openbot-space-2) 0 0;
+  padding-left: var(--openbot-space-4);
+  list-style: decimal;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-steps > li::marker {
+  color: var(--openbot-text-muted);
+}
+
+.mcp-local-address {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-address > code {
+  overflow-wrap: anywhere;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+}
+
+/* On the label's line, at the far end of it: the way out to the key page is a quiet aside, and it
+   is the size of the other links in the marketplace rather than the size of the field. */
+.mcp-connect-docs {
+  position: absolute;
+  top: var(--openbot-space-3);
+  right: var(--openbot-space-3);
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+/* The mark that says the link leaves the app. It reads beside the words rather than over them,
+   so it is the size of every other external-link mark in the marketplace. */
+.mcp-connect-docs > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.mcp-connect-privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-connect-privacy svg {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-muted);
+}
+
+/* A joined server's sign-in page, drawn from the host's browser. The page keeps the shape of the host's frame. */
+.mcp-sign-in-page {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.mcp-sign-in-page-note {
+  min-width: 0;
+  margin: 0;
+}
+
+/* A relayed sign-in: the page is in the user's own browser, so the dialog holds only the address field. */
+.mcp-sign-in-relay-open {
+  margin-top: var(--openbot-space-4);
+}
+
+.mcp-sign-in-relay-form {
+  margin-top: var(--openbot-space-4);
+}
+
+/* In the connect dialog, the body's gap spaces them. The open button keeps the width of its words. */
+.integration-wizard-body > :is(.mcp-sign-in-relay-open, .mcp-sign-in-relay-form) {
+  margin-top: 0;
+}
+
+.integration-wizard-body > .mcp-sign-in-relay-open {
+  justify-self: start;
+}
+
+.mcp-sign-in-relay-row {
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+.mcp-sign-in-relay-row > .ui-input {
+  flex: 1;
+  min-width: 0;
+}

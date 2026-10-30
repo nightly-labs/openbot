@@ -395,6 +395,8 @@ export const ChatMath = memo(function ChatMath({
   fallback: ReactNode;
 }) {
   const tree = useMemo(() => mathTree(tex, display), [tex, display]);
+  // The app build embeds these fonts with the expo-font plugin in `app.json`, so they are loaded from
+  // the first frame. An older build or Expo Go loads them here.
   const [fontsLoaded, fontError] = useFonts(KATEX_FONTS);
   if (!tree) return fallback;
   const context: MathContext = { base: textSize * MATH_SCALE, level: 0, display, color };

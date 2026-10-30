@@ -2,11 +2,13 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "@openbo
 import { GitHubConnectorPanel } from "@openbot/ui/features/settings/GitHubConnectorPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { SettledArgs } from "./settled-args";
 
 const meta = {
   title: "Settings/GitHubConnectorPanel",
   component: GitHubConnectorPanel,
   parameters: { layout: "padded", a11y: { test: "error" } },
+  render: (args) => <SettledArgs>{() => <GitHubConnectorPanel {...args} />}</SettledArgs>,
 } satisfies Meta<typeof GitHubConnectorPanel>;
 
 export default meta;

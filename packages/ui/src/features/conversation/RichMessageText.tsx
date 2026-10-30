@@ -1,12 +1,12 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { AttachmentSummary, InstalledSkill } from "@openbot/contracts/ipc";
+import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Blocks, Button, Puzzle, TextQuote } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
-import type { AgentProfile, MessageCitation } from "../../data";
+import type { ComposerAgent, ComposerSkill, MessageCitation } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
@@ -23,20 +23,25 @@ import {
 
 export interface RichMessageTextProps {
   body: string;
-  agents: AgentProfile[];
-  skills?: InstalledSkill[];
-  attachments?: AttachmentSummary[];
-  citations?: MessageCitation[];
+  agents: ComposerAgent[];
+  skills?: ComposerSkill[] | undefined;
+  attachments?: AttachmentSummary[] | undefined;
+  citations?: MessageCitation[] | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
-  onOpenAttachment?: (attachment: AttachmentSummary) => void;
-  onOpenSharedFile?: (path: string) => void;
-  onOpenWorkspaceFile?: (path: string) => void;
+  onOpenAttachment?: ((attachment: AttachmentSummary) => void) | undefined;
+  onOpenSharedFile?: ((path: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
-  onOpenQuote?: (messageId: string, text: string) => void;
+  onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   showCitationFooter?: boolean;
   /** The characters of a streaming body after this text. It fades the words revealed last. */
   streamingTailAfter?: number | undefined;
+  /**
+   * False shows only the link icon, so that no linked site is asked for its favicon. Use it for
+   * text that another person wrote, such as the instructions of a shared agent.
+   */
+  linkFavicons?: boolean | undefined;
 }
 
 const UNAVAILABLE_TAG_LABELS = {
@@ -136,7 +141,12 @@ export function RichMessageText(props: RichMessageTextProps) {
           }
           if (part.url) {
             return (
-              <MessageLink url={part.url} title={linkTitle(part.text, part.url)} onOpenLink={props.onOpenLink}>
+              <MessageLink
+                url={part.url}
+                title={linkTitle(part.text, part.url)}
+                favicon={props.linkFavicons !== false}
+                onOpenLink={props.onOpenLink}
+              >
                 {part.text}
               </MessageLink>
             );
@@ -287,6 +297,8 @@ export function MessageLink(props: {
   /** The native tooltip. Omit it when the link text already shows the URL. */
   title?: string | undefined;
   children: JSX.Element;
+  /** False keeps the request for the linked site's favicon from being made. */
+  favicon?: boolean;
   onOpenLink: (url: string) => void;
 }) {
   return (
@@ -303,14 +315,16 @@ export function MessageLink(props: {
     >
       <span class="message-link-icon" aria-hidden="true">
         <LinkIcon />
-        <img
-          src={faviconUrl(props.url)}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerpolicy="no-referrer"
-          onError={(event) => event.currentTarget.remove()}
-        />
+        <Show when={props.favicon !== false}>
+          <img
+            src={faviconUrl(props.url)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onError={(event) => event.currentTarget.remove()}
+          />
+        </Show>
       </span>
       {props.children}
     </a>
@@ -333,8 +347,8 @@ function plainTextPart(part: RichMessagePart): boolean {
 
 interface RichMessagePart {
   text: string;
-  agent?: AgentProfile;
-  skill?: InstalledSkill;
+  agent?: ComposerAgent | undefined;
+  skill?: ComposerSkill;
   /**
    * An MCP server tag carries the name it was written with, and nothing looks it up. A message is a
    * record of what the user asked, and a server removed since does not make that record wrong.
@@ -351,8 +365,8 @@ interface RichMessagePart {
 
 function richMessageParts(
   body: string,
-  agents: AgentProfile[],
-  skills: InstalledSkill[],
+  agents: ComposerAgent[],
+  skills: ComposerSkill[],
   citationsByNumber: Map<number, MessageCitation>,
   attachmentsById: Map<string, AttachmentSummary>,
 ): RichMessagePart[] {
@@ -390,7 +404,7 @@ function richMessageParts(
   return parts;
 }
 
-function semanticTagParts(body: string, agents: AgentProfile[], skills: InstalledSkill[]): RichMessagePart[] {
+function semanticTagParts(body: string, agents: ComposerAgent[], skills: ComposerSkill[]): RichMessagePart[] {
   const references = chatTagReferences(body);
   if (references.length === 0) return [{ text: body }];
   const parts: RichMessagePart[] = [];
@@ -513,12 +527,12 @@ function CitationArrowIcon() {
 
 interface AgentTagMatcher {
   expression: RegExp;
-  agentsByName: Map<string, AgentProfile>;
+  agentsByName: Map<string, ComposerAgent>;
 }
 
-const agentTagMatchers = new WeakMap<AgentProfile[], AgentTagMatcher>();
+const agentTagMatchers = new WeakMap<ComposerAgent[], AgentTagMatcher>();
 
-function agentTagMatcher(agents: AgentProfile[]): AgentTagMatcher | null {
+function agentTagMatcher(agents: ComposerAgent[]): AgentTagMatcher | null {
   if (agents.length === 0) return null;
   const cached = agentTagMatchers.get(agents);
   if (cached) return cached;
@@ -534,12 +548,12 @@ function agentTagMatcher(agents: AgentProfile[]): AgentTagMatcher | null {
   return matcher;
 }
 
-function taggedMessageParts(body: string, agents: AgentProfile[]) {
+function taggedMessageParts(body: string, agents: ComposerAgent[]) {
   if (!body.includes("@")) return [{ text: body, agent: undefined }];
   const matcher = agentTagMatcher(agents);
   if (!matcher) return [{ text: body, agent: undefined }];
   matcher.expression.lastIndex = 0;
-  const parts: Array<{ text: string; agent: AgentProfile | undefined }> = [];
+  const parts: Array<{ text: string; agent: ComposerAgent | undefined }> = [];
   let cursor = 0;
   for (const match of body.matchAll(matcher.expression)) {
     const index = match.index ?? 0;

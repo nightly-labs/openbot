@@ -20,8 +20,8 @@ import {
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
-import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { groupAgentMessageMarkers } from "../agent-message-timeline";
+import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
+import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import {
   expandRoutineRunGroups,
@@ -32,6 +32,8 @@ import {
   routineRunTurnMessages,
   summarizeRoutineRunMessages,
 } from "../routine-run-timeline";
+import { isTurnAnswer } from "../turn-steps";
+import { conversationOwnerId } from "./composer-store";
 
 interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -69,8 +71,18 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   let talliedConversationIdentity: string | undefined;
 
   const [openRoutineRuns, setOpenRoutineRuns] = createSignal<RoutineRunOpenState>(new Map());
+  // The thinking and the memory changes of a turn show in the steps above its answer. A turn with
+  // no answer shows its memory changes in a row of their own.
+  const answeredTurns = createMemo(
+    () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
+  );
   const shownMessages = createMemo(() =>
-    deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
+    deps.props.messages.filter(
+      (message) =>
+        message.kind !== "thinking" &&
+        !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
+        !silentAgentAnswer(message),
+    ),
   );
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
@@ -82,13 +94,32 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const key = routineRunToggleKey(marker);
     setOpenRoutineRuns((open) => new Map(open).set(key, marker.expanded !== true));
   }
+  /* The exchange ids of the agent messages whose text shows under their marker. */
+  const [openAgentMessages, setOpenAgentMessages] = createSignal<ReadonlySet<string>>(new Set());
+  function toggleAgentMessage(messageId: string): void {
+    setOpenAgentMessages((open) => {
+      const next = new Set(open);
+      if (!next.delete(messageId)) next.add(messageId);
+      return next;
+    });
+  }
+  /*
+   * An open chat marks its messages read at once, so read state loses the first unread message.
+   * The visit keeps it until the reader opens another chat. A newer unread message replaces it.
+   */
+  const visitUnread = createMemo<{ identity: string; messageId: string | null }>((previous) => {
+    const identity = `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`;
+    const messageId = deps.props.firstUnreadMessageId;
+    if (previous?.identity === identity && !messageId) return previous;
+    return { identity, messageId };
+  });
   /*
    * The unread divider sits on the first unread row the timeline draws. A silent answer has no row,
    * so the divider moves to the next row that has one; read state keeps the stored message. A
    * message that is not loaded keeps its id, so the jump can open its page.
    */
   const unreadBoundaryMessageId = createMemo(() => {
-    const firstUnreadMessageId = deps.props.firstUnreadMessageId;
+    const firstUnreadMessageId = visitUnread().messageId;
     const start = deps.props.messages.findIndex((message) => message.id === firstUnreadMessageId);
     if (start < 0) return firstUnreadMessageId;
     const drawn = new Set(drawnMessages().map((message) => message.id));
@@ -103,7 +134,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = drawnMessages();
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
     const boundary =
       startedAt === undefined
         ? -1
@@ -138,7 +169,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     () => {
       const rows = timelineRows();
       return {
-        identity: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+        identity: `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`,
         rows,
         length: rows.length,
         lastId: rows.at(-1)?.id,
@@ -168,10 +199,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     },
   );
 
+  // A channel row is mostly a short message under an author; an agent row is often a longer answer.
+  const rowEstimate = untrack(() => deps.props.channel) ? 84 : 128;
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: () => timelineMessages().length,
     getScrollElement: () => deps.elements.scrollElement() ?? null,
-    estimateSize: () => 128,
+    estimateSize: () => rowEstimate,
     getItemKey: (index) => timelineMessages()[index]?.id ?? index,
     keyVersion: () => `${timelineMessages()[0]?.id ?? ""}:${timelineMessages().at(-1)?.id ?? ""}`,
     scrollMargin: virtualScrollMargin,
@@ -230,7 +263,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   async function markUnreadMessages(): Promise<void> {
     if (deps.markingRead()) return;
-    const agentId = deps.props.agent?.id;
+    const agentId = conversationOwnerId(deps.props);
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     deps.setMarkingRead(true);
     deps.setComposerError(null, target);
@@ -297,6 +330,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     messageVirtualizer,
     timelineMessages,
     toggleRoutineRun,
+    toggleAgentMessage,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
