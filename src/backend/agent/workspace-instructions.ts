@@ -141,6 +141,12 @@ export interface PromptInstructionsFile {
 }
 
 /**
+ * The bytes that hold the longest file the editor saves: a UTF-8 character takes at most 4 bytes, and
+ * the editor counts characters.
+ */
+export const AGENT_INSTRUCTIONS_FILE_BYTES = INPUT_LIMITS.agentInstructionsFile * 4;
+
+/**
  * The file for the prompt, trimmed and cut at the editor limit. An empty file keeps its name. A file
  * that cannot be read, or a link outside the workspace, gives none: the workspace belongs to the
  * agent, and its session must still start.
@@ -149,8 +155,7 @@ export const promptInstructionsFile = Effect.fn("WorkspaceInstructions.prompt")(
   const found = yield* findFile(workspace).pipe(Effect.orElseSucceed(() => Option.none<FoundFile>()));
   if (Option.isNone(found)) return null;
   const limit = INPUT_LIMITS.agentInstructionsFile;
-  // A UTF-8 character takes at most 4 bytes, so these bytes hold more than `limit` characters.
-  const bytes = limit * 4;
+  const bytes = AGENT_INSTRUCTIONS_FILE_BYTES;
   const read = yield* readStart(found.value, bytes).pipe(Effect.option);
   if (Option.isNone(read)) return null;
   const text = read.value.trim();

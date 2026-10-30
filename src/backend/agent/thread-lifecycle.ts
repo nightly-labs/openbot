@@ -67,7 +67,11 @@ import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
 import { VISIBLE_DYNAMIC_TOOLS } from "./tool-catalog";
-import { type PromptInstructionsFile, promptInstructionsFile } from "./workspace-instructions";
+import {
+  AGENT_INSTRUCTIONS_FILE_BYTES,
+  type PromptInstructionsFile,
+  promptInstructionsFile,
+} from "./workspace-instructions";
 import {
   checkAgentFolders,
   codexSandboxConfig,
@@ -795,6 +799,7 @@ export class ThreadLifecycle {
       config?: {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
+        project_doc_max_bytes: number;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & ReturnType<typeof codexSandboxConfig>;
@@ -812,6 +817,9 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
+        // script can be longer, and Codex would drop its end.
+        project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
         "features.code_mode.direct_only_tool_namespaces": [
           ...CODEX_DIRECT_ONLY_NAMESPACES,
           ...codexMcpNamespaces(servers),
