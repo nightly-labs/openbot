@@ -36,8 +36,9 @@ export function readTaskSound(storage?: PreferenceStorage): TaskSoundChoice {
 export function setTaskSound(choice: TaskSoundChoice, storage?: Pick<Storage, "setItem">): void {
   try {
     const target = storage ?? window.localStorage;
-    target.setItem(TASK_SOUND_STORAGE_KEY, choice);
+    // The switch goes first: when only it is saved, "off" still reads as off.
     target.setItem(COMPLETION_SOUND_STORAGE_KEY, String(choice !== "off"));
+    target.setItem(TASK_SOUND_STORAGE_KEY, choice);
     unsavedPreference = undefined;
   } catch {
     // Blocked or full storage keeps the choice for this page only.
@@ -73,7 +74,13 @@ export function playSoundChoice(choice: TaskSoundChoice): void {
  * long after the last action, and iOS can interrupt a running context.
  */
 export function unlockCompletionSound(): void {
-  resume();
+  const choice = readTaskSound();
+  if (choice === "off") return;
+  // A theme plays on the cuelume context, so only the context of the chosen sound starts.
+  if (choice !== "classic") {
+    resume();
+    return;
+  }
   try {
     completionAudioContext ??= new AudioContext();
     if (completionAudioContext.state !== "running") void completionAudioContext.resume().catch(() => undefined);

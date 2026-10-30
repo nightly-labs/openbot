@@ -16,6 +16,8 @@ const CHOICE_NAME = {
 
 /** How long the playing icon shows. The cues are shorter than this. */
 const PLAYING_MS = 600;
+/** Keys that do not move the focus in the menu. Arrow keys, Home, End and typeahead letters do. */
+const NO_MOVE_KEYS = new Set(["Enter", " ", "Escape", "Tab"]);
 
 export interface SoundChoiceSelectProps<Choice extends TaskSoundChoice> {
   /** The accessible name of the menu button. */
@@ -45,7 +47,22 @@ export function SoundChoiceSelect<Choice extends TaskSoundChoice>(props: SoundCh
     setPlaying(() => choice);
     playingTimer = window.setTimeout(() => setPlaying(undefined), PLAYING_MS);
   };
-  onCleanup(() => window.clearTimeout(playingTimer));
+  // Kobalte also focuses an item on hover and when the menu opens. Only a key that moves the focus
+  // plays the sound. The mouse moves first when the user goes back to the pointer.
+  let keyMove = false;
+  const readKey = (event: KeyboardEvent) => {
+    keyMove = !NO_MOVE_KEYS.has(event.key);
+  };
+  const readPointer = () => {
+    keyMove = false;
+  };
+  window.addEventListener("keydown", readKey, true);
+  window.addEventListener("pointermove", readPointer, true);
+  onCleanup(() => {
+    window.clearTimeout(playingTimer);
+    window.removeEventListener("keydown", readKey, true);
+    window.removeEventListener("pointermove", readPointer, true);
+  });
 
   return (
     <Select<Choice>
@@ -58,10 +75,9 @@ export function SoundChoiceSelect<Choice extends TaskSoundChoice>(props: SoundCh
       itemComponent={(itemProps) => (
         <SelectItem
           item={itemProps.item}
-          onFocus={(event) => {
-            // Kobalte also focuses an item on hover. Only a keyboard move shows the focus ring.
+          onFocus={() => {
             const choice = itemProps.item.rawValue;
-            if (choice !== "off" && event.currentTarget.matches(":focus-visible")) preview(choice);
+            if (choice !== "off" && keyMove) preview(choice);
           }}
         >
           <span class="sound-choice-item">
