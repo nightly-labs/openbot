@@ -47,7 +47,6 @@
 .message-author-avatar {
   width: var(--message-author-column);
   height: var(--message-author-column);
-  flex-basis: var(--message-author-column);
   grid-column: 1;
   grid-row: 2;
   align-self: end;
