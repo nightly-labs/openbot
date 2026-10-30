@@ -11,7 +11,7 @@ import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppe
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
-import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
+import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import type { ConversationChannelSettingsPaneProps } from "../conversation/conversation-types";
 import { channelMemoriesPort } from "../conversation/memories-port";
@@ -144,7 +144,7 @@ export function ChannelAboveComposer(props: { channelId: string }) {
 
 /**
  * The channel settings in the settings pane of the view. Memories and routines live here rather than
- * in `ChannelEditor`, because the routines view covers the whole pane: its own header replaces the
+ * in `ChannelEditor`, because each of their pages covers the whole pane: its own header replaces the
  * pane header, as in the agent settings.
  */
 export function ChannelSettingsPane(
@@ -216,48 +216,45 @@ export function ChannelSettingsPane(
       maxWidth={props.maxWidth}
       onResize={setPanelWidth}
     >
-      <Show
-        when={panel.routines.open}
-        fallback={
-          <>
-            <SettingsPanelHeader
-              title={t("channel.settings.title")}
-              onClose={props.onClose}
-              closeLabel={t("channel.panel.close")}
-            />
-            <SettingsPanelContent>
-              <ChannelEditor
-                memoryCount={panel.memories.count}
-                routineCount={panel.routines.count}
-                onOpenMemories={() =>
-                  setPanel((state) => {
-                    state.memories.open = true;
-                  })
-                }
-                onOpenRoutines={() =>
-                  setPanel((state) => {
-                    state.routines.open = true;
-                  })
-                }
-              />
-            </SettingsPanelContent>
-            <AgentMemoriesModal
-              port={memoriesPort()}
-              open={panel.memories.open}
-              onOpenChange={(open) =>
-                setPanel((state) => {
-                  state.memories.open = open;
-                })
-              }
-              onCountChange={(count) =>
-                setPanel((state) => {
-                  state.memories.count = count;
-                })
-              }
-            />
-          </>
+      <Show when={!panel.routines.open && !panel.memories.open}>
+        <SettingsPanelHeader
+          title={t("channel.settings.title")}
+          onClose={props.onClose}
+          closeLabel={t("channel.panel.close")}
+        />
+        <SettingsPanelContent>
+          <ChannelEditor
+            memoryCount={panel.memories.count}
+            routineCount={panel.routines.count}
+            onOpenMemories={() =>
+              setPanel((state) => {
+                state.memories.open = true;
+              })
+            }
+            onOpenRoutines={() =>
+              setPanel((state) => {
+                state.routines.open = true;
+              })
+            }
+          />
+        </SettingsPanelContent>
+      </Show>
+      <AgentMemoriesSettings
+        port={memoriesPort()}
+        open={panel.memories.open}
+        onBack={() =>
+          setPanel((state) => {
+            state.memories.open = false;
+          })
         }
-      >
+        onClose={props.onClose}
+        onCountChange={(count) =>
+          setPanel((state) => {
+            state.memories.count = count;
+          })
+        }
+      />
+      <Show when={panel.routines.open}>
         <AgentRoutinesSettings
           port={routinesPort()}
           onCountChange={(count) =>

@@ -50,7 +50,7 @@ export function memoryReviewPrompt(
     "Rules:",
     "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, standing decisions, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
     "- Never keep task progress, logs of completed work, the steps of a task, or temporary to-do items.",
-    '- Write each memory as a short declarative fact with one fact per entry, such as "The user prefers short answers.", not as an instruction such as "Always answer briefly."',
+    '- Write each memory as a short declarative fact with one fact per entry, such as "The user prefers short answers.", not as an instruction such as "Always answer briefly." Start a memory of more than one sentence with a short label and a colon, such as "Release notes: ...".',
     "- Only the searchable memories that relate most to this chat are listed; the count includes the others.",
     "- Do not add what a memory already says. Update or merge an existing memory before you add a new one, and forget a memory that the chat shows is wrong or no longer true.",
     "- When the memories are at the limit, merge or forget memories in the same answer to make room.",
