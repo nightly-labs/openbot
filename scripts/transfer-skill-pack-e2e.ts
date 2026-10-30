@@ -29,7 +29,7 @@ const reportPath = join(
 );
 interface Report {
   status: "running" | "pass" | "fail";
-  summarySkillCount?: number;
+  summarySkillCount?: number | undefined;
   exportWarnings?: string[];
   importWarnings?: string[];
   sourceLock?: Array<{ slug: string; folders: number }>;
