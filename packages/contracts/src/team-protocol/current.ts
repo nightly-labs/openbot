@@ -43,6 +43,7 @@ import { CONNECTORS_CAPABILITY } from "./connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
+import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
@@ -164,6 +165,7 @@ export {
   CONNECTORS_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
   FOCUS_USE_CAPABILITY,
@@ -344,6 +346,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MEMORY_REVIEW_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -476,7 +479,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
     capability !== MEMORY_REVIEW_CAPABILITY &&
     capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
-    capability !== PROVIDER_SIGN_OUT_CAPABILITY,
+    capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY,
 );
 // A v7 host does not know the v8 markers, so a client sends them only after it negotiates protocol 8.
 const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
@@ -555,6 +559,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
       capability !== MEMORY_REVIEW_CAPABILITY &&
       capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
-      capability !== PROVIDER_SIGN_OUT_CAPABILITY,
+      capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   );
 }

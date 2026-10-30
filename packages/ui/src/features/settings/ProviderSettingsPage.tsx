@@ -7,7 +7,9 @@
 import { ProviderLogo } from "@openbot/brand";
 import {
   type AgentProviderId,
+  agentProviderName,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
@@ -131,6 +133,11 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
    * joined server's rows have no Edit.
    */
   onEditCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
+  /**
+   * This computer runs an endpoint on OpenCode or Pi, and each row names its provider. A joined
+   * server's host runs every endpoint on OpenCode.
+   */
+  customProviderHarnesses?: boolean | undefined;
   /** Runs after the user accepts the removal question. */
   onRemoveCustomProvider?: ((provider: CustomProviderSummary) => void) | undefined;
   removingCustomProvider?: string | null | undefined;
@@ -395,14 +402,13 @@ interface DefaultChoice {
 /** The default provider as one select, so the rows need no radio. */
 function DefaultProviderRow(props: ProviderSettingsPageProps) {
   const { t } = useText();
-  const openCode = () => props.options.find((option) => option.id === "opencode");
   const choices = (): DefaultChoice[] => {
     const value = props.defaultProvider?.value ?? null;
     const providers = props.options
       .filter((option) => (option.state === "available" && !option.off) || option.id === value)
       .map((option) => ({ id: option.id, name: option.name }));
     const custom =
-      (props.customProviders?.length ?? 0) > 0 && servesCustomProvider(openCode()) && props.onAddCustomProvider;
+      (props.customProviders?.length ?? 0) > 0 && servesCustomEndpoints(props) && props.onAddCustomProvider;
     return custom || value === "custom" ? [...providers, { id: "custom", name: t("provider.custom.name") }] : providers;
   };
   const selected = () => choices().find((choice) => choice.id === props.defaultProvider?.value) ?? null;
@@ -1678,11 +1684,24 @@ function DownloadSection(props: SectionProps) {
 
 /* ------------------------------------------------------------------ Custom endpoints */
 
+/** OpenCode can run a custom endpoint, or Pi can where this computer offers it. */
+function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
+  const option = (id: AgentProviderId) => props.options.find((candidate) => candidate.id === id);
+  return (
+    servesCustomProvider(option("opencode")) ||
+    Boolean(props.customProviderHarnesses && servesCustomProvider(option("pi")))
+  );
+}
+
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
   const { t, format } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
-  const ready = () => servesCustomProvider(engine());
+  const ready = () => servesCustomEndpoints(props);
+  const runsOn = (endpoint: CustomProviderSummary) =>
+    t("customProvider.list.runsOn", {
+      name: agentProviderName(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS),
+    });
   const [confirming, setConfirming] = createSignal<CustomProviderSummary | null>(null);
   return (
     <>
@@ -1739,6 +1758,7 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
                         count: endpoint().models.length,
                       })}
                       {endpoint().hasApiKey ? ` · ${t("customProvider.list.apiKeySaved")}` : ""}
+                      {props.customProviderHarnesses ? ` · ${runsOn(endpoint())}` : ""}
                     </ItemDescription>
                   </ItemContent>
                   <Show when={props.onEditCustomProvider || props.onRemoveCustomProvider}>

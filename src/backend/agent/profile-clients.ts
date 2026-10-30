@@ -1,3 +1,4 @@
+import { isCustomProviderHarness } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentClient } from "../agent-client";
 
@@ -48,9 +49,9 @@ export class ProfileClients {
   }
 
   /** Ends every disposable generation that may reach an endpoint the user has taken out. */
-  readonly stopOpenCode = Effect.fn("ProfileClients.stopOpenCode")(function* (this: ProfileClients) {
+  readonly stopEndpointClients = Effect.fn("ProfileClients.stopEndpointClients")(function* (this: ProfileClients) {
     for (const [client, generation] of this.#clients) {
-      if (client.provider !== "opencode") continue;
+      if (!isCustomProviderHarness(client.provider)) continue;
       // The generation is cancelled as well as the client stopped. A generation still preparing its
       // workspace holds no process, so the stop reaches nothing, and its own `start()` would then
       // spawn the process with the endpoints as they were before this change.

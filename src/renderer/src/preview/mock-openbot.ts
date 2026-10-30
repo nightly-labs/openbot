@@ -72,6 +72,7 @@ import {
   DEFAULT_APP_LOGO_COLOR,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   DEFAULT_MACHINE_ALERT_SETTINGS,
@@ -308,7 +309,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
 /** Custom models compose as `<provider>/<model>`; preview builds `listModels()` from these. */
 function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentModelOption[] {
   return provider.models.map((model) => ({
-    provider: "opencode",
+    provider: provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
     id: composedCustomModelId(provider.id, model.id),
     name: `${provider.name}/${model.name}`,
     description: `Served by ${provider.baseUrl}.`,
@@ -1458,6 +1459,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             hasApiKey: input.apiKey !== null,
             headerNames: input.headers.map((header) => header.name),
             models: input.models.map((model) => ({ ...model })),
+            harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
           },
         ];
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
@@ -1495,6 +1497,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                 hasApiKey: input.apiKey !== undefined || keepsKey,
                 headerNames,
                 models: input.models.map((model) => ({ ...model })),
+                harness: input.harness ?? stored.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
               }
             : provider,
         );

@@ -26,6 +26,8 @@ import {
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
+  type CustomProviderResult,
+  type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
   type HiddenAgentsSnapshot,
   type QueueSnapshot,
@@ -61,6 +63,11 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CODECS,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
   type MachineAlertEvent,
@@ -75,6 +82,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -600,6 +608,19 @@ const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
 const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
+// The host's endpoints in memory. The one on Pi has a header and a context window that stay on the host.
+let customEndpoints: CustomProviderSummary[] = [
+  {
+    id: "spark",
+    name: "DGX Spark",
+    baseUrl: "http://spark.local:8080/v1",
+    hasApiKey: false,
+    headerNames: ["X-Tenant"],
+    models: [{ id: "qwen3-coder", name: "Qwen3 Coder", contextWindow: 131072 }],
+    harness: "pi",
+  },
+];
+const customEndpointResult = (): CustomProviderResult => ({ providers: customEndpoints, restart: "not-running" });
 const readMachine = () =>
   Effect.sync(() => {
     record("machineMetrics");
@@ -757,9 +778,27 @@ try {
             }),
         },
         customProviders: {
-          list: unused("providers.customProviders.list"),
-          save: unused("providers.customProviders.save"),
-          remove: unused("providers.customProviders.remove"),
+          list: () => customEndpoints,
+          save: (input) =>
+            Effect.sync(() => {
+              record("saveCustomProvider", input.id, input.harness);
+              const { apiKey, headers, harness, ...endpoint } = input;
+              customEndpoints = [
+                ...customEndpoints,
+                {
+                  ...endpoint,
+                  hasApiKey: apiKey !== null,
+                  headerNames: headers.map(({ name }) => name),
+                  harness: harness ?? "opencode",
+                },
+              ];
+              return customEndpointResult();
+            }),
+          remove: (id) =>
+            Effect.sync(() => {
+              customEndpoints = customEndpoints.filter((endpoint) => endpoint.id !== id);
+              return customEndpointResult();
+            }),
         },
         pasteSignIn: false,
       },
@@ -2391,6 +2430,92 @@ try {
         isDeepStrictEqual(callsOf("setProviderKey").at(-1), ["inception", key]) &&
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
+    );
+  }
+
+  // ---- Custom endpoint harness (custom-provider-harness-v1) ----
+  {
+    const harness = { token: adaToken, capabilities: [CUSTOM_PROVIDER_HARNESS_CAPABILITY] };
+    const released = { token: adaToken, capabilities: [PROVIDERS_ADMIN_CAPABILITY] };
+    const decoded = (route: string, reply: Reply) =>
+      CUSTOM_PROVIDER_HARNESS_CODECS.get(route)?.response(200, reply.body);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 7 });
+    check(
+      "the host advertises custom-provider-harness-v1",
+      list(field(compatibility.body, "capabilities")).includes(CUSTOM_PROVIDER_HARNESS_CAPABILITY),
+      summary(compatibility),
+    );
+    const spark = {
+      id: "spark",
+      name: "DGX Spark",
+      baseUrl: "http://spark.local:8080/v1",
+      hasApiKey: false,
+      models: [{ id: "qwen3-coder", name: "Qwen3 Coder" }],
+    };
+    const listed = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customList, { ...harness, json: {} });
+    const releasedList = await call("POST", PROVIDERS_ADMIN_ROUTES.customList, { ...released, json: {} });
+    check(
+      "an admin lists the endpoint on Pi with its harness, and providers-v1 lists it as it did, without the harness",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, [{ ...spark, harness: "pi" }]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customList, listed), [{ ...spark, harness: "pi" }]) &&
+        isDeepStrictEqual(releasedList.body, [spark]),
+      [summary(listed), summary(releasedList)],
+    );
+    const saved = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customSave, {
+      ...harness,
+      json: {
+        id: "studio",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        apiKey: null,
+        models: [{ id: "gpt-oss", name: "GPT-OSS" }],
+        headers: [],
+        harness: "pi",
+      },
+    });
+    const studio = {
+      id: "studio",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      hasApiKey: false,
+      models: [{ id: "gpt-oss", name: "GPT-OSS" }],
+      harness: "opencode",
+    };
+    check(
+      "a save names no harness: the host adds the endpoint on OpenCode, and the result names each harness",
+      saved.status === 200 &&
+        isDeepStrictEqual(callsOf("saveCustomProvider"), [["studio", undefined]]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customSave, saved), {
+          providers: [{ ...spark, harness: "pi" }, studio],
+          restart: "not-running",
+        }),
+      summary(saved),
+    );
+    const unsupported = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customList, { ...released, json: {} });
+    const member = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, {
+      ...harness,
+      token: bobToken,
+      json: { id: "studio" },
+    });
+    check(
+      "the harness routes without the capability get 400 providersUnsupported, and a member gets 403",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")),
+      [summary(unsupported), summary(member)],
+    );
+    const deleted = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, {
+      ...harness,
+      json: { id: "studio" },
+    });
+    check(
+      "an admin removes the endpoint, and the result names the harness of the one that stays",
+      deleted.status === 200 &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, deleted), {
+          providers: [{ ...spark, harness: "pi" }],
+          restart: "not-running",
+        }),
+      summary(deleted),
     );
   }
 

@@ -100,6 +100,12 @@ const Settings = Schema.Struct({
       ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */
       needsApiKey: Schema.Boolean,
+      /**
+       * Added after version 1 shipped, and only for an endpoint that runs on Pi. An older app ignores
+       * it and runs the endpoint on OpenCode. The import drops an unknown value, so that a harness a
+       * newer app adds cannot refuse the whole Settings section.
+       */
+      harness: Schema.optionalKey(Schema.String),
     }),
   ).check(Schema.isMaxLength(32)),
   customAgents: Schema.Array(

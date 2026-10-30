@@ -7,6 +7,7 @@ import type {
   AgentStatus,
   ClientAgentModelOption,
   CustomAgentSummary,
+  CustomProviderHarness,
   CustomProviderSummary,
   ForeignProviderId,
   ProviderAccountStatus,
@@ -16,9 +17,10 @@ import {
   agentProviderCliName,
   agentProviderName,
   customAgentIdOfModel,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
-  isCustomProviderModelId,
+  isCustomProviderHarness,
   PICKER_PROVIDERS,
   providerDisplayName,
 } from "@openbot/contracts/ipc";
@@ -52,6 +54,7 @@ import { providerAccountName } from "./provider-accounts";
 import {
   customProviderIds,
   groupPickerModels,
+  isCustomEndpointModel,
   isCustomModel,
   type PickerModel,
   type PickerModelGroup,
@@ -211,7 +214,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
-    props.provider === "acp" || (props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()))
+    props.provider === "acp" || isCustomEndpointModel(props.provider, props.value, customIds())
       ? CUSTOM_RAIL
       : props.provider;
   const activeKey = (): RailKey => {
@@ -223,15 +226,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** The provider whose mark the trigger shows, so only a changed one springs in. */
   let shownProvider = untrack(activeProvider);
 
-  /** OpenCode and Custom tabs split one wire provider so each model appears once. */
+  /** The OpenCode, Pi and Custom tabs split one wire provider so each model appears once. */
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
     if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    if (rail === "opencode") {
-      return props.modelOptions.filter(
-        (option) => option.provider === "opencode" && !isCustomModel(option, customIds()),
-      );
-    }
-    return props.modelOptions.filter((option) => option.provider === rail);
+    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   /**
@@ -259,13 +257,21 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       agents: t("provider.customAgentCount", { count: agents }),
     });
   };
+  /** The status of the providers that run the saved endpoints: the first available one, or the first. */
+  const endpointStatus = (): AgentProviderStatus => {
+    const status = (harness: CustomProviderHarness) =>
+      providerAvailability(props.agentStatus, props.modelOptions, harness, t);
+    const harnesses = [...new Set(customIds().values())];
+    const available = harnesses.find((harness) => status(harness).state === "available");
+    return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
+  };
   /**
-   * One provider status per tab. The Custom tab stands for OpenCode, which serves the endpoints, and
-   * for `acp`, which runs the agents: it is available when either of the saved kinds is.
+   * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
+   * and for `acp`, which runs the agents: it is available when either of the saved kinds is.
    */
   const railStatus = (rail: RailId): AgentProviderStatus => {
     if (rail !== CUSTOM_RAIL) return providerAvailability(props.agentStatus, props.modelOptions, rail, t);
-    const endpoints = providerAvailability(props.agentStatus, props.modelOptions, "opencode", t);
+    const endpoints = endpointStatus();
     if (agentCount() === 0) return endpoints;
     const agents = providerAvailability(props.agentStatus, props.modelOptions, "acp", t);
     if (!props.customProviders?.length) return agents;
@@ -665,13 +671,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   const model = selected();
                   return model ? pickerModelKey(model) : props.value;
                 };
-                // OpenCode and Custom share the `opencode` wire id; the tab whose list holds it owns it.
+                // OpenCode or Pi and Custom share one wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
                   provider === CUSTOM_RAIL
                     ? selected()?.provider === props.provider
                     : provider === props.provider &&
                       accountId() === currentAccount() &&
-                      (props.provider !== "opencode" || Boolean(selected()));
+                      (!isCustomProviderHarness(props.provider) || Boolean(selected()));
                 const effortOptions = createMemo(() => {
                   if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];

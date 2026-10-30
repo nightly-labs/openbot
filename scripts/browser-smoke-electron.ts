@@ -2289,11 +2289,11 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
  * A page that redirects while it loads made `loadURL` reject inside Electron's `did-start-navigation`
  * event, and the tab then called `webContents.stop()` before that event returned. Chromium stops the
  * process when a navigation is cancelled while it starts. The process must survive and end on the
- * redirected page.
+ * redirected page, and each navigation must succeed.
  */
 async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
   const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
-  const outcomes: { via: string; url: string; success: boolean; error?: string }[] = [];
+  const outcomes: { via: string; url: string; success: boolean; finalUrl?: string; error?: string }[] = [];
   try {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       for (const url of [`${origin}/redirect-start`, `${origin}/redirect-start?slow`]) {
@@ -2311,6 +2311,14 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
           success: exit._tag === "Success",
           ...(exit._tag === "Success" ? {} : { error: String(exit.cause) }),
         });
+        const opened = await Effect.runPromiseExit(browser.open(url, "smoke-thread", "smoke-bot"));
+        outcomes.push({
+          via: "open",
+          url,
+          success: opened._tag === "Success" && opened.value.url.includes("/redirect-end"),
+          ...(opened._tag === "Success" ? { finalUrl: opened.value.url } : { error: String(opened.cause) }),
+        });
+        if (opened._tag === "Success") await runCauseEffect(browser.close(opened.value.id));
       }
     }
     await waitFor(
@@ -2329,6 +2337,8 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
     ".openbot-build/browser-redirect-navigation-report.json",
     JSON.stringify({ processAlive: true, attempts: outcomes.length, outcomes }, null, 2),
   );
+  const failed = outcomes.filter((outcome) => !outcome.success);
+  if (failed.length > 0) throw new Error(`${failed.length} redirecting navigations failed: ${failed[0]?.error}`);
   process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
 }
 

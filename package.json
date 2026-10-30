@@ -208,6 +208,7 @@
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
     "test:grok-steer": "bun scripts/grok-steer-e2e.ts",
     "test:pi-steer": "bun scripts/pi-steer-e2e.ts",
+    "test:custom-provider-pi": "bun scripts/custom-provider-pi-harness-e2e.ts",
     "test:muse-instructions-once": "bun scripts/muse-instructions-once-e2e.ts",
     "test:provider-conformance": "bun scripts/provider-conformance-e2e.ts",
     "test:provider-cli-canary": "bun scripts/provider-cli-canary.ts",
