@@ -1052,7 +1052,7 @@ short-lived signed addresses, in transit only.
   agent can post redacted text to a linked chat.
 
 Anyone who can post in a linked chat can give the agents work. The agents run on the host with the
-access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
+access the user gave them. A hosted server that sleeps starts for any message of a linked chat. Until it connects,
 Signal keeps that message in memory for at most 10 minutes, encrypted to a key that only that server
 has, so Signal cannot read it; a restart of Signal deletes it.
 
