@@ -19,5 +19,10 @@ export const messages = {
   "error.messaging.telegramRelayUnavailable":
     "OpenBot bu bilgisayarda Telegram'a ulaşamıyor. Oturum açın, bu bilgisayara bir ad verin ve tekrar deneyin.",
   "error.messaging.telegramServiceUnavailable": "OpenBot şu anda Telegram'ı bağlayamıyor. Daha sonra tekrar deneyin.",
+  // Bağlı bir WhatsApp numarasının ana makinenin gönderdiği hataları.
+  "error.messaging.whatsappNotConnected": "Bu WhatsApp numarası bağlı değil.",
+  "error.messaging.whatsappUnsupported": "Bu bilgisayar WhatsApp'a bağlanamıyor.",
+  "error.messaging.whatsappTooManySenders": "Bir WhatsApp numarası en fazla 200 kişiye ve gruba izin verebilir.",
+  "error.messaging.whatsappRequestEnded": "Bu istek sona erdi. Yeni bir kod için kişiden tekrar yazmasını isteyin.",
   "error.messaging.memoryLimit": "Bağlı bir çalışma alanı en fazla {limit} belleğe sahip olabilir. Önce birini silin.",
 } as const satisfies PartialTranslation<typeof source>;

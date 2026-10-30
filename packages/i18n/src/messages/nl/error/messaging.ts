@@ -16,6 +16,11 @@ export const messages = {
   "error.messaging.telegramRelayUnavailable":
     "OpenBot kan Telegram niet bereiken op deze computer. Log in, geef deze computer een naam en probeer het opnieuw.",
   "error.messaging.telegramServiceUnavailable": "OpenBot kan Telegram nu niet verbinden. Probeer het later opnieuw.",
+  "error.messaging.whatsappNotConnected": "Dit WhatsApp-nummer is niet verbonden.",
+  "error.messaging.whatsappUnsupported": "Deze computer kan geen verbinding maken met WhatsApp.",
+  "error.messaging.whatsappTooManySenders": "Een WhatsApp-nummer kan maximaal 200 contacten en groepen toestaan.",
+  "error.messaging.whatsappRequestEnded":
+    "Dit verzoek is beëindigd. Vraag de persoon opnieuw te schrijven voor een nieuwe code.",
   "error.messaging.memoryLimit":
     "Een verbonden werkruimte kan maximaal {limit} herinneringen hebben. Verwijder er eerst een.",
 } as const satisfies PartialTranslation<typeof source>;

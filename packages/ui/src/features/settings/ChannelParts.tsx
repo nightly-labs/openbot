@@ -1,7 +1,7 @@
 /**
- * The parts that the chat channel pages share: Slack, Discord and Telegram. Each page connects places
- * where people talk to OpenBot (a workspace, a Discord server, a chat), and one orchestrator agent
- * answers there. The pages differ only in how a place connects and in their own extra sections.
+ * The parts that the chat channel pages share: Slack, Discord, Telegram and WhatsApp. Each page
+ * connects places where people talk to OpenBot (a workspace, a Discord server, a chat, a number), and
+ * one orchestrator agent answers there. The pages differ only in how a place connects and in their own extra sections.
  */
 
 import type {
@@ -160,6 +160,8 @@ export function ChannelPage(
     onConnect: () => void;
     /** A step that no section holds, in the header after the page is set up. */
     headerAction?: JSX.Element;
+    /** An alert that the page always shows after its other alerts, such as a risk of the platform. */
+    notice?: JSX.Element;
     disconnectAllSummary: string;
     onDisconnectAll: () => void;
     /** The sections of a page that is set up. */
@@ -190,17 +192,20 @@ export function ChannelPage(
       readError={props.loadError}
       onRetry={props.onRetry}
       alert={
-        <Show when={props.state.attention > 0}>
-          <Alert tone="warning" role="alert">
-            <AlertIcon>
-              <TriangleAlert />
-            </AlertIcon>
-            <AlertContent>
-              <AlertTitle>{t(props.text.attentionTitle, { count: props.state.attention })}</AlertTitle>
-              <AlertDescription>{t(props.text.attentionDescription)}</AlertDescription>
-            </AlertContent>
-          </Alert>
-        </Show>
+        <>
+          <Show when={props.state.attention > 0}>
+            <Alert tone="warning" role="alert">
+              <AlertIcon>
+                <TriangleAlert />
+              </AlertIcon>
+              <AlertContent>
+                <AlertTitle>{t(props.text.attentionTitle, { count: props.state.attention })}</AlertTitle>
+                <AlertDescription>{t(props.text.attentionDescription)}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          </Show>
+          {props.notice}
+        </>
       }
       tagline={props.tagline}
       intro={props.intro}
@@ -234,6 +239,8 @@ export function ChannelConnectionRow(props: {
   busy: boolean;
   /** False when only a new connection brings the place back. */
   canReconnect?: boolean | undefined;
+  /** One more action before Disconnect, such as a new link in place of Reconnect. */
+  action?: JSX.Element;
   onReconnect: () => void;
   onSetEnabled: (enabled: boolean) => void;
   onDisconnect: () => void;
@@ -263,6 +270,7 @@ export function ChannelConnectionRow(props: {
           <Match when={kind() === "paused"}>{action(t(props.text.resume), () => props.onSetEnabled(true))}</Match>
           <Match when={kind() === "live"}>{action(t(props.text.pause), () => props.onSetEnabled(false))}</Match>
         </Switch>
+        {props.action}
         <Button
           type="button"
           size="sm"

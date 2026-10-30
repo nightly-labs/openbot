@@ -44,4 +44,15 @@ export const messages = defineMessages("status.messaging", {
     "OpenBot is connected to this chat. Mention {bot} or reply to a message of OpenBot to ask the agents.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Answers in Telegram and asks the team",
+  // Text that OpenBot posts from a linked WhatsApp number, and the WhatsApp Orchestrator agent.
+  // WhatsApp users read the posts. Personal WhatsApp has no buttons, so a person answers with a number.
+  "status.messaging.whatsappNoAgent": "No agent can answer here yet. Add the WhatsApp Orchestrator in OpenBot.",
+  "status.messaging.whatsappApprovalMenu": "Reply 1 to approve or 2 to deny.",
+  "status.messaging.whatsappStopMenu": "Reply stop to stop.",
+  "status.messaging.whatsappPairingCode":
+    "This number answers only people that its owner allowed. Give the owner this code: {code}",
+  "status.messaging.whatsappPairingApproved": "You can now send requests to this number.",
+  "status.messaging.whatsappOwnChat": "Message yourself",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "Answers in WhatsApp and asks the team",
 });

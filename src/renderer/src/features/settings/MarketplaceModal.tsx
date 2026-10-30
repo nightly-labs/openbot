@@ -110,7 +110,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       untrack(() => startConnect(slug));
     },
   );
-  // Slack, Discord and Telegram change with no event from main, so each available connector is
+  // Slack, Discord, Telegram and WhatsApp change with no event from main, so each available connector is
   // followed while the window is open.
   createEffect(
     () => (props.open ? props.connectors?.available() : undefined),

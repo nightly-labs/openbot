@@ -113,6 +113,7 @@ export const messages = {
   "marketplace.app.slackTagline": "Slack'te bahsetmeler ve doğrudan mesajlar",
   "marketplace.app.discordTagline": "Discord'da bahsetmeler ve doğrudan mesajlar",
   "marketplace.app.telegramTagline": "Telegram'da gruplar ve doğrudan sohbetler",
+  "marketplace.app.whatsappTagline": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
   "marketplace.app.bitwardenTagline": "Paylaşılan bir klasördeki oturum bilgileriyle sitelerde oturum açın",
   // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "Oturum açma ve kimlik bilgisi yönetimi",

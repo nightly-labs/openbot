@@ -341,6 +341,8 @@ import type {
   AddSlackOrchestratorInput,
   AddSlackOrchestratorResult,
   AddTelegramOrchestratorInput,
+  AddWhatsAppOrchestratorInput,
+  AnswerWhatsAppRequestInput,
   ConnectTelegramChatInput,
   DiscordAccess,
   DiscordRoleList,
@@ -353,14 +355,21 @@ import type {
   HostSetMessagingEnabledInput,
   MessagingOverview,
   MessagingWorkspaceInput,
+  RemoveWhatsAppSenderInput,
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
+  SetWhatsAppOwnNumberInput,
   SlackOverview,
   SlackWorkspaceInput,
+  StartWhatsAppLinkInput,
   TelegramChatInput,
   TelegramOverview,
+  WhatsAppGroupList,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
 import type {
@@ -1079,6 +1088,24 @@ export const IPC_ENDPOINTS = {
     addTelegramOrchestrator: request<AddTelegramOrchestratorInput, AddMessagingOrchestratorResult>()(
       "messaging:add-telegram-orchestrator",
     ),
+    // The WhatsApp numbers linked as a device of this computer. A link shows a QR code or a pairing
+    // code that the phone uses; the page reads the link state while its dialog is open. No Signal and
+    // no account service: this computer holds the session.
+    getWhatsAppOverview: request<undefined, WhatsAppOverview>()("messaging:get-whatsapp-overview"),
+    startWhatsAppLink: request<StartWhatsAppLinkInput, WhatsAppLinkState>()("messaging:start-whatsapp-link"),
+    getWhatsAppLinkState: request<undefined, WhatsAppLinkState>()("messaging:get-whatsapp-link-state"),
+    cancelWhatsAppLink: request<undefined, void>()("messaging:cancel-whatsapp-link"),
+    disconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:disconnect-whatsapp-number"),
+    reconnectWhatsAppNumber: request<MessagingWorkspaceInput, void>()("messaging:reconnect-whatsapp-number"),
+    setWhatsAppEnabled: request<SetMessagingEnabledInput, void>()("messaging:set-whatsapp-enabled"),
+    addWhatsAppOrchestrator: request<AddWhatsAppOrchestratorInput, AddMessagingOrchestratorResult>()(
+      "messaging:add-whatsapp-orchestrator",
+    ),
+    listWhatsAppGroups: request<MessagingWorkspaceInput, WhatsAppGroupList>()("messaging:list-whatsapp-groups"),
+    addWhatsAppSender: request<WhatsAppSenderInput, void>()("messaging:add-whatsapp-sender"),
+    removeWhatsAppSender: request<RemoveWhatsAppSenderInput, void>()("messaging:remove-whatsapp-sender"),
+    answerWhatsAppRequest: request<AnswerWhatsAppRequestInput, void>()("messaging:answer-whatsapp-request"),
+    setWhatsAppOwnNumber: request<SetWhatsAppOwnNumberInput, void>()("messaging:set-whatsapp-own-number"),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.

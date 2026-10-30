@@ -85,6 +85,7 @@ const CONNECTOR_SETUP = {
   slack: "channel",
   discord: "channel",
   telegram: "channel",
+  whatsapp: "channel",
   onepassword: "vault",
   bitwarden: "vault",
   github: "account",

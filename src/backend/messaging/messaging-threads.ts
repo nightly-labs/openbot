@@ -141,7 +141,12 @@ const HISTORY_TIMEOUT_MS = 15_000;
 const FINISHED_TURN_LIMIT = 256;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
-const PLATFORM_NAMES: Record<MessagingPlatform, string> = { slack: "Slack", discord: "Discord", telegram: "Telegram" };
+const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
+  slack: "Slack",
+  discord: "Discord",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
+};
 
 /**
  * Owns the execution threads of external conversations: it enqueues their messages, frames their
