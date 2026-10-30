@@ -175,9 +175,12 @@ A message that opens with a typed "@Name" and no tag goes to the member with tha
 (case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
 parser does not change. A routine run reads its text in the same way. A request to more than one
 member does not continue the task of the message it replies to. "continue" (or "resume", "go on",
-"keep going") continues each stopped or failed root task of the newest request that has one. Older
-open work does not block it, and a member that still works stays as it is. A resumed task keeps its
-instruction; the dispatch and the packet add the new message as a follow-up line. A request that needs routing in a channel with no lead stops with the reason
+"keep going") continues each stopped root task of the newest request that has one. A failed root
+task continues only when no root task is stopped. When the message has a recipient, that member's
+own stopped (or else failed) task continues first. Older open work does not block it, and a member
+that still works stays as it is. A resumed task keeps its instruction; the dispatch and the packet
+add the new message as a follow-up line. A child task gets the follow-up only when the message
+replies to that task, because a new child task has the request of its parent. A request that needs routing in a channel with no lead stops with the reason
 `channelLeadRequired`. A save that sets a new lead queues these requests again, and the lead routes
 them. A lead change does not move a task that already has an owner. The member packet names the lead
 (`leadAgentId`).

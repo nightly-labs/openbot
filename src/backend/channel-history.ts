@@ -69,11 +69,12 @@ export function isMemberThinking({ message }: ChannelMessage): boolean {
 /**
  * The work a task asks for. A follow-up such as "continue" resumes a task and becomes its request,
  * but the task keeps its first instruction: the follow-up alone told the member nothing, and the
- * member answered an older request from its own history instead. A child task inherits its
- * parent's request, so only a root task has a follow-up.
+ * member answered an older request from its own history instead. A new child task inherits its
+ * parent's request, so a child task has a follow-up only when the request is a message to that task.
  */
 export function assignmentText(task: ChannelTask, request: ChannelMessage | null | undefined): string {
-  const followUp = task.parentTaskId === null && task.sourceMessageIds[0] !== task.requestMessageId;
+  const followUp =
+    task.sourceMessageIds[0] !== task.requestMessageId && (task.parentTaskId === null || request?.taskId === task.id);
   return followUp && request?.id === task.requestMessageId && request.message.text.trim()
     ? `${task.instruction}\n\nFollow-up: ${request.message.text}`
     : task.instruction;
