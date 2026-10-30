@@ -32,6 +32,7 @@ export const messages = {
   "channel.form.titlePlaceholder": "Bu kanalın ne yaptığını açıklayın",
   "channel.form.instructions": "Talimatlar",
   "channel.form.instructionsLabel": "Kanal talimatları",
+  "channel.form.instructionsResize": "Talimatları yeniden boyutlandır",
   "channel.form.instructionsPlaceholder": "Bu kanal ne üzerinde çalışacak?",
   "channel.members.title": "Üyeler",
   "channel.members.unavailable": "Kullanılamayan üye {id}",

@@ -96,6 +96,7 @@ export const messages = {
   "agentSettings.agentTitlePlaceholder": "エージェントの役割を説明してください",
   "agentSettings.instructions": "指示",
   "agentSettings.instructionsLabel": "エージェントへの指示",
+  "agentSettings.instructionsResize": "指示欄のサイズを変更",
   "agentSettings.instructionsPlaceholder": "このエージェントの用途",
 
   "agentSettings.avatar.edit": "エージェントのアバターを編集",

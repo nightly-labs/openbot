@@ -61,11 +61,11 @@ import {
   SlidersHorizontal,
   Switch,
   Text,
-  Textarea,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
 import { ProviderModelPicker, reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
+import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import {
   SettingsField,
   SettingsLinkGroup,
@@ -1237,11 +1237,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 />
               </SettingsField>
               <SettingsField label={t("agentSettings.instructions")}>
-                <Textarea
+                <ResizableTextarea
                   class="settings-instructions-input"
                   rows="5"
                   value={draft.fields.description}
                   aria-label={t("agentSettings.instructionsLabel")}
+                  resizeLabel={t("agentSettings.instructionsResize")}
                   placeholder={t("agentSettings.instructionsPlaceholder")}
                   invalid={instructionsTooLong(draft.fields.description)}
                   onValueChange={(value) => {

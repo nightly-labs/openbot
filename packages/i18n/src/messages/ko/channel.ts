@@ -32,6 +32,7 @@ export const messages = {
   "channel.form.titlePlaceholder": "이 채널이 하는 일을 설명하세요",
   "channel.form.instructions": "지침",
   "channel.form.instructionsLabel": "채널 지침",
+  "channel.form.instructionsResize": "지침 크기 조정",
   "channel.form.instructionsPlaceholder": "이 채널에서 어떤 작업을 하나요?",
   "channel.members.title": "멤버",
   "channel.members.unavailable": "사용할 수 없는 멤버 {id}",

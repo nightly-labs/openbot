@@ -32,6 +32,7 @@ export const messages = {
   "channel.form.titlePlaceholder": "Beschrijf wat dit kanaal doet",
   "channel.form.instructions": "Instructies",
   "channel.form.instructionsLabel": "Kanaalinstructies",
+  "channel.form.instructionsResize": "Formaat van instructies wijzigen",
   "channel.form.instructionsPlaceholder": "Waar gaat dit kanaal aan werken?",
   "channel.members.title": "Leden",
   "channel.members.unavailable": "Niet-beschikbaar lid {id}",

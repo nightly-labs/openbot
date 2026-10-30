@@ -38,6 +38,7 @@ export const messages = {
   "channel.form.titlePlaceholder": "Describe lo que hace este canal",
   "channel.form.instructions": "Instrucciones",
   "channel.form.instructionsLabel": "Instrucciones del canal",
+  "channel.form.instructionsResize": "Cambiar tamaño de las instrucciones",
   "channel.form.instructionsPlaceholder": "¿En qué trabajará este canal?",
   "channel.members.title": "Miembros",
   "channel.members.unavailable": "Miembro no disponible {id}",

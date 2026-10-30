@@ -169,12 +169,13 @@
   overflow-y: auto;
 }
 
-/* Instructions keep a fixed height and scroll inside, so the rows below do not move. */
+/* Instructions keep a fixed height while the user types, so the rows below do not move.
+   The grip in the corner sets a taller height. */
 .settings-field .settings-instructions-input {
   field-sizing: fixed;
   height: 120px;
   min-height: 120px;
-  max-height: 120px;
+  max-height: none;
   resize: none;
 }
 

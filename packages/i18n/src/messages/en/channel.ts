@@ -31,6 +31,7 @@ export const messages = defineMessages("channel", {
   "channel.form.titlePlaceholder": "Describe what this channel does",
   "channel.form.instructions": "Instructions",
   "channel.form.instructionsLabel": "Channel instructions",
+  "channel.form.instructionsResize": "Resize instructions",
   "channel.form.instructionsPlaceholder": "What will this channel work on?",
   "channel.members.title": "Members",
   "channel.members.unavailable": "Unavailable member {id}",

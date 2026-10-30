@@ -32,6 +32,7 @@ export const messages = {
   "channel.form.titlePlaceholder": "描述这个频道做什么",
   "channel.form.instructions": "指令",
   "channel.form.instructionsLabel": "频道指令",
+  "channel.form.instructionsResize": "调整指令大小",
   "channel.form.instructionsPlaceholder": "这个频道负责什么工作？",
   "channel.members.title": "成员",
   "channel.members.unavailable": "不可用的成员 {id}",

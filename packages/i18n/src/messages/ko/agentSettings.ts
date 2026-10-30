@@ -95,6 +95,7 @@ export const messages = {
   "agentSettings.agentTitlePlaceholder": "에이전트가 하는 일을 설명해 주세요",
   "agentSettings.instructions": "지침",
   "agentSettings.instructionsLabel": "에이전트 지침",
+  "agentSettings.instructionsResize": "지침 크기 조정",
   "agentSettings.instructionsPlaceholder": "이 에이전트의 용도",
   "agentSettings.avatar.edit": "에이전트 아바타 편집",
   "agentSettings.avatar.editor": "아바타 편집기",

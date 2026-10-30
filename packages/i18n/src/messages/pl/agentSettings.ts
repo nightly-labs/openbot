@@ -116,6 +116,7 @@ export const messages = {
   "agentSettings.agentTitlePlaceholder": "Opisz, co robi twój agent",
   "agentSettings.instructions": "Instrukcje",
   "agentSettings.instructionsLabel": "Instrukcje agenta",
+  "agentSettings.instructionsResize": "Zmień rozmiar instrukcji",
   "agentSettings.instructionsPlaceholder": "Do czego służy ten agent",
   "agentSettings.avatar.edit": "Edytuj awatar agenta",
   "agentSettings.avatar.editor": "Edytor awatara",

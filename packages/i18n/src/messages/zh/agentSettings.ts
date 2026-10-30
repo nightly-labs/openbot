@@ -93,6 +93,7 @@ export const messages = {
   "agentSettings.agentTitlePlaceholder": "描述你的助手做什么",
   "agentSettings.instructions": "指令",
   "agentSettings.instructionsLabel": "助手指令",
+  "agentSettings.instructionsResize": "调整指令大小",
   "agentSettings.instructionsPlaceholder": "这个助手用来做什么",
 
   "agentSettings.avatar.edit": "编辑助手头像",
