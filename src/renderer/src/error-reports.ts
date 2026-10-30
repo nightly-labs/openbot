@@ -25,6 +25,8 @@ let profileId: string | null = null;
 export const WEB_PREFERENCE = "openbot:web:error-reports-enabled";
 /** A choice of this browser that the account has not saved yet, "true" or "false". */
 const WEB_ACCOUNT_PENDING = "openbot:web:analytics-account-pending";
+/** "true" or "false". Missing: an app from before the account kept answers saved the choice. */
+const WEB_KEEP_OFF = "openbot:web:analytics-keep-off";
 
 export function configureDesktopReports(
   info: AppInfo,
@@ -120,11 +122,25 @@ export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> 
   configureErrorReports(webReportsEnabled(), user?.id ?? null);
 }
 
+/**
+ * True when this browser keeps an "off" that it saved before the account kept answers. An account
+ * answer of "on" does not replace it; only a choice in this browser does.
+ */
+export function webKeepsOff(): boolean {
+  try {
+    return localStorage.getItem(WEB_PREFERENCE) === "false" && localStorage.getItem(WEB_KEEP_OFF) !== "false";
+  } catch {
+    return false;
+  }
+}
+
 export function setWebReportsEnabled(value: boolean): boolean {
   // Disable first. A failed write must never permit a pending send.
   if (!value) configureErrorReports(false);
   webChoice = value;
   try {
+    // A kept "off" stays kept until this browser turns analytics on.
+    localStorage.setItem(WEB_KEEP_OFF, String(!value && webKeepsOff()));
     localStorage.setItem(WEB_PREFERENCE, String(value));
     configureErrorReports(value);
   } catch {

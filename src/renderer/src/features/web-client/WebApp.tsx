@@ -20,6 +20,7 @@ import {
   setWebAccountPending,
   setWebReportsEnabled,
   webAccountPending,
+  webKeepsOff,
   webReportsAgreed,
   webReportsEnabled,
 } from "../../error-reports";
@@ -284,12 +285,14 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   }
   /**
    * Keeps this browser and the account on the user's latest analytics answer. A choice that the
-   * account does not have yet goes to it; otherwise this browser follows the account's answer.
+   * account does not have yet goes to it; otherwise this browser follows the account's answer. An
+   * "off" from before the account kept answers does not follow an "on".
    */
   async function followAccountAnalytics(answer: boolean | null | undefined) {
     const module = await import("./web-analytics");
     if (webAccountPending()) return module.sendWebAnalyticsChoice(accountCalls);
     if (answer === null || answer === undefined || answer === webReportsEnabled()) return;
+    if (answer && webKeepsOff()) return;
     setWebReportsEnabled(answer);
     module.followWebReportsPreference();
   }

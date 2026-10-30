@@ -6,6 +6,7 @@ import {
   setWebReportsEnabled,
   WEB_PREFERENCE,
   webAccountPending,
+  webKeepsOff,
   webReportsEnabled,
 } from "../../error-reports";
 import type { WebAccountCalls } from "./web-account";
@@ -40,8 +41,9 @@ let sending = false;
 
 /**
  * Sends the choice that the account does not have yet, also a newer one that the user makes during
- * the send. The account keeps a newer answer from another device, and this browser follows it. A
- * failed send stays marked; the next session check or choice sends it again.
+ * the send. The account keeps a newer answer from another device, and this browser follows it,
+ * except for an "on" over a kept "off". A failed send stays marked; the next session check or
+ * choice sends it again.
  */
 export async function sendWebAnalyticsChoice(calls: Pick<WebAccountCalls, "updateAnalytics">): Promise<void> {
   // The send in progress reads the latest choice when it ends.
@@ -52,7 +54,7 @@ export async function sendWebAnalyticsChoice(calls: Pick<WebAccountCalls, "updat
       const account = await calls.updateAnalytics(choice.enabled, Math.max(0, Date.now() - choice.at));
       if (webAccountPending()?.at !== choice.at) continue;
       setWebAccountPending(null);
-      if (account === null || account === choice.enabled) continue;
+      if (account === null || account === choice.enabled || (account && webKeepsOff())) continue;
       setWebReportsEnabled(account);
       followWebReportsPreference();
     }
