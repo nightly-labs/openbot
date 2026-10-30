@@ -911,10 +911,11 @@ function replaceSignal(state: PeerState): void {
 
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
-  // The jitter spreads the hosts that a Signal restart disconnects at the same time.
+  // A Signal restart disconnects all hosts at the same time, and each resume asks the account service.
+  // The jitter spreads the first retry over 0.5–4 s, not 0.25–0.5 s.
   const delay = Math.max(
     signalRetryAt - Date.now(),
-    Math.min(30_000, 500 * 2 ** state.reconnectAttempt++) * (0.5 + Math.random() / 2),
+    Math.min(30_000, 4_000 * 2 ** state.reconnectAttempt++) * (0.125 + (Math.random() * 7) / 8),
   );
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;

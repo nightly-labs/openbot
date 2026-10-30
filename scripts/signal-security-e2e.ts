@@ -1,7 +1,7 @@
 // Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the generic webhook headers, the hello deadline, the reuse of
+// events, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the hello deadline, the reuse of
 // TURN credentials, and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
 import { type ChildProcess, spawn } from "node:child_process";
@@ -56,6 +56,13 @@ const LINK_CODE = randomBytes(32).toString("base64url");
 // The account service fails for the sessions of this host, and calls the sessions of the next one inactive.
 const UNAVAILABLE_HOST_ID = "host-unavailable-e2e";
 const INACTIVE_HOST_ID = "host-inactive-e2e";
+// The account service answers the sessions of these hosts slowly, and the run counts how many checks wait at a time.
+const BURST_HOST_PREFIX = "host-burst-e2e-";
+const BURST_PEERS = 100;
+const BURST_CHECK_MILLISECONDS = 300;
+// `RESUME_CHECK_CONCURRENCY` in remote/api/src/index.ts.
+const RESUME_CHECK_CONCURRENCY = 64;
+const burstChecks = { active: 0, maximum: 0 };
 
 interface Check {
   name: string;
@@ -130,6 +137,13 @@ function startControlPlane(port: number): Promise<Server> {
     if (!signed) return answer(401);
     if (path === "/v2/remote/resume/validate") {
       if (payload.hostId === UNAVAILABLE_HOST_ID) return answer(503);
+      if (String(payload.hostId).startsWith(BURST_HOST_PREFIX)) {
+        burstChecks.active += 1;
+        burstChecks.maximum = Math.max(burstChecks.maximum, burstChecks.active);
+        await new Promise((wake) => setTimeout(wake, BURST_CHECK_MILLISECONDS));
+        burstChecks.active -= 1;
+        return answer(200, { valid: true });
+      }
       return answer(200, { valid: payload.hostId !== INACTIVE_HOST_ID });
     }
     if (path === "/v2/remote/telegram-route/validate") return answer(200, { chats: payload.chats });
@@ -165,7 +179,10 @@ async function sign(claims: JWTPayload, audience: string, key = privateKey) {
 
 function remoteTicket(
   overrides: Partial<
-    Pick<RemoteTicketClaims, "hostId" | "membershipId" | "sessionExpiresAt" | "protocolMinimum" | "protocolMaximum">
+    Pick<
+      RemoteTicketClaims,
+      "hostId" | "userId" | "membershipId" | "sessionExpiresAt" | "protocolMinimum" | "protocolMaximum"
+    >
   > = {},
   key = privateKey,
 ) {
@@ -280,6 +297,9 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     SLACK_SIGNING_SECRET: `${SLACK_APP_ID}:${SLACK_SECRET}`,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
+    // All sockets of the burst check come from one address.
+    REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 2),
+    REMOTE_MAX_MESSAGES_PER_MINUTE: String(BURST_PEERS * 20),
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -717,6 +737,35 @@ try {
     );
     return `closed with ${code} and an authentication_required error`;
   });
+  // After a restart every peer connects again at once. Signal sends a limited number of checks to the
+  // account service at the same time, and each peer still gets ready.
+  await check(
+    `A burst of hellos sends at most ${RESUME_CHECK_CONCURRENCY} account service checks at a time`,
+    async () => {
+      const tickets = await Promise.all(
+        Array.from({ length: BURST_PEERS }, (_, index) => {
+          const hostId = `${BURST_HOST_PREFIX}${index}`;
+          return remoteTicket({ hostId, membershipId: `${hostId}:host`, userId: `owner-burst-${index}` });
+        }),
+      );
+      const peers = await Promise.all(tickets.map(() => connect(signalUrl)));
+      try {
+        for (const [index, peer] of peers.entries()) {
+          peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "host", token: tickets[index] }));
+        }
+        await Promise.all(
+          peers.map((peer) => peer.next((frame) => frame.includes('"type":"ready"'), "ready after a burst hello")),
+        );
+        expect(
+          burstChecks.maximum === RESUME_CHECK_CONCURRENCY,
+          `${burstChecks.maximum} checks at a time, expected ${RESUME_CHECK_CONCURRENCY}`,
+        );
+        return `${BURST_PEERS} peers ready; at most ${burstChecks.maximum} checks at a time`;
+      } finally {
+        for (const peer of peers) peer.socket.close();
+      }
+    },
+  );
   await check("An ingress hello without a route ticket is refused", async () => {
     const peer = await connect(signalUrl);
     peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "ingress", token: await remoteTicket() }));

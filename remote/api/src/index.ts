@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
-import { Context, Effect, Layer, ManagedRuntime, Schema } from "effect";
+import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
 import { DiscordGateway } from "./discord-gateway";
@@ -21,6 +21,15 @@ const config = readRemoteApiConfig();
 class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("ControlPlaneError", {
   message: Schema.String,
 }) {}
+
+// A restart empties the resume cache, and every peer connects again in the same second. Each hello then
+// asks the account service, and one D1 database answers its queries one at a time. On 2026-10-30 one
+// restart gave 9443 resumes that the account service did not confirm, and each of those peers tried again.
+// The limit keeps the 5-second request timeout for the request only, not for its wait in a queue. A
+// check that waits longer than the deadline fails as unavailable (close 1013), before the 30-second
+// hello deadline sends `authentication_required`. A stale resume token can need two checks.
+const RESUME_CHECK_CONCURRENCY = 64;
+const RESUME_CHECK_DEADLINE = "12 seconds";
 
 const ResumeValidation = Schema.Struct({ valid: Schema.Boolean });
 const SlackValidation = Schema.Struct({ teams: Schema.Array(Schema.String) });
@@ -103,24 +112,31 @@ class ControlPlane extends Context.Service<
         ? Effect.tryPromise({ try: () => body.cancel(), catch: () => undefined }).pipe(Effect.catch(() => Effect.void))
         : Effect.void;
     };
+    const resumeChecks = Semaphore.makeUnsafe(RESUME_CHECK_CONCURRENCY);
     return ControlPlane.of({
-      validateResume: Effect.fn("ControlPlane.validateResume")((claims) =>
-        Effect.acquireUseRelease(
-          ask("/v2/remote/resume/validate", claims),
-          (response) =>
-            Effect.gen(function* () {
-              // A failed service is not an inactive session: the session can still be active.
-              if (response.status >= 500 || response.status === 429)
-                return yield* new ControlPlaneError({ message: "The account service is unavailable." });
-              if (!response.ok) return false;
-              const result = yield* readJson(response).pipe(
-                Effect.flatMap(Schema.decodeUnknownEffect(ResumeValidation)),
-                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
-              );
-              return result.valid;
-            }),
-          releaseResponse,
-        ),
+      validateResume: Effect.fn("ControlPlane.validateResume")(
+        (claims) =>
+          Effect.acquireUseRelease(
+            ask("/v2/remote/resume/validate", claims),
+            (response) =>
+              Effect.gen(function* () {
+                // A failed service is not an inactive session: the session can still be active.
+                if (response.status >= 500 || response.status === 429)
+                  return yield* new ControlPlaneError({ message: "The account service is unavailable." });
+                if (!response.ok) return false;
+                const result = yield* readJson(response).pipe(
+                  Effect.flatMap(Schema.decodeUnknownEffect(ResumeValidation)),
+                  Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+                );
+                return result.valid;
+              }),
+            releaseResponse,
+          ),
+        resumeChecks.withPermit,
+        Effect.timeoutOrElse({
+          duration: RESUME_CHECK_DEADLINE,
+          orElse: () => Effect.fail(new ControlPlaneError({ message: "The account service is unavailable." })),
+        }),
       ),
       validateSlackRoute: Effect.fn("ControlPlane.validateSlackRoute")((hostId, teams) =>
         Effect.acquireUseRelease(
