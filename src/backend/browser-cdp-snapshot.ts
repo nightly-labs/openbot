@@ -744,6 +744,12 @@ function actionableNodesExpression(limit: number): string {
     };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
+      // The walk can visit every scanned node, so the cheap tag and role check runs before the style walk.
+      const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
+      const tag = node.localName;
+      const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
+        tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
+      if (!semantic && !roles.has(explicitRole)) return false;
       let element = node;
       while (element) {
         if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
@@ -756,11 +762,6 @@ function actionableNodesExpression(limit: number): string {
           element = root?.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? root.host : null;
         }
       }
-      const explicitRole = (node.getAttribute('role') || '').trim().split(/\\s+/)[0].toLowerCase();
-      const tag = node.localName;
-      const semantic = tag === 'button' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href')) ||
-        tag === 'select' || tag === 'textarea' || (tag === 'input' && node.type !== 'hidden') || node.isContentEditable;
-      if (!semantic && !roles.has(explicitRole)) return false;
       return node.getClientRects().length > 0;
     };
     const limit = ${Math.max(0, limit)};
