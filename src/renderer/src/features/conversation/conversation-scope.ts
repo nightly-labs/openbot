@@ -1854,7 +1854,9 @@ export function createConversationViewScope(props: ConversationProps) {
   let animatedUnreadBoundary: string | undefined;
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
-    const boundary = `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${untrack(unreadBoundaryMessageId) ?? ""}`;
+    const boundary = untrack(
+      () => `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${unreadBoundaryMessageId() ?? ""}`,
+    );
     if (boundary === animatedUnreadBoundary) return;
     animatedUnreadBoundary = boundary;
     element.dataset.arrive = "";
