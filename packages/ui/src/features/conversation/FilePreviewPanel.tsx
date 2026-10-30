@@ -49,7 +49,7 @@ interface FilePreviewPanelProps {
   preview: FilePreview | null;
   /**
    * Names the shown file. A new preview with the same key is the same file read again, so the panel
-   * keeps its view of it. Absent means that each preview is another file.
+   * keeps the source view. Absent means that each preview is another file.
    */
   fileKey?: string | undefined;
   /** A workspace folder. The panel lists it instead of a file. */

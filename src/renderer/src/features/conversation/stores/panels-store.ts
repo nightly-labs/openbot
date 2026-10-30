@@ -22,7 +22,6 @@ import type {
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
 import { filePreviewQuoteId } from "../quoted-text";
-import { runningTurnUpdate } from "./activity-store";
 import { conversationOwnerId } from "./composer-store";
 
 // Each member reads the interface language when it is called.
@@ -409,21 +408,26 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   /**
-   * An agent changes files in the steps of its turn. While the panel is open, each update of the
-   * running turn, and the end of the turn, reads the shown file or folder again. Opening the panel
-   * during a turn does not, because the open just read it.
+   * An agent changes files in the steps of its turn. While the panel is open, each new step of the
+   * running turn, and the end of the turn, reads the shown file or folder again. Text that the turn
+   * writes is not a step. A memo, because an effect runs again on an equal value: opening another
+   * file, or a read that shows a change, must not start a read.
    */
+  const turnStep = createMemo(() => {
+    if (!filePreviewOpen()) return undefined;
+    const turnId = deps.props.activeTurnId;
+    if (!turnId) return null;
+    return [turnId, deps.props.activityDetail, deps.props.turnStepLines?.[turnId]?.at(-1)?.id].join("\u0000");
+  });
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  createEffect(
-    () => (filePreviewOpen() ? runningTurnUpdate(deps.props) : undefined),
-    (update, previous) => {
-      if (update === undefined || previous === undefined || refreshTimer !== undefined) return;
-      refreshTimer = setTimeout(() => {
-        refreshTimer = undefined;
-        refreshSidebarFilePreview();
-      }, FILE_PREVIEW_REFRESH_MS);
-    },
-  );
+  createEffect(turnStep, (step, previous) => {
+    // Opening the panel just read the file.
+    if (step === undefined || previous === undefined || refreshTimer !== undefined) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      refreshSidebarFilePreview();
+    }, FILE_PREVIEW_REFRESH_MS);
+  });
   onCleanup(() => clearTimeout(refreshTimer));
 
   let refreshRequest = 0;
@@ -472,7 +476,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   /**
    * Names the file or folder that the side panel shows. A preview read again keeps the key, so the
-   * panel keeps its view of the file.
+   * panel keeps the source view of the file.
    */
   function previewFileKey(): string | undefined {
     const source = deps.sidebarFilePreview()?.source;
@@ -621,7 +625,10 @@ function samePreview(next: FilePreview, shown: FilePreview): boolean {
     next.previewKind !== shown.previewKind
   )
     return false;
-  const shownBytes = shown.bytes;
-  if (!next.bytes || !shownBytes) return next.bytes === shownBytes;
-  return next.bytes.length === shownBytes.length && next.bytes.every((byte, index) => byte === shownBytes[index]);
+  if (!next.bytes || !shown.bytes) return next.bytes === shown.bytes;
+  if (next.bytes.length !== shown.bytes.length) return false;
+  for (let index = 0; index < next.bytes.length; index += 1) {
+    if (next.bytes[index] !== shown.bytes[index]) return false;
+  }
+  return true;
 }

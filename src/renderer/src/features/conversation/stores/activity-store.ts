@@ -44,26 +44,6 @@ export interface ActivityStoreDeps {
   turnRuntimes: Map<string, TurnRuntime>;
 }
 
-/** Changes when anything of the running turn arrives: text, a thought, a plan or subagent step, a progress line. */
-export function runningTurnUpdate(props: ConversationProps): string | null {
-  const turnId = props.activeTurnId;
-  if (!turnId) return null;
-  // The last line's id, not the count: a turn keeps only its newest lines, so the count stops at the limit.
-  const parts: unknown[] = [turnId, props.activityDetail, props.turnStepLines?.[turnId]?.at(-1)?.id];
-  // The turn's replies are at the end of the chat. An older page or a message from the user is not an
-  // update from the provider, so the scan reads only the agent messages of this turn.
-  for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-    const message = props.messages[index];
-    if (message?.author !== "agent") continue;
-    if (message.turnId !== turnId) break;
-    parts.push(message.id, message.body.length, message.items?.length, message.items?.at(-1)?.length);
-    if (message.plan) parts.push(JSON.stringify(message.plan));
-    for (const subagent of message.subagents ?? [])
-      parts.push(subagent.id, subagent.status, subagent.steps.at(-1)?.id, subagent.steps.at(-1)?.text.length);
-  }
-  return parts.join("\u0000");
-}
-
 export function createActivityStore(deps: ActivityStoreDeps) {
   const [renderedAgentActivity, setRenderedAgentActivity] = createSignal<RenderedAgentActivity | null>(null);
   const [agentActivitySpaceReserved, setAgentActivitySpaceReserved] = createSignal(false);
@@ -269,13 +249,29 @@ export function createActivityStore(deps: ActivityStoreDeps) {
       !deps.props.approval &&
       !deps.props.browserTakeover,
   );
+  /** Changes when anything of the running turn arrives: text, a thought, a plan or subagent step, a progress line. */
+  const turnUpdate = () => {
+    const turnId = deps.props.activeTurnId;
+    if (!turnId) return null;
+    // The last line's id, not the count: a turn keeps only its newest lines, so the count stops at the limit.
+    const parts: unknown[] = [turnId, deps.props.activityDetail, deps.props.turnStepLines?.[turnId]?.at(-1)?.id];
+    // The turn's replies are at the end of the chat. An older page or a message from the user is not an
+    // update from the provider, so the scan reads only the agent messages of this turn.
+    for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
+      const message = deps.props.messages[index];
+      if (message?.author !== "agent") continue;
+      if (message.turnId !== turnId) break;
+      parts.push(message.id, message.body.length, message.items?.length, message.items?.at(-1)?.length);
+      if (message.plan) parts.push(JSON.stringify(message.plan));
+      for (const subagent of message.subagents ?? [])
+        parts.push(subagent.id, subagent.status, subagent.steps.at(-1)?.id, subagent.steps.at(-1)?.text.length);
+    }
+    return parts.join("\u0000");
+  };
   const [lastTurnUpdateAt, setLastTurnUpdateAt] = createSignal(Date.now());
-  createEffect(
-    () => runningTurnUpdate(deps.props),
-    () => {
-      setLastTurnUpdateAt(Date.now());
-    },
-  );
+  createEffect(turnUpdate, () => {
+    setLastTurnUpdateAt(Date.now());
+  });
   const [clock, setClock] = createSignal(Date.now());
   createEffect(waitsForProvider, (waiting) => {
     if (!waiting) return;
