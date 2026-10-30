@@ -61,6 +61,8 @@
 - A switch that is off has the same edge as a field.
 - In a run of conversation events from the same minute, only the first event shows the time.
 - Sidebar unread counts are less bright than agent names.
+- The website and the status page use the same type sizes, weights, letter spacing and corner
+  radii as the app. Website text uses the optical sizes of Inter, so long titles take fewer lines.
 
 ### Fixed
 

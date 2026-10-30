@@ -1,4 +1,6 @@
-@import "@fontsource-variable/inter";
+/* The optical-size axis: Inter draws small text with open spacing and large text tighter, as
+   font-optical-sizing: auto follows the font size. */
+@import "@fontsource-variable/inter/opsz.css";
 @import "@fontsource-variable/inter/wght-italic.css";
 @import "tailwindcss";
 @import "@openbot/brand/tokens.css";
@@ -38,6 +40,67 @@
   --reveal-dur: 240ms;
   --reveal-blur: 2px;
   --reveal-ease: ease-in-out;
+}
+
+/* The site scale: the steps the public pages need that the brand scale does not have. Use a brand
+   token where one fits, and one of these steps where none does. Add a step only when no step stays
+   within about 8% of the value at every width. */
+:root {
+  /* Fixed text sizes. Body is the reading size of the site; prose is the article size. */
+  --site-text-4xs: 9px;
+  --site-text-3xs: 10px;
+  --site-text-2xs: 11px;
+  --site-text-body: 15px;
+  --site-text-prose: 17px;
+  --site-text-title: 20px;
+  --site-text-heading: 26px;
+  /* Inline code and keys, relative to the text around them. */
+  --site-text-code: 0.88em;
+
+  /* Fluid headings, from the largest. Hero is the title of a page; xl is a section heading. */
+  --site-display-hero: clamp(46px, 7.2vw, 104px);
+  --site-display-2xl: clamp(38px, 5.8vw, 78px);
+  --site-display-xl: clamp(38px, 5vw, 64px);
+  --site-display-lg: clamp(32px, 4.2vw, 54px);
+  --site-display-md: clamp(35px, 3.7vw, 49px);
+  --site-display-sm: clamp(28px, 3.2vw, 39px);
+  --site-display-title: clamp(24px, 2.4vw, 32px);
+  --site-display-subtitle: clamp(22px, 2.3vw, 29px);
+  /* Headings that grow at their own rate: the featured post, and the statement in the footer. */
+  --site-display-feature: clamp(30px, 3.4vw, 50px);
+  --site-display-footer: clamp(24px, 3vw, 34px);
+  /* The title printed on the artwork of a featured post. */
+  --site-display-art: clamp(24px, 3.2vw, 44px);
+  /* Card headings that reach full size on a narrow screen: join, shared agent, and 404. */
+  --site-display-card: clamp(30px, 6vw, 42px);
+  --site-display-card-sm: clamp(26px, 4vw, 30px);
+  --site-display-card-lg: clamp(32px, 5vw, 52px);
+  /* Figures, not headings: the landing price and the 404 digits. */
+  --site-display-price: clamp(8rem, 30vw, 22rem);
+  --site-display-404: clamp(112px, 24vw, 248px);
+  /* Fluid lede and standfirst text under a heading. */
+  --site-lede-hero: clamp(17px, 2vw, 20px);
+  --site-lede-lg: clamp(18px, 1.8vw, 21px);
+  --site-lede: clamp(16px, 1.8vw, 19px);
+  --site-lede-sm: clamp(16px, 1.5vw, 18px);
+  --site-lede-xs: clamp(14px, 1.2vw, 16px);
+
+  /* The price figure and the 404 digits only. */
+  --site-weight-heavy: 800;
+
+  /* Display type tightens more than the brand display step, because it is larger. Small capitals
+     open up. */
+  --site-tracking-tight: -0.03em;
+  --site-tracking-display: -0.045em;
+  --site-tracking-heading: -0.055em;
+  --site-tracking-hero: -0.06em;
+  --site-tracking-label: 0.05em;
+  --site-tracking-spread: 0.12em;
+
+  /* Between the brand xl step (20px) and the modal step (30px). */
+  --site-radius-2xl: 24px;
+  /* An ellipse on a box that is not square, such as a shadow under a figure. */
+  --site-radius-ellipse: 50%;
 }
 
 * {
@@ -211,8 +274,8 @@ a {
   gap: 10px;
   border-radius: var(--openbot-radius-md);
   font-size: var(--openbot-text-xl);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .landing-brand:focus-visible {
@@ -239,7 +302,7 @@ a {
   --site-nav-blur: 8px;
   --site-nav-offset: 10px;
   --site-nav-radius: 18px;
-  --site-nav-hairline: rgba(255, 255, 255, 0.07);
+  --site-nav-hairline: var(--openbot-border);
   --site-nav-hover: rgba(255, 255, 255, 0.05);
   /* The one containing block for the pill, the panels and the surface. The menu
      places a panel and the surface with the same numbers, so they must share it:
@@ -301,9 +364,9 @@ a {
   background: transparent;
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   text-decoration: none;
   cursor: pointer;
   transition: color var(--openbot-duration-normal) ease;
@@ -498,7 +561,7 @@ a {
   justify-content: flex-end;
   overflow: hidden;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--openbot-radius-lg);
   isolation: isolate;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
@@ -521,7 +584,7 @@ a {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0) 70%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), var(--openbot-transparent) 70%);
 }
 
 .site-panel-feature-badge {
@@ -536,9 +599,9 @@ a {
   background: rgba(0, 0, 0, 0.44);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   color: var(--openbot-text-primary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--site-text-3xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-label);
   line-height: 1;
   text-transform: uppercase;
 }
@@ -555,9 +618,9 @@ a {
   display: -webkit-box;
   overflow: hidden;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1.25;
   text-wrap: balance;
   -webkit-box-orient: vertical;
@@ -567,7 +630,7 @@ a {
 .site-panel-meta {
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -601,7 +664,7 @@ a {
   align-items: center;
   gap: 12px;
   padding: 10px;
-  border-radius: 12px;
+  border-radius: var(--openbot-radius-lg);
   transition: background-color var(--openbot-duration-normal) ease;
 }
 
@@ -610,9 +673,9 @@ a {
   width: 40px;
   height: 40px;
   flex: 0 0 auto;
-  border-radius: 10px;
+  border-radius: var(--openbot-radius-md);
   background: var(--site-panel-art);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
   /* A short ease and a layer of its own. With the menu's long settle, the browser painted the
      mark again on each step of the last few tenths of a pixel, so the hover zoom stuttered. */
   transition: transform var(--openbot-duration-slow) var(--openbot-ease-out);
@@ -628,16 +691,16 @@ a {
 .site-panel-plugin-logo {
   width: 20px;
   height: 20px;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
   text-align: center;
 }
 
 .site-panel-plugin-icon {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--openbot-radius-sm);
 }
 
 .site-panel-resource-icon {
@@ -654,9 +717,9 @@ a {
   display: -webkit-box;
   overflow: hidden;
   color: var(--openbot-text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1.3;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -669,7 +732,7 @@ a {
   gap: 16px;
   margin: 8px -8px -8px;
   padding: 12px 18px;
-  border-top: 1px solid var(--site-nav-hairline, rgba(255, 255, 255, 0.07));
+  border-top: 1px solid var(--site-nav-hairline, var(--openbot-border));
   border-radius: 0 0 var(--site-nav-radius, 18px) var(--site-nav-radius, 18px);
   background: rgba(255, 255, 255, 0.02);
 }
@@ -677,7 +740,7 @@ a {
 .site-panel-summary {
   min-width: 0;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 .site-panel-index {
@@ -689,8 +752,8 @@ a {
   padding: 6px 10px;
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-primary);
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   transition: background-color var(--openbot-duration-normal) ease;
 }
 
@@ -797,7 +860,7 @@ a {
     position: absolute;
     width: 15px;
     height: 1.5px;
-    border-radius: 1px;
+    border-radius: var(--openbot-radius-pill);
     background: currentColor;
     transform: translateY(-3.5px);
     transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -854,9 +917,9 @@ a {
     filter: blur(6px);
     transform: translateY(-12px);
     transition:
-      opacity 200ms ease,
-      filter 200ms ease,
-      transform 200ms ease;
+      opacity var(--openbot-duration-slow) ease,
+      filter var(--openbot-duration-slow) ease,
+      transform var(--openbot-duration-slow) ease;
   }
 
   .site-sheet[data-state="open"] .site-sheet-section,
@@ -874,18 +937,18 @@ a {
   .site-sheet-heading {
     margin: 0 0 8px 6px;
     color: var(--openbot-text-dim);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: var(--site-text-2xs);
+    font-weight: var(--openbot-weight-semibold);
+    letter-spacing: var(--openbot-tracking-caps);
     text-transform: uppercase;
   }
 
   .site-sheet .site-panel {
     width: auto;
     padding: 6px;
-    border-radius: 18px;
+    border-radius: var(--openbot-radius-dialog);
     background: rgba(255, 255, 255, 0.03);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+    box-shadow: 0 0 0 1px var(--openbot-border);
   }
 
   .site-sheet .site-panel-body {
@@ -906,12 +969,12 @@ a {
     align-items: center;
     justify-content: space-between;
     padding: 16px 18px;
-    border-radius: 18px;
+    border-radius: var(--openbot-radius-dialog);
     background: color-mix(in srgb, var(--openbot-text-primary) 3%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 7%, transparent);
     color: var(--openbot-text-primary);
-    font-size: 15px;
-    font-weight: 500;
+    font-size: var(--site-text-body);
+    font-weight: var(--openbot-weight-medium);
     text-decoration: none;
   }
 
@@ -959,7 +1022,7 @@ a {
   border: 1px solid transparent;
   border-radius: var(--openbot-radius-pill);
   font: inherit;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   line-height: 1;
   white-space: nowrap;
   transition:
@@ -1016,7 +1079,7 @@ a {
   display: grid;
   justify-items: center;
   border: 1px solid var(--openbot-border-strong);
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
   background: var(--openbot-bg-sidebar);
   padding: clamp(32px, 7vw, 56px);
   text-align: center;
@@ -1054,24 +1117,24 @@ a {
 .join-card-eyebrow {
   margin: 0 0 10px;
   color: var(--openbot-logo-production);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
 }
 
 .join-card h1 {
   margin: 0;
-  font-size: clamp(30px, 6vw, 42px);
+  font-size: var(--site-display-card);
   line-height: 1.05;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--site-tracking-display);
 }
 
 .join-card-copy {
   max-width: 420px;
   margin: 18px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.55;
 }
 
@@ -1097,7 +1160,7 @@ a {
 .join-card-note {
   margin: 24px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   line-height: 1.5;
 }
 
@@ -1115,21 +1178,21 @@ a {
   height: 38px;
   gap: 7px;
   padding: 0 17px;
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 .landing-button-md {
   height: 42px;
   gap: 8px;
   padding: 0 20px;
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .landing-button-lg {
   height: 48px;
   gap: 9px;
   padding: 0 24px;
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 .landing-button-primary {
@@ -1158,7 +1221,7 @@ a {
 .site-header-actions > .landing-button-glass,
 .landing-availability {
   border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(180deg, var(--openbot-glass-highlight), rgba(255, 255, 255, 0.03));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 0 rgba(255, 255, 255, 0.04),
@@ -1268,9 +1331,9 @@ a {
   border-style: solid;
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-wide);
   line-height: 1;
   white-space: nowrap;
 }
@@ -1284,9 +1347,9 @@ a {
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
   font-family: var(--openbot-font-mono);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: var(--site-text-4xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-caps);
 }
 
 .landing-availability-copy {
@@ -1327,8 +1390,8 @@ a {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-hero);
-  font-weight: 500;
-  letter-spacing: -0.065em;
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-hero);
   line-height: 0.96;
 }
 
@@ -1344,7 +1407,7 @@ a {
   max-width: 720px;
   margin: 30px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 2vw, 20px);
+  font-size: var(--site-lede-hero);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -1354,7 +1417,7 @@ a {
   align-items: center;
   gap: 0.28em;
   color: var(--openbot-text-primary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   line-height: 1;
   white-space: nowrap;
   vertical-align: -0.04em;
@@ -1401,8 +1464,8 @@ a {
   justify-content: center;
   gap: 9px;
   padding: 0 18px 0 22px;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
   line-height: 1;
   white-space: nowrap;
   transition: opacity var(--openbot-duration-normal) ease;
@@ -1483,7 +1546,7 @@ a {
   background: transparent;
   color: var(--openbot-text-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   text-align: left;
   transition:
     background-color var(--openbot-duration-fast) ease,
@@ -1498,7 +1561,7 @@ a {
 
 .landing-download-menu-item span {
   overflow: hidden;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1506,8 +1569,8 @@ a {
 .landing-download-menu-item small {
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: var(--site-text-4xs);
+  letter-spacing: var(--site-tracking-label);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -1534,8 +1597,8 @@ a {
   color: var(--openbot-text-muted);
   text-align: left;
   font-family: var(--openbot-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: var(--site-text-4xs);
+  letter-spacing: var(--site-tracking-label);
   text-transform: uppercase;
 }
 
@@ -1589,13 +1652,13 @@ a {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: calc(var(--openbot-radius-lg) - 1px);
+  border-radius: var(--openbot-radius-media-preview);
   background: var(--openbot-bg-canvas);
 }
 
 .landing-preview-placeholder {
   overflow: hidden;
-  border-radius: calc(var(--openbot-radius-lg) - 1px);
+  border-radius: var(--openbot-radius-media-preview);
   background: var(--openbot-bg-canvas);
 }
 
@@ -1624,9 +1687,9 @@ a {
 
 .landing-download-heading h2 {
   margin: 0;
-  font-size: clamp(38px, 5vw, 64px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 1;
 }
 
@@ -1634,7 +1697,7 @@ a {
   max-width: 620px;
   margin: 22px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.8vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -1653,7 +1716,7 @@ a {
   flex-direction: column;
   padding: clamp(26px, 2.6vw, 34px);
   border: 1px solid var(--openbot-download-card-border);
-  border-radius: 20px;
+  border-radius: var(--openbot-radius-xl);
   color: var(--openbot-text-on-light);
 }
 
@@ -1669,7 +1732,7 @@ a {
   background: var(--openbot-logo-dev);
 }
 
-/* The phone apps: a blue and a coral beside the three build colours. Dark text keeps over 7:1 on both. */
+/* The phone apps: two more hues beside the three build colours. Dark text keeps over 7:1 on both. */
 .landing-page {
   --download-ios-color: #74b9ff;
   --download-android-color: #ee9a7d;
@@ -1725,9 +1788,9 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-download-card-chip);
   font-family: var(--openbot-font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--site-text-3xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-label);
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1739,16 +1802,16 @@ a {
 
 .landing-download-card-copy h3 {
   margin: 0;
-  font-size: clamp(29px, 3vw, 38px);
-  font-weight: 600;
-  letter-spacing: -0.045em;
+  font-size: var(--site-display-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1;
 }
 
 .landing-download-card-copy p {
   margin: 14px 0 0;
   color: var(--openbot-download-card-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.5;
 }
 
@@ -1757,8 +1820,8 @@ a {
   align-items: center;
   gap: 7px;
   margin-top: 28px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-download-arrow {
@@ -1799,9 +1862,9 @@ a {
 .landing-pricing-eyebrow {
   margin: 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.8vw, 19px);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--site-lede);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1.4;
 }
 
@@ -1812,9 +1875,9 @@ a {
   position: relative;
   isolation: isolate;
   margin: clamp(8px, 1.5vw, 20px) 0 clamp(28px, 4vw, 48px);
-  font-size: clamp(8rem, 30vw, 22rem);
-  font-weight: 800;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-price);
+  font-weight: var(--site-weight-heavy);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 0.9;
   color: transparent;
   background-image:
@@ -1870,14 +1933,14 @@ a {
   max-width: 560px;
   margin: 0 auto;
   color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 2vw, 20px);
+  font-size: var(--site-lede-hero);
   line-height: 1.55;
   text-wrap: balance;
 }
 
 .landing-pricing-compare {
   margin: 20px 0 0;
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
 }
 
@@ -1887,7 +1950,7 @@ a {
   gap: 6px;
   color: var(--openbot-text-secondary);
   text-decoration: none;
-  transition: color 160ms ease;
+  transition: color var(--openbot-duration-normal) ease;
 }
 
 .landing-pricing-compare a:hover,
@@ -1898,7 +1961,7 @@ a {
 .landing-pricing-compare-arrow {
   width: 16px;
   height: 16px;
-  transition: transform 160ms ease;
+  transition: transform var(--openbot-duration-normal) ease;
 }
 
 .landing-pricing-compare a:hover .landing-pricing-compare-arrow {
@@ -1954,9 +2017,9 @@ a {
 
 .landing-section-heading :is(h1, h2) {
   margin: 0;
-  font-size: clamp(38px, 5vw, 64px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 1;
 }
 
@@ -1964,7 +2027,7 @@ a {
   max-width: 620px;
   margin: 22px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.8vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -2007,12 +2070,12 @@ a {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--landing-card-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--openbot-bg-surface);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   transition:
-    border-color 200ms ease,
-    background-color 200ms ease;
+    border-color var(--openbot-duration-slow) ease,
+    background-color var(--openbot-duration-slow) ease;
 }
 
 .landing-feature:hover {
@@ -2071,9 +2134,9 @@ a {
 
 .landing-feature h3 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.15;
 }
 
@@ -2081,7 +2144,7 @@ a {
   max-width: 44ch;
   margin: 10px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -2112,7 +2175,7 @@ a {
   overflow: hidden;
   border: 1px solid var(--landing-card-border);
   background: var(--openbot-bg-canvas);
-  box-shadow: 0 24px 60px rgb(0 0 0 / 28%);
+  box-shadow: 0 24px 60px var(--openbot-glass-shadow);
 }
 
 .landing-window-bar {
@@ -2132,19 +2195,19 @@ a {
 .landing-team-window {
   flex: 1;
   margin-right: -24px;
-  border-radius: 20px 0 0;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+  border-radius: var(--openbot-radius-xl) 0 0;
+  mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) calc(100% - 40px), transparent);
 }
 
 .landing-team-channel {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-team-hash {
   margin-right: 6px;
   color: var(--openbot-text-muted);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 
 .landing-team-stack {
@@ -2217,19 +2280,19 @@ a {
 }
 
 .landing-team-name {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-team-time {
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .landing-team-text {
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
 }
 
@@ -2238,8 +2301,8 @@ a {
   align-items: center;
   gap: 12px;
   color: var(--openbot-text-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .landing-team-system::before,
@@ -2318,7 +2381,13 @@ a {
   /* The mask hides all that is outside this box, so leave room for a pill that
      moves up on hover. */
   padding-block: 4px;
-  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--openbot-mask-solid) 14%,
+    var(--openbot-mask-solid) 86%,
+    transparent
+  );
 }
 
 .landing-marquee-row {
@@ -2354,13 +2423,13 @@ a {
   border: 1px solid var(--landing-card-border);
   border-radius: var(--openbot-radius-pill);
   background: var(--landing-card-fill);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    border-color var(--openbot-duration-normal) ease,
+    background-color var(--openbot-duration-normal) ease,
+    transform var(--openbot-duration-normal) ease;
 }
 
 .landing-provider-pill:hover {
@@ -2392,7 +2461,7 @@ a {
   border-color: var(--openbot-download-card-border);
   border-right: 0;
   border-bottom: 0;
-  border-radius: 16px 0 0;
+  border-radius: var(--openbot-radius-dialog) 0 0;
   background: color-mix(in srgb, var(--openbot-text-primary) 42%, transparent);
   box-shadow: 0 20px 44px color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
 }
@@ -2403,8 +2472,8 @@ a {
 }
 
 .landing-local-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-lock {
@@ -2436,9 +2505,9 @@ a {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: var(--openbot-radius-md);
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   transition: background-color 140ms ease;
 }
 
@@ -2461,7 +2530,7 @@ a {
 }
 
 .landing-persist-window {
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
 }
 
 .landing-persist-window .landing-window-bar {
@@ -2476,7 +2545,7 @@ a {
   margin-left: auto;
   padding: 6px 10px 6px 9px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 10px;
+  border-radius: var(--openbot-radius-md);
   background: var(--landing-card-fill);
 }
 
@@ -2490,8 +2559,8 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
   transition:
     opacity 220ms ease,
@@ -2535,16 +2604,16 @@ a {
   padding: 16px 16px 18px;
   overflow: hidden;
   list-style: none;
-  mask-image: linear-gradient(to bottom, transparent, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent, var(--openbot-mask-solid) 28px);
 }
 
 .landing-persist-request {
   align-self: flex-end;
   max-width: 85%;
   padding: 9px 14px;
-  border-radius: 16px 16px 4px;
+  border-radius: var(--openbot-radius-dialog) var(--openbot-radius-dialog) var(--openbot-radius-xs);
   background: var(--openbot-bg-surface-raised);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.45;
 }
 
@@ -2554,19 +2623,19 @@ a {
 }
 
 .landing-persist-reply .landing-team-text {
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .landing-persist-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-persist-meta .landing-team-time {
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 
 /* The later messages take no room until the pointer is on the tile. */
@@ -2606,7 +2675,7 @@ a {
 
 .landing-browser {
   position: relative;
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
 }
 
 /* The sizes of the app's tabs: 28px high, on the bottom line of a 34px header.
@@ -2629,9 +2698,9 @@ a {
   align-items: center;
   gap: 6px;
   padding: 0 8px;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--openbot-radius-md) var(--openbot-radius-md) 0 0;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 .landing-browser-tab[data-controlled] {
@@ -2703,10 +2772,10 @@ a {
   overflow: hidden;
   margin-left: 4px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-secondary);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2720,16 +2789,16 @@ a {
 }
 
 .landing-browser-heading {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .landing-browser-label {
   margin-top: 12px;
   color: color-mix(in srgb, var(--openbot-text-on-light) 60%, transparent);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .landing-browser-input {
@@ -2740,9 +2809,9 @@ a {
   margin-top: 5px;
   padding: 0 10px;
   border: 1px solid color-mix(in srgb, var(--openbot-text-on-light) 18%, transparent);
-  border-radius: 8px;
-  font-size: 13px;
-  transition: border-color 160ms ease;
+  border-radius: var(--openbot-radius-md);
+  font-size: var(--openbot-text-md);
+  transition: border-color var(--openbot-duration-normal) ease;
 }
 
 .landing-browser-typed {
@@ -2762,11 +2831,11 @@ a {
 .landing-browser-submit {
   margin-top: 12px;
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--openbot-radius-md);
   background: var(--openbot-text-on-light);
   color: var(--openbot-text-primary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
   transition:
     transform 140ms ease,
     opacity 140ms ease;
@@ -2811,7 +2880,7 @@ a {
   margin: 0 10px -14px;
   padding: 6px 5px 19px;
   border: 1px solid var(--openbot-queue-border);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-queue-surface);
 }
 
@@ -2820,8 +2889,8 @@ a {
   overflow: hidden;
   padding: 0 8px 4px 9px;
   color: var(--openbot-text-muted);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2839,9 +2908,9 @@ a {
   gap: 8px;
   height: 29px;
   padding: 0 4px 0 8px;
-  border-radius: 8px;
+  border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-secondary);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   transition: background 140ms ease;
 }
 
@@ -2881,7 +2950,7 @@ a {
   align-items: center;
   gap: 8px;
   padding: 0 8px 0 24px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--openbot-radius-md) var(--openbot-radius-md) 0;
   background: linear-gradient(to right, transparent, var(--openbot-bg-surface-raised) 20px);
   color: var(--openbot-text-muted);
   opacity: 0;
@@ -2897,8 +2966,8 @@ a {
   align-items: center;
   gap: 4px;
   color: var(--openbot-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .landing-queue-added {
@@ -2934,16 +3003,16 @@ a {
   gap: 10px;
   padding: 10px 10px 10px 14px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-canvas);
-  box-shadow: 0 18px 44px rgb(0 0 0 / 28%);
+  box-shadow: 0 18px 44px var(--openbot-glass-shadow);
 }
 
 .landing-queue-input {
   min-width: 0;
   flex: 1;
   display: grid;
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .landing-queue-input > * {
@@ -3015,9 +3084,9 @@ a {
   gap: 6px;
   margin-top: 28px;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 500;
-  transition: color 160ms ease;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
+  transition: color var(--openbot-duration-normal) ease;
 }
 
 .landing-faq-contact:hover,
@@ -3037,8 +3106,8 @@ a {
 .landing-compare-links h3 {
   margin: 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .landing-compare-links ul {
@@ -3059,13 +3128,13 @@ a {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--landing-card-border);
-  border-radius: 18px;
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-surface);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease;
+    border-color var(--openbot-duration-normal) ease,
+    background-color var(--openbot-duration-normal) ease;
 }
 
 .landing-compare-links a:hover,
@@ -3117,8 +3186,8 @@ a {
   height: 16px;
   color: var(--openbot-text-muted);
   transition:
-    color 160ms ease,
-    transform 160ms ease;
+    color var(--openbot-duration-normal) ease,
+    transform var(--openbot-duration-normal) ease;
 }
 
 .landing-compare-links a:hover .landing-compare-arrow {
@@ -3273,9 +3342,9 @@ a {
   align-items: center;
   gap: 12px;
   border-radius: var(--openbot-radius-md);
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: var(--site-text-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
 }
 
 .landing-footer-lockup:focus-visible,
@@ -3297,9 +3366,9 @@ a {
   max-width: 560px;
   margin: 32px 0 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(24px, 3vw, 34px);
-  font-weight: 400;
-  letter-spacing: -0.04em;
+  font-size: var(--site-display-footer);
+  font-weight: var(--openbot-weight-regular);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1.18;
   text-wrap: balance;
 }
@@ -3311,8 +3380,8 @@ a {
   margin-top: 28px;
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .landing-footer-cta svg,
@@ -3358,9 +3427,9 @@ a {
 .landing-footer-column h2 {
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-spread);
   text-transform: uppercase;
 }
 
@@ -3374,9 +3443,9 @@ a {
 }
 
 .landing-footer-column a {
-  border-radius: 4px;
+  border-radius: var(--openbot-radius-xs);
   color: var(--openbot-text-secondary);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -3389,7 +3458,7 @@ a {
   padding-top: 24px;
   border-top: 1px solid var(--openbot-border);
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 .landing-footer-bottom p {
@@ -3410,7 +3479,7 @@ a {
 }
 
 .landing-footer-meta a {
-  border-radius: 4px;
+  border-radius: var(--openbot-radius-xs);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -3423,8 +3492,8 @@ a {
 
 .landing-footer-made {
   font-family: var(--openbot-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: var(--site-text-3xs);
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
 }
 
@@ -3731,7 +3800,7 @@ a {
   .site-nav-surface,
   .site-nav[data-state="open"] .site-nav-surface {
     transform: translateX(var(--site-nav-surface-x, 0));
-    transition: opacity 160ms ease;
+    transition: opacity var(--openbot-duration-normal) ease;
   }
 
   .site-nav-panel[data-motion] {
@@ -3745,7 +3814,7 @@ a {
   .site-sheet[data-state="open"] .site-sheet-actions {
     filter: none;
     transform: none;
-    transition: opacity 200ms ease;
+    transition: opacity var(--openbot-duration-slow) ease;
   }
 }
 
@@ -3793,7 +3862,7 @@ a {
   .landing-brand {
     flex-shrink: 0;
     gap: 8px;
-    font-size: 15px;
+    font-size: var(--site-text-body);
   }
 
   .landing-brand-logo {
@@ -3812,7 +3881,7 @@ a {
 
   .landing-description {
     margin-top: 24px;
-    font-size: 16px;
+    font-size: var(--openbot-text-xl);
     line-height: 1.5;
   }
 
@@ -3847,13 +3916,13 @@ a {
     margin-bottom: 24px;
     gap: 6px;
     padding: 3px 9px 3px 3px;
-    font-size: 10px;
+    font-size: var(--site-text-3xs);
   }
 
   .landing-availability-new {
     min-height: 23px;
     padding-inline: 7px;
-    font-size: 8px;
+    font-size: var(--openbot-glyph-sm);
   }
 
   /* The five systems do not fit on a phone with the words in front of them. */
@@ -3917,7 +3986,7 @@ a {
   }
 
   .landing-footer-description {
-    font-size: 25px;
+    font-size: var(--openbot-text-3xl);
   }
 
   .landing-footer-columns {
@@ -4133,9 +4202,9 @@ a {
 .landing-section-heading .landing-teams-statement {
   margin-top: 20px;
   color: var(--openbot-text-primary);
-  font-size: clamp(19px, 1.8vw, 22px);
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: var(--site-lede-lg);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .landing-section-heading .landing-teams-description {
@@ -4166,8 +4235,8 @@ a {
   gap: 14px;
   padding: 10px 0 10px 20px;
   color: var(--openbot-text-muted);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -4194,8 +4263,8 @@ a {
 
 .landing-teams-progress-number {
   font-family: var(--openbot-font-mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .landing-teams-stack {
@@ -4216,7 +4285,7 @@ a {
   overflow: hidden;
   padding: 0 clamp(26px, 3vw, 40px) clamp(26px, 3vw, 40px);
   border: 1px solid var(--openbot-download-card-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--landing-teams-color);
   box-shadow: 0 -20px 40px -28px rgb(0 0 0 / 70%);
   color: var(--openbot-text-on-light);
@@ -4252,8 +4321,8 @@ a {
 
 .landing-teams-card-number {
   font-family: var(--openbot-font-mono);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
   opacity: 0.6;
 }
 
@@ -4275,11 +4344,12 @@ a {
 }
 
 .landing-teams-card-title {
-  max-width: 12ch;
+  /* Optical sizes make display text narrower: at 12ch "Shared or personal" fits one line and runs under the icon. */
+  max-width: 11ch;
   margin: 0;
-  font-size: clamp(34px, 4vw, 56px);
-  font-weight: 600;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-lg);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 0.98;
   text-wrap: balance;
 }
@@ -4288,7 +4358,7 @@ a {
   max-width: 34ch;
   margin: 16px 0 0;
   color: var(--openbot-download-card-muted);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.5;
   text-wrap: pretty;
 }
@@ -4328,7 +4398,7 @@ a {
 
   .landing-teams-card {
     min-height: 320px;
-    border-radius: 24px;
+    border-radius: var(--site-radius-2xl);
   }
 
   .landing-teams-card-icon {
@@ -4401,9 +4471,9 @@ a {
 
 .teams-page .teams-heading h2 {
   margin: 0;
-  font-size: clamp(38px, 5vw, 64px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 1;
   text-wrap: balance;
 }
@@ -4412,7 +4482,7 @@ a {
   max-width: 560px;
   margin: 22px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.8vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -4429,7 +4499,7 @@ a {
   gap: 12px 16px;
   margin: 32px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
 }
 
 .teams-page .teams-section[data-revealed="false"] > * {
@@ -4470,8 +4540,8 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .teams-page .teams-pill::before,
@@ -4490,8 +4560,8 @@ a {
   );
   content: "";
   mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+    linear-gradient(var(--openbot-mask-solid) 0 0) content-box,
+    linear-gradient(var(--openbot-mask-solid) 0 0);
   mask-composite: exclude;
   pointer-events: none;
   animation: teams-pill-turn 5s linear infinite;
@@ -4580,9 +4650,9 @@ a {
 .teams-page .teams-title {
   max-width: 17ch;
   margin: 0;
-  font-size: clamp(46px, 7.2vw, 104px);
-  font-weight: 500;
-  letter-spacing: -0.06em;
+  font-size: var(--site-display-hero);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-hero);
   line-height: 0.95;
   text-wrap: balance;
 }
@@ -4606,7 +4676,7 @@ a {
   overflow: hidden;
   padding: clamp(26px, 2.6vw, 34px);
   border: 1px solid var(--openbot-download-card-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--teams-color);
   color: var(--openbot-text-on-light);
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
@@ -4638,7 +4708,7 @@ a {
 }
 
 .teams-page .teams-setup .landing-download-card-copy p {
-  font-size: 15px;
+  font-size: var(--site-text-body);
   text-wrap: pretty;
 }
 
@@ -4658,12 +4728,12 @@ a {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--landing-card-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--openbot-bg-surface);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
   transition:
-    border-color 200ms ease,
-    background-color 200ms ease;
+    border-color var(--openbot-duration-slow) ease,
+    background-color var(--openbot-duration-slow) ease;
 }
 
 .teams-page .teams-tile:hover {
@@ -4706,7 +4776,7 @@ a {
   height: 88px;
   padding: 20px;
   border: 1px solid var(--openbot-download-card-border);
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
   background: var(--teams-color);
   box-shadow: 0 20px 50px -18px var(--teams-color);
   color: var(--openbot-text-on-light);
@@ -4724,9 +4794,9 @@ a {
 
 .teams-page .teams-tile-copy h2 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: var(--site-text-heading);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.15;
 }
 
@@ -4734,7 +4804,7 @@ a {
   max-width: 48ch;
   margin: 10px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -4777,7 +4847,7 @@ a {
   width: 12px;
   height: 12px;
   margin: -6px 0 0 -6px;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--openbot-text-primary);
   box-shadow:
     0 0 10px 3px color-mix(in srgb, var(--openbot-logo-preview) 80%, transparent),
@@ -4820,7 +4890,7 @@ a {
   width: 56px;
   height: 56px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--teams-color);
   box-shadow:
     0 0 0 10px var(--openbot-bg-canvas),
@@ -4832,7 +4902,7 @@ a {
   position: absolute;
   inset: 0;
   border: 2px solid var(--teams-color);
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   content: "";
   opacity: 0;
 }
@@ -4846,21 +4916,21 @@ a {
   margin: 26px 0 0;
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .teams-page .teams-step-title {
   max-width: 16ch;
   margin: 10px 0 0;
-  font-size: clamp(17px, 1.6vw, 21px);
-  font-weight: 500;
-  letter-spacing: -0.025em;
+  font-size: var(--site-lede-lg);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.25;
   text-wrap: balance;
 }
 
-/* Before a step lights, its node is a small grey dot, and its text is not shown. */
+/* Before a step lights, its node is a small muted dot, and its text is not shown. */
 .teams-page [data-play="false"] .teams-timeline-fill {
   transform: scaleX(0);
 }
@@ -4954,7 +5024,13 @@ a {
   display: grid;
   gap: 16px;
   margin: clamp(48px, 6vw, 72px) calc(clamp(20px, 4vw, 48px) * -1) 0;
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--openbot-mask-solid) 12%,
+    var(--openbot-mask-solid) 88%,
+    transparent
+  );
 }
 
 .teams-page .teams-marquee-row {
@@ -5003,7 +5079,7 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--landing-card-fill);
   color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 1.6vw, 21px);
+  font-size: var(--site-lede-lg);
   white-space: nowrap;
   transition:
     border-color var(--openbot-duration-normal) var(--openbot-ease-out),
@@ -5017,7 +5093,7 @@ a {
 
 .teams-page .teams-chip strong {
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .teams-page .teams-chip-icon {
@@ -5026,7 +5102,7 @@ a {
   height: 48px;
   flex: none;
   place-items: center;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--teams-color);
   color: var(--openbot-text-on-light);
 }
@@ -5055,9 +5131,9 @@ a {
   z-index: 1;
   max-width: 16ch;
   margin: 0;
-  font-size: clamp(40px, 6vw, 84px);
-  font-weight: 500;
-  letter-spacing: -0.06em;
+  font-size: var(--site-display-2xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-hero);
   line-height: 0.98;
   text-wrap: balance;
 }
@@ -5221,8 +5297,8 @@ a {
   background: var(--teams-color);
   box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
   color: var(--openbot-text-on-light);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 /* Phone ------------------------------------------------------------------ */
@@ -5234,7 +5310,7 @@ a {
 
   .teams-page .teams-setup {
     min-height: 320px;
-    border-radius: 24px;
+    border-radius: var(--site-radius-2xl);
   }
 
   .teams-page .teams-tile[data-tile] {
@@ -5430,7 +5506,7 @@ a {
 .post-meta {
   display: block;
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.4;
 }
 
@@ -5459,9 +5535,9 @@ a {
 
 .post-featured-title {
   margin: 12px 0 0;
-  font-size: clamp(30px, 3.4vw, 50px);
-  font-weight: 600;
-  letter-spacing: -0.045em;
+  font-size: var(--site-display-feature);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1.05;
   text-wrap: balance;
 }
@@ -5470,7 +5546,7 @@ a {
   max-width: 46ch;
   margin: 16px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
 }
 
@@ -5513,25 +5589,25 @@ a {
 
 .post-featured-art {
   aspect-ratio: 19 / 10;
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
 }
 
 .post-card-art {
   aspect-ratio: 2 / 1;
-  border-radius: 12px;
+  border-radius: var(--openbot-radius-lg);
 }
 
 .post-article-art {
   aspect-ratio: 21 / 9;
   margin-top: clamp(28px, 3.5vw, 44px);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
 }
 
 /* Squarer than an article card: what sits in the middle is a mark rather than a
    line of words, and a wide frame leaves it stranded in empty colour. */
 .plugin-card-art {
   aspect-ratio: 4 / 3;
-  border-radius: 12px;
+  border-radius: var(--openbot-radius-lg);
 }
 
 /* Layer order inside the frame, bottom to top: the CSS approximation and the
@@ -5579,19 +5655,19 @@ a {
   pointer-events: none;
   padding: clamp(18px, 2.6vw, 40px);
   color: var(--openbot-text-primary);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.12;
   text-align: center;
   text-wrap: balance;
 }
 
 .post-featured-art-title {
-  font-size: clamp(24px, 3.2vw, 44px);
+  font-size: var(--site-display-art);
 }
 
 .post-card-art-title {
-  font-size: clamp(15px, 1.4vw, 19px);
+  font-size: var(--site-lede);
 }
 
 .post-grid-section {
@@ -5610,7 +5686,7 @@ a {
 }
 
 .post-card:focus-visible {
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
   outline: 3px solid var(--openbot-border-focus);
   outline-offset: 4px;
 }
@@ -5628,9 +5704,9 @@ a {
 .post-card-title {
   margin: 6px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.35;
   transition: color var(--openbot-duration-normal) ease;
 }
@@ -5697,7 +5773,7 @@ a {
   align-items: center;
   gap: 6px;
   color: var(--openbot-text-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -5707,9 +5783,9 @@ a {
 
 .post-article-title {
   margin: 18px 0 0;
-  font-size: clamp(32px, 4.2vw, 54px);
-  font-weight: 600;
-  letter-spacing: -0.045em;
+  font-size: var(--site-display-lg);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1.04;
   text-wrap: balance;
 }
@@ -5717,7 +5793,7 @@ a {
 .post-article-standfirst {
   margin: 18px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.6vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.55;
 }
 
@@ -5728,7 +5804,7 @@ a {
 .post-prose {
   margin-top: clamp(32px, 4vw, 48px);
   color: var(--openbot-text-secondary);
-  font-size: 17px;
+  font-size: var(--site-text-prose);
   line-height: 1.7;
 }
 
@@ -5739,18 +5815,18 @@ a {
 .post-prose h2 {
   margin: 40px 0 14px;
   color: var(--openbot-text-primary);
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: var(--site-text-heading);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.2;
 }
 
 .post-prose h3 {
   margin: 32px 0 12px;
   color: var(--openbot-text-primary);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--site-text-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.3;
 }
 
@@ -5776,7 +5852,7 @@ a {
 
 .post-prose strong {
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .post-prose a {
@@ -5787,10 +5863,10 @@ a {
 
 .post-prose code {
   padding: 2px 6px;
-  border-radius: 6px;
+  border-radius: var(--openbot-radius-sm);
   background: var(--openbot-bg-surface);
   font-family: var(--openbot-font-mono);
-  font-size: 0.9em;
+  font-size: var(--site-text-code);
 }
 
 .post-prose pre {
@@ -5802,7 +5878,7 @@ a {
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.6;
 }
 
@@ -5824,7 +5900,7 @@ a {
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: 0.85em;
+  font-size: var(--site-text-code);
 }
 
 .post-prose hr {
@@ -5837,7 +5913,7 @@ a {
   width: 100%;
   margin: 0 0 24px;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 .post-prose th,
@@ -5850,7 +5926,7 @@ a {
 
 .post-prose th {
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .post-prose blockquote {
@@ -5942,14 +6018,14 @@ a {
 
 .post-mount .post-media {
   border-color: var(--openbot-border);
-  border-radius: 9px;
+  border-radius: var(--openbot-radius-md);
   box-shadow: var(--openbot-shadow-overlay);
 }
 
 .post-figure-caption {
   margin-top: 12px;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.5;
 }
 
@@ -5959,9 +6035,9 @@ a {
 
 .post-more-title {
   margin: 0 0 clamp(22px, 2.6vw, 32px);
-  font-size: clamp(22px, 2.4vw, 30px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: var(--site-display-subtitle);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
 }
 
 /* The heading joins the sweep of the cards under it. Left out, it was the one
@@ -6161,9 +6237,9 @@ a {
 
 .post-cta-title {
   margin: 0;
-  font-size: clamp(34px, 4.6vw, 56px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-lg);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 1.04;
   text-wrap: balance;
 }
@@ -6172,7 +6248,7 @@ a {
   max-width: 580px;
   margin: 20px auto 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.8vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -6323,7 +6399,7 @@ a {
 
 .reading-progress {
   --reading-accent: var(--openbot-logo-production);
-  --reading-track: rgba(255, 255, 255, 0.1);
+  --reading-track: var(--openbot-border-strong);
   --reading-glow: color-mix(in srgb, var(--reading-accent) 60%, transparent);
   /* The header menu's motion. Its tokens live on .site-nav, out of reach here. */
   --reading-ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -6346,7 +6422,7 @@ a {
   pointer-events: none;
   transform: scaleX(var(--reading-progress, 0));
   transform-origin: left center;
-  transition: opacity 240ms ease;
+  transition: opacity var(--openbot-duration-overlay) ease;
 }
 
 .reading-progress[data-visible="true"] .reading-progress-line {
@@ -6405,9 +6481,15 @@ a {
       color-mix(in srgb, var(--openbot-bg-canvas) 92%, transparent) 55%,
       transparent 100%
     );
-    mask-image: linear-gradient(to bottom, transparent, #000 64px, #000 calc(100% - 64px), transparent);
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--openbot-mask-solid) 64px,
+      var(--openbot-mask-solid) calc(100% - 64px),
+      transparent
+    );
     opacity: 0;
-    transition: opacity 200ms ease;
+    transition: opacity var(--openbot-duration-slow) ease;
   }
 
   .reading-progress-eyebrow {
@@ -6418,11 +6500,11 @@ a {
     padding: 0 20px 0 18px;
     color: var(--openbot-text-dim);
     font-family: var(--openbot-font-mono);
-    font-size: 10px;
-    letter-spacing: 0.08em;
+    font-size: var(--site-text-3xs);
+    letter-spacing: var(--openbot-tracking-caps);
     text-transform: uppercase;
     opacity: 0;
-    transition: opacity 200ms ease;
+    transition: opacity var(--openbot-duration-slow) ease;
   }
 
   .reading-progress-count {
@@ -6473,8 +6555,8 @@ a {
     min-width: 0;
     overflow: hidden;
     margin-top: -3px;
-    font-size: 12.5px;
-    line-height: 18px;
+    font-size: var(--openbot-text-md);
+    line-height: var(--openbot-leading-md);
     text-align: right;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -6514,7 +6596,7 @@ a {
     right: 9px;
     bottom: 4px;
     width: 2px;
-    border-radius: 2px;
+    border-radius: var(--openbot-radius-pill);
     transition:
       width 300ms var(--reading-ease),
       right 300ms var(--reading-ease),
@@ -6549,7 +6631,7 @@ a {
     right: 7px;
     width: 6px;
     height: 6px;
-    border-radius: 50%;
+    border-radius: var(--openbot-radius-pill);
     background: var(--reading-accent);
     box-shadow:
       0 0 0 3px color-mix(in srgb, var(--reading-accent) 18%, transparent),
@@ -6560,7 +6642,7 @@ a {
   .reading-progress-rail:hover .reading-progress-surface,
   .reading-progress-rail:focus-within .reading-progress-surface {
     opacity: 1;
-    transition: opacity 240ms ease;
+    transition: opacity var(--openbot-duration-overlay) ease;
   }
 
   .reading-progress-rail:hover .reading-progress-eyebrow,
@@ -6608,8 +6690,8 @@ a {
    answer, a table, a pair of cards per topic, the questions, and the sources.
    Each side keeps one accent the whole way down (`--compare-accent`), so a reader
    can tell which column is which without reading the label again. OpenBot's is
-   its own lilac and the rival's is a quiet grey, so OpenBot is the side the eye
-   goes to. Where one side is better, the page marks it in green
+   its own lilac and the rival's is a quiet neutral, so OpenBot is the side the eye
+   goes to. Where one side is better, the page marks it in the success colour
    (`--openbot-success`), with a check and a word, never with colour alone.
    A page that compares two other apps (sides "a" and "b") gives both sides the
    same quiet accent: it takes no side.
@@ -6644,16 +6726,16 @@ a {
   margin: 22px 0 0;
   color: var(--openbot-text-dim);
   font-family: var(--openbot-font-mono);
-  font-size: 12px;
-  letter-spacing: 0.14em;
+  font-size: var(--openbot-text-sm);
+  letter-spacing: var(--site-tracking-spread);
   text-transform: uppercase;
 }
 
 .compare-title {
   margin: 12px 0 0;
-  font-size: clamp(32px, 4vw, 54px);
-  font-weight: 600;
-  letter-spacing: -0.045em;
+  font-size: var(--site-display-lg);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1.04;
   text-wrap: balance;
 }
@@ -6666,7 +6748,7 @@ a {
   max-width: 48ch;
   margin: 18px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.5vw, 18px);
+  font-size: var(--site-lede-sm);
   line-height: 1.55;
 }
 
@@ -6700,7 +6782,7 @@ a {
   aspect-ratio: 19 / 10;
   overflow: hidden;
   border: 1px solid var(--openbot-border-strong);
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
   pointer-events: none;
   animation: compare-rise 720ms cubic-bezier(0.22, 1, 0.36, 1) 160ms backwards;
 }
@@ -6717,7 +6799,7 @@ a {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: clamp(20px, 2.4vw, 32px) clamp(22px, 3vw, 40px);
-  border-radius: 20px;
+  border-radius: var(--openbot-radius-xl);
   background: rgba(14, 14, 18, 0.26);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
@@ -6750,9 +6832,9 @@ a {
 
 .compare-mark-name {
   color: rgba(255, 255, 255, 0.86);
-  font-size: clamp(13px, 1.1vw, 15px);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--site-lede-xs);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .compare-vs {
@@ -6763,9 +6845,9 @@ a {
   gap: 8px;
   margin-inline: clamp(14px, 2.2vw, 32px);
   color: rgba(255, 255, 255, 0.62);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-label);
 }
 
 .compare-vs::before,
@@ -6811,9 +6893,9 @@ a {
 
 .compare-heading {
   margin: 0;
-  font-size: clamp(24px, 2.4vw, 32px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: var(--site-display-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.15;
   text-wrap: balance;
 }
@@ -6822,14 +6904,14 @@ a {
   max-width: 62ch;
   margin: 16px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 1.6vw, 20px);
+  font-size: var(--site-lede);
   line-height: 1.55;
 }
 
 .compare-glance-summary {
   margin: 10px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 /* The plans an agent can run on, each with its provider's logo in its own colour
@@ -6839,7 +6921,7 @@ a {
   max-width: 62ch;
   margin: 14px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.4vw, 18px);
+  font-size: var(--site-lede-sm);
   line-height: 1.6;
 }
 
@@ -6870,7 +6952,7 @@ a {
   row-gap: 3px;
   padding: 16px 18px;
   border: 1px solid var(--openbot-border);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface);
 }
 
@@ -6892,9 +6974,9 @@ a {
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--openbot-radius-md);
   background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
 }
 
 .compare-plan-logo {
@@ -6912,14 +6994,14 @@ a {
 .compare-plan-name {
   align-self: end;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .compare-plan-text {
   color: var(--openbot-text-muted);
-  font-size: 13.5px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.45;
 }
 
@@ -6929,13 +7011,13 @@ a {
   gap: 10px;
   margin: 18px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
 }
 
 .compare-plans-rival strong {
   color: var(--openbot-text-secondary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .compare-plans-rival-logo {
@@ -6950,7 +7032,7 @@ a {
   max-width: 62ch;
   margin: clamp(56px, 7vw, 96px) auto 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 1.6vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.7;
   text-align: center;
   text-wrap: pretty;
@@ -6971,7 +7053,7 @@ a {
   overflow: hidden;
   padding: clamp(20px, 2.2vw, 28px);
   border: 1px solid var(--openbot-border);
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
   background:
     radial-gradient(
       120% 80% at 0% 0%,
@@ -7019,9 +7101,9 @@ a {
   gap: 8px;
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--site-text-prose);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .compare-side-label {
@@ -7038,7 +7120,7 @@ a {
 .compare-card-text {
   margin: 14px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.65;
 }
 
@@ -7048,7 +7130,7 @@ a {
   margin: 16px 0 0;
   padding: 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
 }
 
@@ -7072,7 +7154,7 @@ a {
   width: 6px;
   height: 6px;
   margin: 0.6em 5px 0;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--openbot-text-dim);
 }
 
@@ -7085,8 +7167,8 @@ a {
   background: color-mix(in srgb, var(--openbot-success) 14%, var(--openbot-transparent));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-success) 30%, var(--openbot-transparent));
   color: var(--openbot-success-text);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
   letter-spacing: 0;
 }
 
@@ -7100,7 +7182,7 @@ a {
   margin-top: 22px;
   overflow-x: auto;
   border: 1px solid var(--openbot-border);
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-surface);
 }
 
@@ -7108,7 +7190,7 @@ a {
   width: 100%;
   min-width: 560px;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
   text-align: left;
 }
@@ -7123,8 +7205,8 @@ a {
   border-bottom: 1px solid var(--openbot-border-strong);
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .compare-table thead th:first-child {
@@ -7163,7 +7245,7 @@ a {
   width: 20px;
   height: 20px;
   margin: 1px 9px 0 0;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-success) 18%, var(--openbot-transparent));
   color: var(--openbot-success);
 }
@@ -7180,7 +7262,7 @@ a {
 
 .compare-table tbody th {
   color: var(--openbot-text-primary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .compare-table td {
@@ -7233,9 +7315,9 @@ a {
   padding: 18px 2px;
   cursor: pointer;
   color: var(--openbot-text-primary);
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: -0.015em;
+  font-size: var(--site-text-prose);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   list-style: none;
 }
 
@@ -7244,7 +7326,7 @@ a {
 }
 
 .compare-faq-question:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--openbot-radius-md);
   outline: 2px solid var(--openbot-border-focus);
   outline-offset: 2px;
 }
@@ -7266,7 +7348,7 @@ a {
   margin: 0;
   padding: 0 2px 20px;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.65;
 }
 
@@ -7278,12 +7360,12 @@ a {
 
 .landing-faq-body .compare-faq-question {
   padding: 24px 2px;
-  font-size: 18px;
+  font-size: var(--openbot-text-2xl);
 }
 
 .landing-faq-body .compare-faq-answer {
   padding-bottom: 24px;
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
 }
 
 .landing-faq-body .compare-faq-answer a {
@@ -7302,7 +7384,7 @@ a {
   max-width: 68ch;
   margin: 14px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.6;
 }
 
@@ -7319,7 +7401,7 @@ a {
   align-items: center;
   gap: 6px;
   color: var(--openbot-text-secondary);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -7335,7 +7417,7 @@ a {
   max-width: 62ch;
   margin: 12px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.6;
 }
 
@@ -7359,14 +7441,14 @@ a {
 .compare-roundup-rank {
   color: var(--openbot-text-muted);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .compare-roundup-best {
   margin: 10px 0 0;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
   line-height: 1.5;
 }
 
@@ -7384,8 +7466,8 @@ a {
   align-items: center;
   gap: 6px;
   color: var(--openbot-logo-production);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .compare-roundup-link-icon {
@@ -7419,7 +7501,7 @@ a {
   max-width: 62ch;
   margin: 14px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.4vw, 18px);
+  font-size: var(--site-lede-sm);
   line-height: 1.6;
 }
 
@@ -7439,8 +7521,8 @@ a {
 .compare-bench-hint {
   display: block;
   color: var(--openbot-text-dim);
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .compare-bench-agent {
@@ -7458,15 +7540,15 @@ a {
 .compare-bench-name {
   display: block;
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .compare-bench-model,
 .compare-bench-note {
   display: block;
   color: var(--openbot-text-muted);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .compare-bench-note {
@@ -7486,7 +7568,7 @@ a {
   width: calc(var(--compare-bench-share) * (100% - 64px));
   min-width: 2px;
   height: 14px;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 var(--openbot-radius-xs) var(--openbot-radius-xs) 0;
   background: var(--compare-bench-fill);
 }
 
@@ -7501,7 +7583,7 @@ a {
   max-width: 68ch;
   margin: 14px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.6;
 }
 
@@ -7564,9 +7646,9 @@ a {
 
 .compare-index-title {
   margin: 12px 0 0;
-  font-size: clamp(36px, 5vw, 64px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
+  font-size: var(--site-display-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1.02;
 }
 
@@ -7574,7 +7656,7 @@ a {
   max-width: 56ch;
   margin: 18px auto 0;
   color: var(--openbot-text-secondary);
-  font-size: clamp(16px, 1.5vw, 18px);
+  font-size: var(--site-lede-sm);
   line-height: 1.55;
 }
 
@@ -7594,7 +7676,7 @@ a {
 }
 
 .compare-index-card:focus-visible {
-  border-radius: 20px;
+  border-radius: var(--openbot-radius-xl);
   outline: 3px solid var(--openbot-border-focus);
   outline-offset: 4px;
 }
@@ -7606,13 +7688,13 @@ a {
   aspect-ratio: 19 / 10;
   overflow: hidden;
   border: 1px solid var(--openbot-border-strong);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   pointer-events: none;
 }
 
 .compare-marks-small {
   padding: clamp(16px, 1.8vw, 24px) clamp(18px, 2.2vw, 28px);
-  border-radius: 16px;
+  border-radius: var(--openbot-radius-dialog);
 }
 
 .compare-marks-small .compare-mark {
@@ -7661,16 +7743,16 @@ a {
 .compare-index-card-title {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(18px, 1.7vw, 22px);
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-size: var(--site-lede-lg);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.25;
 }
 
 .compare-index-card-description {
   margin: 8px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.55;
 }
 
@@ -7680,8 +7762,8 @@ a {
   gap: 6px;
   margin-top: 14px;
   color: var(--openbot-text-secondary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .compare-index-card-arrow {
@@ -7753,7 +7835,7 @@ a {
   .compare-table {
     display: block;
     min-width: 0;
-    font-size: 14px;
+    font-size: var(--openbot-text-lg);
   }
 
   .compare-table thead,
@@ -7803,7 +7885,7 @@ a {
   }
 
   .compare-bench-table thead th {
-    font-size: 13px;
+    font-size: var(--openbot-text-md);
   }
 
   .compare-bench-cell {
@@ -7926,11 +8008,11 @@ a {
 
 .compare-page :is(.provider-step-text, .provider-table td) code {
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: var(--openbot-radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: 0.88em;
+  font-size: var(--site-text-code);
 }
 
 .provider-steps {
@@ -7946,7 +8028,7 @@ a {
   position: relative;
   padding: 18px 20px 18px 64px;
   border: 1px solid var(--openbot-border);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface);
   counter-increment: provider-step;
 }
@@ -7959,28 +8041,28 @@ a {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-logo-production) 16%, var(--openbot-transparent));
   color: var(--openbot-text-primary);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   content: counter(provider-step);
 }
 
 .provider-step-title {
   margin: 3px 0 0;
   color: var(--openbot-text-primary);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .provider-step-text {
   max-width: 68ch;
   margin: 8px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
 }
 
@@ -8000,8 +8082,8 @@ a {
   align-items: center;
   gap: 6px;
   color: var(--openbot-logo-production);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .provider-related-list {
@@ -8012,7 +8094,7 @@ a {
 /* Inline, so the arrow follows the last word when a long title wraps. */
 .provider-related-list a {
   display: inline;
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 .provider-related-arrow {
@@ -8040,7 +8122,7 @@ a {
   min-width: 0;
   padding: 18px 20px;
   border: 1px solid var(--openbot-border);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface);
 }
 
@@ -8065,15 +8147,15 @@ a {
 .provider-add-title {
   margin: 14px 0 0;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .provider-add-text {
   margin: 6px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.55;
 }
 
@@ -8166,9 +8248,9 @@ a {
 .plugin-intro-title {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(30px, 3.4vw, 40px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: var(--site-display-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.1;
 }
 
@@ -8189,7 +8271,7 @@ a {
 }
 
 .plugin-card:focus-visible {
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
   outline: 3px solid var(--openbot-border-focus);
   outline-offset: 4px;
 }
@@ -8240,9 +8322,9 @@ a {
 .plugin-logo-letter {
   display: grid;
   place-items: center;
-  font-size: clamp(34px, 3.8vw, 48px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: var(--site-display-md);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1;
 }
 
@@ -8261,7 +8343,7 @@ a {
 .plugin-card-meta {
   margin-top: 14px;
   color: var(--openbot-text-dim);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 .plugin-card-version {
@@ -8312,7 +8394,7 @@ a {
   background: var(--openbot-bg-surface);
   padding: 5px 11px;
   color: var(--openbot-text-dim);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   letter-spacing: var(--openbot-tracking-wide);
   line-height: 1.2;
   white-space: nowrap;
@@ -8332,8 +8414,8 @@ a {
   padding: 0 17px;
   color: var(--openbot-text-secondary);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   letter-spacing: var(--openbot-tracking-wide);
   line-height: 1;
   white-space: nowrap;
@@ -8369,7 +8451,7 @@ a {
 .plugin-empty {
   margin: 0;
   color: var(--openbot-text-dim);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .plugin-card-headline {
@@ -8379,16 +8461,16 @@ a {
 .plugin-card-title {
   flex: none;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.35;
   transition: color var(--openbot-duration-normal) ease;
 }
 
 .plugin-card-tagline {
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 /* Per card, ordered by --plugin-card-index, so the grid arrives as a sweep. */
@@ -8429,7 +8511,7 @@ a {
 .plugin-hero-row .post-article-title {
   min-width: 0;
   margin-top: 0;
-  font-size: clamp(26px, 3vw, 36px);
+  font-size: var(--site-display-sm);
   line-height: 1.1;
 }
 
@@ -8451,7 +8533,7 @@ a {
    block against the mark, and the article's gap would leave the mark between them. */
 .plugin-hero-standfirst {
   margin-top: 4px;
-  font-size: clamp(14px, 1.3vw, 16px);
+  font-size: var(--site-lede-xs);
   line-height: 1.4;
 }
 
@@ -8541,14 +8623,14 @@ a {
 
 .plugin-dialog-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--openbot-text-2xl);
   line-height: 1.3;
 }
 
 .plugin-dialog-copy {
   margin: 8px 0 0;
   color: var(--openbot-text-dim);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.55;
 }
 
@@ -8571,7 +8653,7 @@ a {
   background: none;
   color: var(--openbot-text-dim);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   transition: color var(--openbot-duration-fast) ease;
 }
 
@@ -8588,7 +8670,7 @@ a {
 .plugin-description {
   margin: 0;
   color: var(--openbot-text-readable);
-  font-size: 17px;
+  font-size: var(--site-text-prose);
   line-height: 1.7;
 }
 
@@ -8624,13 +8706,13 @@ a {
   margin: 10px 0 0;
   padding-left: 18px;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
 }
 
 .plugin-connect-field-label {
   color: var(--openbot-text-primary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 @media (max-width: 640px) {
@@ -8673,7 +8755,7 @@ a {
   width: min(100%, 520px);
   overflow: hidden;
   border: 1px solid var(--openbot-glass-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--openbot-bg-surface);
   box-shadow: 0 40px 120px -40px color-mix(in srgb, var(--agent-share-accent) 45%, transparent);
 }
@@ -8757,9 +8839,9 @@ a {
 .agent-share-name {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(26px, 4vw, 30px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--site-display-card-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
@@ -8767,7 +8849,7 @@ a {
 .agent-share-creator {
   margin: 4px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 /* What the agent brings, as one row of small tags. */
@@ -8787,7 +8869,7 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-secondary);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 /* Clamped, the instructions read as one paragraph of plain text, so the ellipsis never lands on a
@@ -8797,7 +8879,7 @@ a {
   margin: 14px 0 0;
   overflow: hidden;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -8810,7 +8892,7 @@ a {
   width: 100%;
   margin: 14px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.55;
   text-align: start;
   overflow-wrap: anywhere;
@@ -8827,13 +8909,13 @@ a {
 .agent-share-instructions .message-markdown-heading {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: var(--site-text-prose);
+  font-weight: var(--openbot-weight-semibold);
   line-height: 1.4;
 }
 
 .agent-share-instructions .message-markdown-heading:is([data-level="1"], [data-level="2"]) {
-  font-size: 19px;
+  font-size: var(--site-text-title);
 }
 
 .agent-share-instructions * + .message-markdown-heading {
@@ -8863,12 +8945,12 @@ a {
 
 .agent-share-instructions strong {
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .agent-share-instructions code {
   font-family: var(--openbot-font-mono);
-  font-size: 0.9em;
+  font-size: var(--site-text-code);
 }
 
 .agent-share-instructions .message-link {
@@ -8901,7 +8983,7 @@ a {
   background: none;
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -8922,7 +9004,7 @@ a {
 .agent-share-notice {
   margin: 12px 0 0;
   color: var(--openbot-text-dim);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   line-height: 1.5;
 }
 
@@ -8939,7 +9021,7 @@ a {
   z-index: 1;
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   text-align: center;
 }
 
@@ -8957,8 +9039,8 @@ a {
   gap: 8px;
   margin: 0 0 12px;
   color: var(--openbot-text-primary);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
 }
 
 /* A count is one or two digits. A box that is square at one digit holds every count
@@ -8973,7 +9055,7 @@ a {
   border-radius: var(--openbot-radius-sm);
   background: var(--openbot-glass-surface);
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -8983,7 +9065,7 @@ a {
    corner as the picture further up this column, and the same clipping of the shader,
    which is the whole reason it is declared there and not here. */
 .plugin-prompts-card {
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   padding: clamp(16px, 2.4vw, 24px);
 }
 
@@ -9030,7 +9112,7 @@ a {
   background: var(--openbot-bg-canvas);
   padding: 12px;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
 }
 
@@ -9045,7 +9127,7 @@ a {
   background: var(--openbot-glass-surface);
   padding: 3px 10px 3px 6px;
   color: var(--openbot-text-primary);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 /* Set by height alone, so a wide wordmark stays a wordmark instead of being letterboxed
@@ -9055,7 +9137,7 @@ a {
   width: auto;
   max-width: 56px;
   height: 14px;
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   filter: none;
 }
 
@@ -9072,7 +9154,7 @@ a {
   min-width: 0;
   padding: 12px 14px;
   color: var(--openbot-text-secondary);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.55;
 }
 
@@ -9136,7 +9218,7 @@ a {
 .plugin-prompt-icon {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--openbot-radius-xs);
 }
 
 .plugin-row-text {
@@ -9146,14 +9228,14 @@ a {
 .plugin-row-title {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .plugin-row-copy {
   margin: 2px 0 0;
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.55;
 }
 
@@ -9169,7 +9251,7 @@ a {
   gap: 16px;
   padding: 11px 0;
   border-top: 1px solid var(--openbot-glass-surface);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .plugin-fact dt {
@@ -9308,10 +9390,10 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.08em;
-  font-size: clamp(112px, 24vw, 248px);
-  font-weight: 800;
+  font-size: var(--site-display-404);
+  font-weight: var(--site-weight-heavy);
   line-height: 1;
-  letter-spacing: -0.06em;
+  letter-spacing: var(--site-tracking-hero);
   user-select: none;
 }
 
@@ -9357,7 +9439,7 @@ a {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 24%;
+  border-radius: var(--openbot-radius-logo);
   pointer-events: none;
   filter: drop-shadow(0 0 48px color-mix(in srgb, var(--openbot-logo-production) 45%, var(--openbot-transparent)));
   animation: not-found-tilt 6s cubic-bezier(0.77, 0, 0.175, 1) infinite;
@@ -9373,7 +9455,7 @@ a {
   bottom: -0.2em;
   width: 76%;
   height: 0.07em;
-  border-radius: 50%;
+  border-radius: var(--site-radius-ellipse);
   background: radial-gradient(closest-side, var(--openbot-scroll-edge-overlay), var(--openbot-transparent));
   animation: not-found-shadow 6s ease-in-out 900ms infinite;
 }
@@ -9389,24 +9471,24 @@ a {
   margin: 0 0 12px;
   color: var(--openbot-logo-production);
   font-family: var(--openbot-font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-spread);
   text-transform: uppercase;
 }
 
 .not-found-title {
   margin: 0;
-  font-size: clamp(32px, 5vw, 52px);
+  font-size: var(--site-display-card-lg);
   line-height: 1.05;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--site-tracking-display);
 }
 
 .not-found-description {
   max-width: 460px;
   margin: 16px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.55;
 }
 
@@ -9423,7 +9505,7 @@ a {
   margin-top: 48px;
   overflow: hidden;
   border: 1px solid var(--openbot-glass-border);
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-glass);
   box-shadow: 0 24px 80px var(--openbot-glass-shadow);
   backdrop-filter: blur(12px);
@@ -9453,7 +9535,7 @@ a {
   list-style: none;
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-mono);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.5;
 }
 
@@ -9503,7 +9585,7 @@ a {
   border: 1px solid var(--openbot-glass-border);
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   transition:
     color var(--openbot-duration-normal) ease,
     background-color var(--openbot-duration-normal) ease,
@@ -9647,7 +9729,7 @@ a {
    dissolves into the page. On a wide screen the index of releases stays beside
    the notes and marks the one being read; on a narrow one it becomes a strip of
    versions that stays at the top. Colour belongs to the kind of change, so a
-   reader scanning for fixes finds the green groups without reading headings. */
+   reader finds the fixes by their colour without reading headings. */
 
 .changelog-page {
   --changelog-hairline: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
@@ -9674,13 +9756,13 @@ a {
   z-index: -1;
   inset: 0;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) 40%, transparent 100%);
   mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) 40%, transparent 100%);
 }
 
-/* A shade on the reading side, so white type keeps its contrast over the lightest
+/* A shade on the reading side, so light type keeps its contrast over the lightest
    colours the shader draws. */
 .changelog-hero-art::after {
   content: "";
@@ -9702,18 +9784,18 @@ a {
 .changelog-eyebrow {
   margin: 0;
   color: color-mix(in srgb, var(--openbot-text-primary) 76%, transparent);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-spread);
   text-transform: uppercase;
 }
 
 .changelog-title {
   margin: 12px 0 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(38px, 5.6vw, 72px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
+  font-size: var(--site-display-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1;
   text-wrap: balance;
 }
@@ -9722,7 +9804,7 @@ a {
   max-width: 54ch;
   margin: 18px 0 0;
   color: color-mix(in srgb, var(--openbot-text-primary) 80%, transparent);
-  font-size: clamp(15px, 1.4vw, 18px);
+  font-size: var(--site-lede-sm);
   line-height: 1.55;
   text-wrap: pretty;
 }
@@ -9753,7 +9835,7 @@ a {
   gap: 8px;
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .changelog-latest-dot {
@@ -9792,7 +9874,7 @@ a {
   border-radius: var(--openbot-radius-xs);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   text-decoration: none;
 }
 
@@ -9905,9 +9987,9 @@ a {
   padding: 5px 12px;
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   text-decoration: none;
   white-space: nowrap;
   transition: color var(--openbot-duration-normal) ease;
@@ -9940,16 +10022,16 @@ a {
   gap: 8px;
   margin: 0 0 14px;
   color: var(--openbot-text-dim);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-spread);
   text-transform: uppercase;
 }
 
 .changelog-index-count {
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   letter-spacing: 0;
 }
 
@@ -9988,8 +10070,8 @@ a {
 .changelog-index-month-label {
   margin: 0 0 6px 14px;
   color: var(--openbot-text-dim);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .changelog-index-list {
@@ -10008,7 +10090,7 @@ a {
   padding: 6px 10px 6px 14px;
   border-radius: 0 var(--openbot-radius-sm) var(--openbot-radius-sm) 0;
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   text-decoration: none;
   transition: color var(--openbot-duration-normal) ease;
 }
@@ -10052,7 +10134,7 @@ a {
 
 .changelog-index-date {
   color: var(--openbot-text-dim);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -10089,7 +10171,7 @@ a {
   align-items: center;
   gap: 10px;
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 .changelog-release-badge {
@@ -10097,9 +10179,9 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-success-soft);
   color: var(--openbot-success-text);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
 }
 
 /* The stores that have a mobile version. A store that still reviews it reads as waiting. */
@@ -10117,9 +10199,9 @@ a {
   border-radius: var(--openbot-radius-pill);
   box-shadow: inset 0 0 0 1px var(--changelog-hairline);
   color: var(--openbot-text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
   white-space: nowrap;
 }
 
@@ -10132,7 +10214,7 @@ a {
 
 .changelog-store-detail {
   color: var(--openbot-text-dim);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .changelog-store[data-state="review"] {
@@ -10152,9 +10234,9 @@ a {
 
 .changelog-release-title {
   margin: 8px 0 0;
-  font-size: clamp(24px, 2.4vw, 32px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: var(--site-display-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.15;
 }
 
@@ -10170,7 +10252,7 @@ a {
   content: "#";
   margin-left: 10px;
   color: var(--openbot-text-dim);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
   opacity: 0;
   transition: opacity var(--openbot-duration-normal) ease;
 }
@@ -10182,7 +10264,7 @@ a {
 
 .changelog-release-version {
   color: var(--openbot-text-muted);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -10190,7 +10272,7 @@ a {
   max-width: 68ch;
   margin: 16px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.65;
 }
 
@@ -10201,13 +10283,13 @@ a {
   box-shadow: inset 0 0 0 1px var(--changelog-hairline);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: 0.86em;
+  font-size: var(--site-text-code);
   overflow-wrap: anywhere;
 }
 
 .changelog-strong {
   color: var(--openbot-text-primary);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .changelog-link {
@@ -10239,8 +10321,8 @@ a {
   gap: 10px;
   margin: 0;
   color: var(--openbot-warning-text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .changelog-notice-mark {
@@ -10252,8 +10334,8 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-warning);
   color: var(--openbot-text-on-light);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-bold);
   line-height: 1;
 }
 
@@ -10267,7 +10349,7 @@ a {
 
 .changelog-notice-item {
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
 }
 
@@ -10275,7 +10357,7 @@ a {
    "act on this", full weight on every word is only harder to read. */
 .changelog-notice .changelog-strong {
   color: var(--openbot-text-primary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .changelog-group {
@@ -10307,9 +10389,9 @@ a {
   gap: 8px;
   margin: 0 0 12px;
   color: var(--changelog-tone);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
 }
 
@@ -10326,8 +10408,8 @@ a {
   border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--changelog-tone) 12%, transparent);
   font-family: var(--openbot-font-mono);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--site-text-2xs);
+  font-weight: var(--openbot-weight-medium);
   letter-spacing: 0;
 }
 
@@ -10345,7 +10427,7 @@ a {
   position: relative;
   padding-left: 22px;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -10456,7 +10538,7 @@ a {
   }
 
   .changelog-hero-art {
-    border-radius: 18px;
+    border-radius: var(--openbot-radius-dialog);
   }
 }
 
@@ -10559,7 +10641,7 @@ a {
 
 .download-panel {
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
 }
 
 .download-panel-body {
@@ -10576,8 +10658,8 @@ a {
   gap: 8px;
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-download-card-muted);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   transition: color var(--openbot-duration-normal) ease;
 }
 
@@ -10589,9 +10671,9 @@ a {
 
 .download-panel-title {
   margin: clamp(36px, 5vw, 64px) 0 0;
-  font-size: clamp(46px, 7.4vw, 104px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-size: var(--site-display-hero);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-heading);
   line-height: 0.94;
   text-wrap: balance;
 }
@@ -10600,7 +10682,7 @@ a {
   max-width: 50ch;
   margin: clamp(20px, 2.4vw, 28px) 0 0;
   color: var(--openbot-download-card-muted);
-  font-size: clamp(17px, 1.5vw, 19px);
+  font-size: var(--site-lede);
   line-height: 1.5;
 }
 
@@ -10623,7 +10705,7 @@ a {
 .download-panel-installer-detail {
   padding-left: 4px;
   color: var(--openbot-download-card-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 .download-panel-logo {
@@ -10650,14 +10732,14 @@ a {
 .download-panel-specs dt,
 .download-hub-card-specs dt {
   color: var(--openbot-download-card-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 .download-panel-specs dd {
   margin: 6px 0 0;
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1.35;
 }
 
@@ -10671,8 +10753,8 @@ a {
   padding: 0 24px 0 20px;
   border: 1px solid var(--openbot-text-on-light);
   border-radius: var(--openbot-radius-pill);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
   line-height: 1;
   white-space: nowrap;
   transition:
@@ -10726,9 +10808,9 @@ a {
 
 .download-row-title {
   margin: 0;
-  font-size: clamp(24px, 2.4vw, 30px);
-  font-weight: 500;
-  letter-spacing: -0.035em;
+  font-size: var(--site-display-title);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-tight);
   line-height: 1.1;
   text-wrap: balance;
 }
@@ -10764,11 +10846,11 @@ a {
   display: grid;
   place-items: center;
   border: 1px solid var(--download-color, var(--openbot-border-strong));
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-canvas);
   color: var(--download-color, var(--openbot-text-primary));
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .download-steps > li:not(:last-child)::after {
@@ -10785,7 +10867,7 @@ a {
   grid-column: 2;
   margin: 8px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.6;
 }
 
@@ -10808,7 +10890,7 @@ a {
   padding: 15px 18px;
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-mono);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.65;
 }
 
@@ -10825,8 +10907,8 @@ a {
   background: transparent;
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   cursor: pointer;
   transition:
     background-color var(--openbot-duration-normal) ease,
@@ -10857,7 +10939,7 @@ a {
   position: relative;
   padding: 0 0 18px 24px;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.6;
 }
 
@@ -10873,7 +10955,7 @@ a {
   left: 2px;
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--download-color, var(--openbot-text-dim));
 }
 
@@ -10901,7 +10983,7 @@ a {
   align-items: center;
   gap: 18px;
   padding: 22px 24px;
-  border-radius: 20px;
+  border-radius: var(--openbot-radius-xl);
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
@@ -10918,14 +11000,14 @@ a {
 }
 
 .download-system-card-name {
-  font-size: 19px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-size: var(--site-text-title);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-tight);
 }
 
 .download-system-card-detail {
   color: var(--openbot-download-card-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.4;
 }
 
@@ -10947,7 +11029,7 @@ a {
   gap: 8px 24px;
   margin-top: 28px;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .download-resources a {
@@ -10981,7 +11063,7 @@ a {
   display: flex;
   flex-direction: column;
   padding: clamp(26px, 2.6vw, 34px);
-  border-radius: 24px;
+  border-radius: var(--site-radius-2xl);
 }
 
 .download-hub-cards-mobile {
@@ -11001,9 +11083,9 @@ a {
 .download-hub-card-name {
   margin: auto 0 0;
   padding-top: 40px;
-  font-size: clamp(36px, 3.6vw, 50px);
-  font-weight: 500;
-  letter-spacing: -0.05em;
+  font-size: var(--site-display-md);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-display);
   line-height: 1;
 }
 
@@ -11017,13 +11099,13 @@ a {
   gap: 12px;
   padding: 10px 0;
   border-top: 1px solid var(--openbot-download-card-border);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.4;
 }
 
 .download-hub-card-specs dd {
   margin: 0;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .download-hub-card-installers {
@@ -11036,7 +11118,7 @@ a {
 .download-hub-card .download-installer-button {
   height: 46px;
   padding: 0 20px 0 16px;
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .download-hub-card-link {
@@ -11046,8 +11128,8 @@ a {
   gap: 7px;
   margin-top: 22px;
   border-radius: var(--openbot-radius-xs);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .download-main > .download-resources {
@@ -11155,7 +11237,7 @@ a {
   gap: 6px 16px;
   margin-top: 28px;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .landing-download-pages-mobile {
@@ -11187,7 +11269,7 @@ a {
 
 .contact-card {
   border: 1px solid var(--contact-border);
-  border-radius: 28px;
+  border-radius: var(--openbot-radius-modal);
   background: var(--contact-fill);
   padding: clamp(20px, 3vw, 36px);
 }
@@ -11216,21 +11298,21 @@ a {
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
 }
 
 .contact-field-head label {
   flex: 0 0 auto;
   color: var(--openbot-text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .contact-optional,
 .contact-error {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -11252,7 +11334,7 @@ a {
   padding: 12px 14px;
   color: var(--openbot-text-primary);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
   transition:
     border-color var(--openbot-duration-normal) ease,
@@ -11315,7 +11397,7 @@ a {
 .contact-count {
   justify-self: end;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -11335,7 +11417,7 @@ a {
   flex: 1 1 240px;
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   line-height: 1.5;
 }
 
@@ -11374,22 +11456,22 @@ a {
 
 .contact-sent h2 {
   margin: 8px 0 0;
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--site-tracking-tight);
 }
 
 .contact-sent p {
   margin: 0;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--site-text-body);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .contact-sent strong {
   color: var(--openbot-text-primary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .contact-text-button {
@@ -11399,8 +11481,8 @@ a {
   padding: 6px 0;
   color: var(--openbot-text-primary);
   font: inherit;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
   cursor: pointer;
 }
 
@@ -11428,11 +11510,11 @@ a {
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  font-size: 15px;
+  font-size: var(--site-text-body);
 }
 
 .contact-channel-label {
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .contact-channel-detail {
@@ -11472,7 +11554,7 @@ a {
 .agent-share-gone-copy {
   margin: 12px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: var(--openbot-text-xl);
   line-height: 1.55;
 }
 
@@ -11542,7 +11624,7 @@ a {
   margin: 24px 0 0;
   padding: 0;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
   line-height: 1.5;
   list-style: none;
 }
@@ -11654,9 +11736,9 @@ a {
 .site-logo-menu {
   z-index: 60;
   min-width: 236px;
-  border-radius: 14px;
+  border-radius: var(--openbot-radius-lg);
   background: rgba(22, 22, 22, 0.8);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px var(--openbot-border);
   backdrop-filter: blur(40px) saturate(180%);
   padding: 6px;
   outline: 0;
@@ -11666,10 +11748,10 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-radius: 9px;
+  border-radius: var(--openbot-radius-md);
   padding: 8px 10px;
   color: var(--openbot-text-primary);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   cursor: default;
   outline: 0;
 }
@@ -11688,7 +11770,7 @@ a {
 .site-logo-menu-separator {
   margin: 6px 4px;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--openbot-border);
 }
 
 /* Brand page logo cards --------------------------------------------------- */
@@ -11717,9 +11799,9 @@ a {
 
 .brand-group-title {
   margin: 0;
-  font-size: clamp(22px, 2.2vw, 28px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: var(--site-display-subtitle);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--site-tracking-tight);
 }
 
 .brand-space-toggle {
@@ -11774,8 +11856,8 @@ a {
 
 .brand-card-name {
   margin: 0;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: var(--site-text-body);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .brand-card-actions {

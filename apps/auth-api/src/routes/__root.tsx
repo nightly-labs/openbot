@@ -1,4 +1,4 @@
-import interLatinFont from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import interLatinFont from "@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2?url";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, type ErrorComponentProps, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import { createSignal, onSettled, Show } from "solid-js";

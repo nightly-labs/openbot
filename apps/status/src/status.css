@@ -15,6 +15,15 @@
 .status-page {
   --status-hairline: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
   --status-fill: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
+  /* Steps that the brand scale does not have. */
+  --status-text-body: 15px;
+  --status-text-lead: 17px;
+  --status-text-title: 20px;
+  --status-display: clamp(36px, 5vw, 56px);
+  --status-tracking-display: -0.05em;
+  --status-tracking-label: 0.06em;
+  /* The day bars are 7px wide. The brand 4px step would round them into capsules. */
+  --status-radius-bar: 2px;
   min-height: 100vh;
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
@@ -87,8 +96,8 @@
   align-items: center;
   gap: 10px;
   border-radius: var(--openbot-radius-md);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .status-brand-logo {
@@ -116,21 +125,21 @@
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--openbot-radius-pill);
   background: var(--status-color);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-color) 18%, transparent);
 }
 
 .status-state {
   color: var(--status-text);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
 }
 
 .status-muted {
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
 }
 
 .status-section-head {
@@ -144,21 +153,21 @@
 
 .status-section-title {
   color: var(--openbot-text-primary);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--status-text-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .status-card {
   border: 1px solid var(--status-hairline);
-  border-radius: 20px;
+  border-radius: var(--openbot-radius-xl);
   background: var(--status-fill);
 }
 
 .status-link {
   color: var(--openbot-text-secondary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-medium);
   text-decoration: underline;
   text-decoration-color: var(--status-hairline);
   text-underline-offset: 3px;
@@ -174,7 +183,7 @@
 .status-link:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px var(--openbot-accent-strong);
-  border-radius: 6px;
+  border-radius: var(--openbot-radius-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -200,8 +209,8 @@
   border-radius: var(--openbot-radius-pill);
   background: transparent;
   color: var(--openbot-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   line-height: 1;
   white-space: nowrap;
   transition:
@@ -253,8 +262,8 @@
   padding: 5px 12px;
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
   cursor: pointer;
   transition:
     color var(--openbot-duration-normal) ease,
@@ -297,14 +306,14 @@
 
 .status-update-stage {
   color: var(--openbot-text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .status-update-body {
   max-width: 64ch;
   color: var(--openbot-text-secondary);
-  font-size: 15px;
+  font-size: var(--status-text-body);
   line-height: 1.55;
   text-wrap: pretty;
   white-space: pre-line;
@@ -325,7 +334,7 @@
   border: 1px solid var(--status-hairline);
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-secondary);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
   white-space: nowrap;
 }
 
@@ -348,9 +357,9 @@
 
 .status-title {
   color: var(--openbot-text-primary);
-  font-size: clamp(36px, 5vw, 56px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
+  font-size: var(--status-display);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--status-tracking-display);
   line-height: 1;
 }
 
@@ -367,9 +376,9 @@
 .status-banner-title {
   flex: 1 1 auto;
   color: var(--openbot-text-primary);
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--status-text-title);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .status-stack {
@@ -394,8 +403,8 @@
   align-items: center;
   gap: 12px;
   color: var(--openbot-text-primary);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: var(--status-text-lead);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .status-section {
@@ -422,14 +431,14 @@
 
 .status-service-name {
   color: var(--openbot-text-primary);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
 }
 
 .status-service-description {
   margin-top: 2px;
   color: var(--openbot-text-muted);
-  font-size: 13px;
+  font-size: var(--openbot-text-md);
 }
 
 .status-bars {
@@ -442,7 +451,7 @@
 .status-bar {
   flex: 1 1 0;
   min-width: 0;
-  border-radius: 2px;
+  border-radius: var(--status-radius-bar);
   background: var(--status-color);
   opacity: 0.88;
 }
@@ -464,12 +473,12 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--openbot-text-muted);
-  font-size: 12px;
+  font-size: var(--openbot-text-sm);
 }
 
 .status-bars-foot strong {
   color: var(--openbot-text-secondary);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .status-tooltip {
@@ -480,7 +489,7 @@
   max-width: 260px;
   padding: 10px 12px;
   border: 1px solid var(--openbot-border-strong);
-  border-radius: 12px;
+  border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-surface-raised);
   box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.6);
   pointer-events: none;
@@ -489,8 +498,8 @@
 
 .status-tooltip-date {
   color: var(--openbot-text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .status-tooltip p + p {
@@ -508,9 +517,9 @@
 .status-month-title {
   margin-bottom: 10px;
   color: var(--openbot-text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--status-tracking-label);
   text-transform: uppercase;
 }
 
@@ -531,15 +540,15 @@
   padding: 0;
   color: var(--openbot-text-primary);
   font: inherit;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-medium);
   text-align: left;
   cursor: pointer;
 }
 
 .status-incident-title:focus-visible {
   outline: 0;
-  border-radius: 6px;
+  border-radius: var(--openbot-radius-sm);
   box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 

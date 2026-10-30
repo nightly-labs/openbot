@@ -317,14 +317,11 @@ export function checkUiFoundation(
 
 /** The style debt of the public site, which may only go down. */
 const SITE_DEBT_BUDGETS: SiteStyles["budgets"] = {
-  "colour literals outside the palette": 107,
-  "untokenized font-size": 280,
-  "untokenized font-weight": 159,
-  "pixel line-height": 4,
-  "untokenized letter-spacing": 79,
+  "colour literals outside the palette": 78,
+  // The `600 900` weight range of the Inter @font-face rule.
+  "untokenized font-weight": 1,
   "icon size outside the icon scale": 38,
-  "untokenized border-radius": 88,
-  "untokenized transition durations": 33,
+  "untokenized transition durations": 17,
 };
 
 if (import.meta.main) {
