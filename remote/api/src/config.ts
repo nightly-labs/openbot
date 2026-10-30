@@ -1,3 +1,4 @@
+import { GOOGLE_CLIENT_ID_PATTERN, GOOGLE_TOKEN_ENDPOINT } from "@openbot/contracts/signal-protocol/google-oauth";
 import { TELEGRAM_BOT_ID_PATTERN } from "@openbot/contracts/signal-protocol/telegram-route";
 
 export interface RemoteApiConfig {
@@ -37,7 +38,7 @@ export interface RemoteApiConfig {
   google: GoogleOAuthConfig | null;
 }
 
-export interface GoogleOAuthClient {
+interface GoogleOAuthClient {
   clientId: string;
   // Only Signal has it: never log it or put it in an answer.
   clientSecret: string;
@@ -182,11 +183,8 @@ function readGoogleOAuthConfig(environment: Record<string, string | undefined>):
   if (clients.length === 0) return null;
   const override = optional(environment.GOOGLE_OAUTH_TOKEN_URL);
   if (override && !URL.canParse(override)) return off("GOOGLE_OAUTH_TOKEN_URL must be a URL.");
-  return { clients, tokenUrl: override ?? GOOGLE_TOKEN_URL };
+  return { clients, tokenUrl: override ?? GOOGLE_TOKEN_ENDPOINT };
 }
-
-const GOOGLE_CLIENT_ID_PATTERN = /^[0-9]{1,30}-[a-z0-9]{1,64}\.apps\.googleusercontent\.com$/u;
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
   const tlsDisabled = environment.REMOTE_TLS_DISABLED === "true";

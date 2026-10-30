@@ -10,7 +10,7 @@
  */
 
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { GoogleOAuthTokenRequest } from "@openbot/contracts/signal-protocol/google-oauth";
+import { GOOGLE_TOKEN_ENDPOINT, type GoogleOAuthTokenRequest } from "@openbot/contracts/signal-protocol/google-oauth";
 
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/";
 
@@ -50,23 +50,31 @@ export const GOOGLE_MCP_SCOPES: Readonly<Record<string, string>> = {
   ),
 };
 
-/** Google's token endpoint, as its authorization server metadata names it. */
-export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-
 /**
  * Sends one token request through Signal and answers with Google's answer as Signal returns it. It
  * fails with a sentence for the user when this computer cannot ask Signal, for example with no
  * OpenBot account.
  */
-export type GoogleTokenBroker = (
-  request: GoogleOAuthTokenRequest,
-  signal: AbortSignal | undefined,
-) => Promise<Response>;
+export type GoogleTokenBroker = (request: GoogleOAuthTokenRequest, signal: AbortSignal) => Promise<Response>;
 
 export interface GoogleSignIn {
   /** The client ID of the OpenBot Google sign-in app. */
   clientId: string;
   broker: GoogleTokenBroker;
+  /**
+   * Whether this host can ask Signal now: it has an OpenBot account and a host ID. Without them the
+   * Google servers get no OpenBot app, so a sign-in does not send the user to Google for nothing.
+   */
+  available: () => boolean;
+}
+
+/**
+ * Whether a sign-in app on file for this server is the OpenBot Google sign-in app, of this build or an
+ * earlier one. Google refuses a client with no secret at its token endpoint, so on a Google server an
+ * app with no secret cannot be one that the user saved.
+ */
+export function isGoogleSignInApp(resource: string, app: { clientSecret?: string | undefined }): boolean {
+  return Object.hasOwn(GOOGLE_MCP_SCOPES, resource) && app.clientSecret === undefined;
 }
 
 /**
@@ -75,7 +83,7 @@ export interface GoogleSignIn {
  * to this computer. A request for another client, such as a sign-in app the user saved, goes to Google
  * as it is.
  */
-export function withGoogleTokenBroker(fetch: FetchLike, google: GoogleSignIn): FetchLike {
+export function withGoogleTokenBroker(fetch: FetchLike, google: GoogleSignIn, signal: AbortSignal): FetchLike {
   return async (input, init) => {
     const url = input instanceof URL ? input.href : String(input);
     if (init?.method !== "POST" || url !== GOOGLE_TOKEN_ENDPOINT || !(init.body instanceof URLSearchParams))
@@ -85,7 +93,8 @@ export function withGoogleTokenBroker(fetch: FetchLike, google: GoogleSignIn): F
     const request = tokenRequest(form, google.clientId);
     // An unknown grant is not one of the two the broker passes on. Google would refuse it without the secret too.
     if (!request) return fetch(input, init);
-    return google.broker(request, init.signal ?? undefined);
+    // The SDK sends no signal of its own; the exchange's signal ends the request with the exchange.
+    return google.broker(request, init.signal ?? signal);
   };
 }
 

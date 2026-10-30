@@ -12,6 +12,13 @@
 // The host posts JSON to this Signal path.
 export const GOOGLE_OAUTH_TOKEN_PATH = "/v1/google/oauth/token";
 
+// Google's token endpoint, as Google's authorization server metadata names it. The host sends only the
+// requests to this address through Signal, and Signal sends them on to it.
+export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+
+// The shape of a Google OAuth client ID. The host and Signal accept the same IDs.
+export const GOOGLE_CLIENT_ID_PATTERN = /^[0-9]{1,30}-[a-z0-9]{1,64}\.apps\.googleusercontent\.com$/u;
+
 // The only address a code can come back to: the host's loopback listener (`mcp-oauth-redirect-server.ts`).
 export const GOOGLE_OAUTH_REDIRECT_PATTERN = /^http:\/\/127\.0\.0\.1:[0-9]{1,5}\/mcp-auth$/u;
 

@@ -211,6 +211,7 @@ export const messages = {
     "Le serveur de connexion n’a pas accepté OpenBot à la fin de la connexion. Connectez-vous à nouveau : OpenBot s’enregistre de nouveau auprès du serveur.",
   "error.backend.googleSignInNeedsAccount":
     "Connectez-vous d’abord à votre compte OpenBot. OpenBot en a besoin pour terminer une connexion à Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot n’a pas pu terminer la connexion à Google. Réessayez plus tard.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
   "error.backend.mcpRegistrationRefused":
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",

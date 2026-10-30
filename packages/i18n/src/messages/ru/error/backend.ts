@@ -199,6 +199,7 @@ export const messages = {
     "Сервер входа не принял OpenBot при завершении входа. Войдите снова: OpenBot заново зарегистрируется на сервере.",
   "error.backend.googleSignInNeedsAccount":
     "Сначала войдите в учётную запись OpenBot. Она нужна OpenBot, чтобы завершить вход в Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot не удалось завершить вход в Google. Повторите попытку позже.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
   "error.backend.mcpRegistrationRefused":
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",

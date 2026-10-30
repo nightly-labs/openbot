@@ -298,11 +298,6 @@ export function createRemoteApiApp(
     .post(
       GOOGLE_OAUTH_TOKEN_PATH,
       async ({ request }) => {
-        const google = config.google;
-        if (!google) {
-          await request.body?.cancel();
-          return googleOAuthError(503, "unavailable");
-        }
         const ticket = TICKET_BEARER_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
         const verified = ticket
           ? await runtime.runPromise(
@@ -317,6 +312,12 @@ export function createRemoteApiApp(
         if (caller !== "ok") {
           await request.body?.cancel();
           return googleOAuthError(caller === "unauthorized" ? 401 : 429, caller);
+        }
+        // Only a host with a valid ticket learns whether this Signal has the Google sign-in app.
+        const google = config.google;
+        if (!google) {
+          await request.body?.cancel();
+          return googleOAuthError(503, "unavailable");
         }
         if ((request.headers.get("content-type") ?? "").split(";", 1)[0]?.trim().toLowerCase() !== "application/json") {
           await request.body?.cancel();

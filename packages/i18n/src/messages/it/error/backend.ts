@@ -207,6 +207,7 @@ export const messages = {
     "Il server di accesso non ha accettato OpenBot al completamento dell'accesso. Accedi di nuovo: OpenBot si registra di nuovo sul server.",
   "error.backend.googleSignInNeedsAccount":
     "Accedi prima al tuo account OpenBot. OpenBot ne ha bisogno per completare un accesso a Google.",
+  "error.backend.googleSignInUnavailable": "OpenBot non è riuscito a completare l'accesso a Google. Riprova più tardi.",
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
   "error.backend.mcpRegistrationRefused":
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",

@@ -194,6 +194,7 @@ export const messages = {
     "Oturum açma sunucusu, oturum açma tamamlanırken OpenBot'u kabul etmedi. Yeniden oturum açın: OpenBot sunucuya yeniden kaydolur.",
   "error.backend.googleSignInNeedsAccount":
     "Önce OpenBot hesabınıza oturum açın. OpenBot, Google oturum açmayı tamamlamak için buna ihtiyaç duyar.",
+  "error.backend.googleSignInUnavailable": "OpenBot, Google oturum açmayı tamamlayamadı. Daha sonra yeniden deneyin.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",
   "error.backend.mcpRegistrationRefused":
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",

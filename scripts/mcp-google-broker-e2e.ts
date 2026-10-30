@@ -19,7 +19,7 @@ import { exportJWK, SignJWT } from "jose";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { GOOGLE_MCP_SCOPES } from "../src/backend/google-mcp-sign-in";
 import { McpOAuth, type McpOAuthRecord } from "../src/backend/mcp-oauth-provider";
-import { googleSignIn, type HostTicket } from "../src/main/google-token-broker";
+import { type GoogleHost, googleSignIn } from "../src/main/google-token-broker";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build/mcp-google-broker-e2e");
@@ -136,8 +136,13 @@ async function hostTicket(): Promise<string> {
     .sign(privateKey);
 }
 
-function oauthWith(records: Map<string, McpOAuthRecord>, ticket: HostTicket, opened: string[]): McpOAuth {
-  const google = googleSignIn(ticket, { OPENBOT_GOOGLE_CLIENT_ID: CLIENT_ID });
+function oauthWith(
+  records: Map<string, McpOAuthRecord>,
+  host: GoogleHost,
+  opened: string[],
+  clientId = CLIENT_ID,
+): McpOAuth {
+  const google = googleSignIn(host, { OPENBOT_GOOGLE_CLIENT_ID: clientId });
   if (!google) throw new Error("The test client ID was refused.");
   return new McpOAuth({
     storage: {
@@ -190,7 +195,10 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
 child.stdout?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
 child.stderr?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
 const signalUrl = `ws://127.0.0.1:${signalPort}/v1/signal`;
-const withTicket: HostTicket = async () => ({ ticket: await hostTicket(), signalUrl });
+const withTicket: GoogleHost = {
+  available: () => true,
+  ticket: async () => ({ ticket: await hostTicket(), signalUrl }),
+};
 
 try {
   await waitForReady(`http://127.0.0.1:${signalPort}/health/ready`, child);
@@ -244,6 +252,13 @@ try {
       return "a new access token after a refresh_token request";
     });
 
+    await check("Removing the sign-in app keeps a sign-in that uses the OpenBot app", async () => {
+      const removed = await runCauseEffect(oauth.removeSignInApp(SERVER_URL));
+      expect(!removed, "removeSignInApp removed the OpenBot app.");
+      expect(oauth.signedIn(SERVER_URL), "The sign-in was dropped.");
+      return "removeSignInApp answered false and the tokens stayed";
+    });
+
     await check("No Signal log line holds the secret, the code or a token", async () => {
       const tokens = records.get(SERVER_URL)?.tokens;
       const values = [CLIENT_SECRET, CODE, REFRESH_TOKEN, tokens?.access_token ?? CODE];
@@ -273,6 +288,59 @@ try {
     }
   });
 
+  await check("An OpenBot app of an earlier client on file gets the current client", async () => {
+    const stale = new Map<string, McpOAuthRecord>([
+      [SERVER_URL, { app: { clientId: "111111111111-earlier.apps.googleusercontent.com", scope: "x" } }],
+    ]);
+    const pages: string[] = [];
+    const oauth = oauthWith(stale, withTicket, pages);
+    try {
+      const { attempt, page } = await openPage(oauth, pages);
+      attempt.abandon();
+      expect(page.searchParams.get("client_id") === CLIENT_ID, `client_id: ${page.searchParams.get("client_id")}`);
+      expect(oauth.signInApp(SERVER_URL) === null, "The earlier OpenBot app shows as a sign-in app of the user.");
+      return "the page names the current client";
+    } finally {
+      await runCauseEffect(oauth.close());
+    }
+  });
+
+  await check("A host with no OpenBot account does not get the OpenBot app", async () => {
+    const pages: string[] = [];
+    const oauth = oauthWith(new Map(), { available: () => false, ticket: async () => null }, pages);
+    try {
+      const attempt = oauth.signIn(SERVER_URL);
+      expect(attempt !== null, "No sign-in.");
+      await runCauseEffect(attempt.begin()).catch(() => false);
+      attempt.abandon();
+      const named = pages.some((page) => new URL(page).searchParams.get("client_id") === CLIENT_ID);
+      expect(!named, "A page opened for the OpenBot app.");
+      return `${pages.length} pages opened, none for the OpenBot app`;
+    } finally {
+      await runCauseEffect(oauth.close());
+    }
+  });
+
+  await check("A Signal refusal gets the unavailable sentence", async () => {
+    const pages: string[] = [];
+    const calls = googleCalls.length;
+    // Signal does not know this client, and refuses it with its own error.
+    const unknown = oauthWith(new Map(), withTicket, pages, "222222222222-unknown.apps.googleusercontent.com");
+    try {
+      const { attempt, page } = await openPage(unknown, pages);
+      expect(unknown.receiveAuthorizationCode(page.searchParams.get("state") ?? "", CODE), "No sign-in waited.");
+      const failure = await runCauseEffect(attempt.complete()).then(
+        () => null,
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+      );
+      expect(failure?.includes(sourceText("error.backend.googleSignInUnavailable")) === true, `error: ${failure}`);
+      expect(googleCalls.length === calls, "Google got a request.");
+      return failure;
+    } finally {
+      await runCauseEffect(unknown.close());
+    }
+  });
+
   await check("A sign-in app that the user saved wins over the OpenBot app", async () => {
     const saved = new Map<string, McpOAuthRecord>([
       [SERVER_URL, { app: { clientId: "999999999999-own.apps.googleusercontent.com", clientSecret: "own-secret" } }],
@@ -293,7 +361,7 @@ try {
   await check("A host with no ticket gets the account sentence", async () => {
     const pages: string[] = [];
     const calls = googleCalls.length;
-    const none = oauthWith(new Map(), async () => null, pages);
+    const none = oauthWith(new Map(), { available: () => true, ticket: async () => null }, pages);
     try {
       const { attempt, page } = await openPage(none, pages);
       expect(none.receiveAuthorizationCode(page.searchParams.get("state") ?? "", CODE), "No sign-in waited.");

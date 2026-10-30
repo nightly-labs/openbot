@@ -1390,9 +1390,12 @@ export async function createApplicationServices({
   }
   // The OpenBot Google sign-in app: its token requests go to Signal with a new ticket of this host.
   // A sign-in comes after startup, when the team store below names this host.
-  const mcpGoogleSignIn = googleSignIn(async () => {
-    const hostId = ingressHostId();
-    return hostId ? Effect.runPromise(centralAuth.issueRemoteHostTicket(hostId)) : null;
+  const mcpGoogleSignIn = googleSignIn({
+    available: () => ingressHostId() !== null,
+    ticket: async (signal) => {
+      const hostId = ingressHostId();
+      return hostId ? Effect.runPromise(centralAuth.issueRemoteHostTicket(hostId), { signal }) : null;
+    },
   });
   const mcpOAuth = new McpOAuth({
     storage: mcpOAuthStore,
