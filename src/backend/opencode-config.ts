@@ -72,12 +72,22 @@ type OpenCodePermissionLayer = Readonly<Record<string, "allow" | "ask" | "deny">
 
 /** The config layer OpenBot owns on `OPENCODE_CONFIG_CONTENT`. The user's own file is untouched. */
 interface OpenCodeConfig {
+  readonly agent?: { readonly title: { readonly disable: true } };
   readonly permission?: OpenCodePermissionLayer;
   readonly provider?: Readonly<Record<string, OpenCodeProviderEntry | OpenCodeKeyEntry>>;
 }
 
-/** What a caller starts from: every layer except the providers this module adds. */
-export type OpenCodeConfigBase = Omit<OpenCodeConfig, "provider">;
+/** What a caller starts from: every layer except the ones this module adds. */
+export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider">;
+
+/**
+ * OpenBot names its own chats and never reads OpenCode's titles. OpenCode asks its `small_model` for
+ * a title on the first turn of each session, and a llama-swap server loads each model that a request
+ * names: a `small_model` on the same server unloaded the agent's model and loaded it again for the
+ * next turn. Checked in OpenCode 2.2.3 with `scripts/opencode-custom-model-e2e.ts`. OpenCode merges
+ * `agent` by key, so the user's own agents stay: `opencode debug agents` lost only "Title".
+ */
+const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 
 /**
  * Profile generation runs a throwaway OpenCode session for a one-shot prompt, so it must not be able
@@ -189,27 +199,25 @@ function mergeOpenCodeConfig(
   base: OpenCodeConfigBase,
   providers: readonly CustomProviderConfig[],
   apiKey: string | null,
-): OpenCodeConfig | null {
+): OpenCodeConfig {
   const entries = {
     ...(apiKey ? Object.fromEntries(OPENCODE_KEY_PROVIDERS.map((id) => [id, { options: { apiKey } }])) : {}),
     ...customProviderEntries(providers),
   };
-  if (Object.keys(entries).length === 0) return Object.keys(base).length > 0 ? { ...base } : null;
-  return { ...base, provider: entries };
+  return { ...base, agent: OPENCODE_TITLE_OFF, ...(Object.keys(entries).length > 0 ? { provider: entries } : {}) };
 }
 
 /**
- * The spawn environment for one OpenCode client. Returns `{}` when there is nothing to configure, so
- * a build with no custom providers, no stored key and no base layer spawns exactly as it did before
- * this existed. With no stored key, the user's own `opencode auth login` keys stay in use.
+ * The spawn environment for one OpenCode client. OpenCode applies it after the user's own config, so
+ * the title setting is always off. With no stored key, the user's own `opencode auth login` keys stay
+ * in use.
  */
 export function openCodeConfigEnv(
   base: OpenCodeConfigBase,
   source: CustomProviderSource,
   apiKey: string | null,
 ): Record<string, string> {
-  const config = mergeOpenCodeConfig(base, source(), apiKey);
-  return config ? { [OPENCODE_CONFIG_ENV]: JSON.stringify(config) } : {};
+  return { [OPENCODE_CONFIG_ENV]: JSON.stringify(mergeOpenCodeConfig(base, source(), apiKey)) };
 }
 
 /** OpenCode's own providers, by the names that OpenCode 1 showed (models.dev). */

@@ -239,6 +239,7 @@
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",
     "test:opencode-usage-metering": "bun scripts/opencode-usage-metering-e2e.ts",
     "test:opencode-anthropic-cache": "bun scripts/opencode-anthropic-cache-e2e.ts",
+    "test:opencode-custom-model": "bun scripts/opencode-custom-model-e2e.ts",
     "test:opencode-azure-responses": "bun scripts/opencode-azure-responses-e2e.ts",
     "test:claude-api-key": "bun scripts/claude-api-key-e2e.ts",
     "test:cursor-usage": "bun scripts/cursor-usage-e2e.ts",
