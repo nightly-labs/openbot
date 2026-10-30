@@ -3733,14 +3733,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /** Saves an OpenAI API key as Codex's login and restarts Codex on it, as a changed key does. */
   signInCodexWithApiKey(apiKey: string): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
-    return this.#providers
-      .signInCodexWithApiKey(apiKey)
-      .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "signInCodexWithApiKey", cause: failure.cause }),
+    return this.changeProviderCredential("codex", () =>
+      this.#providers
+        .saveCodexApiKey(apiKey)
+        .pipe(
+          Effect.mapError(
+            (failure) => new AgentLifecycleFailed({ operation: "signInCodexWithApiKey", cause: failure.cause }),
+          ),
         ),
-      );
+    );
   }
 
   submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {

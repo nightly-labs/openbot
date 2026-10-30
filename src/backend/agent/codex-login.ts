@@ -133,14 +133,21 @@ export class CodexLoginFlow {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * Signs Codex in with an OpenAI API key. Codex keeps the key in its own home, as
-   * `codex login --with-api-key` does, so OpenBot stores no copy and Disconnect removes it. Codex
-   * checks the key on the first request, not here.
+   * Saves an OpenAI API key as Codex's login, in a client of its own that stops at the end. Codex
+   * keeps the key in its home, as `codex login --with-api-key` does, so OpenBot stores no copy and
+   * Disconnect removes it. The caller restarts Codex on the new login. Codex checks the key on the
+   * first request, not here.
    */
-  readonly startApiKey = Effect.fn("CodexLogin.startApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
-    yield* this.#withLoginClientEffect(
-      (client, cli) =>
-        Effect.gen({ self: this }, function* () {
+  readonly saveApiKey = Effect.fn("CodexLogin.saveApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
+    const bundledExecutable = this.#host.bundledExecutable();
+    const cli = yield* resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable }).pipe(
+      toCodexLoginFailed,
+    );
+    yield* Effect.acquireUseRelease(
+      loginStep(() => this.#host.createClient(cli)),
+      (client) =>
+        Effect.gen(function* () {
+          yield* initializeLoginClient(client);
           yield* client
             .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
             .pipe(toCodexLoginFailed);
@@ -152,9 +159,8 @@ export class CodexLoginFlow {
               cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
             });
           }
-          yield* this.#host.activate(client, cli, account);
         }),
-      { reuseSaved: false },
+      (client) => client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore),
     );
   }, Effect.uninterruptible).bind(this);
 
@@ -268,13 +274,11 @@ export class CodexLoginFlow {
    * Returns null when the client turned out to be signed in already: the account was activated and
    * there is no login to start. Both sign-in shapes share this because everything before the
    * `account/login/start` call - the CLI, the handshake, the account already on this computer - and
-   * everything the failure path has to undo is the same for a browser hand-off and for a code. A
-   * key login replaces the saved one, so it passes `reuseSaved: false`.
+   * everything the failure path has to undo is the same for a browser hand-off and for a code.
    */
   readonly #withLoginClientEffect = Effect.fn("CodexLogin.withClient")(function* <T>(
     this: CodexLoginFlow,
     run: (client: AgentClient, cli: CodexCliInfo) => Effect.Effect<T, CodexLoginFailed>,
-    { reuseSaved = true }: { reuseSaved?: boolean } = {},
   ) {
     let cli: CodexCliInfo | null = null;
     this.#host.setConnecting();
@@ -288,19 +292,8 @@ export class CodexLoginFlow {
         loginStep(() => this.#host.createClient(resolved)),
         (client) =>
           Effect.gen({ self: this }, function* () {
-            yield* loginStep(() => client.start());
-            yield* client
-              .request(
-                "initialize",
-                {
-                  clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
-                  capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
-                },
-                decodeRecordResponse,
-              )
-              .pipe(toCodexLoginFailed);
-            yield* loginStep(() => client.notify("initialized"));
-            if (reuseSaved && !this.#host.hasActiveClient()) {
+            yield* initializeLoginClient(client);
+            if (!this.#host.hasActiveClient()) {
               const existing = yield* client
                 .request("account/read", { refreshToken: false }, decodeAccountReadResult)
                 .pipe(
@@ -369,6 +362,24 @@ export class CodexLoginFlow {
     yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
     this.#host.setFailure(new Error(message), pending.cli.version);
   }, Effect.uninterruptible);
+}
+
+/** Starts a login client and completes its handshake. */
+function initializeLoginClient(client: AgentClient): Effect.Effect<void, CodexLoginFailed> {
+  return Effect.gen(function* () {
+    yield* loginStep(() => client.start());
+    yield* client
+      .request(
+        "initialize",
+        {
+          clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
+          capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
+        },
+        decodeRecordResponse,
+      )
+      .pipe(toCodexLoginFailed);
+    yield* loginStep(() => client.notify("initialized"));
+  });
 }
 
 function end(pending: PendingCodexLogin, signedIn: boolean): void {

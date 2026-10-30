@@ -1235,6 +1235,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     cancelProviderSignIn: async () => clone(agentStatus),
     setProviderApiKey: async ({ provider, key }) => {
       if (!key.trim()) throw new Error("A provider key is required.");
+      // Codex keeps its key in its own login: the row says that the key is in use, and no key is stored.
+      if (provider === "codex") {
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers?.map((row) =>
+            row.id === "codex" ? { ...row, state: "available", apiKeyInUse: true } : row,
+          ),
+        };
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return clone(agentStatus);
+      }
       providerApiKeys.add(provider);
       return clone(agentStatus);
     },

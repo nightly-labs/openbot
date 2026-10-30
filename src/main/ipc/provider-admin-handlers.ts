@@ -91,6 +91,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  signInCodexWithApiKey,
 } from "./provider-handlers";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString } from "./validation";
@@ -411,8 +412,7 @@ export function providerAdminIpcHandlers({
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
         local: async ({ provider, key }) => {
-          // Codex keeps its key in its own login, not in OpenBot's store.
-          if (provider === "codex") return runCauseEffect(service.signInCodexWithApiKey(key));
+          if (provider === "codex") return signInCodexWithApiKey(service, key);
           await runCauseEffect(runtimes.ensureKeyProviderCli(provider));
           return runCauseEffect(
             service.changeProviderCredential(provider, () =>

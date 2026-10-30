@@ -135,6 +135,11 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   });
 
   async function readState(): Promise<void> {
+    // Codex keeps its key in its own login, so OpenBot's store has no state for it. Disconnect removes it.
+    if (provider() === "codex") {
+      setPhase("idle");
+      return;
+    }
     setPhase("loading");
     try {
       setStored((await props.api.getProviderApiKeyState(provider())).status);
