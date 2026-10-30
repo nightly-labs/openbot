@@ -83,6 +83,7 @@ import {
   type TransferSettings,
 } from "./instance-transfer-manifest";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
+import { readPackFolders } from "./skill-marketplace-service";
 import { inspectArchive, isUnsafeArchivePath } from "./skill-package";
 
 const ARCHIVE: ArchiveLimits = {
@@ -1010,7 +1011,10 @@ const walk = Effect.fn("InstanceTransfer.walk")(function* (
   return files.sort((a, b) => a.name.localeCompare(b.name));
 });
 
-/** The skills a user or a marketplace installed. OpenBot's own skills are installed again on import. */
+/**
+ * The skills a user or a marketplace installed, with a pack as one skill. OpenBot's own skills are
+ * installed again on import.
+ */
 const skillFolders = Effect.fn("InstanceTransfer.skillFolders")(function* (
   workspace: string,
 ): Effect.fn.Return<Array<{ slug: string; files: FileEntry[] }>, ArchiveOperationError> {
@@ -1034,6 +1038,18 @@ const skillFolders = Effect.fn("InstanceTransfer.skillFolders")(function* (
       if (files.some((file) => file.name === OWNERSHIP_MARKER) || !files.some((file) => file.name === "SKILL.md"))
         continue;
       skills.set(slug, files);
+    }
+  }
+  // A pack is one skill, as in its marketplace bundle: its skills go back to `skills/<folder>/` of the
+  // pack, and the install on import writes each one as a folder of its own again. When the lock
+  // cannot be read, each folder stays a skill of its own.
+  const packs = yield* readPackFolders(workspace).pipe(Effect.orElseSucceed(() => new Map<string, string[]>()));
+  for (const [slug, children] of packs) {
+    const pack = skills.get(slug);
+    if (!pack) continue;
+    for (const child of children) {
+      for (const file of skills.get(child) ?? []) pack.push({ ...file, name: `skills/${child}/${file.name}` });
+      skills.delete(child);
     }
   }
   return [...skills].sort(([a], [b]) => a.localeCompare(b)).map(([slug, files]) => ({ slug, files }));
