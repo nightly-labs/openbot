@@ -183,6 +183,7 @@ import {
   decodeVoiceTranscriptionResult,
   decodeVoid,
 } from "./app-decoding";
+import { decodeBackgroundProcesses } from "./background-process-decoding";
 import {
   decodeBrowserBounds,
   decodeBrowserControlState,
@@ -677,6 +678,7 @@ const openbotApi: OpenBotDesktopApi = {
     cancelProviderAccountSignIn: decodeAgentStatusFromMain,
     renameProviderAccount: decodeAgentStatusFromMain,
     removeProviderAccount: decodeAgentStatusFromMain,
+    signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
   }),
@@ -714,6 +716,10 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   macAutomation: bridgeGroup(IPC_ENDPOINTS.macAutomation, {
     request: decodeMacAutomationResults,
+  }),
+  backgroundProcesses: bridgeGroup(IPC_ENDPOINTS.backgroundProcesses, {
+    list: decodeBackgroundProcesses,
+    stop: decodeVoid,
   }),
   providerRuntimes: bridgeGroup(IPC_ENDPOINTS.providerRuntimes, {
     getStatus: decodeProviderRuntimeSnapshot,
@@ -964,6 +970,7 @@ const openbotApi: OpenBotDesktopApi = {
     removeAccount: decodeVoid,
     usageResets: decodeProviderUsageResetsFromMain,
     resetUsage: decodeProviderUsageResetOutcomeFromMain,
+    signOut: decodeVoid,
     startRelaySignIn: decodeVoid,
     startAccountRelaySignIn: decodeVoid,
     relaySignInStatus: decodeProviderRelaySignInStatus,

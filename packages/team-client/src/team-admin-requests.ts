@@ -204,12 +204,13 @@ import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sig
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
-import {
-  type PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+import type {
+  ProviderAccountRelay,
+  ProviderAccountRelayProvider,
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
@@ -741,12 +742,13 @@ export function startProviderSignInRelay(
   return adminCall(() => request("POST", SIGN_IN_RELAY_ROUTES.providerStart, decodeSignInRelayFlow, { provider }));
 }
 
-/** A relayed sign-in of an account after the first (`provider-account-relay-v1`). */
+/** A relayed sign-in of an account after the first, on the route of the host's account relay. */
 export function startProviderAccountSignInRelay(
   request: TeamApiRequest,
-  input: { provider: (typeof PROVIDER_ACCOUNT_RELAY_PROVIDERS)[number]; accountId: string | null },
+  relay: ProviderAccountRelay,
+  input: { provider: ProviderAccountRelayProvider; accountId: string | null },
 ): Effect.Effect<{ flowId: string }, TeamAdminRequestError> {
-  return adminCall(() => request("POST", PROVIDER_ACCOUNT_RELAY_ROUTES.start, decodeSignInRelayFlow, { ...input }));
+  return adminCall(() => request("POST", relay.start, decodeSignInRelayFlow, { ...input }));
 }
 
 /** A relayed sign-in of a link that an agent of the host printed (`sign-in-relay-v1`). */
@@ -1018,6 +1020,14 @@ export function resetProviderUsage(
       { ...input },
     ),
   );
+}
+
+/** `provider-sign-out-v1`: signs the host's own sign-in of a provider out. */
+export function signOutProvider(
+  request: TeamApiRequest,
+  provider: AgentProviderId,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_SIGN_OUT_ROUTES.signOut, ignoreResponse, { provider }));
 }
 
 /** Moves the agent to an account of its provider; null is the provider's own sign-in. */

@@ -96,6 +96,7 @@ interface HostServiceOptions {
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
   providerUsageResets?: ForwardedApiOptions["providerUsageResets"];
+  providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
   machine?: ForwardedApiOptions["machine"];
@@ -392,6 +393,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
       ...(options.providerUsageResets === undefined ? {} : { providerUsageResets: options.providerUsageResets }),
+      ...(options.providerSignOut === undefined ? {} : { providerSignOut: options.providerSignOut }),
       ...(options.mcpToolRuntimePreparation === undefined
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),

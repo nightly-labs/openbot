@@ -94,14 +94,22 @@ export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
  * OpenCode process runs, so a confined process gets a cache of its own: `OPENCODE_CONFINED_ENV`.
  */
 export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
-  const xdg = (name: string, fallback: string) => join(env[name]?.trim() || join(home, fallback), "opencode");
   return {
-    writable: [xdg("XDG_DATA_HOME", ".local/share"), xdg("XDG_STATE_HOME", ".local/state"), OPENCODE_CONFINED_CACHE],
+    writable: [
+      openCodeDataDirectory(env, home),
+      join(env.XDG_STATE_HOME?.trim() || join(home, ".local/state"), "opencode"),
+      OPENCODE_CONFINED_CACHE,
+    ],
     protected: [],
   };
 }
 
 const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
+
+/** OpenCode's data folder: its sessions, its database (`opencode.db`) and its `auth.json`. */
+export function openCodeDataDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local/share"), "opencode");
+}
 
 /**
  * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under

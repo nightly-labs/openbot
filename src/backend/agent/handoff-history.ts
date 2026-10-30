@@ -14,13 +14,23 @@ const ROUTINE_HANDOFF_CHARACTERS = 8_000;
 const ROUTINE_MESSAGE_CHARACTERS = 2_000;
 type HistoryRow = ReturnType<OpenBotDatabase["readAgentHistory"]>["messages"][number];
 
+/** A cut at `index` would leave a lone surrogate, which a provider's JSON parser rejects. */
+function splitsPair(text: string, index: number): boolean {
+  const before = text.charCodeAt(index - 1);
+  const after = text.charCodeAt(index);
+  return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
+}
+
 /** Cuts redacted text at both ends, so a large request keeps its final instructions. */
 function historyExcerpt(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const marker = "\n[... omitted; use history_read with this messageId ...]\n";
-  if (limit <= marker.length) return text.slice(0, Math.max(0, limit));
-  const length = limit - marker.length;
-  return `${text.slice(0, Math.ceil(length / 2))}${marker}${text.slice(-Math.floor(length / 2))}`;
+  const headEnd = limit <= marker.length ? Math.max(0, limit) : Math.ceil((limit - marker.length) / 2);
+  const head = text.slice(0, splitsPair(text, headEnd) ? headEnd - 1 : headEnd);
+  if (limit <= marker.length) return head;
+  // An explicit start index: `slice(-0)` would keep the whole text.
+  const tailStart = text.length - Math.floor((limit - marker.length) / 2);
+  return `${head}${marker}${text.slice(splitsPair(text, tailStart) ? tailStart + 1 : tailStart)}`;
 }
 
 function render(message: ConversationMessage, names: ReadonlyMap<string, string>): string {

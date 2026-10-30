@@ -182,13 +182,13 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "list_logins",
     description:
-      "List the logins that the user shared with OpenBot for the tab's current HTTPS site: id, title, username, and whether it has an authenticator code. Passwords and codes are never returned. Type the username yourself, then call submit_secret with loginId.",
+      "List 1Password, Bitwarden and OpenBot Vault logins for the tab's HTTPS site: id, title, username and hasOneTimePassword. Use it to log in with a password manager. No passwords or codes. Type the username, then call submit_secret with loginId.",
     shape: { tabId },
   }),
   browserTool({
     name: "list_vault_items",
     description:
-      "List what the user saved in the OpenBot Vault. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy names the agent that added an item; it is absent when the user added it.",
+      "List what the user saved in the OpenBot Vault, not 1Password or Bitwarden. A login shows id, website and username; its password and notes are never returned, so sign in with list_logins and submit_secret. A card shows id, label, nameOnCard, brand, last4, expiry and hasSecurityCode; its number and security code are never returned, so fill card fields with fill_card. A contact shows every field: type them with fill_fields, type, or select_option. addedBy, when present, names the agent that added the item.",
     shape: {},
   }),
   browserTool({

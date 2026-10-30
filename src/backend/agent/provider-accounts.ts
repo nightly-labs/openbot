@@ -28,7 +28,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { waitForSuccessfulProcess } from "./provider-status";
+import { type ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -644,6 +644,25 @@ export class ProviderAccounts {
     });
   }
 
+  /**
+   * Signs the provider's own sign-in out: the CLI's sign-out in the user's own home folder, which a
+   * terminal CLI on the same computer shares. The caller stops the client that still runs on it.
+   */
+  readonly signOutDefault = Effect.fn("ProviderAccounts.signOutDefault")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+  ) {
+    const command = ProviderAccounts.support(provider)?.signOut;
+    const cli = this.#host.cli(provider);
+    if (!command || !cli)
+      return yield* accountFailure(
+        sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) }),
+      );
+    yield* this.#runSignOut(cli, command, {}).pipe(
+      Effect.mapError((error) => accountFailure(this.#message(provider, error))),
+    );
+  });
+
   /** Runs the CLI's sign-out in the account's folder, for a CLI that keeps a credential outside it. */
   readonly #signOut = Effect.fn("ProviderAccounts.signOut")(function* (
     this: ProviderAccounts,
@@ -653,25 +672,7 @@ export class ProviderAccounts {
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
-    yield* Effect.scoped(
-      Effect.gen({ self: this }, function* () {
-        const target = cliSpawnTarget(cli.executable, command.argv);
-        const child = yield* Effect.acquireRelease(
-          Effect.sync(() =>
-            spawn(target.command, target.args, {
-              cwd: process.cwd(),
-              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...this.environment(account) },
-              stdio: "ignore",
-              shell: false,
-              windowsHide: process.platform === "win32",
-              windowsVerbatimArguments: target.windowsVerbatimArguments,
-            }),
-          ),
-          (child) => stopProcessTree(child).pipe(Effect.ignore),
-        );
-        yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
-      }),
-    ).pipe(
+    yield* this.#runSignOut(cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
         Effect.sync(() =>
@@ -683,6 +684,32 @@ export class ProviderAccounts {
       ),
     );
   });
+
+  #runSignOut(
+    cli: AgentCliInfo,
+    command: NonNullable<ProviderAccountSupport["signOut"]>,
+    environment: Readonly<Record<string, string>>,
+  ): Effect.Effect<void, ProviderProcessFailed> {
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const target = cliSpawnTarget(cli.executable, command.argv);
+        const child = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            spawn(target.command, target.args, {
+              cwd: process.cwd(),
+              env: { ...process.env, ...cliPathEnvironment(cli), ...command.env(cli), ...environment },
+              stdio: "ignore",
+              shell: false,
+              windowsHide: process.platform === "win32",
+              windowsVerbatimArguments: target.windowsVerbatimArguments,
+            }),
+          ),
+          (child) => stopProcessTree(child).pipe(Effect.ignore),
+        );
+        yield* waitForSuccessfulProcess(child, command.timeoutMs, "Provider sign-out");
+      }),
+    );
+  }
 
   #emailTaken(provider: AgentProviderId, accountId: string, email: string): boolean {
     const normalized = email.toLowerCase();

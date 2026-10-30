@@ -183,6 +183,7 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем подключитесь заново.",
+  "error.provider.cliBusySignOut": "CLI {provider} обрабатывает ход. Дождитесь окончания, затем отключите.",
   "error.provider.opencodeCredentialsRejected":
     "Провайдер моделей отклонил API-ключ. Исправьте ключ OpenCode в настройках или ключ провайдера командой `opencode auth login`. Затем повторите попытку или выберите другую модель.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -317,6 +318,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} поддерживает только один аккаунт.",
   "error.provider.accountNeedsConnection": "Подключите {provider}, прежде чем добавлять ещё один аккаунт.",
   "error.provider.usageResetUnsupported": "{provider} не может сбрасывать лимиты использования.",
+  "error.provider.signOutUnsupported": "OpenBot не может отключить вход в {provider}.",
   "error.provider.usageResetNotConnected":
     "Снова войдите в этот аккаунт {provider}, прежде чем сбрасывать его использование.",
   "error.provider.accountLimit": "Максимум аккаунтов {provider}: {limit}.",

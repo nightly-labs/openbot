@@ -67,6 +67,22 @@ export const messages = {
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. Работает с ChatGPT и Claude.",
+  "settings.backgroundProcesses.title": "Фоновые процессы",
+  "settings.backgroundProcesses.description":
+    "Программы, которые агенты запустили и оставили работать, например dev-серверы. Они работают и после конца чата, и после выхода из OpenBot.",
+  "settings.backgroundProcesses.empty": "Программы агентов не запущены.",
+  "settings.backgroundProcesses.loadFailed": "Не удалось прочитать фоновые процессы.",
+  "settings.backgroundProcesses.noAgent": "Без агента",
+  "settings.backgroundProcesses.started": "Запущен {time}",
+  "settings.backgroundProcesses.ports": {
+    one: "Порт {ports}",
+    few: "Порты {ports}",
+    many: "Порты {ports}",
+    other: "Порты {ports}",
+  },
+  "settings.backgroundProcesses.stop": "Остановить",
+  "settings.backgroundProcesses.stopLabel": "Остановить процесс {pid}",
+  "settings.backgroundProcesses.stopFailed": "Не удалось остановить процесс.",
   "settings.keepRemoteSessions.title": "Быстрое подключение к серверам",
   "settings.keepRemoteSessions.description":
     "Сохранять подключение к серверам между запусками. OpenBot запускается примерно на секунду быстрее. При выходе из OpenBot сервис OpenBot не закрывает подключение.",

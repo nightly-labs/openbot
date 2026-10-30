@@ -186,6 +186,7 @@ export const messages = {
   "provider.account.cancelSignIn": "サインインをキャンセル",
   "provider.account.finishSignIn": "ブラウザーでサインインを完了してください。",
   "provider.account.remove": "アカウントを削除",
+  "provider.account.disconnect": "切断",
   "provider.account.actionFailed": "{name} のアカウントを変更できませんでした。",
   "provider.account.resetUsage": "使用量をリセット",
   "provider.account.resetUsageTitle": "{name} の使用量をリセットしますか？",
@@ -199,6 +200,11 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} には使用量リセットのクレジットが残っていません。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} のこのリセットのクレジットはすでに使われています。",
   "provider.account.resetUsageFailed": "{name} の使用量をリセットできませんでした。",
+  "provider.settings.disconnectTitle": "{name} を切断しますか？",
+  "provider.settings.disconnectOthers": "{provider} を再接続するまで、ほかの {provider} アカウントは待機します。",
+  "provider.settings.disconnectLocal":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
+  "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":

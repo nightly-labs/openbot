@@ -81,6 +81,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "agentSettings.agentNewChat.title" },
       { titleKey: "agentSettings.quickAcknowledgement.title" },
       { titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
+      { titleKey: "settings.backgroundProcesses.title", descriptionKey: "settings.backgroundProcesses.description" },
     ],
   },
   {

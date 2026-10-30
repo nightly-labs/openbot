@@ -12,6 +12,7 @@ import {
   decodeAccountLoginStartResult,
   decodeAccountReadResult,
   decodeRecordResponse,
+  isCodexLoginType,
 } from "./../protocol";
 import { recordRestartActivity } from "../restart-activity";
 
@@ -129,6 +130,38 @@ export class CodexLoginFlow {
       }),
     );
     return started ?? { kind: "connected" };
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Saves an OpenAI API key as Codex's login, in a client of its own that stops at the end. Codex
+   * keeps the key in its home, as `codex login --with-api-key` does, so OpenBot stores no copy and
+   * Disconnect removes it. The caller restarts Codex on the new login. Codex checks the key on the
+   * first request, not here.
+   */
+  readonly saveApiKey = Effect.fn("CodexLogin.saveApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
+    const bundledExecutable = this.#host.bundledExecutable();
+    const cli = yield* resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable }).pipe(
+      toCodexLoginFailed,
+    );
+    yield* Effect.acquireUseRelease(
+      loginStep(() => this.#host.createClient(cli)),
+      (client) =>
+        Effect.gen(function* () {
+          yield* initializeLoginClient(client);
+          yield* client
+            .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
+            .pipe(toCodexLoginFailed);
+          const { account } = yield* client
+            .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+            .pipe(toCodexLoginFailed);
+          if (account?.type !== "apiKey") {
+            return yield* new CodexLoginFailed({
+              cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
+            });
+          }
+        }),
+      (client) => client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore),
+    );
   }, Effect.uninterruptible).bind(this);
 
   readonly complete = Effect.fn("CodexLogin.complete")(function* (
@@ -259,18 +292,7 @@ export class CodexLoginFlow {
         loginStep(() => this.#host.createClient(resolved)),
         (client) =>
           Effect.gen({ self: this }, function* () {
-            yield* loginStep(() => client.start());
-            yield* client
-              .request(
-                "initialize",
-                {
-                  clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
-                  capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
-                },
-                decodeRecordResponse,
-              )
-              .pipe(toCodexLoginFailed);
-            yield* loginStep(() => client.notify("initialized"));
+            yield* initializeLoginClient(client);
             if (!this.#host.hasActiveClient()) {
               const existing = yield* client
                 .request("account/read", { refreshToken: false }, decodeAccountReadResult)
@@ -284,7 +306,7 @@ export class CodexLoginFlow {
                   ),
                 );
               const account = existing.account;
-              if (account?.type === "chatgpt") {
+              if (account && isCodexLoginType(account.type)) {
                 yield* this.#host.activate(client, resolved, account).pipe(toCodexLoginFailed);
                 return null;
               }
@@ -340,6 +362,24 @@ export class CodexLoginFlow {
     yield* pending.client.stop().pipe(toCodexLoginFailed).pipe(Effect.ignore);
     this.#host.setFailure(new Error(message), pending.cli.version);
   }, Effect.uninterruptible);
+}
+
+/** Starts a login client and completes its handshake. */
+function initializeLoginClient(client: AgentClient): Effect.Effect<void, CodexLoginFailed> {
+  return Effect.gen(function* () {
+    yield* loginStep(() => client.start());
+    yield* client
+      .request(
+        "initialize",
+        {
+          clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
+          capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
+        },
+        decodeRecordResponse,
+      )
+      .pipe(toCodexLoginFailed);
+    yield* loginStep(() => client.notify("initialized"));
+  });
 }
 
 function end(pending: PendingCodexLogin, signedIn: boolean): void {

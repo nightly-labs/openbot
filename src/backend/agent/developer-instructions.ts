@@ -251,7 +251,7 @@ export function developerInstructions(
       : []),
     ...(options.passwordVault
       ? [
-          "The user shares saved logins with OpenBot: before a username, password, or authenticator-app step, call openbot_browser.list_logins for the tab and follow the browser guidance.",
+          "The user shares saved logins with OpenBot, from 1Password, Bitwarden, or the OpenBot Vault: before a username, password, or authenticator-app step, call openbot_browser.list_logins for the tab and follow the browser guidance.",
           ROUTINE_SIGN_IN_RULE,
         ]
       : []),

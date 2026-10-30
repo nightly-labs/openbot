@@ -66,6 +66,20 @@ export function isMemberThinking({ message }: ChannelMessage): boolean {
   return message.author === "assistant" && message.itemType === "commentary" && REASONING_ID.test(message.id);
 }
 
+/**
+ * The work a task asks for. A follow-up such as "continue" resumes a task and becomes its request,
+ * but the task keeps its first instruction: the follow-up alone told the member nothing, and the
+ * member answered an older request from its own history instead. A new child task inherits its
+ * parent's request, so a child task has a follow-up only when the request is a message to that task.
+ */
+export function assignmentText(task: ChannelTask, request: ChannelMessage | null | undefined): string {
+  const followUp =
+    task.sourceMessageIds[0] !== task.requestMessageId && (task.parentTaskId === null || request?.taskId === task.id);
+  return followUp && request?.id === task.requestMessageId && request.message.text.trim()
+    ? `${task.instruction}\n\nFollow-up: ${request.message.text}`
+    : task.instruction;
+}
+
 /** Cuts one rendered message into inputs the summary model accepts. The source ID stays the same. */
 function parts(text: string, size: number): string[] {
   const values: string[] = [];
@@ -172,6 +186,7 @@ export class ChannelHistory {
         recent = messages.filter((message) => message.sequence > summary.throughSequence);
       }
       const memories = yield* channelSync(() => dependencies.memories.list(channel.id));
+      const request = messages.find((message) => message.id === task.requestMessageId);
       const sources = new Set(task.sourceMessageIds);
       sources.add(task.requestMessageId);
       for (const message of [...messages].reverse())
@@ -229,7 +244,7 @@ export class ChannelHistory {
           seen === null
             ? `Recent shared messages:\n${render(recent)}`
             : `Shared messages after the ones you already have (after ${seen}):\n${render(recent.filter((message) => message.sequence > seen))}`,
-          `Current assignment:\n${task.instruction}\nExpected result: ${task.expectedResult}`,
+          `Current assignment:\n${assignmentText(task, request)}\nExpected result: ${task.expectedResult}`,
           ...(peers.length
             ? [
                 `Other members answer this same request separately: ${peers.join(", ")}. Give your own view from your own role. Do not answer for them, wait for them, or repeat what they already said.`,

@@ -222,6 +222,9 @@ export type TeamApiProviderAccounts = Pick<
 /** Its presence is what `#protocolSupport` advertises `provider-usage-reset-v1` on. The routes are admin-only. */
 export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets" | "resetProviderUsage">;
 
+/** Its presence is what `#protocolSupport` advertises `provider-sign-out-v1` on. The route is admin-only. */
+export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
+
 /** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */
@@ -494,6 +497,7 @@ export interface TeamApiOptions {
   providerHostSignIns?: TeamApiProviderHostSignIns | undefined;
   providerAccounts?: TeamApiProviderAccounts | undefined;
   providerUsageResets?: TeamApiProviderUsageResets | undefined;
+  providerSignOut?: TeamApiProviderSignOut | undefined;
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;

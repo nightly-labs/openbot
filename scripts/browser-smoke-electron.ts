@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -430,6 +431,7 @@ const SCENARIOS = [
   "background",
   "focus",
   "controls",
+  "typing-focus",
   "tool-boundary",
   "evaluation",
   "wait-deadlines",
@@ -524,6 +526,8 @@ async function main(): Promise<void> {
           await runToolBoundaryScenario(browser, origin);
         } else if (scenario === "redirect-navigation") {
           await runRedirectNavigationScenario(browser, origin);
+        } else if (scenario === "typing-focus") {
+          await runTypingFocusScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -551,6 +555,7 @@ async function main(): Promise<void> {
       }
       return;
     }
+    await runTypingFocusScenario(browser, origin);
     const documentChangedTabs: string[] = [];
     const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
     browser.onDocumentChanged((tabId, documentIds) => {
@@ -1954,6 +1959,250 @@ async function main(): Promise<void> {
     if (server.listening) server.close();
     if (!configuredRoot) await rm(temporaryRoot, { recursive: true, force: true });
     app.quit();
+  }
+}
+
+async function runTypingFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab, contents } = await openTabWithContents(
+    browser,
+    `${origin}/blocking-frame?typing-focus`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const cases: Array<{ name: string; safe: boolean; toolSuccess: boolean; state: string; error: string }> = [];
+  try {
+    for (const surface of [
+      "ordinary",
+      "shadow",
+      "closed shadow",
+      "same-origin frame",
+      "cross-origin frame",
+      "closed-shadow cross-origin frame",
+      "contenteditable",
+    ]) {
+      const inFrame = surface.endsWith("frame");
+      const frameUrl = `${surface.includes("cross-origin frame") ? origin.replace("127.0.0.1", "localhost") : origin}/frame?typing-focus`;
+      if (inFrame) {
+        await contents.executeJavaScript(
+          `new Promise(resolve => {
+            document.body.innerHTML = '';
+            const frame = document.createElement('iframe');
+            frame.src = ${JSON.stringify(frameUrl)};
+            frame.onload = resolve;
+            ${
+              surface === "closed-shadow cross-origin frame"
+                ? `const host = document.createElement('div');
+                   document.body.append(host);
+                   host.attachShadow({mode:'closed'}).append(frame);`
+                : "document.body.append(frame);"
+            }
+          }).then(() => true)`,
+          true,
+        );
+      } else {
+        await contents.executeJavaScript("document.body.innerHTML = ''; true", true);
+      }
+      const frame = inFrame
+        ? contents.mainFrame.framesInSubtree.find((candidate) => candidate.url === frameUrl)
+        : contents.mainFrame;
+      assert(frame, `Typing focus frame is missing: ${surface}`);
+      const names = [
+        "normal append",
+        "normal replace submit",
+        "redirected focus append",
+        "redirected focus replace",
+        "redirected input",
+        "replaced target",
+      ];
+      if (surface === "same-origin frame") names.push("frame focus transfer", "sibling frame focus transfer");
+      if (surface === "cross-origin frame") names.push("frame focus transfer");
+      if (surface === "ordinary")
+        names.push(
+          "readonly",
+          "empty replacement",
+          "empty submit redirected focus",
+          "formatted input",
+          "End redirected focus",
+          "replaced focus target",
+        );
+      for (const name of names) {
+        const frameTransfer = name.endsWith("frame focus transfer");
+        const siblingTransfer = name === "sibling frame focus transfer";
+        const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
+        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const replace = [
+          "normal replace submit",
+          "redirected focus replace",
+          "empty replacement",
+          "readonly",
+          "formatted input",
+        ].includes(name);
+        const empty = name.startsWith("empty");
+        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
+        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        await frame.executeJavaScript(
+          `(() => {
+            document.body.innerHTML = '<div id="typing-root"></div>';
+            const host = document.querySelector('#typing-root');
+            const root = ${!inFrame && surface.includes("shadow") ? `host.attachShadow({mode:'${surface === "closed shadow" ? "closed" : "open"}'})` : "host"};
+            root.innerHTML = ${JSON.stringify(
+              surface === "contenteditable"
+                ? '<div id="intended" contenteditable="true" role="textbox" aria-label="Intended field">alpha</div><input id="other" aria-label="Other field" value="beta">'
+                : '<input id="intended" aria-label="Intended field" value="alpha"><input id="other" aria-label="Other field" value="beta">',
+            )};
+            globalThis.typingRoot = root;
+            globalThis.inputEvents = [];
+            globalThis.keyEvents = [];
+            const intended = root.querySelector('#intended');
+            const other = root.querySelector('#other');
+            for (const field of [intended, other]) field.oninput = event => {
+              globalThis.inputEvents.push({field: field.id, trusted: event.isTrusted});
+            };
+            root.addEventListener('keydown', event => {
+              globalThis.keyEvents.push({field: event.composedPath()[0].id, key: event.key, trusted: event.isTrusted});
+              if (event.key === 'Enter') event.preventDefault();
+            });
+            ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
+            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
+            ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
+            ${
+              frameTransfer
+                ? surface === "cross-origin frame"
+                  ? // The page in the other process takes focus while this handler still runs.
+                    `intended.addEventListener('input', () => {
+                      parent.postMessage('move-typing-focus', '*');
+                      for (const end = Date.now() + 500; Date.now() < end;);
+                    });`
+                  : `intended.addEventListener('input', () => parent.moveTypingFocus());`
+                : ""
+            }
+            ${name === "readonly" ? "intended.readOnly = true;" : ""}
+            ${name === "formatted input" ? "intended.addEventListener('input', () => { intended.value = intended.value.toLowerCase(); });" : ""}
+            ${name === "End redirected focus" ? "intended.type = 'email'; intended.onkeydown = event => { if (event.key === 'End') other.focus(); };" : ""}
+            return true;
+          })()`,
+          true,
+        );
+        if (frameTransfer) {
+          await contents.executeJavaScript(
+            `(() => {
+              document.querySelector('#outside')?.remove();
+              document.querySelector('#typing-sibling')?.remove();
+              let doc = document;
+              ${
+                siblingTransfer
+                  ? `const sibling = document.createElement('iframe');
+                     sibling.id = 'typing-sibling'; document.body.append(sibling);
+                     doc = sibling.contentDocument;`
+                  : ""
+              }
+              const outside = doc.createElement('input');
+              outside.id = 'outside'; outside.value = 'gamma';
+              globalThis.outsideEvents = []; globalThis.outsideKeys = [];
+              outside.oninput = event => globalThis.outsideEvents.push(event.isTrusted);
+              outside.onkeydown = event => { globalThis.outsideKeys.push(event.key); event.preventDefault(); };
+              doc.body.prepend(outside);
+              globalThis.moveTypingFocus = () => outside.focus();
+              globalThis.onmessage = event => { if (event.data === 'move-typing-focus') outside.focus(); };
+              return true;
+            })()`,
+            true,
+          );
+        }
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        const target = snapshot.elements.find((element) => element.name === "Intended field");
+        assert(target || surface === "closed shadow", `Typing focus target is missing: ${surface}: ${name}`);
+        if (surface === "closed-shadow cross-origin frame")
+          assert(
+            target?.frame && new URL(target.frame.url).hostname === "localhost",
+            "Closed-root owner lost its cross-process frame ref.",
+          );
+        const result = await callBrowserTool(browser, "type", {
+          tabId: tab.id,
+          target: target
+            ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
+            : { kind: "role", role: "textbox", name: "Intended field", exact: true },
+          text: empty ? "" : "X",
+          mode: replace ? "replace" : "append",
+          submit,
+        });
+        const state = await frame.executeJavaScript(
+          `JSON.stringify({
+            intended: globalThis.typingRoot.querySelector('#intended').value ?? globalThis.typingRoot.querySelector('#intended').textContent,
+            other: globalThis.typingRoot.querySelector('#other').value,
+            events: globalThis.inputEvents,
+            keys: globalThis.keyEvents,
+            locallyFocused: document.activeElement === globalThis.typingRoot.querySelector('#intended'),
+          })`,
+        );
+        assert(isString(state));
+        const observed = JSON.parse(state);
+        const outside = frameTransfer
+          ? await contents.executeJavaScript(`(() => {
+              const doc = ${siblingTransfer ? "document.querySelector('#typing-sibling').contentDocument" : "document"};
+              return {
+                value: doc.querySelector('#outside').value,
+                focused: doc.activeElement === doc.querySelector('#outside'),
+                events: globalThis.outsideEvents,
+                keys: globalThis.outsideKeys,
+              };
+            })()`)
+          : null;
+        const expectedValue =
+          changedBeforeInput || name === "readonly"
+            ? "alpha"
+            : empty
+              ? ""
+              : name === "formatted input"
+                ? "x"
+                : replace
+                  ? "X"
+                  : "alphaX";
+        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
+        // The error tells the agent whether the text is already in the field.
+        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const safe =
+          result.success === expectedSuccess &&
+          (result.success || toolError(result).includes(expectedError)) &&
+          observed.other === "beta" &&
+          observed.intended === expectedValue &&
+          observed.events.length === expectedInputs &&
+          observed.events.every((event: DynamicRecord) => event.field === "intended" && event.trusted === true) &&
+          JSON.stringify(observed.keys.map((event: DynamicRecord) => event.key)) === JSON.stringify(expectedKeys) &&
+          observed.keys.every((event: DynamicRecord) => event.field === "intended" && event.trusted === true) &&
+          (!frameTransfer ||
+            (outside.focused === true &&
+              outside.value === "gamma" &&
+              outside.events.length === 0 &&
+              outside.keys.length === 0));
+        cases.push({
+          name: `${surface}: ${name}`,
+          safe,
+          toolSuccess: result.success,
+          state: frameTransfer ? JSON.stringify({ frame: observed, outside }) : state,
+          error: result.success ? "" : toolError(result),
+        });
+      }
+    }
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(
+      ".openbot-build/browser-typing-focus.json",
+      JSON.stringify(
+        { status: cases.every((item) => item.safe) ? "passed" : "issues_found", versions: process.versions, cases },
+        null,
+        2,
+      ),
+    );
+    assert(
+      cases.every((item) => item.safe),
+      // CI keeps no report file, so the message carries the failed cases.
+      JSON.stringify(cases.filter((item) => !item.safe)),
+    );
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
   }
 }
 

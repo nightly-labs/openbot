@@ -187,6 +187,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Cancelar inicio de sesión",
   "provider.account.finishSignIn": "Termina de iniciar sesión en el navegador.",
   "provider.account.remove": "Eliminar cuenta",
+  "provider.account.disconnect": "Desconectar",
   "provider.account.actionFailed": "No se pudo cambiar la cuenta de {name}.",
   "provider.account.resetUsage": "Restablecer uso",
   "provider.account.resetUsageTitle": "¿Restablecer el uso de {name}?",
@@ -201,6 +202,12 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} no tiene más créditos de restablecimiento de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de restablecimiento de {name} ya se usó.",
   "provider.account.resetUsageFailed": "No se pudo restablecer el uso de {name}.",
+  "provider.settings.disconnectTitle": "¿Desconectar {name}?",
+  "provider.settings.disconnectOthers":
+    "Las otras cuentas de {provider} esperan hasta que vuelvas a conectar {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
+  "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":

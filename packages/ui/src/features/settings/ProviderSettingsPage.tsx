@@ -42,6 +42,7 @@ import {
   KeyRound,
   Link,
   LogIn,
+  LogOut,
   Pencil,
   Plus,
   Popover,
@@ -562,11 +563,15 @@ function AlternativeItem(props: { row: ProviderRow }) {
 
 /* ---------------------------------------------- Accounts */
 
+/** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
+const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex"]);
+
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const accounts = () => props.option.accounts ?? [];
   const [removing, setRemoving] = createSignal<ProviderPickerAccount | null>(null);
   const [resetting, setResetting] = createSignal<ProviderPickerAccount | null>(null);
+  const [disconnecting, setDisconnecting] = createSignal<ProviderPickerAccount | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   /** How the last usage reset ended, when it did not fail. */
   const [notice, setNotice] = createSignal<string | null>(null);
@@ -635,6 +640,22 @@ function AccountsSection(props: SectionProps) {
         : t("provider.settings.removeUnused");
     return `${move} ${t("provider.settings.removeCredentials")}`;
   };
+  const disconnectDescription = (account: ProviderPickerAccount | null) => {
+    if (!account) return "";
+    const provider = props.option.name;
+    const agents = account.usedBy ?? [];
+    return [
+      props.accountActions?.local
+        ? t("provider.settings.disconnectLocal", { provider })
+        : t("provider.settings.disconnectHost", { provider }),
+      agents.length > 0
+        ? t("provider.settings.accountBlocked", { agents: format.list(agents) })
+        : t("provider.settings.removeUnused"),
+      accounts().length > 1 ? t("provider.settings.disconnectOthers", { provider }) : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
   return (
     <SettingsSection
       title={t("provider.settings.accounts")}
@@ -667,6 +688,11 @@ function AccountsSection(props: SectionProps) {
               accounts={accounts()}
               run={run}
               onRemove={() => setRemoving({ ...account() })}
+              onDisconnect={
+                props.accountActions?.signOut && SIGN_OUT_PROVIDERS.has(props.option.id)
+                  ? () => setDisconnecting({ ...account() })
+                  : undefined
+              }
               resetsLeft={props.accountActions?.resetUsage ? resetsLeft(account().id) : 0}
               onResetUsage={() => setResetting({ ...account() })}
             />
@@ -712,6 +738,23 @@ function AccountsSection(props: SectionProps) {
         }}
       />
       <ConfirmDialog
+        open={disconnecting() !== null}
+        tone="destructive"
+        title={t("provider.settings.disconnectTitle", {
+          name: disconnecting() ? providerAccountName(t, accounts(), disconnecting()?.id ?? "") : "",
+        })}
+        description={disconnectDescription(disconnecting())}
+        confirmLabel={t("provider.account.disconnect")}
+        onCancel={() => setDisconnecting(null)}
+        onConfirm={() => {
+          const target = disconnecting();
+          setDisconnecting(null);
+          if (target) {
+            run(providerAccountName(t, accounts(), target.id), () => props.accountActions?.signOut?.(props.option.id));
+          }
+        }}
+      />
+      <ConfirmDialog
         open={resetting() !== null}
         tone="default"
         icon={<Gauge aria-hidden="true" />}
@@ -748,6 +791,8 @@ function AccountRow(
     accounts: readonly ProviderPickerAccount[];
     run: (name: string, action: () => Promise<void> | undefined) => void;
     onRemove: () => void;
+    /** Absent where the provider's own sign-in cannot be signed out here. */
+    onDisconnect: (() => void) | undefined;
     /** The usage reset credits the provider gave this account; the menu offers a reset only when there is one. */
     resetsLeft: number;
     onResetUsage: () => void;
@@ -890,6 +935,17 @@ function AccountRow(
                   <Trash2 aria-hidden="true" />
                   {t("provider.account.remove")}
                 </DropdownMenu.Item>
+              </Show>
+              <Show when={own() && state() === "connected" && props.onDisconnect}>
+                {(disconnect) => (
+                  <>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.Item onSelect={() => disconnect()()}>
+                      <LogOut aria-hidden="true" />
+                      {t("provider.account.disconnect")}
+                    </DropdownMenu.Item>
+                  </>
+                )}
               </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -1114,7 +1170,11 @@ function ApiKeySection(props: SectionProps) {
                   ? t("provider.settings.geminiKeyInUse")
                   : props.option.id === "claude" && saved()
                     ? t("provider.settings.claudeKeyInUse")
-                    : t("provider.settings.keyAlternative", { name: props.option.name })}
+                    : props.option.id === "codex"
+                      ? saved()
+                        ? t("provider.settings.codexKeyInUse")
+                        : t("provider.settings.codexKeyAlternative")
+                      : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>

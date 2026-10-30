@@ -33,6 +33,13 @@ export interface ProviderAccountActions {
   usageResets?: ((provider: AgentProviderId) => Promise<readonly ProviderUsageResets[]>) | undefined;
   /** Spends one usage reset credit of an account, and answers what the provider did. */
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
+  /**
+   * Signs the provider's own sign-in out. Its agents wait until it connects again. Absent where the
+   * computer that runs the providers cannot.
+   */
+  signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
+  /** True for this computer's providers, whose own sign-in a terminal CLI shares. */
+  local?: boolean | undefined;
 }
 
 /** The name an account shows: the user's name for it, its email, "API key", or its place in the list. */

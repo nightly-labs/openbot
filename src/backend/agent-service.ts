@@ -3709,6 +3709,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /** Signs the provider's own sign-in out. Its agents keep it and wait until it connects again. */
+  signOutProvider(provider: AgentProvider): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .signOutProvider(provider)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signOutProvider", cause: failure.cause })),
+      );
+  }
+
   /** See `ProviderRuntime.signInProviderOnHost`. */
   signInProviderOnHost(
     provider: AgentProvider,
@@ -3741,6 +3750,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "startProviderCodeLogin", cause: failure.cause }),
         ),
       );
+  }
+
+  /** Saves an OpenAI API key as Codex's login and restarts Codex on it, as a changed key does. */
+  signInCodexWithApiKey(apiKey: string): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.changeProviderCredential("codex", () =>
+      this.#providers
+        .saveCodexApiKey(apiKey)
+        .pipe(
+          Effect.mapError(
+            (failure) => new AgentLifecycleFailed({ operation: "signInCodexWithApiKey", cause: failure.cause }),
+          ),
+        ),
+    );
   }
 
   submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {

@@ -282,7 +282,7 @@ import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
 import { clearRoutineHold, ROUTINE_HOLD_FILE, takeRoutineHold, writeRoutineHold } from "./routine-hold-file";
 import { ScreenCapturer } from "./screen-capture";
-import { agentProcessEnvironment, ServerMemory } from "./server-memory";
+import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
@@ -1086,12 +1086,13 @@ export async function createApplicationServices({
       : null;
   // Every provider process on a server gets the marker of leftover agent processes and the CPU limit
   // module for Node. The module must exist: Node does not start when a `--require` file is missing.
+  // On the desktop it gets the marker only, so Settings › Agents can list what agents left running.
   const cpuLimitModule = app.isPackaged
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
   const serverEnvironment = hostMemory
     ? agentProcessEnvironment(existsSync(cpuLimitModule) ? cpuLimitModule : null)
-    : null;
+    : { [AGENT_PROCESS_VARIABLE]: "1" };
   if (hostMemory) {
     hostMemory.start();
     teardown.push(TEARDOWN_ORDER.serverMemory, "the server memory reading", () => Effect.runPromise(hostMemory.stop()));
@@ -1721,7 +1722,7 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
-      ...(serverEnvironment ? { serverEnvironment } : {}),
+      serverEnvironment,
       // The GitHub entries are paths only: `gh` and `git` read the token from the files the connection
       // keeps current. On a server with an agent display, `DISPLAY` names it, so a program an agent
       // starts opens where the driver sees it.
@@ -2331,6 +2332,8 @@ export async function createApplicationServices({
     providerAccounts: providerAccountsHost,
     // Present, so the host advertises `provider-usage-reset-v1`. The routes are admin-only.
     providerUsageResets: service,
+    // Present, so the host advertises `provider-sign-out-v1`. The route is admin-only.
+    providerSignOut: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.

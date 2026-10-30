@@ -189,6 +189,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Anmeldung abbrechen",
   "provider.account.finishSignIn": "Schließen Sie die Anmeldung im Browser ab.",
   "provider.account.remove": "Konto entfernen",
+  "provider.account.disconnect": "Trennen",
   "provider.account.actionFailed": "Das {name}-Konto konnte nicht geändert werden.",
   "provider.account.resetUsage": "Nutzung zurücksetzen",
   "provider.account.resetUsageTitle": "Nutzung von {name} zurücksetzen?",
@@ -204,6 +205,11 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hat kein Guthaben zum Zurücksetzen der Nutzung mehr.",
   "provider.account.resetUsageAlreadyRedeemed": "Dieses Guthaben von {name} wurde bereits verwendet.",
   "provider.account.resetUsageFailed": "Die Nutzung von {name} konnte nicht zurückgesetzt werden.",
+  "provider.settings.disconnectTitle": "{name} trennen?",
+  "provider.settings.disconnectOthers": "Die anderen {provider}-Konten warten, bis du {provider} wieder verbindest.",
+  "provider.settings.disconnectLocal":
+    "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal wird auch abgemeldet.",
+  "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt-Cache",
   "provider.settings.promptCacheDescription":

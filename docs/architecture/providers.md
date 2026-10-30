@@ -401,6 +401,17 @@ with no key stored those models can only come from the user's own OpenCode sign-
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
 
+The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
+sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
+applies config `options.apiKey` last. With no saved key, it reads the CLI's own keys in the order
+T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
+self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
+(or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
+Console key tries the Go key. The
+database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
+SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
+
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
 services the user signed in to before its own — so the fallback used to pick a model behind a token
@@ -565,8 +576,9 @@ The account sign-in is the same ACP `authenticate` call as the first account's; 
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
 first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server signs the account in through the
-live view, because `provider-account-relay-v1` names Codex and Claude only.
+that two accounts are the same Google account. A joined server relays the account's sign-in to the
+client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
+names Codex and Claude only, signs the account in through the live view.
 
 From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
 reads the Google account's quota summary and sends one Markdown answer. The driver's
@@ -887,6 +899,19 @@ After the answer `reset`, or `nothingToReset` (no limit of the account is spent)
 Settings > Providers shows **Reset usage** in the ⋯ menu of a connected account that has a credit.
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
+
+### Disconnect the own sign-in
+
+Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude and
+Codex (issue #3487). These drivers have an `accounts.signOut` command (`claude auth logout`,
+`codex logout`). `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
+sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
+On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
+the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
+sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
+need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`
+route.
 
 ## Provider settings and the ACP registry
 

@@ -206,6 +206,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Anuluj logowanie",
   "provider.account.finishSignIn": "Dokończ logowanie w przeglądarce.",
   "provider.account.remove": "Usuń konto",
+  "provider.account.disconnect": "Odłącz",
   "provider.account.actionFailed": "Nie udało się zmienić konta {name}.",
   "provider.account.resetUsage": "Zresetuj użycie",
   "provider.account.resetUsageTitle": "Zresetować użycie konta {name}?",
@@ -222,6 +223,11 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "Konto {name} nie ma już kredytów resetu użycia.",
   "provider.account.resetUsageAlreadyRedeemed": "Ten kredyt resetu konta {name} został już użyty.",
   "provider.account.resetUsageFailed": "Nie udało się zresetować użycia konta {name}.",
+  "provider.settings.disconnectTitle": "Odłączyć {name}?",
+  "provider.settings.disconnectOthers": "Pozostałe konta {provider} czekają, aż ponownie połączysz {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot wyloguje {provider} na tym komputerze. CLI {provider} w terminalu również zostanie wylogowane.",
+  "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
   "provider.settings.cache": "Pamięć podręczna",
   "provider.settings.promptCache": "Pamięć podręczna promptów",
   "provider.settings.promptCacheDescription":

@@ -505,6 +505,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
 
+      - name: Run the OpenCode Go usage E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:opencode-go-usage
+
       - name: Run the Pi sign-in outside OpenBot E2E test
         if: ${{ !cancelled() }}
         run: bun run test:pi-sign-in-watch
@@ -565,6 +569,7 @@ jobs:
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
+            .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
             .openbot-build/agent-api-keys-e2e/
           if-no-files-found: ignore

@@ -114,7 +114,7 @@ export interface McpHandoff<T> {
   dropped: McpServerDrop[];
 }
 
-/** Said by both providers that cannot carry one, so the user reads the same sentence either way. */
+/** Said by the providers that cannot carry one, so the user reads the same sentence each time. */
 const WORKING_DIRECTORY_UNSUPPORTED = "This provider cannot start a server in a working directory.";
 
 /** Said when two names differ only in characters the provider replaces. */
@@ -561,12 +561,9 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
  * writes to disable the user's own servers.
  *
- * **stdio needs no working directory.** Neither a key for a working directory nor any other guess
- * could be confirmed against the pinned Codex app-server, and a guessed key name would fail
- * silently at the next turn. A server that names a directory is left out of the Codex payload
- * instead: a directory that does not arrive would start the server in the wrong place, which a
- * server told to open `./data.db` answers by creating a second database. Every other capable
- * provider still gets it.
+ * **stdio takes its working directory as `cwd`.** Codex starts the server there; without it, Codex
+ * starts it in its own directory. A server whose start script names a local `.venv` was left out
+ * when OpenBot did not send the key, so a Codex agent had no tools from it (#3869).
  *
  * **http travels as `url` with `http_headers`.** Both were confirmed against the pinned Codex
  * app-server: an entry with an invalid credential is listed as failed with the server's own 401,
@@ -581,7 +578,14 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * `codexMcpServerKey`.
  */
 export type CodexMcpServer =
-  | { command: string; args: string[]; env: Record<string, string>; enabled?: boolean; tools?: DynamicRecord }
+  | {
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      cwd?: string;
+      enabled?: boolean;
+      tools?: DynamicRecord;
+    }
   | { url: string; http_headers: Record<string, string> };
 
 /**
@@ -713,18 +717,11 @@ export function codexMcpServers(
       continue;
     }
     if (server.config.transport === "stdio") {
-      if (server.config.workingDirectory) {
-        dropped.push({
-          name: server.config.name,
-          reason: "working_directory_unsupported",
-          detail: WORKING_DIRECTORY_UNSUPPORTED,
-        });
-        continue;
-      }
       record[name] = {
         command: server.command,
         args: [...server.config.args],
         env: mcpLaunchEnvironment(server),
+        ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
       };
     } else {
       record[name] = {

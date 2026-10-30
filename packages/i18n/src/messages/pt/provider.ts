@@ -178,6 +178,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Cancelar entrada",
   "provider.account.finishSignIn": "Conclua a entrada no navegador.",
   "provider.account.remove": "Remover conta",
+  "provider.account.disconnect": "Desconectar",
   "provider.account.actionFailed": "Não foi possível alterar a conta de {name}.",
   "provider.account.resetUsage": "Redefinir uso",
   "provider.account.resetUsageTitle": "Redefinir o uso de {name}?",
@@ -192,6 +193,12 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} não tem mais créditos de redefinição de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de redefinição de {name} já foi usado.",
   "provider.account.resetUsageFailed": "Não foi possível redefinir o uso de {name}.",
+  "provider.settings.disconnectTitle": "Desconectar {name}?",
+  "provider.settings.disconnectOthers":
+    "As outras contas do {provider} esperam até você conectar o {provider} de novo.",
+  "provider.settings.disconnectLocal":
+    "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
+  "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":

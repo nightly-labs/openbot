@@ -185,6 +185,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Annulla accesso",
   "provider.account.finishSignIn": "Completa l'accesso nel browser.",
   "provider.account.remove": "Rimuovi account",
+  "provider.account.disconnect": "Disconnetti",
   "provider.account.actionFailed": "Impossibile modificare l'account {name}.",
   "provider.account.resetUsage": "Azzera utilizzo",
   "provider.account.resetUsageTitle": "Azzerare l'utilizzo di {name}?",
@@ -199,6 +200,11 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} non ha più crediti di azzeramento dell'utilizzo.",
   "provider.account.resetUsageAlreadyRedeemed": "Questo credito di azzeramento di {name} è già stato usato.",
   "provider.account.resetUsageFailed": "Impossibile azzerare l'utilizzo di {name}.",
+  "provider.settings.disconnectTitle": "Disconnettere {name}?",
+  "provider.settings.disconnectOthers": "Gli altri account {provider} attendono finché non ricolleghi {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
+  "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":

@@ -865,7 +865,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.stdioDescription": "The server starts this command on the computer of the server.",
   "mobile.server.mcp.httpDescription": "Every provider can use an HTTP MCP server.",
   "mobile.server.mcp.providerLimit":
-    "Claude only: the other providers do not get a server that has a working directory.",
+    "Claude and Codex only: the other providers do not get a server that has a working directory.",
   "mobile.server.mcp.command": "Command",
   "mobile.server.mcp.commandHint": "The program only. Put each word after it in Arguments.",
   "mobile.server.mcp.arguments": "Arguments",

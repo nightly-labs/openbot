@@ -243,6 +243,7 @@
     "test:opencode-azure-responses": "bun scripts/opencode-azure-responses-e2e.ts",
     "test:claude-api-key": "bun scripts/claude-api-key-e2e.ts",
     "test:cursor-usage": "bun scripts/cursor-usage-e2e.ts",
+    "test:opencode-go-usage": "bun scripts/opencode-go-usage-e2e.ts",
     "test:cursor-stream-closed": "bun scripts/cursor-stream-closed-e2e.ts",
     "test:cursor-model-set": "bun scripts/cursor-model-set-e2e.ts",
     "test:provider-update-busy": "bun scripts/provider-update-busy-e2e.ts",
@@ -321,6 +322,7 @@
     "test:host-key-rotation": "bun scripts/host-key-rotation-e2e.ts",
     "test:cloud-authorization": "bun apps/auth-api/scripts/cloud-authorization-e2e.ts",
     "test:billing-snapshot": "bun apps/auth-api/scripts/billing-snapshot-e2e.ts",
+    "test:smtp-stall": "bun apps/auth-api/scripts/smtp-stall-e2e.ts",
     "test:mobile-connected-devices": "bun scripts/mobile-connected-devices-e2e.ts",
     "test:mobile-share-sender": "bun scripts/mobile-share-sender-e2e.ts",
     "test:composer-lists": "bun scripts/composer-markdown-lists-e2e.ts",
@@ -342,7 +344,7 @@
     "check": "bun run --parallel check:desktop check:api && bun run test:desktop",
     "check:desktop": "bun run check:desktop:static && bun run test:browser",
     "check:desktop:static": "bun run check:ui && bun run lint && bun run desktop:typecheck && bun run build && bun run verify:preload",
-    "check:api": "bun run typecheck:api && bun run test:api && bun run test:billing-snapshot && bun run test:remote-auth-events && bun run test:invite-acceptance && bun run test:host-key-handover && bun run test:cloud-authorization && bun run test:hosted-held-resume && bun run test:hosted-retention-wake && bun run test:mobile-connected-devices && bun run api:build:check",
+    "check:api": "bun run typecheck:api && bun run test:api && bun run test:billing-snapshot && bun run test:remote-auth-events && bun run test:invite-acceptance && bun run test:host-key-handover && bun run test:cloud-authorization && bun run test:hosted-held-resume && bun run test:hosted-retention-wake && bun run test:mobile-connected-devices && bun run test:smtp-stall && bun run api:build:check",
     "desktop:typecheck": "bun run --parallel typecheck:node typecheck:renderer typecheck:contracts typecheck:brand typecheck:storybook",
     "api:build:check": "CLOUDFLARE_ENV=preview bun run api:build",
     "check:ui": "bun scripts/ui-foundation-check.ts",
@@ -449,7 +451,8 @@
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
-    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch"
+    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
+    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

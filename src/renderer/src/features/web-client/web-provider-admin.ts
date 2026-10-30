@@ -13,10 +13,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+  type ProviderAccountRelay,
+  providerAccountRelay,
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
@@ -56,6 +57,7 @@ import {
   resetProviderUsage,
   saveCustomProvider,
   setProviderApiKey,
+  signOutProvider,
   startProviderAccountSignIn,
   startProviderCodeLogin,
   startProviderHostSignIn,
@@ -115,6 +117,7 @@ function webProviderAdmin(
   signInRoutes: () => ProviderCodeLoginRoutes,
   keyRoutes: () => typeof PROVIDERS_ADMIN_ROUTES | typeof PROVIDERS_V5_ROUTES | typeof PROVIDERS_V8_ROUTES,
   customRoutes: () => CustomProviderRoutes,
+  accountRelay: () => ProviderAccountRelay | null,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -215,7 +218,9 @@ function webProviderAdmin(
       runTeamEffect(providerUsageResets(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
     resetUsage: async (input, serverId) =>
       runTeamEffect(resetProviderUsage(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
-    ...webProviderRelay(request),
+    signOut: async (provider, serverId) =>
+      runTeamEffect(signOutProvider(request(serverId), provider).pipe(Effect.mapError((error) => error.cause))),
+    ...webProviderRelay(request, accountRelay),
   };
 }
 
@@ -237,6 +242,8 @@ export interface WebProviderSettingsOptions {
  * comes back.
  */
 export function createWebProviderSettings(options: WebProviderSettingsOptions) {
+  const accountRelayOfServer = () =>
+    providerAccountRelay((capability) => serverSupportsCapability(options.server(), capability));
   // `request` refuses a server other than the connected one, so the connected one decides the routes.
   const admin = webProviderAdmin(
     options.request,
@@ -269,6 +276,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
         ? CUSTOM_PROVIDER_HARNESS_ROUTES
         : PROVIDERS_ADMIN_ROUTES,
+    accountRelayOfServer,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -321,6 +329,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     applyStatus: options.setStatus,
     target: () => {
       const id = serverId();
+      const relayed = accountsServerId() ? accountRelayOfServer() : null;
       return {
         start: (provider: AgentProviderId) => admin.startCodeLogin(provider, id ?? ""),
         submit: (provider: AgentProviderId, code: string) => admin.submitCodeLogin({ provider, code }, id ?? ""),
@@ -334,9 +343,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           cancel: (provider: AgentProviderId) => admin.cancelHostSignIn(provider, id ?? ""),
         },
         ...(accountsServerId() ? { accountSignIn: accountSignIn(accountsServerId() ?? "") } : {}),
-        ...(accountsServerId() && serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_RELAY_CAPABILITY)
-          ? { accountRelay: accountRelay(accountsServerId() ?? "") }
-          : {}),
+        ...(relayed ? { accountRelay: accountRelay(accountsServerId() ?? "", relayed) } : {}),
         relay: {
           hostName: options.server()?.name ?? "",
           start: (provider: AgentProviderId) => admin.startRelaySignIn(provider, id ?? ""),
@@ -374,9 +381,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     };
   }
   /** As on desktop: the other relay requests run an account's relayed sign-in by its provider. */
-  function accountRelay(id: string) {
+  function accountRelay(id: string, relayed: ProviderAccountRelay) {
     return {
-      providers: PROVIDER_ACCOUNT_RELAY_PROVIDERS,
+      providers: relayed.providers,
       hostName: options.server()?.name ?? "",
       start: (provider: AgentProviderId, accountId: string | null) =>
         admin.startAccountRelaySignIn({ provider, accountId }, id),
@@ -419,6 +426,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
               return outcome;
             },
           }
+        : {}),
+      ...(remoteAdminServer(options.server(), PROVIDER_SIGN_OUT_CAPABILITY)?.id === id
+        ? { signOut: (provider: AgentProviderId) => changed(admin.signOut(provider, id)) }
         : {}),
     };
   });

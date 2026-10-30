@@ -218,7 +218,12 @@ jobs:
 
       - name: Install macOS build dependencies
         if: runner.os == 'macOS' && steps.runtime-cache.outputs.cache-hit != 'true'
-        run: brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
+        # Sunshine does not build with OpenSSL 4. Runner images since 2026-10-28 link openssl@4 into the
+        # Homebrew prefix, where CMake finds it before the keg-only openssl@3.
+        run: |
+          brew install cmake ninja node pkgconf icu4c@78 miniupnpc openssl@3 opus
+          if brew list openssl@4 >/dev/null 2>&1; then brew unlink openssl@4; fi
+          brew link --force --overwrite openssl@3
 
       - name: Set up Windows build dependencies
         if: runner.os == 'Windows' && steps.runtime-cache.outputs.cache-hit != 'true'

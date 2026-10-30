@@ -27,6 +27,7 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "codex": {
       if (addedAccount) return "unknown";
       const account = facts.account("codex");
+      if (account?.type === "apiKey") return "api_key";
       if (account?.type !== "chatgpt") return "unknown";
       return account.planType === "free" ? "free" : "subscription";
     }

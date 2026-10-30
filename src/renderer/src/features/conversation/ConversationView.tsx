@@ -1,3 +1,4 @@
+import { agentProviderDescriptor, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { DEFAULT_AGENT_ACCESS } from "@openbot/contracts/ipc";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
@@ -45,11 +46,14 @@ export function ConversationView(props: ConversationProps) {
   const folderCalls = agentFolderCalls();
   /**
    * A local agent in Workspace only mode can get a folder from a drop on the chat. With wider access a
-   * folder gives it nothing new, and the Team API does not carry an agent's folders.
+   * folder gives it nothing new, except to a provider whose own file tools reach only its folders.
+   * The Team API does not carry an agent's folders.
    */
   function folderDropAgent() {
     const agent = props.agent;
     if (!agent || props.server?.kind !== "local" || props.runtime) return undefined;
+    if (isKnownAgentProvider(agent.provider) && agentProviderDescriptor(agent.provider).foldersInFullAccess)
+      return agent;
     return (agent.access ?? DEFAULT_AGENT_ACCESS) === "workspace" ? agent : undefined;
   }
   const chatFolders = createAgentFolders(() => {
