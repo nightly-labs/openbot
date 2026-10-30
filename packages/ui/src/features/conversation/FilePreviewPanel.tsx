@@ -277,12 +277,15 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <Show when={source()}>
           {(value) => (
-            <CopyButton
-              class="browser-toolbar-button file-preview-copy"
-              value={value()}
-              label={t("preview.panel.copy")}
-              iconOnly
-            />
+            <LabelTooltip content={t("preview.panel.copy")}>
+              <LabelTooltipTrigger
+                as={CopyButton}
+                class="browser-toolbar-button file-preview-copy"
+                value={value()}
+                label={t("preview.panel.copy")}
+                iconOnly
+              />
+            </LabelTooltip>
           )}
         </Show>
         <Show when={file() && props.allowExternalOpen !== false}>

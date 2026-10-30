@@ -252,35 +252,31 @@ export function CopyButton(props: CopyButtonProps): JSX.Element {
     }
   }
 
-  // An icon-only button names itself in a tooltip, as `IconButton` does.
   return (
-    <LabelTooltip content={label()} disabled={!props.iconOnly}>
-      <LabelTooltipTrigger
-        as={Button}
-        type="button"
-        variant="ghost"
-        size={props.size ?? (props.iconOnly ? "icon-sm" : "sm")}
-        class={cx(props.iconOnly && "ui-icon-button", props.class)}
-        disabled={Boolean(props.disabled || !props.value)}
-        data-copied={copied() ? "" : undefined}
-        {...others}
-        onClick={() => void copyValue()}
+    <Button
+      type="button"
+      variant="ghost"
+      size={props.size ?? (props.iconOnly ? "icon-sm" : "sm")}
+      class={cx(props.iconOnly && "ui-icon-button", props.class)}
+      disabled={Boolean(props.disabled || !props.value)}
+      data-copied={copied() ? "" : undefined}
+      {...others}
+      onClick={() => void copyValue()}
+    >
+      <Show when={copied()} fallback={<Copy aria-hidden="true" />}>
+        <Check aria-hidden="true" />
+      </Show>
+      <Show
+        when={!props.iconOnly}
+        fallback={
+          <span class="sr-only" aria-live="polite">
+            {copied() ? copiedLabel() : label()}
+          </span>
+        }
       >
-        <Show when={copied()} fallback={<Copy aria-hidden="true" />}>
-          <Check aria-hidden="true" />
-        </Show>
-        <Show
-          when={!props.iconOnly}
-          fallback={
-            <span class="sr-only" aria-live="polite">
-              {copied() ? copiedLabel() : label()}
-            </span>
-          }
-        >
-          <StableLabel labels={[label(), copiedLabel()]} active={copied() ? 1 : 0} live />
-        </Show>
-      </LabelTooltipTrigger>
-    </LabelTooltip>
+        <StableLabel labels={[label(), copiedLabel()]} active={copied() ? 1 : 0} live />
+      </Show>
+    </Button>
   );
 }
 
