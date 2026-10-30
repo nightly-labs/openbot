@@ -32,10 +32,6 @@
   min-width: 72px;
 }
 
-.notification-matrix-levels[data-disabled] {
-  opacity: 0.5;
-}
-
 /* The last row of a card is one button as wide as the card. Its "+" stands in the column of the server logo. */
 .notification-matrix-add {
   display: flex;
@@ -77,8 +73,8 @@
 }
 
 .notification-matrix-add-icon > svg {
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
 
 /* The notes of a server tell what its card can do, so they wrap and are never cut. */

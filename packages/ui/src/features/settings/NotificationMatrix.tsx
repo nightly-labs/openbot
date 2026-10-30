@@ -21,7 +21,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, For, Show } from "solid-js";
+import { createEffect, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -202,11 +202,11 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
         const card = serverCards.get(request.serverId);
         if (!card) return;
         card.scrollIntoView({ block: "start" });
-        card
-          .querySelector<HTMLElement>(
-            '.notification-matrix-level[aria-selected="true"]:not(:disabled), button:not(:disabled)',
-          )
-          ?.focus({ preventScroll: true });
+        // The selected level comes first: the Retry or Mute button of a card can come before it in the DOM.
+        const target =
+          card.querySelector<HTMLElement>('.notification-matrix-level[aria-selected="true"]:not(:disabled)') ??
+          card.querySelector<HTMLElement>("button:not(:disabled)");
+        target?.focus({ preventScroll: true });
       });
     },
   );
@@ -216,6 +216,8 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
       {/* Keyed by id: a new summary of a server keeps its controls, and the focus stays on them. */}
       <For each={props.servers} keyed={(server) => server.id}>
         {(server) => {
+          const serverId = untrack(() => server().id);
+          onCleanup(() => serverCards.delete(serverId));
           const agents = () => readyAgents(server().agents) ?? [];
           // An offline server answers nothing, and a server set to Nothing is silent for every agent.
           const agentsOpen = () => !server().offline && serverLevel(server()) !== "nothing";
@@ -225,7 +227,7 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
             <ItemGroup
               class="settings-modal-card"
               ref={(card) => {
-                serverCards.set(server().id, card);
+                serverCards.set(serverId, card);
               }}
             >
               <Item class="settings-modal-row">
