@@ -40,4 +40,14 @@ export const messages = {
     "OpenBot이 이 채팅에 연결되었어요. {bot}을(를) 멘션하거나 OpenBot의 메시지에 답장해서 에이전트에게 요청하세요.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram에서 답변하고 팀에 요청해요",
+  "status.messaging.whatsappNoAgent":
+    "아직 여기서 답변할 수 있는 에이전트가 없어요. OpenBot에서 WhatsApp Orchestrator를 추가하세요.",
+  "status.messaging.whatsappApprovalMenu": "승인하려면 1, 거부하려면 2로 답장하세요.",
+  "status.messaging.whatsappStopMenu": "중지하려면 “stop”으로 답장하세요.",
+  "status.messaging.whatsappPairingCode":
+    "이 번호는 소유자가 허용한 사람에게만 답해요. 소유자에게 이 코드를 알려 주세요: {code}",
+  "status.messaging.whatsappPairingApproved": "이제 이 번호로 요청을 보낼 수 있어요.",
+  "status.messaging.whatsappOwnChat": "나에게 메시지 보내기",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "WhatsApp에서 답변하고 팀에 요청해요",
 } as const satisfies PartialTranslation<typeof source>;

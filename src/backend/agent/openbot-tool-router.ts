@@ -603,7 +603,7 @@ export class OpenBotToolRouter {
     if (vaultKey) return openBotToolResult({ status: "saved", ...vaultKey });
     if (this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId)))
       return openBotToolFailure(
-        "request_api_key does not work in a Slack, Discord or Telegram chat. Ask the user to give you the key in OpenBot.",
+        "request_api_key does not work in an external chat. Ask the user to give you the key in OpenBot.",
       );
     const spec = apiKeyFormSpec(parsed.data);
     if (!spec) return openBotToolFailure("OpenBot could not show this form. Use a shorter title and retry.");
@@ -629,7 +629,7 @@ export class OpenBotToolRouter {
       return;
     }
     const threadId = this.#conversation.publicThreadId(agent.id, params.threadId);
-    // Nobody presses a button on Slack, Discord or Telegram.
+    // Nobody presses a button on Slack, Discord, Telegram or WhatsApp.
     if (this.#messaging.store.linkForThread(threadId)) {
       refuse("This chat cannot show the plan card. Do not call it here; start the work.");
       return;
@@ -803,9 +803,7 @@ export class OpenBotToolRouter {
       // Only the agent that answers a platform conversation, in that conversation's own thread.
       const link = this.#messaging.store.linkForThread(executionThreadId);
       if (!link || link.agentId !== senderAgentId)
-        return openBotToolFailure(
-          "Messaging tools work only in a turn that answers a Slack, Discord or Telegram message.",
-        );
+        return openBotToolFailure("Messaging tools work only in a turn that answers an external chat message.");
       return yield* this.#messaging.tool(link, params.turnId, params.callId, params.tool, params.arguments);
     }
     const channelId = this.#channels.store.channelForThread(executionThreadId);
@@ -1162,7 +1160,7 @@ export class OpenBotToolRouter {
     const host = this.#screenCapture;
     if (!host) return openBotToolFailure(sourceText("error.agent.screenCaptureUnavailable"));
     const threadId = this.#conversation.publicThreadId(agent.id, params.threadId);
-    // A Slack, Discord or Telegram link sends each agent attachment of the turn to the platform. The
+    // A Slack, Discord, Telegram or WhatsApp link sends each agent attachment of the turn to the platform. The
     // screen of this computer must stay on this computer.
     if (this.#messaging.store.linkForThread(threadId)) {
       return openBotToolFailure(sourceText("error.agent.screenCaptureShared"));

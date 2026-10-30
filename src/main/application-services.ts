@@ -1,6 +1,8 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
+import { makeWASocket } from "@openbot/whatsapp/baileys";
+import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
 import { Effect, Fiber } from "effect";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
@@ -118,6 +120,8 @@ import { discordDriver } from "../backend/messaging/discord/discord-driver";
 import { MessagingOperationFailed, MessagingService } from "../backend/messaging/messaging-service";
 import { slackDriver } from "../backend/messaging/slack/slack-driver";
 import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
+import { whatsAppDriver } from "../backend/messaging/whatsapp/whatsapp-driver";
+import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
@@ -717,6 +721,12 @@ async function createMessagingServices({
   // Development only: `bun run dev:slack` names this loopback port, so a Slack install returns to this
   // dev app and not to an installed OpenBot that owns `openbot://`.
   const developmentSlackCallbackPort = app.isPackaged ? 0 : Number(process.env.OPENBOT_DEV_SLACK_CALLBACK_PORT ?? 0);
+  // The WhatsApp numbers linked as devices of this computer. Their keys stay in `<userData>/whatsapp`.
+  const whatsapp = new WhatsAppRuntime({
+    root: join(app.getPath("userData"), "whatsapp"),
+    createSocket: (config) => makeWASocket(config),
+    makeSignalRepository: makeOpenBotSignalRepository,
+  });
   const messaging = new MessagingService({
     threads: service.messaging,
     agents: {
@@ -738,10 +748,12 @@ async function createMessagingServices({
       slackDriver({ ingress: signalIngress }),
       discordDriver({ ingress: signalIngress }),
       telegramDriver({ ingress: signalIngress }),
+      whatsAppDriver({ runtime: whatsapp }),
     ],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
     statusPath: join(app.getPath("userData"), "openbot-messaging-status-v1.json"),
     ingress: signalIngress,
+    whatsapp,
     sidebar: sidebarLayout,
     slackApp: {
       authorize: (input) =>

@@ -47,6 +47,13 @@ export interface MessagingAllowedRole {
   name: string;
 }
 
+/** A WhatsApp contact (phone number in digits) or group (its JID) that can give work in one connection. */
+export interface MessagingAllowedSender {
+  id: string;
+  kind: "contact" | "group";
+  name: string;
+}
+
 export interface MessagingLinkInput {
   connectionId: string;
   agentId: string;
@@ -59,8 +66,8 @@ export interface MessagingLinkInput {
 const LINK_LIST_LIMIT = 200;
 
 /**
- * Owns `projection_messaging_connections`, `projection_messaging_threads` and
- * `projection_messaging_allowed_roles`. It never stores a
+ * Owns `projection_messaging_connections`, `projection_messaging_threads`,
+ * `projection_messaging_allowed_roles` and `projection_messaging_allowed_senders`. It never stores a
  * token, and it never imports the database facade's callers.
  *
  * A connection row is configuration, so it is written directly, as MCP servers are. A link creates
@@ -182,6 +189,39 @@ export class MessagingStore {
       if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  /** The WhatsApp contacts and groups that can give work here, oldest first. */
+  allowedSenders(connectionId: string): MessagingAllowedSender[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT sender_id, kind, name FROM projection_messaging_allowed_senders
+           WHERE connection_id = ? ORDER BY created_at, name, sender_id`,
+        )
+        .all(connectionId),
+    ).flatMap((row) => {
+      const kind = requiredStringColumn(row, "kind");
+      if (kind !== "contact" && kind !== "group") return [];
+      return [{ id: requiredStringColumn(row, "sender_id"), kind, name: requiredStringColumn(row, "name") }];
+    });
+  }
+
+  /** Adds a sender, or gives one that is already there its new name. */
+  addAllowedSender(connectionId: string, sender: MessagingAllowedSender): void {
+    this.#database.connection
+      .prepare(
+        `INSERT INTO projection_messaging_allowed_senders (connection_id, sender_id, kind, name, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(connection_id, sender_id) DO UPDATE SET name = excluded.name`,
+      )
+      .run(connectionId, sender.id, sender.kind, sender.name, new Date().toISOString());
+  }
+
+  removeAllowedSender(connectionId: string, senderId: string): void {
+    this.#database.connection
+      .prepare("DELETE FROM projection_messaging_allowed_senders WHERE connection_id = ? AND sender_id = ?")
+      .run(connectionId, senderId);
   }
 
   link(linkId: string): MessagingLink | null {

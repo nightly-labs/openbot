@@ -31,6 +31,12 @@ import {
   telegramIntegrationState,
   telegramOrchestrator,
 } from "../settings/TelegramIntegrationPanel";
+import {
+  WhatsAppIntegrationPanel,
+  type WhatsAppIntegrationPanelProps,
+  whatsappIntegrationState,
+  whatsappOrchestrator,
+} from "../settings/WhatsAppIntegrationPanel";
 
 /**
  * The page of one connector, with its live state and actions, as Marketplace › Apps shows it. Read the props through getters, so the page follows them.
@@ -40,7 +46,8 @@ export type ConnectorDetail =
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
   | { id: "bitwarden"; props: BitwardenConnectorPanelProps }
   | { id: "slack" | "discord"; props: SlackIntegrationPanelProps }
-  | { id: "telegram"; props: TelegramIntegrationPanelProps };
+  | { id: "telegram"; props: TelegramIntegrationPanelProps }
+  | { id: "whatsapp"; props: WhatsAppIntegrationPanelProps };
 
 /** What a list of connectors shows for one connector: its status and one line about it. */
 export interface ConnectorSummary {
@@ -158,6 +165,26 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
         agents: orchestrator ? [orchestrator] : [],
       };
     }
+    case "whatsapp": {
+      if (messagingStateUnknown(detail.props)) return unknownSummary(t);
+      const { connections, agents } = detail.props;
+      const state = whatsappIntegrationState(connections, agents);
+      const orchestrator = whatsappOrchestrator(connections, agents);
+      const count = connections.length;
+      return {
+        status: state.status,
+        statusLabel: t(state.label),
+        summary:
+          state.attention > 0
+            ? t("connector.whatsapp.attentionTitle", { count: state.attention })
+            : count === 0
+              ? t("connector.whatsapp.description")
+              : orchestrator
+                ? t("connector.whatsapp.summaryConnected", { count })
+                : t("connector.whatsapp.summaryNoAgent", { count }),
+        agents: orchestrator ? [orchestrator] : [],
+      };
+    }
   }
 }
 
@@ -181,6 +208,8 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
       return t(messagingPlatformText(detail.id).description);
     case "telegram":
       return t("connector.telegram.description");
+    case "whatsapp":
+      return t("connector.whatsapp.description");
   }
 }
 
@@ -194,6 +223,7 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
   const bitwarden = () => (props.detail.id === "bitwarden" ? props.detail : undefined);
   const workspace = () => (props.detail.id === "slack" || props.detail.id === "discord" ? props.detail : undefined);
   const telegram = () => (props.detail.id === "telegram" ? props.detail : undefined);
+  const whatsapp = () => (props.detail.id === "whatsapp" ? props.detail : undefined);
   return (
     <Switch>
       <Match when={github()}>
@@ -240,6 +270,16 @@ export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & Integr
       <Match when={telegram()}>
         {(detail) => (
           <TelegramIntegrationPanel
+            {...detail().props}
+            tagline={props.tagline}
+            intro={props.intro}
+            details={props.details}
+          />
+        )}
+      </Match>
+      <Match when={whatsapp()}>
+        {(detail) => (
+          <WhatsAppIntegrationPanel
             {...detail().props}
             tagline={props.tagline}
             intro={props.intro}

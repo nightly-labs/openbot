@@ -326,7 +326,7 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   connector_action: {
-    connector: "slack" | "discord" | "telegram" | "github" | "onepassword" | "bitwarden";
+    connector: "slack" | "discord" | "telegram" | "whatsapp" | "github" | "onepassword" | "bitwarden";
     action: "connect_started" | "connected" | "disconnected" | "enabled" | "disabled";
     result: AnalyticsResult;
     failure_code?: string;
@@ -673,7 +673,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   outcome: ["completed", "cancelled"],
   step: ["choose", "plan", "computer", "language"],
   path: ["free", "plan"],
-  connector: ["slack", "discord", "telegram", "github", "onepassword", "bitwarden"],
+  connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
   destination: ["discord", "feedback", "guides", "changelog"],

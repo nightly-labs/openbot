@@ -66,6 +66,7 @@
     "./slack-workspace-grant": "./src/slack-workspace-grant.ts",
     "./web-messaging-install": "./src/web-messaging-install.ts",
     "./telegram-app": "./src/telegram-app.ts",
+    "./whatsapp-app": "./src/whatsapp-app.ts",
     "./team-api-routes": "./src/team-api-routes.ts",
     "./ui-blocks": "./src/ui-blocks.ts",
     "./team-protocol": "./src/team-protocol/index.ts",
