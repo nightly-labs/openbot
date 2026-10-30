@@ -76,9 +76,11 @@ export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    // Measure now: the field can be hidden when it mounts, and then the start height is 0.
+    const current = textarea?.offsetHeight ?? currentHeight();
     let next: number | undefined;
-    if (event.key === "ArrowDown") next = currentHeight() + KEYBOARD_STEP;
-    else if (event.key === "ArrowUp") next = currentHeight() - KEYBOARD_STEP;
+    if (event.key === "ArrowDown") next = current + KEYBOARD_STEP;
+    else if (event.key === "ArrowUp") next = current - KEYBOARD_STEP;
     else if (event.key === "Home") next = minimum();
     else if (event.key === "End") next = maximum();
     if (next === undefined) return;
