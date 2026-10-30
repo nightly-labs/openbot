@@ -383,7 +383,7 @@ function LevelSegments(props: {
     <SlidingTabs.Root
       class="notification-matrix-levels"
       value={props.value}
-      disabled={props.disabled}
+      disabled={props.disabled === true}
       onChange={(value: string) => {
         if (isLevel(value) && value !== props.value) props.onChange(value);
       }}
