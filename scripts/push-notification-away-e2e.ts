@@ -231,6 +231,14 @@ const reply = (agentId: string, turnId: string): AgentEvent => ({
   turnId,
   status: "completed",
 });
+/** A reply in another thread of the agent: the host does not know whether the member read it. */
+const sideReply = (agentId: string, turnId: string): AgentEvent => ({
+  type: "turn-completed",
+  agentId,
+  threadId: `${agentId}-side`,
+  turnId,
+  status: "completed",
+});
 const failure = (agentId: string, turnId: string): AgentEvent => ({
   type: "turn-completed",
   agentId,
@@ -266,32 +274,39 @@ try {
     const from = sent.length;
     state.unread.set(AGENT_A, 1);
     events.emit("event", reply(AGENT_A, "turn-1"));
+    // iOS can have suspended the app before it showed a reply in another thread, so it goes out too.
+    events.emit("event", sideReply(AGENT_B, "turn-1b"));
     // The phone looked on screen, so nothing went out. The path then fails, as when iOS suspended it.
     assert.equal(sent.length, from);
     phones.disconnected(ANDROID);
-    const said = await sendsUntil(ANDROID, from, `reply ${AGENT_A}`);
-    assert.deepEqual(said, [`reply ${AGENT_A}`]);
+    const said = await sendsUntil(ANDROID, from, `reply ${AGENT_B}`);
+    assert.deepEqual(said, [`reply ${AGENT_A}`, `reply ${AGENT_B}`]);
     return { said };
   });
 
-  await step("a read reply and an answered question stay quiet, a failed turn goes out", async () => {
-    phones.reconnected(ANDROID);
-    registerAndroid(false);
-    const from = sent.length;
-    // The member read this reply in the app before it went away.
-    state.unread.set(AGENT_A, 0);
-    events.emit("event", reply(AGENT_A, "turn-2"));
-    events.emit("event", prompt(7));
-    events.emit("event", { type: "agent-input-resolved", kind: "prompt", requestId: 7, agentId: AGENT_A });
-    state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-3" }];
-    events.emit("event", failure(AGENT_B, "turn-3"));
-    // The phone says that it goes away, as when the `away` request goes out late.
-    registerAndroid(true);
-    // The failed turn is the last kept event, so the others were decided before it went out.
-    const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
-    assert.deepEqual(said, [`failed ${AGENT_B}`]);
-    return { said };
-  });
+  await step(
+    "a read reply, a reply in another thread and an answered question stay quiet, a failed turn goes out",
+    async () => {
+      phones.reconnected(ANDROID);
+      registerAndroid(false);
+      const from = sent.length;
+      // The member read this reply in the app before it went away.
+      state.unread.set(AGENT_A, 0);
+      events.emit("event", reply(AGENT_A, "turn-2"));
+      // The app was on screen and can have shown a reply in another thread, so the host does not repeat it.
+      events.emit("event", sideReply(AGENT_A, "turn-2b"));
+      events.emit("event", prompt(7));
+      events.emit("event", { type: "agent-input-resolved", kind: "prompt", requestId: 7, agentId: AGENT_A });
+      state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-3" }];
+      events.emit("event", failure(AGENT_B, "turn-3"));
+      // The phone says that it goes away, as when the `away` request goes out late.
+      registerAndroid(true);
+      // The failed turn is the last kept event, so the others were decided before it went out.
+      const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
+      assert.deepEqual(said, [`failed ${AGENT_B}`]);
+      return { said };
+    },
+  );
 
   await step("a phone that comes back at once does not get the kept events", async () => {
     registerAndroid(false);

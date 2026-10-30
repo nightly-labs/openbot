@@ -459,8 +459,13 @@ export class PushNotificationService {
       markerExclusionsForCapabilities(registration.capabilities),
     );
     const agents = this.#options.agents.listAgents();
+    // A phone that said that it goes away over an open connection was on screen until then, so it
+    // gets only the events that it surely did not see. After a lost connection, iOS can have
+    // suspended the app before it showed them, so the events that the host cannot judge go out too.
+    const sawScreen = registration.connected;
     for (const { event } of held) {
-      if (!heldEventUnseen(event, snapshot, reads, agents)) continue;
+      const unseen = heldEventUnseen(event, snapshot, reads, agents);
+      if (unseen === false || (unseen === null && sawScreen)) continue;
       yield* this.#deliver(event, registration);
     }
   });
@@ -509,21 +514,24 @@ function relayRequest(
 }
 
 /**
- * Whether the member still has to see a kept event: the reply in the agent's own chat is unread, or
- * the turn still shows as failed. An answered request left the list when its answer came.
+ * Whether the member still has to see a kept event: the reply in the agent's own chat is unread, the
+ * turn still shows as failed, or the request still waits (an answered one left the list when its
+ * answer came). `null` when the host cannot know: a reply in another thread, or a message that did
+ * not start.
  */
 function heldEventUnseen(
   event: AgentEvent,
   snapshot: ReturnType<PushNotificationAgents["getRuntimeSnapshot"]>,
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
-): boolean {
+): boolean | null {
+  if (event.type === "error") return null;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
   }
   // The read state counts the agent's own chat only. A reply in another thread is not known as read.
-  if (agents.find((agent) => agent.id === event.agentId)?.threadId !== event.threadId) return true;
+  if (agents.find((agent) => agent.id === event.agentId)?.threadId !== event.threadId) return null;
   return (reads[event.agentId]?.unreadCount ?? 0) > 0;
 }
 
