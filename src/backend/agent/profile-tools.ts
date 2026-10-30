@@ -22,9 +22,7 @@ const profileFields = {
   description: z
     .string()
     .max(INPUT_LIMITS.agentDescription)
-    .describe(
-      `A short summary of what the agent does, at most ${INPUT_LIMITS.agentDescription} characters, that teammates read to choose who does a task. Standing rules go in the agent's instruction file, not here.`,
-    ),
+    .describe(`A short summary of the agent's work, at most ${INPUT_LIMITS.agentDescription} characters.`),
   avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
   // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
   avatarHue: z
