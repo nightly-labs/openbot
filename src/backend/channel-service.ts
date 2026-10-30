@@ -176,6 +176,8 @@ export class ChannelService {
    * one of those changes the mailbox, so the next queue change wakes these channels again.
    */
   readonly #waitingForAgents = new Set<string>();
+  /** Turns that the provider started with no delivery. Their rows are no task's reply. */
+  readonly #providerTurns = new Set<string>();
   readonly #deletedChannels = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
   /** The active assignments last seen per channel, so turn traffic reports no new hold. */
@@ -2063,6 +2065,7 @@ export class ChannelService {
       return true;
     }
     if (event.type === "turn-completed") {
+      this.#providerTurns.delete(event.turnId);
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) {
         this.#dispatchEvent(this.wake());
@@ -2077,7 +2080,10 @@ export class ChannelService {
       // No delivery was starting, as when Claude or OpenCode starts a turn after a background job
       // ends. That turn is not the member's next assignment: taking it ran the provider's answer as
       // that task, and the task's own start then failed.
-      if (event.origin === "unknown") return true;
+      if (event.origin === "unknown") {
+        this.#providerTurns.add(event.turnId);
+        return true;
+      }
       const assignment = this.store
         .assignments(channelId)
         .find((item) => item.agentId === event.agentId && activeAssignment(item));
@@ -2147,12 +2153,14 @@ export class ChannelService {
         !(message.attachments?.length && message.author !== "user")
       )
         continue;
+      const owner = assignments.find((item) => item.turnId === message.turnId);
+      if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const original = existing(message.id);
       // The first rows of a turn come before its assignment knows the turn id, so they go to the
       // running assignment. A row of another turn does not: in a whole snapshot, every old row of
       // the thread went to the task that ran now.
       const assignment =
-        assignments.find((item) => item.turnId === message.turnId) ??
+        owner ??
         (turnId !== undefined ||
         message.turnId === snapshot.activeTurnId ||
         (original !== undefined && original.taskId === active?.taskId)
