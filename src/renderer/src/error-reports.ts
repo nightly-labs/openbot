@@ -100,7 +100,7 @@ export function webReportsAgreed(): boolean {
 }
 
 /** On only when the region of the browser language and the time zone are in a default-on country. */
-export function webAnalyticsDefault(): boolean {
+function webAnalyticsDefault(): boolean {
   try {
     const region = new Intl.Locale(navigator.language).region;
     return region !== undefined && analyticsOnByDefault(region, Intl.DateTimeFormat().resolvedOptions().timeZone);

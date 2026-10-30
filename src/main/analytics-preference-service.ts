@@ -82,27 +82,27 @@ export class AnalyticsPreferenceService {
     Effect.runFork(effect.pipe(Effect.catch((error) => Effect.sync(() => logger.warn(message, toLogValue(error))))));
   }
 
-  // The renderer reads the answer after an account change. This holds the write permit until this
-  // computer has the latest answer, also while an unsent choice goes to the account.
+  // Started before the renderer is told, so its next read waits for the followed answer. An unsent
+  // choice goes to the account outside the write permit, so reads and writes do not wait for it.
   readonly #follow = Effect.fn("AnalyticsPreferences.followAccount")(function* (
     this: AnalyticsPreferenceService,
     user: CentralAuthUser,
   ) {
     const account = user.analyticsEnabled ?? null;
-    yield* this.#writes.withPermit(
+    const unsent = yield* this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         const saved = yield* readSavedAnalyticsPreference(this.#path);
-        if (saved?.unsentAt != null) {
-          yield* this.#send(saved.enabled, saved.unsentAt);
-          return;
-        }
-        if (account === null || account === saved?.enabled) return;
+        if (saved?.unsentAt != null) return true;
+        if (account === null || account === saved?.enabled) return false;
         yield* writeAnalyticsPreference(this.#path, account);
         this.#setTrackingEnabled(account);
+        return false;
       }),
     );
+    if (unsent) yield* this.#sendUnsent();
   }).bind(this);
 
+  // The account change after a send runs this again. It waits for the send, and then finds no unsent choice.
   readonly #sendUnsent = Effect.fn("AnalyticsPreferences.sendUnsent")(function* (this: AnalyticsPreferenceService) {
     yield* this.#sends.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -121,16 +121,6 @@ export class AnalyticsPreferenceService {
         );
       }),
     );
-  }).bind(this);
-
-  /** Sends a choice while the caller holds the write permit, then keeps the account's answer. */
-  readonly #send = Effect.fn("AnalyticsPreferences.send")(function* (
-    this: AnalyticsPreferenceService,
-    enabled: boolean,
-    unsentAt: number,
-  ) {
-    const account = yield* this.#request(enabled, unsentAt);
-    if (account !== undefined) yield* this.#keep(enabled, account);
   }).bind(this);
 
   /** The account's answer after the send, null when it has none, or undefined when signed out. */
