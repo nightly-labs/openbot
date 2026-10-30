@@ -741,7 +741,7 @@ provider added after v8 needs no new protocol version. The `providers-v8` routes
 The host hides a provider from a peer below v8 when that protocol's frozen list does not have it
 (`FROZEN_PROVIDERS` in `src/main/team-api/provider-visibility.ts`). So a new provider is hidden
 from old peers with no change there. Do not edit those lists. A key-only provider
-(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek and OpenRouter) is not in any frozen list, so a v8
+(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek, OpenRouter and Opper) is not in any frozen list, so a v8
 peer is the first to see it. The `providers-v8` key routes read, set and clear its key. A key set
 there starts the host's Pi download when Pi cannot start, and does not wait for it. Until Pi is
 ready no process uses the key, so the route saves only the key; the provider is checked again when Pi
@@ -993,6 +993,20 @@ Pi unchanged. The catalog drops the aliases that start with `~`, such as
 `anthropic/claude-sonnet-5.5`. The model picker groups the models by lab (`openRouterLab` in
 `provider-model-options.ts`) and marks the `:free` models as free. A 402 means the account has no
 credits. Peers see OpenRouter from v8, as Inception.
+
+## Opper
+
+Opper works as Inception does: a key-only provider on Pi's managed CLI, and Pi has no built-in Opper
+provider. The key is stored as the `opper` API key. The extension from `pi-key-providers.ts` calls
+`pi.registerProvider("opper", ...)` with Opper's OpenAI-compatible endpoint
+(`https://api.opper.ai/v3/compat`, `openai-completions`), the key, an `Authorization` header and a
+short model list. Opper is a gateway: one key reaches models from several labs. Model ids are Opper's
+bare ids, such as `claude-sonnet-5-5` or `gpt-6.1-sol`, and the client passes them to Pi unchanged.
+The limits in the list are the smallest that Opper's public catalog
+(`https://api.opper.ai/v3/models`) lists for a route of the id, and the prices are those of the lab's
+own route. A model gets a `thinkingLevelMap` only when every route of the id takes OpenAI's
+`reasoning_effort`, with the levels that the catalog lists. The default is `claude-sonnet-5-5`. Peers
+see Opper from v8, as Inception.
 
 ## Muse
 

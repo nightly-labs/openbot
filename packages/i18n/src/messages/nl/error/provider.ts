@@ -390,6 +390,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Voeg een Inception-API-sleutel toe om door te gaan.",
   "error.provider.deepseekSignIn": "Voeg een DeepSeek-API-sleutel toe om door te gaan.",
   "error.provider.openrouterSignIn": "Voeg een OpenRouter-API-sleutel toe om door te gaan.",
+  "error.provider.opperSignIn": "Voeg een Opper-API-sleutel toe om door te gaan.",
   "error.provider.terminalLoginFailed":
     "De inlogterminal kon niet openen. Open de CLI van de aanbieder op deze host, log daar in en vernieuw daarna de aanbieders.",
   "error.provider.nativeArchiveInvalid": "De download van de aanbieder bevat geen geldige installatie.",

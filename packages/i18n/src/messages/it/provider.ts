@@ -157,6 +157,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "Salva una chiave API di OpenRouter su questo computer per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.openrouterKey.label": "Chiave API di OpenRouter",
+  "provider.opperKey.title": "Chiave API di Opper",
+  "provider.opperKey.description":
+    "Salva una chiave API di Opper su questo computer per usare i modelli di Opper. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.opperKey.label": "Chiave API di Opper",
 
   "provider.openCodeKey.title": "Accedi a OpenCode Go",
   "provider.openCodeKey.description":

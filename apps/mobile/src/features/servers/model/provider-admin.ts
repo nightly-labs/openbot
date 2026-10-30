@@ -112,7 +112,7 @@ function runtimeProviders(capabilities: readonly string[]): readonly ManagedProv
 
 /**
  * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`, and
- * Inception, DeepSeek and OpenRouter from `providers-v8`.
+ * Inception, DeepSeek, OpenRouter and Opper from `providers-v8`.
  */
 function providerHasApiKey(provider: AgentProviderId, capabilities: readonly string[]): boolean {
   if (provider === "opencode") return true;

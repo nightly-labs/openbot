@@ -1271,6 +1271,18 @@ Pi keeps its session files in its own folder, as for Pi agents. OpenBot does not
 files. OpenRouter's terms apply: <https://openrouter.ai/terms>. OpenRouter agents stay on this
 computer: OpenBot does not show them to team members.
 
+### Opper
+
+Opper agents run in the Pi CLI that OpenBot downloads for Pi. On this computer, Connect on the Opper
+row saves an Opper API key. OpenBot encrypts it in its existing provider credential store, gives it
+to the local Pi process in its environment, and redacts it from logs. Pi does not write the key to a
+file. Prompts, attachments, and tool results go to that process, and Pi sends them with this key to
+`api.opper.ai`. Opper sends the request to the company that serves the selected model, and that
+company's terms also apply. When OpenBot reads the Opper model list, Pi reads the list that OpenBot
+gives it and does not contact Opper. Pi keeps its session files in its own folder, as for Pi agents.
+OpenBot does not copy or upload these files. Opper's terms apply: <https://opper.ai/terms>. Opper
+agents stay on this computer: OpenBot does not show them to team members.
+
 ### Local model servers
 
 When Server settings shows the Providers section of this computer, and once on the onboarding

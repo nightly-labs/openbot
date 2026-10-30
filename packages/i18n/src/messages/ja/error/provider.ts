@@ -400,6 +400,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "続行するには、Inception API キーを追加してください。",
   "error.provider.deepseekSignIn": "続けるには DeepSeek API キーを追加してください。",
   "error.provider.openrouterSignIn": "続けるには OpenRouter API キーを追加してください。",
+  "error.provider.opperSignIn": "続けるには Opper API キーを追加してください。",
   "error.provider.terminalLoginFailed":
     "サインイン用のターミナルを開けませんでした。このホストでプロバイダーの CLI を開いてサインインしてから、プロバイダーを更新してください。",
   "error.provider.nativeArchiveInvalid": "プロバイダーのダウンロードに有効なインストールが含まれていません。",

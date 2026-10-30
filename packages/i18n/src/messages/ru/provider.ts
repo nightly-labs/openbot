@@ -173,6 +173,10 @@ export const messages = {
   "provider.openrouterKey.description":
     "Сохраните ключ API OpenRouter на этом компьютере, чтобы использовать модели OpenRouter. OpenBot запускает их в загруженном Pi CLI.",
   "provider.openrouterKey.label": "Ключ API OpenRouter",
+  "provider.opperKey.title": "Ключ API Opper",
+  "provider.opperKey.description":
+    "Сохраните ключ API Opper на этом компьютере, чтобы использовать модели Opper. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.opperKey.label": "Ключ API Opper",
 
   "provider.openCodeKey.title": "Вход в OpenCode Go",
   "provider.openCodeKey.description": "Бесплатным моделям аккаунт не нужен. Ключ открывает платные модели Go.",
