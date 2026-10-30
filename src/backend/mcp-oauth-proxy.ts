@@ -237,10 +237,10 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
-    const client = this.#options.client;
-    const body = read && client ? withClientInfo(read, request, clientInfo(client, agentKey ?? null)) : read;
     const target = yield* this.#options.target(route);
-    if (!target) return signInNeeded(response, method, body);
+    if (!target) return signInNeeded(response, method, read);
+    const client = this.#options.client;
+    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
     if (!upstream) return signInNeeded(response, method, body);
     const headers: Record<string, string> = {};
@@ -307,10 +307,11 @@ interface ClientInfo {
  * agent, read at each `initialize`, so a rename shows in the next session.
  */
 function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): ClientInfo {
-  // Control characters and line breaks would break a label that a server shows on one line.
+  // Control characters and line breaks would break a label that a server shows on one line, and
+  // direction marks could make it read as the name of another agent.
   const agentName = agentKey ? client.agentName(agentKey) : null;
   const name = agentName
-    ? Array.from(agentName.replace(/\p{Cc}+/gu, " ").trim())
+    ? Array.from(agentName.replace(/[\p{Cc}\p{Zl}\p{Zp}\u200E\u200F\u202A-\u202E\u2066-\u2069]+/gu, " ").trim())
         .slice(0, MAX_AGENT_NAME_LENGTH)
         .join("")
         .trim()
@@ -324,10 +325,15 @@ function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): Clien
 }
 
 /**
- * The body with `info` as the `clientInfo` of each `initialize` request in it. Any other body, or
- * one that is not JSON, is returned as it is.
+ * The body with OpenBot as the `clientInfo` when it is an `initialize` request. Any other body is
+ * returned as it is. MCP does not let `initialize` be part of a batch, so a batch is not read.
  */
-function withClientInfo(body: Buffer, request: IncomingMessage, info: ClientInfo): Buffer {
+function withClientInfo(
+  body: Buffer,
+  request: IncomingMessage,
+  client: McpOAuthProxyClient,
+  agentKey: string | null,
+): Buffer {
   if (
     body.length > MAX_INITIALIZE_BYTES ||
     !request.headers["content-type"]?.toLowerCase().includes("json") ||
@@ -340,15 +346,9 @@ function withClientInfo(body: Buffer, request: IncomingMessage, info: ClientInfo
   } catch {
     return body;
   }
-  let changed = false;
-  const named = (message: unknown) => {
-    if (!isDynamicRecord(message) || message.method !== "initialize" || !isDynamicRecord(message.params))
-      return message;
-    changed = true;
-    return { ...message, params: { ...message.params, clientInfo: info } };
-  };
-  const rewritten = Array.isArray(parsed) ? parsed.map(named) : named(parsed);
-  return changed ? Buffer.from(JSON.stringify(rewritten)) : body;
+  if (!isDynamicRecord(parsed) || parsed.method !== "initialize" || !isDynamicRecord(parsed.params)) return body;
+  const params = { ...parsed.params, clientInfo: clientInfo(client, agentKey) };
+  return Buffer.from(JSON.stringify({ ...parsed, params }));
 }
 
 function allowedHost(host: string | undefined, port: number): boolean {

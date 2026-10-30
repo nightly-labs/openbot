@@ -642,7 +642,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     // Read at each `initialize`, so a rename here shows in the next session.
     const agents = [
       { id: "agent-research", name: "Research Bot" },
-      { id: "chief", name: "Ops\u0007\nBot" },
+      { id: "chief", name: "Ops\u0007\n\u202eBot" },
     ];
     const startGateway = () => {
       const gateway = new McpGateway({

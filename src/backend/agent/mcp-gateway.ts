@@ -131,7 +131,6 @@ export class McpGateway {
     this.#hooks = options.hooks;
     const oauth = this.#oauth;
     const agents = options.agents;
-    const logger = this.#logger;
     this.#proxy = new McpOAuthProxy({
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
@@ -140,15 +139,10 @@ export class McpGateway {
         ? {
             client: {
               version: credentials.appVersion,
-              agentName: (agentKey) => {
-                try {
-                  return agents?.().find((agent) => mcpOAuthProxyAgentKey(agent.id) === agentKey)?.name ?? null;
-                } catch (error) {
-                  // The server then sees "OpenBot" alone, which is still true.
-                  logger.warn("The agent name for an MCP server could not be read.", { cause: toLogValue(error) });
-                  return null;
-                }
-              },
+              // A scan, not a map filled by `endpoint`: a Codex session resumed after a restart sends
+              // its agent route before this process hands out any route.
+              agentName: (agentKey) =>
+                agents?.().find((agent) => mcpOAuthProxyAgentKey(agent.id) === agentKey)?.name ?? null,
             },
           }
         : {}),
