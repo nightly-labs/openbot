@@ -731,8 +731,17 @@ function actionableNodesExpression(limit: number): string {
     const roles = new Set(${JSON.stringify([...ACTIONABLE_ROLES])});
     const roots = [document];
     const seenRoots = new Set();
-    const matches = [];
+    // Controls in the viewport come first: on a long page, the controls above the scroll position
+    // would otherwise fill the budget. Offscreen controls fill what is left.
+    const inView = [];
+    const outside = [];
     let scanned = 0;
+    const isInView = node => {
+      const view = node.ownerDocument.defaultView;
+      const width = view?.innerWidth ?? 0;
+      const height = view?.innerHeight ?? 0;
+      return [...node.getClientRects()].some(rect => rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width);
+    };
     const isCandidate = node => {
       if (node.nodeType !== 1) return false;
       let element = node;
@@ -754,22 +763,25 @@ function actionableNodesExpression(limit: number): string {
       if (!semantic && !roles.has(explicitRole)) return false;
       return node.getClientRects().length > 0;
     };
-    while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && matches.length < ${Math.max(0, limit)}) {
+    const limit = ${Math.max(0, limit)};
+    while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
       let node;
-      while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && matches.length < ${Math.max(0, limit)}) {
+      while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;
         if (node.shadowRoot) roots.push(node.shadowRoot);
         if (node.localName === 'iframe' || node.localName === 'frame') {
           try { if (node.contentDocument) roots.push(node.contentDocument); } catch {}
         }
-        if (isCandidate(node)) matches.push(node);
+        if (!isCandidate(node)) continue;
+        if (isInView(node)) inView.push(node);
+        else if (outside.length < limit) outside.push(node);
       }
     }
-    return matches;
+    return [...inView, ...outside].slice(0, limit);
   })()`;
 }
 
