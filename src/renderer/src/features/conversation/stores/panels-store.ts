@@ -3,11 +3,12 @@ import {
   type BrowserBounds,
   canPreviewAttachment,
   type FileAction,
+  type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, type Store, type StoreSetter, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
 import { attachmentFilePreview } from "../attachment-preview";
 import { releaseFilePreviewPage } from "../conversation-port";
@@ -21,6 +22,7 @@ import type {
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
 import { filePreviewQuoteId } from "../quoted-text";
+import { runningTurnUpdate } from "./activity-store";
 import { conversationOwnerId } from "./composer-store";
 
 // Each member reads the interface language when it is called.
@@ -48,6 +50,9 @@ export interface SidePanelsState {
   subagents: Record<string, string>;
   threads: Record<string, string>;
 }
+
+/** While the agent's turn runs, the shown file is read again at most this often. */
+const FILE_PREVIEW_REFRESH_MS = 750;
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
 
@@ -403,6 +408,80 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId());
   }
 
+  /**
+   * An agent changes files in the steps of its turn. While the panel is open, each update of the
+   * running turn, and the end of the turn, reads the shown file or folder again. Opening the panel
+   * during a turn does not, because the open just read it.
+   */
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(
+    () => (filePreviewOpen() ? runningTurnUpdate(deps.props) : undefined),
+    (update, previous) => {
+      if (update === undefined || previous === undefined || refreshTimer !== undefined) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = undefined;
+        refreshSidebarFilePreview();
+      }, FILE_PREVIEW_REFRESH_MS);
+    },
+  );
+  onCleanup(() => clearTimeout(refreshTimer));
+
+  let refreshRequest = 0;
+  /**
+   * Reads the shown file or folder again, and shows the result only when it changed. A file that the
+   * user opened since, or a newer read, wins. A failed read keeps what the panel shows: a turn can
+   * move or delete the file, and the open file stays readable until the user closes it.
+   */
+  function refreshSidebarFilePreview() {
+    const file = deps.sidebarFilePreview();
+    if (!file || !filePreviewOpen() || file.source.kind === "attachment") return;
+    const { ownerAgentId, source } = file;
+    const generation = deps.currentFilePreviewGeneration();
+    const request = ++refreshRequest;
+    const current = () =>
+      scopeActive() &&
+      request === refreshRequest &&
+      generation === deps.currentFilePreviewGeneration() &&
+      deps.sidebarFilePreview()?.source === source;
+    const agent = conversationRuntime(deps.props).agent;
+    if (source.kind === "workspace-folder") {
+      void agent.listWorkspaceDirectory({ agentId: source.agentId, path: source.path }).then(
+        (directory) => {
+          if (!current() || JSON.stringify(directory) === JSON.stringify(file.directory)) return;
+          deps.setSidebarFilePreview({ ownerAgentId, source, preview: null, directory });
+        },
+        () => undefined,
+      );
+      return;
+    }
+    const read =
+      source.kind === "shared"
+        ? agent.previewSharedFile({ path: source.path })
+        : agent.previewWorkspaceFile({ agentId: source.agentId, path: source.path });
+    void read.then(
+      (preview) => {
+        if (!current() || (file.preview && samePreview(preview, file.preview))) {
+          releaseFilePreviewPage(preview.pageUrl);
+          return;
+        }
+        deps.setSidebarFilePreview({ ownerAgentId, source, preview });
+      },
+      () => undefined,
+    );
+  }
+
+  /**
+   * Names the file or folder that the side panel shows. A preview read again keeps the key, so the
+   * panel keeps its view of the file.
+   */
+  function previewFileKey(): string | undefined {
+    const source = deps.sidebarFilePreview()?.source;
+    if (!source) return undefined;
+    if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
+    if (source.kind === "shared") return `shared\u0000${source.path}`;
+    return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
+  }
+
   /** The quote id of the file that the side panel shows. See `filePreviewQuoteId`. */
   function previewQuoteId(): string | undefined {
     const file = deps.sidebarFilePreview();
@@ -507,6 +586,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -530,4 +610,18 @@ function filePreviewError(error: unknown, path: string): string {
     return t("attachment.error.fileNotFound", { name });
   }
   return errorMessage(error, t("attachment.error.previewFile", { name }));
+}
+
+/** The same file content, so a read again need not replace the shown one. */
+function samePreview(next: FilePreview, shown: FilePreview): boolean {
+  if (
+    next.name !== shown.name ||
+    next.size !== shown.size ||
+    next.mimeType !== shown.mimeType ||
+    next.previewKind !== shown.previewKind
+  )
+    return false;
+  const shownBytes = shown.bytes;
+  if (!next.bytes || !shownBytes) return next.bytes === shownBytes;
+  return next.bytes.length === shownBytes.length && next.bytes.every((byte, index) => byte === shownBytes[index]);
 }
