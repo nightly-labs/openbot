@@ -129,7 +129,7 @@ import {
 } from "@openbot/contracts/ipc-decoding";
 import { type LicenseState, parseLicenseState } from "@openbot/contracts/license";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
-import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
@@ -253,7 +253,15 @@ function decodeCentralAuthUser(value: unknown): CentralAuthUser {
     email: requiredString(user, "email"),
     name: nullableString(user, "name"),
     avatarUrl: nullableString(user, "avatarUrl"),
+    ...optionalAnalyticsEnabled(user),
   };
+}
+
+function optionalAnalyticsEnabled(user: DynamicRecord): Pick<CentralAuthUser, "analyticsEnabled"> {
+  const { analyticsEnabled } = user;
+  if (analyticsEnabled === undefined) return {};
+  if (analyticsEnabled !== null && !isBoolean(analyticsEnabled)) throw new Error("Invalid analyticsEnabled.");
+  return { analyticsEnabled };
 }
 
 function decodeCentralAuthIssue(value: unknown): CentralAuthIssue {

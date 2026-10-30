@@ -161,7 +161,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "Server-Standard ({level})",
   "agentSettings.notificationLevel.note":
     "Diese Wahl gilt nur für dich, auf allen deinen Geräten. Ist der Server stummgeschaltet oder auf „Nichts“ gesetzt, bleibt auch dieser Agent still.",
-  "agentSettings.notificationLevel.sharedOff": "Benachrichtigungen für diesen Agent sind für alle Mitglieder aus.",
   "agentSettings.newChat.title": "Neuer Chat",
   "agentSettings.newChat.description": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",
   "agentSettings.newChat.button": "Starten",

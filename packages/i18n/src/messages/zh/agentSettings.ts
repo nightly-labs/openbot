@@ -156,7 +156,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "服务器默认（{level}）",
   "agentSettings.notificationLevel.note":
     "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
-  "agentSettings.notificationLevel.sharedOff": "此助手的通知已对所有成员关闭。",
 
   "agentSettings.newChat.title": "新对话",
   "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",

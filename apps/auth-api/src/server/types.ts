@@ -164,6 +164,8 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /** The latest product analytics answer from any device. Null until the user answers. */
+  analyticsEnabled: boolean | null;
 }
 
 export interface MobileAuthDevice {
@@ -263,6 +265,12 @@ export interface AuthRepository {
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserAnalytics(
+    userId: string,
+    enabled: boolean,
+    answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,

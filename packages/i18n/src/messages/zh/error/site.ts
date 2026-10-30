@@ -27,4 +27,13 @@ export const messages = {
   "error.site.fileType": "不允许使用该文件类型：{path}",
   "error.site.fileOutsideRoot": "站点文件必须位于源根目录内：{path}",
   "error.site.fileTooLarge": "某个文件超过了 1 MB 上限：{path}",
+  "error.site.serverLimit": {
+    one: "该服务器已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
+    other: "该服务器已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
+  },
+  "error.site.unlinkedLimit": {
+    one: "该电脑不是服务器，其账户已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
+    other:
+      "该电脑不是服务器，其账户已达到 {count} 个活跃站点的上限。要发布其他站点，请删除一个站点，或使用站点更多套餐的云服务器。",
+  },
 } as const satisfies PartialTranslation<typeof source>;

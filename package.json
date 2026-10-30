@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -194,6 +194,7 @@
     "test:browser": "bun scripts/browser-smoke.ts",
     "test:browser-agent-session": "bun scripts/browser-agent-session-e2e.ts",
     "test:browser-steps": "bun scripts/browser-steps-e2e.ts",
+    "test:browser-dialogs": "bun scripts/browser-dialogs-e2e.ts",
     "test:browser-profile-agents": "bun scripts/browser-profile-agents-e2e.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
     "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
@@ -460,7 +461,8 @@
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
-    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch"
+    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
+    "cuelume@0.2.8": "patches/cuelume@0.2.8.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

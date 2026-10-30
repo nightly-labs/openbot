@@ -26,4 +26,14 @@ export const messages = {
   "error.site.fileType": "Dit bestandstype is niet toegestaan: {path}",
   "error.site.fileOutsideRoot": "Sitebestanden moeten in de hoofdmap van de bron blijven: {path}",
   "error.site.fileTooLarge": "Een bestand is groter dan de limiet van 1 MB: {path}",
+  "error.site.serverLimit": {
+    one: "Deze server heeft de limiet van {count} actieve site bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
+    other:
+      "Deze server heeft de limiet van {count} actieve sites bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
+  },
+  "error.site.unlinkedLimit": {
+    one: "Deze computer is geen server, en het account heeft de limiet van {count} actieve site bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
+    other:
+      "Deze computer is geen server, en het account heeft de limiet van {count} actieve sites bereikt. Verwijder een site of gebruik een cloudserver met een abonnement met meer sites om nog een site te publiceren.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

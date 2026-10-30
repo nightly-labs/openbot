@@ -20,7 +20,7 @@ import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
-import { resolveHostedSiteScope } from "./hosted-site-server";
+import { adoptUnlinkedHostedSites, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
 import { type ApnsRelaySender, sharedApnsSender } from "./live-activity-relay";
@@ -92,6 +92,11 @@ export function requestAgentTemplates(): AgentTemplates {
 /** The sites that a signed-in `/v1/sites` request can see and change. See `resolveHostedSiteScope`. */
 export function requestHostedSiteScope(request: Request, userId: string) {
   return resolveHostedSiteScope(requireWorkerBindings(env).DB, userId, request);
+}
+
+/** Moves the account's sites from before a self-hosted server registered into it. See `adoptUnlinkedHostedSites`. */
+export function requestAdoptUnlinkedHostedSites(userId: string, serverId: string) {
+  return adoptUnlinkedHostedSites(requireWorkerBindings(env).DB, userId, serverId, Date.now());
 }
 
 export function requestHostedSiteService(): HostedSiteService {

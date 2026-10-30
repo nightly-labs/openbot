@@ -166,7 +166,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
   "agentSettings.notificationLevel.note":
     "Ce choix ne concerne que vous, sur tous vos appareils. Si le serveur est en sourdine ou réglé sur « Rien », cet agent reste aussi silencieux.",
-  "agentSettings.notificationLevel.sharedOff": "Les notifications de cet agent sont désactivées pour tous les membres.",
 
   "agentSettings.newChat.title": "Nouvelle discussion",
   "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",

@@ -223,6 +223,8 @@ export interface MockOpenBotOptions
     MockRoutineResultsOptions {
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
+  /** The first value of the first-run analytics box. Clear, as in a region that asks for consent. */
+  analyticsDefault?: boolean;
   languagePreference?: AppLanguagePreference;
   setupState?: AppSetupState;
   agentStatus?: AgentStatus;
@@ -1084,10 +1086,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // Only a joined admin changes the setup from outside the window, and the preview has none.
     onSetupState: () => () => undefined,
     getAnalyticsPreference: async () => clone(analyticsPreference),
+    getAnalyticsDefault: async () => ({ enabled: options.analyticsDefault ?? false }),
     setAnalyticsPreference: async ({ enabled }) => {
       analyticsPreference = { enabled };
       return clone(analyticsPreference);
     },
+    onAnalyticsPreference: () => () => undefined,
     getApprovalAutomation: async () => clone(approvalAutomation),
     onApprovalAutomation: (listener) => {
       approvalAutomationListeners.add(listener);

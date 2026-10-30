@@ -60,6 +60,7 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "많은 에이전트와 무거운 브라우저 작업을 위한 요금제예요.",
   "mobile.server.hosted.members": { other: "최대 멤버 {count}명" },
   "mobile.server.hosted.storage": { other: "저장 공간 {count}GB" },
+  "mobile.server.hosted.sites": { other: "호스팅 사이트 최대 {count}개" },
   "mobile.server.hosted.speedBase": "기본 속도",
   "mobile.server.hosted.speedFaster": "{factor}배 빠름",
   "mobile.server.hosted.joinHint": "서버 소유자에게 받은 초대를 사용하세요.",
@@ -67,7 +68,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "에이전트가 항상 켜져 있어요",
   "mobile.server.hosted.intro.description":
     "컴퓨터가 꺼져 있어도 클라우드 서버가 에이전트와 루틴을 실행해요. OpenBot이 설정하고 계속 실행 상태를 유지해요.",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "컴퓨터에서",
   "mobile.server.hosted.computer.add": "클라우드 서버 추가",
   "mobile.server.hosted.computer.addHint": "OpenBot에서 설정 → 호스팅 서버를 열고 서버 추가를 선택하세요.",

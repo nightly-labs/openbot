@@ -324,7 +324,7 @@ export class DrainScheduler {
     if (!this.#duplication.mayDrain(agentId)) return "duplication";
     if (this.#compactionHolds(lane)) return "compaction";
     if (!this.#routines.mayDrain(agentId)) return "routine";
-    if (!this.#usageLimits.mayDrain(agentId)) return "usage-limit";
+    if (!this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId)) return "usage-limit";
     return null;
   }
 
@@ -554,6 +554,8 @@ export class DrainScheduler {
           return;
         }
       }
+      // One message from the user lets one turn try a limit, so the other lanes stay held.
+      this.#usageLimits.tryStarted(agentId);
       yield* this.startDelivery(context, planNote ?? undefined);
     }).pipe(
       Effect.ensuring(

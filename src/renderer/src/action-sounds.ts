@@ -34,7 +34,7 @@ export function readActionSoundTheme(storage?: PreferenceStorage): SoundTheme {
   }
 }
 
-/** The sound picker value: "off", or the saved theme. */
+/** The sound menu value: "off", or the saved theme. */
 export function readActionSoundChoice(): SoundChoice {
   return isActionSoundEnabled() ? readActionSoundTheme() : "off";
 }
@@ -50,8 +50,8 @@ function savePreference(key: string, value: string): boolean {
 }
 
 /**
- * Saves a sound picker choice and plays it. "off" keeps the theme, so the next time the user turns
- * the sounds on, the picker shows the theme from before.
+ * Saves a sound menu choice and plays it. "off" keeps the theme, so the next time the user turns
+ * the sounds on, the menu shows the theme from before.
  */
 export function setActionSoundChoice(choice: SoundChoice): void {
   const enabled = choice !== "off";
@@ -64,14 +64,9 @@ export function setActionSoundChoice(choice: SoundChoice): void {
   unsavedTheme = savePreference(ACTION_SOUNDS_THEME_STORAGE_KEY, choice) ? undefined : choice;
   setEnabled(true);
   setTheme(choice);
-  // The picker's own click is skipped while the sounds are off, and it does not name a theme, so the
+  // The menu's own click is skipped while the sounds are off, and it does not name a theme, so the
   // preview plays here.
   play("success", { theme: choice });
-}
-
-/** Plays the preview of the selected theme again. "Off" stays silent. */
-export function replayActionSoundChoice(choice: SoundChoice): void {
-  if (choice !== "off") play("success", { theme: choice });
 }
 
 function applySavedChoice(): void {

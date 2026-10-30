@@ -63,6 +63,7 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "适合多个助手和繁重的浏览器工作。",
   "mobile.server.hosted.members": { one: "最多 {count} 名成员", other: "最多 {count} 名成员" },
   "mobile.server.hosted.storage": { one: "{count} GB 存储空间", other: "{count} GB 存储空间" },
+  "mobile.server.hosted.sites": { one: "最多 {count} 个托管站点", other: "最多 {count} 个托管站点" },
   "mobile.server.hosted.speedBase": "基础速度",
   "mobile.server.hosted.speedFaster": "快 {factor} 倍",
   "mobile.server.hosted.joinHint": "使用服务器所有者给你的邀请。",
@@ -70,8 +71,8 @@ export const messages = {
   "mobile.server.hosted.intro.title": "你的助手，永不掉线",
   "mobile.server.hosted.intro.description":
     "即使你的电脑关机，云服务器也会运行你的助手和自动化任务。OpenBot 负责配置并保持它运行。",
-  // {members}, {storage} and {speed} are the texts of the three facts of a plan.
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  // {members}, {storage}, {sites} and {speed} are the texts of the four facts of a plan.
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   // The steps on the desktop app. The names after "Settings" are the desktop Settings tabs and buttons.
   "mobile.server.hosted.computer.title": "在你的电脑上",
   "mobile.server.hosted.computer.add": "添加云服务器",

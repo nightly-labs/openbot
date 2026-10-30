@@ -257,7 +257,6 @@ interface AgentSettingsDraft {
   avatar: AvatarEditor;
   dirty: Record<keyof AgentTextFields, boolean>;
   fields: AgentTextFields;
-  notifications: boolean;
   permission: AgentPermissionLevel;
   computerUse: boolean;
   allowAutomation: boolean;
@@ -300,7 +299,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
     dirty: { description: false, name: false, title: false },
     fields: { description: "", name: "", title: "" },
-    notifications: true,
     permission: untrack(() => currentPermission()),
     computerUse: true,
     allowAutomation: false,
@@ -461,7 +459,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agent.name,
           agent.title,
           agent.description,
-          String(agent.notifications),
           currentPermission(),
           String(agentComputerUseEnabled(agent)),
           String(agentAutomationAllowed(agent, agentDefaults())),
@@ -506,7 +503,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           if (!keep.name) state.fields.name = agent.name;
           if (!keep.title) state.fields.title = agent.title;
           if (!keep.description) state.fields.description = agent.description;
-          state.notifications = agent.notifications;
           state.permission = currentPermission();
           state.computerUse = agentComputerUseEnabled(agent);
           state.allowAutomation = agentAutomationAllowed(agent, agentDefaults());
@@ -1372,9 +1368,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                       />
                     </SettingsLinkGroup>
                     <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
-                      {draft.notifications
-                        ? t("agentSettings.notificationLevel.note")
-                        : t("agentSettings.notificationLevel.sharedOff")}
+                      {t("agentSettings.notificationLevel.note")}
                     </Text>
                   </>
                 )}

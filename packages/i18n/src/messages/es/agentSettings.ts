@@ -160,8 +160,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "Predeterminado del servidor ({level})",
   "agentSettings.notificationLevel.note":
     "Esta opción es solo para ti y se aplica en todos tus dispositivos. Si el servidor está silenciado o en «Nada», este agente también queda en silencio.",
-  "agentSettings.notificationLevel.sharedOff":
-    "Las notificaciones de este agente están desactivadas para todos los miembros.",
   "agentSettings.newChat.title": "Nuevo chat",
   "agentSettings.newChat.description": "El agente olvida este chat. Se conserva su configuración.",
   "agentSettings.newChat.button": "Iniciar",

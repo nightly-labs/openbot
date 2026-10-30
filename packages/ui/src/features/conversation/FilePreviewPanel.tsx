@@ -9,6 +9,8 @@ import {
   File,
   Folder,
   FolderOpen,
+  LabelTooltip,
+  LabelTooltipTrigger,
   WrapText,
   X,
 } from "@openbot/ui";
@@ -19,6 +21,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 
 import { MediaFilePreview } from "./MediaFilePreview";
@@ -210,15 +213,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       <header class="file-preview-header">
         <Show when={props.onBack}>
           {(back) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.back")}
-              onClick={() => back()()}
-            >
+            <HeaderButton label={t("preview.panel.back")} onClick={() => back()()}>
               <ArrowLeft class="browser-toolbar-icon" />
-            </Button>
+            </HeaderButton>
           )}
         </Show>
         <Show when={props.directory} fallback={<File class="file-preview-file-icon" />}>
@@ -226,98 +223,63 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <h2 title={props.directory?.path ?? title()}>{title()}</h2>
         <Show when={previewKind() === "markdown"}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.rawMarkdown")}
-            aria-pressed={rawSource() ? "true" : "false"}
+          <HeaderButton
+            label={t("preview.panel.rawMarkdown")}
+            pressed={rawSource()}
             onClick={() => setRawSource((raw) => !raw)}
           >
             <Code class="browser-toolbar-icon" />
-          </Button>
+          </HeaderButton>
         </Show>
         <Show when={hasPage()}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.rawHtml")}
-            aria-pressed={rawSource() ? "true" : "false"}
+          <HeaderButton
+            label={t("preview.panel.rawHtml")}
+            pressed={rawSource()}
             onClick={() => setRawSource((raw) => !raw)}
           >
             <Code class="browser-toolbar-icon" />
-          </Button>
+          </HeaderButton>
         </Show>
         <Show when={showsSourceText()}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.wrapLines")}
-            aria-pressed={wrapLines() ? "true" : "false"}
-            onClick={toggleWrapLines}
-          >
+          <HeaderButton label={t("preview.panel.wrapLines")} pressed={wrapLines()} onClick={toggleWrapLines}>
             <WrapText class="browser-toolbar-icon" />
-          </Button>
+          </HeaderButton>
         </Show>
         <Show when={source()}>
           {(value) => (
-            <CopyButton
-              class="browser-toolbar-button file-preview-copy"
-              value={value()}
-              label={t("preview.panel.copy")}
-              iconOnly
-            />
+            <LabelTooltip content={t("preview.panel.copy")}>
+              <LabelTooltipTrigger
+                as={CopyButton}
+                class="browser-toolbar-button file-preview-copy"
+                value={value()}
+                label={t("preview.panel.copy")}
+                iconOnly
+              />
+            </LabelTooltip>
           )}
         </Show>
         <Show when={file() && props.allowExternalOpen !== false}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.openExternally")}
-            onClick={props.onOpenExternally}
-          >
+          <HeaderButton label={t("preview.panel.openExternally")} onClick={props.onOpenExternally}>
             <ExternalLink class="browser-toolbar-icon" />
-          </Button>
+          </HeaderButton>
         </Show>
         <Show when={file() && props.onDownload}>
           {(download) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.download")}
-              onClick={() => download()()}
-            >
+            <HeaderButton label={t("preview.panel.download")} onClick={() => download()()}>
               <Download class="browser-toolbar-icon" />
-            </Button>
+            </HeaderButton>
           )}
         </Show>
         <Show when={file() && props.onReveal}>
           {(reveal) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.reveal")}
-              onClick={() => reveal()()}
-            >
+            <HeaderButton label={t("preview.panel.reveal")} onClick={() => reveal()()}>
               <FolderOpen class="browser-toolbar-icon" />
-            </Button>
+            </HeaderButton>
           )}
         </Show>
-        <Button
-          variant="ghost"
-          type="button"
-          class="browser-toolbar-button"
-          aria-label={t("preview.panel.close")}
-          data-cuelume-tap="close"
-          onClick={props.onClose}
-        >
+        <HeaderButton label={t("preview.panel.close")} data-cuelume-tap="close" onClick={props.onClose}>
           <X class="browser-toolbar-icon" />
-        </Button>
+        </HeaderButton>
       </header>
       <div class="file-preview-content">
         <Show when={props.directory}>
@@ -430,6 +392,33 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
       </div>
     </aside>
+  );
+}
+
+/** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
+function HeaderButton(props: {
+  label: string;
+  pressed?: boolean;
+  onClick: () => void;
+  "data-cuelume-tap"?: string;
+  children: JSX.Element;
+}) {
+  const pressed = () => (props.pressed === undefined ? undefined : String(props.pressed));
+  return (
+    <LabelTooltip content={props.label}>
+      <LabelTooltipTrigger
+        as={Button}
+        variant="ghost"
+        type="button"
+        class="browser-toolbar-button"
+        aria-label={props.label}
+        aria-pressed={pressed()}
+        data-cuelume-tap={props["data-cuelume-tap"]}
+        onClick={() => props.onClick()}
+      >
+        {props.children}
+      </LabelTooltipTrigger>
+    </LabelTooltip>
   );
 }
 

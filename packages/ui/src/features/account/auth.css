@@ -153,6 +153,12 @@
   margin-top: 24px;
 }
 
+/* The lock line and any fine print under it read as one footer. */
+.account-login-footer {
+  display: grid;
+  gap: 4px;
+}
+
 .account-login-local-data {
   margin: 4px 0 0;
   color: var(--openbot-text-muted);

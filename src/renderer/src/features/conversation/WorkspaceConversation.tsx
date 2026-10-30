@@ -467,13 +467,12 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   createEffect(
     () => {
       const ask = usageLimitAsk();
-      return ask ? `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}` : null;
+      return ask ? { key: `${activeAgent()?.id ?? ""}:${ask.resetsAt ?? ""}`, provider: ask.provider } : null;
     },
-    (key) => {
-      const ask = usageLimitAsk();
-      if (!key || !ask || shownUsageLimits.has(key)) return;
-      shownUsageLimits.add(key);
-      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: ask.provider });
+    (shown) => {
+      if (!shown || shownUsageLimits.has(shown.key)) return;
+      shownUsageLimits.add(shown.key);
+      desktopAnalytics.track("usage_limit_action", { action: "shown", from_provider: shown.provider });
     },
   );
 

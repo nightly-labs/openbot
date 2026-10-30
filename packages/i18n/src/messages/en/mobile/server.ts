@@ -62,6 +62,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.plan.proSummary": "For many agents and heavy browser work.",
   "mobile.server.hosted.members": { one: "Up to {count} member", other: "Up to {count} members" },
   "mobile.server.hosted.storage": { one: "{count} GB storage", other: "{count} GB storage" },
+  "mobile.server.hosted.sites": { one: "Up to {count} hosted site", other: "Up to {count} hosted sites" },
   "mobile.server.hosted.speedBase": "Base speed",
   "mobile.server.hosted.speedFaster": "{factor}× faster",
   "mobile.server.hosted.joinHint": "Use an invitation from a server owner.",
@@ -69,8 +70,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.intro.title": "Your agents, always on",
   "mobile.server.hosted.intro.description":
     "A cloud server runs your agents and routines when your computer is off. OpenBot sets it up and keeps it running.",
-  // {members}, {storage} and {speed} are the texts of the three facts of a plan.
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  // {members}, {storage}, {sites} and {speed} are the texts of the four facts of a plan.
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   // The steps on the desktop app. The names after "Settings" are the desktop Settings tabs and buttons.
   "mobile.server.hosted.computer.title": "On your computer",
   "mobile.server.hosted.computer.add": "Add a cloud server",

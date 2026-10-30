@@ -161,7 +161,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "Sunucu varsayılanı ({level})",
   "agentSettings.notificationLevel.note":
     "Bu seçim yalnızca sizin için geçerlidir ve tüm cihazlarınızda uygulanır. Sunucu sessize alınmışsa veya “Hiçbir şey” seçiliyse bu ajan da sessiz kalır.",
-  "agentSettings.notificationLevel.sharedOff": "Bu ajanın bildirimleri tüm üyeler için kapalı.",
   "agentSettings.newChat.title": "Yeni sohbet",
   "agentSettings.newChat.description": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
   "agentSettings.newChat.button": "Başlat",

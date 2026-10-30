@@ -29,6 +29,32 @@
   display: none;
 }
 
+/* The analytics box of the sign-in form is a line of the form, not a row of a grouped list. */
+.web-consent-row.first-run-choice-improve {
+  align-items: flex-start;
+  border-top: 0;
+  padding: var(--openbot-space-1) 0 0;
+}
+
+.web-consent-row .ui-checkbox {
+  margin-top: 1px;
+}
+
+/* Under the box, the lock line and the Terms notice form the footer of the form. */
+.web-consent-row + .account-login-footer {
+  margin-top: var(--openbot-space-3);
+}
+
+.account-login-footer .first-run-consent-notice {
+  width: 100%;
+  margin: 0;
+}
+
+.web-consent-row .first-run-choice-improve-pop {
+  top: 0;
+  right: 0;
+}
+
 @media (max-width: 720px) {
   .web-app-window {
     --web-mobile-navigation-height: 64px;

@@ -75,6 +75,12 @@ export const messages = {
     many: "Хранилище: {count} ГБ",
     other: "Хранилище: {count} ГБ",
   },
+  "mobile.server.hosted.sites": {
+    one: "До {count} размещённого сайта",
+    few: "До {count} размещённых сайтов",
+    many: "До {count} размещённых сайтов",
+    other: "До {count} размещённого сайта",
+  },
   "mobile.server.hosted.speedBase": "Базовая скорость",
   "mobile.server.hosted.speedFaster": "{factor}× быстрее",
   "mobile.server.hosted.joinHint": "Используйте приглашение от владельца сервера.",
@@ -82,7 +88,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "Ваши агенты всегда на связи",
   "mobile.server.hosted.intro.description":
     "Облачный сервер выполняет ваших агентов и регулярные задачи, когда компьютер выключен. OpenBot настраивает его и поддерживает в рабочем состоянии.",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "На компьютере",
   "mobile.server.hosted.computer.add": "Добавить облачный сервер",
   "mobile.server.hosted.computer.addHint":

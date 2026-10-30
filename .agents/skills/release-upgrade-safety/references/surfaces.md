@@ -57,7 +57,7 @@ use the key-inventory diff there instead. Derive the set rather than reading it 
 | `openbot:left-panel-collapsed`, `openbot:left-panel-width` | `src/renderer/src/layout.tsx`, `layout-constants.ts` |
 | `openbot:browser-panel-width`, `openbot:browser-pip-native-bounds` | `src/renderer/src/features/conversation/FilePreviewPanel.tsx`, `conversation-controller.ts` |
 | `openbot:settings-panel-width` | `src/renderer/src/features/settings/settings-context.tsx` |
-| `openbot:completion-sound-enabled` | `src/renderer/src/completion-sound.ts` |
+| `openbot:completion-sound-enabled`, `openbot:task-sound` | `src/renderer/src/completion-sound.ts`. The app writes both keys; `"false"` in the old key reads as Off, so an older version keeps the choice |
 | `openbot:analytics-app-version` | `src/renderer/src/App.tsx` |
 | `openbot:landing-preview-ready`, `openbot:landing-preview-start` | `packages/contracts/src/landing-preview-messages.ts` |
 

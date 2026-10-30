@@ -163,7 +163,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
   "agentSettings.notificationLevel.note":
     "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",
-  "agentSettings.notificationLevel.sharedOff": "このエージェントの通知は、すべてのメンバーに対してオフです。",
 
   "agentSettings.newChat.title": "新しいチャット",
   "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",

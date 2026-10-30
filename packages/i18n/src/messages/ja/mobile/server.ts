@@ -60,6 +60,7 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "多数のエージェントとブラウザーの多用向け。",
   "mobile.server.hosted.members": { other: "最大 {count} 人のメンバー" },
   "mobile.server.hosted.storage": { other: "{count} GB のストレージ" },
+  "mobile.server.hosted.sites": { other: "最大 {count} 件の公開サイト" },
   "mobile.server.hosted.speedBase": "標準の速度",
   "mobile.server.hosted.speedFaster": "{factor} 倍の速度",
   "mobile.server.hosted.joinHint": "サーバーのオーナーからの招待を使います。",
@@ -67,7 +68,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "エージェントを常に稼働",
   "mobile.server.hosted.intro.description":
     "クラウドサーバーは、コンピューターの電源が切れていてもエージェントとルーティンを実行します。セットアップと運用は OpenBot が行います。",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "コンピューターで",
   "mobile.server.hosted.computer.add": "クラウドサーバーを追加",
   "mobile.server.hosted.computer.addHint":

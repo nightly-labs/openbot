@@ -4700,6 +4700,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#conversation.emitConversation(snapshot);
     }
     this.#mailboxSync.emitQueue(agent.id);
+    this.#usageLimits.retry(agent.id);
     this.#drain.scheduleDrain(agent.id);
     return receipt;
   }, Effect.uninterruptible).bind(this);

@@ -4,14 +4,16 @@
 // the usage limit gate holds the agent. Cases: the credits are read; a reset answers `reset`, spends one
 // credit with one idempotency key, and the held message runs; a second reset with no spent limit answers
 // `nothingToReset`, spends none, and ends a hold that a refused turn left; a credential change, as when a
-// key is saved, ends a hold; another provider is refused.
+// key is saved, ends a hold; a message from the user tries one turn before the reset, which a spent
+// plan refuses again with no second notice, and which runs the held messages after the account changed
+// outside OpenBot; another provider is refused.
 // `bun scripts/codex-usage-reset-e2e.ts`. Writes .openbot-build/codex-usage-reset-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -22,6 +24,9 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const consumeLog = join(root, "consumed.jsonl");
 const refusedLog = join(root, "refused.jsonl");
+const turnLog = join(root, "turns.jsonl");
+/** Its presence makes the next turn find a new account with an unspent plan, as a sign-in in a terminal does. */
+const switchedFlag = join(root, "switched");
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -40,7 +45,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
  * plan, and while the plan is spent each turn fails as Codex fails it. A reset credit restores it.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
-const { appendFileSync, existsSync, readFileSync } = require("node:fs");
+const { appendFileSync, existsSync, readFileSync, rmSync } = require("node:fs");
 if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
   process.exit(0);
@@ -89,6 +94,9 @@ const answer = (message) => {
       // Unique across a restart, as Codex turn ids are: the service ignores the end of a turn id it saw end.
       const turnId = "turn-" + process.pid + "-" + (++turns);
       if (!hit && JSON.stringify(params.input).includes("limit")) { hit = true; spent = true; }
+      if (JSON.stringify(params.input).includes("Exhaust")) spent = true;
+      if (existsSync(${JSON.stringify(switchedFlag)})) { rmSync(${JSON.stringify(switchedFlag)}); spent = false; }
+      appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify(params.input) + "\\n");
       // A refusal that the plan does not show, as when Codex counted a limit that ended since. Once per
       // message, also across a restart, so the retry of a released message runs.
       const input = JSON.stringify(params.input);
@@ -168,6 +176,14 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
     if (value) return value;
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}.`);
     await new Promise((done) => setTimeout(done, 25));
+  }
+}
+
+function turnInputs(): string[] {
+  try {
+    return readFileSync(turnLog, "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
@@ -281,6 +297,55 @@ try {
   );
   assert.equal(consumed().length, 2, "A credential change spends no reset credit.");
   report.cases.push({ name: "a credential change ends a hold", details: null, passed: true });
+
+  // The plan is spent and the reading names its reset an hour away, so the gate waits for it.
+  const notices: number[] = [];
+  const onEvent = (event: AgentEvent) => {
+    if (event.type === "usage-limit-reached" && event.agentId === agent.id) notices.push(event.agentCount);
+  };
+  agents.on("event", onEvent);
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Exhaust the plan." }));
+  const spentHold = await waitFor("the spent plan to hold the agent", () =>
+    agents.getRuntimeSnapshot().usageLimits?.find((limit) => limit.agentId === agent.id && limit.resetsAt !== null),
+  );
+  await waitFor("the first notice", () => notices.length === 1);
+  // A message from the user tries one turn. The plan is still spent, so the turn is refused, both
+  // messages wait again, and the user is not told about the same limit twice.
+  const turnsBefore = turnInputs().length;
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Still spent?" }));
+  await waitFor("the user's message to try a turn", () => turnInputs().length > turnsBefore);
+  const stillHeld = await waitFor("the refused try to hold both messages again", () => {
+    const statuses = agents
+      .listQueue(agent.id)
+      .deliveries.map((delivery) => delivery.status)
+      .filter((status) => status !== "completed");
+    return (
+      statuses.length === 2 &&
+      statuses.every((status) => status === "queued") &&
+      agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id) &&
+      statuses
+    );
+  });
+  assert.equal(notices.length, 1, "A refused try does not announce the limit again.");
+  assert.equal(turnInputs().length, turnsBefore + 1, "One message from the user tries one turn.");
+  // The user signs Codex in to another account outside OpenBot. Nothing tells the gate, so only a
+  // new message tries again, long before the old account's reset.
+  writeFileSync(switchedFlag, "");
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "After the account switch." }));
+  await waitFor("the held messages to run on the new account", () =>
+    agents.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+  );
+  assert.ok(
+    !agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
+    "A completed try ends the limit.",
+  );
+  assert.equal(consumed().length, 2, "A try spends no reset credit.");
+  agents.off("event", onEvent);
+  report.cases.push({
+    name: "a message from the user tries one turn before the reset",
+    details: { spentHold, stillHeld, notices },
+    passed: true,
+  });
 
   const refused = await runCauseEffect(agents.resetProviderUsage("claude", DEFAULT_PROVIDER_ACCOUNT_ID)).then(
     () => null,
