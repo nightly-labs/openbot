@@ -53,7 +53,7 @@ export const DESKTOP_USE_MS = 30 * 1000;
  * about 30 s later, or about 150 s when only Signal reports it. An event in that time is kept this
  * long, and goes out when the phone turns out to be away and the member has not seen it.
  */
-export const HELD_EVENT_MS = 5 * 60 * 1000;
+const HELD_EVENT_MS = 5 * 60 * 1000;
 /** The most events kept for one phone. */
 const HELD_EVENT_LIMIT = 20;
 /**

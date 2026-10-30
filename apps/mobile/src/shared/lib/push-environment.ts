@@ -12,7 +12,7 @@ let environment: Promise<PushEnvironment> | null = null;
  * Xcode signs for a device gets tokens of the sandbox, and Apple refuses them in production. An App
  * Store or TestFlight build has no profile in the app, and gets production tokens.
  */
-export function loadPushEnvironment(): Promise<PushEnvironment> {
+function loadPushEnvironment(): Promise<PushEnvironment> {
   environment ??= readPushEnvironment();
   return environment;
 }
