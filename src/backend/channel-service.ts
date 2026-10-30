@@ -2074,6 +2074,10 @@ export class ChannelService {
     if (event.type === "turn-started") {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
+      // No delivery was starting, as when Claude or OpenCode starts a turn after a background job
+      // ends. That turn is not the member's next assignment: taking it ran the provider's answer as
+      // that task, and the task's own start then failed.
+      if (event.origin === "unknown") return true;
       const assignment = this.store
         .assignments(channelId)
         .find((item) => item.agentId === event.agentId && activeAssignment(item));
