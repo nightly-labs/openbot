@@ -801,6 +801,15 @@
   white-space: pre;
 }
 
+.message-code-block[data-wrap] .message-code-scroll > code {
+  width: auto;
+}
+
+.message-code-block[data-wrap] .message-code-line-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .message-code-caret {
   width: 2px;
   height: 13px;

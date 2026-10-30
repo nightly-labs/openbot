@@ -101,6 +101,9 @@ const LANGUAGE_TEXT_KEYS = {
   regex: "chat.code.language.regex",
 } as const satisfies Partial<Record<ShjLanguage, AppTextKey>>;
 
+// Prose, such as a message draft, so its lines wrap instead of scrolling.
+const WRAPPED_LANGUAGES = new Set(["plaintext", "text", "txt"]);
+
 // Mermaid has no highlighter, so it shows as plain code with its own name.
 const PLAIN_LANGUAGE_LABELS: Record<string, string> = { mermaid: "Mermaid", mmd: "Mermaid" };
 
@@ -213,7 +216,11 @@ export function CodeBlock(props: {
   );
 
   return (
-    <section class="message-code-block" aria-label={t("chat.code.blockLabel", { language: languageLabel() })}>
+    <section
+      class="message-code-block"
+      data-wrap={WRAPPED_LANGUAGES.has(props.block.language.trim().toLowerCase()) ? "" : undefined}
+      aria-label={t("chat.code.blockLabel", { language: languageLabel() })}
+    >
       <header class="message-code-header">
         <div class="message-code-heading">
           <Show when={props.block.filename}>

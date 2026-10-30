@@ -10,7 +10,13 @@ import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
+import {
+  type CodeToken,
+  cachedHighlight,
+  codeLanguageLabel,
+  codeTextWraps,
+  highlightCode,
+} from "../model/code-highlight";
 import { useListSettled } from "./use-list-settled";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
@@ -92,6 +98,27 @@ const CodeBlockBody = memo(function CodeBlockBody({
       showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   }
+  const code = (
+    <Typography.Code
+      selectable={selectable}
+      className="bg-transparent p-0"
+      style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+    >
+      {tokens.map((token) => (
+        <Typography.Code
+          key={token.offset}
+          className="bg-transparent p-0"
+          style={{
+            color: token.type ? (colors[token.type] ?? foreground) : foreground,
+            fontSize: 14,
+            lineHeight: 20,
+          }}
+        >
+          {token.text}
+        </Typography.Code>
+      ))}
+    </Typography.Code>
+  );
   return (
     <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
       <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
@@ -108,32 +135,23 @@ const CodeBlockBody = memo(function CodeBlockBody({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <ScrollView
-        horizontal
-        bounces={false}
-        style={{ flexGrow: 0, flexShrink: 0, height: text.split("\n").length * 20 * fontScale + 20, maxWidth: "100%" }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
-      >
-        <Typography.Code
-          selectable={selectable}
-          className="bg-transparent p-0"
-          style={{ color: foreground, fontSize: 14, lineHeight: 20 }}
+      {codeTextWraps(language) ? (
+        <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>{code}</View>
+      ) : (
+        <ScrollView
+          horizontal
+          bounces={false}
+          style={{
+            flexGrow: 0,
+            flexShrink: 0,
+            height: text.split("\n").length * 20 * fontScale + 20,
+            maxWidth: "100%",
+          }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
         >
-          {tokens.map((token) => (
-            <Typography.Code
-              key={token.offset}
-              className="bg-transparent p-0"
-              style={{
-                color: token.type ? (colors[token.type] ?? foreground) : foreground,
-                fontSize: 14,
-                lineHeight: 20,
-              }}
-            >
-              {token.text}
-            </Typography.Code>
-          ))}
-        </Typography.Code>
-      </ScrollView>
+          {code}
+        </ScrollView>
+      )}
     </View>
   );
 });
