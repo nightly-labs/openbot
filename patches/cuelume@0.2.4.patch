@@ -1,0 +1,89 @@
+diff --git a/dist/audio/engine.d.ts b/dist/audio/engine.d.ts
+index 7b9cd53efca3c4db762869f9f3b4b1396bcb402e..ec3ed371fd818c930d7749e47dba64cda9c8966e 100644
+--- a/dist/audio/engine.d.ts
++++ b/dist/audio/engine.d.ts
+@@ -21,6 +21,8 @@ export declare function setEnabled(value: boolean): void;
+ export declare function setTheme(theme: ThemeName): void;
+ /** Sets the volume multiplier for future playback. Preference storage stays with the app. */
+ export declare function setVolume(value: number): void;
++/** Starts the shared `AudioContext` from a user action. Safari starts audio only from one. */
++export declare function resume(): void;
+ export type PlayOptions = {
+     /** Multiplier for this play only, clamped to 0–1. */
+     volume?: number;
+@@ -36,6 +38,8 @@ export type PlayOptions = {
+     duration?: number;
+     /** The material for this play only; the active theme is unchanged. Unknown names play the active theme. */
+     theme?: ThemeName;
++    /** Plays while sounds are off and before a user action, for a sound that the app plays on its own. */
++    force?: boolean;
+ };
+ /**
+  * Plays a sound immediately. Safe to call from anywhere — lazily creates
+diff --git a/dist/audio/engine.js b/dist/audio/engine.js
+index 12a26737d88f7dad4c2a66cc6512c0c297e93fc8..fdefd297091f1c90d2032f15d28aaddf926019d4 100644
+--- a/dist/audio/engine.js
++++ b/dist/audio/engine.js
+@@ -240,6 +240,18 @@ export function setTheme(theme) {
+ export function setVolume(value) {
+     globalVolume = normalizeVolume(value, globalVolume);
+ }
++/** Starts the shared `AudioContext` from a user action. Safari starts audio only from one. */
++export function resume() {
++    const context = getAudioContext();
++    if (context && context.state !== "running") {
++        try {
++            void context.resume().catch(() => { });
++        }
++        catch {
++            // Some browsers throw synchronously when audio is blocked.
++        }
++    }
++}
+ function getAudioContext() {
+     if (sharedContext)
+         return sharedContext;
+@@ -271,9 +283,10 @@ export function play(sound = "tap", options) {
+ /** `play`, plus what a binding knows about the interaction. Internal to cuelume. */
+ export function playInContext(sound, options, interaction) {
+     const name = resolveSound(sound);
+-    if (!enabled || !name)
++    const force = options?.force === true;
++    if ((!enabled && !force) || !name)
+         return;
+-    if (typeof navigator !== "undefined" && navigator.userActivation?.hasBeenActive === false)
++    if (!force && typeof navigator !== "undefined" && navigator.userActivation?.hasBeenActive === false)
+         return;
+     const playVolume = globalVolume * normalizeVolume(options?.volume, 1);
+     if (playVolume === 0)
+@@ -291,7 +304,7 @@ export function playInContext(sound, options, interaction) {
+     else {
+         try {
+             void context.resume().then(() => {
+-                if (enabled && context.state === "running")
++                if ((enabled || force) && context.state === "running")
+                     renderRecipe(context, name, recipe, playVolume, emphasis, shape);
+             }, () => { });
+         }
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 82d7f0ffb6715336226e93927e4cd533322927c6..17909971a6d35a93ee99b0dabdbbd82a755633b5 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -17,5 +17,5 @@ export type { PlayOptions } from "./audio/engine.js";
+ export type { ThemeName } from "./sounds/themes.js";
+ export { themes } from "./sounds/themes.js";
+ export { sounds } from "./sounds/recipes.js";
+-export { play, setEnabled, setTheme, setVolume } from "./audio/engine.js";
++export { play, resume, setEnabled, setTheme, setVolume } from "./audio/engine.js";
+ export { bind } from "./interactions/bind.js";
+diff --git a/dist/index.js b/dist/index.js
+index 1496a336a32a445af74efd11e462f4dfc31a1310..d68f6886c942d6743055808af9e28cc448e4f2ea 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -13,5 +13,5 @@
+  */
+ export { themes } from "./sounds/themes.js";
+ export { sounds } from "./sounds/recipes.js";
+-export { play, setEnabled, setTheme, setVolume } from "./audio/engine.js";
++export { play, resume, setEnabled, setTheme, setVolume } from "./audio/engine.js";
+ export { bind } from "./interactions/bind.js";

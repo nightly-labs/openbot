@@ -10,10 +10,14 @@ import {
   SwitchField,
   toast,
 } from "@openbot/ui";
-import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
+import {
+  ACTION_SOUND_CHOICES,
+  type GeneralSettingsValue,
+  TASK_SOUND_CHOICES,
+} from "@openbot/ui/features/settings/app-settings";
+import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { Show } from "solid-js";
-import { replayActionSoundChoice } from "../../action-sounds";
+import { playSoundChoice } from "../../completion-sound";
 import { useI18n } from "../../i18n-context";
 
 interface SettingsNotificationsTabProps {
@@ -24,6 +28,7 @@ interface SettingsNotificationsTabProps {
   onTestNotification?: (() => void | Promise<void>) | undefined;
   /** Opens the operating system notification settings. Absent where the system has no such page. */
   onOpenNotificationSettings?: (() => void | Promise<void>) | undefined;
+  selectMount: HTMLElement | undefined;
 }
 
 export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
@@ -97,26 +102,41 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
 
       <SettingsSection title={i18n.t("settings.sounds.title")}>
         <ItemGroup class="settings-modal-card">
-          <SwitchField
-            checked={props.value.taskCompletionSound}
-            onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}
-            label={i18n.t("settings.taskSound.title")}
-            description={i18n.t("settings.taskSound.description")}
-          />
-          <Item class="settings-modal-row settings-sound-theme-row">
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.taskSound.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.taskSound.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SoundChoiceSelect
+                label={i18n.t("settings.taskSound.title")}
+                choices={TASK_SOUND_CHOICES}
+                value={props.value.taskSound}
+                onChange={(value) => props.onUpdateSetting("taskSound", value)}
+                onPreview={playSoundChoice}
+                mount={props.selectMount}
+              />
+            </ItemActions>
+          </Item>
+          <Item class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.soundFeedback.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.soundFeedback.description")}</ItemDescription>
             </ItemContent>
-            <SoundThemePicker
-              value={props.value.soundFeedback ? props.value.soundTheme : "off"}
-              onChange={(value) =>
-                props.onUpdateSettings(
-                  value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
-                )
-              }
-              onReplay={replayActionSoundChoice}
-            />
+            <ItemActions>
+              <SoundChoiceSelect
+                label={i18n.t("settings.soundFeedback.title")}
+                choices={ACTION_SOUND_CHOICES}
+                value={props.value.soundFeedback ? props.value.soundTheme : "off"}
+                onChange={(value) =>
+                  props.onUpdateSettings(
+                    value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
+                  )
+                }
+                onPreview={playSoundChoice}
+                mount={props.selectMount}
+              />
+            </ItemActions>
           </Item>
         </ItemGroup>
       </SettingsSection>

@@ -1,0 +1,19 @@
+/* A play icon before each sound name. The menu portals out of the row, so the rules use the item classes. */
+.ui-select-item-label:has(.sound-choice-item) {
+  flex: 1;
+}
+
+.sound-choice-item {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.sound-choice-item-play {
+  flex: none;
+}
+
+.sound-choice-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

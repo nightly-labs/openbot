@@ -7,7 +7,7 @@ import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
 import { desktopAnalytics } from "../../analytics";
-import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
+import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
@@ -75,7 +75,7 @@ const Settings = createSimpleContext({
     let hostedServerDeleteNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
-      taskCompletionSound: isCompletionSoundEnabled(),
+      taskSound: readTaskSound(),
       sendShortcut: readSendShortcutMode(),
       soundFeedback: isActionSoundEnabled(),
       soundTheme: readActionSoundTheme(),
@@ -155,8 +155,9 @@ const Settings = createSimpleContext({
       }
 
       setGeneralSettings(value);
-      if (previous.taskCompletionSound !== value.taskCompletionSound) {
-        setCompletionSoundEnabled(value.taskCompletionSound);
+      if (previous.taskSound !== value.taskSound) {
+        setTaskSound(value.taskSound);
+        playSoundChoice(value.taskSound);
       }
       if (previous.sendShortcut !== value.sendShortcut) {
         setSendShortcutMode(value.sendShortcut);

@@ -224,6 +224,7 @@ export function SettingsModal(props: SettingsModalProps) {
                 ? props.onOpenNotificationSettings
                 : undefined
             }
+            selectMount={modalElement}
           />
         </Tabs.Content>
 

@@ -940,12 +940,3 @@
 .settings-panel .settings-identity-name-control {
   width: 100%;
 }
-
-/* The sound theme cards are too wide to sit beside the text, so they wrap below it. */
-.settings-sound-theme-row {
-  flex-wrap: wrap;
-}
-
-.settings-sound-theme-row > .sound-theme-picker {
-  flex-basis: 100%;
-}
