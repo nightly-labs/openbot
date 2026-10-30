@@ -50,7 +50,9 @@ export interface ThreadStartParams {
 
 export async function startThread(client: AgentClient, params: ThreadStartParams): Promise<string> {
   const response = await runCauseEffect(client.request("thread/start", params, (value) => value));
-  const id = JSON.stringify(response).match(/"id":"([^"]+)"/)?.[1];
+  // Parsed, not matched on `JSON.stringify`: a Windows path escapes its backslashes there, and the
+  // escaped id then misses the open thread and the next request fails on its missing fields.
+  const id = getString(getRecord(response, "thread"), "id");
   if (!id) throw new Error("thread/start answers no thread id.");
   return id;
 }
