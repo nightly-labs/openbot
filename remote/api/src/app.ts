@@ -6,7 +6,6 @@ import {
   type DiscordApiRequest,
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
-import { GOOGLE_OAUTH_TOKEN_PATH } from "@openbot/contracts/signal-protocol/google-oauth";
 import {
   WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
   type WebhookDeliveryStatus,
@@ -38,21 +37,14 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
-import {
-  decodeGoogleOAuthTokenRequest,
-  exchangeGoogleToken,
-  GOOGLE_OAUTH_REQUEST_BYTES_LIMIT,
-  googleOAuthError,
-} from "./google-oauth";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
-import { type SignalService, type SignalSocket, SignalTokens, type SlackDeliveryResponse } from "./signal-service";
+import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
-const TICKET_BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]{1,2048}\.[A-Za-z0-9_-]{1,2048}\.[A-Za-z0-9_-]{1,512})$/u;
 // A JSON call holds at most 2,000 characters of text and five buttons.
 const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
 // The multipart fields and boundaries around one file.
@@ -306,44 +298,6 @@ export function createRemoteApiApp(
           return discordError(result.failure.status, result.failure.code, result.failure.retryAfterMs);
         }
         return Response.json(result.success, { headers: { "Cache-Control": "no-store" } });
-      },
-      { parse: "none" },
-    )
-    // The Google token requests of a host, with its remote host ticket. Signal adds the client secret
-    // of the OpenBot Google sign-in app and returns Google's answer. Nothing here stores or logs the
-    // body, the code, a token or Google's answer.
-    .post(
-      GOOGLE_OAUTH_TOKEN_PATH,
-      async ({ request }) => {
-        const ticket = TICKET_BEARER_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
-        const verified = ticket
-          ? await runtime.runPromise(
-              Effect.gen(function* () {
-                const tokens = yield* SignalTokens;
-                return yield* tokens.verifyTicket(ticket);
-              }).pipe(Effect.result),
-            )
-          : null;
-        const caller =
-          verified && Result.isSuccess(verified) ? signal.acceptGoogleTokenRequest(verified.success) : "unauthorized";
-        if (caller !== "ok") {
-          await request.body?.cancel();
-          return googleOAuthError(caller === "unauthorized" ? 401 : 429, caller);
-        }
-        // Only a host with a valid ticket learns whether this Signal has the Google sign-in app.
-        const google = config.google;
-        if (!google) {
-          await request.body?.cancel();
-          return googleOAuthError(503, "unavailable");
-        }
-        if ((request.headers.get("content-type") ?? "").split(";", 1)[0]?.trim().toLowerCase() !== "application/json") {
-          await request.body?.cancel();
-          return googleOAuthError(400, "invalid_request");
-        }
-        const body = await readBody(request, GOOGLE_OAUTH_REQUEST_BYTES_LIMIT);
-        const input = body ? decodeGoogleOAuthTokenRequest(body) : null;
-        if (!input) return googleOAuthError(400, "invalid_request");
-        return exchangeGoogleToken(google, input, request.signal);
       },
       { parse: "none" },
     )

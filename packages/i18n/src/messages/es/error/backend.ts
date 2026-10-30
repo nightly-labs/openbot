@@ -204,10 +204,6 @@ export const messages = {
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
-  "error.backend.googleSignInNeedsAccount":
-    "Primero inicia sesión en tu cuenta de OpenBot. OpenBot la necesita para completar un inicio de sesión con Google.",
-  "error.backend.googleSignInUnavailable":
-    "OpenBot no pudo completar el inicio de sesión con Google. Inténtalo de nuevo más tarde.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
   "error.backend.mcpRegistrationRefused":
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",

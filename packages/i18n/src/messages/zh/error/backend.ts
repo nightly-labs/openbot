@@ -180,8 +180,6 @@ export const messages = {
   "error.backend.mcpSignInNotAccepted": "服务器未接受该登录。",
   "error.backend.mcpSignInClientRefused":
     "完成登录时，登录服务器未接受 OpenBot。请重新登录，OpenBot 会重新向服务器注册。",
-  "error.backend.googleSignInNeedsAccount": "请先登录你的 OpenBot 账户。OpenBot 需要它来完成 Google 登录。",
-  "error.backend.googleSignInUnavailable": "OpenBot 无法完成 Google 登录。请稍后重试。",
   "error.backend.mcpCommandNotFound": "未找到命令：{command}",
   "error.backend.mcpRegistrationRefused":
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",

@@ -25,7 +25,6 @@ import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
-import { googleSignIn } from "./google-token-broker";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
   CONTAINER_UPDATE_PATHS,
@@ -1414,21 +1413,11 @@ export async function createApplicationServices({
   if (mcpOAuthRedirect) {
     teardown.push(TEARDOWN_ORDER.mcpOAuthRedirect, "the MCP sign-in listener", () => mcpOAuthRedirect.close());
   }
-  // The OpenBot Google sign-in app: its token requests go to Signal with a new ticket of this host.
-  // A sign-in comes after startup, when the team store below names this host.
-  const mcpGoogleSignIn = googleSignIn({
-    available: () => ingressHostId() !== null,
-    ticket: async (signal) => {
-      const hostId = ingressHostId();
-      return hostId ? Effect.runPromise(centralAuth.issueRemoteHostTicket(hostId), { signal }) : null;
-    },
-  });
   const mcpOAuth = new McpOAuth({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
     logger: createOpenBotLogger("mcp-oauth"),
-    ...(mcpGoogleSignIn ? { googleSignIn: mcpGoogleSignIn } : {}),
   });
   mcpOAuthAuthority = mcpOAuth;
   teardown.push(TEARDOWN_ORDER.mcpOAuth, "MCP token refresh", () => Effect.runPromise(mcpOAuth.close()));

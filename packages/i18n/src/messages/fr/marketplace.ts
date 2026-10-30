@@ -410,65 +410,6 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quelles cartes Trello me sont attribuées ?",
   "marketplace.plugin.trello.prompt.board": "Résume ce qui est en cours sur mon tableau Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Ajoute ces actions comme cartes à mon tableau Trello.",
-  "marketplace.plugin.gmail.tagline": "Recherche d’e-mails, brouillons et libellés",
-  "marketplace.plugin.gmail.description":
-    "Gmail permet aux agents de rechercher et lire les conversations et les messages, d’écrire des brouillons, d’ajouter et de retirer des libellés, de créer des libellés, de placer des e-mails dans la corbeille et de les en sortir, et de signaler des e-mails comme spam. Les agents ne peuvent pas envoyer d’e-mails : ils écrivent un brouillon, et l’utilisateur le vérifie et l’envoie dans Gmail. Les agents ne peuvent pas supprimer définitivement d’e-mails. C’est le serveur MCP officiel de Google pour Gmail, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et approuve l’accès sur l’écran de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Un e-mail d’une autre personne peut contenir des instructions pour l’agent : vérifie donc ce que fait l’agent après avoir lu un e-mail non fiable.",
-  "marketplace.plugin.gmail.app":
-    "Recherche d’e-mails, brouillons, libellés et corbeille, via le serveur MCP Gmail de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.gmail.prompt.unread": "Résume mes e-mails non lus d’aujourd’hui.",
-  "marketplace.plugin.gmail.prompt.thread":
-    "Ajoute le libellé Newsletters aux newsletters non lues de cette semaine et place-les dans la corbeille.",
-  "marketplace.plugin.gmail.prompt.draft": "Écris un brouillon de réponse au dernier e-mail de mon responsable.",
-  "marketplace.plugin.googleDrive.tagline": "Rechercher, lire et ajouter des fichiers",
-  "marketplace.plugin.googleDrive.description":
-    "Google Drive permet aux agents de rechercher des fichiers, de lister les fichiers récents, de lire le contenu et les détails des fichiers, de voir qui a accès à un fichier, et de créer et copier des fichiers. Les agents peuvent lire tous les fichiers que l’utilisateur peut ouvrir. Ils peuvent créer des fichiers et copier tout fichier qu’ils peuvent lire. Le serveur Drive de Google n’a aucun outil qui modifie, déplace ou supprime un fichier. C’est le serveur MCP officiel de Google pour Google Drive, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et approuve l’accès sur l’écran de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Un fichier d’une autre personne peut contenir des instructions pour l’agent : vérifie donc ce que fait l’agent après avoir lu un fichier non fiable.",
-  "marketplace.plugin.googleDrive.app":
-    "Recherche, lecture et création de fichiers, via le serveur MCP Drive de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.googleDrive.prompt.find": "Trouve le plan marketing dans mon Google Drive et résume-le.",
-  "marketplace.plugin.googleDrive.prompt.recent":
-    "Liste les fichiers que j’ai utilisés le plus récemment dans Google Drive.",
-  "marketplace.plugin.googleDrive.prompt.access":
-    "Fais une copie du fichier du budget dans mon Google Drive pour l’année prochaine.",
-  "marketplace.plugin.googleDocs.tagline": "Lire et modifier des documents",
-  "marketplace.plugin.googleDocs.description":
-    "Google Docs permet aux agents de lire des documents et d’en modifier le contenu. Les agents peuvent lire tous les documents que l’utilisateur peut ouvrir, et modifier les documents que l’utilisateur peut modifier. C’est le serveur MCP officiel de Google pour Google Docs, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et approuve l’accès sur l’écran de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Un document d’une autre personne peut contenir des instructions pour l’agent : vérifie donc ce que fait l’agent après avoir lu un document non fiable.",
-  "marketplace.plugin.googleDocs.app":
-    "Lecture et modification de documents, via le serveur MCP Docs de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.googleDocs.prompt.summarize":
-    "Résume les questions ouvertes de mon document sur le plan de lancement.",
-  "marketplace.plugin.googleDocs.prompt.edit": "Ajoute un court résumé en haut de mon document de notes de réunion.",
-  "marketplace.plugin.googleDocs.prompt.review":
-    "Trouve les phrases peu claires dans mon document de proposition de projet.",
-  "marketplace.plugin.googleSheets.tagline": "Lire et mettre à jour des feuilles de calcul",
-  "marketplace.plugin.googleSheets.description":
-    "Google Sheets permet aux agents de lire des feuilles de calcul et les valeurs des cellules, d’écrire des valeurs et des formules, d’ajouter des lignes et des colonnes, et de modifier des feuilles de calcul. Les agents peuvent lire toutes les feuilles de calcul que l’utilisateur peut ouvrir, et modifier celles que l’utilisateur peut modifier. C’est le serveur MCP officiel de Google pour Google Sheets, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et approuve l’accès sur l’écran de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Une feuille de calcul d’une autre personne peut contenir des instructions pour l’agent : vérifie donc ce que fait l’agent après avoir lu une feuille de calcul non fiable.",
-  "marketplace.plugin.googleSheets.app":
-    "Valeurs, formules et modifications de feuilles de calcul, via le serveur MCP Sheets de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.googleSheets.prompt.summarize": "Résume les totaux de ma feuille de calcul du budget.",
-  "marketplace.plugin.googleSheets.prompt.addRows":
-    "Ajoute ces dépenses comme nouvelles lignes à ma feuille de calcul des dépenses.",
-  "marketplace.plugin.googleSheets.prompt.formula":
-    "Ajoute à ma feuille de calcul des ventes une colonne avec le total de chaque ligne.",
-  "marketplace.plugin.googleSlides.tagline": "Lire et modifier des présentations",
-  "marketplace.plugin.googleSlides.description":
-    "Google Slides permet aux agents de lire des présentations, des diapositives et des miniatures de diapositives, et de modifier le contenu d’une présentation : ajouter, modifier et supprimer des diapositives, du texte, des formes et des images. Les agents peuvent lire toutes les présentations que l’utilisateur peut ouvrir, et modifier les présentations que l’utilisateur peut modifier. Le serveur Slides de Google n’a aucun outil qui crée ou supprime une présentation. Il s’agit du serveur MCP officiel de Google pour Google Slides, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et autorise l’accès sur la page de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Une présentation d’une autre personne peut contenir des instructions pour l’agent : vérifiez ce que fait l’agent après avoir lu une présentation non fiable.",
-  "marketplace.plugin.googleSlides.app":
-    "Lecture et modification de présentations, via le serveur MCP Slides de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.googleSlides.prompt.summary":
-    "Résume ma présentation du bilan trimestriel diapositive par diapositive.",
-  "marketplace.plugin.googleSlides.prompt.agenda":
-    "Ajoute une diapositive d’ordre du jour après la diapositive de titre de ma présentation pour la réunion d’équipe.",
-  "marketplace.plugin.googleSlides.prompt.typos":
-    "Trouve et corrige les fautes d’orthographe dans ma présentation du lancement du produit.",
-  "marketplace.plugin.googleCalendar.tagline": "Événements, agendas et disponibilités",
-  "marketplace.plugin.googleCalendar.description":
-    "Google Calendar permet aux agents de lister les agendas, de lire et rechercher des événements, de trouver les créneaux où les personnes sont libres, de créer, modifier et supprimer des événements, et de répondre aux invitations. C’est le serveur MCP officiel de Google pour Google Calendar, en Developer Preview. Chaque utilisateur se connecte à son propre compte Google dans le navigateur et approuve l’accès sur l’écran de consentement de Google. OpenBot a sa propre application de connexion Google, donc l’utilisateur n’a rien à configurer dans Google Cloud. Un événement d’une autre personne peut contenir des instructions pour l’agent : vérifie donc ce que fait l’agent après avoir lu un événement non fiable.",
-  "marketplace.plugin.googleCalendar.app":
-    "Agendas, événements et disponibilités, via le serveur MCP Calendar de Google avec connexion dans le navigateur.",
-  "marketplace.plugin.googleCalendar.prompt.today": "Qu’est-ce qu’il y a dans mon Google Calendar aujourd’hui ?",
-  "marketplace.plugin.googleCalendar.prompt.week": "Résume mes réunions de cette semaine.",
-  "marketplace.plugin.googleCalendar.prompt.freeTime":
-    "Trouve une heure libre la semaine prochaine et ajoute une réunion avec Alex à mon agenda.",
   "marketplace.plugin.huggingface.tagline": "Modèles, jeux de données et articles sur le Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permet aux agents de rechercher des modèles, des jeux de données, des Spaces, des collections et des articles sur le Hugging Face Hub, de lire les model cards et les fichiers des dépôts, de prévisualiser des jeux de données et de rechercher dans la documentation de Hugging Face. Il utilise les données publiques du Hub et ne demande ni compte ni clé. Les outils ne font que lire : les agents ne peuvent pas créer de dépôts ni lancer de jobs.",

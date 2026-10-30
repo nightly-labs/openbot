@@ -214,10 +214,6 @@ export const messages = {
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
-  "error.backend.googleSignInNeedsAccount":
-    "Melde dich zuerst bei deinem OpenBot-Konto an. OpenBot braucht es, um eine Google-Anmeldung abzuschließen.",
-  "error.backend.googleSignInUnavailable":
-    "OpenBot konnte die Google-Anmeldung nicht abschließen. Versuche es später erneut.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
   "error.backend.mcpRegistrationRefused":
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",

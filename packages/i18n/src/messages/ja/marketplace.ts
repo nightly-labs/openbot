@@ -399,60 +399,6 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "自分に割り当てられた Trello カードはどれですか？",
   "marketplace.plugin.trello.prompt.board": "Trello ボードで進行中の作業をまとめてください。",
   "marketplace.plugin.trello.prompt.newCards": "これらのアクション項目をカードとして Trello ボードに追加してください。",
-  "marketplace.plugin.gmail.tagline": "メールの検索、下書き、ラベル",
-  "marketplace.plugin.gmail.description":
-    "Gmail を使うと、エージェントはメールのスレッドとメッセージを検索して読み、下書きを作成し、メールにラベルを付けたり外したりし、ラベルを作成し、メールをゴミ箱に移動したりゴミ箱から戻したりし、メールを迷惑メールに指定できます。エージェントはメールを送信できません。下書きを作成し、ユーザーが Gmail で確認して送信します。エージェントはメールを完全に削除できません。これは Google 公式の Gmail MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からのメールにはエージェントへの指示が含まれていることがあります。信頼できないメールを読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.gmail.app":
-    "メールの検索、下書き、ラベル、ゴミ箱を、ブラウザーでサインインする Google の Gmail MCP サーバーで提供します。",
-  "marketplace.plugin.gmail.prompt.unread": "今日の未読メールをまとめてください。",
-  "marketplace.plugin.gmail.prompt.thread":
-    "今週の未読のニュースレターに「ニュースレター」ラベルを付けて、ゴミ箱に移動してください。",
-  "marketplace.plugin.gmail.prompt.draft": "上司からの最新のメールへの返信の下書きを作成してください。",
-  "marketplace.plugin.googleDrive.tagline": "ファイルの検索、読み取り、追加",
-  "marketplace.plugin.googleDrive.description":
-    "Google Drive を使うと、エージェントはファイルを検索し、最近のファイルを一覧表示し、ファイルの内容と詳細を読み、ファイルにアクセスできるユーザーを確認し、ファイルを作成してコピーできます。エージェントは、ユーザーが開けるすべてのファイルを読めます。ファイルを作成でき、読めるファイルはすべてコピーできます。Google の Drive サーバーには、ファイルを変更、移動、削除するツールがありません。これは Google 公式の Google Drive MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からのファイルにはエージェントへの指示が含まれていることがあります。信頼できないファイルを読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.googleDrive.app":
-    "ファイルの検索、読み取り、作成を、ブラウザーでサインインする Google の Drive MCP サーバーで提供します。",
-  "marketplace.plugin.googleDrive.prompt.find": "Google Drive でマーケティング計画を探して、要約してください。",
-  "marketplace.plugin.googleDrive.prompt.recent": "Google Drive で最近使ったファイルを一覧表示してください。",
-  "marketplace.plugin.googleDrive.prompt.access": "Google Drive の予算ファイルのコピーを来年用に作成してください。",
-  "marketplace.plugin.googleDocs.tagline": "ドキュメントの読み取りと編集",
-  "marketplace.plugin.googleDocs.description":
-    "Google Docs を使うと、エージェントはドキュメントを読み、その内容を変更できます。エージェントは、ユーザーが開けるすべてのドキュメントを読み、ユーザーが編集できるドキュメントを編集できます。これは Google 公式の Google Docs MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からのドキュメントにはエージェントへの指示が含まれていることがあります。信頼できないドキュメントを読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.googleDocs.app":
-    "ドキュメントの読み取りと編集を、ブラウザーでサインインする Google の Docs MCP サーバーで提供します。",
-  "marketplace.plugin.googleDocs.prompt.summarize": "ローンチ計画のドキュメントにある未解決の質問をまとめてください。",
-  "marketplace.plugin.googleDocs.prompt.edit": "会議メモのドキュメントの先頭に短い要約を追加してください。",
-  "marketplace.plugin.googleDocs.prompt.review": "プロジェクト提案のドキュメントで、わかりにくい文を探してください。",
-  "marketplace.plugin.googleSheets.tagline": "スプレッドシートの読み取りと更新",
-  "marketplace.plugin.googleSheets.description":
-    "Google Sheets を使うと、エージェントはスプレッドシートとセルの値を読み、値と数式を書き込み、行と列を追加し、スプレッドシートを変更できます。エージェントは、ユーザーが開けるすべてのスプレッドシートを読み、ユーザーが編集できるスプレッドシートを変更できます。これは Google 公式の Google Sheets MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からのスプレッドシートにはエージェントへの指示が含まれていることがあります。信頼できないスプレッドシートを読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.googleSheets.app":
-    "スプレッドシートの値、数式、更新を、ブラウザーでサインインする Google の Sheets MCP サーバーで提供します。",
-  "marketplace.plugin.googleSheets.prompt.summarize": "予算のスプレッドシートの合計をまとめてください。",
-  "marketplace.plugin.googleSheets.prompt.addRows":
-    "これらの経費を、経費のスプレッドシートに新しい行として追加してください。",
-  "marketplace.plugin.googleSheets.prompt.formula":
-    "売上のスプレッドシートに、各行の合計を表示する列を追加してください。",
-  "marketplace.plugin.googleSlides.tagline": "プレゼンテーションの読み取りと編集",
-  "marketplace.plugin.googleSlides.description":
-    "Google Slides を使うと、エージェントはプレゼンテーション、スライド、スライドのサムネイルを読み、プレゼンテーションの内容を変更できます。スライド、テキスト、図形、画像の追加、変更、削除ができます。エージェントは、ユーザーが開けるすべてのプレゼンテーションを読み、ユーザーが編集できるプレゼンテーションを編集できます。Google の Slides サーバーには、プレゼンテーションを作成または削除するツールはありません。これは Google 公式の Google Slides MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からのプレゼンテーションにはエージェントへの指示が含まれていることがあります。信頼できないプレゼンテーションを読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.googleSlides.app":
-    "プレゼンテーションの読み取りと編集を、ブラウザーでサインインする Google の Slides MCP サーバーで提供します。",
-  "marketplace.plugin.googleSlides.prompt.summary": "四半期レビューのプレゼンテーションを 1 枚ずつ要約してください。",
-  "marketplace.plugin.googleSlides.prompt.agenda":
-    "チームミーティングのプレゼンテーションで、タイトルスライドの後に議題のスライドを追加してください。",
-  "marketplace.plugin.googleSlides.prompt.typos":
-    "製品発表のプレゼンテーションにあるスペルの間違いを見つけて直してください。",
-  "marketplace.plugin.googleCalendar.tagline": "予定、カレンダー、空き時間",
-  "marketplace.plugin.googleCalendar.description":
-    "Google Calendar を使うと、エージェントはカレンダーを一覧表示し、予定を読んで検索し、参加者の空き時間を探し、予定を作成、変更、削除し、招待に返答できます。これは Google 公式の Google Calendar MCP サーバーで、Developer Preview 段階です。各ユーザーはブラウザーで自分の Google アカウントにサインインし、Google の同意画面でアクセスを許可します。OpenBot は独自の Google サインインアプリを使うので、ユーザーが Google Cloud を設定する必要はありません。他の人からの予定にはエージェントへの指示が含まれていることがあります。信頼できない予定を読んだ後のエージェントの動作を確認してください。",
-  "marketplace.plugin.googleCalendar.app":
-    "カレンダー、予定、空き時間を、ブラウザーでサインインする Google の Calendar MCP サーバーで提供します。",
-  "marketplace.plugin.googleCalendar.prompt.today": "今日の Google Calendar の予定は何ですか？",
-  "marketplace.plugin.googleCalendar.prompt.week": "今週の会議をまとめてください。",
-  "marketplace.plugin.googleCalendar.prompt.freeTime":
-    "来週の空いている 1 時間を探して、Alex との会議をカレンダーに追加してください。",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",

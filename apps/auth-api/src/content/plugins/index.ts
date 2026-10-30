@@ -8,12 +8,6 @@ import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
-import { GMAIL_PLUGIN_GUIDE } from "./gmail";
-import { GOOGLE_CALENDAR_PLUGIN_GUIDE } from "./google-calendar";
-import { GOOGLE_DOCS_PLUGIN_GUIDE } from "./google-docs";
-import { GOOGLE_DRIVE_PLUGIN_GUIDE } from "./google-drive";
-import { GOOGLE_SHEETS_PLUGIN_GUIDE } from "./google-sheets";
-import { GOOGLE_SLIDES_PLUGIN_GUIDE } from "./google-slides";
 import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
 import { NEON_PLUGIN_GUIDE } from "./neon";
@@ -55,12 +49,6 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
-  gmail: GMAIL_PLUGIN_GUIDE,
-  "google-calendar": GOOGLE_CALENDAR_PLUGIN_GUIDE,
-  "google-drive": GOOGLE_DRIVE_PLUGIN_GUIDE,
-  "google-docs": GOOGLE_DOCS_PLUGIN_GUIDE,
-  "google-sheets": GOOGLE_SHEETS_PLUGIN_GUIDE,
-  "google-slides": GOOGLE_SLIDES_PLUGIN_GUIDE,
   railway: RAILWAY_PLUGIN_GUIDE,
   render: RENDER_PLUGIN_GUIDE,
   prisma: PRISMA_PLUGIN_GUIDE,

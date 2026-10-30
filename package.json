@@ -222,7 +222,6 @@
     "test:claude-foreign-session": "bun scripts/claude-foreign-session-e2e.ts",
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
-    "test:mcp-google-broker": "bun scripts/mcp-google-broker-e2e.ts",
     "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
     "test:mcp-sign-in-client-refused": "bun scripts/mcp-sign-in-client-refused-e2e.ts",
     "test:mcp-server-unreadable-row": "bun scripts/mcp-server-unreadable-row-e2e.ts",

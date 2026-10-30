@@ -253,8 +253,6 @@ const UNAVAILABLE = { status: 503 } as const;
 
 const MAXIMUM_RATE_WINDOWS = 100_000;
 const RATE_WINDOW_MILLISECONDS = 60_000;
-// 30 Google token requests a minute for each host, with the default message limit of 600.
-const GOOGLE_TOKEN_RATE_FACTOR = 1 / 20;
 const SIGNAL_RECONNECT_GRACE_MILLISECONDS = 30_000;
 // A socket must send its hello in this time. Signal closes an idle socket that does not, so it cannot
 // keep a connection slot of its address for the proxy's read timeout. The desktop app opens a socket
@@ -693,15 +691,6 @@ export class SignalService {
     if (this.#acceptRateKey(key, now)) return null;
     const window = this.#rateWindows.get(key);
     return window ? Math.max(1, window.startedAt + RATE_WINDOW_MILLISECONDS - now) : RATE_WINDOW_MILLISECONDS;
-  }
-
-  /**
-   * Whether a host may send a Google token request now. A sign-in sends one request and each refresh
-   * one more, about once an hour for each Google app, so the limit is a small part of the message limit.
-   */
-  acceptGoogleTokenRequest(claims: RemoteTicketClaims, now = Date.now()): "ok" | "unauthorized" | "rate_limited" {
-    if (claims.role !== "host" || this.#isRevoked(claims)) return "unauthorized";
-    return this.#acceptRateKey(`google-host:${claims.hostId}`, now, GOOGLE_TOKEN_RATE_FACTOR) ? "ok" : "rate_limited";
   }
 
   /** Applies the generic webhook rate limit by route or source address. */

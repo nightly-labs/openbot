@@ -743,8 +743,7 @@ Discord mentions of the Discord app, the updates of the OpenBot Telegram bot, an
 webhook routines, in transit; see [Slack connections](#slack-connections),
 [Discord connections](#discord-connections), [Telegram connections](#telegram-connections), and
 [Webhook routines](#webhook-routines). For Discord and Telegram, Signal also carries the host's
-answers to the platform. For a Google MCP server, Signal carries only the host's token requests to
-Google and Google's answers; see [Other network connections](#other-network-connections).
+answers to the platform.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
 browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
@@ -772,15 +771,7 @@ Network traffic can also occur when:
   the token to each call, so the token does not go to the agent's process.
   Nothing about the user's agents, conversations or files is sent in those requests. The
   registration names OpenBot's logo at `openbot.run`; an authorization service that shows it on its
-  sign-in page can make the browser load it from `openbot.run`. For Google's MCP servers (Gmail,
-  Google Drive, Google Docs, Google Sheets, Google Slides and Google Calendar), OpenBot uses its own Google sign-in
-  app and does not register. The two token requests of that sign-in, the exchange of the grant and
-  the renewal of the token, go through OpenBot's Signal service (`signal.openbot.run`) with a ticket
-  of the computer, because only Signal holds the app's client secret. Signal passes the grant, the
-  PKCE verifier or the refresh token to Google, and returns Google's answer with the new tokens to the
-  computer. It does not store or log them. The tokens stay on the computer, and the emails, files and
-  events that an agent reads or changes go between the computer and Google directly, not through
-  Signal;
+  sign-in page can make the browser load it from `openbot.run`;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user

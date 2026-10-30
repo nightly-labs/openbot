@@ -205,10 +205,6 @@ export const messages = {
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
-  "error.backend.googleSignInNeedsAccount":
-    "先に OpenBot アカウントにサインインしてください。Google へのサインインを完了するために必要です。",
-  "error.backend.googleSignInUnavailable":
-    "OpenBot は Google へのサインインを完了できませんでした。後でもう一度お試しください。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",

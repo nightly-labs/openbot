@@ -392,58 +392,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.trello.prompt.myCards": "Which Trello cards are assigned to me?",
   "marketplace.plugin.trello.prompt.board": "Summarize what is in progress on my Trello board.",
   "marketplace.plugin.trello.prompt.newCards": "Add these action items as cards to my Trello board.",
-  "marketplace.plugin.gmail.tagline": "Email search, drafts and labels",
-  "marketplace.plugin.gmail.description":
-    "Gmail lets agents search and read email threads and messages, write drafts, add and remove labels, create labels, move email to the trash and back, and mark email as spam. Agents cannot send email: they write a draft, and the user reviews and sends it in Gmail. Agents cannot delete email permanently. This is Google's official Gmail MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. An email from another person can contain instructions for the agent, so check what the agent does after it reads untrusted email.",
-  "marketplace.plugin.gmail.app":
-    "Email search, drafts, labels, and trash, over Google's Gmail MCP server with browser sign-in.",
-  "marketplace.plugin.gmail.prompt.unread": "Summarize my unread email from today.",
-  "marketplace.plugin.gmail.prompt.thread":
-    "Label the unread newsletters from this week as Newsletters and move them to the trash.",
-  "marketplace.plugin.gmail.prompt.draft": "Write a draft reply to the latest email from my manager.",
-  "marketplace.plugin.googleDrive.tagline": "Search, read and add files",
-  "marketplace.plugin.googleDrive.description":
-    "Google Drive lets agents search files, list recent files, read file content and details, see who has access to a file, and create and copy files. Agents can read all the files that the user can open. They can create files and copy any file that they can read. Google's Drive server has no tool that changes, moves or deletes a file. This is Google's official Drive MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A file from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted file.",
-  "marketplace.plugin.googleDrive.app":
-    "File search, reading, and file creation, over Google's Drive MCP server with browser sign-in.",
-  "marketplace.plugin.googleDrive.prompt.find": "Find the marketing plan in my Google Drive and summarize it.",
-  "marketplace.plugin.googleDrive.prompt.recent": "List the files that I used most recently in Google Drive.",
-  "marketplace.plugin.googleDrive.prompt.access": "Make a copy of the budget file in my Google Drive for next year.",
-  "marketplace.plugin.googleDocs.tagline": "Read and edit documents",
-  "marketplace.plugin.googleDocs.description":
-    "Google Docs lets agents read documents and change their content. Agents can read all the documents that the user can open, and edit the documents that the user can edit. This is Google's official Docs MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A document from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted document.",
-  "marketplace.plugin.googleDocs.app":
-    "Document reading and editing, over Google's Docs MCP server with browser sign-in.",
-  "marketplace.plugin.googleDocs.prompt.summarize": "Summarize the open questions in my launch plan document.",
-  "marketplace.plugin.googleDocs.prompt.edit": "Add a short summary at the top of my meeting notes document.",
-  "marketplace.plugin.googleDocs.prompt.review": "Find unclear sentences in my project proposal document.",
-  "marketplace.plugin.googleSheets.tagline": "Read and update spreadsheets",
-  "marketplace.plugin.googleSheets.description":
-    "Google Sheets lets agents read spreadsheets and cell values, write values and formulas, add rows and columns, and change spreadsheets. Agents can read all the spreadsheets that the user can open, and change the spreadsheets that the user can edit. This is Google's official Sheets MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A spreadsheet from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted spreadsheet.",
-  "marketplace.plugin.googleSheets.app":
-    "Spreadsheet values, formulas, and updates, over Google's Sheets MCP server with browser sign-in.",
-  "marketplace.plugin.googleSheets.prompt.summarize": "Summarize the totals in my budget spreadsheet.",
-  "marketplace.plugin.googleSheets.prompt.addRows": "Add these expenses as new rows to my expenses spreadsheet.",
-  "marketplace.plugin.googleSheets.prompt.formula": "Add a column with the total of each row to my sales spreadsheet.",
-  "marketplace.plugin.googleSlides.tagline": "Read and edit presentations",
-  "marketplace.plugin.googleSlides.description":
-    "Google Slides lets agents read presentations, slides and slide thumbnails, and change the content of a presentation: add, change and delete slides, text, shapes and images. Agents can read all the presentations that the user can open, and edit the presentations that the user can edit. Google's Slides server has no tool that creates or deletes a presentation. This is Google's official Slides MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A presentation from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted presentation.",
-  "marketplace.plugin.googleSlides.app":
-    "Presentation reading and editing, over Google's Slides MCP server with browser sign-in.",
-  "marketplace.plugin.googleSlides.prompt.summary": "Summarize my quarterly review presentation slide by slide.",
-  "marketplace.plugin.googleSlides.prompt.agenda":
-    "Add an agenda slide after the title slide of my team meeting presentation.",
-  "marketplace.plugin.googleSlides.prompt.typos":
-    "Find and fix the spelling mistakes in my product launch presentation.",
-  "marketplace.plugin.googleCalendar.tagline": "Events, calendars and free time",
-  "marketplace.plugin.googleCalendar.description":
-    "Google Calendar lets agents list calendars, read and search events, find times when people are free, create, change and delete events, and answer invitations. This is Google's official Calendar MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. An event from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted event.",
-  "marketplace.plugin.googleCalendar.app":
-    "Calendars, events, and free time, over Google's Calendar MCP server with browser sign-in.",
-  "marketplace.plugin.googleCalendar.prompt.today": "What is on my Google Calendar today?",
-  "marketplace.plugin.googleCalendar.prompt.week": "Summarize my meetings for this week.",
-  "marketplace.plugin.googleCalendar.prompt.freeTime":
-    "Find a free hour next week and add a meeting with Alex to my calendar.",
   "marketplace.plugin.huggingface.tagline": "Models, datasets and papers on the Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",
