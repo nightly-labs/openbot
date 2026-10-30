@@ -114,7 +114,7 @@ jobs:
   host-signing:
     name: Check Host signing keychain
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     environment: release
     permissions:
@@ -259,7 +259,7 @@ jobs:
         include:
           - arch: arm64
             label: ARM64
-            os: macos-14
+            os: macos-15
             app_dir: mac-arm64
             suffix: macos
           - arch: x64
