@@ -33,6 +33,12 @@ interface TeamWebRtcBridgeEvents {
   ];
   connected: [peerId: string, binding?: { localFingerprint: string; remoteFingerprint: string }];
   disconnected: [peerId: string];
+  /**
+   * A host child peer stopped getting ICE consent answers, as when iOS suspends the phone app. The
+   * peer stays open: the phone can come back on it. `pathRestored` follows when it does.
+   */
+  pathLost: [peerId: string];
+  pathRestored: [peerId: string];
   data: [peerId: string, channel: TeamWebRtcChannel, data: string | ArrayBuffer];
   path: [peerId: string, path: "p2p" | "relay"];
   error: [peerId: string, code: string, message: string, terminal?: boolean];
@@ -360,6 +366,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         remoteFingerprint: message.remoteFingerprint,
       });
     else if (message.type === "peer-disconnected") this.emit("disconnected", message.peerId);
+    else if (message.type === "peer-path-lost") this.emit("pathLost", message.peerId);
+    else if (message.type === "peer-path-restored") this.emit("pathRestored", message.peerId);
     else if (message.type === "ice-path" && message.path) this.emit("path", message.peerId, message.path);
     else if (message.type === "ice-servers" && message.iceServers) {
       this.#iceServers.set(message.peerId, message.iceServers);

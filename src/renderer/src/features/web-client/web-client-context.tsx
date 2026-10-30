@@ -43,6 +43,7 @@ import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
+import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
 import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
@@ -1567,7 +1568,16 @@ export function createWebWorkspace(
     cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
-      if (expectedTurnId) changeQueue((agentId) => runtime.steerQueued({ agentId, deliveryId, expectedTurnId }));
+      if (!expectedTurnId) return;
+      changeQueue((agentId) =>
+        runtime.steerQueued({ agentId, deliveryId, expectedTurnId }).catch((error: unknown) => {
+          // A message that left the queue is in the turn already: an agent that steers each message
+          // sent while it works can take it first.
+          const delivery = state.queues[agentId]?.deliveries.find((item) => item.id === deliveryId);
+          if (delivery && delivery.status !== "queued") return;
+          throw error;
+        }),
+      );
     },
     reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
     async updateQueued(
@@ -1768,7 +1778,11 @@ export function createWebWorkspace(
       await refresh();
     },
     /** Answers the takeover of the selected agent's chat, or of its side thread `sideThreadId`. */
-    async respondToBrowserTakeover(decision: "complete" | "cancel", sideThreadId?: string) {
+    async respondToBrowserTakeover(
+      decision: "complete" | "cancel",
+      sideThreadId?: string,
+      options?: PromptAnswerOptions,
+    ) {
       const current = generation;
       const threadId = sideThreadId ?? state.agents.find((agent) => agent.id === selectedId)?.threadId;
       const request = state.takeovers.find((item) => item.agentId === selectedId && item.threadId === threadId);
@@ -1781,7 +1795,9 @@ export function createWebWorkspace(
         });
         return true;
       } catch (error) {
-        if (current === generation) report(error);
+        if (current !== generation) return false;
+        if (options?.onError) options.onError(error);
+        else report(error);
         return false;
       }
     },

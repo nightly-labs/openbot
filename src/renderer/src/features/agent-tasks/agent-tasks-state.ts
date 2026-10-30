@@ -37,6 +37,8 @@ export interface AgentTasksOptions {
   available: () => boolean;
   /** The server renames and deletes side threads: the `agent-threads-v1` routes. */
   editable: () => boolean;
+  /** The server keeps the person's read mark of each side thread: the `agent-thread-reads-v1` routes. */
+  readable: () => boolean;
   /** A change of this value reads the active agent's list again, for example when the agent starts again. */
   reloadKey: () => unknown;
 }
@@ -48,11 +50,13 @@ export interface AgentTasksOptions {
  * server: a reply that arrives after that owner ends changes nothing.
  */
 export function createAgentTasks(options: AgentTasksOptions) {
-  const { port, activeAgentId, local, available, editable } = options;
+  const { port, activeAgentId, local, available, editable, readable } = options;
   const scopeIsCurrent = createScopeGuard();
   const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {} });
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
+  /** The message that each thread's read mark last moved to, so a redraw does not send the same mark again. */
+  const readMarks = new Map<string, string>();
 
   /** Stores a thread list. A conversation of a thread that the list no longer has goes with it. */
   function setSnapshot(snapshot: AgentTasksSnapshot): void {
@@ -173,9 +177,20 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
-  async function startTask(agentId: string, text: string): Promise<AgentTask | null> {
+  /** Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key. */
+  async function startTask(
+    agentId: string,
+    text: string,
+    attachmentDraftIds: string[] = [],
+  ): Promise<AgentTask | null> {
     const task = await runAction(
-      () => port().startTask({ agentId, text, clientMessageId: crypto.randomUUID() }),
+      () =>
+        port().startTask({
+          agentId,
+          text,
+          ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          clientMessageId: crypto.randomUUID(),
+        }),
       "conversation.threads.error.start",
     );
     if (task && scopeIsCurrent()) rememberTask(task);
@@ -191,9 +206,21 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /** Steers the task's running turn, or queues the message in the task. */
-  async function sendToTask(agentId: string, taskId: string, text: string): Promise<boolean> {
+  async function sendToTask(
+    agentId: string,
+    taskId: string,
+    text: string,
+    attachmentDraftIds: string[] = [],
+  ): Promise<boolean> {
     const receipt = await runAction(
-      () => port().sendToTask({ agentId, taskId, text, clientMessageId: crypto.randomUUID() }),
+      () =>
+        port().sendToTask({
+          agentId,
+          taskId,
+          text,
+          ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          clientMessageId: crypto.randomUUID(),
+        }),
       "conversation.threads.error.send",
     );
     return receipt !== null;
@@ -244,6 +271,21 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
+   * Moves the person's read mark of a side thread to the message that they see. The member's other
+   * devices read the mark, so the phone no longer shows the thread as unread. A failure keeps the
+   * old mark: the next message moves it.
+   */
+  function markTaskRead(agentId: string, taskId: string, throughMessageId: string): void {
+    if (!readable() || readMarks.get(taskId) === throughMessageId) return;
+    readMarks.set(taskId, throughMessageId);
+    void port()
+      .markTaskRead({ agentId, taskId, throughMessageId })
+      .catch(() => {
+        if (readMarks.get(taskId) === throughMessageId) readMarks.delete(taskId);
+      });
+  }
+
+  /**
    * Reads the active agent's list and each loaded conversation again, after the server was away. The
    * lists come first: a thread that another device deleted meanwhile is not read again.
    */
@@ -280,6 +322,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     reopenTask,
     renameTask,
     deleteTask,
+    markTaskRead,
   };
 }
 

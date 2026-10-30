@@ -34,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Bu sağlayıcıda zaten {id} listeleniyor.",
   "customProvider.error.modelIdInvalid":
     "Bu model kimliği kullanılamaz. Boşlukları, tırnak işaretlerini ve diğer noktalama işaretlerini kaldırın.",
+  "customProvider.error.contextWindowInvalid": "{min} ile {max} arasında tam sayı bir token sayısı girin.",
   "customProvider.error.headerNameRequired": "Bir başlık adı girin.",
   "customProvider.error.headerNameInvalid": "Geçerli bir HTTP başlık adı kullanın.",
   "customProvider.error.headerDuplicate": "Bu sağlayıcıda zaten {name} ayarlanmış.",
@@ -75,6 +76,8 @@ export const messages = {
   "customProvider.model.id": "{number}. model kimliği",
   "customProvider.model.name": "{number}. model görünen adı",
   "customProvider.model.namePlaceholder": "Görünen Ad",
+  "customProvider.model.contextWindow": "Model {number} bağlam penceresi",
+  "customProvider.model.contextWindowPlaceholder": "Token'lar",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",

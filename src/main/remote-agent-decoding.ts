@@ -10,6 +10,7 @@ import {
   isAgentHostSettings,
   isAgentSessionSettings,
   isAgentTask,
+  isAgentTaskReadState,
   isAgentTasksSnapshot,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
@@ -56,6 +57,7 @@ export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot,
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
+export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");

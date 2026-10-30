@@ -2131,6 +2131,8 @@
 }
 
 .ui-dialog-content.ui-confirm-dialog {
+  --agent-avatar-outline: var(--openbot-bg-sidebar);
+
   width: min(460px, 100%);
   max-height: calc(100dvh - 2 * var(--openbot-space-6));
   display: flex;

@@ -154,6 +154,21 @@ export class LiveActivityPushService {
   }
 
   /**
+   * The path of the session came back, as when the phone app runs again. The phone then updates the
+   * activity itself. A registration that says the phone is away still gets updates.
+   */
+  reconnected(sessionId: string): void {
+    const registration = this.#registrations.get(sessionId);
+    if (!registration) return;
+    registration.connected = true;
+    if (away(registration)) return;
+    this.#clearTimer(registration);
+    // As in `register`: the phone shows its own state now. The next update is sent, and an older alert is old.
+    registration.sent = null;
+    registration.alert = null;
+  }
+
+  /**
    * Whether the phone of the session shows an activity of this host that iOS still updates, so the
    * activity shows an event in place of a notification. With `alert`, its next update lights up the
    * screen and plays the sound. `startedAt` is the start that the phone gives, in milliseconds, or

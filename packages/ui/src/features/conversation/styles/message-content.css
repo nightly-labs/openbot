@@ -2,6 +2,11 @@
   max-width: min(420px, 100%);
 }
 
+/* A table needs the width of an agent table. The bubble still fits a short table. */
+.message-entry-user .ui-bubble:has(.message-markdown-table-scroll) {
+  max-width: min(720px, 100%);
+}
+
 .message-copy {
   margin: 0;
   font-size: var(--openbot-text-lg);
@@ -156,8 +161,11 @@
   box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
 }
 
+/* Each column keeps the data table minimum, so a narrow message scrolls sideways and does not
+   break words. */
 .message-markdown-table {
   width: 100%;
+  min-width: calc(var(--message-markdown-table-columns) * 112px);
   border-collapse: collapse;
   background: var(--openbot-bg-canvas);
   color: var(--openbot-data-table-text);

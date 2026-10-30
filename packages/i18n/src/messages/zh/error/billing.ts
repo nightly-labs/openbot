@@ -10,9 +10,12 @@ export const messages = {
   // License errors.
   "error.billing.licenseExists": "该账号已有许可证，请改为更改其用户数。",
   "error.billing.licenseCurrency": "许可证必须使用你其他套餐的币种。",
+  "error.billing.planCurrency": "新套餐必须使用你其他套餐的币种。",
   "error.billing.licenseUsersInUse": "许可证的用户数不能少于当前正在使用的人数。",
   "error.billing.licensePaymentFailed": "新增用户的付款失败。请更新付款方式后重试。",
   "error.billing.licenseUnavailable": "许可证暂时不可用。",
+  "error.billing.licenseOneUser": "该许可证只包含 1 位用户。如需添加用户，请改为团队版。",
+  "error.billing.licensePlanChange": "该许可证无法改为该套餐。请取消它，然后购买新套餐。",
   "error.billing.noLicense": "该账号没有许可证。",
   // Billing errors that the desktop and web clients make.
   "error.billing.invalidRequest": "账单请求无效。",

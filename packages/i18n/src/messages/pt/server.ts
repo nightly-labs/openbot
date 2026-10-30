@@ -87,6 +87,17 @@ export const messages = {
   "server.add.billing.monthly": "Mensal",
   "server.add.billing.yearly": "Anual",
   "server.add.billing.save": "Economize {percent}%",
+  "server.add.use.label": "Uso",
+  "server.add.use.personal": "Pessoal",
+  "server.add.use.work": "Trabalho",
+  "server.add.license.people": "Pessoas no trabalho",
+  "server.add.license.minimum": {
+    one: "{count} pessoa já usa seus servidores, então você não pode escolher menos.",
+    other: "{count} pessoas já usam seus servidores, então você não pode escolher menos.",
+  },
+  "server.add.license.bundle": "Pacote −{percent}%",
+  "server.add.license.included": "Inclui: {license}",
+  "server.add.license.includedTrial": "Inclui: {license}, grátis até {date}",
   "server.add.billedMonthly": "Cobrado mensalmente",
   "server.add.billedYearly": "{price} cobrados anualmente",
   "server.add.yearlySaving": "Economize {amount}",
@@ -96,8 +107,22 @@ export const messages = {
   "server.add.custom.description":
     "Tenha infraestrutura dedicada, armazenamento adicional ou recursos adaptados ao seu fluxo de trabalho.",
   "server.add.custom.action": "Fale conosco",
-  "server.add.join.title": "Tem um convite?",
   "server.add.join.action": "Entrar em um servidor",
+  "server.add.otherOptions": "Outras opções",
+  "server.local.createTitle": "Novo servidor neste computador",
+  "server.local.createDescription":
+    "O servidor tem seus próprios agentes, chats e arquivos. Ele é executado neste computador.",
+  "server.local.nameLabel": "Nome do servidor",
+  "server.local.create": "Criar servidor",
+  "server.local.creating": "Criando servidor…",
+  "server.local.createFailed": "Não foi possível criar o servidor.",
+  "server.local.limitReached":
+    "Você pode ter no máximo {limit} servidores neste computador. Exclua um para criar outro.",
+  "server.local.deleteConfirmTitle": "Excluir {name}?",
+  "server.local.deleteConfirmDescription":
+    "O OpenBot para o servidor e move os agentes, chats e arquivos dele para a lixeira.",
+  "server.local.deleting": "Excluindo servidor…",
+  "server.local.deletedTitle": "{name} excluído",
   "server.add.limit.title": "Esta conta atingiu o número máximo de servidores",
   "server.add.limit.description": {
     one: "Uma conta pode ter {count} servidor pago. Para adicionar um servidor, exclua um primeiro.",
@@ -164,6 +189,7 @@ export const messages = {
   "server.rail.addRemote": "Adicionar servidor remoto",
   "server.rail.add": "Adicionar servidor",
   "server.rail.buttonLabel": "Servidor {name}",
+  "server.rail.thisComputer": "neste computador",
   "server.rail.notificationsMuted": "notificações silenciadas",
   "server.rail.actions": "Ações do servidor",
   "server.rail.unmute": "Reativar notificações",
@@ -291,6 +317,12 @@ export const messages = {
   "server.settings.memoryLimit": "Memórias por agente",
   "server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",
+  "server.settings.memoryReview": "Revisão de memórias",
+  "server.settings.memoryReviewDescription":
+    "Com que frequência os agentes deste servidor guardam em segundo plano fatos duradouros das conversas.",
+  "server.settings.memoryReviewOff": "Desativada",
+  "server.settings.memoryReviewTurns": { one: "A cada {count} turno", other: "A cada {count} turnos" },
+  "server.settings.memoryReviewLoadFailed": "Não foi possível carregar a configuração de revisão de memórias.",
   "server.settings.remoteOnline": "O computador anfitrião está online. Seu proprietário controla a publicação.",
   "server.settings.remoteOffline": "O computador anfitrião está offline. Seu proprietário controla a publicação.",
   "server.settings.reachable": "Acessível online. Só pessoas convidadas podem entrar.",
@@ -383,8 +415,10 @@ export const messages = {
   "server.invite.showQr": "Mostrar código QR do convite",
   "server.invite.permaHint":
     "Nunca expira e pode ser usado várias vezes. Qualquer pessoa com este link pode entrar; revogue-o para desativar.",
-  "server.invite.full":
-    "Este servidor atingiu o máximo de {limit} membros. Remova um membro para convidar uma nova pessoa.",
+  "server.invite.full": {
+    one: "Este servidor atingiu o máximo de {count} membro. Remova um membro para convidar uma nova pessoa.",
+    other: "Este servidor atingiu o máximo de {count} membros. Remova um membro para convidar uma nova pessoa.",
+  },
   "server.invite.qrLabel": "Código QR do convite",
   "server.invite.qrDescription": "Leia este código no OpenBot Mobile para entrar neste servidor.",
   "server.invite.accepted": "Convite aceito",

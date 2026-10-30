@@ -53,6 +53,8 @@ export interface ThreadHeaderProps {
   onRestore: (id: string) => void;
   onRename?: ((id: string, title: string) => void) | undefined;
   onDelete?: ((id: string) => void) | undefined;
+  /** Opens a side thread in the side panel. Missing when the chat has no side panel. */
+  onMoveToSide?: ((id: string) => void) | undefined;
 }
 
 /** The id of the agent's own chat in the thread lists. A side thread has the id of its task. */

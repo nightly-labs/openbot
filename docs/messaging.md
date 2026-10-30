@@ -144,8 +144,11 @@ agents.
   gives each reply chain its own thread, so a reply to the bot, or to a message in the chain, reaches
   the same agent without a mention. In a forum, each topic is one conversation. A direct chat is one
   conversation.
-- With privacy mode on (Telegram's default), Telegram sends the bot only messages that mention it,
-  replies to it and commands. Other messages of the chat do not reach this computer.
+- The OpenBot bot has privacy mode off, so Telegram sends it every message of a group, and Signal
+  passes each one to this computer. OpenBot answers only a mention, a reply to the bot, or a message
+  of a reply chain that an agent answers. It keeps the others in memory only, and an agent can read
+  the last of them with `messaging_history`. With privacy mode on, Telegram does not send a plain
+  mention to a bot that is not an admin of the group.
 - 👀 means the message arrived. "Working on it…" is replaced by the answer. 👌, 💔 or 🫡 shows the end.
 - An approval appears with **Approve** and **Deny**. Only the person who wrote the message can answer
   it there. When another person presses a button, the bot answers in the chat that only the requester
@@ -157,7 +160,8 @@ agents.
 
 Telegram must reach Signal over public HTTPS.
 
-1. Make a development bot with [@BotFather](https://t.me/BotFather). Keep privacy mode on.
+1. Make a development bot with [@BotFather](https://t.me/BotFather). Turn privacy mode off
+   (`/setprivacy`), or mentions reach the bot only when it is a group admin.
 2. Start a tunnel to the local Signal, for example `cloudflared tunnel --url http://127.0.0.1:<signal port>`.
 3. Give Signal `TELEGRAM_BOT_TOKENS` (the bot token), `TELEGRAM_WEBHOOK_SECRET` (32 bytes or more) and
    `TELEGRAM_WEBHOOK_ORIGIN` (the tunnel address). Signal sets the bot's webhook when it starts.
@@ -241,7 +245,7 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
   thread: a Slack thread ts, a Discord message ID, a Telegram message ID, or `t<topic ID>` for a
   Telegram forum topic. The text is redacted before it leaves this computer. A Discord post pings
   nobody; a Telegram `@username` notifies that person. A Telegram connection posts only in its own
-  chat.
+  chat. The result has `messageId`, the ID of the first post, and for Discord a `url` to it.
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the

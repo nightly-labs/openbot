@@ -1,21 +1,18 @@
-import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { useQuery } from "@tanstack/react-query";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
-import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
-import Animated from "react-native-reanimated";
+import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUniwind } from "uniwind";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import {
@@ -23,48 +20,44 @@ import {
   BrowserSecretComposer,
   BrowserTakeoverCard,
 } from "@/features/chat/components/browser-secret-card";
+import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
+import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
+import { dictationVoice } from "@/features/chat/components/composer-voice";
+import { useMarkThreadRead } from "@/features/chat/components/use-agent-thread-reads";
+import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
 import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
-import { projectChatMessages } from "@/features/chat/model/chat-messages";
+import { latestReadableMessage, projectChatMessages } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
+import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
+import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
-
-type TaskAction = "stop" | "close" | "reopen";
 
 const NO_MESSAGES: never[] = [];
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 /** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
 
-const ACTION_TEXT = {
-  stop: { label: "mobile.server.tasks.stop", error: "mobile.server.tasks.error.stop", icon: "stop.circle" },
-  close: { label: "mobile.server.tasks.close", error: "mobile.server.tasks.error.close", icon: "checkmark.circle" },
-  reopen: { label: "mobile.server.tasks.reopen", error: "mobile.server.tasks.error.reopen", icon: "arrow.clockwise" },
-} as const satisfies Record<TaskAction, { label: MobileTextKey; error: MobileTextKey; icon: string }>;
-
-/** As on desktop: a running or waiting task can stop, another open task can close, and a closed one can reopen. */
-function taskAction(task: AgentTask): TaskAction {
-  if (task.state === "running" || task.state === "queued") return "stop";
-  return task.state === "closed" ? "reopen" : "close";
+function onThreadDeleted(task: AgentTask) {
+  router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
 }
 
 /** Leaves the task. A task opened from a notification or a link has no screen under it. */
@@ -75,9 +68,11 @@ function leaveTask() {
 }
 
 /**
- * One task of an agent, laid out as the agent's chat: the same header, message list and composer.
- * The header has the task's actions in place of the browser, and the composer has no files:
- * `agent-tasks-v1` carries text only.
+ * One thread of an agent, laid out as the agent's chat: the same header, message list and composer.
+ * The agent's name in the header opens the thread menu, the header has the thread's actions in place
+ * of the browser. The composer has files only on a host with `agent-thread-files-v1`: `agent-tasks-v1`
+ * carries text only. The files upload when the person sends, and a failed send keeps them. The task id
+ * `DRAFT_THREAD_ID` is a new thread: its first message starts the thread, as on desktop.
  */
 export function AgentTaskScreen() {
   const { t } = useText();
@@ -86,15 +81,19 @@ export function AgentTaskScreen() {
   const agent = agents.find((item) => item.id === agentId && item.serverId === serverId);
   if (agent)
     return <AgentTaskChat key={`${serverId}:${taskId}`} target={{ ...agent, kind: "agent" }} taskId={taskId} />;
-  return <TaskNote note={t("mobile.server.tasks.notFound")} />;
+  return <TaskNote note={t("mobile.server.threads.notFound")} />;
 }
 
 /** A full screen note with a way back, for a task or an agent that this phone cannot show. */
 function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   const { t } = useText();
   const foreground = useThemeColor("foreground");
+  const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1 items-center justify-center gap-5 bg-background px-8">
+    <View
+      className="flex-1 items-center justify-center gap-5 bg-background"
+      style={{ paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }}
+    >
       <Typography.Paragraph align="center" className="text-text-secondary">
         {note}
       </Typography.Paragraph>
@@ -116,17 +115,25 @@ function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
 
 function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: string }) {
   const { t, errorMessage } = useText();
-  const { theme } = useUniwind();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const isDraft = taskId === DRAFT_THREAD_ID;
+  const threadMenu = useChatThreadMenu(target, taskId);
+  // A deleted thread has no screen: the agent's chat takes its place.
+  const threadActions = useThreadActions(target.serverId, onThreadDeleted);
   const {
     servers,
     agents,
     canUseTasks,
+    canAttachThreadFiles,
+    attachmentSupport,
+    uploadAttachment,
+    discardAttachment,
+    startAgentTask,
     loadAgentTasks,
     loadAgentTaskConversation,
     sendAgentTaskMessage,
-    controlAgentTask,
     respondToTaskPrompt,
     respondToApproval,
     respondToBrowserTakeover,
@@ -145,7 +152,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
   });
   const conversation = useQuery({
     queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId),
-    enabled,
+    enabled: enabled && !isDraft,
     retry: false,
     queryFn: () => loadAgentTaskConversation({ agentId, taskId }, serverId),
   });
@@ -224,14 +231,28 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
     return () => subscription.remove();
   }, []);
+  // The person sees the thread while its screen is in front, so its dot in the thread menu goes, on
+  // this phone and on the member's other devices.
+  useMarkThreadRead(
+    serverId,
+    agentId,
+    task ? taskId : null,
+    isFocused && appActive && conversation.data
+      ? (latestReadableMessage(conversation.data.messages)?.id ?? null)
+      : null,
+    task?.updatedAt ?? null,
+  );
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const filesAllowed = canAttachThreadFiles(serverId);
+  const attachments = useChatAttachments([], undefined, () => attachmentSupport(serverId));
+  // The card's open progress, shared with the composer, as in the agent's chat.
+  const menuProgress = useSharedValue(0);
   // As in the agent's chat: after the host takes the message, the activity row waits for the turn,
   // the reply or a failure. Task events can arrive after the read that holds the reply.
   const [awaitingTurn, setAwaitingTurn] = useState(false);
-  const [acting, setActing] = useState(false);
-  const ready = Boolean(conversation.data);
+  const ready = isDraft || Boolean(conversation.data);
   const rowsShown = useRowsAfterOpenTransition();
   const lastUserId = messages.findLast((row) => row.kind === "message" && row.author === "user")?.id ?? null;
   const motion = useChatMotion(
@@ -243,7 +264,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     questionForm.question ? (questionForm.messageId ?? null) : null,
   );
   const closed = task?.state === "closed";
-  const canSend = online && !closed;
+  const canSend = online && !closed && (!isDraft || enabled);
   const voice = useVoiceMode({
     enabled: isFocused && canSend,
     focused: isFocused,
@@ -272,33 +293,59 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     return () => clearTimeout(timer);
   }, [awaitingTurn]);
 
-  async function act(taskAction: TaskAction) {
-    if (acting) return;
-    setActing(true);
-    void haptics.impact("light");
-    try {
-      await controlAgentTask(taskAction, { agentId, taskId }, serverId);
-    } catch (error) {
-      void haptics.notification("error");
-      const text = currentText();
-      const title = text.t(ACTION_TEXT[taskAction].error);
-      showFailureAlert(error, "team", title, text.errorMessage(error, title));
-    } finally {
-      setActing(false);
-    }
-  }
-
-  /** As in a chat, the composer empties at once; a failed send puts the text back in an empty composer. */
+  /**
+   * As in a chat, the text leaves the composer at once; a failed send puts it back in an empty composer.
+   * The files stay in the composer until the host takes the message, because they upload first.
+   */
   async function send(value: string) {
     const text = value.trim();
-    if (!text || !canSend) return;
+    const files = filesAllowed ? attachments.items : [];
+    // The files of a send in progress are still in the composer, so they do not go twice. A second
+    // start of a new thread would make a second thread.
+    if ((!text && files.length === 0) || !canSend || (sending && (isDraft || files.length > 0))) return;
+    if (files.length > INPUT_LIMITS.attachments) {
+      void haptics.notification("error");
+      setSendError(t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments }));
+      return;
+    }
     setDraft("");
     setSendError(null);
     Keyboard.dismiss();
     void haptics.impact();
     // While the agent asks a question and the person chose to reply here, the text is the answer.
-    if (answersQuestion) {
+    // Files still go as a message, as in the agent's chat.
+    if (answersQuestion && files.length === 0) {
       if (!questionForm.disabled) questionForm.answer([mentionDraft(text).text]);
+      return;
+    }
+    /** Uploads the files as drafts, then sends; a failure discards the drafts that uploaded. */
+    const withFiles = <R,>(deliver: (attachmentDraftIds: string[]) => Promise<R>) =>
+      uploadChatAttachments(files, {
+        upload: (file, onProgress) => uploadAttachment(agentId, file, serverId, onProgress),
+        discard: (id) => discardAttachment(agentId, id, serverId),
+        send: deliver,
+      });
+    // A new thread starts with this message, and the screen then shows the thread.
+    if (isDraft) {
+      setSending(true);
+      try {
+        const started = await withFiles((attachmentDraftIds) =>
+          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() }, serverId),
+        );
+        attachments.clear();
+        // The thread shows in the menu before its list event arrives.
+        queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
+          stored && !stored.tasks.some((entry) => entry.id === started.id)
+            ? { ...stored, tasks: [started, ...stored.tasks] }
+            : stored,
+        );
+        router.setParams<"/task/[taskId]">({ taskId: started.id });
+      } catch (error) {
+        void haptics.notification("error");
+        setDraft((current) => (current.trim() ? current : value));
+        setSendError(errorMessage(error, t("mobile.server.threads.error.start")));
+        setSending(false);
+      }
       return;
     }
     // As in the agent's chat: a message to an idle task moves to the top of the chat when its row
@@ -308,64 +355,46 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
     else motion.scrollToLatest();
     setSending(true);
     try {
-      await sendAgentTaskMessage({ agentId, taskId, text, clientMessageId: Crypto.randomUUID() }, serverId);
+      await withFiles((attachmentDraftIds) =>
+        sendAgentTaskMessage(
+          { agentId, taskId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() },
+          serverId,
+        ),
+      );
+      attachments.clear();
       if (startsTurn) setAwaitingTurn(true);
     } catch (error) {
       motion.cancelSend();
       void haptics.notification("error");
       setDraft((current) => (current.trim() ? current : value));
-      setSendError(errorMessage(error, t("mobile.server.tasks.error.send")));
+      setSendError(errorMessage(error, t("mobile.server.threads.error.send")));
     } finally {
       setSending(false);
     }
   }
 
-  if (!task) {
-    if (list.isError) return <TaskNote note={t("mobile.server.tasks.loadFailed")} retry={() => void list.refetch()} />;
+  if (!task && !isDraft) {
+    if (list.isError)
+      return <TaskNote note={t("mobile.server.threads.loadFailed")} retry={() => void list.refetch()} />;
     if (!enabled || list.data)
-      return <TaskNote note={t(enabled ? "mobile.server.tasks.notFound" : "mobile.server.tasks.offline")} />;
+      return <TaskNote note={t(enabled ? "mobile.server.threads.notFound" : "mobile.server.threads.offline")} />;
   }
 
   const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
-  const taskActionId = task ? taskAction(task) : null;
-  const actions =
-    taskActionId === null ? null : (
-      <MenuView
-        colorScheme={theme === "dark" ? "dark" : "light"}
-        actions={[
-          {
-            id: taskActionId,
-            title: t(ACTION_TEXT[taskActionId].label),
-            image: ACTION_TEXT[taskActionId].icon,
-            attributes: { disabled: acting, destructive: taskActionId === "stop" },
-          },
-        ]}
-        onPressAction={({ nativeEvent }) => {
-          if (nativeEvent.event === taskActionId) void act(taskActionId);
-        }}
-      >
-        <GlassView
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.server.tasks.actions")}
-          glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
-          isInteractive
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: liquidGlassAvailable ? "transparent" : fieldBackground,
-          }}
-        >
-          <Ellipsis color={String(foreground)} size={24} strokeWidth={2} />
-        </GlassView>
-      </MenuView>
-    );
+  const actionsMenu = task
+    ? {
+        label: t("mobile.server.threads.actions"),
+        actions: threadActions.menu(task),
+        onPressAction: (id: string) => threadActions.run(task, id),
+      }
+    : null;
 
   // Under the activity, as the desktop task panel: why the task waits, its queued messages and its failure.
-  const taskNotes = task ? (
+  const taskNotes = isDraft ? (
+    <Typography.Paragraph type="body-xs" align="center" className="px-6 pb-3 text-text-secondary">
+      {t("mobile.chat.threads.draftNote", { name: target.name })}
+    </Typography.Paragraph>
+  ) : task ? (
     <View className="gap-3 pb-3">
       {hold ? (
         <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
@@ -375,7 +404,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
       {task.queuedMessages.length > 0 ? (
         <View className="gap-2">
           <Typography.Paragraph type="body-xs" weight="semibold" className="px-1 text-text-secondary">
-            {t("mobile.server.tasks.queued")}
+            {t("mobile.server.threads.queued")}
           </Typography.Paragraph>
           {task.queuedMessages.map((queued) => (
             <View
@@ -393,10 +422,10 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
       {task.state === "idle" && task.outcome === "failed" ? (
         <View accessibilityRole="alert" className="gap-1 px-1">
           <Typography.Paragraph weight="medium" className="text-danger-text">
-            {t("mobile.server.tasks.failedTitle")}
+            {t("mobile.server.threads.failedTitle")}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" className="text-danger-text">
-            {task.error || t("mobile.server.tasks.failedBody")}
+            {task.error || t("mobile.server.threads.failedBody")}
           </Typography.Paragraph>
         </View>
       ) : null}
@@ -413,9 +442,10 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
       >
         <ChatHeader
           target={target}
-          kicker={t("mobile.app.route.task")}
-          title={task?.title ?? ""}
-          trailing={actions}
+          kicker={target.name}
+          title={isDraft ? t("mobile.chat.threads.new") : (task?.title ?? "")}
+          threadMenu={threadMenu}
+          actionsMenu={actionsMenu}
           fallbackBackground={fieldBackground}
           foreground={foreground}
           liquidGlassAvailable={liquidGlassAvailable}
@@ -476,7 +506,6 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
         {voiceOpen ? (
           <VoiceOverlay
             voice={voice}
-            palette={palette}
             hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
             reply={null}
             muted={muted}
@@ -493,7 +522,9 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
-          <ConnectionStatus server={server} />
+          <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+            <ConnectionStatus server={server} />
+          </View>
           {showBrowserRequests
             ? taskBrowserRequests
                 .filter((request) => !asksForSecret(request))
@@ -517,7 +548,11 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
                 ))
             : null}
           {sendError ? (
-            <Typography.Paragraph accessibilityRole="alert" className="bg-background px-4 py-2 text-danger-text">
+            <Typography.Paragraph
+              accessibilityRole="alert"
+              className="bg-background py-2 text-danger-text"
+              style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+            >
               {sendError}
             </Typography.Paragraph>
           ) : null}
@@ -526,10 +561,14 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
             <Typography.Paragraph
               type="body-xs"
               align="center"
-              className="px-6 pt-2 text-text-secondary"
-              style={{ paddingBottom: Math.max(insets.bottom, 10) + 6 }}
+              className="pt-2 text-text-secondary"
+              style={{
+                paddingLeft: insets.left + 24,
+                paddingRight: insets.right + 24,
+                paddingBottom: Math.max(insets.bottom, 10) + 6,
+              }}
             >
-              {t("mobile.server.tasks.closedNote")}
+              {t("mobile.server.threads.closedNote")}
             </Typography.Paragraph>
           ) : secretRequest ? (
             <BrowserSecretComposer
@@ -557,14 +596,19 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
               placeholder={
                 answersQuestion
                   ? t("mobile.chat.question.answerPlaceholder")
-                  : t(
-                      task?.state === "running" || task?.state === "queued"
-                        ? "mobile.server.tasks.messagePlaceholder"
-                        : "mobile.server.tasks.continuePlaceholder",
-                    )
+                  : isDraft
+                    ? t("mobile.chat.threads.draftPlaceholder", { name: target.name })
+                    : t(
+                        task?.state === "running" || task?.state === "queued"
+                          ? "mobile.server.threads.messagePlaceholder"
+                          : "mobile.server.threads.continuePlaceholder",
+                      )
               }
               bottomInset={insets.bottom}
-              disabled={!canSend}
+              disabled={!canSend || (sending && (isDraft || attachments.items.length > 0))}
+              attachments={filesAllowed ? attachments : undefined}
+              menuOpen={attachments.menuOpen}
+              menuProgress={menuProgress}
               draft={draft}
               fallbackBackground={fieldBackground}
               foreground={foreground}
@@ -573,15 +617,30 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
               raised={raised}
               onChangeDraft={setDraft}
               onSend={(text) => void send(text)}
-              onStop={task?.state === "running" && !answersQuestion ? () => void act("stop") : undefined}
-              stopping={acting}
+              onStop={task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined}
+              stopping={task ? threadActions.acting(task) : false}
               keyboardProgress={motion.keyboardProgress}
-              voice={voice}
+              voice={dictationVoice(voice, t)}
               voiceAccent={accent}
             />
           )}
         </Animated.View>
       </KeyboardGestureArea>
+      {/* As in the agent's chat: the card stays while a system prompt holds the foreground. */}
+      {filesAllowed && attachments.menuAnchor && isFocused ? (
+        <ChatAttachmentPanel
+          anchor={attachments.menuAnchor}
+          appActive={appActive}
+          attachments={attachments}
+          fallbackBackground={fieldBackground}
+          foreground={foreground}
+          keyboardHeight={motion.keyboardHeight}
+          keyboardOffset={keyboardOffset}
+          liquidGlassAvailable={liquidGlassAvailable}
+          onClose={attachments.closeMenu}
+          progress={menuProgress}
+        />
+      ) : null}
     </View>
   );
 }

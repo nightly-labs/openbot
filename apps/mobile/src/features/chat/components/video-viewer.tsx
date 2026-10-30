@@ -7,7 +7,7 @@ import Share from "lucide-react-native/icons/share";
 import X from "lucide-react-native/icons/x";
 import { useState } from "react";
 import { Modal, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScopedTheme } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -40,9 +40,13 @@ export function VideoViewer(props: VideoViewerProps) {
       navigationBarTranslucent
       onRequestClose={props.onDismissed}
     >
-      <ScopedTheme theme="dark">
-        <VideoViewerContent {...props} />
-      </ScopedTheme>
+      {/* The player covers the window, and the chat can be one column of it: the insets are the
+          window's, so the controls keep clear of the rail of iPhone Duo on either side. */}
+      <SafeAreaProvider>
+        <ScopedTheme theme="dark">
+          <VideoViewerContent {...props} />
+        </ScopedTheme>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -67,8 +71,8 @@ function VideoViewerContent({ uri, name, busy, onShare, onSave, onDismissed }: V
     <View className="flex-1 bg-black" accessibilityViewIsModal>
       <StatusBar style="light" />
       <View
-        className="flex-row items-center justify-between px-4 pb-2"
-        style={{ paddingTop: insets.top + 8 }}
+        className="flex-row items-center justify-between pb-2"
+        style={{ paddingTop: insets.top + 8, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
         accessibilityActions={[{ name: "escape" }]}
         onAccessibilityEscape={close}
       >

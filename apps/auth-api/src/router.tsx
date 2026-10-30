@@ -20,11 +20,30 @@ if (typeof window !== "undefined") {
   });
 }
 
+/** The catalog that a page renders through `TextProvider`. Its loader returns it as `textCatalog`. */
+function textCatalogOf(loaderData: unknown): string | undefined {
+  if (typeof loaderData !== "object" || loaderData === null || !("textCatalog" in loaderData)) return undefined;
+  return typeof loaderData.textCatalog === "string" ? loaderData.textCatalog : undefined;
+}
+
 export function getRouter() {
-  return createRouter({
+  const router = createRouter({
     routeTree,
     defaultPreload: "intent",
+    // Components that read the catalog in the browser (the pricing order form) need it before hydration, or they
+    // render English over the server's text. Loader data comes too late for that, so the router carries the locale.
+    dehydrate: (): { textCatalog: string | undefined } => ({
+      textCatalog: router.state.matches.map((match) => textCatalogOf(match.loaderData)).find(Boolean),
+    }),
+    hydrate: async (data: { textCatalog?: string | undefined }) => {
+      const locale = data.textCatalog;
+      if (!locale || locale === "en") return;
+      const { loadLocale, TRANSLATED_LOCALES } = await import("@openbot/i18n");
+      const translated = TRANSLATED_LOCALES.find((item) => item === locale);
+      if (translated) await loadLocale(translated).catch(() => undefined);
+    },
   });
+  return router;
 }
 
 declare module "@tanstack/solid-router" {

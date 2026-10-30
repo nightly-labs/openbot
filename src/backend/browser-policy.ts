@@ -27,10 +27,10 @@ export function browserRequestHeaders(url: string, requestHeaders: Record<string
     setRequestHeader(headers, "User-Agent", browserRequestUserAgent(url, userAgent[1], process.versions.electron));
   }
   // Send only low-entropy hints, on secure origins. Keep any hints Chromium supplies.
-  const target = new URL(url);
+  const target = URL.parse(url);
   if (
-    target.protocol === "https:" ||
-    (target.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))
+    target?.protocol === "https:" ||
+    (target?.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))
   ) {
     for (const [name, value] of Object.entries(browserClientHints(process.versions.chrome, process.platform))) {
       if (!Object.keys(headers).some((candidate) => candidate.toLowerCase() === name.toLowerCase())) {

@@ -264,10 +264,12 @@ const textContent = (block: MessageContentBlock) => (block.type === "text" ? blo
 const imageFileKeys = (files: readonly MessageImageFile[]) =>
   files.map((file) => `${file.kind}:${file.path}`).join("\n");
 
+const fileImageId = (file: MessageImageFile) => `file:${file.kind}:${file.path}`;
+
 /** A named image file in the shape of an image attachment, so the gallery and the viewer show it. */
 function fileImage(file: MessageImageFile, url: string): AttachmentSummary {
   return {
-    id: `file:${file.kind}:${file.path}`,
+    id: fileImageId(file),
     name: fileReferenceName(file.path),
     size: 0,
     kind: "image",
@@ -311,6 +313,10 @@ export function MessageBody(props: {
    * image as a `data:` URL, or `null` when it cannot show. Absent, a named file is only a chip.
    */
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
+  /** Downloads an image file that an agent message names. Absent, its preview has no download. */
+  onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
 }) {
   const { t } = useText();
   const streamingBody = createStreamingBody(
@@ -335,23 +341,33 @@ export function MessageBody(props: {
       imageGenerationStatus(props.message.streaming, props.message.status) !== "completed"
     );
   });
+  const referencedAttachmentIds = createMemo(
+    () =>
+      new Set(
+        messageFileReferences(props.message.body, props.message.attachments ?? [])
+          .filter((reference) => reference.kind === "attachment")
+          .map((reference) => reference.attachment.id),
+      ),
+  );
   const standaloneAttachments = createMemo(() => {
-    const referencedIds = new Set(
-      messageFileReferences(props.message.body, props.message.attachments ?? [])
-        .filter((reference) => reference.kind === "attachment")
-        .map((reference) => reference.attachment.id),
-    );
+    const referencedIds = referencedAttachmentIds();
     const generatedAttachmentId = generatedImageShown() ? props.message.attachments?.[0]?.id : undefined;
     return (props.message.attachments ?? []).filter(
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
   /* The image files that a finished agent message names show under it like attached images. A
-     file that the message also attaches shows once, as the attachment. */
+     file that the message also attaches shows once, as the attachment. An attachment that the text
+     names by path does not show on its own, so its image shows here. */
   const namedImageFiles = createMemo(
     () => {
       if (props.message.author !== "agent" || props.message.streaming || !props.loadImageFile) return [];
-      const attached = new Set((props.message.attachments ?? []).map((attachment) => attachment.name));
+      const referencedIds = referencedAttachmentIds();
+      const attached = new Set(
+        (props.message.attachments ?? [])
+          .filter((attachment) => !referencedIds.has(attachment.id))
+          .map((attachment) => attachment.name),
+      );
       const texts = messageContentBlocks(props.message.body, false).flatMap((block) =>
         block.type === "text" ? [block.text] : [],
       );
@@ -420,8 +436,13 @@ export function MessageBody(props: {
     content: () => messageContent,
     enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
   });
-  // A markdown image is a web address, and a named image file is not an attachment, so the viewer
-  // has no download for them.
+  /* A named image file downloads by its path. A markdown image is a web address, so it has no download. */
+  const namedImageFile = (image: AttachmentSummary) => namedImageFiles().find((file) => fileImageId(file) === image.id);
+  const downloadImage = (image: AttachmentSummary) => {
+    const file = namedImageFile(image);
+    if (file) props.onDownloadImageFile?.(file);
+    else props.onDownload?.(image);
+  };
   const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
   const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
@@ -678,6 +699,7 @@ export function MessageBody(props: {
                 aspectRatio="square"
                 attachment={image()}
                 onPreview={openAttachment}
+                onDownload={props.onDownloadImageFile ? downloadImage : undefined}
               />
             </div>
           )}
@@ -698,7 +720,13 @@ export function MessageBody(props: {
           <ImageLightbox
             opening={opening()}
             thumbnail={imageThumbnail}
-            onDownload={opening().markdown ? undefined : props.onDownload}
+            onDownload={downloadImage}
+            canDownload={(image) =>
+              namedImageFile(image)
+                ? Boolean(props.onDownloadImageFile)
+                : !opening().markdown && Boolean(props.onDownload)
+            }
+            macWindowControls={props.macWindowControls}
             onClose={() => setLightbox(null)}
           />
         )}

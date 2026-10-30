@@ -79,6 +79,8 @@ interface ConversationResources {
   voiceMeterStop: (() => void) | undefined;
   voiceAgentId: string | undefined;
   voiceServerId: string | undefined;
+  /** The thread sends its draft when the recording's text is in it. */
+  voiceThreadSend: boolean;
   voiceSubmitRequest:
     | {
         agentId: string;
@@ -131,8 +133,8 @@ export function createStableConversationState(
   });
   /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
   const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
-  /** The text of each side thread's message box, keyed by `threadDraftKey`. */
-  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, string>>(storedDrafts?.threads ?? {});
+  /** The message box of each side thread, keyed by `threadDraftKey`. */
+  const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.threads ?? {});
   const [editingAgentId, setEditingAgentId] = createSignal<string | null>(restoredEdit?.agentId ?? null);
   const [editingServerId, setEditingServerId] = createSignal<string | null>(restoredEdit?.serverId ?? null);
   const [editingEditId, setEditingEditId] = createSignal<string | null>(restoredEdit?.editId ?? null);
@@ -226,6 +228,8 @@ export function createStableConversationState(
   const [voiceModelProgress, setVoiceModelProgress] = createSignal<number | null>(null);
   const [voiceElapsedSeconds, setVoiceElapsedSeconds] = createSignal(0);
   const [voiceLiveTranscript, setVoiceLiveTranscript] = createSignal<VoiceLiveTranscript | null>(null);
+  /** The side thread draft that the last recording was started for. Undefined for the agent's own chat. */
+  const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
   /** The conversation whose last recording stopped at the time limit. */
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
@@ -250,6 +254,7 @@ export function createStableConversationState(
     voiceMeterStop: undefined,
     voiceAgentId: undefined,
     voiceServerId: undefined,
+    voiceThreadSend: false,
     voiceSubmitRequest: undefined,
     voiceDisposed: false,
     voiceRequestGeneration: 0,
@@ -346,6 +351,8 @@ export function createStableConversationState(
     setVoiceElapsedSeconds,
     voiceLiveTranscript,
     setVoiceLiveTranscript,
+    voiceThreadKey,
+    setVoiceThreadKey,
     voiceLevels,
     setVoiceLevels,
     voiceLimitReached,
@@ -389,7 +396,7 @@ export function createServerConversationState() {
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
-  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {} });
+  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");

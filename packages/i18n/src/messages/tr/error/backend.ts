@@ -78,6 +78,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "Kanal teslimatı oluşturulamadı.",
   "error.backend.channelAssignmentStopped": "Bu kanal ataması durduruldu veya değiştirildi.",
   "error.backend.channelAssigneeUnavailable": "Atanan ajan kullanılamıyor.",
+  "error.backend.channelAssigneeRemoved": "Atanan üye kaldırıldı.",
+  "error.backend.channelAssigneeReassign": "Atanan üye kullanılamıyor. Bu görevi yeniden atayın.",
   "error.backend.channelAssignmentChanged": "Bu kanal ataması değişti.",
   "error.backend.channelMemberRequired": "Bu kanalın kullanılabilir bir üyesini seçin.",
   "error.backend.memoryEssentialBudget":
@@ -185,6 +187,7 @@ export const messages = {
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
+  "error.backend.mcpServerInvalid": "OpenBot bu MCP sunucusu yapılandırmasını kaydedemiyor.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
   "error.backend.mcpSignInNotAccepted": "Sunucu bu oturum açmayı kabul etmedi.",
   "error.backend.mcpSignInClientRefused":
@@ -209,6 +212,7 @@ export const messages = {
     "OpenBot bu sunucunun oturum açma bilgilerini okuyamadı. Sunucu adresini denetleyin ve yeniden deneyin.",
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":

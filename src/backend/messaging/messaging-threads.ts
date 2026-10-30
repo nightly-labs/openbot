@@ -105,7 +105,10 @@ export interface MessagingOutbound {
     connectionId: string,
     target: MessageTarget,
     markdown: string,
-  ): Effect.Effect<{ posted: true } | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }>;
+  ): Effect.Effect<
+    | { posted: true; messageId: string; url?: string }
+    | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
+  >;
 }
 
 export interface MessagingThreadsHooks {

@@ -108,6 +108,13 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   Workspace only agent keeps its card; a Computer Use tool does not. OpenBot keeps Codex's `approvalPolicy`
   at `on-request`, because `never` denies MCP tool calls and rejects elicitations. Other questions, MCP
   forms and sign-in requests, and browser takeovers remain interactive.
+- A Workspace only agent can change files in its workspace, the shared folder, and the folders that the
+  user added (`AgentSummary.additionalFolders`, in `agent_json`, real paths, at most 32). One function,
+  `workspaceWritableRoots`, gives these roots to every provider sandbox, and the agent's developer
+  instructions name them. Only the local `agentFolders` IPC endpoints change the list; an agent cannot
+  add a folder to itself. Main refuses a disk root, the home folder, and a folder that holds OpenBot data.
+  A folder that is not on the disk stays in the list but is not a root. The list is local, like
+  `access`: the Team API does not carry it.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
   carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.

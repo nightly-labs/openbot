@@ -84,6 +84,8 @@ import {
   isSpeechVoice,
   isVoiceLanguage,
   isVoiceModelId,
+  isVoiceServerProbe,
+  isVoiceServerSettings,
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
@@ -106,6 +108,8 @@ import {
   type UpdatePreference,
   type UpdateStatus,
   type VoiceModelStatus,
+  type VoiceServerProbe,
+  type VoiceServerSettings,
   type VoiceSettings,
   type VoiceStream,
   type VoiceStreamTranscript,
@@ -476,6 +480,21 @@ export function decodeSpeechAudio(value: unknown): SpeechAudio {
     throw new Error("Invalid speech audio.");
   }
   return { pcm, sampleRate };
+}
+
+export function decodeVoiceServerSettings(value: unknown): VoiceServerSettings | null {
+  if (value === null) return null;
+  if (!isVoiceServerSettings(value)) throw new Error("Invalid voice server settings.");
+  const { address, hasApiKey, routes } = value;
+  const { dictation, speech, transcriptionModel, speechModel, voice } = routes;
+  return { address, hasApiKey, routes: { dictation, speech, transcriptionModel, speechModel, voice } };
+}
+
+export function decodeVoiceServerProbe(value: unknown): VoiceServerProbe {
+  if (!isVoiceServerProbe(value)) throw new Error("Invalid voice server test result.");
+  if (!value.ok) return { ok: false, field: value.field, message: value.message };
+  const { transcription, speech, voices } = value.models;
+  return { ok: true, models: { transcription: [...transcription], speech: [...speech], voices: [...voices] } };
 }
 
 export function decodeExportResult(value: unknown): ExportResult {

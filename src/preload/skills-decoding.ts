@@ -60,6 +60,7 @@ function decodeSkillSummary(value: unknown) {
     version: requiredNumber(item, "version"),
     installs: requiredNumber(item, "installs"),
     featured: requiredBoolean(item, "featured"),
+    ...(isBoolean(item.verified) ? { verified: item.verified } : {}),
     iconUrl: nullableString(item, "iconUrl"),
     updatedAt: requiredString(item, "updatedAt"),
   };

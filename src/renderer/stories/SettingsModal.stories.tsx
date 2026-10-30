@@ -110,7 +110,24 @@ function SettingsModalStory(props: {
     setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
   }
 
+  /** A phone scans the code and signs in a few seconds after the code shows. */
+  let scanTimer: number | undefined;
+  onCleanup(() => window.clearTimeout(scanTimer));
   async function createMobileConnect(): Promise<{ qrData: string; expiresAt: number }> {
+    window.clearTimeout(scanTimer);
+    scanTimer = window.setTimeout(() => {
+      setMobileDevices((current) => [
+        ...current,
+        {
+          sessionId: crypto.randomUUID(),
+          name: "Work iPhone",
+          platform: "ios",
+          connectedAt: Date.now(),
+          lastActiveAt: Date.now(),
+          via: "code",
+        },
+      ]);
+    }, 6_000);
     return {
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",
@@ -151,7 +168,10 @@ function SettingsModalStory(props: {
             onUpdateAccountName={updateAccountName}
             onUpdateAccountAvatar={updateAccountAvatar}
             onCreateMobileConnect={createMobileConnect}
-            onCancelMobileConnect={mock.api.auth.cancelMobileConnect}
+            onCancelMobileConnect={async () => {
+              window.clearTimeout(scanTimer);
+              await mock.api.auth.cancelMobileConnect();
+            }}
             onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
             onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
             onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}

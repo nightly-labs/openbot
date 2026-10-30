@@ -12,6 +12,7 @@ import {
 import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
+import { donateShareTarget } from "@/features/share/model/share-extension";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
@@ -127,6 +128,8 @@ async function deliverOutboxMessage(
         );
       },
     });
+    const agent = workspace.agents.find((item) => item.serverId === target.serverId && item.id === target.agentId);
+    if (agent) donateShareTarget(agent.serverId, agent.id, agent.name);
     return { messageId };
   }
   const { channelStore } = workspace;

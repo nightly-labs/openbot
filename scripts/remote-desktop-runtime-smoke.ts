@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -48,6 +48,13 @@ try {
   }
   if (state.displays.length === 0 || !state.selectedDisplayId) {
     throw new Error("Sunshine did not return a native display identifier.");
+  }
+  // macOS 27 stops Sunshine when its tray changes AppKit from the pairing thread (#3805).
+  if (
+    process.platform === "darwin" &&
+    (await readFile(join(stateDirectory, "sunshine.log"), "utf8")).includes("Starting system tray")
+  ) {
+    throw new Error("Sunshine started its system tray on macOS.");
   }
   const streamPage = await fetch(`${state.baseUrl}/stream.html`);
   if (!streamPage.ok) throw new Error(`Moonlight stream page failed with HTTP ${streamPage.status}.`);

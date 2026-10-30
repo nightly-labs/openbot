@@ -32,6 +32,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Модель «{id}» уже есть в списке этого провайдера.",
   "customProvider.error.modelIdInvalid":
     "Такой ID модели использовать нельзя. Уберите пробелы, кавычки и другие знаки препинания.",
+  "customProvider.error.contextWindowInvalid": "Введите целое число токенов от {min} до {max}.",
   "customProvider.error.headerNameRequired": "Введите имя заголовка.",
   "customProvider.error.headerNameInvalid": "Используйте допустимое имя HTTP-заголовка.",
   "customProvider.error.headerDuplicate": "Этот провайдер уже задаёт заголовок {name}.",
@@ -71,6 +72,8 @@ export const messages = {
   "customProvider.model.id": "ID модели {number}",
   "customProvider.model.name": "Отображаемое имя модели {number}",
   "customProvider.model.namePlaceholder": "Отображаемое имя",
+  "customProvider.model.contextWindow": "Контекстное окно модели {number}",
+  "customProvider.model.contextWindowPlaceholder": "Токены",
   "customProvider.model.remove": "Удалить модель {number}",
   "customProvider.model.add": "Добавить модель",
   "customProvider.headers": "Заголовки",

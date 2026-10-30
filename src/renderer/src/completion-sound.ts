@@ -39,8 +39,9 @@ function shouldPlayCompletionSound(
   agents: NotificationAgent[],
   storage?: PreferenceStorage,
 ): boolean {
-  // A quiet routine run posted nothing, so it has no reply to announce.
-  if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet) return false;
+  // A quiet routine run posted nothing, so it has no reply to announce. A turn that continues its
+  // plan is not the end of the request.
+  if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet || event.continues) return false;
   if (!isCompletionSoundEnabled(storage)) return false;
   return agents.some((agent) => agent.id === event.agentId && agent.notifications);
 }

@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { Effect, Schema } from "effect";
 import { z } from "zod";
-import { attachmentsOf, type DiscordState, discordAuthorName, stripBotMention } from "./discord-events";
+import { type DiscordState, discordAuthorName, messageBody } from "./discord-events";
 
 const snowflakeSchema = z.string().regex(/^[0-9]{1,20}$/u);
 const contentSchema = z.string().min(1).max(DISCORD_MESSAGE_TEXT_LIMIT);
@@ -204,6 +204,17 @@ const userSchema = z.object({
   bot: z.boolean().optional(),
 });
 const memberSchema = z.object({ nick: z.string().nullish(), user: userSchema });
+const historyAttachmentsSchema = z
+  .array(
+    z.object({
+      id: snowflakeSchema,
+      filename: z.string(),
+      content_type: z.string().optional(),
+      size: z.number().int().nonnegative(),
+      url: z.string(),
+    }),
+  )
+  .optional();
 const historySchema = z
   .array(
     z.object({
@@ -212,16 +223,14 @@ const historySchema = z
       timestamp: z.string(),
       author: userSchema,
       member: z.object({ nick: z.string().nullish() }).optional(),
-      message_reference: z.object({ message_id: snowflakeSchema.optional() }).optional(),
-      attachments: z
+      message_reference: z
+        .object({ type: z.number().int().optional(), message_id: snowflakeSchema.optional() })
+        .optional(),
+      attachments: historyAttachmentsSchema,
+      // The forwarded message of a forward.
+      message_snapshots: z
         .array(
-          z.object({
-            id: snowflakeSchema,
-            filename: z.string(),
-            content_type: z.string().optional(),
-            size: z.number().int().nonnegative(),
-            url: z.string(),
-          }),
+          z.object({ message: z.object({ content: z.string().optional(), attachments: historyAttachmentsSchema }) }),
         )
         .optional(),
     }),
@@ -339,16 +348,19 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const botUserId = state.botUserId;
         return {
           messages: messages
-            .map((message) => ({
-              id: message.id,
-              authorId: message.author.id,
-              authorName: discordAuthorName(message),
-              authorIsBot: message.author.bot === true,
-              content: stripBotMention(message.content, botUserId),
-              replyToId: message.message_reference?.message_id ?? null,
-              sentAt: message.timestamp,
-              attachments: attachmentsOf(message.attachments ?? []),
-            }))
+            .map((message) => {
+              const body = messageBody(message, botUserId);
+              return {
+                id: message.id,
+                authorId: message.author.id,
+                authorName: discordAuthorName(message),
+                authorIsBot: message.author.bot === true,
+                // A forward refers to the message it copies, which it does not reply to.
+                replyToId: body.forwarded ? null : (message.message_reference?.message_id ?? null),
+                sentAt: message.timestamp,
+                ...body,
+              };
+            })
             .sort((left, right) => compareSnowflakes(left.id, right.id)),
         };
       }

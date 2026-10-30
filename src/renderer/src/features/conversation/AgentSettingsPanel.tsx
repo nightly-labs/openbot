@@ -1,6 +1,7 @@
 import {
   type AgentBrowserProfile,
   agentAutomationAllowed,
+  assignedSkillCount,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
 } from "@openbot/contracts/ipc";
@@ -27,7 +28,7 @@ import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesS
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
-import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount, type SkillDetail } from "./AgentSkillsModal";
+import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";

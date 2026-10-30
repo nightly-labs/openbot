@@ -17,7 +17,7 @@ import {
   writeThreadTabs,
 } from "./thread-tabs-storage";
 
-const NO_TABS: AgentThreadTabs = { open: [], active: null };
+const NO_TABS: AgentThreadTabs = { open: [], active: null, side: [] };
 /** The window that shows the Undo toast finishes the delete. Another window waits this much longer. */
 const OTHER_WINDOW_DELAY_MS = 5_000;
 
@@ -55,9 +55,14 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   };
   /** The side threads with a tab that shows. */
   const openIds = (agentId: string): string[] => storedTabs(agentId).open.filter((id) => shown(agentId, id));
+  /** The side threads with a tab in the side panel that shows. */
+  const sideIds = (agentId: string): string[] => storedTabs(agentId).side.filter((id) => shown(agentId, id));
   /** The side threads whose tabs a write keeps. Before the thread list loads, no stored tab is dropped. */
   const keptIds = (agentId: string): string[] =>
     tasks.snapshot(agentId) ? openIds(agentId) : storedTabs(agentId).open.filter((id) => !hidden().has(id));
+  /** The same for the side panel tabs. */
+  const keptSideIds = (agentId: string): string[] =>
+    tasks.snapshot(agentId) ? sideIds(agentId) : storedTabs(agentId).side.filter((id) => !hidden().has(id));
   const hasDraft = (agentId: string) => drafts().has(agentId);
   const tabOrder = (agentId: string): string[] => [
     MAIN_THREAD_ID,
@@ -71,12 +76,17 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     return active !== null && shown(agentId, active) && openIds(agentId).includes(active) ? active : MAIN_THREAD_ID;
   }
 
-  /** Writes the tabs of one agent. Another window can write other agents, so the stored value is read first. */
-  function writeTabs(agentId: string, tabs: AgentThreadTabs | null): void {
+  /**
+   * Writes the tabs of one agent. Another window can write other agents, so the stored value is read
+   * first. Without `side`, the side panel keeps its tabs, less a thread that now has a chat tab.
+   */
+  function writeTabs(agentId: string, tabs: (Omit<AgentThreadTabs, "side"> & { side?: string[] }) | null): void {
     const server = serverId();
     const stored = readThreadTabs();
     const agents = { ...stored[server] };
-    if (tabs && (tabs.open.length > 0 || tabs.active !== null)) agents[agentId] = tabs;
+    const side = tabs?.side ?? keptSideIds(agentId).filter((id) => !tabs?.open.includes(id));
+    if (tabs && (tabs.open.length > 0 || side.length > 0 || tabs.active !== null))
+      agents[agentId] = { open: tabs.open, active: tabs.active, side };
     else delete agents[agentId];
     const next = { ...stored, [server]: agents };
     if (Object.keys(agents).length === 0) delete next[server];
@@ -161,9 +171,52 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     setOrder(agentId, [MAIN_THREAD_ID, ...sides, ...(hasDraft(agentId) ? [DRAFT_THREAD_ID] : [])], activeId(agentId));
   }
 
+  /**
+   * Moves a chat tab to the side panel, where its thread shows beside the agent's own chat. When the
+   * thread was open in the chat, the agent's own chat opens.
+   */
+  function toSide(agentId: string, id: string): void {
+    if (id === MAIN_THREAD_ID || id === DRAFT_THREAD_ID) return;
+    const active = activeId(agentId);
+    writeTabs(agentId, {
+      open: keptIds(agentId).filter((entry) => entry !== id),
+      active: active === id || active === MAIN_THREAD_ID ? null : active,
+      side: [...keptSideIds(agentId).filter((entry) => entry !== id), id],
+    });
+  }
+
+  /** Moves a side panel tab back to the end of the chat tabs, and opens its thread in the chat. */
+  function toChat(agentId: string, id: string): void {
+    writeTabs(agentId, {
+      open: [...keptIds(agentId).filter((entry) => entry !== id), id],
+      active: id,
+      side: keptSideIds(agentId).filter((entry) => entry !== id),
+    });
+  }
+
+  /** Closes a side panel tab. The thread stays in the thread list. */
+  function closeSide(agentId: string, id: string): void {
+    const active = activeId(agentId);
+    writeTabs(agentId, {
+      open: keptIds(agentId),
+      active: active === MAIN_THREAD_ID ? null : active,
+      side: keptSideIds(agentId).filter((entry) => entry !== id),
+    });
+  }
+
+  /** Moves a side panel tab to an index among the side panel tabs. */
+  function moveSide(agentId: string, id: string, index: number): void {
+    const side = keptSideIds(agentId).filter((entry) => entry !== id);
+    side.splice(index, 0, id);
+    const active = activeId(agentId);
+    writeTabs(agentId, { open: keptIds(agentId), active: active === MAIN_THREAD_ID ? null : active, side });
+  }
+
   /** Archives a thread. Its tab closes when the host archived it; the thread then shows in the archived list. */
   async function archive(agentId: string, id: string): Promise<void> {
-    if ((await tasks.closeTask(agentId, id)) && scopeIsCurrent()) close(agentId, id);
+    if (!(await tasks.closeTask(agentId, id)) || !scopeIsCurrent()) return;
+    if (storedTabs(agentId).side.includes(id)) closeSide(agentId, id);
+    else close(agentId, id);
   }
 
   /** Restores an archived thread and opens it. */
@@ -313,14 +366,14 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   );
 
   /** Sends a message to a side thread. An archived thread is restored first. */
-  async function send(agentId: string, id: string, text: string): Promise<boolean> {
+  async function send(agentId: string, id: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
     if (task(agentId, id)?.state === "closed" && !(await tasks.reopenTask(agentId, id))) return false;
-    return tasks.sendToTask(agentId, id, text);
+    return tasks.sendToTask(agentId, id, text, attachmentDraftIds);
   }
 
   /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
-  async function sendDraft(agentId: string, text: string): Promise<boolean> {
-    const started = await tasks.startTask(agentId, text);
+  async function sendDraft(agentId: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
+    const started = await tasks.startTask(agentId, text, attachmentDraftIds);
     if (!started || !scopeIsCurrent()) return false;
     seen.add(started.id);
     const stillOpen = activeId(agentId) === DRAFT_THREAD_ID;
@@ -347,18 +400,23 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     writeTabs(agentId, null);
   }
 
-  // The open thread reads its conversation once, also when its tab is open after a restart. Events then keep it current.
+  // The open thread and the threads in the side panel read their conversations once, also when their
+  // tabs are open after a restart. Events then keep them current. A thread that waits for its read is
+  // not read again when another thread loads; it is read again only after it stops waiting and waits again.
+  let reading: ReadonlySet<string> = new Set();
   createEffect(
     () => {
       const agentId = activeAgentId();
-      const id = agentId ? activeId(agentId) : MAIN_THREAD_ID;
-      if (id === MAIN_THREAD_ID || id === DRAFT_THREAD_ID || tasks.conversation(id)) return null;
-      return `${agentId}\n${id}`;
+      if (!agentId) return null;
+      const ids = [activeId(agentId), ...sideIds(agentId)].filter(
+        (id) => id !== MAIN_THREAD_ID && id !== DRAFT_THREAD_ID && !tasks.conversation(id),
+      );
+      return ids.length === 0 ? null : [agentId, ...ids].join("\n");
     },
     (key) => {
-      if (!key) return;
-      const [agentId = "", id = ""] = key.split("\n");
-      tasks.openTask(agentId, id);
+      const [agentId = "", ...ids] = key?.split("\n") ?? [];
+      for (const id of ids) if (!reading.has(id)) tasks.openTask(agentId, id);
+      reading = new Set(ids);
     },
   );
 
@@ -392,6 +450,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
 
   return {
     openIds,
+    sideIds,
     hasDraft,
     activeId,
     hidden,
@@ -402,6 +461,10 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     closeOthers,
     closeToTheRight,
     move,
+    toSide,
+    toChat,
+    closeSide,
+    moveSide,
     archive,
     restore,
     rename,

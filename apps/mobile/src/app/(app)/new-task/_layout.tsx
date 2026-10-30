@@ -5,5 +5,5 @@ export const unstable_settings = { anchor: "index" };
 
 export default function NewTaskLayout() {
   const { t } = useText();
-  return <SheetPageStack title={t("mobile.server.tasks.new")} />;
+  return <SheetPageStack title={t("mobile.server.threads.new")} />;
 }

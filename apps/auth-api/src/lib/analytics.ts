@@ -15,6 +15,7 @@ import { CONTACT_TOPICS } from "./contact";
 import { CONTENT_COLLECTIONS } from "./content";
 import { type CollectionId, type ContentCollection, findArticle } from "./content-collection";
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
+import { DPA_ROUTE } from "./dpa";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_LINKS,
@@ -22,6 +23,7 @@ import {
   OPENBOT_LINKS,
 } from "./landing-links";
 import { MOBILE_APPS } from "./mobile-apps";
+import { PRICING_ROUTE } from "./pricing-page";
 import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
 import { TEAMS_ROUTE } from "./teams-page";
 import { TERMS_ROUTE } from "./terms";
@@ -74,6 +76,7 @@ type LandingPlacement =
   | "download_section"
   | "teams_section"
   | "teams_page"
+  | "pricing_page"
   | "download_page"
   | "footer"
   | "content_index"
@@ -87,6 +90,7 @@ const LANDING_PLACEMENTS = [
   "download_section",
   "teams_section",
   "teams_page",
+  "pricing_page",
   "download_page",
   "footer",
   "content_index",
@@ -103,6 +107,7 @@ type LandingDestination =
   | "guides"
   | "contact"
   | "teams"
+  | "pricing"
   | "x"
   | "discord"
   | "repository"
@@ -128,10 +133,12 @@ export type LandingScreenPath =
   | "/contact"
   | "/billing/return"
   | typeof TEAMS_ROUTE
+  | typeof PRICING_ROUTE
   | typeof BRAND_ROUTE
   | typeof PRIVACY_POLICY_ROUTE
   | typeof TERMS_ROUTE
   | typeof COMMERCIAL_LICENSE_ROUTE
+  | typeof DPA_ROUTE
   | DownloadPagePath
   | CollectionIndexRoute
   | `${CollectionIndexRoute}/${string}`;
@@ -141,10 +148,12 @@ const FIXED_SCREEN_PATHS = [
   "/join",
   "/contact",
   TEAMS_ROUTE,
+  PRICING_ROUTE,
   BRAND_ROUTE,
   PRIVACY_POLICY_ROUTE,
   TERMS_ROUTE,
   COMMERCIAL_LICENSE_ROUTE,
+  DPA_ROUTE,
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
   "/news",
   "/guides",
@@ -222,6 +231,7 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.guides, "guides"],
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
+  [PRICING_ROUTE, "pricing"],
   [OPENBOT_LINKS.x, "x"],
   [OPENBOT_LINKS.discord, "discord"],
   [OPENBOT_LINKS.repository, "repository"],
@@ -655,8 +665,9 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   // Checked before `.post-article`, which wraps it: a card in the related row is a different
   // question from a link inside the article body.
   if (link.closest(".post-more")) return "content_related";
-  // Checked before `.landing-hero`: the /teams hero uses the landing hero classes.
+  // Checked before `.landing-hero`: the /teams and /pricing heroes use the landing hero classes.
   if (link.closest(".teams-main")) return "teams_page";
+  if (link.closest(".pricing-page main")) return "pricing_page";
   if (link.closest(".landing-hero")) return "hero";
   if (link.closest(".landing-download")) return "download_section";
   if (link.closest(".landing-teams")) return "teams_section";

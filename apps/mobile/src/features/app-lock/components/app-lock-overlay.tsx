@@ -8,7 +8,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExtern
 import { Alert, AppState, BackHandler, Modal, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { type EdgeInsets, useSafeAreaInsets } from "react-native-safe-area-context";
 import { FullWindowOverlay } from "react-native-screens";
 import { PinDots, PinPad } from "@/features/app-lock/components/pin-pad";
 import {
@@ -380,7 +380,7 @@ function LockLayout({
   footer,
   children,
 }: {
-  insets: { top: number; bottom: number };
+  insets: EdgeInsets;
   leaving: boolean;
   onHeaderLayout: (bottom: number) => void;
   title: string;
@@ -393,7 +393,10 @@ function LockLayout({
   const { height } = useWindowDimensions();
   const reduced = useReducedMotion();
   return (
-    <View className="flex-1" style={{ paddingBottom: insets.bottom + 8 }}>
+    <View
+      className="flex-1"
+      style={{ paddingBottom: insets.bottom + 8, paddingLeft: insets.left, paddingRight: insets.right }}
+    >
       <View
         style={{
           flexGrow: 1,

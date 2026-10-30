@@ -4,18 +4,21 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
+  TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
@@ -93,6 +96,8 @@ export interface TeamWebRtcHostPeerOptions {
   appVersion: string;
   transferDirectory: string;
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
+  /** The path of the session failed or came back. The peer and the session stay open. */
+  pathChanged?: (sessionId: string, lost: boolean) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | undefined;
@@ -126,6 +131,7 @@ export class TeamWebRtcHostPeer {
   readonly #appVersion: string;
   readonly #files: TeamWebRtcFileTransfer;
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
+  readonly #pathChanged: (sessionId: string, lost: boolean) => void;
   readonly #verifyClientTicket:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
@@ -188,10 +194,13 @@ export class TeamWebRtcHostPeer {
       (peerId) => peerId === this.#peerId && this.#localSessionToken !== null,
     );
     this.#closeSession = options.closeSession ?? (() => Effect.void);
+    this.#pathChanged = options.pathChanged ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
     this.#bridge.on("data", this.#onData);
     this.#bridge.on("disconnected", this.#onDisconnected);
+    this.#bridge.on("pathLost", this.#onPathLost);
+    this.#bridge.on("pathRestored", this.#onPathRestored);
   }
 
   readonly revokeSession = Effect.fn("TeamHostPeer.revokeSession")(function* (
@@ -227,6 +236,8 @@ export class TeamWebRtcHostPeer {
     this.#bridge.off("connected", this.#onConnected);
     this.#bridge.off("data", this.#onData);
     this.#bridge.off("disconnected", this.#onDisconnected);
+    this.#bridge.off("pathLost", this.#onPathLost);
+    this.#bridge.off("pathRestored", this.#onPathRestored);
     // Transport teardown must not revoke a logical session resumed by another peer.
     yield* this.#closeLocalSession(false);
     this.#peerId = null;
@@ -364,6 +375,14 @@ export class TeamWebRtcHostPeer {
       this.#authenticationCompletion = null;
       this.#dispatch(this.#closeLocalSession(false));
     }
+  };
+
+  readonly #onPathLost = (peerId: string): void => {
+    if (peerId === this.#peerId && this.#localSessionId) this.#pathChanged(this.#localSessionId, true);
+  };
+
+  readonly #onPathRestored = (peerId: string): void => {
+    if (peerId === this.#peerId && this.#localSessionId) this.#pathChanged(this.#localSessionId, false);
   };
 
   readonly #handleAuthentication = Effect.fn("TeamHostPeer.handleAuthentication")(function* (
@@ -614,6 +633,31 @@ export class TeamWebRtcHostPeer {
     uploaded: ReceivedWebRtcFile | null,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, HostPeerTransport> {
     const sideRoute = teamSideRouteCodec(input.path);
+    const protocol = peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
+      ? 8
+      : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
+        ? 7
+        : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
+          ? 6
+          : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+            ? 5
+            : peerCapabilities.has("opencode")
+              ? 4
+              : isTeamProtocolV3OnlyRoute(input.method, input.path)
+                ? 3
+                : 1;
+    const decodeRequest =
+      protocol === 8
+        ? decodeTeamProtocolV8WebRtcHttpRequest
+        : protocol === 7
+          ? decodeTeamProtocolV7WebRtcHttpRequest
+          : protocol === 6
+            ? decodeTeamProtocolV6WebRtcHttpRequest
+            : protocol === 5
+              ? decodeTeamProtocolV5WebRtcHttpRequest
+              : protocol === 4
+                ? decodeTeamProtocolV4WebRtcHttpRequest
+                : decodeTeamProtocolV3WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined
@@ -621,26 +665,21 @@ export class TeamWebRtcHostPeer {
           ? yield* remoteCall(() => openAsBlob(uploaded.path))
           : input.body === null
             ? undefined
-            : yield* remoteDecode(() =>
-                JSON.stringify(
-                  sideRoute
-                    ? sideRoute.request(input.path, input.body)
-                    : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                        ? decodeTeamProtocolV8WebRtcHttpRequest
-                        : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                          ? decodeTeamProtocolV7WebRtcHttpRequest
-                          : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                            ? decodeTeamProtocolV6WebRtcHttpRequest
-                            : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                              ? decodeTeamProtocolV5WebRtcHttpRequest
-                              : peerCapabilities.has("opencode")
-                                ? decodeTeamProtocolV4WebRtcHttpRequest
-                                : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
-                        preserveSemanticTags,
-                        agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-                      }),
-                ),
-              );
+            : yield* remoteDecode(() => {
+                if (sideRoute) return JSON.stringify(sideRoute.request(input.path, input.body));
+                const decoded = decodeRequest(input.method, input.path, input.body, {
+                  preserveSemanticTags,
+                  agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+                });
+                // The local Team API decodes the body again, and with semantic tags its frozen projection
+                // reads only the wire keys: `ownerAgentId` is dropped where `ownerBotId` is kept. So the
+                // decoded frame goes back to the wire key names first.
+                return JSON.stringify(
+                  decoded !== null && typeof decoded === "object" && !Array.isArray(decoded)
+                    ? toWireAgentKeysObjectForPath(input.path, decoded)
+                    : decoded,
+                );
+              });
     return yield* Effect.acquireUseRelease(
       HostPeerTransport.use((transport) =>
         transport.fetch(url, {
@@ -648,19 +687,7 @@ export class TeamWebRtcHostPeer {
           headers: {
             Authorization: `Bearer ${this.#localSessionToken}`,
             "Content-Type": uploaded?.mimeType ?? input.contentType ?? "application/json",
-            "OpenBot-Protocol-Version": peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-              ? "8"
-              : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                ? "7"
-                : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                  ? "6"
-                  : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                    ? "5"
-                    : peerCapabilities.has("opencode")
-                      ? "4"
-                      : isTeamProtocolV3OnlyRoute(input.method, input.path)
-                        ? "3"
-                        : "1",
+            "OpenBot-Protocol-Version": String(protocol),
             "OpenBot-App-Version": this.#appVersion,
             "OpenBot-Capabilities": [...this.#peerCapabilities].join(","),
             ...(this.#localSessionId ? { "X-OpenBot-WebRTC-Session": this.#localSessionId } : {}),
@@ -709,6 +736,7 @@ export class TeamWebRtcHostPeer {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
+            agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -765,7 +793,9 @@ export class TeamWebRtcHostPeer {
         // protocol validates and envelopes its own event, exactly as the request path does. The
         // `host-update-v1`, `skills-events-v1`, and `quiet-turn-v1` events take the same path.
         const event = JSON.parse(data.toString());
-        const channel = optionalTeamEvent(event);
+        const channel = optionalTeamEvent(event, {
+          agentTaskUiBlocks: this.#peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
+        });
         frame = encodeTeamProtocolV2Frame(
           channel
             ? decodeTeamProtocolV2EventFrame({
@@ -787,8 +817,9 @@ export class TeamWebRtcHostPeer {
                         : createTeamProtocolV2Event)(this.#nextEventSequence, event, {
                 preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
                 preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
-                // Only the V8 event reads it.
+                // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
+                contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
                 // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

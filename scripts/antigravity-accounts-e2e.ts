@@ -3,8 +3,9 @@
 // runtime 1.4.0 and later do. Checks that a runtime before 1.4.0 offers no account after the first,
 // that a sign-in on the host opens Google's page and writes the token in the account's folder only,
 // that each process of that account gets the folder and never the saved API key while the first
-// account keeps the key, that a Reconnect signs the account out first, and that Remove deletes the
-// folder. `bun scripts/antigravity-accounts-e2e.ts`.
+// account keeps the key, that a Reconnect signs the account out first, that Remove deletes the
+// folder, and that a new account stays when its usage reading fails after the sign-in.
+// `bun scripts/antigravity-accounts-e2e.ts`.
 // Writes .openbot-build/antigravity-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -77,6 +78,8 @@ function handle(message) {
         models: { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" },
       } });
     case "session/prompt":
+      if (message.params.prompt?.[0]?.text === "/usage" && fs.existsSync(process.env.FAKE_AGY_USAGE_FAIL))
+        return write({ id: message.id, error: { code: -32603, message: "Quota service unavailable" } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     default:
       return write({ id: message.id, result: {} });
@@ -113,16 +116,19 @@ interface Report {
   busyReconnect?: { error: string; loggedOut: boolean; agentProcessKept: boolean };
   reconnect?: { logoutFirst: boolean; agentProcessStopped: boolean; accountState: string | undefined };
   remove?: { folderLeft: boolean; rows: number };
+  failedUsage?: { usagePrompts: number; stored: number; accountState: string | undefined };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-accounts-e2e-"));
 const log = join(root, "agy.jsonl");
 const approve = join(root, "approve");
+const usageFails = join(root, "usage-fails");
 const defaultHome = join(root, "default-gemini");
 const report: Report = { passed: false };
 const savedEnvironment = { GEMINI_HOME: process.env.GEMINI_HOME };
 process.env.FAKE_AGY_LOG = log;
 process.env.FAKE_AGY_APPROVE = approve;
+process.env.FAKE_AGY_USAGE_FAIL = usageFails;
 // The first account's folder: the runtime's own processes inherit it.
 process.env.GEMINI_HOME = defaultHome;
 
@@ -320,6 +326,19 @@ try {
   assert.equal(report.remove.folderLeft, false);
   assert.equal(report.remove.rows, 1);
   assert.equal(await readFile(join(defaultHome, "antigravity-acp", "acp_token.json"), "utf8"), defaultToken);
+
+  // 6. A new account whose usage reading fails after the sign-in stays: the sign-in worked.
+  await rm(log, { force: true });
+  await writeFile(usageFails, "");
+  await runCauseEffect(runtime.signInProviderAccountOnHost("antigravity", null, openPage));
+  report.failedUsage = {
+    usagePrompts: (await entries()).filter((entry) => entry.event === "session/prompt").length,
+    stored: store.list("antigravity").length,
+    accountState: accountRows(runtime)?.[1]?.state,
+  };
+  assert.ok(report.failedUsage.usagePrompts > 0, "the check asked for the usage");
+  assert.equal(report.failedUsage.stored, 1);
+  assert.equal(report.failedUsage.accountState, "connected");
 
   report.passed = true;
 } finally {

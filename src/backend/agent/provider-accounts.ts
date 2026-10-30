@@ -25,18 +25,16 @@ import { type ProviderAccountSupport, requireProviderDriver } from "./../provide
 import type { ProviderTempOptions } from "./../provider-temp";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
-import { usageWindowHasReset } from "./account-usage";
+import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { type ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
+import { UsageReadGate } from "./usage-read-gate";
 
 const logger = createOpenBotLogger("provider-accounts");
 
-/**
- * How long an account check or a usage reading stays good. The dock asks for usage every five
- * minutes, and each reading of an account with no running agent starts a short process.
- */
+/** How long an account check stays good. `UsageReadGate` paces the usage readings. */
 const ACCOUNT_CHECK_TTL_MS = 5 * 60_000;
 
 export class ProviderAccountFailed extends Schema.TaggedError<ProviderAccountFailed>()("ProviderAccountFailed", {
@@ -66,11 +64,15 @@ export interface ProviderAccountsHost {
   defaultUsesApiKey(provider: AgentProviderId): boolean;
   /** The temporary folder of an ACP sign-in process, as the provider's own sign-in gets it. */
   signInTemp(provider: AgentProviderId): ProviderTempOptions | undefined;
-  /** Starts and checks a client that signs in to the account's folder. The caller stops it. */
+  /**
+   * Starts and checks a client that signs in to the account's folder. The caller stops it.
+   * `afterSignIn`: the check that ends a sign-in, which gets the long start wait.
+   */
   authenticate(
     provider: AgentProviderId,
     cli: AgentCliInfo,
     accountEnvironment: Readonly<Record<string, string>>,
+    afterSignIn?: boolean,
   ): Effect.Effect<{ client: AgentClient; account: NonNullable<AccountReadResult["account"]> }, ProviderAccountFailed>;
   stopClient(client: AgentClient): Effect.Effect<void>;
   /** The running process of an agent on this account, if there is one. */
@@ -102,10 +104,9 @@ export class ProviderAccounts {
   readonly #added = new Set<string>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
   /** The last usage reading of each account, with the usage reset credits it counted. */
-  readonly #usage = new Map<
-    string,
-    { limit: AccountUsageLimit; resetCredits: number | null | undefined; at: number }
-  >();
+  readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
+  /** Paces the usage reads of each account. A new key resets it, and a removed account drops it. */
+  readonly #usageGates = new Map<string, UsageReadGate>();
 
   constructor(store: ProviderAccountStore, host: ProviderAccountsHost) {
     this.#store = store;
@@ -222,7 +223,7 @@ export class ProviderAccounts {
       Effect.gen({ self: this }, function* () {
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
-          // The server prints Google's page, which a host shows and Linux opens through the desktop.
+          // The server prints Google's page, which a host shows and this computer opens itself.
           const login = yield* startAcpAuthentication({
             executable: cli.executable,
             argv: command.argv,
@@ -231,7 +232,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            ...(onHost || process.platform === "linux" ? { openGoogleSignIn: openExternal } : {}),
+            openGoogleSignIn: openExternal,
           });
           return yield* login.done;
         }
@@ -259,7 +260,7 @@ export class ProviderAccounts {
         yield* waitForSuccessfulProcess(child, command.timeoutMs);
       }),
     ).pipe(
-      Effect.andThen(this.#check(account)),
+      Effect.andThen(this.#check(account, true)),
       Effect.onError((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.void
@@ -395,6 +396,7 @@ export class ProviderAccounts {
       if (!account) return;
       yield* this.#interrupt(account.id);
       this.#usage.delete(account.id);
+      this.#usageGate(account.id).reset();
       yield* this.#startCheck(account);
     });
   }
@@ -444,36 +446,41 @@ export class ProviderAccounts {
   }
 
   /**
-   * The usage of each connected account of a provider that reports usage. A kept reading answers
-   * until it is five minutes old or a window resets; then an agent's process or a short check reads it.
+   * The usage of each connected account of a provider that reports usage. Each account's gate decides
+   * when it is read again; until then, or when a read fails, the kept reading answers. A read takes an
+   * agent's process or a short check.
    */
   readonly usage = Effect.fn("ProviderAccounts.usage")(function* (
     this: ProviderAccounts,
     provider: AgentProviderId,
     model: string | undefined,
   ) {
-    const now = Date.now();
     const limits: AccountUsageLimit[] = [];
     if (!this.#support(provider)) return limits;
     for (const account of this.#store.list(provider)) {
       // A key has no plan, so no usage to read.
       if (isKeyAccount(account) || this.#states.get(account.id)?.state !== "connected") continue;
-      const kept = this.#usage.get(account.id);
-      if (kept && now - kept.at < ACCOUNT_CHECK_TTL_MS && !usageWindowHasReset(kept.limit)) {
-        limits.push(kept.limit);
-        continue;
-      }
-      const limit = yield* this.#readUsage(account, model).pipe(
-        Effect.catch((error) =>
-          Effect.sync(() => {
-            logger.warn("Could not read provider account usage.", {
-              provider,
-              message: this.#message(provider, error),
-            });
-            return kept?.limit ?? null;
-          }),
-        ),
-      );
+      const kept = () => this.#usage.get(account.id)?.limit ?? null;
+      const limit = yield* this.#usageGate(account.id)
+        .run({
+          read: this.#readUsage(account, model),
+          kept,
+          stale: (readAt) => {
+            const reading = kept();
+            return reading !== null && usageWindowResetSince(reading, readAt);
+          },
+        })
+        .pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              logger.warn("Could not read provider account usage.", {
+                provider,
+                message: this.#message(provider, error),
+              });
+              return kept();
+            }),
+          ),
+        );
       if (limit) limits.push(limit);
     }
     return limits;
@@ -551,6 +558,7 @@ export class ProviderAccounts {
   readonly #check = Effect.fn("ProviderAccounts.check")(function* (
     this: ProviderAccounts,
     account: StoredProviderAccount,
+    afterSignIn = false,
   ) {
     const provider = account.provider;
     const cli = this.#host.cli(provider);
@@ -561,7 +569,7 @@ export class ProviderAccounts {
     if (this.#states.get(account.id)?.state !== "connecting")
       this.#setState(account.id, { state: "checking", message: null });
     yield* Effect.acquireUseRelease(
-      this.#host.authenticate(provider, cli, this.environment(account)),
+      this.#host.authenticate(provider, cli, this.environment(account), afterSignIn),
       ({ client, account: signedIn }) =>
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
@@ -570,13 +578,26 @@ export class ProviderAccounts {
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
           // The reading comes first: a usage request for a connected account uses it and starts no client.
+          const reading = this.#host
+            .readUsage(client, defaultUsageModel(provider))
+            .pipe(Effect.flatMap((usage) => this.#storeUsage(account, client, usage)));
+          // After a sign-in, the client is signed in already, so a reading that fails does not fail the
+          // check: that failure removed the new account.
           const limit =
             agentProviderDescriptor(provider).reportsUsage && !isKeyAccount(account)
-              ? yield* this.#storeUsage(
-                  account,
-                  client,
-                  yield* this.#host.readUsage(client, defaultUsageModel(provider)),
-                )
+              ? yield* afterSignIn
+                  ? reading.pipe(
+                      Effect.catch((error) =>
+                        Effect.sync(() => {
+                          logger.warn("A provider account usage reading failed after its sign-in.", {
+                            provider,
+                            message: this.#message(provider, error),
+                          });
+                          return null;
+                        }),
+                      ),
+                    )
+                  : reading
               : null;
           this.#setState(account.id, { state: "connected", email, message: null });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
@@ -616,7 +637,9 @@ export class ProviderAccounts {
       const first = usage.limits[0];
       if (!first || (!first.primary && !first.secondary)) return null;
       const limit = { ...first, id: account.provider, accountId: account.id };
-      this.#usage.set(account.id, { limit, resetCredits: this.#host.resetCredits(client), at: Date.now() });
+      this.#usage.set(account.id, { limit, resetCredits: this.#host.resetCredits(client) });
+      // Also a reading of an account check or a reset counts, so the next poll does not read again.
+      this.#usageGate(account.id).succeeded();
       return limit;
     });
   }
@@ -706,6 +729,16 @@ export class ProviderAccounts {
   #forget(accountId: string): void {
     this.#states.delete(accountId);
     this.#usage.delete(accountId);
+    this.#usageGates.delete(accountId);
+  }
+
+  #usageGate(accountId: string): UsageReadGate {
+    let gate = this.#usageGates.get(accountId);
+    if (!gate) {
+      gate = new UsageReadGate();
+      this.#usageGates.set(accountId, gate);
+    }
+    return gate;
   }
 
   #setState(accountId: string, patch: Partial<Omit<AccountState, "checkedAt">>): void {

@@ -1,11 +1,13 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
   deleteAgentThread,
   listAgentTasks,
+  markAgentThreadRead,
   readAgentTask,
   renameAgentThread,
   sendAgentTaskMessage,
@@ -21,7 +23,7 @@ import { createAgentThreadTabs } from "../agent-threads/agent-thread-tabs";
 import type { WebWorkspace } from "./web-client-context";
 
 /** The host names attachment previews with the desktop `openbot-attachment:` scheme, which a browser cannot load. */
-function withoutPreviewUrls(snapshot: ConversationSnapshot): ConversationSnapshot {
+export function withoutPreviewUrls(snapshot: ConversationSnapshot): ConversationSnapshot {
   return {
     ...snapshot,
     messages: snapshot.messages.map((message) =>
@@ -49,6 +51,7 @@ function webAgentTasksPort(request: () => TeamApiRequest): AgentTasksPort {
     reopenTask: (input) => run((host) => agentTaskControl(host, "reopen", input)),
     renameTask: (input) => run((host) => renameAgentThread(host, input)),
     deleteTask: (input) => run((host) => deleteAgentThread(host, input)),
+    markTaskRead: (input) => run((host) => markAgentThreadRead(host, input)),
   };
 }
 
@@ -70,6 +73,7 @@ export function createWebAgentThreads(options: {
     local: () => false,
     available: () => workspace.state.capabilities.includes(AGENT_TASKS_CAPABILITY),
     editable: () => workspace.state.capabilities.includes(AGENT_THREADS_CAPABILITY),
+    readable: () => workspace.state.capabilities.includes(AGENT_THREAD_READS_CAPABILITY),
     // A reconnect sends a runtime snapshot, which reads the threads again.
     reloadKey: () => null,
   });

@@ -23,6 +23,7 @@ const AgentTasks = createSimpleContext({
       local,
       available: () => local() || activeServerSupportsCapability("agent-tasks-v1"),
       editable: () => local() || activeServerSupportsCapability("agent-threads-v1"),
+      readable: () => local() || activeServerSupportsCapability("agent-thread-reads-v1"),
       reloadKey: () => agentStatus().phase,
     });
   },

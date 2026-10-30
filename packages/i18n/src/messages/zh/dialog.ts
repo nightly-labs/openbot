@@ -4,6 +4,8 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   // Native file pickers.
   "dialog.chooseSiteDirectory": "选择静态站点目录",
+  "dialog.chooseAgentFolder": "为 {agent} 选择文件夹",
+  "dialog.chooseAgentExclusion": "选择 {agent} 不得更改的文件夹",
   "dialog.chooseSkill": "选择技能文件夹或 ZIP",
   "dialog.filter.skillPackages": "技能包",
   "dialog.filter.images": "图片",

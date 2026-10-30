@@ -357,6 +357,21 @@ export function isVaultChangeMarker(message: ConversationMessage): boolean {
 }
 
 /**
+ * The item type of the note that a turn ended with open steps in the agent's plan, and that the agent
+ * continues by itself. The text says which automatic continuation this is.
+ */
+export const PLAN_CONTINUATION_ITEM_TYPE = "plan-continuation";
+
+export function isPlanContinuationMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === PLAN_CONTINUATION_ITEM_TYPE
+  );
+}
+
+/**
  * The item type of a message that one agent sends to another, in the sender's thread and in the
  * recipient's thread. It is traffic between agents, not a message to the user.
  */

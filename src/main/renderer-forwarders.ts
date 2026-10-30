@@ -26,6 +26,7 @@ import {
   type ServerNotificationLevel,
   type SpeechModelStatus,
   type VoiceModelStatus,
+  type VoiceServerSettings,
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -485,6 +486,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.speechModelStatus, status);
   }
 
+  function forwardVoiceServerSettings(settings: VoiceServerSettings | null): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.serverSettings, settings);
+  }
+
   function forwardVoiceStreamTranscript(transcript: VoiceStreamTranscript): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
@@ -569,6 +574,7 @@ export function createRendererForwarders({
     forwardVoiceModelStatus,
     forwardVoiceStreamTranscript,
     forwardSpeechModelStatus,
+    forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,
     forwardOnePasswordConnectorStatus,

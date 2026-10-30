@@ -22,6 +22,7 @@ export function useServerActions() {
     setServerNotificationLevel,
     setJoinServerOpen,
     setAddServerOpen,
+    setCreateLocalServerOpen,
     hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
@@ -64,6 +65,23 @@ export function useServerActions() {
     void refreshHostedServersAvailable();
   }
 
+  /** Opens the dialog that names a new server on this computer. The landing preview has no main process. */
+  const createLocal = platform.landingPreview ? undefined : () => setCreateLocalServerOpen(true);
+
+  /**
+   * The item for a server on this computer in the add menus of the rail and the server menu. The hosted
+   * server plans show it in their "Other options" menu, so the add menus show it only when the add
+   * button opens the invite dialog in place of the plans.
+   */
+  function addMenuCreateLocal(): (() => void) | undefined {
+    return hostedServersAvailable() ? undefined : createLocal;
+  }
+
+  /** A server that runs on this computer as a child process. Delete and restart go to its supervisor. */
+  function onThisComputer(serverId: string): boolean {
+    return servers().some((server) => server.id === serverId && server.thisComputer === true);
+  }
+
   const callbacks = {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
     onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
@@ -71,12 +89,22 @@ export function useServerActions() {
     onLeave: requestLeaveServer,
     // The same confirmation: main removes an owned server from the account instead of leaving it.
     onRemove: requestLeaveServer,
-    canRemove: (serverId) => hostedServersLoaded() && !hostedServerIds().has(serverId),
-    onDelete: openHostedServerDelete,
-    canDelete: (serverId) => hostedServerIds().has(serverId),
+    canRemove: (serverId) => hostedServersLoaded() && !hostedServerIds().has(serverId) && !onThisComputer(serverId),
+    // A server on this computer uses the leave confirmation, which deletes it in that case.
+    onDelete: (serverId, trigger) =>
+      onThisComputer(serverId) ? requestLeaveServer(serverId, trigger) : openHostedServerDelete(serverId, trigger),
+    canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
-    canRestart: (serverId) => hostedServerIds().has(serverId),
+    canRestart: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
   } satisfies ServerActionCallbacks;
 
-  return { orderedServers, select, add, addCreatesServer: hostedServersAvailable, callbacks };
+  return {
+    orderedServers,
+    select,
+    add,
+    createLocal,
+    addMenuCreateLocal,
+    addCreatesServer: hostedServersAvailable,
+    callbacks,
+  };
 }

@@ -84,7 +84,8 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const [drawerPhase, setDrawerPhase] = useState<DrawerPhase>("closed");
   const drawerShownOnUI = useSharedValue(false);
   const drawerProgress = useSharedValue(0);
-  const drawerWidth = Math.min(360, Math.max(280, width - 52));
+  // The surface stays in view at the right, clear of a right inset (the iPhone Duo rail).
+  const drawerWidth = Math.min(360, Math.max(280, width - insets.right - 52));
   const drawerSideInset = Math.max(insets.left, 18);
   const surfaceCornerRadius = Math.max(DRAWER_SURFACE_MIN_RADIUS, insets.top, insets.right, insets.bottom, insets.left);
 

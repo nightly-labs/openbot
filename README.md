@@ -610,8 +610,8 @@ Copyright 2026 Synthetify Labs spółka z ograniczoną odpowiedzialnością.
 
 Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, modify, and
 distribute the code for permitted noncommercial purposes. Commercial use requires a separate license
-from the copyright owner. For a commercial license, contact
-[licenses@openbot.run](mailto:licenses@openbot.run). Versions up to and including 0.1.11 remain
+from the copyright owner. Buy a commercial license in Settings → Billing (Starter for 1 user, or
+Team for 2 to 10 users), or contact [licenses@openbot.run](mailto:licenses@openbot.run). Versions up to and including 0.1.11 remain
 available under Apache-2.0.
 See [NOTICE](NOTICE) for attribution and third-party notices.
 

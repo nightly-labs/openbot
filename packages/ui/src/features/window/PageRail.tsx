@@ -6,6 +6,7 @@ import {
   ChartArea,
   DropdownMenu,
   Ellipsis,
+  ListChecks,
   MotionTooltip,
   Pin,
   Settings,
@@ -168,12 +169,21 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
 }
 
 /** The rail pages. Agents and Routines show the same page with a different sidebar list. */
-export type PageRailPage = "agents" | "routines" | "workflows" | "schedule" | "usage" | "marketplace" | "settings";
+export type PageRailPage =
+  | "agents"
+  | "routines"
+  | "workflows"
+  | "tasks"
+  | "schedule"
+  | "usage"
+  | "marketplace"
+  | "settings";
 
 /** The pages that the user can pin to the rail, in rail order. Agents always shows. */
 export const PAGE_RAIL_PINNABLE_PAGES = [
   "routines",
   "workflows",
+  "tasks",
   "schedule",
   "usage",
 ] as const satisfies readonly PageRailPage[];
@@ -195,6 +205,8 @@ export interface PageRailProps {
   onRoutines?: (() => void) | undefined;
   /** Absent when the server has no workflows. */
   onWorkflows?: (() => void) | undefined;
+  /** Absent where the server keeps no tasks. */
+  onTasks?: ((button: HTMLElement) => void) | undefined;
   /** Absent where there is no schedule page. */
   onSchedule?: ((button: HTMLElement) => void) | undefined;
   onUsage: (button: HTMLElement) => void;
@@ -335,7 +347,7 @@ export function PageRail(props: PageRailProps) {
   /** The pages that this server has, in rail order. */
   const pages = createMemo((): RailPage[] => {
     const list: RailPage[] = [];
-    const { onRoutines, onWorkflows, onSchedule } = props;
+    const { onRoutines, onWorkflows, onTasks, onSchedule } = props;
     if (onRoutines) {
       list.push({
         id: "routines",
@@ -351,6 +363,9 @@ export function PageRail(props: PageRailProps) {
         icon: Waypoints,
         open: () => onWorkflows(),
       });
+    }
+    if (onTasks) {
+      list.push({ id: "tasks", label: t("app.rail.tasks"), icon: ListChecks, open: onTasks });
     }
     if (onSchedule) {
       list.push({

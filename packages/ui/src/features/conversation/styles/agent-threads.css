@@ -19,9 +19,40 @@
   margin-left: 4px;
 }
 
+/* The agent's name is the first tab, for the agent's own chat, with the shape of the thread tabs. */
+.conversation-title.ui-button[data-tab] {
+  height: var(--openbot-control-sm);
+  gap: var(--openbot-space-1-5);
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-secondary);
+}
+
+.conversation-title.ui-button[data-tab] h1 {
+  color: inherit;
+  font-size: var(--openbot-text-sm);
+}
+
+.conversation-title.ui-button[data-tab]:hover {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.conversation-title.ui-button[data-tab][data-selected] {
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+}
+
+/* The gap after the name tab is the gap between two tabs, with the same divider in it. */
+.conversation-heading-group:has(.conversation-title[data-tab]) .agent-threads-header {
+  margin-left: 1px;
+}
+
 /*
- * Only the two icon buttons are left, and they cannot be narrower. The agent name gives way instead.
- * It shortens only in this mode, so its width cannot move the row into another mode.
+ * Only the two icon buttons are left, and they cannot be narrower. The agent name gives way instead:
+ * when it does not fit, only its avatar shows, and the name stays for a screen reader. Then "+" goes,
+ * because the thread list also starts a thread. The row measures the name at its full width in this
+ * mode, so the hidden name cannot change the mode.
  */
 .agent-threads-header[data-mode="minimal"] {
   flex-shrink: 0;
@@ -32,11 +63,37 @@
   flex-shrink: 1;
 }
 
-.conversation-heading-group:has(.agent-threads-header[data-mode="minimal"]) .conversation-title h1 {
-  min-width: 0;
+.conversation-heading-group:has(.agent-threads-header[data-fold]) .conversation-title {
+  position: relative;
+  flex-shrink: 0;
+  padding-right: var(--openbot-space-1-5);
+}
+
+.conversation-heading-group:has(.agent-threads-header[data-fold]) .conversation-title h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* With no room for the avatar and both buttons, "+" goes and the model picker drops its chevron. Then
+   the list button goes, and last the avatar, so no part of the row covers the picker. A hidden part
+   keeps its size, so the row can still measure it. */
+.conversation-heading-group:has(.agent-threads-header[data-fold]:not([data-fold="name"])) {
+  overflow: clip;
+}
+
+.conversation-header:has(.agent-threads-header[data-fold]:not([data-fold="name"]))
+  .provider-model-trigger
+  > .provider-model-chevron {
+  display: none;
+}
+
+.agent-threads-header:is([data-fold="list"], [data-fold="all"]),
+.conversation-heading-group:has(.agent-threads-header[data-fold="all"]) .conversation-title {
+  visibility: hidden;
 }
 
 .agent-threads-tabs-area {
@@ -51,15 +108,17 @@
   min-width: 0;
 }
 
-/* The rename field covers its tab. Its text starts where the tab title starts. */
+/* The field has no frame of its own: the tab is its frame. It takes the place of the tab title. */
 .agent-threads-rename.ui-input {
   position: absolute;
   top: 50%;
   z-index: 2;
   height: var(--openbot-control-sm);
-  padding: 0 calc(var(--openbot-space-3) - 1px);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--openbot-text-sm);
   transform: translateY(-50%);
 }
 
@@ -70,6 +129,7 @@
   /* "+" and the thread list follow the last tab directly. */
   padding-right: 0;
   overflow-x: auto;
+  gap: var(--openbot-space-1);
   background: transparent;
   box-shadow: none;
   scrollbar-width: none;
@@ -94,8 +154,10 @@
   );
 }
 
+/* The fill of the selected tab, as in the side panel tabs. */
 .agent-threads-tabs .agent-threads-fill {
-  background: var(--openbot-bg-surface);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control-active);
 }
 
 /* The trigger that keeps the agent's own chat selected in the tabs. It never shows. */
@@ -103,12 +165,23 @@
   display: none;
 }
 
+/* A tab has the shape of a side panel tab: the icon slot, then the title. All tabs have the same width,
+   so a short title does not make a small tab. When the tabs do not fit, they get narrower together, and
+   below the smallest width they scroll. A side panel thread tab has the same widths. */
 .agent-threads-tab.ui-sliding-tabs-trigger {
   display: inline-flex;
-  max-width: 200px;
-  flex: 0 0 auto;
+  /* A width, not only a flex basis: the tab row takes its width from the widths of its tabs. */
+  width: 140px;
+  min-width: 96px;
+  max-width: 140px;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 4px;
+  gap: var(--openbot-space-1-5);
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
   animation: agent-threads-tab-in var(--openbot-duration-normal) var(--openbot-ease-out);
   /* The other tabs slide when a tab moves past them. */
   transition:
@@ -122,45 +195,89 @@
   text-overflow: ellipsis;
 }
 
-/* The close control takes no space. It shows over the end of the tab on hover, so a tab keeps its
-   width when it is selected and "+" follows the last tab directly. */
-.agent-threads-tab-close {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  display: inline-grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border-radius: var(--openbot-radius-sm);
-  color: var(--openbot-text-muted);
-  opacity: 0;
-  transform: translateY(-50%);
-}
-
-/* The tab of an open right-click menu looks hovered, so the user sees which tab the menu acts on. */
-.agent-threads-tab.ui-sliding-tabs-trigger[data-menu-open] {
-  background-color: var(--openbot-hover);
+/* A tab whose title the user edits has the fill of a selected tab and a thin border, so it reads as
+   a field. Its own title hides under the field, and the icon slot stays. */
+.agent-threads-tab.ui-sliding-tabs-trigger[data-renaming] {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: -1px;
+  background-color: var(--openbot-bg-control-active);
   color: var(--openbot-text-primary);
 }
 
-.agent-threads-tab:hover .agent-threads-tab-close {
+.agent-threads-tab[data-renaming] .agent-threads-tab-title {
+  visibility: hidden;
+}
+
+/* The selected tab is on the fill, which the tabs measure. The tab of an open right-click menu
+   looks hovered, so the user sees which tab the menu acts on. A tab in rename keeps its own fill. */
+.agent-threads-tab.ui-sliding-tabs-trigger:not([aria-selected="true"], [data-renaming]):is(:hover, [data-menu-open]) {
+  background-color: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+/* The icon slot. On hover, a round fill and an X replace the icon, as in a side panel tab. */
+.agent-threads-tab-close {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.agent-threads-tab-icon,
+.agent-threads-tab-x {
+  grid-area: 1 / 1;
+}
+
+.agent-threads-tab-icon {
+  display: grid;
+  opacity: 0.7;
+}
+
+.agent-threads-tab-icon > svg,
+.agent-threads-tab-x {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.agent-threads-tab-x {
+  opacity: 0;
+}
+
+/* A tab in rename keeps its icon: the pointer is there to edit the title, not to close the tab. */
+.agent-threads-tab:hover:where(:not([data-renaming])) .agent-threads-tab-close {
+  background: var(--openbot-bg-control-hover);
+}
+
+.agent-threads-tab:hover:where(:not([data-renaming])) .agent-threads-tab-icon {
+  opacity: 0;
+}
+
+.agent-threads-tab:hover:where(:not([data-renaming])) .agent-threads-tab-x {
   opacity: 1;
 }
 
-/* On hover the title fades under the close control. */
-.agent-threads-tab:hover .agent-threads-tab-title {
-  mask-image: linear-gradient(to left, transparent 14px, var(--openbot-text-primary) 28px);
-}
-
 .agent-threads-tab-close:hover {
-  background: var(--openbot-hover);
+  background: var(--openbot-bg-control-active);
   color: var(--openbot-text-primary);
 }
 
-.agent-threads-tab-close svg {
-  width: 14px;
-  height: 14px;
+.agent-threads-tab[data-renaming] .agent-threads-tab-close {
+  pointer-events: none;
+}
+
+/* The state badge of the thread takes the icon slot at its own size. */
+.agent-threads-tab-close:has(.agent-threads-state) {
+  width: auto;
+  min-width: var(--openbot-icon-md);
+  height: auto;
+  min-height: var(--openbot-icon-md);
+}
+
+.agent-threads-tab:not(:hover) .agent-threads-tab-icon:has(.agent-threads-state) {
+  opacity: 1;
 }
 
 /* As tall as a tab and with its corners, so a hover fill on "+" matches the tab fill. */
@@ -172,31 +289,44 @@
   color: var(--openbot-text-muted);
 }
 
-/* A narrow header: the open thread as one button, with the fill and type of a selected tab. The
-   chevron says that it opens the thread list. */
+/* A narrow header: the open thread as one button, with the shape, fill and type of a selected tab.
+   The chevron says that it opens the thread list. */
 .agent-threads-switcher.ui-button {
   min-width: 0;
-  max-width: 240px;
+  max-width: 200px;
   height: var(--openbot-control-sm);
   flex: 0 1 auto;
-  gap: 4px;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-bg-surface);
-  padding: 0 6px 0 var(--openbot-space-3);
+  gap: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  background-color: var(--openbot-bg-control-active);
+  padding: 0 var(--openbot-space-1) 0 var(--openbot-space-1-5);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-sm);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .agent-threads-switcher.ui-button:hover,
 .agent-threads-switcher.ui-button[aria-expanded="true"] {
-  background: var(--openbot-hover);
+  background-color: var(--openbot-bg-control-hover);
+}
+
+.agent-threads-switcher-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: var(--openbot-icon-md);
+  min-height: var(--openbot-icon-md);
+}
+
+.agent-threads-switcher-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  opacity: 0.7;
 }
 
 .agent-threads-switcher-chevron {
-  width: 16px;
-  height: 16px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   flex: none;
   color: var(--openbot-text-muted);
 }
@@ -289,15 +419,17 @@
 /* A tab that needs the user wears a soft tint of its badge, at 40% of the badge strength, so the
    badge stays the strongest mark. The tint is an image layer, so it also shows over the selection
    fill and on a moving tab. */
-.agent-threads-tab[data-attention] {
+.agent-threads-tab[data-attention],
+.agent-threads-switcher[data-attention],
+.side-panel-thread-tab[data-attention] {
   background-image: linear-gradient(var(--agent-threads-tint), var(--agent-threads-tint));
 }
 
-.agent-threads-tab[data-attention="waiting"] {
+:is(.agent-threads-tab, .agent-threads-switcher, .side-panel-thread-tab)[data-attention="waiting"] {
   --agent-threads-tint: color-mix(in srgb, var(--openbot-warning-soft) 40%, var(--openbot-transparent));
 }
 
-.agent-threads-tab[data-attention="failed"] {
+:is(.agent-threads-tab, .agent-threads-switcher, .side-panel-thread-tab)[data-attention="failed"] {
   --agent-threads-tint: color-mix(in srgb, var(--openbot-danger-soft) 40%, var(--openbot-transparent));
 }
 
@@ -306,17 +438,27 @@
   display: none;
 }
 
-/* A soft line between two tabs. It hides next to the selected or hovered tab, as the fill marks it. */
-.agent-threads-tab + .agent-threads-tab::before {
+/* A line in the middle of the gap between two tabs, as in the side panel. It hides next to the
+   selected or hovered tab, as the fill marks it. */
+.agent-threads-tab + .agent-threads-tab::before,
+:where(.conversation-heading-group:has(.conversation-title[data-tab]))
+  .agent-threads-main-key
+  + .agent-threads-tab::before {
   position: absolute;
   top: 50%;
-  left: -2px;
+  left: calc(var(--openbot-space-1) / -2 - 0.5px);
   width: 1px;
-  height: 14px;
-  background: var(--openbot-border-grouped);
+  height: var(--openbot-icon-lg);
+  background: var(--openbot-border-strong);
   content: "";
   transform: translateY(-50%);
   transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+:where(.conversation-heading-group:has(.conversation-title:is([data-selected], :hover)))
+  .agent-threads-main-key
+  + .agent-threads-tab::before {
+  opacity: 0;
 }
 
 .agent-threads-tab[aria-selected="true"]::before,
@@ -340,10 +482,16 @@
 }
 
 /* The moving tab wears the fill itself, so it covers the tabs that it passes. */
-.agent-threads-tab.ui-sliding-tabs-trigger[data-dragged] {
+.agent-threads-tab.ui-sliding-tabs-trigger[data-dragged=""] {
   z-index: 2;
-  background-color: var(--openbot-bg-surface);
+  background-color: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
   transition: color var(--sliding-tabs-duration) var(--sliding-tabs-ease);
+}
+
+/* Over the side panel, the tab goes back to its place, faded, and a copy follows the pointer. */
+.agent-threads-tab.ui-sliding-tabs-trigger[data-dragged="away"] {
+  opacity: 0.4;
 }
 
 .agent-threads-tabs[data-dragging] .agent-threads-fill {
@@ -351,15 +499,31 @@
 }
 
 .agent-threads-tabs[data-dragging] .agent-threads-tab::before,
-.agent-threads-tabs[data-dragging] .agent-threads-tab-close {
+.agent-threads-tabs[data-dragging] .agent-threads-tab-x {
   opacity: 0;
 }
 
-.agent-threads-tabs[data-dragging] .agent-threads-tab-title {
-  mask-image: none;
+.agent-threads-tabs[data-dragging] .agent-threads-tab-close {
+  background: transparent;
 }
 
-/* Marks after the title, as in a sidebar row. A mark opens and closes in width, and the negative
+.agent-threads-tabs[data-dragging] .agent-threads-tab-icon {
+  opacity: 0.7;
+}
+
+.agent-threads-tabs[data-dragging] .agent-threads-tab-icon:has(.agent-threads-state) {
+  opacity: 1;
+}
+
+/* Where a side panel tab goes when the pointer lets it go over the chat. */
+.agent-threads-header[data-drop-target] {
+  border-radius: var(--openbot-radius-md);
+  outline: 1px dashed var(--openbot-text-secondary);
+  outline-offset: 2px;
+  background: var(--openbot-bg-control-hover);
+}
+
+/* Marks after the title in the thread menu, as in a sidebar row. A mark opens and closes in width, and the negative
    margin takes back the gap before it, so a tab changes width smoothly. */
 .agent-threads-tab-mark-slot {
   display: grid;
@@ -418,15 +582,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The close control takes the place of the state mark on hover. The title stays clear of it. */
-.agent-threads-tab:hover .agent-threads-tab-mark {
-  opacity: 0;
-}
-
-.agent-threads-tab:hover:has(.agent-threads-tab-mark-slot[data-open]) .agent-threads-tab-title {
-  mask-image: none;
-}
-
 .agent-thread-origin {
   margin: 0;
   padding-top: var(--openbot-chat-entry-gap);
@@ -449,19 +604,6 @@
   font-size: var(--openbot-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The thread composer has no attach button, so it drops the empty first column, as `.side-question-composer` does. */
-.agent-thread-composer.composer[data-compact] {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.agent-thread-composer.composer[data-compact] > .composer-input-label {
-  grid-column: 1;
-}
-
-.agent-thread-composer.composer[data-compact] .composer-primary-actions {
-  grid-column: 2;
 }
 
 /* The hint holds the thread title, which can be long. It stays on the one line of the compact box. */

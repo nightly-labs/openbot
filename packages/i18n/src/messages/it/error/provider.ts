@@ -7,6 +7,7 @@ export const messages = {
   "error.provider.computerUseConfig":
     "OpenBot non è riuscito a registrare il Controllo del computer nella configurazione di Codex. Controlla che il config.toml di Codex sia valido e scrivibile, poi riavvia OpenBot. Puoi disattivare il Controllo del computer nelle impostazioni dell'agente per continuare senza.",
   "error.provider.codexUnresponsive": "Codex ha smesso di rispondere, quindi OpenBot ha terminato il suo processo.",
+  "error.provider.acpUnresponsive": "{provider} non ha risposto in tempo, quindi OpenBot ha terminato il suo processo.",
   "error.provider.endpointsReadOnly":
     "Gli endpoint salvati sono stati scritti da una versione più recente di OpenBot, oppure il file non è leggibile. Aggiorna OpenBot per modificarli.",
   "error.provider.endpointNoSecureStorage":
@@ -97,6 +98,8 @@ export const messages = {
   "error.provider.modelsTooMany": "Ci sono troppi modelli.",
   "error.provider.modelIdCharacter": "L'ID di un modello contiene un carattere non utilizzabile.",
   "error.provider.modelIdDuplicate": "Due modelli hanno lo stesso ID.",
+  "error.provider.contextWindowInvalid":
+    "La finestra di contesto di un modello deve essere un numero intero di token tra {min} e {max}.",
   "error.provider.headersTooMany": "Ci sono troppi header.",
   "error.provider.headerNameCharacter": "Il nome di un header contiene un carattere non consentito da HTTP.",
   "error.provider.headerNameTooLong": "Il nome di un header è troppo lungo.",
@@ -269,6 +272,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "L'accesso si è interrotto prima di essere completato.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini non è riuscito ad aprire la pagina di accesso. Installa un browser e xdg-utils, poi connettiti da una sessione desktop su questo host. Un server senza desktop non può completare questo accesso.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini non è riuscito ad aprire la pagina di accesso nel browser. Controlla il browser predefinito, poi connettiti di nuovo.",
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
   "error.provider.acpSignInMethodMissing":

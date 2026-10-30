@@ -106,7 +106,7 @@ export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
   return (
     <span class="agent-row-wait-chip">
       <SidebarWaitIcon reason={props.reason} />
-      {t(SIDEBAR_WAIT_ACTION[props.reason])}
+      <span class="agent-row-wait-chip-label">{t(SIDEBAR_WAIT_ACTION[props.reason])}</span>
     </span>
   );
 }

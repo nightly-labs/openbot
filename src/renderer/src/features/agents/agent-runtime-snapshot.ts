@@ -21,6 +21,21 @@ export function attentionKey(agentId: string, threadId: string | null): string {
   return `${agentId}\u0000${threadId ?? ""}`;
 }
 
+/**
+ * Whether the answer to this prompt is on its way to main. The agent's own chat marks it by agent id,
+ * and a side thread by its `attentionKey`, so an answer in one does not replace the mark of the other.
+ */
+function promptAnswerInFlight(
+  prompt: { agentId: string; threadId: string; turnId: string; requestId: string | number },
+  submittedRequests: Record<string, string | undefined>,
+): boolean {
+  const key = promptRequestKey(prompt.turnId, prompt.requestId);
+  return (
+    key === submittedRequests[prompt.agentId] ||
+    key === submittedRequests[attentionKey(prompt.agentId, prompt.threadId)]
+  );
+}
+
 export function attentionEventKey(event: AttentionEvent): string {
   return event.type === "prompt"
     ? attentionKey(event.agentId, event.threadId)
@@ -88,7 +103,7 @@ export function reconcileAttentionPrompts(
   for (const prompt of snapshot.pendingPrompts) {
     // A prompt whose answer is already on its way to main would otherwise come
     // back the moment a snapshot crosses the answer in flight.
-    if (promptRequestKey(prompt.turnId, prompt.requestId) !== submittedRequests[prompt.agentId]) {
+    if (!promptAnswerInFlight(prompt, submittedRequests)) {
       next[attentionKey(prompt.agentId, prompt.threadId)] = { type: "prompt", ...prompt };
     }
   }
@@ -128,7 +143,7 @@ export function seededAttentionPrompts(
     const agentId = attentionAgentId(entry);
     if (entry.type === "prompt") {
       const key = promptRequestKey(entry.turnId, entry.requestId);
-      if (key === presentedResolutions[agentId] || key === submittedRequests[agentId]) continue;
+      if (key === presentedResolutions[agentId] || promptAnswerInFlight(entry, submittedRequests)) continue;
     }
     next[attentionEventKey(entry)] = entry;
   }

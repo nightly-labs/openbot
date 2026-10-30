@@ -1,3 +1,4 @@
+import { providerSteersTurns } from "@openbot/contracts/agent-providers";
 import {
   BROWSER_DOCK_LIMITS,
   type BrowserDockAction,
@@ -286,6 +287,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
       hold: hold(),
       editingDeliveryId: editingDeliveryId() ?? null,
       canSteer: Boolean(props.activeTurnId),
+      steerSupported: providerSteersTurns(agent.provider),
       canRunAsTask: Boolean(props.threads?.onRunQueuedMessage),
       island: dockIsland(island()),
       handoffPending: handoffPending(),
@@ -404,7 +406,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
             onValueChange={(text) => updateCurrentDraft({ text })}
             onSend={send}
             onStop={props.onStop}
-            onSteer={props.onSteerQueuedMessage}
+            onSteer={providerSteersTurns(agent().provider) ? props.onSteerQueuedMessage : undefined}
             onRunAsTask={props.threads?.onRunQueuedMessage}
             onCancel={props.onCancelQueuedMessage}
             onEdit={(delivery) => void editQueuedMessage(delivery)}

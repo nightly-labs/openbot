@@ -85,6 +85,34 @@ function withMemoryChange(change: unknown) {
   };
 }
 
+const threadContext = {
+  agentId: "agent-1",
+  threadId: "thread-2",
+  usage: { usedTokens: 148_000, windowTokens: 258_000, autoCompactAt: 0.8, nativeManaged: false },
+  compaction: null,
+};
+
+function withThreadContexts(threadContextStates: unknown[]) {
+  return {
+    serverId: "local",
+    event: {
+      type: "runtime-snapshot",
+      snapshot: {
+        threadContextStates,
+        agents: [],
+        activeTurns: [],
+        work: [],
+        latestMessages: [],
+        attentionComplete: true,
+        pendingPrompts: [],
+        pendingApprovals: [],
+        pendingBrowserTakeovers: [],
+        failedTurns: [],
+      },
+    },
+  };
+}
+
 describe("decodeScopedAgentEvent", () => {
   it.each([
     ["an event", delta],
@@ -96,6 +124,11 @@ describe("decodeScopedAgentEvent", () => {
     ["an empty hidden agents change", { serverId: "local", event: { type: "hidden-agents-changed", agents: [] } }],
     ["the memory changes of a turn", memoryChanges],
   ] satisfies [string, ScopedAgentEvent][])("keeps %s", (_name, value) => {
+    expect(decodeScopedAgentEvent(value)).toEqual(value);
+  });
+
+  it("keeps the context of a side thread", () => {
+    const value = withThreadContexts([threadContext]);
     expect(decodeScopedAgentEvent(value)).toEqual(value);
   });
 
@@ -127,6 +160,15 @@ describe("decodeScopedAgentEvent", () => {
     [
       "a memory change with a text longer than a memory",
       withMemoryChange({ memoryId: "memory-1", action: "saved", text: "x".repeat(501) }),
+    ],
+    [
+      "a side thread context with no window",
+      withThreadContexts([{ ...threadContext, usage: { ...threadContext.usage, windowTokens: 0 } }]),
+    ],
+    ["a side thread context with no thread", withThreadContexts([{ ...threadContext, threadId: undefined }])],
+    [
+      "more side thread contexts than the agents can have threads",
+      withThreadContexts(Array(100 * 50 + 1).fill(threadContext)),
     ],
     ["a value that is not a record", "event"],
   ])("rejects %s", (_name, value) => {

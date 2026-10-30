@@ -43,9 +43,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
   const preview = () => {
-    const text = rowProps.channel.lastMessage?.text ?? t("sidebar.channel.noMessages");
+    // A waiting row previews the question, as on the agent row.
+    const text = wait()?.detail || (rowProps.channel.lastMessage?.text ?? t("sidebar.channel.noMessages"));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
+  // The wait label already reads the question, so the label does not say it twice, unless the
+  // preview also says that work runs.
+  const labelPreview = () => (wait()?.detail && rowProps.channel.activeTasks === 0 ? "" : `. ${preview()}`);
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
       <ContextMenu.Trigger
@@ -59,7 +63,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
             "sidebar-agent-row-dragging": draggedChatId() === rowProps.channel.id,
           },
         ]}
-        aria-label={`${rowProps.channel.name}${title() ? `, ${title()}` : ""}. ${preview()}${waitLabel()}`}
+        aria-label={`${rowProps.channel.name}${title() ? `, ${title()}` : ""}${labelPreview()}${waitLabel()}`}
         aria-pressed={active() ? "true" : "false"}
         data-cuelume-navigate=""
         onClick={(event: MouseEvent) => {

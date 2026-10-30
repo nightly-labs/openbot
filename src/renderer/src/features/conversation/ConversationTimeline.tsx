@@ -29,7 +29,7 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
-import { currentDevicePlatform, deviceSendShortcut } from "../../send-shortcut-preference";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -43,12 +43,12 @@ import {
 } from "../speech/speech-replies";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
+import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
-import type { ConversationProps } from "./conversation-types";
 import { agentSkillsMode } from "./installed-skills-source";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { McpSignInChatCard } from "./McpSignInChatCard";
@@ -122,6 +122,7 @@ export function ConversationTimeline() {
     composerHasContent,
     copiedMessageId,
     dismissPendingSend,
+    downloadMessageImageFile,
     editingDeliveryId,
     editPendingSend,
     copyMessage,
@@ -170,6 +171,7 @@ export function ConversationTimeline() {
     setExpandedEmojiMessageId,
     setOpenReactionMessageId,
     setRequiredInteractionElement,
+    registerPromptComposerAnswer,
     showScrollToLatest,
     unreadDividerVisible,
     updateScrollFade,
@@ -359,6 +361,7 @@ export function ConversationTimeline() {
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             onOpenQuote={openQuote}
+            macWindowControls={props.platform === "darwin"}
           />
         )}
       </Show>
@@ -500,23 +503,6 @@ export function ConversationTimeline() {
     },
   });
   const channelWorkingSteps = createMemo(() => (channel ? turnSteps.workingSteps(channel.workingTurns()) : []));
-  let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
-  const keyedPrompt = createMemo(() => {
-    const prompt = props.prompt;
-    if (!prompt) {
-      cachedPrompt = null;
-      return null;
-    }
-    const key = JSON.stringify([prompt.turnId, String(prompt.requestId)]);
-    if (cachedPrompt?.key === key) return cachedPrompt;
-    cachedPrompt = { key, prompt };
-    return cachedPrompt;
-  });
-  /**
-   * The block of the waiting prompt draws it as a card. Until the block's message arrives, or when the
-   * agent asked without one, the prompt's questions draw it.
-   */
-  const pendingPromptBlock = createMemo(() => (keyedPrompt() ? props.promptUiBlock : undefined));
   /**
    * A direct chat with no message yet, and no turn, queued send or question. A queued send leaves the
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
@@ -529,7 +515,7 @@ export function ConversationTimeline() {
     !props.activeTurnId &&
     presentedQueueDeliveries().length === 0 &&
     !renderedAgentActivity() &&
-    !keyedPrompt()
+    !props.prompt
       ? props.agent
       : undefined,
   );
@@ -542,8 +528,8 @@ export function ConversationTimeline() {
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {keyedPrompt() && !sideThreadOpen()
-          ? t("prompt.inputRequiredAnnouncement", { question: keyedPrompt()?.prompt.questions[0]?.question ?? "" })
+        {props.prompt
+          ? t("prompt.inputRequiredAnnouncement", { question: props.prompt.questions[0]?.question ?? "" })
           : ""}
       </span>
       <Show when={chatSearchOpen() && !sideThreadOpen()}>
@@ -1109,6 +1095,7 @@ export function ConversationTimeline() {
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
                             isAppShortcut={isChatVisualAppShortcut}
+                            macWindowControls={props.platform === "darwin"}
                           />
                         </article>
                       </ChatRowBoundary>
@@ -1228,6 +1215,7 @@ export function ConversationTimeline() {
                             onOpenQuote={openQuote}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            macWindowControls={props.platform === "darwin"}
                             loadImageFile={
                               loadImageFile &&
                               ((file) =>
@@ -1236,6 +1224,9 @@ export function ConversationTimeline() {
                                   messageId: message()?.id ?? initialMessage.id,
                                   agentId: workspaceAgentId(),
                                 }))
+                            }
+                            onDownloadImageFile={
+                              loadImageFile && ((file) => downloadMessageImageFile(file, workspaceAgentId()))
                             }
                             actions={
                               <>
@@ -1394,43 +1385,12 @@ export function ConversationTimeline() {
                 </Show>
               </Show>
             </div>
-            <Show when={keyedPrompt()} keyed>
-              {(entry) => {
-                const presentResolution = () =>
-                  props.onPromptResolutionPresented?.(
-                    entry.prompt.agentId,
-                    entry.prompt.turnId,
-                    entry.prompt.requestId,
-                  );
-                return (
-                  <Loading>
-                    <Show
-                      when={pendingPromptBlock()}
-                      fallback={
-                        <QuestionPromptBubble
-                          questions={entry.prompt.questions}
-                          elementRef={setRequiredInteractionElement}
-                          sendShortcut={deviceSendShortcut(props.platform)}
-                          onSubmit={props.onAnswerPrompt}
-                          onResolutionPresented={presentResolution}
-                        />
-                      }
-                    >
-                      {(block) => (
-                        <UiBlockPrompt
-                          block={block()}
-                          agents={props.agents}
-                          onSelectAgent={props.onSelectAgent}
-                          onOpenLink={(url) => void openExternalMessageUrl(url)}
-                          elementRef={setRequiredInteractionElement}
-                          onAnswer={props.onAnswerPrompt}
-                          onAnswered={presentResolution}
-                        />
-                      )}
-                    </Show>
-                  </Loading>
-                );
-              }}
+            {/* Under an open side thread, the thread draws the card of its own question. */}
+            <Show when={!sideThreadOpen()}>
+              <ConversationQuestionPrompt
+                elementRef={setRequiredInteractionElement}
+                registerComposerAnswer={registerPromptComposerAnswer}
+              />
             </Show>
             <Show keyed when={props.approval}>
               {(approval) => (

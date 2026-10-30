@@ -211,6 +211,15 @@ export interface McpSignIn {
    */
   registrationFailed: () => boolean;
   /**
+   * The HTTP status of this attempt's last registration answer, or `null`. The SDK keeps the status
+   * only when the body is not an OAuth error, and turns a code it does not know into a
+   * `ServerError`: Dropbox answers 403 `registration_not_supported`, which arrives as a bare
+   * sentence. Only a fetch passed through `watchRegistration` sees the status.
+   */
+  registrationStatus: () => number | null;
+  /** `fetch` for an exchange that can register, keeping the status of the registration answer. */
+  watchRegistration: (fetch: FetchLike) => FetchLike;
+  /**
    * Whether the user cancelled this attempt. A cancel can land during discovery, registration or
    * the token exchange, where the step it stops fails with its own words; the reader says
    * "cancelled" instead, because that is what the user did.
@@ -451,7 +460,7 @@ export class McpOAuth implements McpOAuthAuthority {
           if (cancelled || abandoned || this.#options.storage.read(resource)?.tokens) return false;
           // Discovery and the registration read only public documents; the abort ends them with this step.
           const controller = new AbortController();
-          const fetchFn = this.#fetch(resource, controller.signal);
+          const fetchFn = provider.watchRegistration(this.#fetch(resource, controller.signal));
           return yield* withTimeout(
             Effect.gen(function* () {
               // A server that answers without a sign-in and names no authorization server takes none:
@@ -534,6 +543,8 @@ export class McpOAuth implements McpOAuthAuthority {
       abandon,
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
+      registrationStatus: () => provider.registrationStatus,
+      watchRegistration: (fetch) => provider.watchRegistration(fetch),
       cancelled: () => cancelled,
     };
   }
@@ -821,6 +832,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #discoveryState: OAuthDiscoveryState | undefined;
   /** Set when the SDK is told to register, and cleared when it saves what it registered. */
   #registrationPending = false;
+  /** The status the authorization server answered the pending registration with. */
+  #registrationStatus: number | null = null;
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -842,6 +855,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * Some servers also issue a secret they never accept: Railway registers `client_secret_basic` and
    * then refuses that secret at the token endpoint (#3429). A server that does not list `none` still
    * picks its own method, and the SDK uses the one it registered.
+   *
+   * Except a server that lists only `client_secret_post`. A request with no method asks for the RFC
+   * 7591 default, `client_secret_basic`, and Make refuses that registration with a 400: "No supported
+   * Token Endpoint Auth Method provided."
    */
   get clientMetadata(): OAuthClientMetadata {
     const scope = this.#record().app?.scope;
@@ -853,7 +870,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       redirect_uris: [this.#options.redirectUrl],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      ...(methods?.includes("none") ? { token_endpoint_auth_method: "none" } : {}),
+      ...tokenEndpointAuthMethod(methods),
       ...(scope ? { scope } : {}),
     };
   }
@@ -924,6 +941,34 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#registrationPending;
   }
 
+  get registrationStatus(): number | null {
+    return this.#registrationStatus;
+  }
+
+  /**
+   * Matched by address, not by `#registrationPending`: the SDK also registers when it drops a
+   * client bound to another issuer, which this provider never hears about.
+   */
+  watchRegistration(fetch: FetchLike): FetchLike {
+    return async (input, init) => {
+      const response = await fetch(input, init);
+      const registrationUrl = this.#registrationUrl();
+      if (init?.method === "POST" && registrationUrl !== null && new URL(String(input)).href === registrationUrl)
+        this.#registrationStatus = response.status;
+      return response;
+    };
+  }
+
+  /** Where the SDK registers: the advertised endpoint, or `/register` when no metadata was found. */
+  #registrationUrl(): string | null {
+    const discovery = this.#discoveryState;
+    if (!discovery) return null;
+    const endpoint = discovery.authorizationServerMetadata
+      ? discovery.authorizationServerMetadata.registration_endpoint
+      : new URL("/register", discovery.authorizationServerUrl).href;
+    return endpoint && URL.canParse(endpoint) ? new URL(endpoint).href : null;
+  }
+
   /** No client, which makes the SDK register next. */
   #register(): undefined {
     this.#registrationPending = true;
@@ -942,6 +987,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#registrationPending = false;
+        this.#registrationStatus = null;
         this.recordSecret(information.client_secret);
         // The SDK binds an unstamped client to its issuer after an exchange. For a sign-in app that
         // binding is all that is written: the app is not a registration.
@@ -1624,6 +1670,16 @@ const revokeToken = Effect.fn("McpOAuth.revokeToken")(function* (
   yield* mcpCall(() => response.body?.cancel()).pipe(Effect.catch(() => Effect.void));
   return response.ok ? "ok" : `http ${response.status}`;
 });
+
+/** The method a registration asks for, from the ones the authorization server lists. */
+function tokenEndpointAuthMethod(
+  methods: string[] | undefined,
+): Pick<OAuthClientMetadata, "token_endpoint_auth_method"> {
+  if (methods?.includes("none")) return { token_endpoint_auth_method: "none" };
+  if (methods?.includes("client_secret_post") && !methods.includes("client_secret_basic"))
+    return { token_endpoint_auth_method: "client_secret_post" };
+  return {};
+}
 
 /** The class of a failure, for a log line that must not carry the failure's own text. */
 function errorKind(error: unknown): string {

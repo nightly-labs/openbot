@@ -10,6 +10,7 @@ import {
   RequestTimeoutError,
 } from "../agent-client";
 import { AppServerError } from "../app-server-client";
+import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import {
   bridgedToolName,
   type DynamicToolCallParams,
@@ -42,6 +43,21 @@ export function isArchivedThreadError(error: unknown): boolean {
  */
 export function isCodexMissingRollout(error: unknown): boolean {
   return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
+}
+
+/**
+ * The first turn of a new thread starts and is not saved yet, so there is no history to read now.
+ * Codex 0.165.0 answers `thread/turns/list` with `is not materialized yet` then, and while that
+ * turn is saved, with one of the `is not supported yet` errors (#3609). Unlike a missing rollout,
+ * the history is readable once the turn is saved.
+ */
+export function isCodexRolloutPending(error: unknown): boolean {
+  if (!(error instanceof AppServerError)) return false;
+  if (error.code === -32600) return error.message.includes(" is not materialized yet");
+  return (
+    error.code === -32601 &&
+    (error.message === "list_turns is not supported yet" || error.message === "paginated_threads is not supported yet")
+  );
 }
 
 /**
@@ -294,6 +310,44 @@ function openBotTool(item: ThreadItem): string | null {
 }
 
 /**
+ * The OpenBot browser tool that an item calls, or null for any other tool: a `tool_call` bridge item
+ * names it in its arguments, a Codex item names its namespace, and a Claude item names it
+ * `mcp__openbot_browser__<tool>` (`claudeBridgedToolName`).
+ */
+function browserTool(item: ThreadItem): string | null {
+  const bridged = bridgedTool(item);
+  if (bridged) return bridged.namespace === OPENBOT_BROWSER_NAMESPACE ? bridged.tool : null;
+  if (item.type === "toolCall") {
+    return /^mcp__openbot_browser__(.+)$/u.exec(getString(item, "name") ?? "")?.[1] ?? null;
+  }
+  if (item.type !== "dynamicToolCall" || getString(item, "namespace") !== OPENBOT_BROWSER_NAMESPACE) return null;
+  return getString(item, "tool");
+}
+
+/** The text of a running browser step. Its completed text is the same for each tool. */
+function browserProgressText(tool: string): string {
+  switch (tool) {
+    case "open":
+    case "navigate":
+      return sourceText("status.agent.browserOpening");
+    case "snapshot":
+    case "screenshot":
+    case "status":
+    case "list_tabs":
+    case "wait_for":
+      return sourceText("status.agent.browserReading");
+    case "click":
+      return sourceText("status.agent.browserClicking");
+    case "type":
+    case "fill_fields":
+    case "press":
+      return sourceText("status.agent.browserTyping");
+    default:
+      return sourceText("status.agent.browserActing");
+  }
+}
+
+/**
  * The agents that a `send_message` item went to. A bridge item holds the tool's arguments in its own
  * arguments, and some providers send them as JSON text.
  */
@@ -367,6 +421,11 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {
     return sourceText(completed ? "status.agent.screenCaptureReviewing" : "status.agent.screenCaptureProgress");
+  }
+  // Before the generic words too: each browser tool name contains `browser`, which is a web search word.
+  const browser = browserTool(item);
+  if (browser !== null) {
+    return completed ? sourceText("status.agent.browserReviewing") : browserProgressText(browser);
   }
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
     return completed ? "Reviewing the sources and information I found…" : "Searching for current information…";

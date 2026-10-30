@@ -42,10 +42,36 @@
   }
 }
 
+/* The sidebar, the card and the top row are clear, so no ring colour matches what shows through them:
+ * an avatar outline there would be a halo. A row that paints its own hover or selected fill sets the
+ * outline again. */
+:root[data-openbot-window-glass] .app-window > .app-frame-edge > .sidebar,
+:root[data-openbot-window-glass] .app-window > .app-frame-edge :is(.channel-empty, .channel-title),
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  > .sidebar
+  :is(.sidebar-section-agent-drop-target, .sidebar-pinned-group-agent-drop-target)
+  > * {
+  --agent-avatar-outline: transparent;
+}
+
+/* With no outline, faces that overlap would merge into one shape, so the channel title and the empty
+ * state put them side by side. This also covers the title's hover fill, which has no clear part. */
+:root[data-openbot-window-glass]
+  .app-window
+  > .app-frame-edge
+  :is(.channel-empty, .channel-title)
+  .channel-avatar
+  .agent-avatar
+  + .agent-avatar {
+  margin-left: 0;
+}
+
 /* The pages in the card are clear, so the card's tint shows once and not twice. */
 :root[data-openbot-window-glass]
   .app-window
-  :is(.schedule-pane, .agent-usage, .diagram-view, .settings-page-content .agent-files-view) {
+  :is(.schedule-pane, .agent-usage, .tasks-page, .diagram-view, .settings-page-content .agent-files-view) {
   background: transparent;
 }
 
@@ -53,7 +79,12 @@
   background-color: transparent;
 }
 
-/* The Settings fades cover the rows that scroll under them, so they take the card's tint. */
+/* The composer at the top of the tasks list and the Settings fades cover the rows that scroll under
+ * them, so they take the card's tint. */
+:root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
+  background: var(--window-glass-card);
+}
+
 :root[data-openbot-window-glass] .app-window .settings-page-content .settings-modal-scroll-frame::before {
   background: linear-gradient(to bottom, var(--window-glass-card) 28%, transparent 100%);
 }

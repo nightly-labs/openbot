@@ -49,7 +49,6 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       ? t("sidebar.hidden.since", { date: format.date(new Date(since), { month: "short", day: "numeric" }) })
       : "";
   };
-  const detail = () => hiddenDetail() || rowProps.agent.preview;
   // A function, not a JSX ternary: the compiler wraps a ternary in a memo, and the avatar reads its
   // mood inside an effect, where a memo cannot be created.
   const mood = () => (rowProps.userHidden ? "asleep" : (props.agentMoods[rowProps.agent.id] ?? "idle"));
@@ -59,6 +58,10 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     const current = state();
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
   };
+  // A waiting row previews the question: the stored preview is the message before it.
+  const detail = () => hiddenDetail() || wait()?.detail || rowProps.agent.preview;
+  // The state label already reads the question, so the label does not say it twice.
+  const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);
   const limit = () => {
     const current = state();
@@ -85,7 +88,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
             "sidebar-agent-row-dragging": draggedChatId() === rowProps.agent.id,
           },
         ]}
-        aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}${windowLabel()}. ${hiddenLabel()}${detail()}${stateLabel() ? `. ${stateLabel()}` : ""}`}
+        aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}${windowLabel()}${labelDetail()}${stateLabel() ? `. ${stateLabel()}` : ""}`}
         title={routineLabel() || undefined}
         aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
         data-cuelume-navigate=""

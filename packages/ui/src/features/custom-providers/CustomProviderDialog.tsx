@@ -31,6 +31,7 @@ import {
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import {
+  blankModel,
   type CustomProviderDraft,
   type CustomProviderEndpoint,
   type CustomProviderErrors,
@@ -84,6 +85,11 @@ interface CustomProviderDialogProps {
   /** Main holds a key for this endpoint. A blank key field keeps it. */
   apiKeyKept?: boolean | undefined;
   /**
+   * Shows the context window of each model. This computer only: a joined server's host takes the
+   * model fields of the Team API, which has no context window.
+   */
+  contextWindows?: boolean | undefined;
+  /**
    * The last model list request. The host owns it because the request leaves the renderer. Without
    * `onDiscoverModels` the dialog has no find control and only the typed rows.
    */
@@ -95,7 +101,7 @@ interface CustomProviderDialogProps {
 }
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   // The form owns its state from here on: the incoming draft is read once, as a snapshot, so later
   // edits by the caller do not reach in and overwrite what the user is typing.
   const [draft, setDraft] = createStore<CustomProviderDraft>(
@@ -122,7 +128,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   );
 
   const errors = () =>
-    validateCustomProvider(draft, { taken: props.takenProviderIds, locked: props.providerIdLocked }, t);
+    validateCustomProvider(draft, { taken: props.takenProviderIds, locked: props.providerIdLocked }, t, format);
   const shown = (): CustomProviderErrors | null => (submitted() ? errors() : null);
   const busy = () => Boolean(props.busy);
   const discovery = (): ModelDiscovery => props.discovery ?? { status: "idle" };
@@ -141,7 +147,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     () => fades.remeasure(),
   );
 
-  const modelColumns: readonly [RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>] = [
+  const modelNameColumns: readonly [RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>] = [
     {
       label: (number) => t("customProvider.model.id", { number }),
       placeholder: () => MODEL_ID_PLACEHOLDER,
@@ -166,6 +172,25 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         }),
     },
   ];
+
+  const contextWindowColumn: RepeatableColumn<ModelRow> = {
+    label: (number) => t("customProvider.model.contextWindow", { number }),
+    placeholder: () => t("customProvider.model.contextWindowPlaceholder"),
+    // `100,000,000` with its separators.
+    maxlength: 16,
+    identifier: true,
+    numeric: true,
+    read: (row) => row.contextWindow ?? "",
+    write: (index, value) =>
+      setDraft((state) => {
+        const model = state.models[index];
+        if (model) model.contextWindow = value;
+      }),
+  };
+  const modelColumns = ():
+    | typeof modelNameColumns
+    | readonly [RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>] =>
+    props.contextWindows ? [modelNameColumns[0], modelNameColumns[1], contextWindowColumn] : modelNameColumns;
 
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {
@@ -218,9 +243,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         return;
       }
       if (state.models.some((row) => row.id.trim() === model.id)) return;
-      const row = { id: model.id, name: model.name ?? model.id };
+      const row = { id: model.id, name: model.name ?? model.id, contextWindow: model.contextWindow?.toString() ?? "" };
       // The blank row that a new form opens with is a placeholder, not a model the user added.
-      const blank = state.models.findIndex((entry) => !entry.id.trim() && !entry.name.trim());
+      const blank = state.models.findIndex(blankModel);
       if (blank >= 0) state.models[blank] = row;
       else state.models.push(row);
     });
@@ -367,7 +392,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   label={t("customProvider.models")}
                   removeLabel={(number) => t("customProvider.model.remove", { number })}
                   addLabel={t("customProvider.model.add")}
-                  columns={modelColumns}
+                  columns={modelColumns()}
                   rows={draft.models}
                   limit={CUSTOM_PROVIDER_LIMITS.models}
                   busy={busy()}

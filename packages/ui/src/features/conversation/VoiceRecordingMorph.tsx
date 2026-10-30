@@ -1,6 +1,6 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Check, X } from "@openbot/ui";
+import { Button, Check, LoaderCircle, Mic, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -115,6 +115,57 @@ export function VoiceRecordingMorph(props: {
       </div>
       <span class="voice-morph-send">{props.send}</span>
     </div>
+  );
+}
+
+/**
+ * The dictation controls of a message box: the speech model progress while it is prepared, then the
+ * microphone and the send control in one recording morph. The main chat and side threads share them.
+ */
+export function ComposerVoiceControls(props: {
+  phase: VoicePhase;
+  levels: readonly number[];
+  elapsedSeconds: number;
+  /** The download progress of the speech model, in percent, while it is prepared. */
+  modelProgress: number | null;
+  /** The microphone cannot start a recording now. It is always disabled outside the idle phase. */
+  blocked: boolean;
+  onStart: () => void;
+  onCancel: () => void;
+  onFinish: () => void;
+  /** The send control. Finish buds off it. */
+  send: JSX.Element;
+}): JSX.Element {
+  const { t } = useText();
+  return (
+    <>
+      <Show when={props.phase === "preparing"}>
+        <span class="voice-model-progress" role="status">
+          {t("composer.voice.progress", { progress: props.modelProgress ?? 0 })}
+        </span>
+      </Show>
+      <VoiceRecordingMorph
+        recording={props.phase === "recording"}
+        levels={props.levels}
+        elapsedSeconds={props.elapsedSeconds}
+        onCancel={() => props.onCancel()}
+        onFinish={() => props.onFinish()}
+        send={props.send}
+      >
+        <Button
+          variant="ghost"
+          type="button"
+          class="dictation-button"
+          aria-label={t(voiceButtonLabel(props.phase))}
+          disabled={props.blocked || props.phase !== "idle"}
+          onClick={() => props.onStart()}
+        >
+          <Show when={props.phase !== "idle"} fallback={<Mic aria-hidden="true" />}>
+            <LoaderCircle class="composer-spinner" aria-hidden="true" />
+          </Show>
+        </Button>
+      </VoiceRecordingMorph>
+    </>
   );
 }
 

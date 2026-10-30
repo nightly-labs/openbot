@@ -30,6 +30,12 @@ export const messages = {
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
+  "status.agent.browserOpening": "Opent een webpagina…",
+  "status.agent.browserReading": "Leest de webpagina…",
+  "status.agent.browserClicking": "Klikt op de webpagina…",
+  "status.agent.browserTyping": "Typt op de webpagina…",
+  "status.agent.browserActing": "Gebruikt de webpagina…",
+  "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",
@@ -52,4 +58,5 @@ export const messages = {
   "status.agent.vaultAdded": "Opgeslagen in de Kluis: {name}",
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",
+  "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
 } as const satisfies PartialTranslation<typeof source>;

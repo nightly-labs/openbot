@@ -93,7 +93,7 @@ export function NewTaskScreen() {
       setFinished(true);
     } catch (cause) {
       void haptics.notification("error");
-      setError(errorMessage(cause, t("mobile.server.tasks.error.start")));
+      setError(errorMessage(cause, t("mobile.server.threads.error.start")));
       pending.current = false;
       setSaving(false);
     }
@@ -111,7 +111,7 @@ export function NewTaskScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      <Stack.Screen options={{ title: t("mobile.server.tasks.new") }} />
+      <Stack.Screen options={{ title: t("mobile.server.threads.new") }} />
       {isAndroid ? (
         <AndroidHeaderButton
           placement="left"
@@ -131,17 +131,17 @@ export function NewTaskScreen() {
         dirty={dirty}
         canSave={canSave}
         pending={saving}
-        label={t("mobile.server.tasks.start")}
+        label={t("mobile.server.threads.start")}
         onSave={() => void start()}
       />
       <SheetFormField
-        label={t("mobile.server.tasks.ask")}
+        label={t("mobile.server.threads.ask")}
         hideLabel
         appearance="soft"
         multiline
         editable={!saving}
         maxLength={INPUT_LIMITS.messageText}
-        placeholder={t("mobile.server.tasks.ask")}
+        placeholder={t("mobile.server.threads.ask")}
         value={draft}
         onChangeText={(value) => {
           setDraft(value);
@@ -149,11 +149,11 @@ export function NewTaskScreen() {
         }}
       />
       {agents.length > 0 ? (
-        <SettingsSection title={t("mobile.server.tasks.chooseAgent")}>
+        <SettingsSection title={t("mobile.server.threads.chooseAgent")}>
           {agents.map((agent) => (
             <SettingsRow
               key={agent.id}
-              accessibilityLabel={t("mobile.server.tasks.agentLabel", { name: agent.name })}
+              accessibilityLabel={t("mobile.server.threads.agentLabel", { name: agent.name })}
               checked={agent.id === chosenId}
               disclosure={false}
               leading={<TaskAgentAvatar agent={agent} />}
@@ -169,11 +169,11 @@ export function NewTaskScreen() {
           ))}
         </SettingsSection>
       ) : (
-        <Typography.Paragraph className="px-4 text-muted">{t("mobile.server.tasks.noAgents")}</Typography.Paragraph>
+        <Typography.Paragraph className="px-4 text-muted">{t("mobile.server.threads.noAgents")}</Typography.Paragraph>
       )}
       {!online || !supported ? (
         <Typography.Paragraph className="text-muted">
-          {t(online ? "mobile.server.tasks.unsupported" : "mobile.server.tasks.offline")}
+          {t(online ? "mobile.server.threads.unsupported" : "mobile.server.threads.offline")}
         </Typography.Paragraph>
       ) : null}
       {error ? (

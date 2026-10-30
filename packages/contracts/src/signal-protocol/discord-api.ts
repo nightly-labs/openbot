@@ -56,6 +56,11 @@ export interface DiscordInboundQuote {
   sentAt: string;
   /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
+  /**
+   * A forward: `content` and `attachments` are the forwarded message's, and both are empty when
+   * Discord did not give them. False from an older Signal.
+   */
+  forwarded: boolean;
 }
 
 /** One guild message that mentions OpenBot. */
@@ -165,6 +170,8 @@ export interface DiscordHistoryMessage {
   sentAt: string;
   /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
+  /** As in `DiscordInboundQuote`. */
+  forwarded: boolean;
 }
 
 /** One place of `listChannels`. A thread is a channel too: a post to its id goes into the thread. */
@@ -254,7 +261,15 @@ function quote(value: unknown): DiscordInboundQuote | null {
     content,
     sentAt: text(item.sentAt),
     attachments: attachments(item.attachments),
+    forwarded: forwarded(item.forwarded),
   };
+}
+
+function forwarded(value: unknown): boolean {
+  // An older Signal sends no flag.
+  if (value === undefined) return false;
+  if (!isBoolean(value)) invalid();
+  return value;
 }
 
 function attachments(value: unknown): DiscordInboundAttachment[] {
@@ -343,6 +358,7 @@ export function decodeDiscordHistory(value: unknown): DiscordHistoryMessage[] {
       replyToId: nullableSnowflake(item.replyToId),
       sentAt: text(item.sentAt),
       attachments: attachments(item.attachments),
+      forwarded: forwarded(item.forwarded),
     };
   });
 }

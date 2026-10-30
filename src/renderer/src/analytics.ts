@@ -40,7 +40,7 @@ type AnalyticsResult = "succeeded" | "failed";
 /** For a step that the user can stop before it ends. */
 type AnalyticsOutcome = AnalyticsResult | "cancelled";
 /** Where the words are heard: a model on this computer, or a cloud model. */
-type TranscriptionKind = "local" | "cloud";
+type TranscriptionKind = "local" | "cloud" | "server";
 
 interface AgentAnalyticsProperties {
   provider: AgentProviderId;
@@ -297,6 +297,7 @@ interface DesktopAnalyticsEvents {
       | "buy_opened"
       | "checkout_opened"
       | "users_change_requested"
+      | "plan_change_requested"
       | "cancel_requested"
       | "cancel_kept"
       | "renewal_resumed"
@@ -619,6 +620,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
     "buy_opened",
     "checkout_opened",
     "users_change_requested",
+    "plan_change_requested",
     "cancel_requested",
     "cancel_kept",
     "renewal_resumed",
@@ -661,7 +663,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   role: ["admin", "member"],
   server_kind: ["local", "remote", "unknown"],
   transport: ["unknown", "p2p", "relay"],
-  transcription: ["local", "cloud"],
+  transcription: ["local", "cloud", "server"],
   trigger: ["voice_conversation", "dictation", "read_aloud"],
   voice: SPEECH_VOICES,
   plan: BILLING_PLAN_IDS,

@@ -18,7 +18,8 @@
 //   - **The directory owns the list.** A stored WebRTC host missing from the directory is dropped,
 //     and so is every non-WebRTC server unless `keepOtherTransports` is set. That flag is on only
 //     in development builds, which is why a released build treats the account directory as the
-//     complete answer rather than a set of additions.
+//     complete answer rather than a set of additions. The one exception is a local server of this
+//     computer (`local-servers/`): the account service never knows it.
 //
 // Order is preserved deliberately: surviving stored servers keep their positions, and hosts the
 // user has not seen before are appended in directory order. The user drags this list.
@@ -82,6 +83,8 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
+  /** The local servers of this computer. The account directory never lists them, and they stay. */
+  readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
   /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
   readonly followedHandovers?: ReadonlySet<string>;
@@ -157,7 +160,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
       // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
       // below would put one id in the list twice, and every lookup by id then answers whichever
       // copy it reached first.
-      if (input.keepOtherTransports && !listedById.has(server.id)) return [{ ...server }];
+      if ((input.keepOtherTransports || input.isThisComputer?.(server.id)) && !listedById.has(server.id))
+        return [{ ...server }];
       // The entry goes, so whatever it opened has to go with it, and nothing else here says so:
       // `removedHostIds` reports WebRTC ids, and a replaced id is still in `servers`, so a caller
       // diffing the two lists sees this host as kept.

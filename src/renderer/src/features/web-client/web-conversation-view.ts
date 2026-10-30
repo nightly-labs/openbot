@@ -3,6 +3,7 @@ import {
   agentPermissionLevel,
   agentPermissionUpdate,
   type ConversationMessage,
+  type ConversationSnapshot,
   type RespondToApprovalInput,
   type RespondToPromptInput,
 } from "@openbot/contracts/ipc";
@@ -28,6 +29,8 @@ export function createWebConversationView(options: {
   remoteAgentAdmin: Pick<ReturnType<typeof createRemoteAgentAdmin>, "settings" | "update">;
   /** True when the agent form or a channel covers the conversation. */
   hidden: () => boolean;
+  /** The open side thread's conversation, null when it has none, or undefined for the agent's own chat. */
+  thread: () => ConversationSnapshot | null | undefined;
 }) {
   const { workspace, remoteAgentAdmin } = options;
   const approval = createMemo(() =>
@@ -65,9 +68,14 @@ export function createWebConversationView(options: {
     () => ({ agentId: workspace.state.selectedId, hidden: options.hidden() }),
     () => setAnsweredPrompt(undefined),
   );
+  /** The conversation whose question shows: the open side thread, or the agent's own chat. */
+  const promptPage = () => {
+    const thread = options.thread();
+    return thread === undefined ? workspace.conversation()?.page : thread;
+  };
   const prompt = createMemo<PromptEvent | undefined>(() => {
     if (workspace.state.status !== "online") return;
-    const page = workspace.conversation()?.page;
+    const page = promptPage();
     if (!page?.threadId) return;
     const pending = workspace.state.prompts.find(
       (item) =>
@@ -126,7 +134,7 @@ export function createWebConversationView(options: {
   /** The interactive block of the waiting prompt's message, when the agent asked with one. */
   const promptUiBlock = createMemo(() => {
     const question = prompt();
-    const page = workspace.conversation()?.page;
+    const page = promptPage();
     if (!question || !page) return undefined;
     const requestKey = promptRequestKey(question.turnId, question.requestId);
     return page.messages.findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;

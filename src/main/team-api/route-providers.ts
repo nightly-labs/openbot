@@ -7,6 +7,7 @@ import {
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
 import type {
+  CustomProviderModel,
   CustomProviderResult,
   CustomProviderSummary,
   ProviderRuntimeSnapshot,
@@ -44,6 +45,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
+import { isObject } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -241,7 +243,9 @@ export async function routeProviders(
       case PROVIDERS_ADMIN_ROUTES.customSave:
         return json(
           200,
-          wireCustomProviderResult(await runCauseEffect(customProviders.save(parsed(parseSaveCustomProvider, body)))),
+          wireCustomProviderResult(
+            await runCauseEffect(customProviders.save(parsed(parseSaveCustomProvider, releasedSaveBody(body)))),
+          ),
         );
       default:
         return json(
@@ -278,9 +282,32 @@ function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
 }
 
-/** The `providers-v1` endpoint summary: the header names stay on this computer, as they did. */
+/**
+ * The `providers-v1` endpoint summary: the header names and the model context windows stay on this
+ * computer, as they did.
+ */
 function wireCustomProvider({ headerNames: _headerNames, ...provider }: CustomProviderSummary): CustomProviderSummary {
-  return provider;
+  return { ...provider, models: provider.models.map(wireCustomModel) };
+}
+
+/**
+ * A `providers-v1` save names each model by its released fields only. A model field that the protocol
+ * does not have is removed before the parse, so that it cannot refuse a save the host used to accept.
+ */
+function releasedSaveBody(body: DynamicRecord): DynamicRecord {
+  if (!Array.isArray(body.models)) return body;
+  return {
+    ...body,
+    models: body.models.map((model: unknown) => {
+      if (!isObject(model)) return model;
+      const { contextWindow: _contextWindow, ...released } = model;
+      return released;
+    }),
+  };
+}
+
+function wireCustomModel({ id, name }: CustomProviderModel): CustomProviderModel {
+  return { id, name };
 }
 
 function wireCustomProviderResult(result: CustomProviderResult): CustomProviderResult {

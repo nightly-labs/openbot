@@ -51,11 +51,12 @@ export function startAgentLog(logsDirectory: string): () => void {
  * startup failures, uncaught errors, and why the app quit. Without it, a window that disappeared on
  * Windows left no record of whether OpenBot quit or crashed (#2675). It runs for the life of the
  * process, so the teardown's own lines reach the file too. The shutdown deadline exits before its
- * line can be written.
+ * line can be written. The update logger goes here too: `update.log` names only the failure code of
+ * a check, download or install, and this file keeps the reason (#3724).
  */
 export function startMainLog(logsDirectory: string): void {
   const directory = join(logsDirectory, "main");
-  teeLogLines(["main"], (line) => {
+  teeLogLines(["main", "update"], (line) => {
     Effect.runFork(appendRemoteDiagnosticLog(directory, "main", `${line}\n`));
   });
 }

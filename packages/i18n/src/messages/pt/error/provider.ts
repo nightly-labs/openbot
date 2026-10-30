@@ -7,6 +7,7 @@ export const messages = {
   "error.provider.computerUseConfig":
     "O OpenBot não conseguiu registrar o Uso do computador na configuração do Codex. Verifique se seu config.toml do Codex é válido e gravável, depois reinicie o OpenBot. Você pode desativar o Uso do computador nas configurações do agente para continuar sem ele.",
   "error.provider.codexUnresponsive": "O Codex parou de responder, então o OpenBot encerrou o processo dele.",
+  "error.provider.acpUnresponsive": "O {provider} não respondeu a tempo, então o OpenBot encerrou o processo dele.",
   "error.provider.endpointsReadOnly":
     "Os endpoints salvos foram gravados por uma versão mais recente do OpenBot, ou o arquivo não pode ser lido. Atualize o OpenBot para alterá-los.",
   "error.provider.endpointNoSecureStorage":
@@ -101,6 +102,8 @@ export const messages = {
   "error.provider.modelsTooMany": "Há modelos demais.",
   "error.provider.modelIdCharacter": "Um ID de modelo contém um caractere inválido.",
   "error.provider.modelIdDuplicate": "Dois modelos têm o mesmo ID.",
+  "error.provider.contextWindowInvalid":
+    "A janela de contexto de um modelo deve ser um número inteiro de tokens entre {min} e {max}.",
   "error.provider.headersTooMany": "Há cabeçalhos demais.",
   "error.provider.headerNameCharacter": "O nome de um cabeçalho contém um caractere não permitido pelo HTTP.",
   "error.provider.headerNameTooLong": "O nome de um cabeçalho é muito longo.",
@@ -269,6 +272,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "O login parou antes de terminar.",
   "error.provider.geminiBrowserUnavailable":
     "O Gemini não conseguiu abrir a página de login. Instale um navegador e o xdg-utils, depois conecte a partir de uma sessão de área de trabalho neste computador anfitrião. Um servidor sem área de trabalho não consegue concluir este login.",
+  "error.provider.geminiBrowserOpenFailed":
+    "O Gemini não conseguiu abrir a página de login no seu navegador. Verifique o navegador padrão e conecte novamente.",
   "error.provider.acpSignInFailed": "O login não foi concluído.",
   "error.provider.acpSignInFailedReason": "O login não foi concluído: {reason}",
   "error.provider.acpSignInMethodMissing":

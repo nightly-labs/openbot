@@ -36,12 +36,23 @@ interface OpenCodeProviderOptions {
   readonly headers?: Readonly<Record<string, string>>;
 }
 
+/**
+ * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
+ * endpoint's models. `output: 0` keeps OpenCode's own output budget, which it also cuts to the room
+ * the context leaves. Checked in OpenCode 2.1.4: a model with no `limit` reports 200K context, and
+ * `{ context: 32768, output: 0 }` sent `max_completion_tokens: 21071`.
+ */
+interface OpenCodeModelEntry {
+  readonly name: string;
+  readonly limit?: { readonly context: number; readonly output: 0 };
+}
+
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
 interface OpenCodeProviderEntry {
   readonly npm: string;
   readonly name: string;
   readonly options: OpenCodeProviderOptions;
-  readonly models: Readonly<Record<string, { readonly name: string }>>;
+  readonly models: Readonly<Record<string, OpenCodeModelEntry>>;
 }
 
 /**
@@ -144,8 +155,14 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
         ? { headers: Object.fromEntries(provider.headers.map((header) => [header.name, header.value])) }
         : {}),
     },
-    models: Object.fromEntries(provider.models.map((model) => [model.id, { name: model.name }])),
+    models: Object.fromEntries(provider.models.map((model) => [model.id, modelEntry(model)])),
   };
+}
+
+function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
+  return model.contextWindow === undefined
+    ? { name: model.name }
+    : { name: model.name, limit: { context: model.contextWindow, output: 0 } };
 }
 
 /**

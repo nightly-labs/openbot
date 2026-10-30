@@ -7,6 +7,7 @@ export const messages = {
   "error.provider.computerUseConfig":
     "OpenBot no pudo registrar el uso del equipo en la configuración de Codex. Comprueba que tu config.toml de Codex sea válido y se pueda escribir, y reinicia OpenBot. Puedes desactivar el uso del equipo en los ajustes del compañero para continuar sin él.",
   "error.provider.codexUnresponsive": "Codex dejó de responder, así que OpenBot terminó su proceso.",
+  "error.provider.acpUnresponsive": "{provider} no respondió a tiempo, así que OpenBot terminó su proceso.",
   "error.provider.endpointsReadOnly":
     "Los endpoints guardados se escribieron con una versión más reciente de OpenBot o el archivo no se puede leer. Actualiza OpenBot para cambiarlos.",
   "error.provider.endpointNoSecureStorage":
@@ -101,6 +102,8 @@ export const messages = {
   "error.provider.modelsTooMany": "Hay demasiados modelos.",
   "error.provider.modelIdCharacter": "Un ID de modelo contiene un carácter no permitido.",
   "error.provider.modelIdDuplicate": "Dos modelos tienen el mismo ID.",
+  "error.provider.contextWindowInvalid":
+    "La ventana de contexto de un modelo debe ser un número entero de tokens entre {min} y {max}.",
   "error.provider.headersTooMany": "Hay demasiadas cabeceras.",
   "error.provider.headerNameCharacter": "El nombre de una cabecera contiene un carácter que HTTP no permite.",
   "error.provider.headerNameTooLong": "El nombre de una cabecera es demasiado largo.",
@@ -272,6 +275,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "El inicio de sesión se detuvo antes de completarse.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini no pudo abrir la página de inicio de sesión. Instala un navegador y xdg-utils, y conéctate desde una sesión de escritorio en este host. Un servidor sin escritorio no puede completar este inicio de sesión.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini no pudo abrir la página de inicio de sesión en tu navegador. Revisa tu navegador predeterminado y vuelve a conectarte.",
   "error.provider.acpSignInFailed": "El inicio de sesión no se completó.",
   "error.provider.acpSignInFailedReason": "El inicio de sesión no se completó: {reason}",
   "error.provider.acpSignInMethodMissing":

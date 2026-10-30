@@ -21,6 +21,7 @@ import {
   IconButton,
   LoaderCircle,
   Plus,
+  SearchSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -254,29 +255,25 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
           </ol>
         </Show>
         <Show when={order().length < AGENT_BACKUP_MODEL_LIMIT && addable().length > 0}>
-          <Select<BackupModelOption>
-            class="agent-settings-runtime-select"
+          <SearchSelect<BackupModelOption>
+            class="agent-settings-runtime-row"
+            aria-label={t("agentSettings.backupModels.add")}
             options={addable()}
-            optionValue="key"
-            optionTextValue={label}
             value={null}
-            onChange={(option) => {
-              if (option) save({ automatic: automatic(), order: [...order(), option.choice] });
-            }}
-            itemComponent={(item) => (
-              <SelectItem item={item.item}>
-                <OptionContent option={item.item.rawValue} />
-              </SelectItem>
-            )}
+            optionValue={(option) => option.key}
+            label={label}
+            // OpenRouter lists hundreds of models, so the search also reads the provider and the model id.
+            optionTextValue={(option) =>
+              `${label(option)} ${agentProviderName(option.choice.provider)} ${option.choice.model}`
+            }
+            itemContent={(option) => <OptionContent option={option} />}
+            onChange={(option) => save({ automatic: automatic(), order: [...order(), option.choice] })}
           >
-            <SelectTrigger class="agent-settings-runtime-row" aria-label={t("agentSettings.backupModels.add")}>
-              <span class="settings-link-icon">
-                <Plus aria-hidden="true" />
-              </span>
-              <span class="agent-settings-runtime-label">{t("agentSettings.backupModels.add")}</span>
-            </SelectTrigger>
-            <SelectContent />
-          </Select>
+            <span class="settings-link-icon">
+              <Plus aria-hidden="true" />
+            </span>
+            <span class="agent-settings-runtime-label">{t("agentSettings.backupModels.add")}</span>
+          </SearchSelect>
         </Show>
       </SettingsLinkGroup>
       <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">

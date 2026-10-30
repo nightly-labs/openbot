@@ -2,16 +2,15 @@ import { z } from "zod";
 
 /**
  * When the offer of a hosted server shows. A routine on a computer stops when the computer is off,
- * so the offer comes when the user depends on that computer: a new routine, the routine list, and
- * the computer offline. It must come back often enough to be seen, but never as a repeat in one
- * sitting.
+ * so the offer comes when the user depends on that computer: the first routine on this computer, the
+ * routine list, and the computer offline. The modal shows one time for each account; the notices come
+ * back often enough to be seen, but never as a repeat in one sitting.
  */
 
 const HOSTED_UPSELL_KEY_PREFIX = "openbot:hosted-server-upsell:v1:";
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** The modal after a new routine: at most once in this time, and at most this many times. */
-const MODAL_INTERVAL_MS = 30 * DAY_MS;
-const MODAL_LIMIT = 3;
+/** The modal after the first routine shows one time. An account that saw it before does not see it again. */
+const MODAL_LIMIT = 1;
 /** Each "Not now" on the routine list hides the notice for longer, up to the last step. */
 const NOTICE_SNOOZE_DAYS = [7, 14, 30] as const;
 /** "See plans" without a purchase: the user saw the plans, so the notice waits a little. */
@@ -21,6 +20,7 @@ type UpsellStorage = Pick<Storage, "getItem" | "setItem">;
 
 const upsellStateSchema = z.object({
   modalCount: z.number().int().min(0).catch(0),
+  // Kept so that a saved value stays valid; the modal no longer comes back after an interval.
   modalShownAt: z.number().nullable().catch(null),
   noticeDismissals: z.number().int().min(0).catch(0),
   noticeHiddenUntil: z.number().nullable().catch(null),
@@ -69,9 +69,8 @@ export function writeHostedUpsellState(storage: UpsellStorage, accountId: string
   }
 }
 
-export function modalAllowed(state: HostedUpsellState, now: number): boolean {
-  if (state.modalCount >= MODAL_LIMIT) return false;
-  return state.modalShownAt === null || now - state.modalShownAt >= MODAL_INTERVAL_MS;
+export function modalAllowed(state: HostedUpsellState): boolean {
+  return state.modalCount < MODAL_LIMIT;
 }
 
 export function withModalShown(state: HostedUpsellState, now: number): HostedUpsellState {

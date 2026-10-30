@@ -1,3 +1,5 @@
+import { isSkillCategory, type MarketplaceSkillQuery } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { STORY_AGENT_TEMPLATE_DETAIL } from "./agent-template-fixtures";
 import {
   STORY_MARKETPLACE_AGENT_DETAILS,
@@ -5,6 +7,7 @@ import {
   STORY_MARKETPLACE_SKILL_DETAILS,
   STORY_MARKETPLACE_SKILLS,
 } from "./fixtures";
+import { mockSkillPage } from "./mock-skills";
 import { matchesQuery } from "./mock-support";
 
 /** One page of `items`, with the search, filter and cursor of the account service's list routes. */
@@ -24,16 +27,26 @@ function page<T extends { category?: string | undefined; featured?: boolean | un
   return { items: matches.slice(start, end), nextCursor: end < matches.length ? String(end) : null };
 }
 
+/** The skill list query that `marketplaceQueryParams` sent. A value the route does not know is left out. */
+function skillQuery(params: URLSearchParams): MarketplaceSkillQuery {
+  const category = params.get("category");
+  const verified = params.get("verified");
+  const sort = params.get("sort");
+  const limit = Number(params.get("limit"));
+  return {
+    query: params.get("query") ?? undefined,
+    ...(isSkillCategory(category) ? { category } : {}),
+    ...(params.get("featured") === "true" ? { featured: true } : {}),
+    verified: verified === "true" ? true : verified === "false" ? false : undefined,
+    sort: isOneOf(["installs", "updated", "name"] as const, sort) ? sort : undefined,
+    cursor: params.get("cursor") ?? undefined,
+    ...(limit > 0 ? { limit } : {}),
+  };
+}
+
 /** The answer of a catalog route, or a 404 for a listing that the fixtures do not have. */
 function catalogResponse(path: string, params: URLSearchParams): Response {
-  if (path === "/v1/skills/") {
-    const { items, nextCursor } = page(
-      STORY_MARKETPLACE_SKILLS,
-      params,
-      (skill) => `${skill.name} ${skill.description} ${skill.creatorName}`,
-    );
-    return Response.json({ skills: items, nextCursor });
-  }
+  if (path === "/v1/skills/") return Response.json(mockSkillPage(STORY_MARKETPLACE_SKILLS, skillQuery(params)));
   if (path === "/v1/marketplace/agents/") {
     const { items, nextCursor } = page(
       STORY_MARKETPLACE_AGENTS,

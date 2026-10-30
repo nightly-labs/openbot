@@ -55,7 +55,8 @@ export interface BrowserDockProps {
   onValueChange: (value: string) => void;
   onSend: (text: string) => void;
   onStop: () => void;
-  onSteer: (deliveryId: string) => void;
+  /** Absent where the agent's provider cannot steer a running turn. */
+  onSteer?: ((deliveryId: string) => void) | undefined;
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
   onEdit: (delivery: QueueDelivery) => void;
@@ -233,7 +234,7 @@ export function BrowserDock(props: BrowserDockProps) {
       };
       box.style.visibility = "hidden";
     }
-    props.onSteer(id);
+    props.onSteer?.(id);
   };
 
   onSettled(() => () => {
@@ -316,7 +317,7 @@ export function BrowserDock(props: BrowserDockProps) {
                 skills={props.skills}
                 editingDeliveryId={props.editingDeliveryId}
                 canSteer={props.canSteer}
-                onSteer={steer}
+                onSteer={props.onSteer ? steer : undefined}
                 onRunAsTask={props.onRunAsTask}
                 onCancel={props.onCancel}
                 onEdit={props.onEdit}

@@ -303,19 +303,42 @@ capability (`packages/contracts/src/team-protocol/agent-tasks-v1.ts`, host route
 with the ids in the body. A member who can send a message to the agent can use them; no role is
 checked, and the member is the sender of a start and of a message. A hidden agent, or one that the
 peer cannot see, answers 404. A start and a message carry text only, and "Run in new thread" stays local.
+Files go through `agent-thread-files-v1`, below.
 The host sends the task events (`agent-tasks-changed`, `agent-task-conversation`,
 `agent-task-conversation-delta`) in their local shape, only to a peer with the capability, and not
 for a hidden agent. The optional `agent-threads-v1` capability
 (`packages/contracts/src/team-protocol/agent-threads-v1.ts`, host route
 `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{rename,delete}` with the
 agent and task ids in the body. They need the `chat` agent level; a hidden agent answers 404. A server
-with only `agent-tasks-v1` shows threads with no rename or delete. A server without either shows only
+with only `agent-tasks-v1` shows threads with no rename or delete. The optional `agent-thread-reads-v1`
+capability (`packages/contracts/src/team-protocol/agent-thread-reads-v1.ts`, host route
+`routeAgentThreadReads` in `src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{reads,read}`: the member's read
+mark of each open side thread, and a move of one. The marks are rows of `projection_thread_reads`
+under the side thread's own `threadId`, so the member's devices share them and no migration was
+needed. A desktop marks the open thread read while its window has focus (`markTaskRead` over IPC, or
+the route for a joined server); the phone marks it while the thread screen is in front, and shows a
+dot on the agent's name for an open thread with unread agent messages. The host sends no event when
+a mark moves; a client reads the marks again when `agent-tasks-changed` arrives or a screen that
+shows them opens. The optional `agent-thread-files-v1` capability
+(`packages/contracts/src/team-protocol/agent-thread-files-v1.ts`, host route `routeAgentThreadFiles` in
+`src/main/team-api/route-agent-threads.ts`) adds `POST /v1/agent-threads/{start-with-files,send-with-files}`:
+a start or a message with up to 10 attachment drafts that the member uploaded with `POST /v1/attachments`,
+and text that can be empty. The answers are the frozen `agent-tasks-v1` task and receipt. The team client
+uses these routes only for a message with files, so a message without files still works on an older host.
+A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
+and the phone shows the plus in the thread composer only on a server that has it. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`
 column, and the next turn of the task clears it. The thread shows it after a restart too.
 
-On desktop and the web, a task opens as a thread in the chat header. The phone uses the section and title rules in `@openbot/team-client/agent-tasks`.
+On desktop and the web, a task opens as a thread in the chat header. The Tasks rail page
+(`packages/ui/src/features/tasks/TasksPage.tsx`, `src/renderer/src/features/tasks/`) lists the tasks of all
+agents of the active server and opens a task beside the list in `AgentThreadView`, the view of a thread tab.
+The panel archives, restores and opens the task in the chat. A read there marks the thread read. A running
+task that waits for an approval, a question or a browser takeover goes to Needs you; the chat answers a
+question or takeover, so the panel links there. The Tasks page and the phone share the section and title
+rules in `@openbot/team-client/agent-tasks`.
 On the phone, the server drawer opens the Tasks screen (`apps/mobile/src/app/(app)/server-tasks.tsx`) when
 the host serves the capability. A task opens as a full screen (`apps/mobile/src/app/(app)/task/[taskId].tsx`)
 with the message list and header of the agent's chat, the task actions in place of the browser
@@ -660,7 +683,8 @@ in `.agents/skills` and `.claude/skills` that OpenBot does not manage. Workspace
 and leave out `.openbot/`, the skill folders, links, and every path `isUnsafeArchivePath` refuses
 (`.git`, `node_modules`, `.env*`, private keys, nested archives). Server settings are optional: MCP servers,
 custom model providers, custom ACP agents (as a warning, see below), sidebar sections and routine flows
-between exported agents.
+between exported agents. A custom provider model keeps its optional `contextWindow`; an app that
+does not know the field ignores it.
 
 No secret is in the file: MCP variable and header values are empty, custom providers have no key or
 headers, custom agents keep only the names of their variables, and `signedIn` lists provider ids,

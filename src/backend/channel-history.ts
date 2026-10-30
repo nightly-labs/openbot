@@ -99,6 +99,7 @@ export class ChannelHistory {
       agent: AgentSummary,
       lead: AgentSummary | undefined,
       delivered: DeliveredChannelContext | null,
+      peers: readonly string[],
       requestedBudget = CONTEXT_CHARACTERS,
     ): Effect.fn.Return<
       { text: string; delta: string | null; throughSequence: number; summaryVersion: number },
@@ -229,6 +230,11 @@ export class ChannelHistory {
             ? `Recent shared messages:\n${render(recent)}`
             : `Shared messages after the ones you already have (after ${seen}):\n${render(recent.filter((message) => message.sequence > seen))}`,
           `Current assignment:\n${task.instruction}\nExpected result: ${task.expectedResult}`,
+          ...(peers.length
+            ? [
+                `Other members answer this same request separately: ${peers.join(", ")}. Give your own view from your own role. Do not answer for them, wait for them, or repeat what they already said.`,
+              ]
+            : []),
         ].join("\n\n");
       const text = packet(null);
       // The delta has less history than the complete packet, so it fits when that one fits.
@@ -237,7 +243,7 @@ export class ChannelHistory {
       const delta = delivered ? packet(delivered.throughSequence) : null;
       return { text, delta, throughSequence, summaryVersion: summary.version };
     },
-    (operation, _task, _agent, _lead, _delivered, _requestedBudget?: number) =>
+    (operation, _task, _agent, _lead, _delivered, _peers, _requestedBudget?: number) =>
       operation.pipe(Effect.provide(this.#layer)),
   );
 }

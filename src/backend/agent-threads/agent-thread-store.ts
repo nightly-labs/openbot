@@ -92,6 +92,18 @@ export class AgentThreadStore {
     ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
   }
 
+  /** The agent id and thread id of every open side thread, the newest first. */
+  openExecutionThreads(): Array<{ id: string; threadId: string }> {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT agent_id, thread_id FROM projection_agent_threads
+           WHERE archived_at IS NULL ORDER BY updated_at DESC, thread_id`,
+        )
+        .all(),
+    ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
+  }
+
   /** The task ids of the open threads of this agent, oldest first, so a thread that waits longer starts first. */
   openTaskIds(agentId: string): string[] {
     return databaseRows(

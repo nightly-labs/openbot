@@ -87,6 +87,7 @@ export interface VoiceStoreDeps {
     voiceMeterStop: (() => void) | undefined;
     voiceAgentId: string | undefined;
     voiceServerId: string | undefined;
+    voiceThreadSend: boolean;
   };
   voicePhase: () => "idle" | "preparing" | "requesting" | "recording" | "transcribing";
   setVoicePhase: (phase: "idle" | "preparing" | "requesting" | "recording" | "transcribing") => void;
@@ -94,6 +95,9 @@ export interface VoiceStoreDeps {
   voiceElapsedSeconds: () => number;
   setVoiceElapsedSeconds: (seconds: number) => void;
   setVoiceLiveTranscript: (transcript: VoiceLiveTranscript | null) => void;
+  /** The side thread draft that the last recording was started for. It stays set after the recording. */
+  voiceThreadKey: () => string | undefined;
+  setVoiceThreadKey: (key: string | undefined) => void;
   setVoiceLevels: (levels: number[]) => void;
   drafts: () => Record<string, ComposerDraft>;
   setDrafts: (update: (current: Record<string, ComposerDraft>) => Record<string, ComposerDraft>) => void;
@@ -106,6 +110,20 @@ export interface VoiceStoreDeps {
   /** Shows or ends the notice that the recording of this conversation stopped at the time limit. */
   setVoiceLimitReached?: (target: ConversationTarget, reached: boolean) => void;
   hooks: VoiceSubmitHooks;
+  /** The open side thread. A recording for it puts its text in the thread's draft. */
+  thread?: VoiceThreadHooks;
+}
+
+/** What a recording for a side thread needs. The agent's own chat is covered while a thread is open. */
+interface VoiceThreadHooks {
+  /** The draft key of the open side thread. Undefined while the agent's own chat is open. */
+  openDraftKey: () => string | undefined;
+  appendTranscript: (key: string, text: string) => void;
+  /** Sends the thread's draft, when that thread is still open. The message box stays locked until it ends. */
+  send: (key: string) => Promise<void>;
+  reportError: (message: string) => void;
+  /** The recording stopped at the time limit. */
+  reportLimit: () => void;
 }
 
 export function createVoiceStore(deps: VoiceStoreDeps) {
@@ -115,19 +133,29 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   /** The recording that is being transcribed stopped at the time limit, not at the user's click. */
   let stoppedAtLimit = false;
 
-  async function startVoiceRecording(): Promise<void> {
+  /** Starts a recording for the agent's own chat, or for the side thread whose draft is `threadKey`. */
+  async function startVoiceRecording(threadKey?: string): Promise<void> {
     const agentId = deps.props.agent?.id;
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || deps.voicePhase() !== "idle") return;
+    deps.setVoiceThreadKey(threadKey);
     // The user speaks again: the reply that is read aloud stops.
     stopSpokenReply();
     // The limit cues play up to two minutes after this click, and audio starts surely only from one.
     unlockCompletionSound();
     const target = { agentId, serverId };
-    deps.setVoiceLimitReached?.(target, false);
-    deps.clearConversationError(target);
+    const destination = { ...target, threadKey };
+    // The agent's own chat is covered by the thread, so a thread recording reports its errors there.
+    const fail = (message: string) =>
+      threadKey === undefined ? deps.setConversationError(target, message) : deps.thread?.reportError(message);
+    // A recording also ends when its message box closes or is covered before the microphone opens.
+    const stillOpen = () => deps.viewIsMounted() && deps.thread?.openDraftKey() === threadKey;
+    if (threadKey === undefined) {
+      deps.setVoiceLimitReached?.(target, false);
+      deps.clearConversationError(target);
+      deps.setComposerError(null);
+    }
     resources.voiceSubmitRequest = undefined;
-    deps.setComposerError(null);
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
     deps.setVoiceModelProgress(0);
@@ -139,11 +167,13 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       let streamed = false;
       // The settings answer at once; a download reports progress only after that.
       const [, modelStatus] = await Promise.all([
-        voice.getSettings().then((settings) => {
+        Promise.all([voice.getSettings(), voice.getServer()]).then(([settings, server]) => {
           preparingModelId = settings.modelId;
           const model = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
-          livePreview = model?.livePreview ?? true;
-          streamed = model?.kind === "cloud";
+          // The user's own server takes the whole recording once: it has no live preview or stream.
+          const own = server?.routes.dictation === true;
+          livePreview = !own && (model?.livePreview ?? true);
+          streamed = !own && model?.kind === "cloud";
         }),
         voice.prepareModel(),
       ]);
@@ -151,13 +181,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       if (modelStatus.phase !== "ready") {
         deps.setVoicePhase("idle");
         deps.setVoiceModelProgress(null);
-        deps.setConversationError(
-          target,
-          currentText().errorMessage(modelStatus.message, currentText().t("composer.voice.prepareFailed")),
-        );
+        fail(currentText().errorMessage(modelStatus.message, currentText().t("composer.voice.prepareFailed")));
         return;
       }
-      if (!deps.viewIsMounted()) {
+      if (!stillOpen()) {
         deps.setVoicePhase("idle");
         deps.setVoiceModelProgress(null);
         return;
@@ -165,12 +192,12 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       deps.setVoicePhase("requesting");
       deps.setVoiceModelProgress(null);
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      if (resources.voiceDisposed || !deps.viewIsMounted() || resources.voiceRequestGeneration !== generation) {
+      if (resources.voiceDisposed || !stillOpen() || resources.voiceRequestGeneration !== generation) {
         for (const track of stream.getTracks()) track.stop();
         if (!resources.voiceDisposed && resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
         return;
       }
-      cloud = streamed ? await openCloudStream(target, generation) : undefined;
+      cloud = streamed ? await openCloudStream(destination, fail, stillOpen, generation) : undefined;
       if (streamed && !cloud) {
         for (const track of stream.getTracks()) track.stop();
         return;
@@ -180,6 +207,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       resources.voiceRecorder = recorder;
       resources.voiceAgentId = agentId;
       resources.voiceServerId = serverId;
+      resources.voiceThreadSend = false;
       resources.voiceChunks = [];
       deps.setVoiceLiveTranscript(null);
       recorder.addEventListener("dataavailable", (event) => {
@@ -188,7 +216,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         resources.voiceChunks.push(event.data);
         // The last chunk arrives after Stop, and the final pass already covers it.
         if (livePreview && recorder.state === "recording" && !resources.voiceLiveRequest) {
-          const request = cloud ? streamNewAudio(recorder, cloud) : refreshLiveTranscript(recorder, target);
+          const request = cloud ? streamNewAudio(recorder, cloud) : refreshLiveTranscript(recorder, destination);
           resources.voiceLiveRequest = request.finally(() => {
             resources.voiceLiveRequest = undefined;
           });
@@ -214,7 +242,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       // A stream that no recording uses would take the next recording's audio.
       if (cloud && resources.voiceCloudStream === cloud) cancelCloudStream();
       if (resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
-      deps.setConversationError(target, voiceCaptureError(error));
+      fail(voiceCaptureError(error));
     }
   }
 
@@ -223,7 +251,9 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
    * the request was replaced; the phase and the error are then already set.
    */
   async function openCloudStream(
-    target: ConversationTarget,
+    destination: Omit<VoiceLiveTranscript, "text">,
+    fail: (message: string) => void,
+    stillOpen: () => boolean,
     generation: number,
   ): Promise<VoiceCloudStream | undefined> {
     const voice = conversationRuntime(deps.props).voice;
@@ -232,17 +262,17 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       ({ streamId } = await voice.startStream());
     } catch (error) {
       if (resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
-      deps.setConversationError(target, voiceTranscriptionError(error));
+      fail(voiceTranscriptionError(error));
       return undefined;
     }
-    if (resources.voiceDisposed || !deps.viewIsMounted() || resources.voiceRequestGeneration !== generation) {
+    if (resources.voiceDisposed || !stillOpen() || resources.voiceRequestGeneration !== generation) {
       void voice.cancelStream({ streamId }).catch(() => {});
       if (!resources.voiceDisposed && resources.voiceRequestGeneration === generation) deps.setVoicePhase("idle");
       return undefined;
     }
     const stopTranscript = voice.onStreamTranscript((event) => {
       if (event.streamId === streamId && !resources.voiceDisposed)
-        deps.setVoiceLiveTranscript({ ...target, text: event.text.trim() });
+        deps.setVoiceLiveTranscript({ ...destination, text: event.text.trim() });
     });
     const cloud = { streamId, sentSamples: 0, stopTranscript };
     resources.voiceCloudStream = cloud;
@@ -306,6 +336,13 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     stopVoiceStream();
   }
 
+  /** Stops a side thread's recording, and the thread sends its draft when the text is in it. */
+  function stopVoiceRecordingAndSend(): void {
+    if (deps.voicePhase() !== "recording" || deps.voiceThreadKey() === undefined) return;
+    resources.voiceThreadSend = true;
+    stopVoiceRecording();
+  }
+
   /** The recording reached the time limit: a chime says so, as the user may not look at the screen. */
   function stopVoiceRecordingAtLimit(): void {
     if (deps.voicePhase() !== "recording" || !resources.voiceRecorder) return;
@@ -324,6 +361,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceRecorder = undefined;
     resources.voiceAgentId = undefined;
     resources.voiceServerId = undefined;
+    resources.voiceThreadSend = false;
     resources.voiceChunks = [];
     resources.voiceSubmitRequest = undefined;
     recorder.stop();
@@ -392,12 +430,15 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
    * not say better, so it is dropped, and a result that arrives after the recorder stopped is
    * dropped too, because the final transcript is about to replace it.
    */
-  async function refreshLiveTranscript(recorder: MediaRecorder, target: ConversationTarget): Promise<void> {
+  async function refreshLiveTranscript(
+    recorder: MediaRecorder,
+    destination: Omit<VoiceLiveTranscript, "text">,
+  ): Promise<void> {
     try {
       const audio = await recordingToWav(new Blob(resources.voiceChunks, { type: recorder.mimeType }));
       const result = await conversationRuntime(deps.props).voice.transcribe({ audio });
       if (resources.voiceRecorder === recorder && !resources.voiceDisposed)
-        deps.setVoiceLiveTranscript({ ...target, text: result.text.trim() });
+        deps.setVoiceLiveTranscript({ ...destination, text: result.text.trim() });
     } catch {
       // The final transcription reports its own error.
     }
@@ -406,6 +447,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   async function finishVoiceRecording(mimeType: string): Promise<void> {
     const targetAgentId = resources.voiceAgentId;
     const targetServerId = resources.voiceServerId;
+    const threadKey = deps.voiceThreadKey();
+    const sendThread = resources.voiceThreadSend;
     const chunks = resources.voiceChunks;
     const submitRequest = resources.voiceSubmitRequest;
     const atLimit = stoppedAtLimit;
@@ -415,6 +458,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceRecorder = undefined;
     resources.voiceAgentId = undefined;
     resources.voiceServerId = undefined;
+    resources.voiceThreadSend = false;
     resources.voiceChunks = [];
     resources.voiceSubmitRequest = undefined;
     // The recorder also stops by itself, for example when the microphone is disconnected.
@@ -459,6 +503,14 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
       });
       if (resources.voiceDisposed) return;
+      // A thread's text stays in its draft, and the agent's own chat does not read the reply aloud.
+      if (threadKey !== undefined) {
+        deps.thread?.appendTranscript(threadKey, result.text);
+        if (atLimit) deps.thread?.reportLimit();
+        // As in the agent's own chat, the phase stays "transcribing" until the send ends, so a second Send waits.
+        if (sendThread) await deps.thread?.send(threadKey);
+        return;
+      }
       const recordingTarget = { agentId: targetAgentId, serverId: targetServerId };
       deps.clearConversationError(recordingTarget);
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
@@ -501,7 +553,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
         failure_code: "transcription_failed",
       });
-      if (!resources.voiceDisposed) {
+      if (!resources.voiceDisposed && threadKey !== undefined) deps.thread?.reportError(voiceTranscriptionError(error));
+      else if (!resources.voiceDisposed) {
         const target = { agentId: targetAgentId, serverId: targetServerId };
         deps.setConversationErrors((current) => ({
           ...current,
@@ -546,6 +599,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   return {
     startVoiceRecording,
     stopVoiceRecording,
+    stopVoiceRecordingAndSend,
     cancelVoiceRecording,
     finishVoiceRecording,
     stopVoiceStream,

@@ -26,4 +26,10 @@ export const messages = defineMessages("error.voice", {
   "error.voice.speech.timedOut": "Reading the reply aloud timed out.",
   "error.voice.speech.failed": "OpenBot could not read the reply aloud.",
   "error.voice.recordingNotKept": "OpenBot could not keep the voice recording.",
+  // The user's own voice server.
+  "error.voice.server.routeOff": "The voice server is not set up for this. Check Settings → Voice.",
+  "error.voice.server.keyRefused": "{host} refused the API key.",
+  "error.voice.server.invalidAnswer": "{host} did not send an OpenAI-compatible answer.",
+  "error.voice.server.invalidAudio": "{host} sent audio that OpenBot cannot play. Use a server that sends WAV.",
+  "error.voice.server.tooLarge": "The answer from {host} is too large.",
 });

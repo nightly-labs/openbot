@@ -1,5 +1,15 @@
-import type { BillingCurrency, BillingPlanId } from "@openbot/contracts/billing";
+import type { BillingCurrency, BillingInterval, BillingPlanId } from "@openbot/contracts/billing";
 import type { HostedServerCatalog } from "@openbot/contracts/hosted-servers";
+import {
+  LICENSE_BUNDLE_DISCOUNT_PERCENT,
+  LICENSE_INCLUDED_USERS,
+  LICENSE_MAX_USERS,
+  LICENSE_TRIAL_DATE_FORMAT,
+  licenseListMonthly,
+  licenseOrderFor,
+  licenseOrderMonthly,
+  stepLicenseUsers,
+} from "@openbot/contracts/license";
 import type { AppFormat, AppTextKey } from "@openbot/i18n";
 import {
   Badge,
@@ -7,6 +17,9 @@ import {
   Clock3,
   Gauge,
   HardDrive,
+  IconButton,
+  Minus,
+  Plus,
   RadioGroup,
   Select,
   SelectContent,
@@ -14,11 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
   Server,
+  ShieldCheck,
+  toast,
   UsersRound,
 } from "@openbot/ui";
-import { createDigitRoll } from "@openbot/ui/digit-roll";
-import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createMemo, For, Show, untrack } from "solid-js";
+import { RollingPrice } from "@openbot/ui/rolling-price";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
 export type HostedServerPlanId = BillingPlanId;
@@ -83,6 +97,84 @@ export function hostedPlanMonthlyPrice(
   currency: HostedCurrency,
 ): number {
   return billing === "yearly" ? plan.yearlyPrice[currency] / 12 : plan.monthlyPrice[currency];
+}
+
+const BILLING_INTERVAL = { monthly: "month", yearly: "year" } as const satisfies Record<
+  HostedServerBilling,
+  BillingInterval
+>;
+
+/** A price for one month: `regular` has no discount, `monthly` has the yearly and bundle discounts. */
+export interface HostedOrderPrice {
+  regular: number;
+  monthly: number;
+}
+
+/**
+ * The price for one month of a server and, for the people at work, its license at the bundle price. 0
+ * people is personal use: the server alone.
+ */
+export function hostedOrderMonthlyPrice(
+  plan: HostedServerPlan,
+  billing: HostedServerBilling,
+  currency: HostedCurrency,
+  people: number,
+): HostedOrderPrice {
+  const regular = plan.monthlyPrice[currency];
+  const monthly = hostedPlanMonthlyPrice(plan, billing, currency);
+  if (people === 0) return { regular, monthly };
+  const license = licenseOrderFor(people);
+  const stripe = HOSTED_BILLING_CURRENCY[currency];
+  const bundle = { tier: license.tier, interval: BILLING_INTERVAL[billing], bundle: true };
+  return {
+    regular: regular + licenseListMonthly(license.tier, license.users, stripe) / 100,
+    monthly: monthly + licenseOrderMonthly(bundle, license.users, stripe) / 100,
+  };
+}
+
+/** The counts of people at work that the dialog sells a license for. */
+const WORK_PEOPLE = Array.from({ length: LICENSE_MAX_USERS }, (_, index) => index + 1);
+
+/**
+ * The smallest yearly discount of a server with its license, in whole percent, for each count of people
+ * and each plan that fits them. The license has a smaller discount than the server, so the text is true
+ * for each order, and it does not change with the count.
+ */
+export function hostedWorkYearlyDiscountPercent(plans: readonly HostedServerPlan[], currency: HostedCurrency): number {
+  const discounts = WORK_PEOPLE.flatMap((people) =>
+    plans
+      .filter((plan) => plan.memberLimit >= people)
+      .map((plan) => {
+        // In cents, so that the division does not get a floating point error.
+        const month = Math.round(hostedOrderMonthlyPrice(plan, "monthly", currency, people).monthly * 100);
+        const year = Math.round(hostedOrderMonthlyPrice(plan, "yearly", currency, people).monthly * 100);
+        return month > 0 ? Math.floor(((month - year) * 100) / month) : 0;
+      }),
+  );
+  return discounts.length === 0 ? 0 : Math.max(0, Math.min(...discounts));
+}
+
+/**
+ * The longest old and new price texts of all orders that the plans can show: each billing, personal use,
+ * and each count of people at work on each plan that fits them.
+ */
+export function hostedLongestOrderPrice(
+  plans: readonly HostedServerPlan[],
+  currency: HostedCurrency,
+  format: AppFormat,
+): { was: string; now: string } {
+  const longest = { was: "", now: "" };
+  for (const billing of BILLING_OPTIONS)
+    for (const people of [0, ...WORK_PEOPLE])
+      for (const plan of plans) {
+        if (plan.memberLimit < people) continue;
+        const price = hostedOrderMonthlyPrice(plan, billing, currency, people);
+        const was = formatHostedPrice(format, price.regular, currency);
+        const now = formatHostedPrice(format, price.monthly, currency);
+        if (was.length > longest.was.length) longest.was = was;
+        if (now.length > longest.now.length) longest.now = now;
+      }
+  return longest;
 }
 
 /** The plans of the Stripe catalog. The catalog has amounts in cents; the plans show whole units. */
@@ -166,6 +258,8 @@ interface HostedCurrencySelectProps {
   currency: HostedCurrency;
   onChange: (currency: HostedCurrency) => void;
   disabled?: boolean | undefined;
+  /** The account pays its plans in this currency, so it shows as text, not as a choice. */
+  locked?: boolean | undefined;
   /** The dialog element the popover portals into, so that it stays inside the dialog's focus trap. */
   mount?: HTMLElement | undefined;
 }
@@ -174,21 +268,23 @@ interface HostedCurrencySelectProps {
 export function HostedCurrencySelect(props: HostedCurrencySelectProps) {
   const { t } = useText();
   return (
-    <Select<HostedCurrency>
-      class="hosted-currency"
-      options={CURRENCY_OPTIONS}
-      value={props.currency}
-      disabled={props.disabled ?? false}
-      onChange={(currency) => currency && props.onChange(currency)}
-      placement="bottom-start"
-      sameWidth={false}
-      itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{itemProps.item.rawValue}</SelectItem>}
-    >
-      <SelectTrigger size="sm" aria-label={t("server.add.currency.label")}>
-        <SelectValue<HostedCurrency>>{(state) => state.selectedOption()}</SelectValue>
-      </SelectTrigger>
-      <SelectContent mount={props.mount} />
-    </Select>
+    <Show when={!props.locked} fallback={<span class="hosted-currency hosted-currency-locked">{props.currency}</span>}>
+      <Select<HostedCurrency>
+        class="hosted-currency"
+        options={CURRENCY_OPTIONS}
+        value={props.currency}
+        disabled={props.disabled ?? false}
+        onChange={(currency) => currency && props.onChange(currency)}
+        placement="bottom-start"
+        sameWidth={false}
+        itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{itemProps.item.rawValue}</SelectItem>}
+      >
+        <SelectTrigger size="sm" aria-label={t("server.add.currency.label")}>
+          <SelectValue<HostedCurrency>>{(state) => state.selectedOption()}</SelectValue>
+        </SelectTrigger>
+        <SelectContent mount={props.mount} />
+      </Select>
+    </Show>
   );
 }
 
@@ -203,15 +299,30 @@ interface HostedServerPlansProps {
   pendingPlan?: HostedServerPlanId | null | undefined;
   /** Disables all buttons, such as when the account has the maximum number of servers. */
   disabled?: boolean | undefined;
+  /**
+   * The people at work, when the plans also sell a license. 0 is personal use: the server alone. Each
+   * plan that fits the people shows the server and its license together; the other plans are disabled.
+   */
+  people?: number | undefined;
+  /**
+   * The longest old and new price that the plans can show, from `hostedLongestOrderPrice`. When it does
+   * not fit on one line, each plan puts the old price on its own line, so the plans keep their shape
+   * when the people or the billing change.
+   */
+  longestPrice?: { was: string; now: string } | undefined;
+  /** The license that the plans sell is free until this time, in milliseconds since the epoch. */
+  licenseTrialEnd?: number | undefined;
 }
 
 /** A plan price: "zł 90" in place of "PLN 90", so that the old and the new price fit in a column. */
 export function formatHostedPrice(format: AppFormat, value: number, currency: HostedCurrency): string {
+  // "€103.50", not "€103.5": a price with cents shows two digits.
+  const whole = Math.round(value * 100) % 100 === 0;
   return format.number(value, {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: 0,
+    minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: 2,
   });
 }
@@ -241,21 +352,46 @@ export function hostedPriceLength(
 export function HostedServerPlans(props: HostedServerPlansProps) {
   const { t, format } = useText();
   const price = (value: number) => formatHostedPrice(format, value, props.currency);
+  const people = () => props.people ?? 0;
+  const [stacked, setStacked] = createSignal(false);
+  /** The license of the order, as the summary of a plan says it. */
+  const licenseLine = () => {
+    const license = licenseOrderFor(people());
+    return license.tier === "team"
+      ? t("billing.order.summary.license", { count: license.users })
+      : t("billing.order.summary.starterLicense");
+  };
+  const licenseIncluded = () => {
+    const end = props.licenseTrialEnd;
+    if (end === undefined) return t("server.add.license.included", { license: licenseLine() });
+    return t("server.add.license.includedTrial", {
+      license: licenseLine(),
+      date: format.date(end, LICENSE_TRIAL_DATE_FORMAT),
+    });
+  };
 
   return (
-    <ul class="hosted-plans" aria-label={t("settings.hostedServers.plan.label")}>
+    <ul
+      class="hosted-plans"
+      aria-label={t("settings.hostedServers.plan.label")}
+      data-license={props.people === undefined ? undefined : ""}
+      data-stacked={stacked() ? "" : undefined}
+    >
       <For each={props.plans}>
         {(plan, index) => {
           const recommended = () => plan.id === props.recommended;
-          const yearly = () => props.billing === "yearly";
-          const regular = () => plan.monthlyPrice[props.currency];
-          const monthly = () => hostedPlanMonthlyPrice(plan, props.billing, props.currency);
+          const fits = () => plan.memberLimit >= people();
+          const work = () => people() > 0 && fits();
+          const order = () => hostedOrderMonthlyPrice(plan, props.billing, props.currency, fits() ? people() : 0);
+          const regular = () => order().regular;
+          const monthly = () => order().monthly;
+          const discounted = () => monthly() < regular();
           return (
             <li
               class="hosted-plan"
               data-recommended={recommended() ? "" : undefined}
               data-dimmed={
-                plan.soldOut || (props.pendingPlan != null && props.pendingPlan !== plan.id) ? "" : undefined
+                plan.soldOut || (props.pendingPlan != null && props.pendingPlan !== plan.id) || !fits() ? "" : undefined
               }
               style={{ "--plan-index": index() }}
             >
@@ -265,19 +401,31 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                   when={!plan.soldOut}
                   fallback={<Badge variant="outline">{t("settings.hostedServers.plan.soldOut")}</Badge>}
                 >
-                  <Show when={recommended()}>
-                    <Badge class="hosted-plan-badge" variant="outline">
-                      {t("settings.hostedServers.plan.recommended")}
-                    </Badge>
+                  <Show
+                    when={work()}
+                    fallback={
+                      <Show when={recommended()}>
+                        <Badge class="hosted-plan-badge" variant="outline">
+                          {t("settings.hostedServers.plan.recommended")}
+                        </Badge>
+                      </Show>
+                    }
+                  >
+                    <span class="hosted-plan-bundle">
+                      {t("server.add.license.bundle", { percent: LICENSE_BUNDLE_DISCOUNT_PERCENT })}
+                    </span>
                   </Show>
                 </Show>
               </div>
               <p class="hosted-plan-price">
-                {/* Always in the layout, so that it can grow in when the yearly price shows. */}
+                <Show when={index() === 0 ? props.longestPrice : undefined}>
+                  {(longest) => <LongestPrice was={longest().was} now={longest().now} onStackedChange={setStacked} />}
+                </Show>
+                {/* Always in the layout, so that it can grow in when a discount shows. */}
                 <span
                   class="hosted-plan-was"
-                  data-shown={yearly() ? "" : undefined}
-                  aria-hidden={yearly() ? undefined : "true"}
+                  data-shown={discounted() ? "" : undefined}
+                  aria-hidden={discounted() ? undefined : "true"}
                 >
                   <span class="hosted-plan-was-inner">
                     <span class="sr-only">{t("server.add.regularPrice", { price: price(regular()) })}</span>
@@ -305,14 +453,20 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                   </p>
                 )}
               </Show>
-              <p class="hosted-plan-summary">{t(PLAN_TEXT[plan.id].summary)}</p>
+              {/* For work, the summary says that the price includes the license. */}
+              <p class="hosted-plan-summary" data-license={work() ? "" : undefined}>
+                <Show when={work()} fallback={t(PLAN_TEXT[plan.id].summary)}>
+                  <ShieldCheck aria-hidden="true" />
+                  {licenseIncluded()}
+                </Show>
+              </p>
               <Button
                 class="hosted-plan-choose"
                 variant={recommended() ? "default" : "secondary"}
                 fullWidth
                 loading={props.pendingPlan === plan.id}
                 loadingLabel={t("settings.hostedServers.creating")}
-                disabled={props.disabled || plan.soldOut || props.pendingPlan != null}
+                disabled={props.disabled || plan.soldOut || props.pendingPlan != null || !fits()}
                 onClick={() => props.onChoose(plan.id)}
               >
                 {t("server.add.choosePlan", { plan: t(PLAN_TEXT[plan.id].name) })}
@@ -334,6 +488,27 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                   <HardDrive aria-hidden="true" />
                   {t("settings.hostedServers.plan.disk", { count: plan.diskGb })}
                 </li>
+                {/* For work, the summary already names the license of the order. An account with a license buys no license. */}
+                <Show when={props.people !== undefined && !work()}>
+                  <li>
+                    <ShieldCheck aria-hidden="true" />
+                    {/* A server too small for the Team license sells the Starter license, at the bundle price of the period. */}
+                    <Show
+                      when={plan.memberLimit < LICENSE_INCLUDED_USERS}
+                      fallback={t("settings.hostedServers.plan.license.team")}
+                    >
+                      {t("settings.hostedServers.plan.license.starter", {
+                        price: price(
+                          licenseOrderMonthly(
+                            { tier: "starter", interval: BILLING_INTERVAL[props.billing], bundle: true },
+                            1,
+                            HOSTED_BILLING_CURRENCY[props.currency],
+                          ) / 100,
+                        ),
+                      })}
+                    </Show>
+                  </li>
+                </Show>
                 <li>
                   <Gauge aria-hidden="true" />
                   {plan.relativeSpeed === 1
@@ -350,47 +525,110 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
 }
 
 /**
- * The price, with digits that roll to each new value, as in the task list. They fall when the
- * price goes down and rise when it goes up. Assistive technology reads the plain text.
+ * A hidden copy of the longest price, as wide as the price line of the first plan. When it does not fit on
+ * one line, all plans put the old price on its own line.
  */
-function RollingPrice(props: { value: number; format: (value: number) => string }) {
-  const roll = createDigitRoll(() => props.value, { settleMs: 0, animate: () => !prefersReducedMotion() });
-  let previous = untrack(roll.displayed);
-  const direction = createMemo(() => {
-    const next = roll.displayed();
-    const result = next < previous ? -1 : 1;
-    previous = next;
-    return result;
+function LongestPrice(props: { was: string; now: string; onStackedChange: (stacked: boolean) => void }) {
+  const { t } = useText();
+  let line: HTMLSpanElement | undefined;
+  let now: HTMLSpanElement | undefined;
+  onSettled(() => {
+    const resize = new ResizeObserver(() => props.onStackedChange((now?.offsetTop ?? 0) > 0));
+    if (line) resize.observe(line);
+    return () => resize.disconnect();
   });
-  // The digits follow the displayed value, so that the new digits do not show before the roll starts.
-  const characters = () => props.format(roll.displayed()).split("");
-  // The last two digits trail the others, so the number that changes most lands last.
-  const stagger = (index: number) => {
-    const digits = characters().flatMap((character, position) => (isDigit(character) ? [position] : []));
-    if (index === digits.at(-1)) return "2";
-    if (index === digits.at(-2)) return "1";
-    return undefined;
-  };
   return (
-    <span class="hosted-plan-amount">
-      <span class="sr-only">{props.format(props.value)}</span>
-      <span ref={roll.ref} class="t-digit-group" style={{ "--digit-dir-y": direction() }} aria-hidden="true">
-        {/* Only the digits roll. The currency sign stays still. */}
-        <For each={characters()} keyed={false}>
-          {(character, index) => (
-            <span
-              class={isDigit(character()) ? "t-digit" : undefined}
-              data-stagger={isDigit(character()) ? stagger(index) : undefined}
-            >
-              {character()}
-            </span>
-          )}
-        </For>
+    <span ref={line} class="hosted-plan-longest" aria-hidden="true">
+      <span class="hosted-plan-was" data-shown="">
+        <span class="hosted-plan-was-inner">
+          <s>{props.was}</s>
+        </span>
+      </span>
+      <span ref={now} class="hosted-plan-now">
+        <span class="hosted-plan-amount">{props.now}</span>
+        <span class="hosted-plan-period">{t("settings.hostedServers.plan.perMonth")}</span>
       </span>
     </span>
   );
 }
 
-function isDigit(character: string) {
-  return /\d/u.test(character);
+/** Personal use buys the server alone. Work adds a license to the server. */
+export function HostedUseSwitch(props: {
+  work: boolean;
+  onChange: (work: boolean) => void;
+  disabled?: boolean | undefined;
+}) {
+  const { t } = useText();
+  return (
+    <RadioGroup.Root
+      class="hosted-billing hosted-use"
+      data-use={props.work ? "work" : "personal"}
+      aria-label={t("server.add.use.label")}
+      value={props.work ? "work" : "personal"}
+      disabled={props.disabled ?? false}
+      onChange={(value) => props.onChange(value === "work")}
+    >
+      <RadioGroup.Item class="hosted-billing-option" value="personal">
+        <RadioGroup.ItemInput />
+        <RadioGroup.ItemControl class="hosted-billing-control">
+          <RadioGroup.ItemLabel>{t("server.add.use.personal")}</RadioGroup.ItemLabel>
+        </RadioGroup.ItemControl>
+      </RadioGroup.Item>
+      <RadioGroup.Item class="hosted-billing-option" value="work">
+        <RadioGroup.ItemInput />
+        <RadioGroup.ItemControl class="hosted-billing-control">
+          <RadioGroup.ItemLabel>{t("server.add.use.work")}</RadioGroup.ItemLabel>
+        </RadioGroup.ItemControl>
+      </RadioGroup.Item>
+    </RadioGroup.Root>
+  );
+}
+
+const LICENSE_MINIMUM_TOAST = "hosted-license-minimum";
+
+/**
+ * The people at work, under the plans. It stays in place for personal use, disabled, so that the dialog
+ * does not change size.
+ */
+export function HostedLicensePeople(props: {
+  value: number;
+  /** The fewest people to choose. */
+  min: number;
+  /** The people who use the account's servers now. They set the minimum; "Fewer" there tells why. */
+  used: number;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  const { t } = useText();
+  function fewer(): void {
+    if (props.value > props.min) props.onChange(stepLicenseUsers(props.value, -1));
+    else toast(t("server.add.license.minimum", { count: props.used }), { id: LICENSE_MINIMUM_TOAST });
+  }
+  return (
+    <div class="hosted-license-people" data-disabled={props.disabled ? "" : undefined}>
+      <span>{t("server.add.license.people")}</span>
+      <fieldset class="hosted-license-stepper">
+        <legend class="sr-only">{t("billing.order.license.members")}</legend>
+        <IconButton
+          label={t("billing.order.license.fewer")}
+          variant="outline"
+          size="icon-sm"
+          disabled={props.disabled || props.value <= 1}
+          onClick={fewer}
+        >
+          <Minus aria-hidden="true" />
+        </IconButton>
+        <span aria-live="polite">{t("billing.order.memberCount", { count: props.value })}</span>
+        <IconButton
+          label={t("billing.order.license.more")}
+          variant="outline"
+          size="icon-sm"
+          disabled={props.disabled || props.value >= LICENSE_MAX_USERS}
+          onClick={() => props.onChange(stepLicenseUsers(props.value, 1))}
+        >
+          <Plus aria-hidden="true" />
+        </IconButton>
+      </fieldset>
+    </div>
+  );
 }

@@ -61,6 +61,7 @@ import {
   type MachineAlertEvent,
   machineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_DEFAULT_ROUTES,
@@ -102,6 +103,7 @@ import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
+import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -586,6 +588,9 @@ const machineMetrics = {
   checkedAt: "2026-10-27T12:00:00.000Z",
 };
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
+// The real memory review store on a temporary file, as the host keeps it.
+const memoryReviewFile = join(root, "memory-review.json");
+const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 const readMachine = () =>
   Effect.sync(() => {
     record("machineMetrics");
@@ -676,6 +681,7 @@ try {
         busyMessageMode: { get: () => ({ mode: "queue" }) },
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
       }),
+      memoryReview,
       // The setup file in memory. The host writes it and tells the agent service, as `saveSetup` does.
       defaultProvider: {
         get: () => Effect.sync(() => providerDefault),
@@ -1617,6 +1623,74 @@ try {
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,
       [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Memory review (memory-review-v1) ----
+  {
+    const capabilities = [MEMORY_REVIEW_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 7 });
+    check(
+      "the host advertises memory-review-v1",
+      list(field(compatibility.body, "capabilities")).includes(MEMORY_REVIEW_CAPABILITY),
+      summary(compatibility),
+    );
+    const adminRead = await call("POST", MEMORY_REVIEW_ROUTES.settings, { token: adaToken, json: {}, capabilities });
+    check(
+      "an admin reads the default memory review of 20 turns and the values the host permits",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, { interval: 20, choices: [0, 10, 20, 40] }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", MEMORY_REVIEW_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the memory review routes without the capability get 400 memoryReviewUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.memoryReviewUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", MEMORY_REVIEW_ROUTES.settings, { token: bobToken, json: {}, capabilities });
+    const memberSet = await call("POST", MEMORY_REVIEW_ROUTES.update, {
+      token: bobToken,
+      json: { interval: 0 },
+      capabilities,
+    });
+    const invalid = await call("POST", MEMORY_REVIEW_ROUTES.update, {
+      token: adaToken,
+      json: { interval: 15 },
+      capabilities,
+    });
+    check(
+      "a member cannot read or set the memory review, the host refuses a value it does not permit, and nothing is saved",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        memoryReview.get().interval === 20 &&
+        !existsSync(memoryReviewFile),
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const off = await call("POST", MEMORY_REVIEW_ROUTES.update, {
+      token: adaToken,
+      json: { interval: 0 },
+      capabilities,
+    });
+    const reloaded = new MemoryReviewPreferenceStore(memoryReviewFile);
+    await runCauseEffect(reloaded.load());
+    check(
+      "an admin turns the memory review off; the host saves it and a restart reads it",
+      off.status === 200 &&
+        isDeepStrictEqual(off.body, { interval: 0, choices: [0, 10, 20, 40] }) &&
+        memoryReview.get().interval === 0 &&
+        reloaded.get().interval === 0,
+      summary(off),
+    );
+    const on = await call("POST", MEMORY_REVIEW_ROUTES.update, {
+      token: adaToken,
+      json: { interval: 40 },
+      capabilities,
+    });
+    check(
+      "an admin turns the memory review on again at 40 turns",
+      on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
+      summary(on),
     );
   }
 

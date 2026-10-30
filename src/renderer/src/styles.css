@@ -24,6 +24,7 @@
 @import "./features/account/account-update-island.css";
 @import "@openbot/ui/features/servers/join-server-dialog.css";
 @import "@openbot/ui/features/servers/add-server-dialog.css";
+@import "@openbot/ui/features/servers/create-local-server-dialog.css";
 @import "@openbot/ui/features/servers/hosted-server-upsell.css";
 @import "@openbot/ui/features/servers/restart-server-dialog.css";
 @import "@openbot/ui/features/servers/server-roles.css";
@@ -40,6 +41,7 @@
 @import "@openbot/ui/features/usage/agent-usage-report.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
+@import "@openbot/ui/features/tasks/tasks.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";
 @import "@openbot/ui/features/import/agent-import.css";

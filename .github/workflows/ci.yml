@@ -325,6 +325,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:sign-in-relay-paste
 
+      - name: Run the sign-in relay replay E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:sign-in-relay-replay
+
       - name: Run the server mute and unmute E2E test
         if: ${{ !cancelled() }}
         run: bun run test:server-mute
@@ -405,6 +409,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
 
+      - name: Run the usage read pacing E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:usage-read-pacing
+
       - name: Run the routine session E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-fresh-session
@@ -461,6 +469,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:mcp-sign-in-client-refused
 
+      - name: Run the unreadable MCP server row E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-server-unreadable-row
+
       - name: Run the agent bulk settings E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-update-agents
@@ -510,6 +522,7 @@ jobs:
             .openbot-build/team-api-legacy-clients-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
+            .openbot-build/sign-in-relay-replay-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/routine-pause-resume-e2e/
@@ -529,6 +542,7 @@ jobs:
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
+            .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
             .openbot-build/agent-webhook-routine-e2e/
@@ -542,6 +556,7 @@ jobs:
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
+            .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
             .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
@@ -587,6 +602,10 @@ jobs:
       - name: Run the Antigravity login shell PATH E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity:login-path
+
+      - name: Run the Antigravity MCP load failure E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-mcp-load-failure
 
       - name: Run the ACP additional directories E2E test
         if: ${{ !cancelled() }}
@@ -648,6 +667,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-stream-closed
 
+      - name: Run the Cursor model set E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cursor-model-set
+
       - name: Run the Cline free models E2E test
         if: ${{ !cancelled() }}
         run: bun run test:cline-free-models
@@ -666,6 +689,7 @@ jobs:
             .openbot-build/custom-acp-agent-login-path-e2e/
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
+            .openbot-build/antigravity-mcp-load-failure-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
@@ -681,6 +705,7 @@ jobs:
             .openbot-build/opencode-thought-interleave-e2e/
             .openbot-build/opencode-background-turn-e2e/
             .openbot-build/cursor-stream-closed-e2e/
+            .openbot-build/cursor-model-set-e2e/
             .openbot-build/cline-free-models-e2e/
             .openbot-build/provider-transcript-replay-e2e/
           if-no-files-found: ignore
@@ -744,6 +769,34 @@ jobs:
 
       - name: Validate the remote Compose files
         run: bun run remote:check:compose
+
+  mobile-share-sender-e2e:
+    # Builds the page that the iOS share extension runs and drives it in the runner's Chrome, as the
+    # extension's web view does. It needs no host, display or external service.
+    name: Share extension page E2E
+    needs: detect
+    if: needs.detect.outputs.surfaces == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Run the share extension page E2E test
+        run: bun run test:mobile-share-sender
+
+      - name: Upload the share extension page E2E report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-share-sender-e2e
+          path: .openbot-build/mobile-share-sender-e2e/report.json
+          if-no-files-found: ignore
 
   api:
     # `check:api` ends with `api:build:check`, the preview build of the Worker. For a pull request
@@ -827,7 +880,7 @@ jobs:
     # fails this one.
     name: All required checks pass
     if: always()
-    needs: [detect, check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, surfaces, api, storybook]
+    needs: [detect, check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, surfaces, mobile-share-sender-e2e, api, storybook]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -853,7 +906,7 @@ jobs:
     # `apps/auth-api`, which `api` already covers: mobile, the site router, the
     # team client and the remote stack all consume the account API, so a red
     # Surfaces is the signal that this deploy is the thing about to break them.
-    needs: [check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, api, storybook, surfaces]
+    needs: [check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, api, storybook, surfaces, mobile-share-sender-e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: cloudflare-production

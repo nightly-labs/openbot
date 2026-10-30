@@ -341,7 +341,9 @@ interface PeerState {
   answeredRequest: boolean;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
-  hostProtocol?: number;
+  hostProtocol: number | undefined;
+  /** The compatibility read in flight. A request waits for it when the host protocol is not known. */
+  hostProtocolRead?: Deferred.Deferred<void>;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
@@ -444,6 +446,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
   // A failed attempt keeps its session for the next attempt on the same host. Ending it each time
   // made every recovery attempt a create, a ticket and an end on the account Worker.
   let retainedSession: { hostId: string; sessionId: string } | null = null;
+  // A new peer of a known host sends the capabilities of its last protocol. With the bootstrap
+  // capabilities, the host would hide the agents of the providers that protocol 7 does not know.
+  const hostProtocols = new Map<string, number>();
 
   return {
     async sendHostStreamData(data: string | ArrayBuffer) {
@@ -826,6 +831,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         signalReady: false,
         answeredRequest: false,
         lastSignalClose: null,
+        hostProtocol: hostProtocols.get(hostId),
       };
       peer = state;
       const connected = Deferred.makeUnsafe<void, RemotePeerError>();
@@ -1274,12 +1280,17 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
             state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV7Base(body))).protocol.maximum;
+            hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({
             status: frame.result.status,
             body: sideRoute
               ? yield* peerDecode(() =>
-                  sideRoute.response(pending.path, status, body, { historyExtent: true, channelAttention: true }),
+                  sideRoute.response(pending.path, status, body, {
+                    historyExtent: true,
+                    channelAttention: true,
+                    agentTaskUiBlocks: true,
+                  }),
                 )
               : yield* peerDecode(() =>
                   decodeTeamProtocolV8WebRtcHttpResponse(pending.method, pending.path, status, body),
@@ -1318,7 +1329,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         diagnose(state, "event-gap", `expected ${state.lastEventSequence + 1}, got ${frame.sequence}`);
         return yield* new RemotePeerError({ message: sourceText("error.remote.eventStreamGap") });
       }
-      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload));
+      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }));
       const decoded = channel
         ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
         : yield* peerDecode(() => decodeTeamProtocolV8CurrentEvent(frame));
@@ -1400,6 +1411,12 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
         return yield* new RemotePeerError({ message: sourceText("error.remote.selectedServerOffline") });
       }
+      const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
+      const protocolRead = checksConnection ? Deferred.makeUnsafe<void>() : null;
+      if (protocolRead) state.hostProtocolRead = protocolRead;
+      // A read sent with the compatibility read must not go out with the bootstrap capabilities.
+      else if (state.hostProtocol === undefined && state.hostProtocolRead)
+        yield* Deferred.await(state.hostProtocolRead);
       const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
@@ -1421,7 +1438,6 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
-        const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -1519,7 +1535,14 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
         return response;
-      }).pipe(Effect.ensuring(Effect.sync(() => delivery?.stop())));
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            delivery?.stop();
+            if (protocolRead) Deferred.doneUnsafe(protocolRead, Effect.void);
+          }),
+        ),
+      );
     })();
   }
 

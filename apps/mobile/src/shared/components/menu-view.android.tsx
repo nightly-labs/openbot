@@ -1,6 +1,7 @@
 import type { MenuAction, MenuComponentProps, MenuComponentRef } from "@expo/ui/community/menu";
 import { Menu, type MenuTriggerRef, Separator, SubMenu, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
+import Archive from "lucide-react-native/icons/archive";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
@@ -22,6 +23,8 @@ import Folder from "lucide-react-native/icons/folder";
 import Globe from "lucide-react-native/icons/globe";
 import Info from "lucide-react-native/icons/info";
 import LayoutGrid from "lucide-react-native/icons/layout-grid";
+import Link from "lucide-react-native/icons/link";
+import List from "lucide-react-native/icons/list";
 import ListChecks from "lucide-react-native/icons/list-checks";
 import LogOut from "lucide-react-native/icons/log-out";
 import MailBadge from "lucide-react-native/icons/mail-badge";
@@ -61,6 +64,7 @@ export type { MenuAction, MenuComponentRef } from "@expo/ui/community/menu";
 
 /** The Lucide icon for each SF Symbol that a menu action names. */
 const ICONS: Partial<Record<string, LucideIcon>> = {
+  archivebox: Archive,
   "arrow.clockwise": RotateCw,
   "arrow.down": ArrowDown,
   "arrow.up": ArrowUp,
@@ -69,6 +73,7 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   calendar: Calendar,
   "chart.bar": ChartColumn,
   "checkmark.circle": CircleCheck,
+  "circle.fill": Circle,
   "circlebadge.fill": Circle,
   checklist: ListChecks,
   "chevron.left.forwardslash.chevron.right": Code,
@@ -85,6 +90,8 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   globe: Globe,
   gearshape: Settings,
   "info.circle": Info,
+  link: Link,
+  "list.bullet": List,
   "person.2": Users,
   pin: Pin,
   "pin.slash": PinOff,
@@ -367,7 +374,9 @@ function OpenedMenu({
           presentation="popover"
           placement={room?.placement ?? "bottom"}
           align="start"
-          className="min-w-52"
+          // A fixed width. With a content width, Android sizes the menu with each title on one line and
+          // then wraps a long title, so the menu is shorter than its items and the last item goes out.
+          className="w-52"
           style={scrolls ? { maxHeight: room?.height ?? height - safeArea.top - safeArea.bottom - 24 } : undefined}
         >
           {title ? (

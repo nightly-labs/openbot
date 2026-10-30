@@ -193,6 +193,16 @@ export function useGlobalSearchSources(open: () => boolean) {
             run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
           });
         }
+        if (serverCanAdminister(server, "memory-review-v1") && (server.kind === "local" || server.state === "online")) {
+          list.push({
+            id: "server:memory-review",
+            label: t("server.settings.memoryReview"),
+            detail: server.name,
+            group: "settings",
+            icon: BookMarked,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
       }
       return list;
     },

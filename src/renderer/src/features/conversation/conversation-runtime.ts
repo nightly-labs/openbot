@@ -54,6 +54,7 @@ export interface ConversationRuntime {
   voice: Pick<
     OpenBotDesktopApi["voice"],
     | "getSettings"
+    | "getServer"
     | "onModelStatus"
     | "prepareModel"
     | "transcribe"

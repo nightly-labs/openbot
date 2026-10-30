@@ -3,6 +3,8 @@ import type { messages as source } from "../en/dialog";
 
 export const messages = {
   "dialog.chooseSiteDirectory": "Statik site dizinini seçin",
+  "dialog.chooseAgentFolder": "{agent} için bir klasör seçin",
+  "dialog.chooseAgentExclusion": "{agent} adlı ajanın değiştirmemesi gereken klasörü seç",
   "dialog.chooseSkill": "Bir beceri klasörü veya ZIP seçin",
   "dialog.filter.skillPackages": "Beceri paketleri",
   "dialog.filter.images": "Görseller",

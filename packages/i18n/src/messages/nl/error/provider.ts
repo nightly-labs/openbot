@@ -7,6 +7,7 @@ export const messages = {
   "error.provider.computerUseConfig":
     "OpenBot kon Computerbesturing niet registreren in de configuratie van Codex. Controleer of je Codex-config.toml geldig en beschrijfbaar is en start OpenBot opnieuw. Je kunt Computerbesturing uitzetten in de instellingen van de teamgenoot om zonder door te gaan.",
   "error.provider.codexUnresponsive": "Codex reageerde niet meer, dus OpenBot heeft het proces beëindigd.",
+  "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
   "error.provider.endpointsReadOnly":
     "De opgeslagen endpoints zijn geschreven door een nieuwere versie van OpenBot, of het bestand kan niet worden gelezen. Werk OpenBot bij om ze te wijzigen.",
   "error.provider.endpointNoSecureStorage":
@@ -96,6 +97,8 @@ export const messages = {
   "error.provider.modelsTooMany": "Er zijn te veel modellen.",
   "error.provider.modelIdCharacter": "Een model-ID bevat een onbruikbaar teken.",
   "error.provider.modelIdDuplicate": "Twee modellen hebben dezelfde ID.",
+  "error.provider.contextWindowInvalid":
+    "Het contextvenster van een model moet een geheel aantal tokens zijn van {min} tot {max}.",
   "error.provider.headersTooMany": "Er zijn te veel headers.",
   "error.provider.headerNameCharacter": "Een headernaam bevat een teken dat HTTP niet toestaat.",
   "error.provider.headerNameTooLong": "Een headernaam is te lang.",
@@ -267,6 +270,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "Het inloggen is gestopt voordat het klaar was.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini kon de inlogpagina niet openen. Installeer een browser en xdg-utils en verbind vanuit een desktopsessie op deze host. Een server zonder desktop kan deze inlog niet afronden.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":

@@ -13,14 +13,14 @@ type Drafts = Record<string, ComposerDraft>;
 export interface StoredComposerDrafts {
   agents: Drafts;
   channels: Drafts;
-  /** The text of each side thread's message box, keyed by `threadDraftKey`. */
-  threads: Record<string, string>;
+  /** The message box of each side thread, keyed by `threadDraftKey`. */
+  threads: Drafts;
 }
 
 interface ComposerDraftOwner {
   drafts: () => Drafts;
   channelDrafts: () => Drafts;
-  threadDrafts: () => Record<string, string>;
+  threadDrafts: () => Drafts;
   editingAgentId: () => string | null;
   editingServerId: () => string | null;
   editingDraftBackup: () => ComposerDraft | null;
@@ -125,9 +125,9 @@ function storableDrafts(drafts: Drafts): Record<string, { text: string }> {
   );
 }
 
-/** A side thread's message box has no attachments, so its text is kept as it is. */
-function storableThreadDrafts(drafts: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(drafts).filter(([, text]) => text.trim()));
+/** A side thread's draft is stored as its text only, as `storableDrafts` keeps it. */
+function storableThreadDrafts(drafts: Drafts): Record<string, string> {
+  return Object.fromEntries(Object.entries(storableDrafts(drafts)).map(([key, draft]) => [key, draft.text]));
 }
 
 function decodeDrafts(value: unknown): Drafts {
@@ -141,7 +141,11 @@ function decodeDrafts(value: unknown): Drafts {
   );
 }
 
-function decodeThreadDrafts(value: unknown): Record<string, string> {
+function decodeThreadDrafts(value: unknown): Drafts {
   if (!isDynamicRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).flatMap(([key, text]) => (isString(text) ? [[key, text]] : [])));
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, text]) =>
+      isString(text) ? [[key, { text, attachments: [], replyToMessageId: null }]] : [],
+    ),
+  );
 }

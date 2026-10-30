@@ -3,7 +3,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { sidebarMessageTime } from "@openbot/ui/features/sidebar/sidebar-filtering";
 import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
-import { ThreadStatusMark } from "./ThreadStatusMark";
+import { ThreadStatusMark, ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
 import type { ThreadHeaderProps, ThreadRowMode } from "./thread-types";
 
 /** The threads in the menu. The list scrolls without a scrollbar, and fades at an edge with more threads. */
@@ -59,11 +59,16 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
       {(thread) => (
         <DropdownMenu.Trigger
           class={buttonVariants({ variant: "ghost", size: "sm", class: "agent-threads-switcher no-drag" })}
+          data-attention={threadAttention(thread().status)}
           title={thread().title}
           aria-label={t("conversation.threads.current", { title: thread().title })}
         >
+          {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
+          <span class="agent-threads-switcher-icon" aria-hidden="true">
+            <ThreadTabIcon status={thread().status} />
+          </span>
           <span class="agent-threads-tab-title">{thread().title}</span>
-          <ThreadStatusMark status={thread().status} />
+          <ThreadStatusText status={thread().status} />
           <ChevronDown class="agent-threads-switcher-chevron" aria-hidden="true" />
         </DropdownMenu.Trigger>
       )}

@@ -89,6 +89,8 @@ const Turns = createSimpleContext({
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
     // The agents whose queue waits for a provider plan to reset, in epoch seconds. Only a runtime snapshot of the local host carries it.
     const [contextStates, setContextStates] = createSignal<Record<string, AgentContextState>>({});
+    // The context of each side thread, by thread id. Only a runtime snapshot of the local host carries it.
+    const [threadContextStates, setThreadContextStates] = createSignal<Record<string, AgentContextState>>({});
     const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
     // Each provider account and model that a usage limit holds, also with no agent on it.
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
@@ -229,15 +231,23 @@ const Turns = createSimpleContext({
       },
     );
 
-    async function answerPrompt(answers: Record<string, string[]>, options?: PromptAnswerOptions): Promise<boolean> {
+    /** Answers the prompt of the agent's chat, or of its side thread `threadId`. */
+    async function answerPrompt(
+      answers: Record<string, string[]>,
+      options?: PromptAnswerOptions,
+      threadId?: string,
+    ): Promise<boolean> {
       const agent = activeAgent();
-      const prompt = agent ? pendingPrompts()[attentionKey(agent.id, agent.threadId)] : undefined;
+      const prompt = agent ? pendingPrompts()[attentionKey(agent.id, threadId ?? agent.threadId)] : undefined;
       if (!agent || prompt?.type !== "prompt") return false;
-      return submitPromptAnswers(agent.id, prompt, answers, options);
+      // A side thread marks its answer by its own key: the agent id marks the agent's own chat.
+      const mark = threadId === undefined ? agent.id : attentionKey(agent.id, threadId);
+      return submitPromptAnswers(agent.id, mark, prompt, answers, options);
     }
 
     async function submitPromptAnswers(
       agentId: string,
+      mark: string,
       prompt: PromptEvent,
       answers: Record<string, string[]>,
       options?: PromptAnswerOptions,
@@ -246,7 +256,7 @@ const Turns = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       setSubmittedPromptRequests((current) => ({
         ...current,
-        [agentId]: promptRequestKey(prompt.turnId, prompt.requestId) ?? undefined,
+        [mark]: promptRequestKey(prompt.turnId, prompt.requestId) ?? undefined,
       }));
       try {
         await turnsPort().agent.respondToPrompt({
@@ -260,7 +270,7 @@ const Turns = createSimpleContext({
         });
         return true;
       } catch (error) {
-        setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
+        setSubmittedPromptRequests((current) => ({ ...current, [mark]: undefined }));
         analytics.track("agent_input_action", {
           kind: "prompt",
           decision: "answered",
@@ -277,7 +287,7 @@ const Turns = createSimpleContext({
       agentId: string,
       requestId: string | number,
       decision: "accept" | "decline",
-      options?: { onError?: (error: unknown) => void },
+      options?: PromptAnswerOptions,
     ): Promise<boolean> {
       const serverId = activeServerId();
       const approval = approvals().find(
@@ -314,7 +324,11 @@ const Turns = createSimpleContext({
     }
 
     /** Answers the takeover of the agent's chat, or of its side thread `threadId`. */
-    async function respondToBrowserTakeover(decision: "complete" | "cancel", threadId?: string): Promise<boolean> {
+    async function respondToBrowserTakeover(
+      decision: "complete" | "cancel",
+      threadId?: string,
+      options?: PromptAnswerOptions,
+    ): Promise<boolean> {
       const agent = activeAgent();
       const key = agent ? attentionKey(agent.id, threadId ?? agent.threadId) : undefined;
       const event = key ? pendingPrompts()[key] : undefined;
@@ -325,7 +339,8 @@ const Turns = createSimpleContext({
         setPendingPrompts((current) => ({ ...current, [key]: undefined }));
         return true;
       } catch (error) {
-        appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
+        if (options?.onError) options.onError(error);
+        else appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
         return false;
       }
     }
@@ -366,6 +381,10 @@ const Turns = createSimpleContext({
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
           // After the turn ended, the message runs as the next turn. The refusal is old news (#3206).
           if (activeTurns()[agent.id] !== turnId) return;
+          // A message that left the queue is in the turn already: an agent that steers each message
+          // sent while it works can take it first.
+          const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
+          if (delivery && delivery.status !== "queued") return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
@@ -468,6 +487,8 @@ const Turns = createSimpleContext({
       setFailedTurns,
       contextStates,
       setContextStates,
+      threadContextStates,
+      setThreadContextStates,
       usageLimits,
       setUsageLimits,
       usageLimitedModels,

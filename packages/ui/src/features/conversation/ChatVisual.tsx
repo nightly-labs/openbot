@@ -85,6 +85,8 @@ interface ChatVisualProps {
    * accepted chord to the app as a key press on the frame element. Without it, no key leaves the page.
    */
   isAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
 }
 
 /**
@@ -318,6 +320,7 @@ function VisualFrame(props: ChatVisualProps) {
         {(opening) => (
           <ImageLightbox
             opening={opening()}
+            macWindowControls={props.macWindowControls}
             onClose={() => {
               setImage(null);
               frame?.focus({ preventScroll: true });

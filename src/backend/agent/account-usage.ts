@@ -51,6 +51,20 @@ export function usageWindowHasReset(limit: AccountUsageLimit): boolean {
   );
 }
 
+/**
+ * True when a window of the reading, or of one of its groups, reset after `sinceMs` and before now. A window
+ * that had already reset when the reading was taken does not count, so it cannot ask for a read each time.
+ */
+export function usageWindowResetSince(limit: AccountUsageLimit, sinceMs: number): boolean {
+  const now = Date.now() / 1_000;
+  const since = sinceMs / 1_000;
+  return [limit, ...(limit.groups ?? [])].some((group) =>
+    [group.primary, group.secondary].some(
+      (window) => window?.resetsAt != null && window.resetsAt > since && window.resetsAt <= now,
+    ),
+  );
+}
+
 function selectModelRateLimits(
   entries: Array<[string, AccountRateLimitResult]>,
   model: string,

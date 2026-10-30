@@ -195,4 +195,11 @@ export const messages = defineMessages("error.remote", {
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
   "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
+  // Servers that the desktop app starts on this computer.
+  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.localServerNotFound": "This server is not on this computer.",
+  "error.remote.localServerLimit":
+    "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "error.remote.localServersReadOnly":
+    "This version of OpenBot cannot read the list of servers on this computer. Update OpenBot.",
 });

@@ -6,14 +6,17 @@ import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
 import { MarketplaceAppPage } from "./MarketplaceAppPage";
 import { createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
 import { MarketplaceNav } from "./MarketplaceNav";
-import { MarketplaceSkillPage } from "./MarketplaceSkillPage";
-import { createMarketplaceListing } from "./marketplace-listing";
+import { MarketplaceLocalSkillPage, MarketplaceSkillPage } from "./MarketplaceSkillPage";
+import { SkillGroupPage } from "./MarketplaceSkills";
+import { CATEGORY_LABELS, createMarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceModel } from "./marketplace-model";
+import { createMovingNavigation } from "./marketplace-motion";
 import {
   MARKETPLACE_TAB_LABEL,
   type MarketplaceNavigation,
   type MarketplaceScope,
   type MarketplaceView,
+  sourceVerified,
 } from "./marketplace-view";
 
 export interface MarketplaceProps {
@@ -24,7 +27,9 @@ export interface MarketplaceProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: string): string {
+type Translate = ReturnType<typeof useText>["t"];
+
+function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: string, t: Translate): string {
   switch (view.kind) {
     case "browse":
       return fallback;
@@ -33,6 +38,14 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
       return view.listing.name;
     case "app":
       return scope.model.apps().find((app) => app.id === view.id)?.name ?? fallback;
+    case "skillGroup":
+      return view.group === "yours" ? t("marketplace.skills.yours") : t(CATEGORY_LABELS[view.group]);
+    case "localSkill":
+      for (const agent of scope.model.agents()) {
+        const skill = scope.model.installedSkill(agent.id, view.skillId);
+        if (skill) return skill.name;
+      }
+      return fallback;
   }
 }
 
@@ -44,7 +57,7 @@ function MarketplaceHeader(props: { scope: MarketplaceScope }) {
   const { t } = useText();
   const stack = () => props.scope.nav.state.stack;
   const title = (view: MarketplaceView) =>
-    viewTitle(props.scope, view, t(MARKETPLACE_TAB_LABEL[props.scope.nav.state.tab]));
+    viewTitle(props.scope, view, t(MARKETPLACE_TAB_LABEL[props.scope.nav.state.tab]), t);
   return (
     <nav class="marketplace-heading" aria-label={t("marketplace.crumbs.label")} hidden={stack().length < 2}>
       <For each={stack().slice(0, -1)}>
@@ -95,7 +108,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
       list: (query) => props.model.listSkills(query),
       homeCache: props.model.skillHomeCache,
       query: () => nav.state.query,
-      category: () => nav.state.skillCategory,
+      // The Skills tab shows each category, and a group page has its own listing.
+      category: () => null,
+      verified: () => sourceVerified(nav.state.skillSource),
     }),
   };
   const lists = createBrowseLists(scope);
@@ -189,6 +204,12 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 <Match when={view.kind === "app" && view.id} keyed>
                   {(id) => <MarketplaceAppPage scope={scope} id={id} />}
                 </Match>
+                <Match when={view.kind === "skillGroup" && view.group} keyed>
+                  {(group) => <SkillGroupPage scope={scope} group={group} />}
+                </Match>
+                <Match when={view.kind === "localSkill" && view.skillId} keyed>
+                  {(skillId) => <MarketplaceLocalSkillPage scope={scope} skillId={skillId} />}
+                </Match>
               </Switch>
             )}
           </Show>
@@ -208,9 +229,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
         </Show>
       </div>
       {/*
-        The skill install menu stays open while installs run, and an open menu hides the rest of the
-        window from screen readers. It keeps an element with `data-live-announcer` visible, so the
-        results are said from here.
+        The agents dialog of a skill hides the rest of the window from screen readers while it is
+        open. It keeps an element with `data-live-announcer` visible, so the results are said from
+        here.
       */}
       <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
@@ -248,6 +269,8 @@ export function Marketplace(props: MarketplaceProps) {
  */
 function MarketplacePage(props: MarketplaceProps) {
   const { t } = useText();
+  // Each view change of the open page moves in a view transition. The caller's navigation stays plain.
+  const nav = createMovingNavigation(props.nav);
   let root!: HTMLElement;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   onSettled(() => {
@@ -258,7 +281,6 @@ function MarketplacePage(props: MarketplaceProps) {
       if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
       if (target && !root.contains(target) && target.closest("input, textarea, select, [contenteditable]")) return;
       event.preventDefault();
-      const nav = props.nav;
       if (nav.state.stack.length > 1) nav.back();
       else if (nav.state.query)
         nav.set((draft) => {
@@ -282,7 +304,7 @@ function MarketplacePage(props: MarketplaceProps) {
   });
   return (
     <section ref={root} class="skills-marketplace skills-marketplace-page" aria-label={t("marketplace.title")}>
-      <MarketplaceWindow {...props} />
+      <MarketplaceWindow model={props.model} nav={nav} open={props.open} onOpenChange={props.onOpenChange} />
     </section>
   );
 }

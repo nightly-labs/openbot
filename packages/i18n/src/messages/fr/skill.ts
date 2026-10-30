@@ -69,4 +69,18 @@ export const messages = {
   "skill.preview.examplePrompt": "Aidez-moi à utiliser cette compétence.",
   "skill.preview.try": "Essayer la compétence",
   "skill.preview.linkFailed": "Impossible d’ouvrir le lien.",
+
+  "skill.marketplace.changed": {
+    one: "{name} modifié sur {count} agent.",
+    other: "{name} modifié sur {count} agents.",
+  },
+  "skill.marketplace.updated": {
+    one: "{name} mis à jour sur {count} agent.",
+    other: "{name} mis à jour sur {count} agents.",
+  },
+  "skill.marketplace.undone": "La modification de {name} est annulée.",
+  "skill.marketplace.confirmAgents": "Agents : {agents}.",
+  "skill.marketplace.limitReason": "Un agent peut avoir jusqu’à {limit} compétences.",
+  "skill.marketplace.cannotRemove":
+    "OpenBot ne peut pas retirer une compétence intégrée ni une compétence qu’il n’a pas installée.",
 } as const satisfies PartialTranslation<typeof source>;

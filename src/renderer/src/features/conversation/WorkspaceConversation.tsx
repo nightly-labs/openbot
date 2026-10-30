@@ -126,6 +126,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   } = useAgents();
   const {
     contextStates,
+    threadContextStates,
     activeQueue,
     activeWaits,
     activeRoutineIds,
@@ -181,23 +182,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const { teamPresence, currentTeamMember } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
 
-  const activePrompt = createMemo(() => {
-    const agent = activeAgent();
-    const event = agent ? pendingPrompts()[attentionKey(agent.id, agent.threadId)] : undefined;
-    return event?.type === "prompt" && event.threadId === agent?.threadId ? event : undefined;
-  });
-
-  // The timeline leaves the waiting prompt's message out, so its block is read here.
-  const activePromptUiBlock = createMemo(() => {
-    const agent = activeAgent();
-    const prompt = activePrompt();
-    if (!agent || !prompt) return undefined;
-    const requestKey = promptRequestKey(prompt.turnId, prompt.requestId);
-    return (conversations[agent.id]?.messages ?? []).findLast(
-      (message) => messagePromptRequestKey(message) === requestKey,
-    )?.uiBlock;
-  });
-
   // The waits of the agents that this agent asked, by the same rules as the sidebar's "Needs you".
   const agentWaits = createMemo(() =>
     sidebarAgentWaits({
@@ -239,11 +223,20 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.compactContext(agent.id, server.id);
   });
 
+  /** As `compactActiveAgentContext`, for one side thread of the active agent. */
+  const compactTaskContext = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || server?.kind !== "local") return undefined;
+    return (taskId: string) => turnsPort().agent.compactTaskContext({ agentId: agent.id, taskId }, server.id);
+  });
+
   /** The Team API agent summary has no access, so a joined server's agent shows the host's answer. */
   const conversationAgent = createMemo(() => {
     const agent = activeAgent();
     const settings = remoteAgentSettings();
     const automation = remoteAgentAdmin.automation();
+    const busyMessageMode = remoteAgentAdmin.busyMessageMode();
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
@@ -252,6 +245,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...agent,
           ...(settings ? { access: settings.access } : {}),
           ...(activeServer()?.kind === "remote" && automation !== undefined ? { allowAutomation: automation } : {}),
+          ...(activeServer()?.kind === "remote" && busyMessageMode ? { busyMessageMode } : {}),
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
@@ -359,22 +353,48 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       tasks: agentTasks,
       tabs: agentThreads,
       approvals: approvals(),
+      prompts: Object.values(pendingPrompts()).filter((event) => event?.type === "prompt"),
+      takeovers: Object.values(pendingPrompts()).flatMap((event) =>
+        event?.type === "browser-takeover-requested" ? [event.request] : [],
+      ),
       newThreadTitle: t("conversation.threads.new"),
-      onRespondApproval: (approval, decision) =>
-        respondToApprovalRequest(approval.agentId, approval.requestId, decision),
+      onRespondApproval: (approval, decision, options) =>
+        respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
+      contextStates: threadContextStates,
+      onCompactContext: compactTaskContext(),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */
   const openThreadId = () => threads()?.open?.threadId;
+  /** The thread whose waits the conversation shows. A new thread draft has no turn, so it has none. */
+  const shownThreadId = () => {
+    const open = threads()?.open;
+    return open === undefined ? activeAgent()?.threadId : open?.threadId;
+  };
   const activeBrowserTakeover = createMemo(() => {
     const agent = activeAgent();
-    // A new thread draft has no turn, so it has no takeover.
-    const open = threads()?.open;
-    const threadId = open === undefined ? agent?.threadId : open?.threadId;
+    const threadId = shownThreadId();
     const event = agent && threadId ? pendingPrompts()[attentionKey(agent.id, threadId)] : undefined;
     return event?.type === "browser-takeover-requested" && event.request.threadId === threadId
       ? event.request
       : undefined;
+  });
+  const activePrompt = createMemo(() => {
+    const agent = activeAgent();
+    const threadId = shownThreadId();
+    const event = agent && threadId ? pendingPrompts()[attentionKey(agent.id, threadId)] : undefined;
+    return event?.type === "prompt" && event.threadId === threadId ? event : undefined;
+  });
+
+  // The timeline leaves the waiting prompt's message out, so its block is read here.
+  const activePromptUiBlock = createMemo(() => {
+    const agent = activeAgent();
+    const prompt = activePrompt();
+    if (!agent || !prompt) return undefined;
+    const requestKey = promptRequestKey(prompt.turnId, prompt.requestId);
+    const messages =
+      threads()?.open === undefined ? conversations[agent.id]?.messages : threads()?.conversation?.messages;
+    return (messages ?? []).findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;
   });
   /**
    * A usage limit holds the active agent's queued message on this computer. The chat asks where to
@@ -586,20 +606,25 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           activeAgent() ? openAgentMessage(activeAgent()?.id ?? "", messageId) : Promise.resolve()
         }
         onTypingChange={setTeamTyping}
-        onAnswerPrompt={answerPrompt}
+        onAnswerPrompt={(answers, options) => answerPrompt(answers, options, openThreadId())}
         onPromptResolutionPresented={presentPromptResolution}
         onRespondToApproval={respondToApproval}
         onAlwaysAllowApproval={alwaysAllowApproval()}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
+        remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
         onUpdateAgentPermissions={permissionsEditable() ? writeAgentPermissions : undefined}
-        defaultBusyMessageMode={generalSettings().busyMessageMode}
+        defaultBusyMessageMode={
+          activeServer()?.kind === "remote"
+            ? remoteAgentAdmin.defaultBusyMessageMode()
+            : generalSettings().busyMessageMode
+        }
         agentDefaults={generalSettings().agentDefaults}
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
         onCompactAgentContext={compactActiveAgentContext()}
-        onRespondToBrowserTakeover={(decision) => respondToBrowserTakeover(decision, openThreadId())}
+        onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}
         waits={activeWaits()}
         threads={threads()}

@@ -77,6 +77,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "채널 전달이 만들어지지 않았어요.",
   "error.backend.channelAssignmentStopped": "이 채널 배정은 중지되었거나 다른 배정으로 바뀌었어요.",
   "error.backend.channelAssigneeUnavailable": "배정된 에이전트를 사용할 수 없어요.",
+  "error.backend.channelAssigneeRemoved": "배정된 멤버가 제거되었어요.",
+  "error.backend.channelAssigneeReassign": "배정된 멤버를 사용할 수 없어요. 이 작업을 다시 배정하세요.",
   "error.backend.channelAssignmentChanged": "이 채널 배정이 변경되었어요.",
   "error.backend.channelMemberRequired": "이 채널에서 사용 가능한 멤버를 선택하세요.",
   "error.backend.memoryEssentialBudget":
@@ -183,6 +185,7 @@ export const messages = {
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
+  "error.backend.mcpServerInvalid": "OpenBot이 이 MCP 서버 설정을 저장할 수 없어요.",
   "error.backend.mcpServerNoAnswer": "서버가 {seconds}초 안에 응답하지 않았어요.",
   "error.backend.mcpSignInNotAccepted": "서버가 해당 로그인을 수락하지 않았어요.",
   "error.backend.mcpSignInClientRefused":
@@ -205,6 +208,7 @@ export const messages = {
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
+  "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":

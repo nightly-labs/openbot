@@ -1,10 +1,9 @@
-import type { MarketplaceAgentSummary, MarketplaceSkillSummary } from "@openbot/contracts/ipc";
+import type { MarketplaceAgentSummary } from "@openbot/contracts/ipc";
 import { Badge, Button, Heading, Plus, Text, TriangleAlert } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import { For, Match, Show, Switch } from "solid-js";
-import { InstallSkill } from "./MarketplaceInstallSkill";
-import { AppLogo, Done, SkillMark } from "./MarketplaceParts";
+import { AppLogo, Done } from "./MarketplaceParts";
 import type { MarketplaceApp } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
@@ -86,43 +85,6 @@ function AgentCard(props: { scope: MarketplaceScope; listing: MarketplaceAgentSu
       <div class="marketplace-card-foot">
         <Text as="span" variant="caption" tone="muted">
           {[props.listing.creatorName, installs(props.listing.installs)].join(" · ")}
-        </Text>
-      </div>
-    </article>
-  );
-}
-
-function SkillCard(props: { scope: MarketplaceScope; skill: MarketplaceSkillSummary }) {
-  const { t } = useText();
-  const installs = useInstalls();
-  const id = () => `marketplace-skill-${props.skill.id}`;
-  return (
-    <article class="marketplace-card" aria-labelledby={id()}>
-      <Button
-        type="button"
-        variant="ghost"
-        class="marketplace-hitarea"
-        data-cuelume-tap="navigate"
-        aria-label={t("marketplace.open", { name: props.skill.name })}
-        onClick={() => props.scope.nav.go({ kind: "skill", listing: props.skill })}
-      />
-      <div class="marketplace-card-head">
-        <SkillMark skill={props.skill} size="md" />
-        <Heading as="h3" size="sm" class="marketplace-card-name" id={id()}>
-          {props.skill.name}
-        </Heading>
-        <Show when={props.scope.model.agents().length > 0}>
-          <div class="marketplace-card-action">
-            <InstallSkill scope={props.scope} skill={props.skill} />
-          </div>
-        </Show>
-      </div>
-      <Text as="p" variant="body-sm" class="marketplace-card-body">
-        {props.skill.description}
-      </Text>
-      <div class="marketplace-card-foot">
-        <Text as="span" variant="caption" tone="muted">
-          {[props.skill.creatorName, installs(props.skill.installs)].join(" · ")}
         </Text>
       </div>
     </article>
@@ -267,14 +229,6 @@ export function AgentGrid(props: { scope: MarketplaceScope; items: readonly Mark
   return (
     <div class="marketplace-grid">
       <For each={props.items}>{(listing) => <AgentCard scope={props.scope} listing={listing} />}</For>
-    </div>
-  );
-}
-
-export function SkillGrid(props: { scope: MarketplaceScope; items: readonly MarketplaceSkillSummary[] }) {
-  return (
-    <div class="marketplace-grid">
-      <For each={props.items}>{(skill) => <SkillCard scope={props.scope} skill={skill} />}</For>
     </div>
   );
 }

@@ -499,7 +499,8 @@ function BrowserView({
           {status ? (
             <View
               pointerEvents="box-none"
-              className={`absolute inset-0 items-center justify-center gap-4 px-8 ${live.frame ? "bg-background/60" : ""}`}
+              className={`absolute inset-0 items-center justify-center gap-4 ${live.frame ? "bg-background/60" : ""}`}
+              style={{ paddingLeft: insets.left + 32, paddingRight: insets.right + 32 }}
             >
               <Typography.Paragraph align="center" className="text-muted">
                 {status.text}
@@ -536,7 +537,12 @@ function BrowserView({
             className="absolute inset-x-0"
             style={{ bottom: controlBottom, height: CONTROL_SIZE }}
           >
-            <View pointerEvents="box-none" className="absolute inset-0 flex-row items-center justify-between px-4">
+            <View
+              pointerEvents="box-none"
+              className="absolute inset-0 flex-row items-center justify-between"
+              // Clear of the side insets: the rail of iPhone Duo and the edges in landscape.
+              style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+            >
               <ChatGlassIconButton
                 accessibilityLabel={t("mobile.browser.previousPage")}
                 fallbackBackground={fieldBackground}
@@ -643,9 +649,9 @@ function BrowserView({
       </KeyboardAvoidingView>
 
       <View
-        className="absolute inset-x-0 z-20 flex-row items-center gap-3 px-4"
+        className="absolute inset-x-0 z-20 flex-row items-center gap-3"
         pointerEvents="box-none"
-        style={{ top: insets.top + CONTROL_OFFSET }}
+        style={{ top: insets.top + CONTROL_OFFSET, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
       >
         <ChatGlassIconButton
           accessibilityLabel={t("common.back")}

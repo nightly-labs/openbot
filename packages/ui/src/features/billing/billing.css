@@ -148,60 +148,9 @@
   gap: var(--openbot-space-2);
 }
 
-.billing-license-buy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--openbot-space-3);
-  padding: var(--openbot-space-3) var(--openbot-space-4);
-}
-
-.billing-license-buy-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--openbot-space-3);
-}
-
-.billing-license-buy-users,
-.billing-license-buy-total {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-}
-
-.billing-license-buy-price {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.billing-license-stepper {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.billing-license-stepper-value {
-  min-width: 3ch;
-  font-weight: var(--openbot-weight-semibold);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.billing-license-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-2);
-}
-
-.billing-license-link.ui-button {
-  height: auto;
-  padding: 0;
+/* Billing opens on the dialog-host layer on the web, so the menu must open above it. */
+.billing-license-menu.ui-action-menu {
+  z-index: var(--openbot-layer-dialog-host);
 }
 
 .billing-license-divider {

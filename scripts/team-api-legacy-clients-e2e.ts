@@ -7,6 +7,9 @@
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
+// - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent.
+// - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
+//   client gets the released runtime snapshot (#3584).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -15,8 +18,10 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import type { AgentContextState } from "@openbot/contracts/ipc";
 import {
   createTeamProtocolV2Request,
+  createTeamProtocolV8Event,
   decodeTeamProtocolSupportV1,
   decodeTeamProtocolV1Event,
   decodeTeamProtocolV1HttpRequest,
@@ -26,11 +31,15 @@ import {
   decodeTeamProtocolV3HttpRequest,
   decodeTeamProtocolV3HttpResponse,
   decodeTeamProtocolV7HttpResponse,
+  decodeTeamProtocolV8CurrentEvent,
   decodeTeamProtocolV8HttpResponse,
+  encodeTeamProtocolV1CurrentClientEvent,
   encodeTeamProtocolV2Frame,
+  encodeTeamProtocolV8WebRtcHttpRequest,
   highestCommonTeamProtocol,
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
+  TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_PROTOCOL_V1,
   TEAM_PROTOCOL_V1_CAPABILITIES,
   TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -38,8 +47,10 @@ import {
   TEAM_PROTOCOL_V3_CAPABILITIES,
   TEAM_PROTOCOL_V7,
   TEAM_PROTOCOL_VERSION_HEADER,
+  teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -96,6 +107,7 @@ const { TeamStore } = await import("../src/main/team-store");
 const { TeamWebRtcBridge } = await import("../src/main/team-webrtc-bridge");
 const { TeamWebRtcHostPeer } = await import("../src/main/team-webrtc-host-peer");
 const { RemoteWorkflowError } = await import("../src/main/remote-service-effects");
+const { AGENT_ACCESS_FILE, AgentAccessStore } = await import("../src/main/agent-access-store");
 
 interface Step {
   name: string;
@@ -171,10 +183,15 @@ const agentBrowser: AgentBrowserHost = {
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
 };
+/** The owners of each tab that the Team API asked the browser to open. */
+const openedTabOwners: { ownerThreadId: string | null; ownerAgentId: string | null }[] = [];
 const teamBrowser: TeamApiBrowser = {
   listTabs: () => [],
   getControlState: () => ({ sessions: [] }),
-  open: unused,
+  open: (url, ownerThreadId = null, ownerAgentId = null) => {
+    openedTabOwners.push({ ownerThreadId, ownerAgentId });
+    return Effect.succeed({ id: randomUUID(), title: "", url, loading: false, ownerThreadId, ownerAgentId });
+  },
   activate: unused,
   navigate: unused,
   reload: unused,
@@ -333,6 +350,7 @@ const agentStore = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, agentStore.sharedRoot, agentStore.database);
 const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
 const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
+const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
 let agents: AgentService | null = null;
 let server: InstanceType<typeof TeamApiServer> | null = null;
 let socket: WebSocket | undefined;
@@ -360,6 +378,7 @@ try {
     mailbox,
     browser: teamBrowser,
     sidebarLayout: sidebar,
+    agentAccess: access,
     appVersion: HOST_VERSION,
   });
   const port = await Effect.runPromise(server.start());
@@ -611,13 +630,133 @@ try {
       v8Rows.every((row) => typeof row.displayName === "string" && row.displayName.length > 0),
       "A v8 row has no displayName.",
     );
+    // Protocol 7 knows only these providers. The host leaves out the rows of later ones, such as OpenRouter.
+    const v7Providers = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline", "pi", "muse"];
     assert.deepEqual(
-      v8Rows.map((row) => row.id),
       v7Rows.map((row) => row.id),
+      v8Rows.map((row) => row.id).filter((id) => v7Providers.includes(String(id))),
       "v7 and v8 list different providers.",
     );
     return { providers: v8Rows.map((row) => `${String(row.id)}: ${String(row.displayName)}`) };
   });
+
+  // --- context-usage-v1 ---
+
+  const contextState = (agentId: string, threadId: string): AgentContextState => ({
+    agentId,
+    threadId,
+    usage: {
+      usedTokens: 52_000,
+      windowTokens: 200_000,
+      autoCompactAt: 0.9,
+      nativeManaged: false,
+      categories: [{ category: "messages", tokens: 40_000 }],
+    },
+    compaction: { id: `compaction-${threadId}`, startedAt: 1_793_000_000_000, status: "completed" },
+  });
+  const sourceContext = contextState(source.id, "thread-source");
+  const sourceThreadContext = { ...contextState(source.id, "thread-source-side"), compaction: null };
+  // No provider runs here, so the host reports what a provider would have reported. The copy is the
+  // agent that the member cannot see.
+  const hostAgents = agents;
+  const runtimeSnapshot = hostAgents.getRuntimeSnapshot.bind(hostAgents);
+  hostAgents.getRuntimeSnapshot = () => ({
+    ...runtimeSnapshot(),
+    contextStates: [sourceContext, contextState(duplicate.copyId, "thread-copy")],
+    threadContextStates: [sourceThreadContext, contextState(duplicate.copyId, "thread-copy-side")],
+  });
+
+  /** The first runtime snapshot on the event socket of a current client that declares `capabilities`. */
+  async function currentRuntimeSnapshot(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const snapshot = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      return await snapshot;
+    } finally {
+      opened.close();
+    }
+  }
+
+  /** Sets what every member can do with the copy. */
+  async function setCopyAccess(level: "none" | "manage") {
+    const agentIds = new Set([source.id, duplicate.copyId]);
+    await Effect.runPromise(
+      access.set(
+        identity.serverId,
+        { revision: access.get(identity.serverId).revision, everyone: { [duplicate.copyId]: level }, roles: [] },
+        agentIds,
+        agentIds,
+      ),
+    );
+  }
+
+  await step("context-usage-v1: a v8 client gets the context of each agent that it can see", async () => {
+    const capabilities = teamCapabilitiesForProtocol(8);
+    assert.ok(capabilities.includes(TEAM_CONTEXT_USAGE_CAPABILITY), "A v8 client does not ask for context-usage-v1.");
+    await setCopyAccess("none");
+    try {
+      const wire = await currentRuntimeSnapshot(capabilities);
+      const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+      assert.ok(
+        decoded.kind === "known" && decoded.event.type === "runtime-snapshot",
+        `The v8 snapshot did not decode: ${JSON.stringify(wire)}.`,
+      );
+      const { snapshot } = decoded.event;
+      assert.deepEqual(snapshot.contextStates, [sourceContext], "The context is not that of the visible agent only.");
+      assert.deepEqual(snapshot.threadContextStates, [sourceThreadContext]);
+      return {
+        contextStates: snapshot.contextStates?.length,
+        threadContextStates: snapshot.threadContextStates?.length,
+      };
+    } finally {
+      await setCopyAccess("manage");
+    }
+  });
+
+  await step("context-usage-v1: a client that does not ask for it gets the released snapshot", async () => {
+    assert.ok(
+      !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7).includes(TEAM_CONTEXT_USAGE_CAPABILITY),
+      "A v7 client asks for context-usage-v1.",
+    );
+    const wire = await currentRuntimeSnapshot(
+      teamCapabilitiesForProtocol(8).filter((capability) => capability !== TEAM_CONTEXT_USAGE_CAPABILITY),
+    );
+    const snapshot = record(wire.snapshot, "snapshot");
+    assert.ok(!Object.hasOwn(snapshot, "contextStates"), "A client without context-usage-v1 got contextStates.");
+    assert.ok(!Object.hasOwn(snapshot, "threadContextStates"), "A client without it got threadContextStates.");
+    return { snapshotKeys: Object.keys(snapshot).sort() };
+  });
+
+  await step("context-usage-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+    const wire = await currentRuntimeSnapshot(teamCapabilitiesForProtocol(8));
+    const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { contextUsage: true }));
+    assert.ok(relayed.status === "known" && relayed.event.type === "runtime-snapshot");
+    assert.ok(relayed.event.snapshot.contextStates?.some((state) => state.agentId === source.id));
+    const without = createTeamProtocolV8Event(2, wire, {});
+    assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("contextStates"));
+    const snapshot = record(wire.snapshot, "snapshot");
+    const malformed = { ...wire, snapshot: { ...snapshot, contextStates: [{ botId: source.id, threadId: "t" }] } };
+    assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+    return { relayed: relayed.status, malformed: "invalid" };
+  });
+  // The steps after these read the snapshot that the host builds.
+  hostAgents.getRuntimeSnapshot = runtimeSnapshot;
 
   // --- v2 over WebRTC frames ---
 
@@ -646,12 +785,14 @@ try {
       role: "member" as const,
       clientPublicKey: clientKeys.publicKey,
     };
+    const pathChanges: [sessionId: string, lost: boolean][] = [];
     const peer = new TeamWebRtcHostPeer(
       {
         bridge,
         store: team,
         appVersion: HOST_VERSION,
         transferDirectory: join(root, "transfers"),
+        pathChanged: (changed, lost) => pathChanges.push([changed, lost]),
         verifyClientTicket: (presented) =>
           presented === ticket
             ? Effect.succeed(claims)
@@ -706,7 +847,7 @@ try {
         signature: sign(null, Buffer.from(signed), clientKeys.privateKey).toString("base64url"),
       }),
     );
-    return { bridge, peer, ticket, sessionId, clientNonce };
+    return { bridge, peer, ticket, sessionId, clientNonce, pathChanges };
   }
 
   function authFrame(data: string) {
@@ -813,6 +954,81 @@ try {
     );
     assert.notEqual(record(decoded.bot, "bot").id, duplicate.copyId);
     return { agents: agentsOverV2.length, queueKeys: Object.keys(record(queue.body, "queue")).sort() };
+  });
+
+  await step("v8 RPC: a browser tab opened over WebRTC keeps its owner agent", async () => {
+    // What a current desktop client sends when the user opens a tab in an agent's browser panel.
+    const path = "/v1/browser/open";
+    const owners = { ownerThreadId: `openbot-thread-${source.id}`, ownerAgentId: source.id };
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    openedTabOwners.length = 0;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "POST",
+          path,
+          body: encodeTeamProtocolV8WebRtcHttpRequest("POST", path, {
+            url: "https://example.com/",
+            ...owners,
+            focus: true,
+          }),
+          capabilities: [...teamCapabilitiesForProtocol(8)],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    assert.ok("result" in frame, `The browser open frame failed: ${JSON.stringify(frame)}.`);
+    assert.deepEqual(openedTabOwners, [owners], "The host opened the tab without its owner agent.");
+    return owners;
+  });
+
+  await step("v8 RPC: a DELETE over WebRTC reaches the Team API", async () => {
+    // A current client sends `{}` with a DELETE. No frozen codec has a body for it, so the host must
+    // forward it and let the route answer, not fail it as a host error.
+    const path = `/v1/agents/${source.id}/avatar`;
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "DELETE",
+          path,
+          body: encodeTeamProtocolV8WebRtcHttpRequest("DELETE", path, {}),
+          capabilities: [...teamCapabilitiesForProtocol(8)],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    const status = "result" in frame ? record(frame.result, "RPC result").status : frame.error?.status;
+    assert.ok(
+      "result" in frame || frame.error?.code !== "host_error",
+      `The host failed the DELETE: ${JSON.stringify(frame)}.`,
+    );
+    return { status };
+  });
+
+  await step("v2 path: a failed ICE path marks the session away and keeps it open (#3583)", async () => {
+    v2.bridge.emit("pathLost", "other-peer");
+    assert.deepEqual(v2.pathChanges, [], "The path of another peer must not change this session.");
+    v2.bridge.emit("pathLost", "peer-v2");
+    v2.bridge.emit("pathRestored", "peer-v2");
+    assert.deepEqual(v2.pathChanges, [
+      [v2.sessionId, true],
+      [v2.sessionId, false],
+    ]);
+    assert.deepEqual(v2.bridge.disconnected, [], "A failed path must not drop the peer.");
+    assert.ok(
+      team.listSessions().some((session) => session.id === v2.sessionId),
+      "A failed path must not end the team session.",
+    );
+    return v2.pathChanges;
   });
 
   await step("v2 handshake: a forged proof or an RPC before the proof gets no session", async () => {

@@ -41,7 +41,7 @@ export const Tabs: Story = {
   render: () => <AgentThreadsApp open={["pricing", "competitors", "release", "links"]} active={null} />,
 };
 
-/** A side thread in the place of the chat. */
+/** A side thread in the place of the chat, with its context meter. */
 export const SideThread: Story = {
   render: () => <AgentThreadsApp open={["pricing", "competitors"]} active="pricing" />,
 };

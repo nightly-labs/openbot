@@ -156,6 +156,12 @@ export class PushNotificationService {
     if (registration) registration.connected = false;
   }
 
+  /** The path of the session came back, as when the phone app runs again. The app shows events itself. */
+  reconnected(sessionId: string): void {
+    const registration = this.#registrations.get(sessionId);
+    if (registration) registration.connected = true;
+  }
+
   /** The phone turned notifications off, signed out, or the session ended. */
   remove(sessionId: string): void {
     if (this.#running && this.#registrations.delete(sessionId)) this.#save();

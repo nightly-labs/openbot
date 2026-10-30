@@ -34,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Dieser Anbieter führt {id} bereits auf.",
   "customProvider.error.modelIdInvalid":
     "Diese Modell-ID kann nicht verwendet werden. Entferne Leerzeichen, Anführungszeichen und andere Satzzeichen.",
+  "customProvider.error.contextWindowInvalid": "Gib eine ganze Zahl von Tokens zwischen {min} und {max} ein.",
   "customProvider.error.headerNameRequired": "Gib einen Header-Namen ein.",
   "customProvider.error.headerNameInvalid": "Verwende einen gültigen HTTP-Header-Namen.",
   "customProvider.error.headerDuplicate": "Dieser Anbieter legt {name} bereits fest.",
@@ -73,6 +74,8 @@ export const messages = {
   "customProvider.model.id": "ID von Modell {number}",
   "customProvider.model.name": "Anzeigename von Modell {number}",
   "customProvider.model.namePlaceholder": "Anzeigename",
+  "customProvider.model.contextWindow": "Kontextfenster von Modell {number}",
+  "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.remove": "Modell {number} entfernen",
   "customProvider.model.add": "Modell hinzufügen",
   "customProvider.headers": "Header",

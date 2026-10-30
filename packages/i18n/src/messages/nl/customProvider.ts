@@ -34,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Deze aanbieder heeft {id} al in de lijst.",
   "customProvider.error.modelIdInvalid":
     "Deze model-ID kan niet worden gebruikt. Verwijder spaties, aanhalingstekens en andere leestekens.",
+  "customProvider.error.contextWindowInvalid": "Voer een geheel aantal tokens in van {min} tot {max}.",
   "customProvider.error.headerNameRequired": "Voer een headernaam in.",
   "customProvider.error.headerNameInvalid": "Gebruik een geldige HTTP-headernaam.",
   "customProvider.error.headerDuplicate": "Deze aanbieder stelt {name} al in.",
@@ -71,6 +72,8 @@ export const messages = {
   "customProvider.model.id": "ID van model {number}",
   "customProvider.model.name": "Weergavenaam van model {number}",
   "customProvider.model.namePlaceholder": "Weergavenaam",
+  "customProvider.model.contextWindow": "Contextvenster van model {number}",
+  "customProvider.model.contextWindowPlaceholder": "Tokens",
   "customProvider.model.remove": "Model {number} verwijderen",
   "customProvider.model.add": "Model toevoegen",
   "customProvider.headers": "Headers",

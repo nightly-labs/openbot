@@ -52,9 +52,8 @@ export const messages = {
   "mobile.settings.sessions.disconnectBody":
     "Dit beëindigt ook de actieve externe verbindingen van het account. Het apparaat kan opnieuw inloggen.",
   "mobile.settings.sessions.disconnect": "Ontkoppelen",
-  "mobile.settings.dictation.title": "Dicteren",
   "mobile.settings.dictation.footer":
-    "De taal die je spreekt als je een bericht dicteert. Automatisch gebruikt de eerste taal in de instellingen van je telefoon die spraakherkenning ondersteunt.",
+    "De taal die je tegen de spraakherkenning van de telefoon spreekt, in een spraakgesprek en bij het dicteren. Automatisch gebruikt de eerste ondersteunde taal uit de instellingen van je telefoon.",
   "mobile.settings.dictation.automatic": "Automatisch",
   "mobile.settings.appearance.title": "Weergave",
   "mobile.settings.appearance.footer": "Systeem volgt de weergave van je apparaat.",
@@ -165,4 +164,9 @@ export const messages = {
   "mobile.settings.profile.signOutBody":
     "Maak opnieuw verbinding door een nieuwe code te scannen in OpenBot op je desktop.",
   "mobile.settings.profile.signOut": "Uitloggen",
+  "mobile.settings.voice.elevenLabs.keyPlaceholder": "sk_…",
+  "mobile.settings.voice.tab.listening": "Luisteren",
+  "mobile.settings.voice.tab.speaking": "Spreken",
+  "mobile.settings.voice.elevenLabs.recognitionFooter":
+    "OpenBot streamt je spraak met een eenmalige token naar ElevenLabs, en ElevenLabs brengt het in rekening op je account. De sleutel blijft op deze telefoon.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -82,6 +82,7 @@ const MAX_RESULT_BYTES = 64 * 1024;
 const DOCUMENT_ID_PROPERTY = "__openbot_browser_document_id__";
 const MAX_SNAPSHOT_FRAMES = 12;
 const DOM_QUIET_MS = 250;
+const CHOOSER_WAIT_MS = 5_000;
 
 type ActionDispatch = () => void;
 
@@ -264,28 +265,54 @@ export class BrowserCdpEngine {
     const fingerprint = `function() { return JSON.stringify(${fingerprintFields}); }`;
     const nodes = yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const inputs = [];
-        for (const target of targets) inputs.push(yield* this.#resolveElementEffect(send, target, Date.now() + 10_000));
-        const button = submitTarget
-          ? yield* this.#resolveElementEffect(send, submitTarget, Date.now() + 10_000)
-          : undefined;
-        for (const node of [...inputs, ...(button ? [button] : [])]) {
+        // Each failure names its target, so the agent can correct the one that is wrong.
+        const labels = [
+          ...targets.map((_, index) => (targets.length === 1 ? "The field target" : `Field target ${index + 1}`)),
+          ...(submitTarget ? ["submitTarget"] : []),
+        ];
+        const nodes = [];
+        for (const [index, target] of [...targets, ...(submitTarget ? [submitTarget] : [])].entries())
+          nodes.push(
+            yield* this.#resolveElementEffect(send, target, Date.now() + 10_000).pipe(
+              Effect.mapError((error) =>
+                browserFailure(
+                  new Error(
+                    `${labels[index]}: ${error.cause instanceof Error ? error.cause.message : String(error.cause)}`,
+                  ),
+                ),
+              ),
+            ),
+          );
+        const inputs = nodes.slice(0, targets.length);
+        const button = submitTarget ? nodes[targets.length] : undefined;
+        for (const [index, node] of nodes.entries()) {
           if (node.sessionId)
-            return yield* browserFailure(new Error("Use takeover for authentication inside a frame."));
+            return yield* browserFailure(
+              new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
+            );
+          const input = index < inputs.length;
           const valid = yield* this.#callOnNode(
             send,
             node.backendNodeId,
             `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
-            [origin, inputs.includes(node)],
+            [origin, input],
           );
-          if (valid !== true) return yield* browserFailure(new Error("Authentication target is unavailable."));
+          if (valid !== true)
+            return yield* browserFailure(
+              new Error(
+                input
+                  ? `${labels[index]} is not an enabled, editable password, text, tel, or number input of this page. Target the input itself, not its label or container.`
+                  : `${labels[index]} is not on this page. Take a fresh snapshot and target the page's submit button.`,
+              ),
+            );
         }
         if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
           return yield* browserFailure(new Error("Authentication fields must be distinct."));
         const fingerprints: string[] = [];
-        for (const node of [...inputs, ...(button ? [button] : [])]) {
+        for (const [index, node] of nodes.entries()) {
           const value = yield* this.#callOnNode(send, node.backendNodeId, fingerprint, []);
-          if (!isString(value)) return yield* browserFailure(new Error("Authentication target is unavailable."));
+          if (!isString(value))
+            return yield* browserFailure(new Error(`${labels[index]} is no longer available. Take a fresh snapshot.`));
           fingerprints.push(value);
         }
         // A native submission that could send the value in a URL: a form whose effective method is not
@@ -606,7 +633,8 @@ export class BrowserCdpEngine {
         const attachedSessionId = stringValue(params.sessionId) || sessionId || "";
         const targetInfo = recordValue(params.targetInfo);
         const targetId = stringValue(targetInfo?.targetId);
-        if (attachedSessionId && targetId) {
+        // Frames only: the upload attaches its own session to the page itself, which is not a frame.
+        if (attachedSessionId && targetId && targetInfo?.type === "iframe") {
           this.#targetSessions.set(targetId, { sessionId: attachedSessionId, url: stringValue(targetInfo?.url) });
         }
       }
@@ -1437,7 +1465,19 @@ export class BrowserCdpEngine {
         const resolved = yield* this.#resolveElementEffect(send, target, deadline);
         const assignment = yield* this.#identifyUploadTargetEffect(send, resolved);
         onTargetResolved?.(assignment);
+        const isFileInput = yield* this.#callOnNode(
+          send,
+          resolved.backendNodeId,
+          // `instanceof` fails for an input in a same-process iframe, which has its own `HTMLInputElement`.
+          "function() { return this.localName === 'input' && this.type === 'file'; }",
+          [],
+          resolved.sessionId,
+        );
         yield* browserSync(() => assertBeforeDeadline(deadline));
+        if (isFileInput !== true) {
+          yield* this.#uploadThroughChooserEffect(send, resolved, paths, deadline, onDispatch);
+          return assignment;
+        }
         onDispatch?.();
         yield* send(
           "DOM.setFileInputFiles",
@@ -1446,6 +1486,101 @@ export class BrowserCdpEngine {
         );
         return assignment;
       }),
+    );
+  });
+
+  /**
+   * Pages such as GitHub's comment box make their file input only when a button is clicked, so there
+   * is no input to target. Click the target with the chooser intercepted and set the files on the input
+   * that opened it. Interception is on only for this click: a person's own clicks keep the dialog.
+   */
+  readonly #uploadThroughChooserEffect = Effect.fn("BrowserCdp.uploadThroughChooser")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    resolved: { backendNodeId: number; sessionId?: string | undefined },
+    paths: string[],
+    deadline?: number,
+    onDispatch?: ActionDispatch,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const { sessionId, ...point } = yield* this.#elementPointEffect(
+      send,
+      resolved.backendNodeId,
+      true,
+      resolved.sessionId,
+    );
+    // Interception needs the Page domain, and turning it off again on the root session would also end
+    // the live view's screencast. The root frame's chooser is intercepted on a session of its own.
+    const attachOwnSession = Effect.gen(function* () {
+      if (sessionId !== undefined) return undefined;
+      const info = yield* send("Target.getTargetInfo");
+      const targetId = stringValue(recordValue(info.targetInfo)?.targetId);
+      const attached = yield* send("Target.attachToTarget", { targetId, flatten: true });
+      const ownSessionId = stringValue(attached.sessionId);
+      if (!ownSessionId) return yield* browserFailure(new Error("Unable to intercept the file chooser."));
+      return ownSessionId;
+    });
+    yield* Effect.acquireUseRelease(
+      attachOwnSession,
+      (ownSessionId) =>
+        Effect.gen({ self: this }, function* () {
+          const chooserSessionId = ownSessionId ?? sessionId;
+          const chooser = Deferred.makeUnsafe<DynamicRecord | null>();
+          const stopWaitingForChooser = yield* browserSync(() => {
+            let stopWaitingForChooser = () => undefined;
+            const debuggerClient = this.#contents.debugger;
+            const listener = (_event: Electron.Event, method: string, params: unknown, messageSessionId?: string) => {
+              if (method !== "Page.fileChooserOpened" || messageSessionId !== chooserSessionId) return;
+              stopWaitingForChooser();
+              Deferred.doneUnsafe(chooser, Effect.succeed(recordValue(params) ?? null));
+            };
+            const timeout = setTimeout(
+              () => {
+                stopWaitingForChooser();
+                Deferred.doneUnsafe(chooser, Effect.succeed(null));
+              },
+              // A page can open a chooser only while the click's user activation lasts, about 5 s.
+              Math.min(CHOOSER_WAIT_MS, deadline === undefined ? CHOOSER_WAIT_MS : Math.max(0, deadline - Date.now())),
+            );
+            stopWaitingForChooser = () => {
+              clearTimeout(timeout);
+              debuggerClient.removeListener("message", listener);
+            };
+            debuggerClient.on("message", listener);
+            return stopWaitingForChooser;
+          });
+          yield* Effect.gen(function* () {
+            yield* send("Page.enable", {}, chooserSessionId);
+            yield* send("Page.setInterceptFileChooserDialog", { enabled: true }, chooserSessionId);
+            yield* browserSync(() => assertBeforeDeadline(deadline));
+            onDispatch?.();
+            yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
+            const opened = yield* Deferred.await(chooser);
+            if (!opened) {
+              return yield* browserFailure(
+                new Error("The target was clicked but did not open a file chooser. Take a fresh snapshot."),
+              );
+            }
+            const backendNodeId = numberValue(opened.backendNodeId);
+            if (!backendNodeId) return yield* browserFailure(new Error("The file chooser has no file input."));
+            if (opened.mode === "selectSingle" && paths.length > 1)
+              return yield* browserFailure(new Error("The file chooser accepts only one file."));
+            yield* send("DOM.setFileInputFiles", { backendNodeId, files: paths }, chooserSessionId);
+          }).pipe(
+            Effect.ensuring(
+              Effect.gen(function* () {
+                stopWaitingForChooser();
+                // Detaching the own session drops its interception and Page domain with it.
+                if (ownSessionId) return;
+                yield* send("Page.setInterceptFileChooserDialog", { enabled: false }, chooserSessionId).pipe(
+                  Effect.ignore,
+                );
+                yield* send("Page.disable", {}, chooserSessionId).pipe(Effect.ignore);
+              }),
+            ),
+          );
+        }),
+      (ownSessionId) =>
+        ownSessionId ? send("Target.detachFromTarget", { sessionId: ownSessionId }).pipe(Effect.ignore) : Effect.void,
     );
   });
 
@@ -2466,9 +2601,14 @@ export class BrowserCdpEngine {
     ]);
     let blockerId = 0;
     for (const point of points) {
+      // The hit test takes document coordinates; input events keep viewport coordinates.
       const hit = yield* send(
         "DOM.getNodeForLocation",
-        { x: Math.round(point.x), y: Math.round(point.y), includeUserAgentShadowDOM: true },
+        {
+          x: Math.round(point.x + numberValue(viewport?.pageX)),
+          y: Math.round(point.y + numberValue(viewport?.pageY)),
+          includeUserAgentShadowDOM: true,
+        },
         sessionId,
       );
       const hitId = numberValue(hit.backendNodeId);

@@ -7,6 +7,7 @@ export const messages = {
   "error.provider.computerUseConfig":
     "OpenBot は Codex の設定に Computer Use を登録できませんでした。Codex の config.toml が有効で書き込み可能であることを確認してから、OpenBot を再起動してください。Computer Use なしで続行するには、エージェントの設定で Computer Use をオフにできます。",
   "error.provider.codexUnresponsive": "Codex が応答しなくなったため、OpenBot がそのプロセスを終了しました。",
+  "error.provider.acpUnresponsive": "{provider} が時間内に応答しなかったため、OpenBot がそのプロセスを終了しました。",
   "error.provider.endpointsReadOnly":
     "保存されたエンドポイントは新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
   "error.provider.endpointNoSecureStorage":
@@ -100,6 +101,8 @@ export const messages = {
   "error.provider.modelsTooMany": "モデルが多すぎます。",
   "error.provider.modelIdCharacter": "モデル ID に使用できない文字が含まれています。",
   "error.provider.modelIdDuplicate": "2 つのモデルの ID が同じです。",
+  "error.provider.contextWindowInvalid":
+    "モデルのコンテキストウィンドウは {min} から {max} までの整数のトークン数にしてください。",
   "error.provider.headersTooMany": "ヘッダーが多すぎます。",
   "error.provider.headerNameCharacter": "ヘッダー名に HTTP で使用できない文字が含まれています。",
   "error.provider.headerNameTooLong": "ヘッダー名が長すぎます。",
@@ -272,6 +275,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini はサインインページを開けませんでした。ブラウザーと xdg-utils をインストールしてから、このホストのデスクトップセッションで接続してください。デスクトップのないサーバーではこのサインインを完了できません。",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":

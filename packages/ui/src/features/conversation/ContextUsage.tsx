@@ -1,4 +1,4 @@
-import { AGENT_CONTEXT_CATEGORIES, type AgentContextCategory } from "@openbot/contracts/ipc";
+import { AGENT_CONTEXT_CATEGORIES, type AgentContextCategory, type AgentContextState } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -35,6 +35,22 @@ export interface ContextUsageView {
   lastCompaction?: { beforeTokens: number; afterTokens: number } | undefined;
   /** What fills `usedTokens`. Absent when the provider gives only a total. */
   categories?: readonly { category: AgentContextCategory; tokens: number }[] | undefined;
+}
+
+/** The meter's view of a thread's context state, or undefined when its provider reported no usage. */
+export function contextUsageView(state: AgentContextState | undefined): ContextUsageView | undefined {
+  const usage = state?.usage;
+  if (!usage) return undefined;
+  const compaction = state.compaction;
+  return {
+    ...usage,
+    compacting: compaction?.status === "running",
+    ...(compaction?.status === "completed" &&
+    compaction.beforeTokens !== undefined &&
+    compaction.afterTokens !== undefined
+      ? { lastCompaction: { beforeTokens: compaction.beforeTokens, afterTokens: compaction.afterTokens } }
+      : {}),
+  };
 }
 
 const CATEGORY_LABEL = {

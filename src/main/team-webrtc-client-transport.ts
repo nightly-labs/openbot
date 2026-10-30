@@ -532,7 +532,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ? null
           : yield* remoteDecode(() =>
               sideRoute
-                ? sideRoute.response(path, status, envelope.body, { historyExtent: true, channelAttention: true })
+                ? sideRoute.response(path, status, envelope.body, {
+                    historyExtent: true,
+                    channelAttention: true,
+                    agentTaskUiBlocks: true,
+                  })
                 : decodeTeamProtocolV8WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(
@@ -1361,7 +1365,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, sourceText("error.remote.eventGap"));
         return;
       }
-      const optional = frame.type === "event" ? optionalTeamEvent(frame.payload) : null;
+      const optional = frame.type === "event" ? optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }) : null;
       const decoded = optional
         ? { status: "known" as const, event: optionalTeamEventToCurrent(optional) }
         : decodeTeamProtocolV8CurrentEvent(frame);

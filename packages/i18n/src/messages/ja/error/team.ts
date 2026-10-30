@@ -89,6 +89,7 @@ export const messages = {
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
+  "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
   "error.team.promptCacheTtlUnsupported": "この接続はプロンプトキャッシュ時間に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
   "error.team.attachmentNameRequired": "安全な添付ファイル名が必要です。",
