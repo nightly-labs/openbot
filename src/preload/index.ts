@@ -11,6 +11,7 @@ import {
   decodeAgentFolderListFromMain,
   decodeAgentImportPreview,
   decodeAgentImportResult,
+  decodeAgentInstructionsFileFromMain,
   decodeAgentProfileDraft,
   decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
@@ -1179,6 +1180,10 @@ const openbotApi: OpenBotDesktopApi = {
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,
+    ...bridgeGroup(IPC_ENDPOINTS.agentInstructions, {
+      readAgentInstructions: decodeAgentInstructionsFileFromMain,
+      saveAgentInstructions: decodeAgentInstructionsFileFromMain,
+    }),
     // The page gets the folder, not its path, as for a dropped attachment.
     addDroppedAgentFolder: async (agentId, folder) => {
       const path = webUtils.getPathForFile(folder);

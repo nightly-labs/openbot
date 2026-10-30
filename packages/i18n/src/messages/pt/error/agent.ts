@@ -20,6 +20,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "É necessário incluir uma mensagem ou um anexo.",
   "error.agent.promptAnswersTooLong": "As respostas às perguntas são muito longas.",
   "error.agent.gone": "Este agente não existe mais.",
+  "error.agent.instructionsTooLarge":
+    "O arquivo de instruções é grande demais para abrir aqui. Encurte-o em um editor de texto.",
+  "error.agent.instructionsOutside":
+    "O arquivo de instruções aponta para um local fora do espaço de trabalho do agente, então o OpenBot não o abre.",
+  "error.agent.instructionsReadFailed": "Não foi possível ler o arquivo de instruções.",
+  "error.agent.instructionsSaveFailed": "Não foi possível salvar o arquivo de instruções.",
   "error.agent.profileGenerationBusy": "A geração de perfil já está em andamento. Tente novamente em instantes.",
   "error.agent.initialMessageRequired": "É necessário informar uma mensagem inicial.",
   "error.agent.initialMessageTooLong": "A mensagem inicial é muito longa.",

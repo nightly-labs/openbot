@@ -18,6 +18,7 @@ import {
   type AgentExclusionChange,
   type AgentFolderChange,
   type AgentFolderList,
+  type AgentInstructionsFile,
   type AgentMemory,
   type AgentMemoryLimitPreference,
   type AgentMemorySelection,
@@ -729,6 +730,14 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   }
 
   /** The preview has no disk: a folder whose path ends in "(missing)" is not found. */
+  // The instruction file of each agent, in memory. An agent with none shows an empty AGENTS.md.
+  const mockInstructionFiles = new Map<string, AgentInstructionsFile>();
+
+  function mockAgentInstructions(agentId: string): AgentInstructionsFile {
+    requireMockAgent(agentId);
+    return mockInstructionFiles.get(agentId) ?? { fileName: "AGENTS.md", exists: false, text: "" };
+  }
+
   function mockAgentFolders(agentId: string): AgentFolderList {
     const agent = requireMockAgent(agentId);
     return {
@@ -1967,6 +1976,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           (agent.excludedFolders ?? []).filter((folder) => folder !== path),
         );
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
+      },
+      readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
+      saveAgentInstructions: async ({ agentId, text }) => {
+        const file: AgentInstructionsFile = { fileName: mockAgentInstructions(agentId).fileName, exists: true, text };
+        mockInstructionFiles.set(agentId, file);
+        return file;
       },
       getAgentTaskLimit: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);

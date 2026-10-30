@@ -21,6 +21,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Een bericht of bijlage is verplicht.",
   "error.agent.promptAnswersTooLong": "De antwoorden op de prompt zijn te lang.",
   "error.agent.gone": "Deze agent bestaat niet meer.",
+  "error.agent.instructionsTooLarge":
+    "Het instructiebestand is te groot om hier te openen. Kort het in met een teksteditor.",
+  "error.agent.instructionsOutside":
+    "Het instructiebestand verwijst naar een plek buiten de werkruimte van de agent, dus OpenBot opent het niet.",
+  "error.agent.instructionsReadFailed": "Kan het instructiebestand niet lezen.",
+  "error.agent.instructionsSaveFailed": "Kan het instructiebestand niet opslaan.",
   "error.agent.profileGenerationBusy": "Er wordt al een profiel gemaakt. Probeer het zo opnieuw.",
   "error.agent.initialMessageRequired": "Een eerste bericht is verplicht.",
   "error.agent.initialMessageTooLong": "Het eerste bericht is te lang.",

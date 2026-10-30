@@ -21,6 +21,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseAgentId } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import { oneAtATimePerKey } from "./one-at-a-time";
 
 export interface AgentFolderIpcDependencies {
   service: AgentService;
@@ -47,16 +48,7 @@ export function agentFolderIpcHandlers({
 }: AgentFolderIpcDependencies): Pick<IpcGroupHandlers, "agentFolders"> {
   // Each change reads the list, checks the disk, then saves the whole list. One change at a time for
   // each agent, so an Undo during a remove does not save over it.
-  const pending = new Map<string, Promise<unknown>>();
-  function oneAtATime<T>(agentId: string, change: () => Promise<T>): Promise<T> {
-    const result = (pending.get(agentId) ?? Promise.resolve()).then(change);
-    const settled = result.catch(() => undefined);
-    pending.set(agentId, settled);
-    void settled.then(() => {
-      if (pending.get(agentId) === settled) pending.delete(agentId);
-    });
-    return result;
-  }
+  const oneAtATime = oneAtATimePerKey();
 
   /** A second press on + while the picker is open does not open another one. */
   let picking = false;

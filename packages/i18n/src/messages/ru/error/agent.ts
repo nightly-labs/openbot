@@ -19,6 +19,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Нужно сообщение или вложение.",
   "error.agent.promptAnswersTooLong": "Ответы на вопросы слишком длинные.",
   "error.agent.gone": "Этого агента больше нет.",
+  "error.agent.instructionsTooLarge":
+    "Файл инструкций слишком большой, чтобы открыть его здесь. Сократите его в текстовом редакторе.",
+  "error.agent.instructionsOutside":
+    "Файл инструкций ссылается на место вне рабочей папки агента, поэтому OpenBot его не открывает.",
+  "error.agent.instructionsReadFailed": "Не удалось прочитать файл инструкций.",
+  "error.agent.instructionsSaveFailed": "Не удалось сохранить файл инструкций.",
   "error.agent.profileGenerationBusy": "Создание профиля уже выполняется. Повторите попытку чуть позже.",
   "error.agent.initialMessageRequired": "Нужно первое сообщение.",
   "error.agent.initialMessageTooLong": "Первое сообщение слишком длинное.",

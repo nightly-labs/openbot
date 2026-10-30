@@ -13,6 +13,7 @@ export const messages = defineMessages("agent", {
   "agent.setup.name": "Name",
   "agent.setup.purpose": "What should this agent help with?",
   "agent.setup.purposePlaceholder": "Plan trips, compare options, or help with everyday work.",
+  "agent.description.tooLong": "Shorten the description to {limit} characters. A longer description is not saved.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong": "Shorten the instructions to {limit} characters. Longer instructions are not saved.",
   "agent.setup.model": "Agent model",

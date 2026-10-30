@@ -14,6 +14,7 @@ export const messages = {
   "agent.setup.name": "Имя",
   "agent.setup.purpose": "С чем должен помогать этот агент?",
   "agent.setup.purposePlaceholder": "Планировать поездки, сравнивать варианты или помогать с повседневной работой.",
+  "agent.description.tooLong": "Сократите описание до {limit} символов. Более длинное описание не сохраняется.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong": "Сократите инструкции до {limit} символов. Более длинные инструкции не сохраняются.",
   "agent.setup.model": "Модель агента",

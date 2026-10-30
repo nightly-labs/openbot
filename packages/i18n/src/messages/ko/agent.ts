@@ -14,6 +14,7 @@ export const messages = {
   "agent.setup.name": "이름",
   "agent.setup.purpose": "이 에이전트가 무엇을 도와야 하나요?",
   "agent.setup.purposePlaceholder": "여행 계획, 옵션 비교, 일상 업무 지원 등을 맡길 수 있어요.",
+  "agent.description.tooLong": "설명을 {limit}자 이내로 줄여 주세요. 더 긴 설명은 저장되지 않아요.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong": "지침을 {limit}자 이내로 줄여 주세요. 더 긴 지침은 저장되지 않아요.",
   "agent.setup.model": "에이전트 모델",

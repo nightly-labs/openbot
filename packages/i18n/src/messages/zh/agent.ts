@@ -14,6 +14,7 @@ export const messages = {
   "agent.setup.name": "名称",
   "agent.setup.purpose": "这个助手要帮你做什么？",
   "agent.setup.purposePlaceholder": "规划行程、比较方案，或者处理日常工作。",
+  "agent.description.tooLong": "请把描述缩短到 {limit} 个字符以内。过长的描述不会保存。",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong": "请把指令缩短到 {limit} 个字符以内。过长的指令不会保存。",
   "agent.setup.model": "助手模型",

@@ -24,6 +24,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Eine Nachricht oder ein Anhang ist erforderlich.",
   "error.agent.promptAnswersTooLong": "Die Antworten auf die Fragen sind zu lang.",
   "error.agent.gone": "Dieser Agent existiert nicht mehr.",
+  "error.agent.instructionsTooLarge":
+    "Die Anweisungsdatei ist zu groß, um sie hier zu öffnen. Kürze sie in einem Texteditor.",
+  "error.agent.instructionsOutside":
+    "Die Anweisungsdatei verweist auf einen Ort außerhalb des Arbeitsbereichs des Agenten, daher öffnet OpenBot sie nicht.",
+  "error.agent.instructionsReadFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
+  "error.agent.instructionsSaveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
   "error.agent.profileGenerationBusy": "Die Profilerstellung ist ausgelastet. Versuche es gleich noch einmal.",
   "error.agent.initialMessageRequired": "Eine erste Nachricht ist erforderlich.",
   "error.agent.initialMessageTooLong": "Die erste Nachricht ist zu lang.",

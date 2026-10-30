@@ -95,6 +95,7 @@ import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
+import { type AgentInstructionsCalls, AgentInstructionsField } from "./AgentInstructionsField";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
 
@@ -141,6 +142,8 @@ export interface AgentSettingsPanelProps {
   backupModelsEditable?: boolean;
   /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
   folders?: AgentFolderCalls | undefined;
+  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
+  instructionsFile?: AgentInstructionsCalls | undefined;
   /** Whether a usage limit holds this model and account now, for the backup models page. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The app or host default an agent without its own busy-message setting follows. */
@@ -1236,14 +1239,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onBlur={saveTitle}
                 />
               </SettingsField>
-              <SettingsField label={t("agentSettings.instructions")}>
+              <SettingsField label={t("agentSettings.description")}>
                 <ResizableTextarea
                   class="settings-instructions-input"
                   rows="5"
                   value={draft.fields.description}
-                  aria-label={t("agentSettings.instructionsLabel")}
-                  resizeLabel={t("agentSettings.instructionsResize")}
-                  placeholder={t("agentSettings.instructionsPlaceholder")}
+                  aria-label={t("agentSettings.descriptionLabel")}
+                  resizeLabel={t("agentSettings.descriptionResize")}
+                  placeholder={t("agentSettings.descriptionPlaceholder")}
                   invalid={instructionsTooLong(draft.fields.description)}
                   onValueChange={(value) => {
                     setDraft((state) => {
@@ -1254,8 +1257,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }}
                   onBlur={saveDescription}
                 />
-                <InstructionsLimit text={draft.fields.description} />
+                <InstructionsLimit text={draft.fields.description} tooLong="agent.description.tooLong" />
               </SettingsField>
+              <Show when={props.instructionsFile}>
+                {(calls) => <AgentInstructionsField agentId={props.agent.id} working={props.working} calls={calls()} />}
+              </Show>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
                 <ProviderModelPicker
                   variant="field"

@@ -33,7 +33,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, Loading, lazy, onSettled, Show, untrack } from "solid-js";
-import { agentFolderCalls } from "./agent-folders-port";
+import { agentFolderCalls, agentInstructionsCalls } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 
 /** The voice conversation with the agent that is open when the pane opens. */
@@ -143,6 +143,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const folderCalls = agentFolderCalls();
   /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
   const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
+  const instructionsCalls = agentInstructionsCalls();
+  /** The instruction file is in the agent's workspace on this computer. */
+  const localInstructionsCalls = () =>
+    props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   const canPublish = () =>
     props.runtime
       ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
@@ -467,6 +471,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               remoteClient={Boolean(props.runtime)}
               localHost={props.server?.kind === "local"}
               folders={localFolderCalls()}
+              instructionsFile={localInstructionsCalls()}
               sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}

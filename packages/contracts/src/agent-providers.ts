@@ -1,4 +1,5 @@
 import type { AgentModelId } from "./ipc-agent-identity";
+import type { AgentInstructionFileName } from "./ipc-agent-instructions";
 import type { AccountUsageLimit, AgentAuthState } from "./ipc-agent-status";
 import type { ExternalDestination } from "./ipc-app-auth";
 import { isOneOf, isString } from "./runtime-values";
@@ -137,6 +138,12 @@ export interface AgentProviderDescriptor {
    */
   readonly homeSkills: "native" | "plugin" | "instructions";
   /**
+   * The agent instruction files that the CLI reads by itself from its working directory, the agent's
+   * workspace. OpenBot adds the agent's file to the developer instructions only when its name is not
+   * in this list, so that the CLI does not read it twice.
+   */
+  readonly workspaceInstructionFiles: readonly AgentInstructionFileName[];
+  /**
    * How a Workspace only agent is held to its folders. `tool-sandbox`: the client checks each tool
    * and asks before an edit. `command-sandbox`: the CLI runs each command in a sandbox.
    * `confined-process`: the CLI runs in a sandboxed process of its own (`process-confinement.ts`).
@@ -198,6 +205,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "command-sandbox",
     steer: "native",
     concurrentTurns: true,
@@ -220,6 +228,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
+    workspaceInstructionFiles: ["CLAUDE.md"],
     workspaceEnforcement: "tool-sandbox",
     steer: "native",
     concurrentTurns: true,
@@ -242,6 +251,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -266,6 +276,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -290,6 +301,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -314,6 +326,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -338,6 +351,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
@@ -360,6 +374,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -382,6 +397,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -406,6 +422,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -430,6 +447,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -454,6 +472,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
@@ -479,6 +498,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: false,

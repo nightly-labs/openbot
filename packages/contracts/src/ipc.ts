@@ -13,6 +13,7 @@ export * from "./ipc-agent-events";
 export * from "./ipc-agent-folders";
 export * from "./ipc-agent-identity";
 export * from "./ipc-agent-import";
+export * from "./ipc-agent-instructions";
 export * from "./ipc-agent-memories";
 export * from "./ipc-agent-notification-levels";
 export * from "./ipc-agent-profile";

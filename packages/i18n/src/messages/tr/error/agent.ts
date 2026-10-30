@@ -20,6 +20,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Bir mesaj veya ek gereklidir.",
   "error.agent.promptAnswersTooLong": "İstem yanıtları çok uzun.",
   "error.agent.gone": "Bu ajan artık mevcut değil.",
+  "error.agent.instructionsTooLarge":
+    "Talimat dosyası burada açılamayacak kadar büyük. Bir metin düzenleyicide kısaltın.",
+  "error.agent.instructionsOutside":
+    "Talimat dosyası ajanın çalışma alanı dışındaki bir yeri gösteriyor, bu yüzden OpenBot onu açmıyor.",
+  "error.agent.instructionsReadFailed": "Talimat dosyası okunamadı.",
+  "error.agent.instructionsSaveFailed": "Talimat dosyası kaydedilemedi.",
   "error.agent.profileGenerationBusy": "Profil oluşturma meşgul. Kısa bir süre sonra tekrar deneyin.",
   "error.agent.initialMessageRequired": "İlk mesaj gereklidir.",
   "error.agent.initialMessageTooLong": "İlk mesaj çok uzun.",

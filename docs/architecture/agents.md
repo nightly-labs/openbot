@@ -637,6 +637,26 @@ transaction. Creation follows the existing workspace/initial-message flow with
 cleanup on failure. Receipts make retries after a lost response return the saved
 agent. This does not introduce a schema migration or alter released protocol codecs.
 
+## Agent instruction file
+
+An agent keeps its standing rules (persona, style, steps) in one file at the root of its workspace:
+`AGENTS.md`, or `CLAUDE.md` when only that file exists. The profile description is a short summary
+for teammates and the Team API; it keeps its meaning and its 2,000-character limit.
+
+- `src/backend/agent/workspace-instructions.ts` finds, reads and saves the file. A link that goes
+  outside the workspace is refused. A save writes the first file that exists, else it creates
+  `AGENTS.md` with mode 0600. A save never deletes the file.
+- The agent settings show the file as "Instructions" for a local agent only
+  (`agentInstructions` IPC group). The Team API does not carry the file.
+- The developer instructions name the file and tell the agent to keep its rules there.
+  `workspaceInstructionFiles` in the provider descriptor lists the files that each CLI reads by
+  itself from its working directory. `ThreadLifecycle` adds the text of the file, at most 32,000
+  characters, only when the CLI does not read that file. Claude in workspace-only mode reads user
+  settings only, so it gets the text.
+- Codex keeps the developer instructions of a loaded session. The Codex tool fingerprint therefore
+  includes the file name when it is not `AGENTS.md`, and the text when the instructions carry it.
+  Codex reads `AGENTS.md` by itself when a session starts.
+
 ## Agent import
 
 Server Settings > Import moves agents from a `.zip` export into the local host, or into a remote host

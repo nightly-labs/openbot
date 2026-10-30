@@ -19,6 +19,11 @@ export const messages = defineMessages("error.agent", {
   "error.agent.messageOrAttachmentRequired": "A message or attachment is required.",
   "error.agent.promptAnswersTooLong": "Prompt answers are too long.",
   "error.agent.gone": "This agent no longer exists.",
+  "error.agent.instructionsTooLarge": "The instructions file is too large to open here. Shorten it in a text editor.",
+  "error.agent.instructionsOutside":
+    "The instructions file links to a place outside the agent's workspace, so OpenBot does not open it.",
+  "error.agent.instructionsReadFailed": "Could not read the instructions file.",
+  "error.agent.instructionsSaveFailed": "Could not save the instructions file.",
   "error.agent.profileGenerationBusy": "Profile generation is busy. Try again shortly.",
   "error.agent.initialMessageRequired": "Initial message is required.",
   "error.agent.initialMessageTooLong": "Initial message is too long.",

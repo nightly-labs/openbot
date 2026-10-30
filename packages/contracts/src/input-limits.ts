@@ -20,6 +20,9 @@ export const INPUT_LIMITS = {
   serviceTier: 64,
   agentTitle: 120,
   agentDescription: 2_000,
+  // The instruction file at the root of an agent's workspace. Local-only, so no Team API bounds it;
+  // Codex reads at most 32 KiB of `AGENTS.md` by default.
+  agentInstructionsFile: 32_000,
   // The smallest choice of the app setting `AGENT_MEMORY_LIMITS`.
   agentMemories: 64,
   agentSkills: 32,

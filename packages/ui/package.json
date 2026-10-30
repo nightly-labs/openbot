@@ -93,6 +93,7 @@
     "./features/conversation/AgentActivity": "./src/features/conversation/AgentActivity.tsx",
     "./features/conversation/AgentChatEmptyState": "./src/features/conversation/AgentChatEmptyState.tsx",
     "./features/conversation/AgentFolders": "./src/features/conversation/AgentFolders.tsx",
+    "./features/conversation/AgentInstructionsField": "./src/features/conversation/AgentInstructionsField.tsx",
     "./features/conversation/AgentMemoriesEmpty": "./src/features/conversation/AgentMemoriesEmpty.tsx",
     "./features/conversation/AgentSteps": "./src/features/conversation/AgentSteps.tsx",
     "./features/conversation/AgentTasks": "./src/features/conversation/AgentTasks.tsx",
