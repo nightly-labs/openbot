@@ -1,6 +1,13 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { parseBillingPortalRequest } from "@openbot/contracts/billing";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
+import {
+  LICENSE_UNAVAILABLE_STATE,
+  parseLicenseCheckoutRequest,
+  parseLicensePlanRequest,
+  parseLicenseRenewalRequest,
+  parseLicenseUsersRequest,
+} from "@openbot/contracts/license";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
@@ -62,7 +69,7 @@ export interface BrowserApiServices {
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
   /** The billing service, or null when this deployment has no Stripe key. */
-  billing: () => Pick<BillingService, "getState" | "createPortal"> | null;
+  billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   signalUrl: () => string;
@@ -304,7 +311,8 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: yield* services.auth.listAccountSessions(token) });
-  if (path.startsWith("v1/me/billing")) return yield* handleBilling(request, path, user, services);
+  if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
+    return yield* handleBilling(request, path, user, services);
   // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
   const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
   if (sessionId !== undefined && request.method === "DELETE") {
@@ -315,7 +323,7 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
 });
 
 /**
- * The bearer `/v1/me/billing...` routes for a browser. Stripe sends the user back to `/app`, not to the
+ * The bearer `/v1/me/billing...` and `/v1/me/license...` routes for a browser. Stripe sends the user back to `/app`, not to the
  * desktop return page. Returns null for any other path.
  */
 const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
@@ -333,6 +341,31 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
     const input = parseBillingPortalRequest(yield* readJsonObject(request));
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json({ url: yield* billing.createPortal(user.id, input, "web", origin) });
+  }
+  if (path === "v1/me/license" && request.method === "GET")
+    return json(billing ? yield* billing.license.getState(user.id) : LICENSE_UNAVAILABLE_STATE);
+  if (!path.startsWith("v1/me/license/") || request.method !== "POST") return null;
+  if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+  const body = yield* readJsonObject(request);
+  if (path === "v1/me/license/checkout") {
+    const input = parseLicenseCheckoutRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json({ url: yield* billing.license.createCheckout(user, input, "web", origin) });
+  }
+  if (path === "v1/me/license/users") {
+    const input = parseLicenseUsersRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.license.setUsers(user.id, input.users));
+  }
+  if (path === "v1/me/license/plan") {
+    const input = parseLicensePlanRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.license.changePlan(user.id, input));
+  }
+  if (path === "v1/me/license/renewal") {
+    const input = parseLicenseRenewalRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.license.setRenewal(user.id, input.cancel));
   }
   return null;
 }, refuseWith(BillingError));
@@ -352,14 +385,19 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
     if (request.method !== "POST") return null;
     const body = yield* readJsonObject(request);
     return json(
-      yield* services
-        .hosting()
-        .create(
-          user,
-          { name: body.name, plan: body.plan, interval: body.interval, currency: body.currency },
-          request.headers.get("Idempotency-Key"),
-          returnTo,
-        ),
+      yield* services.hosting().create(
+        user,
+        {
+          name: body.name,
+          plan: body.plan,
+          interval: body.interval,
+          currency: body.currency,
+          entryPoint: body.entryPoint,
+          license: body.license,
+        },
+        request.headers.get("Idempotency-Key"),
+        returnTo,
+      ),
       201,
     );
   }

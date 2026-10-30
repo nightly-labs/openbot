@@ -1,6 +1,9 @@
 import type {
   InstalledSkill,
   MarketplaceSkillDetail,
+  MarketplaceSkillPage,
+  MarketplaceSkillQuery,
+  MarketplaceSkillSummary,
   OpenBotDesktopApi,
   SkillSubmission,
 } from "@openbot/contracts/ipc";
@@ -23,6 +26,40 @@ function storyReleaseNotesSkill(): MarketplaceSkillDetail {
   if (!skill) throw new Error("The release notes skill fixture is missing.");
   return skill;
 }
+/** Newest first. Equal times keep the catalog order. */
+function byUpdate(a: MarketplaceSkillSummary, b: MarketplaceSkillSummary): number {
+  return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+}
+
+const SKILL_ORDERS: Record<NonNullable<MarketplaceSkillQuery["sort"]>, typeof byUpdate> = {
+  installs: (a, b) => b.installs - a.installs,
+  updated: byUpdate,
+  name: (a, b) => a.name.localeCompare(b.name),
+};
+
+/**
+ * One catalog page as the account service answers it: the search and filters, then the order, then
+ * the cursor. No order is featured first, then the latest update.
+ */
+export function mockSkillPage(
+  skills: readonly MarketplaceSkillSummary[],
+  query: MarketplaceSkillQuery = {},
+): MarketplaceSkillPage {
+  const matches = skills.filter(
+    (skill) =>
+      matchesQuery(`${skill.name} ${skill.description} ${skill.creatorName}`, query.query) &&
+      (!query.category || skill.category === query.category) &&
+      (query.featured !== true || skill.featured) &&
+      (query.verified === undefined || (skill.verified === true) === query.verified),
+  );
+  const ordered = matches.sort(
+    query.sort ? SKILL_ORDERS[query.sort] : (a, b) => Number(b.featured) - Number(a.featured) || byUpdate(a, b),
+  );
+  const start = Number(query.cursor ?? 0);
+  const end = start + (query.limit ?? 50);
+  return clone({ skills: ordered.slice(start, end), nextCursor: end < ordered.length ? String(end) : null });
+}
+
 /** The skills marketplace, local skills, and the skills installed on each agent. */
 export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId: string) => void = () => {}) {
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
@@ -107,20 +144,7 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       writeInstalled(agentId, [...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId), installed]);
       return clone(installed);
     },
-    list: async (query) => {
-      const matches = marketplaceSkills.filter(
-        (skill) =>
-          matchesQuery(`${skill.name} ${skill.description} ${skill.creatorName}`, query?.query) &&
-          (!query?.category || skill.category === query.category) &&
-          (query?.featured !== true || skill.featured),
-      );
-      const start = Number(query?.cursor ?? 0);
-      const end = start + (query?.limit ?? 50);
-      return clone({
-        skills: matches.slice(start, end),
-        nextCursor: end < matches.length ? String(end) : null,
-      });
-    },
+    list: async (query) => mockSkillPage(marketplaceSkills, query),
     get: async (skillId) => {
       if (skillId.startsWith("local-skill-")) return skills.localGet({ skillId });
       const detail = STORY_MARKETPLACE_SKILL_DETAILS[skillId];

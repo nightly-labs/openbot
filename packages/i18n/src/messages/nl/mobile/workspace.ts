@@ -1,0 +1,42 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/workspace";
+
+export const messages = {
+  "mobile.workspace.status.notConnected": "Niet verbonden",
+  "mobile.workspace.status.online": "Online",
+  "mobile.workspace.status.offline": "Offline",
+  "mobile.workspace.status.error": "Verbindingsfout",
+  "mobile.workspace.status.reconnecting": "Opnieuw verbinden",
+  "mobile.workspace.status.attempt": "Poging {attempt}/{limit}",
+  "mobile.workspace.status.attemptPrefix": "Poging ",
+  "mobile.workspace.status.retryIn": "Opnieuw over {seconds} seconden",
+  "mobile.workspace.section.agents": "Agents",
+  "mobile.workspace.error.directoryUnavailable": "De serverlijst is niet beschikbaar.",
+  "mobile.workspace.error.sectionsLoadFailed": "Kan secties niet laden. Probeer opnieuw.",
+  "mobile.workspace.error.transportNotReady": "De mobiele verbinding is nog niet klaar.",
+  "mobile.workspace.error.sectionsUnsupported": "Deze host ondersteunt geen wijzigingen in secties.",
+  "mobile.workspace.error.leaveOwnServer": "Je kunt alleen externe servers verlaten waar je lid van bent.",
+  "mobile.workspace.error.removeOwnedServerOnly": "Alleen de eigenaar kan deze server verwijderen.",
+  "mobile.workspace.error.agentNotOnHost": "Agent staat niet op deze host.",
+  "mobile.workspace.error.filesUnsupported": "Deze host ondersteunt geen bestandsbeheer. Werk OpenBot bij op de host.",
+  "mobile.workspace.error.agentUnavailableOnHost": "De agent is niet beschikbaar op deze host.",
+  "mobile.workspace.error.agentUnavailable": "De agent is niet beschikbaar.",
+  "mobile.workspace.error.formUnavailable": "Dit formulier is niet meer beschikbaar.",
+  "mobile.workspace.error.approvalInactive":
+    "Dit verzoek wacht nu niet. Een ander apparaat heeft het beantwoord, of de taak is gestopt.",
+  "mobile.workspace.error.approvalOffline": "Maak verbinding met de server om dit verzoek te beantwoorden.",
+  "mobile.workspace.alert.preferencesTitle": "Kan chatvoorkeuren niet opslaan",
+  "mobile.workspace.alert.preferencesBody": "Je vorige voorkeuren zijn behouden. Probeer het opnieuw.",
+  "mobile.workspace.alert.updateRequiredTitle": "Update vereist",
+  "mobile.workspace.alert.updateRequiredUnread": "Werk deze desktopserver bij om gesprekken als ongelezen te markeren.",
+  "mobile.workspace.alert.markUnreadTitle": "Kan niet als ongelezen markeren",
+  "mobile.workspace.alert.markUnreadBody": "Maak opnieuw verbinding met de server en probeer opnieuw.",
+  "mobile.workspace.alert.markAllReadTitle": "Kan niet alles als gelezen markeren",
+  "mobile.workspace.alert.markAllReadBody":
+    "Sommige chats zijn nog ongelezen. Maak opnieuw verbinding met de server en probeer opnieuw.",
+  "mobile.workspace.alert.serverOrderTitle": "Kan servervolgorde niet opslaan",
+  "mobile.workspace.alert.serverOrderBody": "Je vorige volgorde is behouden. Probeer het opnieuw.",
+  "mobile.workspace.error.connectFailed": "De verbinding met de server is mislukt.",
+  "mobile.workspace.error.disconnectFailed": "De server is niet netjes losgekoppeld.",
+  "mobile.workspace.error.queueEditRejected": "De host heeft deze wijziging niet geaccepteerd.",
+} as const satisfies PartialTranslation<typeof source>;

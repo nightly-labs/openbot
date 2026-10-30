@@ -1,0 +1,57 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/appLock";
+
+export const messages = {
+  "mobile.appLock.title": "앱 잠금",
+  "mobile.appLock.method.pin": "PIN 코드",
+  "mobile.appLock.method.faceId": "Face ID",
+  "mobile.appLock.method.touchId": "Touch ID",
+  "mobile.appLock.method.phone": "휴대폰 잠금 해제",
+  "mobile.appLock.methods.title": "잠금 해제 방법",
+  "mobile.appLock.methods.footer":
+    "PIN, {method} 또는 둘 다 켤 수 있어요. 켜면 OpenBot을 벗어날 때 잠기고, 돌아오면 둘 중 하나를 요청해요.",
+  "mobile.appLock.methods.footerPinOnly": "PIN을 켜 보세요. 켜면 OpenBot을 벗어날 때 잠기고, 돌아오면 PIN을 요청해요.",
+  "mobile.appLock.changePin": "PIN 변경",
+  "mobile.appLock.lockAfter.title": "OpenBot 잠금",
+  "mobile.appLock.lockAfter.immediately": "즉시",
+  "mobile.appLock.lockAfter.minutes": { other: "{count}분 후" },
+  "mobile.appLock.lockAfter.hours": { other: "{count}시간 후" },
+  "mobile.appLock.lockWithPhone": "휴대폰이 잠길 때",
+  "mobile.appLock.lockAfter.footer": "OpenBot을 벗어난 시점부터 시간이 계산돼요. OpenBot을 다시 시작하면 항상 잠겨요.",
+  "mobile.appLock.device.turnOnPrompt": "OpenBot에 {method} 켜기",
+  "mobile.appLock.device.failed": "{method} 확인에 실패했어요. 다시 시도해 주세요.",
+  "mobile.appLock.device.unavailable": "먼저 휴대폰에 암호를 설정해 주세요.",
+  "mobile.appLock.pinSetup.title": "PIN 코드",
+  "mobile.appLock.pinSetup.enter": "새 4자리 PIN을 입력해 주세요",
+  "mobile.appLock.pinSetup.confirm": "PIN을 한 번 더 입력해 주세요",
+  "mobile.appLock.pinSetup.mismatch": "PIN이 일치하지 않아요. 다시 시도해 주세요.",
+  "mobile.appLock.pinSetup.saveFailed": "PIN을 저장할 수 없어요. 다시 시도해 주세요.",
+  "mobile.appLock.lock.title": "OpenBot이 잠겨 있어요",
+  "mobile.appLock.lock.confirmTitle": "본인 확인",
+  "mobile.appLock.lock.enterPin": "PIN을 입력해 주세요",
+  "mobile.appLock.lock.unlockPrompt": "OpenBot 잠금 해제",
+  "mobile.appLock.lock.useDevice": "{method} 사용",
+  "mobile.appLock.lock.unlock": "잠금 해제",
+  "mobile.appLock.lock.wrongPin": "PIN이 올바르지 않아요.",
+  "mobile.appLock.lock.attemptsLeft": {
+    other: "PIN이 올바르지 않아요. 로그아웃되기까지 {count}번 남았어요.",
+  },
+  "mobile.appLock.lock.waitSeconds": {
+    other: "시도 횟수가 너무 많아요. {count}초 후에 다시 시도해 주세요.",
+  },
+  "mobile.appLock.lock.waitMinutes": {
+    other: "시도 횟수가 너무 많아요. {count}분 후에 다시 시도해 주세요.",
+  },
+  "mobile.appLock.lock.checkFailed": "PIN을 확인할 수 없어요. 다시 시도해 주세요.",
+  "mobile.appLock.lock.pinMissing": "이 휴대폰에는 OpenBot PIN이 없어요. 로그아웃해서 앱 잠금을 초기화해 주세요.",
+  "mobile.appLock.lock.loadFailed": "앱 잠금 설정을 읽을 수 없어요.",
+  "mobile.appLock.lock.retry": "다시 시도",
+  "mobile.appLock.lock.forgotPin": "PIN을 잊으셨나요?",
+  "mobile.appLock.lock.signOut": "로그아웃",
+  "mobile.appLock.lock.signOutTitle": "OpenBot에서 로그아웃할까요?",
+  "mobile.appLock.lock.signOutBody":
+    "앱 잠금이 해제되고 이 휴대폰에서 로그아웃돼요. 다시 연결하려면 데스크톱의 OpenBot에서 새 코드를 스캔해 주세요.",
+  "mobile.appLock.lock.signedOut": "PIN을 너무 많이 잘못 입력해서 이 휴대폰에서 OpenBot이 로그아웃됐어요.",
+  "mobile.appLock.lock.delete": "숫자 지우기",
+  "mobile.appLock.lock.progress": { other: "4자리 중 {count}자리 입력됨" },
+} as const satisfies PartialTranslation<typeof source>;

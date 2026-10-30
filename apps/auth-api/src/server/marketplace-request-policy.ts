@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { requestSourceIp } from "./source-ip";
 import type { WorkerBindings } from "./types";
 
 const RETRY_AFTER_SECONDS = 60;
@@ -25,12 +26,8 @@ export const enforceMarketplaceIngress = Effect.fn("MarketplacePolicy.enforceMar
   bindings: Pick<WorkerBindings, "MARKETPLACE_INGRESS_RATE_LIMITER">,
 ) {
   if (!isMarketplacePath(new URL(request.url).pathname)) return;
-  const sourceIp =
-    request.headers.get("CF-Connecting-IP") ??
-    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ??
-    "unknown";
   const result = yield* Effect.tryPromise({
-    try: () => bindings.MARKETPLACE_INGRESS_RATE_LIMITER.limit({ key: `ip:${sourceIp}` }),
+    try: () => bindings.MARKETPLACE_INGRESS_RATE_LIMITER.limit({ key: `ip:${requestSourceIp(request)}` }),
     catch: () => new MarketplaceLimiterError({}),
   });
   if (!result.success) return yield* new MarketplaceRateLimitError();

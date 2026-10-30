@@ -93,8 +93,8 @@ export type McpTestState =
   | { status: "failed"; error: string; kind: McpFailureKind };
 
 /** The sign-in states main answers with, as the lookup by row id the panel reads. */
-export function mcpSignInRecord(states: readonly McpSignInState[]): Record<string, boolean> {
-  return Object.fromEntries(states.map((state) => [state.mcpServerId, state.signedIn]));
+export function mcpSignInRecord(states: readonly McpSignInState[]): Record<string, McpSignInState> {
+  return Object.fromEntries(states.map((state) => [state.mcpServerId, state]));
 }
 
 /** The whole sentence a test produced, for the form. The row shows the short badge instead. */
@@ -154,6 +154,23 @@ export function mcpConfigChanged(draft: McpServerConfig, baseline: McpServerConf
 }
 
 /**
+ * Whether Save connects before it stores: a new http server, or an edit that changes where or how
+ * it connects. A rename or a stdio server saves at once, as before.
+ */
+export function mcpSaveConnects(draft: McpServerConfig, baseline: McpServerConfig, isNew: boolean): boolean {
+  if (draft.transport !== "http") return false;
+  if (isNew || baseline.transport !== "http") return true;
+  const next = normalizeMcpConfig(draft);
+  const stored = normalizeMcpConfig(baseline);
+  return next.url !== stored.url || JSON.stringify(next.headers) !== JSON.stringify(stored.headers);
+}
+
+/** A value in the stdio command that is a web address: it names an http server, not a program. */
+export function isMcpHttpAddress(value: string): boolean {
+  return /^https?:\/\/\S/i.test(value.trim());
+}
+
+/**
  * The badge on a row. Without a test it says only what the user set, because that is all OpenBot
  * knows: a server is offered to this server's agents, or it is not. A test answers for itself, and
  * that answer is shown even on a server that is turned off, because the user asked for it.
@@ -177,8 +194,8 @@ export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
  *
  * Not a health claim, and so not the stored state the note above rules out: it is read from the
  * saved row alone, it needs no connection, and it is the same answer every time until the user
- * edits the field. A server that names a working directory reaches Claude and the test and no
- * other provider, which the user should be able to see without starting an agent to find out.
+ * edits the field. A server that names a working directory reaches Claude, Codex and the test and
+ * no other provider, which the user should be able to see without starting an agent to find out.
  */
 export function mcpProviderLimitNote(config: McpServerConfig, t: AppTranslate): string | null {
   if (config.transport !== "stdio" || !config.workingDirectory.trim()) return null;

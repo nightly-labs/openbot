@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
-  "error.agent.historyUnavailable": "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取ってください。",
+  "error.agent.historyUnavailable":
+    "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取るか、チャンネルの作業には channel_history を使用してください。",
   "error.agent.toolRequestInvalid":
     "ツール検出の引数が無効です。宣言されたスキーマと、元の修飾されたツール名を使用してください。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
@@ -49,6 +50,9 @@ export const messages = {
     "このエージェントのタスクが実行中です。プロバイダーを変更する前に、タスクの完了を待つか、タスクを停止してください。",
   "error.agent.waitBeforeClearContext":
     "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
+  "error.agent.waitBeforeCompactContext":
+    "コンテキストを圧縮する前に、実行中のターンとキューが終わるのを待ってください。",
+  "error.agent.compactContextUnavailable": "このエージェントは今コンテキストを圧縮できません。",
   "error.agent.unknown": "不明なエージェントです: {id}",
   "error.agent.onlyUserWidensSettings":
     "エージェントにフルアクセスを与える、または Computer Use をオンにできるのはユーザーだけです。エージェントの設定で変更するようユーザーに依頼してください。",
@@ -65,6 +69,8 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot はエージェントのコピーに固有の名前を作成できませんでした。",
   "error.agent.endpointRemoved":
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
+  "error.agent.turnStalled":
+    "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.agent.selectedGone": "選択したエージェントはもう存在しません。",
   "error.agent.profileEndpointsChanged": "生成中にカスタムエンドポイントが変更されました。もう一度お試しください。",
   "error.agent.profileInvalid": "プロバイダーが無効なプロフィールを返しました。指示を修正してみてください。",
@@ -92,6 +98,12 @@ export const messages = {
   "error.agent.computerUseLocalOnly": "Computer Use は、エージェントを実行しているコンピューターでのみ変更できます。",
   "error.agent.automationLocalOnly":
     "ローカルスクリプトは、エージェントを実行しているコンピューターでのみ許可できます。",
+  "error.agent.newChatLocalOnly":
+    "新しいチャットの開始を許可できるのは、エージェントを実行しているコンピューターだけです。",
+  "error.agent.quickAcknowledgementLocalOnly":
+    "この設定を変更できるのは、エージェントを実行しているコンピューターだけです。",
+  "error.agent.sideQuestionBusy": "実行中のサイド質問が多すぎます。しばらくしてからもう一度お試しください。",
+  "error.agent.sideQuestionFailed": "エージェントはサイド質問に回答できませんでした。もう一度お試しください。",
   "error.agent.busyMessageModeLocalOnly":
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":
@@ -112,11 +124,13 @@ export const messages = {
     "このサーバーはメモリーが不足しています。メッセージはキューで待機し、メモリーが空くと開始します。",
   "error.agent.workspaceOnlyToolMissing":
     "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.claudeSandboxUnavailable":
+    "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できません: {reason}。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
   "error.agent.screenCaptureOff":
     "このエージェントでは画面キャプチャがオフです。ユーザーはエージェントの設定で Computer Use をオンにできます。",
   "error.agent.screenCaptureUnavailable": "このコンピューターでは画面キャプチャを利用できません。",
   "error.agent.screenCaptureShared":
-    "画面キャプチャはチャンネルや Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
+    "画面キャプチャは Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
   "error.agent.screenCaptureDeclined":
     "ユーザーはこの画面キャプチャを許可しませんでした。何もキャプチャされていません。",
   "error.agent.screenCaptureWindowMissing":

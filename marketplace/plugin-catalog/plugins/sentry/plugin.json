@@ -4,7 +4,7 @@
   "tagline": "Errors and crash triage",
   "description": "Sentry lets agents search recent errors, inspect stack traces and affected releases, and summarize what broke after a deploy. Each user signs in to their own Sentry account through the browser.",
   "category": "coding",
-  "creatorName": "sentry.io",
+  "creatorName": "Sentry",
   "iconUrl": "https://sentry.io/favicon.ico",
   "version": "1.0.0",
   "prompts": [

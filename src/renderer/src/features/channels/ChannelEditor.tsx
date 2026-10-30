@@ -11,12 +11,13 @@ import {
   Plus,
   Popover,
   Search,
-  Textarea,
   Tooltip,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
@@ -174,13 +175,14 @@ export function ChannelEditor(props: ChannelEditorProps) {
   /**
    * The command carries a whole draft, so every save sends the fields as they are on screen. That
    * is deliberate: removing a member commits the instructions the user can see, rather than
-   * reviving the stored ones.
+   * reviving the stored ones. Instructions over the limit are the exception: they stay in the field,
+   * unsaved, and the stored ones go with the other fields until the user shortens them.
    */
   function draftFrom(current: Channel): ChannelDraft {
     return {
       name: fields.name.trim() || current.name,
       title: fields.title,
-      instructions: fields.instructions,
+      instructions: instructionsTooLong(fields.instructions) ? current.instructions : fields.instructions,
       members: current.members.map((member) => ({ agentId: member.agentId })),
       leadAgentId: current.leadAgentId,
     };
@@ -258,6 +260,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
       const current = channel();
       if (!current) return;
       const value = fields[key];
+      if (key === "instructions" && instructionsTooLong(value)) return;
       void commit().then((saved) => {
         if (saved && channel()?.id === current.id && fields[key] === value)
           setDirty((state) => {
@@ -304,12 +307,13 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
       </SettingsField>
       <SettingsField label={t("channel.form.instructions")}>
-        <Textarea
+        <ResizableTextarea
           class="settings-instructions-input"
           rows="4"
           aria-label={t("channel.form.instructionsLabel")}
+          resizeLabel={t("channel.form.instructionsResize")}
           placeholder={t("channel.form.instructionsPlaceholder")}
-          maxlength={INPUT_LIMITS.agentDescription}
+          invalid={instructionsTooLong(fields.instructions)}
           value={fields.instructions}
           onValueChange={(instructions) => {
             setFields((state) => {
@@ -321,6 +325,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
           }}
           onBlur={saveText("instructions")}
         />
+        <InstructionsLimit text={fields.instructions} />
       </SettingsField>
       <SettingsLinkGroup>
         <SettingsLinkRow

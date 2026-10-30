@@ -33,8 +33,9 @@ files:
 asarUnpack:
   # The database host is loaded by path as a separate process, not required into the main bundle.
   - out/main/agent-database-host.js
-  # The voice transcription host is started by path in the same way.
+  # The voice transcription and speech hosts are started by path in the same way.
   - out/main/voice-transcription-host.js
+  - out/main/voice-speech-host.js
   # The unpacked host resolves Effect without loading any application module from asar.
   - node_modules/effect/**/*
 extraResources:
@@ -44,6 +45,12 @@ extraResources:
     to: plugin-catalog
   - from: resources/agent-import
     to: agent-import
+  # `openbot-cli.mjs` runs tasks on agents through the Local scripts API; see docs/automation.md.
+  - from: resources/cli
+    to: cli
+  # `cpu-limit.cjs` makes os.cpus() follow the CPU limit for the Node programs of agents on a server.
+  - from: resources/agent-runtime
+    to: agent-runtime
   - from: build/icon-production.png
     to: icons/icon-production.png
   - from: build/icon-dev.png
@@ -64,28 +71,43 @@ extraResources:
     to: licenses/onnxruntime-LICENSE
   - from: build/licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE
     to: licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE
+  - from: build/licenses/Underdog-Bark-3.0-Plus-LICENSE
+    to: licenses/Underdog-Bark-3.0-Plus-LICENSE
   - from: build/licenses/OpenAI-Whisper-LICENSE
     to: licenses/OpenAI-Whisper-LICENSE
-# Voice and remote desktop are prepared for macOS and Windows only, and each Computer Use driver
-# is built for one target, so their resources are listed under each platform instead of here.
+  - from: build/licenses/Supertone-Supertonic-3-LICENSE
+    to: licenses/Supertone-Supertonic-3-LICENSE
+# The voice runtime, the remote desktop runtime and each Computer Use driver are built for one
+# target, so their resources are listed under each platform instead of here.
 # electron-builder merges the root and platform lists, so every build still gets its own, while a
 # build has no missing `from` to fail on and no other platform's driver to carry.
 directories:
   output: dist
+toolsets:
+  # The static AppImage runtime (AppImage/type2-runtime) has libfuse built in, so the AppImage starts
+  # on Arch Linux, Omarchy and other systems with no libfuse.so.2. It needs only `fusermount3`
+  # from fuse3. The default toolset needs libfuse.so.2. `--appimage-extract` works with both.
+  appimage: "1.0.3"
 mac:
   category: public.app-category.productivity
   minimumSystemVersion: "13.0"
   notarize: true
   hardenedRuntime: true
+  # macOS 26 shows the catalog that `CFBundleIconName` names, with our own dark version; without it,
+  # macOS 26 makes the dark icon a black tile with black eyes. The catalog also has flat images, and
+  # `icon.icns` stays for macOS versions that read only `CFBundleIconFile`. Make the catalog again
+  # with `bun scripts/compile-macos-icon.ts` after a change to the `.icon` file.
   icon: build/icon-production.icns
   extraResources:
+    - from: build/macos/Assets.car
+      to: Assets.car
     - from: build/icon-production-macos-safe-area.png
       to: icons/icon-production-macos-safe-area.png
     - from: build/icon-dev-macos-safe-area.png
       to: icons/icon-dev-macos-safe-area.png
     - from: build/icon-preview-macos-safe-area.png
       to: icons/icon-preview-macos-safe-area.png
-    # The sherpa-onnx addon and its libraries. The Parakeet and Whisper models are downloaded on demand.
+    # The sherpa-onnx addon and its libraries. The dictation and speech models are downloaded on demand.
     - from: .openbot-build/voice/runtime
       to: voice/runtime
     - from: build/remote-desktop-runtime
@@ -102,10 +124,12 @@ mac:
   entitlementsInherit: build/entitlements.mac.inherit.plist
   darkModeSupport: true
   extendInfo:
+    CFBundleIconName: Icon
     ElectronTeamID: ZTRDTUL87R
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
     # Computer Use runs the driver as a child process, so macOS asks for both grants in OpenBot's
-    # name and shows these sentences.
+    # name and shows these sentences. Under the hardened runtime, macOS shows the Automation prompt
+    # only when the app has `com.apple.security.automation.apple-events` in its entitlements.
     NSScreenCaptureUsageDescription: OpenBot captures the screen so an agent can see the app windows you ask it to control.
     NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
     NSUserActivityTypes:
@@ -130,6 +154,14 @@ win:
     - target: nsis
       arch:
         - x64
+# The assisted installer lets the user choose the disk and folder. `build/installer.nsh` keeps it
+# per-user and moves the install into an `OpenBot` subfolder when the chosen folder holds other
+# files, because the uninstaller deletes the whole folder. An update reads the folder from
+# `InstallLocation`. The app starts it silently (`src/main/update-service.ts`), so an update shows
+# no page.
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 linux:
   category: Development
   icon: build/icon-production.png
@@ -143,6 +175,9 @@ linux:
       filter:
         - "**/*"
         - "!*.ts"
+    # The sherpa-onnx addon and its libraries. The dictation and speech models are downloaded on demand.
+    - from: .openbot-build/voice/runtime
+      to: voice/runtime
     # Only the x64 build installs this runtime. For arm64 the directory does not exist, and
     # electron-builder skips a missing source with a warning.
     - from: build/remote-desktop-runtime

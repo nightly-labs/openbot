@@ -26,4 +26,18 @@ export const messages = {
   "error.site.fileType": "Ten typ pliku nie jest dozwolony: {path}",
   "error.site.fileOutsideRoot": "Pliki witryny muszą pozostać w katalogu źródłowym: {path}",
   "error.site.fileTooLarge": "Plik przekracza limit 1 MB: {path}",
+  "error.site.serverLimit": {
+    one: "Ten serwer osiągnął limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    few: "Ten serwer osiągnął limit {count} aktywnych witryn. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    many: "Ten serwer osiągnął limit {count} aktywnych witryn. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    other:
+      "Ten serwer osiągnął limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+  },
+  "error.site.unlinkedLimit": {
+    one: "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    few: "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnych witryn. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    many: "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnych witryn. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+    other:
+      "Ten komputer nie jest serwerem, a jego konto osiągnęło limit {count} aktywnej witryny. Aby opublikować kolejną witrynę, usuń witrynę lub użyj serwera w chmurze z planem, który ma więcej witryn.",
+  },
 } as const satisfies PartialTranslation<typeof source>;

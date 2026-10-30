@@ -1,4 +1,10 @@
-import type { MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "@openbot/contracts/ipc";
+import type {
+  MobileConnectedDevice,
+  MobileConnectLink,
+  MobileConnectTicket,
+  RemoteNetworkRoute,
+  RemoteNetworkRouteState,
+} from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, onCleanup, untrack } from "solid-js";
 import { currentText } from "../../../text";
 
@@ -15,6 +21,8 @@ interface MobileConnectStoreProps {
   onRevokeMobileConnectLink?: () => Promise<void>;
   onListMobileConnectedDevices?: () => Promise<MobileConnectedDevice[]>;
   onRevokeMobileConnectedDevice?: (sessionId: string) => Promise<void>;
+  onGetRemoteNetworkRoute?: () => Promise<RemoteNetworkRouteState>;
+  onSetRemoteNetworkRoute?: (route: RemoteNetworkRoute) => Promise<RemoteNetworkRouteState>;
 }
 
 /** A generated Mobile Connect code, from the moment it is displayed until it is cleared. */
@@ -62,10 +70,19 @@ interface MobileConnectLinkPanel {
   error: string | null;
 }
 
+/** How devices that connect to this computer send chats and files. */
+interface RemoteNetworkRoutePanel {
+  /** Null until main answers. */
+  current: RemoteNetworkRouteState | null;
+  busy: boolean;
+  error: string | null;
+}
+
 interface SettingsMobileConnectPanels {
   connect: MobileConnectPanel;
   devices: MobileDeviceList;
   link: MobileConnectLinkPanel;
+  route: RemoteNetworkRoutePanel;
 }
 
 /**
@@ -86,6 +103,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       successDeviceName: null,
       error: null,
     },
+    route: { current: null, busy: false, error: null },
   });
   /** A clock, not panel state: it ticks the code's countdown and the device list's "3m ago" labels. */
   const [now, setNow] = createSignal(Date.now());
@@ -168,6 +186,61 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       };
     },
   );
+
+  // Each visit reads the route again, so a Tailscale that started since the last visit shows.
+  createEffect(
+    () => ({ open: props.open, active: isActive(), get: props.onGetRemoteNetworkRoute }),
+    ({ open, active, get }) => {
+      if (!open || !active || !get) return;
+      let current = true;
+      void untrack(async () => {
+        try {
+          const route = await get();
+          if (!current) return;
+          setPanels((state) => {
+            state.route.current = route;
+            state.route.error = null;
+          });
+        } catch (error) {
+          if (!current) return;
+          setPanels((state) => {
+            const text = currentText();
+            state.route.error = text.errorMessage(error, text.t("settings.mobileConnect.route.error.load"));
+          });
+        }
+      });
+      return () => {
+        current = false;
+      };
+    },
+  );
+
+  async function setRoute(route: RemoteNetworkRoute) {
+    const set = props.onSetRemoteNetworkRoute;
+    const previous = panels.route.current;
+    if (!set || !previous || panels.route.busy || previous.route === route) return;
+    setPanels((state) => {
+      state.route.current = { ...previous, route };
+      state.route.busy = true;
+      state.route.error = null;
+    });
+    try {
+      const saved = await set(route);
+      setPanels((state) => {
+        state.route.current = saved;
+      });
+    } catch (error) {
+      setPanels((state) => {
+        const text = currentText();
+        state.route.current = previous;
+        state.route.error = text.errorMessage(error, text.t("settings.mobileConnect.route.error.save"));
+      });
+    } finally {
+      setPanels((state) => {
+        state.route.busy = false;
+      });
+    }
+  }
 
   const secondsRemaining = createMemo(() =>
     Math.max(0, Math.ceil(((panels.connect.session?.ticket.expiresAt ?? 0) - now()) / 1_000)),
@@ -511,6 +584,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     revokeDevice,
     revokeLink,
     secondsRemaining,
+    setRoute,
     setLinkConfirm: (confirm: MobileConnectLinkPanel["confirm"]) =>
       setPanels((state) => {
         state.link.confirm = confirm;

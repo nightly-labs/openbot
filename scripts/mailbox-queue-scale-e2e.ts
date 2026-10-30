@@ -1,8 +1,10 @@
 // Checks the queue reads of an agent with a long mailbox history (#2240). Runs the real mailbox
 // store and SQLite on a temporary profile, with many messages and many deliveries to one agent.
 // Checks that `listQueue`, `senderAgentIdsForRecipient` and `conversationMessages` give the rows of
-// the seeded messages, and records the time of the reads that each queue change makes. No app,
-// provider, account or network is started.
+// the seeded messages, and that the single-delivery reads (`getDelivery`, `nextQueued`,
+// `findDeliveriesByTurn`, `unresolvedDeliveries`) give the same queue positions as `listQueue`. It
+// records the time of the reads that each queue change and each turn start makes. No app, provider,
+// account or network is started.
 //
 // Run: bun scripts/mailbox-queue-scale-e2e.ts
 // Writes .openbot-build/mailbox-queue-scale-e2e/report.json and exits non-zero on a failure.
@@ -24,13 +26,23 @@ const SEEDED_MESSAGES = 10_000;
 const AGENT_EVERY = 5;
 const COMPLETED = 1_000;
 const TIMED_READS = 20;
+const TIMED_DELIVERY_READS = 200;
+const TURN_ID = "turn-scale";
 
 interface Report {
   seededMessages: number;
   agentDeliveries: number;
   completedDeliveries: number;
   checks: string[];
-  timing?: { reads: number; totalMs: number; perQueueChangeMs: number };
+  timing?: {
+    reads: number;
+    totalMs: number;
+    perQueueChangeMs: number;
+    deliveryReads?: number;
+    getDeliveryMs?: number;
+    nextQueuedMs?: number;
+    findDeliveriesByTurnMs?: number;
+  };
   passed: boolean;
 }
 
@@ -114,6 +126,70 @@ function checkQueue(mailbox: MailboxStore, seeded: Seeded[]): void {
   report.checks.push(`conversationMessages: ${rows.length} rows with their message text and sender`);
 }
 
+/** The single-delivery reads give the positions of `listQueue`. Starts 3 deliveries in one turn. */
+async function checkDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]): Promise<string[]> {
+  const positionOf = () =>
+    new Map(mailbox.listQueue(AGENT).deliveries.map((delivery) => [delivery.id, delivery.position]));
+  const queuedIndexes = [COMPLETED, COMPLETED + 1, COMPLETED + 500, seeded.length - 2, seeded.length - 1];
+  const before = positionOf();
+  for (const index of queuedIndexes) {
+    const id = seeded[index]?.deliveryId;
+    assert.ok(id);
+    assert.equal(mailbox.getDelivery(id)?.delivery.position, before.get(id), `getDelivery position of ${id}`);
+  }
+  const completedId = seeded[0]?.deliveryId;
+  assert.ok(completedId);
+  assert.equal(mailbox.getDelivery(completedId)?.delivery.position, null);
+  report.checks.push("getDelivery: the listQueue position of a queued delivery, and null for a completed one");
+
+  assert.equal(mailbox.nextQueued(AGENT)?.delivery.id, seeded[COMPLETED]?.deliveryId);
+  assert.equal(mailbox.nextQueued(AGENT)?.delivery.position, 1);
+  report.checks.push("nextQueued: the first queued delivery, at position 1");
+
+  const started = seeded.slice(COMPLETED, COMPLETED + 3).map((item) => item.deliveryId);
+  for (const id of started) {
+    await runCauseEffect(mailbox.markStarting(id));
+    await runCauseEffect(mailbox.markRunning(id, TURN_ID));
+  }
+  assert.deepEqual(
+    mailbox
+      .findDeliveriesByTurn(AGENT, TURN_ID)
+      .map((context) => context.delivery.id)
+      .sort(),
+    [...started].sort(),
+  );
+  const unresolved = new Set(mailbox.unresolvedDeliveries().map((context) => context.delivery.id));
+  for (const id of started) assert.ok(unresolved.has(id), `unresolvedDeliveries has ${id}`);
+  const after = mailbox.listQueue(AGENT).deliveries.filter((delivery) => delivery.status === "queued");
+  assert.deepEqual(
+    after.map((delivery) => delivery.position),
+    after.map((_, index) => index + 1),
+  );
+  const firstQueued = after[0]?.id;
+  assert.ok(firstQueued);
+  assert.equal(mailbox.getDelivery(firstQueued)?.delivery.position, 1);
+  report.checks.push("findDeliveriesByTurn and unresolvedDeliveries: the 3 running deliveries; the queue starts at 1");
+  return started;
+}
+
+/** The reads that a turn start and a turn end make for one delivery. */
+function timeDeliveryReads(mailbox: MailboxStore, seeded: Seeded[]) {
+  const queuedId = seeded[COMPLETED + 500]?.deliveryId;
+  assert.ok(queuedId);
+  const perCall = (read: () => unknown) => {
+    const started = performance.now();
+    for (let index = 0; index < TIMED_DELIVERY_READS; index += 1) read();
+    return Number(((performance.now() - started) / TIMED_DELIVERY_READS).toFixed(3));
+  };
+  return {
+    deliveryReads: TIMED_DELIVERY_READS,
+    getDeliveryMs: perCall(() => mailbox.getDelivery(queuedId)),
+    // The agent's own chat runs the started turn, so a task lane with no message scans the whole queue.
+    nextQueuedMs: perCall(() => mailbox.nextQueued(AGENT, "task-none")),
+    findDeliveriesByTurnMs: perCall(() => mailbox.findDeliveriesByTurn(AGENT, TURN_ID)),
+  };
+}
+
 /** The reads `MailboxSync.emitQueue` makes on each queue change. */
 function timeQueueChanges(mailbox: MailboxStore): NonNullable<Report["timing"]> {
   const started = performance.now();
@@ -138,7 +214,8 @@ try {
   const seeded = await seed(mailbox);
   report.agentDeliveries = seeded.length;
   checkQueue(mailbox, seeded);
-  report.timing = timeQueueChanges(mailbox);
+  await checkDeliveryReads(mailbox, seeded);
+  report.timing = { ...timeQueueChanges(mailbox), ...timeDeliveryReads(mailbox, seeded) };
   report.passed = true;
 } finally {
   database.close();
@@ -147,7 +224,8 @@ try {
   await rm(root, { recursive: true, force: true });
 }
 process.stdout.write(
-  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perQueueChangeMs} ms per queue change. ` +
+  `${report.passed ? "PASS" : "FAIL"}: ${report.checks.length} checks, ${report.timing?.perQueueChangeMs} ms per queue change, ` +
+    `${report.timing?.getDeliveryMs} ms per getDelivery, ${report.timing?.findDeliveriesByTurnMs} ms per findDeliveriesByTurn. ` +
     `Report: ${join(OUT, "report.json")}\n`,
 );
 if (!report.passed) process.exitCode = 1;

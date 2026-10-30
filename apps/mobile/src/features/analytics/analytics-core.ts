@@ -1,6 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
-import { classifyFailure, type ReportQueue, safeProperties } from "@openbot/telemetry";
+import { classifyFailure, type Operation, type ReportQueue, safeProperties } from "@openbot/telemetry";
 import { Effect } from "effect";
 import { type MobileEventName, type MobileEventProperties, type SafeProperties, sanitizeMobileEvent } from "./events";
 
@@ -13,6 +13,41 @@ export interface MobileAnalyticsScope {
   track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void;
 }
 
+/**
+ * The operation of a failed event in its failure report. Each event has one, so a new event cannot
+ * report the wrong operation. Pairing, connection, input, conversation and server events keep
+ * `team`, as in earlier versions.
+ */
+const FAILURE_OPERATIONS: Record<MobileEventName, Operation> = {
+  mobile_app_opened: "other",
+  usage_viewed: "other",
+  mobile_pairing_action: "team",
+  mobile_connection_action: "team",
+  agent_input_action: "team",
+  conversation_action: "team",
+  team_action: "team",
+  hosted_server_plans_action: "team",
+  attachment_action: "attachment",
+  message_send: "turn",
+  conversation_opened: "turn",
+  routine_action: "routine",
+  agent_action: "agent",
+  agent_template_action: "agent",
+  marketplace_action: "marketplace",
+  memory_action: "memory",
+  search_action: "search",
+  account_sign_out: "auth",
+  account_sign_in_started: "auth",
+  account_sign_in_completed: "auth",
+  notification_settings_action: "settings",
+  live_activity_action: "settings",
+  analytics_preference_changed: "settings",
+  voice_conversation_action: "voice",
+  voice_turn: "voice",
+  onboarding_step: "other",
+  onboarding_completed: "other",
+};
+
 const ANONYMOUS_TTL_MS = 30 * 60 * 1_000;
 const MAX_PENDING_EVENTS = 100;
 type PendingEvent = { name: MobileEventName; properties: SafeProperties; timestamp: string };
@@ -23,6 +58,8 @@ export class MobileAnalytics {
   private anonymousStartedAt: number | null = null;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
+  /** Set while the last event before an opt-out goes out. No other event starts. */
+  private closing = false;
   private consentReady = false;
   private userReady = false;
   private generation = 0;
@@ -41,6 +78,7 @@ export class MobileAnalytics {
     if (this.consentReady && this.enabled === enabled) return;
     this.consentReady = true;
     this.enabled = enabled;
+    this.closing = false;
     const reports = this.createReports?.();
     if (reports && this.userReady) Effect.runFork(reports.configure(enabled, this.user?.id ?? null));
     this.consentGeneration += 1;
@@ -136,27 +174,12 @@ export class MobileAnalytics {
     properties: MobileEventProperties<N>,
     failureScope?: ReturnType<ReportQueue["scope"]> | null,
   ): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.closing) return;
     this.expireAnonymous();
     const safe = sanitizeMobileEvent(name, properties);
     if (safe.result === "failed") {
       const reports = failureScope === undefined ? this.createReports?.() : failureScope;
-      const operation =
-        name === "attachment_action"
-          ? "attachment"
-          : name === "message_send" || name === "conversation_opened"
-            ? "turn"
-            : name === "routine_action"
-              ? "routine"
-              : name === "agent_action"
-                ? "agent"
-                : name === "memory_action"
-                  ? "memory"
-                  : name === "search_action"
-                    ? "search"
-                    : name === "account_sign_out"
-                      ? "auth"
-                      : "team";
+      const operation = FAILURE_OPERATIONS[name];
       const failure = safeProperties({
         ...safe,
         operation,
@@ -201,6 +224,22 @@ export class MobileAnalytics {
       });
       throw error;
     }
+  }
+
+  /**
+   * Sends one last event and waits until it and the events before it are sent, for at most `limitMs`.
+   * The caller then turns tracking off. Until then, no other event starts.
+   */
+  async sendLast<N extends MobileEventName>(
+    name: N,
+    properties: MobileEventProperties<N>,
+    limitMs: number,
+  ): Promise<void> {
+    this.track(name, properties);
+    this.closing = true;
+    let limit: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([this.tail, new Promise((resolve) => (limit = setTimeout(resolve, limitMs)))]);
+    clearTimeout(limit);
   }
 
   retryReports(): void {

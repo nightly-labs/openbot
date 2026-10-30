@@ -6,8 +6,8 @@ import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "
 import type {
   AgentEvent,
   AgentImportPreview,
-  AgentSummary,
   AvatarImageInput,
+  ClientAgentSummary,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -38,6 +38,7 @@ import type {
   SendDirectMessageInput,
   ServerNotificationLevel,
   ServerSummary,
+  SetAgentNotificationLevelInput,
   SetTeamTypingInput,
   TeamInviteSummary,
   TeamMemberSummary,
@@ -47,8 +48,10 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import {
+  type AgentNotificationLevelsSnapshot,
   decodeRemoteAgentImportPreview,
   decodeRemoteInstanceTransferPreview,
+  EMPTY_AGENT_NOTIFICATION_LEVELS,
   LOCAL_SERVER_ID,
   REMOTE_DESKTOP_SETUP_CAPABILITY,
   type RemoteDesktopTestInput,
@@ -56,14 +59,20 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
+import {
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
+import { followHostKeyHandovers } from "@openbot/team-client/host-key-handover";
 import {
   HOSTED_HOST_READY_LIMIT_MS,
   HOSTED_START_FAILED_READS,
@@ -75,7 +84,13 @@ import { Deferred, Effect, Exit, Layer, Result, Scope, Semaphore } from "effect"
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import { contentDispositionFileName } from "./content-disposition";
 import type { HostedServerDesktopService } from "./hosted-server-service";
-import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
+import type { PreferenceFileFailure } from "./preference-file";
+import {
+  decodeAgentNotificationLevelsFromHost,
+  decodeAgentSummary,
+  decodeDraftAttachment,
+  decodeDuplicateAgentResultFromHost,
+} from "./remote-agent-decoding";
 import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import type { RemoteConnectTrace } from "./remote-connect-trace";
 import {
@@ -98,7 +113,7 @@ import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
 import { RemoteEventStream } from "./remote-server-event-stream";
-import { reconcileWebRtcHosts } from "./remote-server-host-directory";
+import { followedHostKeyHandovers, reconcileWebRtcHosts, verifyHostKeySignature } from "./remote-server-host-directory";
 import { requestJson, throwRemoteResponseError } from "./remote-server-http";
 import { RemotePresenceCache } from "./remote-server-presence";
 import { RemoteServerStore, type TokenCipher } from "./remote-server-store";
@@ -121,6 +136,20 @@ import {
   type TeamWebRtcClientTransport,
 } from "./team-webrtc-client-transport";
 
+/** Where a stopped local server points: port 0 accepts no connection, so no request leaves this app. */
+const STOPPED_LOCAL_SERVER_URL = "http://127.0.0.1:0";
+
+export interface LocalServerAttachInput {
+  serverId: string;
+  apiUrl: string;
+  fingerprint: string;
+  publicKey: string;
+  username: string;
+  password: string;
+  /** Selects the server: true only when the user just made it. */
+  select: boolean;
+}
+
 interface RemoteServerEvents {
   directoryInvalidated: [];
   changed: [servers: ServerSummary[]];
@@ -128,6 +157,7 @@ interface RemoteServerEvents {
   presence: [serverId: string, snapshot: TeamPresenceSnapshot];
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
+  machineAlert: [serverId: string, event: MachineAlertEvent];
 }
 
 interface CentralAccountSession {
@@ -157,6 +187,21 @@ interface RemoteServerManagerOptions {
    * account says who is signed in; the first read of it waits for this.
    */
   accountReady?: Effect.Effect<unknown, RemoteWorkflowError>;
+  /** The notification levels that the owner of this computer chose on its own server. */
+  localNotificationLevels?: LocalNotificationLevels;
+}
+
+/** The levels of the owner on the server of this computer, which the host also reads for the owner's phones. */
+export interface LocalNotificationLevels {
+  snapshot(): AgentNotificationLevelsSnapshot;
+  setServer(
+    level: ServerNotificationLevel | null,
+  ): Effect.Effect<AgentNotificationLevelsSnapshot, PreferenceFileFailure>;
+  setAgent(
+    input: SetAgentNotificationLevelInput,
+  ): Effect.Effect<AgentNotificationLevelsSnapshot, PreferenceFileFailure>;
+  /** Calls `listener` after each change, also one that the owner's phone made through the host. */
+  subscribe(listener: () => void): () => void;
 }
 
 export interface HostedServerWakeHooks {
@@ -203,6 +248,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  readonly #localLevels: LocalNotificationLevels | null;
+  /**
+   * The notification levels that the user chose on each joined server, as each server last gave them.
+   * Each connection reads them, and `agent-notification-levels-changed` and each change from this
+   * computer keep them current.
+   */
+  readonly #syncedLevels = new Map<string, AgentNotificationLevelsSnapshot>();
   readonly #team: RemoteTeamDirectory;
   readonly #centralAccount: CentralAccountSession;
   readonly #allowLocalDevelopmentInvites: boolean;
@@ -215,6 +267,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #getLocalHostId: () => string | null;
   /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
   #localMemberLimit: number | null = null;
+  /** The local servers that this app runs as its child processes. See `local-servers/`. */
+  #thisComputerServers: ReadonlySet<string> = new Set();
   readonly #hostedServers: HostedServerWakeHooks | null;
   /** When each hosted server that starts after a wake request started. */
   readonly #hostedStartAt = new Map<string, number>();
@@ -270,6 +324,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#hostedServers = options.hostedServers ?? null;
     this.#connectTrace = options.connectTrace ?? null;
     this.#accountReady = options.accountReady ?? Effect.void;
+    this.#localLevels = options.localNotificationLevels ?? null;
+    // A change from the owner's phone shows at once in the server list and in Settings › Notifications.
+    this.#localLevels?.subscribe(() => {
+      this.#emitChanged();
+      const snapshot = this.cachedNotificationLevels(LOCAL_SERVER_ID);
+      this.emit("agent", LOCAL_SERVER_ID, { type: "agent-notification-levels-changed", ...snapshot });
+    });
     this.#client = new RemoteServerClient({
       appVersion: this.#appVersion,
       servers: this.#store,
@@ -285,8 +346,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#refresh = new RemoteEventRefresh({
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       hasServer: (serverId) => this.#store.has(serverId),
-      emit: (serverId, event, bufferedLive) =>
-        bufferedLive ? this.emit("agent", serverId, event, true) : this.emit("agent", serverId, event),
+      emit: (serverId, event, bufferedLive) => {
+        // Another device of the user changed their levels: the server list shows the new server level.
+        if (event.type === "agent-notification-levels-changed")
+          this.#rememberLevels(serverId, { server: event.server, agents: event.agents });
+        if (bufferedLive) this.emit("agent", serverId, event, true);
+        else this.emit("agent", serverId, event);
+      },
     });
     this.#presence = new RemotePresenceCache({
       fetchSnapshot: (serverId) => this.request(serverId, TEAM_API_ROUTES.team.presence, decodeTeamPresenceSnapshot),
@@ -316,6 +382,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectMessage: (serverId, event) => this.emit("directMessage", serverId, event),
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
+      onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
       onChanged: () => this.#emitChanged(),
     });
@@ -344,6 +411,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
             this.#emitChanged();
             yield* Effect.all(
               [
+                // Another device of the user can have changed the levels while this one was away.
+                this.notificationLevels(serverId).pipe(Effect.catch(() => Effect.void)),
                 this.#refresh.refreshAgentRoster(serverId).pipe(
                   Effect.result,
                   Effect.map((result) =>
@@ -533,15 +602,85 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#store.activeServerId,
       (serverId) => this.#connections.statusFor(serverId),
       this.#localMemberLimit,
+      (serverId) => this.#thisComputerServers.has(serverId),
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
       return {
         ...server,
         notificationsMuted: mute.muted,
         notificationsMutedUntil: mute.mutedUntil,
-        notificationLevel: this.#store.notificationLevel(server.id),
+        // The level that the user chose for all devices wins over the level of this computer.
+        notificationLevel: this.cachedNotificationLevels(server.id).server ?? this.#store.notificationLevel(server.id),
       };
     });
+  }
+
+  /** The levels that the user chose on a server for all of their devices, as last read. */
+  cachedNotificationLevels(serverId: string): AgentNotificationLevelsSnapshot {
+    if (serverId === LOCAL_SERVER_ID) return this.#localLevels?.snapshot() ?? EMPTY_AGENT_NOTIFICATION_LEVELS;
+    return this.#syncedLevels.get(serverId) ?? EMPTY_AGENT_NOTIFICATION_LEVELS;
+  }
+
+  /**
+   * The levels of a joined server that this computer has read, or `null` before the first read
+   * succeeds. A server without `agent-notification-levels-v1` has none to read.
+   */
+  knownNotificationLevels(serverId: string): AgentNotificationLevelsSnapshot | null {
+    if (serverId === LOCAL_SERVER_ID) return this.cachedNotificationLevels(serverId);
+    return this.#syncedLevels.get(serverId) ?? null;
+  }
+
+  /**
+   * Reads the levels that the user chose on a server for all of their devices. A joined server without
+   * `agent-notification-levels-v1` has none, so the level of this computer applies.
+   */
+  readonly notificationLevels = Effect.fn("RemoteManager.notificationLevels")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+  ) {
+    if (serverId === LOCAL_SERVER_ID || !this.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+      return this.cachedNotificationLevels(serverId);
+    const snapshot = yield* this.request(
+      serverId,
+      AGENT_NOTIFICATION_LEVELS_ROUTES.read,
+      decodeAgentNotificationLevelsFromHost,
+      { method: "POST", body: {} },
+    );
+    this.#rememberLevels(serverId, snapshot);
+    return snapshot;
+  }).bind(this);
+
+  readonly setAgentNotificationLevel = Effect.fn("RemoteManager.setAgentNotificationLevel")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: SetAgentNotificationLevelInput,
+  ) {
+    if (serverId === LOCAL_SERVER_ID) {
+      const local = this.#localLevels;
+      if (!local) return yield* this.#levelsUnsupported();
+      return yield* local.setAgent(input).pipe(Effect.mapError((cause) => new RemoteWorkflowError({ cause })));
+    }
+    if (!this.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+      return yield* this.#levelsUnsupported();
+    const snapshot = yield* this.request(
+      serverId,
+      AGENT_NOTIFICATION_LEVELS_ROUTES.set,
+      decodeAgentNotificationLevelsFromHost,
+      { method: "POST", body: { agentId: input.agentId, level: input.level } },
+    );
+    this.#rememberLevels(serverId, snapshot);
+    return snapshot;
+  }).bind(this);
+
+  #levelsUnsupported() {
+    return new RemoteWorkflowError({ cause: new Error(sourceText("error.team.agentNotificationLevelsUnsupported")) });
+  }
+
+  #rememberLevels(serverId: string, snapshot: AgentNotificationLevelsSnapshot): void {
+    const before = this.#syncedLevels.get(serverId)?.server ?? null;
+    this.#syncedLevels.set(serverId, snapshot);
+    // The server level is in the server list, which the rail, the menus and the island read.
+    if (before !== snapshot.server) this.#emitChanged();
   }
 
   /**
@@ -586,6 +725,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   get activeServerId(): string {
     return this.#store.activeServerId;
+  }
+
+  /** The servers that a chat window shows. Their hosts keep sending chat events. */
+  setChatWindowServers(serverIds: ReadonlySet<string>): void {
+    this.#events.setChatWindowServers(serverIds);
   }
 
   // What the host on the other end negotiated it can do. An IPC handler asks before calling a route
@@ -662,7 +806,22 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
       level: ServerNotificationLevel,
     ): Effect.fn.Return<ServerSummary[], RemoteWorkflowError, RemoteRequest> {
+      // The level of this computer stays as the fallback for a server that cannot keep the user's level.
       yield* this.#store.setNotificationLevel(serverId, level);
+      if (serverId === LOCAL_SERVER_ID && this.#localLevels) {
+        yield* this.#localLevels.setServer(level).pipe(Effect.mapError((cause) => new RemoteWorkflowError({ cause })));
+      } else if (
+        serverId !== LOCAL_SERVER_ID &&
+        this.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+      ) {
+        const snapshot = yield* this.request(
+          serverId,
+          AGENT_NOTIFICATION_LEVELS_ROUTES.server,
+          decodeAgentNotificationLevelsFromHost,
+          { method: "POST", body: { level } },
+        );
+        this.#syncedLevels.set(serverId, snapshot);
+      }
       this.#emitChanged();
       return this.list();
     },
@@ -709,7 +868,20 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         if (preview.hostId !== invite.serverId)
           return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.inviteHostMismatch")) });
         const publicKey = preview.devicePublicKey;
-        if (!publicKey || (yield* remoteDecode(() => fingerprint(publicKey))) !== invite.fingerprint) {
+        const hostFingerprint = publicKey ? yield* remoteDecode(() => fingerprint(publicKey)) : "";
+        // The invitation names the key that the host had when it made the invitation. A signed handover
+        // chain from that key to the current one keeps the invitation valid after a key rotation.
+        if (
+          !publicKey ||
+          (hostFingerprint !== invite.fingerprint &&
+            !(yield* followHostKeyHandovers({
+              hostId: invite.serverId,
+              trustedFingerprint: invite.fingerprint,
+              advertisedPublicKey: publicKey,
+              handovers: preview.keyHandovers,
+              verify: verifyHostKeySignature,
+            })))
+        ) {
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.inviteIdentityMismatch")),
           });
@@ -722,7 +894,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.#store.unhideHost(accepted.hostId);
         yield* this.#syncWebRtcHosts();
         const synchronized = this.#store.find(accepted.hostId);
-        if (!synchronized || synchronized.fingerprint !== invite.fingerprint) {
+        if (!synchronized || synchronized.fingerprint !== hostFingerprint) {
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.inviteIdentityChanged")),
           });
@@ -826,6 +998,89 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       yield* this.#events.restart(stored.id, true);
       return yield* remoteDecode(() => requiredServerSummary(this.list(), stored.id));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Called by the local servers before they start, so that the directory sync keeps their entries. */
+  setThisComputerServers(serverIds: Iterable<string>): void {
+    this.#thisComputerServers = new Set(serverIds);
+    this.#emitChanged();
+  }
+
+  /**
+   * A local server that started: it proves the key pinned when it was made, then this app logs in as
+   * its owner. A new session at each start, so no session can expire while the server runs.
+   */
+  readonly attachLocalServer = Effect.fn("RemoteManager.attachLocalServer")(
+    function* (
+      this: RemoteServerManager,
+      input: LocalServerAttachInput,
+    ): Effect.fn.Return<ServerSummary, RemoteWorkflowError, RemoteRequest> {
+      const verifiedIdentity = yield* this.#client.verifyIdentity(input.apiUrl, input.serverId, input.fingerprint);
+      if (verifiedIdentity.publicKey !== input.publicKey)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.identityNotVerified")) });
+      const result = yield* requestJson(input.apiUrl, TEAM_API_ROUTES.auth.login, decodeJoinResult, {
+        method: "POST",
+        body: { username: input.username, password: input.password },
+        ...this.#client.requestProtocol(verifiedIdentity.compatibility),
+      }).pipe(
+        Effect.mapError(
+          (failure) =>
+            new RemoteWorkflowError({
+              cause:
+                failure instanceof RemoteRequestError || failure instanceof RemoteProtocolError
+                  ? failure
+                  : failure.cause,
+            }),
+        ),
+      );
+      const stored: StoredRemoteServer = {
+        id: input.serverId,
+        name: verifiedIdentity.serverName,
+        apiUrl: input.apiUrl,
+        fingerprint: input.fingerprint,
+        publicKey: input.publicKey,
+        username: input.username,
+        encryptedToken: yield* remoteDecode(() => this.#store.sealToken(result.sessionToken)),
+        remoteDesktopAvailable: false,
+        logoVersion: verifiedIdentity.logoVersion,
+        role: result.member.role,
+      };
+      this.#connections.setCompatibility(stored.id, verifiedIdentity.compatibility);
+      this.#connections.clearIssue(stored.id);
+      this.#connections.setState(stored.id, "online");
+      yield* this.#store.attachLocal(stored, input.select);
+      this.#events.syncScopes();
+      this.#emitChanged();
+      yield* this.#events.restart(stored.id, true);
+      return yield* remoteDecode(() => requiredServerSummary(this.list(), stored.id));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * A local server stopped (`forget` false) or was deleted (`forget` true). A stopped one keeps its
+   * slot, but not its port or its session: another process can take the port before the next start.
+   */
+  readonly detachLocalServer = Effect.fn("RemoteManager.detachLocalServer")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      forget: boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError> {
+      const current = this.#store.find(serverId);
+      if (!current) return;
+      this.#clearServerConnectionState(serverId);
+      if (forget) {
+        yield* this.#store.remove(serverId);
+      } else {
+        const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
+        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken }, false);
+        this.#connections.setState(serverId, "offline");
+        this.#events.suspendReconnect(serverId);
+      }
+      this.#emitChanged();
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -1756,7 +2011,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       agentId: string,
       image: AvatarImageInput | null,
       serverId = this.#store.activeServerId,
-    ): Effect.fn.Return<AgentSummary, RemoteWorkflowError, RemoteRequest> {
+    ): Effect.fn.Return<ClientAgentSummary, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
       const headers = new Headers();
@@ -1764,7 +2019,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const response = yield* this.#client.fetch(server, url, {
         method: image ? "PUT" : "DELETE",
         headers,
-        body: image ? Buffer.from(image.bytes) : undefined,
+        ...(image ? { body: Buffer.from(image.bytes) } : {}),
       });
       const json = yield* remoteCall(() => response.json());
       const value = yield* remoteDecode(() =>
@@ -1828,22 +2083,27 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this: RemoteServerManager,
       attachmentId: string,
       serverId = this.#store.activeServerId,
+      preview = false,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      return yield* this.#attachments.get(server.id, attachmentId, () =>
-        this.#owned(
-          Effect.gen({ self: this }, function* () {
-            const response = yield* this.#client.fetch(
-              server,
-              new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl),
-            );
-            return {
-              bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-              name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
-              mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-            };
-          }),
-        ),
+      return yield* this.#attachments.get(
+        server.id,
+        attachmentId,
+        () =>
+          this.#owned(
+            Effect.gen({ self: this }, function* () {
+              const response = yield* this.#client.fetch(
+                server,
+                new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl),
+              );
+              return {
+                bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+                name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
+                mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+              };
+            }),
+          ),
+        preview,
       );
     },
     (operation) => this.#owned(operation),
@@ -1854,13 +2114,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this: RemoteServerManager,
       sharedPath: string,
       serverId = this.#store.activeServerId,
+      maxBytes?: number,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.sharedFiles, server.apiUrl);
       url.searchParams.set("path", sharedPath);
       const response = yield* this.#client.fetch(server, url);
       return {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+        bytes: yield* remoteCall(() => fileResponseBytes(response, maxBytes)),
         name: contentDispositionFileName(response.headers.get("content-disposition"), basename(sharedPath)),
       };
     },
@@ -1873,6 +2134,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       agentId: string,
       workspacePath: string,
       serverId = this.#store.activeServerId,
+      maxBytes?: number,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.workspaceFiles, server.apiUrl);
@@ -1881,7 +2143,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       url.searchParams.set("path", workspacePath);
       const response = yield* this.#client.fetch(server, url);
       return {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+        bytes: yield* remoteCall(() => fileResponseBytes(response, maxBytes)),
         name: contentDispositionFileName(response.headers.get("content-disposition"), basename(workspacePath)),
       };
     },
@@ -1949,8 +2211,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const email = yield* remoteDecode(() => this.#centralAccount.getEmail());
     const localHostId = this.#getLocalHostId();
     this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
+    const followedHandovers = yield* followedHostKeyHandovers({
+      hosts,
+      servers: this.#store.servers,
+      preservedIdentities: this.#store.preservedIdentities,
+    });
     const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
       hosts,
+      followedHandovers,
       isConnected: (hostId) => transport.isConnected(hostId),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
@@ -1958,6 +2226,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       isHiddenHost: (hostId) => this.#store.isHiddenHost(hostId),
       username: email.trim().toLowerCase(),
       keepOtherTransports: this.#allowLocalDevelopmentInvites,
+      isThisComputer: (serverId) => this.#thisComputerServers.has(serverId),
     });
     for (const { hostId, publicKey } of pinnedKeys) transport.pinHostKey(hostId, publicKey);
     for (const serverId of removedHostIds) {
@@ -1980,6 +2249,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     } else if (event.type === "team-direct-message") this.emit("directMessage", serverId, event);
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
+    else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
   }
 
@@ -2033,4 +2303,19 @@ function requiredServerSummary(servers: ServerSummary[], serverId: string): Serv
   const server = servers.find((candidate) => candidate.id === serverId);
   if (!server) throw new Error("Remote server summary is missing.");
   return server;
+}
+
+/**
+ * The body of a host file. With `maxBytes`, a preview that names a larger size stops before it reads
+ * the body. A host that names no size is read, and the result is checked.
+ */
+async function fileResponseBytes(response: Response, maxBytes: number | undefined): Promise<Uint8Array> {
+  if (maxBytes !== undefined && Number(response.headers.get("content-length")) > maxBytes) {
+    await response.body?.cancel();
+    throw new Error(sourceText("error.attachment.previewTooLarge"));
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (maxBytes !== undefined && bytes.byteLength > maxBytes)
+    throw new Error(sourceText("error.attachment.previewTooLarge"));
+  return bytes;
 }

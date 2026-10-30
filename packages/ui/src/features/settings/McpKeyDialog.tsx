@@ -3,17 +3,23 @@
  * before it is saved anywhere.
  */
 
+import {
+  applyMcpFlow,
+  type McpAuthValues,
+  type McpKeyFlow,
+  mcpFlowComplete,
+} from "@openbot/contracts/mcp-connect-flows";
 import { Button, ExternalLink, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createMemo, createStore, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
-import { applyMcpFlow, type McpAuthValues, type McpKeyFlow, mcpFlowComplete, mcpFlowError } from "./mcp-connect-auth";
+import { mcpFlowError } from "./mcp-connect-auth";
 
 export interface McpKeyDialogProps extends McpConnectBaseProps {
   /** The credentials this server asks for, as its listing declares them. */
   flow: McpKeyFlow;
   /** Opens the page the key is created on. Without it the dialog shows no link. */
-  onOpenUrl?: (url: string) => void;
+  onOpenUrl?: ((url: string) => void) | undefined;
   /** The joined server whose host keeps the credential. Absent when this computer keeps it. */
   hostName?: string | undefined;
 }
@@ -67,11 +73,11 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
       onSubmit={submit}
       action={
         <Button
-          class="mcp-connect-primary"
           type="submit"
+          size="sm"
           loading={busy()}
           loadingLabel={t("common.connecting")}
-          disabled={busy() || (form.touched && !complete())}
+          disabled={form.touched && !complete()}
         >
           {state.phase === "failed" ? t("common.tryAgain") : t("mcp.connect.connect")}
         </Button>

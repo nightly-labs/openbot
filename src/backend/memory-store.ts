@@ -41,11 +41,11 @@ export interface SaveAutomaticMemory {
 }
 
 export interface SaveMemoryInput {
-  memoryId?: string;
+  memoryId?: string | undefined;
   text: string;
   origin: AgentMemoryOrigin;
   sourceTurnId: string | null;
-  commandId?: string;
+  commandId?: string | undefined;
   uncapped?: boolean;
 }
 
@@ -128,11 +128,11 @@ export class MemoryStore {
       if (!current || current.updatedAt !== input.expectedUpdatedAt) return null;
     }
     return this.save(ownerId, {
-      memoryId: input.memoryId,
+      ...(input.memoryId === undefined ? {} : { memoryId: input.memoryId }),
       text: input.text,
       origin: "automatic",
       sourceTurnId: input.sourceTurnId,
-      commandId: input.commandId,
+      ...(input.commandId === undefined ? {} : { commandId: input.commandId }),
     });
   }
 

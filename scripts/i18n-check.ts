@@ -29,7 +29,18 @@ const CODE_ROOTS = ["src", "packages", "apps/mobile/src", "apps/auth-api/src", "
 const CODE_EXTENSIONS = /\.(?:ts|tsx)$/;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".expo"]);
 /** Keys that no current code sends, but older hosts still do. Keep them so their text is translated. */
-const RELEASED_SOURCE_KEYS = new Set(["error.agent.noStartingModel"]);
+const RELEASED_SOURCE_KEYS = new Set([
+  "error.agent.noStartingModel",
+  "error.provider.cliBusyUpdate",
+  // Hosts before side threads send these for the agent-tasks-v1 routes.
+  "error.backend.taskNotFound",
+  "error.backend.taskStillRunning",
+  "error.backend.taskClosed",
+  "error.backend.taskTitleRequired",
+  "error.backend.taskOpenLimitReached",
+  "error.backend.taskRemoteUnsupported",
+  "error.backend.taskMoveRefused",
+]);
 
 const logger = createOpenBotLogger("i18n-check");
 const failures: string[] = [];

@@ -1,0 +1,374 @@
+/* The overlay view above a local page: the page shows through all of it but the dock. */
+html:has(.browser-dock-surface),
+body:has(.browser-dock-surface),
+#root:has(.browser-dock-surface) {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.browser-dock-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-sans);
+}
+
+/*
+ * The dock over a browser page: the island for what the agent does, the queue, and the composer of the
+ * tab's agent. Each part is glass. The layers are local to the dock: the copies of a motion go under the
+ * composer, the sent text goes over it, and the island is on top.
+ */
+.browser-dock {
+  position: absolute;
+  bottom: var(--openbot-space-4);
+  left: 50%;
+  display: flex;
+  width: min(640px, calc(100% - 2 * var(--openbot-space-6)));
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  isolation: isolate;
+  translate: -50% 0;
+}
+
+.browser-dock-glass {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-0-5);
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-glass);
+  box-shadow: var(--openbot-shadow-raised);
+  backdrop-filter: blur(16px);
+  color: var(--openbot-text-secondary);
+}
+
+.browser-dock-composer svg,
+.browser-dock-island-activity svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The island: one glass capsule over the composer for the step, the code and the reply. A spring sets its
+   size and corners while it changes; at rest, its content sets them. */
+.browser-dock-island {
+  position: relative;
+  z-index: 4;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* It grows out from under the composer, so it is under the composer until it is open. */
+.browser-dock-island[data-budding] {
+  z-index: 1;
+}
+
+.browser-dock-island:is([data-mode="reply"], [data-mode="secret"], [data-mode="prompt"], [data-mode="approval"]) {
+  width: 100%;
+  border-radius: var(--openbot-radius-lg);
+}
+
+/* The code card, the questions and the approval have a denser glass, so that the page under them does not
+   show through as dark shapes behind the text. The code card is narrower than the reply. */
+.browser-dock-island:is([data-mode="secret"], [data-mode="prompt"], [data-mode="approval"]) {
+  border-radius: var(--openbot-radius-xl);
+  background: color-mix(in srgb, var(--openbot-bg-glass), var(--openbot-bg-control) 60%);
+  backdrop-filter: blur(32px) saturate(1.4);
+}
+
+.browser-dock-island[data-mode="secret"] {
+  width: min(100%, 420px);
+}
+
+.browser-dock-island-face {
+  box-sizing: border-box;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The island has the glass of the code card, so the card does not paint a second one. */
+.browser-dock-island-face > .browser-secret-card {
+  width: 100%;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* The questions or the approval of the agent, as in the chat. A long card scrolls, so the page stays in view.
+   The limit is not in vh: over a local page, the viewport is the overlay, which is only as tall as the dock. */
+.browser-dock-island-card {
+  display: grid;
+  max-height: 420px;
+  gap: var(--openbot-space-2);
+  overflow: auto;
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+}
+
+.browser-dock-island-card :is(.question-prompt-bubble, .ui-bubble-content, .approval-card) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+}
+
+.browser-dock-island-card > * {
+  margin: 0;
+}
+
+/* The step is at the start and the button at the end, so that the button stays at the edge while the island
+   changes width. */
+.browser-dock-island-activity {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+/* Old content on its way out of the island, and the copy of an island that closes. */
+.browser-dock-island-leaving {
+  pointer-events: none;
+}
+
+.browser-dock-island.browser-dock-island-ghost {
+  position: absolute;
+  z-index: 1;
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.browser-dock-spin {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
+  animation: ui-spin 1s linear infinite;
+}
+
+/* The step and the button that gives the page to the user, or back. */
+.browser-dock-status {
+  display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.browser-dock-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.browser-dock-handoff {
+  flex: none;
+  margin-left: auto;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.browser-dock-island-reply {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+}
+
+.browser-dock-reply-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-dock-reply-header > strong {
+  font-weight: var(--openbot-weight-medium);
+}
+
+.browser-dock-reply-close {
+  margin-left: auto;
+}
+
+.browser-dock-reply-body {
+  max-height: 160px;
+  padding-right: var(--openbot-space-1);
+  overflow: auto;
+  line-height: var(--openbot-leading-lg);
+}
+
+.browser-dock-reply-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Queue ------------------------------------------------------------------------------------------- */
+
+/* The queue and the composer, with no gap, so the queue tucks under the top edge of the field. */
+.browser-dock-stack {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+}
+
+/* The queue keeps clear of the round ends of the field, and has the glass of the field. */
+.agent-queue-panel[data-variant="floating"] {
+  margin-inline: var(--openbot-space-6);
+  border-color: var(--openbot-glass-border);
+  background: var(--openbot-bg-glass);
+  backdrop-filter: blur(16px);
+  /* A sent message opens the queue with a clip that rises out of the field. */
+  animation: none;
+}
+
+/* The queue closes on the island spring, which the dock sets. */
+.browser-dock-stack > .agent-queue-slot {
+  transition-duration: var(--browser-dock-island-duration);
+  transition-timing-function: var(--browser-dock-island-easing);
+}
+
+.browser-dock-composer {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 100%;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-2);
+}
+
+.browser-dock-avatar {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.browser-dock-editor {
+  min-width: 0;
+  flex: 1;
+  color: var(--openbot-text-primary);
+}
+
+/* The text of a new queue row waits until the sent text arrives from the field. */
+.agent-queue-panel[data-variant="floating"] .agent-queue-item[data-arriving] .agent-queue-message {
+  visibility: hidden;
+}
+
+/* The glass copy that changes into the step. It starts under the field, so it comes out from behind it. */
+.browser-dock-morph {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--openbot-glass-border);
+  background: var(--openbot-bg-glass);
+  box-shadow: var(--openbot-shadow-raised);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
+/* The step on the copy, without its glass, in the middle of the copy at its final size. */
+.browser-dock-morph > .browser-dock-glass {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-color: transparent;
+  animation: none;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  translate: -50% -50%;
+}
+
+/* The sent text on its way from the field, or from a queue row, to the step. */
+.browser-dock-morph-text {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transform-origin: left center;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+/* The row actions are small glass chips, as the field and the step are. */
+.agent-queue-panel[data-variant="floating"] .agent-queue-actions {
+  gap: var(--openbot-space-1);
+}
+
+.agent-queue-panel[data-variant="floating"] :is(.agent-queue-steer, .agent-queue-icon-button) {
+  box-sizing: border-box;
+  height: 24px;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-glass-surface);
+  box-shadow: inset 0 1px 0 var(--openbot-glass-highlight);
+  backdrop-filter: blur(8px);
+  color: var(--openbot-text-secondary);
+  transition:
+    background var(--openbot-duration-hover) ease,
+    border-color var(--openbot-duration-hover) ease,
+    box-shadow var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
+    opacity var(--openbot-duration-hover) ease;
+}
+
+.agent-queue-panel[data-variant="floating"] .agent-queue-steer {
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1-5);
+  font-size: var(--openbot-text-sm);
+}
+
+.agent-queue-panel[data-variant="floating"] .agent-queue-icon-button {
+  width: 24px;
+}
+
+.agent-queue-panel[data-variant="floating"] :is(.agent-queue-steer, .agent-queue-icon-button) svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-queue-panel[data-variant="floating"]
+  :is(.agent-queue-steer, .agent-queue-icon-button):is(:hover:not(:disabled), :focus-visible) {
+  background: var(--openbot-glass-surface-hover);
+  color: var(--openbot-text-primary);
+}
+
+.agent-queue-panel[data-variant="floating"]
+  .agent-queue-icon-button.agent-queue-delete:is(:hover:not(:disabled), :focus-visible) {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+}
+
+.agent-queue-panel[data-variant="floating"] :is(.agent-queue-steer, .agent-queue-icon-button):focus-visible {
+  box-shadow:
+    inset 0 1px 0 var(--openbot-glass-highlight),
+    0 0 0 2px var(--openbot-border-focus);
+}
+
+/* With a pointer, the row actions are quiet. They get their glass on the row under the pointer or with
+   focus. */
+@media (hover: hover) {
+  .agent-queue-panel[data-variant="floating"]
+    .agent-queue-item:not(:hover, :focus-within)
+    :is(.agent-queue-steer, .agent-queue-icon-button):not(:focus-visible) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    color: var(--openbot-text-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-dock-stack > .agent-queue-slot {
+    transition: none;
+  }
+}

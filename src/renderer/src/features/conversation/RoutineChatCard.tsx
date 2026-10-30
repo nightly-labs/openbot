@@ -25,7 +25,7 @@ export interface RoutineChatCardProps {
   /** False when a later card in this chat is for the same routine. */
   latest: boolean;
   onOpenRoutine: (routine: { routineId: string; name: string }) => void;
-  onShowLatest?: () => void;
+  onShowLatest?: (() => void) | undefined;
   /** "Show latest" on an older card moved here, so the card takes keyboard focus once it is in the page. */
   focusRequested?: boolean;
   onFocusHandled?: () => void;
@@ -64,7 +64,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     () => (props.focusRequested ? element() : undefined),
     (card) => {
       if (!card) return;
-      card.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+      card.querySelector<HTMLButtonElement>('button:not(:disabled, [aria-disabled="true"])')?.focus();
       props.onFocusHandled?.();
     },
   );

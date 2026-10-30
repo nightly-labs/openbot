@@ -1,5 +1,5 @@
-// Shared by migration v38 and the separate new-database schema. IF NOT EXISTS throughout, because
-// this text is both the migration and the tail of the latest schema.
+// Migration v38, frozen. Migration 47 moves every task to `projection_agent_threads` and drops this
+// table, so the latest schema no longer has it.
 //
 // A task is a second conversation of one agent that runs next to its own chat: the agent keeps its
 // identity, workspace and memories, and the task has a thread and a provider session of its own.

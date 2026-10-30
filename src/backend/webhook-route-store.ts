@@ -15,10 +15,17 @@ import { ROUTINE_TABLES } from "./routine-tables";
 
 const RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Who answers a route: an agent or channel routine, or a webhook trigger of a workflow. The
+ * workflow arm stays in the backend; the events API and `events-v1` name routine owners only.
+ */
+export type WebhookRouteOwner = EventRoutineOwner | { kind: "workflow"; id: string };
+
 /** What the main process needs to verify and route one inbound request. */
 interface WebhookRoute {
   routeId: string;
-  owner: EventRoutineOwner;
+  owner: WebhookRouteOwner;
+  /** The routine, or the trigger node of a workflow. */
   routineId: string;
   url: string | null;
   secretCiphertext: string;
@@ -41,7 +48,17 @@ const ROUTE_SELECT = Object.values(ROUTINE_TABLES)
                    webhook.url, webhook.secret_ciphertext
             FROM ${webhookTable} webhook JOIN ${routineTable} routine ON routine.routine_id = webhook.routine_id`;
   })
+  .concat(
+    `SELECT route_id, 'workflow' AS owner_kind, workflow_id AS owner_id, node_id AS routine_id, url, secret_ciphertext
+     FROM workflow_trigger_webhooks`,
+  )
   .join(" UNION ALL ");
+
+/** Each table that holds routes. A route ID is in one of them only. */
+const ROUTE_TABLES = [
+  ...Object.values(ROUTINE_TABLES).map(({ webhookTable }) => webhookTable),
+  "workflow_trigger_webhooks",
+];
 
 /**
  * Owns the public side of webhook triggers: the route that the relay forwards, its secret, the
@@ -62,7 +79,7 @@ export class WebhookRouteStore {
 
   /** Saves the relay URL only while the route is still the routine's, so a late registration cannot win. */
   setUrl(routeId: string, url: string | null): void {
-    for (const { webhookTable } of Object.values(ROUTINE_TABLES)) {
+    for (const webhookTable of ROUTE_TABLES) {
       this.database.connection.prepare(`UPDATE ${webhookTable} SET url = ? WHERE route_id = ?`).run(url, routeId);
     }
   }
@@ -74,7 +91,7 @@ export class WebhookRouteStore {
    */
   replaceRouteId(routeId: string, now = new Date()): string | null {
     const replacement = randomUUID();
-    for (const { webhookTable } of Object.values(ROUTINE_TABLES)) {
+    for (const webhookTable of ROUTE_TABLES) {
       const replaced = this.database.connection
         .prepare(`UPDATE ${webhookTable} SET route_id = ?, url = NULL, updated_at = ? WHERE route_id = ?`)
         .run(replacement, now.toISOString(), routeId);
@@ -92,6 +109,34 @@ export class WebhookRouteStore {
       )
       .run(secretCiphertext, now.toISOString(), routineId, owner.id);
     if (rotated.changes === 0) throw new RoutineInputError(sourceText("error.backend.routineGone"));
+  }
+
+  /** Whether a workflow trigger has a route yet. Its first secret makes one. */
+  hasWorkflowRoute(workflowId: string, nodeId: string): boolean {
+    return isDynamicRecord(
+      this.database.connection
+        .prepare("SELECT 1 FROM workflow_trigger_webhooks WHERE workflow_id = ? AND node_id = ?")
+        .get(workflowId, nodeId),
+    );
+  }
+
+  /**
+   * Gives a webhook trigger of a workflow a new secret. The first secret also makes its route, with a
+   * random ID and no URL until the relay registers it. Returns false when the node is not a webhook
+   * trigger of that workflow.
+   */
+  rotateWorkflowSecret(workflowId: string, nodeId: string, secretCiphertext: string, now = new Date()): boolean {
+    const at = now.toISOString();
+    const result = this.database.connection
+      .prepare(
+        `INSERT INTO workflow_trigger_webhooks (workflow_id, node_id, route_id, secret_ciphertext, url, created_at, updated_at)
+         SELECT workflow_id, node_id, ?, ?, NULL, ?, ? FROM workflow_triggers
+         WHERE workflow_id = ? AND node_id = ? AND kind = 'webhook'
+         ON CONFLICT(workflow_id, node_id) DO UPDATE SET secret_ciphertext = excluded.secret_ciphertext,
+           updated_at = excluded.updated_at`,
+      )
+      .run(randomUUID(), secretCiphertext, at, at, workflowId, nodeId);
+    return Number(result.changes) > 0;
   }
 
   pendingRevocations(): string[] {
@@ -136,13 +181,15 @@ export function hasWebhookReceipt(
         `SELECT 1 FROM projection_webhook_receipts
          WHERE owner_kind = ? AND routine_id = ? AND delivery_id = ? AND received_at >= ?`,
       )
-      .get(receipt.ownerKind, receipt.routineId, receipt.deliveryId, receiptCutoff(receipt.receivedAt)),
+      .get(receipt.ownerKind, receipt.routineId, receipt.deliveryId, webhookReceiptCutoff(receipt.receivedAt)),
   );
 }
 
 /** Records one verified request in the caller's transaction and drops receipts past retention. */
 export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt: WebhookReceipt): void {
-  db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(receiptCutoff(receipt.receivedAt));
+  db.prepare("DELETE FROM projection_webhook_receipts WHERE received_at < ?").run(
+    webhookReceiptCutoff(receipt.receivedAt),
+  );
   db.prepare(
     `INSERT INTO projection_webhook_receipts (
        receipt_id, owner_kind, routine_id, delivery_id, event_type, status, reason, run_id, received_at
@@ -160,7 +207,8 @@ export function insertWebhookReceipt(db: OpenBotDatabase["connection"], receipt:
   );
 }
 
-function receiptCutoff(receivedAt: string): string {
+/** The oldest receive time that a receipt keeps. Older delivery IDs count as new again. */
+export function webhookReceiptCutoff(receivedAt: string): string {
   return new Date(Date.parse(receivedAt) - RECEIPT_RETENTION_MS).toISOString();
 }
 
@@ -192,8 +240,8 @@ export function revokeRoutineWebhooks(
 }
 
 function route(row: DynamicRecord): WebhookRoute {
-  const owner = { kind: row.owner_kind, id: row.owner_id };
-  if (!isEventRoutineOwner(owner)) throw new Error("The stored webhook route is invalid.");
+  const owner = routeOwner(row);
+  if (!owner) throw new Error("The stored webhook route is invalid.");
   return {
     routeId: requiredStringColumn(row, "route_id"),
     owner,
@@ -201,4 +249,12 @@ function route(row: DynamicRecord): WebhookRoute {
     url: optionalStringColumn(row, "url"),
     secretCiphertext: requiredStringColumn(row, "secret_ciphertext"),
   };
+}
+
+function routeOwner(row: DynamicRecord): WebhookRouteOwner | null {
+  const owner = { kind: row.owner_kind, id: row.owner_id };
+  if (isEventRoutineOwner(owner)) return owner;
+  return row.owner_kind === "workflow" && typeof row.owner_id === "string"
+    ? { kind: "workflow", id: row.owner_id }
+    : null;
 }

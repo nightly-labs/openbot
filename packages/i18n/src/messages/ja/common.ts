@@ -19,6 +19,7 @@ export const messages = {
   "common.create": "作成",
   "common.open": "開く",
   "common.search": "検索",
+  "common.noMatches": "一致する項目はありません",
   "common.loading": "読み込み中…",
   "common.saving": "保存中…",
   "common.tryAgain": "もう一度試す",

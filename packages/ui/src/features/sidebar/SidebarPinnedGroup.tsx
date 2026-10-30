@@ -13,7 +13,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
-import { SidebarPinnedAvatar } from "./SidebarAgentIndicator";
+import { SidebarAgentIndicator, SidebarPinnedAvatar } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
 import { sidebarAgentStateLabel } from "./sidebar-filtering";
 import { sidebarPinnedItemKey } from "./sidebar-pins";
@@ -62,16 +62,20 @@ export function SidebarPinnedGroup() {
               const key = () => sidebarPinnedItemKey(item.ref);
               const name = () => chatName(item.chat);
               const active = () => chatIsActive(item.chat);
-              // A pinned agent that waits stays in its tile, so the tile says what it waits for.
+              // A pinned chat that waits stays in its tile, so the tile says what it waits for.
+              const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);
               const stateLabel = () => {
-                if (item.chat.kind !== "agent") return "";
-                const state = props.agentStates[item.chat.id];
+                const state = item.chat.kind === "agent" ? props.agentStates[item.chat.id] : channelWait();
                 return state?.kind === "routine" || state?.kind === "waiting" || state?.kind === "limited"
                   ? sidebarAgentStateLabel(state, t, format)
                   : "";
               };
               const rowLabel = () => {
-                if (item.chat.kind === "channel") return t("sidebar.pinned.channel", { name: name() });
+                if (item.chat.kind === "channel") {
+                  return stateLabel()
+                    ? t("sidebar.pinned.channelWithState", { name: name(), state: stateLabel() })
+                    : t("sidebar.pinned.channel", { name: name() });
+                }
                 return stateLabel()
                   ? t("sidebar.pinned.agentWithState", { name: name(), state: stateLabel() })
                   : t("sidebar.pinned.agent", { name: name() });
@@ -137,7 +141,7 @@ export function SidebarPinnedGroup() {
                                 </strong>
                                 <Show when={agent().title.trim()}>
                                   {(label) => (
-                                    <Badge class="sidebar-pinned-title" size="sm" title={label()}>
+                                    <Badge class="sidebar-pinned-title" title={label()}>
                                       <span>{label()}</span>
                                     </Badge>
                                   )}
@@ -154,6 +158,7 @@ export function SidebarPinnedGroup() {
                             <>
                               <span class="agent-row-avatar sidebar-pinned-avatar">
                                 <ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />
+                                <SidebarAgentIndicator state={channelWait} />
                               </span>
                               <span class="agent-row-copy sidebar-pinned-copy">
                                 <strong class="sidebar-pinned-name" title={name()}>
@@ -161,7 +166,7 @@ export function SidebarPinnedGroup() {
                                 </strong>
                                 <Show when={channel().title.trim()}>
                                   {(label) => (
-                                    <Badge class="sidebar-pinned-title" size="sm" title={label()}>
+                                    <Badge class="sidebar-pinned-title" title={label()}>
                                       <span>{label()}</span>
                                     </Badge>
                                   )}

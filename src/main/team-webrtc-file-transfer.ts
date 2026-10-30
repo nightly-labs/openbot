@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { EventEmitter } from "node:events";
 import { createWriteStream } from "node:fs";
 import { type FileHandle, mkdir, open, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
@@ -23,6 +24,10 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 const FILE_CHUNK_BYTES = 60 * 1024;
 const ACK_INTERVAL_BYTES = 1024 * 1024;
 const TRANSFER_RESUME_MILLISECONDS = 10 * 60_000;
+
+type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
+type FileTransferBridge = Pick<EventEmitter<BridgeEvents>, "on" | "off"> &
+  Pick<TeamWebRtcBridge, "send" | "disconnectPeer">;
 
 interface IncomingTransfer {
   peerId: string;
@@ -62,7 +67,7 @@ export interface ReceivedWebRtcFile {
 }
 
 export class TeamWebRtcFileTransfer {
-  readonly #bridge: TeamWebRtcBridge;
+  readonly #bridge: FileTransferBridge;
   readonly #writingAbort = new AbortController();
   readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #directory: string;
@@ -88,7 +93,7 @@ export class TeamWebRtcFileTransfer {
   #stopped = false;
 
   constructor(
-    bridge: TeamWebRtcBridge,
+    bridge: FileTransferBridge,
     directory: string,
     resumeMilliseconds = TRANSFER_RESUME_MILLISECONDS,
     acceptPeer: (peerId: string) => boolean = () => true,
@@ -109,7 +114,7 @@ export class TeamWebRtcFileTransfer {
 
   /** Whether a transfer is moving right now, either direction. Completed files waiting for pickup do not count. */
   hasActiveTransfers(): boolean {
-    return this.#incoming.size > 0 || this.#outgoing.size > 0;
+    return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0;
   }
 
   readonly send = Effect.fn("TeamFileTransfer.send")(function* (
@@ -157,7 +162,10 @@ export class TeamWebRtcFileTransfer {
         // streams cannot write more than the limit before the check.
         const pending = { peerId, size: 0 };
         return yield* Effect.acquireUseRelease(
-          Effect.sync(() => this.#writing.add(pending)),
+          Effect.sync(() => {
+            this.#writing.add(pending);
+            recordRestartActivity();
+          }),
           () =>
             Effect.gen({ self: this }, function* () {
               const hash = createHash("sha256");

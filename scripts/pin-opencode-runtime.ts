@@ -10,11 +10,11 @@ export type OpencodeRuntimeTarget = "darwin-arm64" | "darwin-x64" | "linux-x64" 
 
 /** The npm platform package and the executable inside it, per target OpenBot supports. */
 const TARGETS = {
-  "darwin-arm64": { package: "opencode-darwin-arm64", executable: "opencode", platformDirectory: "mac" },
-  "darwin-x64": { package: "opencode-darwin-x64", executable: "opencode", platformDirectory: "mac" },
-  "linux-x64": { package: "opencode-linux-x64", executable: "opencode", platformDirectory: "linux" },
-  "linux-arm64": { package: "opencode-linux-arm64", executable: "opencode", platformDirectory: "linux" },
-  "win32-x64": { package: "opencode-windows-x64", executable: "opencode.exe", platformDirectory: "win" },
+  "darwin-arm64": { package: "@opencode/cli-darwin-arm64", executable: "opencode", platformDirectory: "mac" },
+  "darwin-x64": { package: "@opencode/cli-darwin-x64", executable: "opencode", platformDirectory: "mac" },
+  "linux-x64": { package: "@opencode/cli-linux-x64", executable: "opencode", platformDirectory: "linux" },
+  "linux-arm64": { package: "@opencode/cli-linux-arm64", executable: "opencode", platformDirectory: "linux" },
+  "win32-x64": { package: "@opencode/cli-windows-x64", executable: "opencode.exe", platformDirectory: "win" },
 } as const satisfies Record<OpencodeRuntimeTarget, { package: string; executable: string; platformDirectory: string }>;
 
 /** The same keys as `TARGETS`, in the order the lock file lists them. */
@@ -27,6 +27,10 @@ const TARGET_IDS: readonly OpencodeRuntimeTarget[] = [
 ];
 
 const REGISTRY = "https://registry.npmjs.org";
+/** The package that lists the OpenCode 2 platform packages. It carries no LICENSE. */
+const CLI_PACKAGE = "@opencode/cli";
+/** The OpenCode 1 package, from the same repository, whose tarball carries the MIT LICENSE. */
+const LICENSE_PACKAGE = "opencode-ai";
 const REPOSITORY = "https://github.com/anomalyco/opencode";
 /** `installedBytes` only funds the manager's free-space precheck, so it is rounded generously. */
 const DISK_HEADROOM = 1.05;
@@ -51,6 +55,7 @@ export interface OpencodeRuntimePin {
   repository: string;
   version: string;
   license: "MIT";
+  licensePackage: { name: typeof LICENSE_PACKAGE; version: string };
   licenseSha256: string;
   artifacts: Record<OpencodeRuntimeTarget, OpencodeArtifactPin>;
 }
@@ -69,21 +74,27 @@ interface OpencodeArtifactPin {
 /**
  * Recomputes the `opencode` block of `native-runtime.lock.json` from the npm registry.
  *
- * `verifyInstalledRuntime` compares `opencode --version` against `lock.opencode.version` for exact
- * equality, so a pin is only trustworthy if the staged binary really prints that string. On darwin
+ * `verifyInstalledRuntime` compares the version in `opencode --version` against `lock.opencode.version`
+ * for exact equality, so a pin is only trustworthy if the staged binary really prints it. On darwin
  * this script runs the extracted binary and asserts it; on other hosts the darwin binary cannot be
  * executed, so the caller has to repeat the pin on a matching machine before a release.
  */
 export async function pinOpencodeRuntime(
   input: {
-    version?: string;
+    version?: string | undefined;
+    /** The `opencode-ai` release whose LICENSE is installed. Its latest release when unset. */
+    licenseVersion?: string | undefined;
     fetchImpl?: typeof fetch;
     /** Set to false to skip the `--version` assertion on the target that matches this host. */
     runBinary?: boolean;
   } = {},
 ): Promise<OpencodeRuntimePin> {
   const fetchImpl = input.fetchImpl ?? fetch;
-  const umbrella = await fetchParsed(fetchImpl, `${REGISTRY}/opencode-ai/${input.version ?? "latest"}`, umbrellaSchema);
+  const umbrella = await fetchParsed(
+    fetchImpl,
+    `${REGISTRY}/${CLI_PACKAGE}/${input.version ?? "latest"}`,
+    umbrellaSchema,
+  );
   const version = umbrella.version;
 
   const pinTarget = (target: OpencodeRuntimeTarget) =>
@@ -98,12 +109,16 @@ export async function pinOpencodeRuntime(
     "win32-x64": await pinTarget("win32-x64"),
   };
 
-  const license = await umbrellaLicense(fetchImpl, version);
+  const licenseVersion =
+    input.licenseVersion ??
+    (await fetchParsed(fetchImpl, `${REGISTRY}/${LICENSE_PACKAGE}/latest`, packageManifestSchema)).version;
+  const license = await packageLicense(fetchImpl, licenseVersion);
   return {
     registry: REGISTRY,
     repository: REPOSITORY,
     version,
     license: "MIT",
+    licensePackage: { name: LICENSE_PACKAGE, version: licenseVersion },
     licenseSha256: sha256(license),
     artifacts,
   };
@@ -118,13 +133,14 @@ async function pinArtifact(
 ): Promise<OpencodeArtifactPin> {
   const descriptor = TARGETS[target];
   if (optionalDependencies[descriptor.package] !== version) {
-    throw new Error(`opencode-ai ${version} does not list ${descriptor.package} at the same version.`);
+    throw new Error(`${CLI_PACKAGE} ${version} does not list ${descriptor.package} at the same version.`);
   }
   const platform = await fetchParsed(fetchImpl, `${REGISTRY}/${descriptor.package}/${version}`, platformSchema);
   if (platform.name !== descriptor.package || platform.version !== version) {
     throw new Error(`The registry served the wrong package for ${target}.`);
   }
-  const asset = `${descriptor.package}-${version}.tgz`;
+  // npm names a scoped tarball after the unscoped part: `@opencode/cli-x` serves `cli-x-<version>.tgz`.
+  const asset = `${descriptor.package.slice(descriptor.package.indexOf("/") + 1)}-${version}.tgz`;
   if (platform.dist.tarball !== `${REGISTRY}/${descriptor.package}/-/${asset}`) {
     throw new Error(`Unexpected tarball URL for ${target}: ${platform.dist.tarball}`);
   }
@@ -146,8 +162,9 @@ async function pinArtifact(
     const binary = join(packageRoot, "bin", descriptor.executable);
     if (runBinary && target === `${process.platform}-${process.arch}`) {
       await chmod(binary, 0o755);
+      // OpenCode 2 prints `opencode v2.1.1`; `parseOpencodeVersion` accepts the same forms.
       const printed = execFileSync(binary, ["--version"], { encoding: "utf8", windowsHide: true }).trim();
-      if (printed !== version) {
+      if (printed.replace(/^(?:opencode\s+)?v?/iu, "") !== version) {
         throw new Error(`The ${target} binary prints "${printed}" and not "${version}".`);
       }
     }
@@ -167,9 +184,9 @@ async function pinArtifact(
 }
 
 /** The LICENSE inside the `opencode-ai` tarball: the copy the app installs, so its hash is the one it checks. */
-async function umbrellaLicense(fetchImpl: typeof fetch, version: string): Promise<Buffer> {
-  const asset = `opencode-ai-${version}.tgz`;
-  const archiveBytes = await fetchBytes(fetchImpl, `${REGISTRY}/opencode-ai/-/${asset}`);
+async function packageLicense(fetchImpl: typeof fetch, version: string): Promise<Buffer> {
+  const asset = `${LICENSE_PACKAGE}-${version}.tgz`;
+  const archiveBytes = await fetchBytes(fetchImpl, `${REGISTRY}/${LICENSE_PACKAGE}/-/${asset}`);
   const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-opencode-pin-"));
   try {
     const archive = join(temporaryRoot, asset);
@@ -182,8 +199,8 @@ async function umbrellaLicense(fetchImpl: typeof fetch, version: string): Promis
     const manifest = packageManifestSchema.parse(
       JSON.parse(await readFile(join(temporaryRoot, "package", "package.json"), "utf8")),
     );
-    if (manifest.name !== "opencode-ai" || manifest.version !== version) {
-      throw new Error(`The opencode-ai ${version} package manifest does not match the registry metadata.`);
+    if (manifest.name !== LICENSE_PACKAGE || manifest.version !== version) {
+      throw new Error(`The ${LICENSE_PACKAGE} ${version} package manifest does not match the registry metadata.`);
     }
     return await readFile(join(temporaryRoot, "package", "LICENSE"));
   } finally {
@@ -235,7 +252,7 @@ export function isPinnedAlready(pin: OpencodeRuntimePin, lock: AgentRuntimeLock)
 }
 
 if (import.meta.main) {
-  const pin = await pinOpencodeRuntime({ version: process.argv[2] });
+  const pin = await pinOpencodeRuntime({ version: process.argv[2], licenseVersion: process.argv[3] });
   const lock = await loadAgentRuntimeLock().catch(() => null);
   process.stdout.write(`${JSON.stringify({ opencode: pin }, null, 2)}\n`);
   for (const target of TARGET_IDS) {

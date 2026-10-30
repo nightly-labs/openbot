@@ -41,7 +41,9 @@ import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./proto
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import { probeTurnAllocation } from "./turn-probe";
 
+const TURN_HEALTH_CACHE = "1 minute";
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
@@ -49,6 +51,8 @@ const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
 const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
 // The multipart fields and boundaries around one file.
 const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
+// An account event is one small JSON object.
+const AUTH_EVENT_BODY_BYTES_LIMIT = 64 * 1024;
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
@@ -70,11 +74,28 @@ const slackRequestSchema = z.object({
     .catch(undefined),
 });
 
-// The only parts of a Telegram update that Signal reads: the chat, the callback query, and the text
-// of a message, only to find a link code.
-const telegramChatSchema = z.object({ id: z.int() });
+// The only parts of a Telegram update that Signal reads: the chat, the callback query, the text of a
+// message, only to find a link code, and, to know whether a message can address OpenBot, the chat
+// type, the entity types, and whether it replies, is in a thread, or renames or leaves the chat.
+const telegramChatSchema = z.object({ id: z.int(), type: z.string().optional().catch(undefined) });
+const telegramEntitiesSchema = z
+  .array(z.object({ type: z.string() }))
+  .optional()
+  .catch(undefined);
 const telegramUpdateSchema = z.object({
-  message: z.object({ chat: telegramChatSchema, text: z.string().optional() }).optional(),
+  message: z
+    .object({
+      chat: telegramChatSchema,
+      text: z.string().optional(),
+      entities: telegramEntitiesSchema,
+      caption_entities: telegramEntitiesSchema,
+      reply_to_message: z.unknown().optional(),
+      message_thread_id: z.unknown().optional(),
+      new_chat_title: z.unknown().optional(),
+      left_chat_member: z.unknown().optional(),
+      migrate_to_chat_id: z.unknown().optional(),
+    })
+    .optional(),
   edited_message: z.object({ chat: telegramChatSchema }).optional(),
   callback_query: z.object({ id: z.string(), message: z.object({ chat: telegramChatSchema }).optional() }).optional(),
   my_chat_member: z.object({ chat: telegramChatSchema }).optional(),
@@ -128,13 +149,29 @@ export function createRemoteApiApp(
   // Null when Signal has no Discord bot token: the Discord route answers 503.
   discord: DiscordApi | null = null,
 ) {
+  // The route is public, so the relay gets one probe allocation a minute at most.
+  const turnHealth = Effect.runSync(Effect.cachedWithTTL(probeTurnAllocation(config), TURN_HEALTH_CACHE));
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
+    // For the status page: Signal can answer while the TURN relay refuses every allocation.
+    .get("/health/turn", async ({ set }) => {
+      const result = await runtime.runPromise(turnHealth.pipe(Effect.result));
+      if (Result.isSuccess(result)) return { service: "openbot-turn", status: "ready" };
+      set.status = 503;
+      return result.failure.reason === "full"
+        ? { error: { code: "turn_full", message: "The TURN relay has no free allocation." } }
+        : { error: { code: "turn_unavailable", message: "The TURN relay did not allocate a relay address." } };
+    })
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
       const signature = request.headers.get("OpenBot-Signature") ?? "";
-      const body = await request.text();
+      const bytes = await readBody(request, AUTH_EVENT_BODY_BYTES_LIMIT);
+      if (!bytes) {
+        set.status = 413;
+        return { error: { code: "event_too_large", message: "The auth event is too large." } };
+      }
+      const body = new TextDecoder().decode(bytes);
       if (!verifyWebhookSignature(body, timestamp, signature, config.authWebhookSecret)) {
         set.status = 401;
         return { error: { code: "invalid_signature", message: "The auth event signature is invalid." } };
@@ -169,8 +206,8 @@ export function createRemoteApiApp(
         }
         const kind = slackDeliveryKind(request.headers.get("content-type"));
         if (!kind) return slackResponse({ status: 415 });
-        const body = new Uint8Array(await request.arrayBuffer());
-        if (body.byteLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) return slackResponse({ status: 413 });
+        const body = await readBounded(request, SLACK_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return slackResponse({ status: 413 });
         const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
         const signature = request.headers.get("x-slack-signature") ?? "";
         const signer = config.slackSigningSecrets.find(({ secret }) =>
@@ -581,9 +618,34 @@ function telegramUpdate(
     chatId,
     callbackQueryId: callbackQueryId.length > 0 && callbackQueryId.length <= 128 ? callbackQueryId : null,
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
-    // A message or a button press can start a hosted server that sleeps; a member change cannot.
-    wakes: update.message !== undefined || update.callback_query !== undefined,
+    wakes:
+      update.callback_query !== undefined || (update.message !== undefined && telegramMessageWakes(update.message)),
   };
+}
+
+// Entity types that can name OpenBot: `@username`, a mention of a user without a username, and a
+// command such as `/stop@bot`. Signal reads only the type, not the text, so a mention of another
+// person also counts.
+const TELEGRAM_ADDRESSING_ENTITIES = new Set(["mention", "text_mention", "bot_command"]);
+
+/**
+ * True when a message can address OpenBot, so it can start a hosted server that sleeps: a direct
+ * message, a reply, a message in a thread, a message with a mention or a command, or a rename or a
+ * removal that the host must see. The bot gets every group message, and the host answers none of the
+ * others.
+ */
+function telegramMessageWakes(message: NonNullable<z.output<typeof telegramUpdateSchema>["message"]>): boolean {
+  return (
+    message.chat.type === "private" ||
+    message.reply_to_message !== undefined ||
+    message.message_thread_id !== undefined ||
+    message.new_chat_title !== undefined ||
+    message.left_chat_member !== undefined ||
+    message.migrate_to_chat_id !== undefined ||
+    [...(message.entities ?? []), ...(message.caption_entities ?? [])].some((entity) =>
+      TELEGRAM_ADDRESSING_ENTITIES.has(entity.type),
+    )
+  );
 }
 
 function decodeAuthEvent(body: string): RemoteAuthEvent | null {
@@ -606,6 +668,8 @@ export function prometheusMetrics(signal: SignalService): string {
     `openbot_remote_signal_messages_total ${metrics.relayedMessages}`,
     "# TYPE openbot_remote_auth_failures_total counter",
     `openbot_remote_auth_failures_total ${metrics.authenticationFailures}`,
+    "# TYPE openbot_remote_auth_unavailable_total counter",
+    `openbot_remote_auth_unavailable_total ${metrics.authenticationUnavailable}`,
     "# TYPE openbot_remote_protocol_failures_total counter",
     `openbot_remote_protocol_failures_total ${metrics.protocolFailures}`,
     "# TYPE openbot_remote_slack_deliveries_total counter",

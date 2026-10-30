@@ -21,7 +21,7 @@ export interface CapturedModeLayerState {
   opacity: number;
   scale: number;
   contentBlurs: number[];
-  anchor?: ModeSwapPoint;
+  anchor?: ModeSwapPoint | undefined;
 }
 
 export interface ModeSwapPoint {

@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
-  "error.agent.historyUnavailable": "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз.",
+  "error.agent.historyUnavailable":
+    "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз или используйте channel_history для работы с каналом.",
   "error.agent.toolRequestInvalid":
     "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
@@ -45,6 +46,8 @@ export const messages = {
     "Задачи этого агента выполняются. Дождитесь их завершения или остановите их, прежде чем менять провайдера.",
   "error.agent.waitBeforeClearContext":
     "Дождитесь, пока завершатся текущий ход и очередь, прежде чем начинать новый чат.",
+  "error.agent.waitBeforeCompactContext": "Дождитесь завершения активного хода и очереди, прежде чем сжимать контекст.",
+  "error.agent.compactContextUnavailable": "Этот агент сейчас не может сжать свой контекст.",
   "error.agent.unknown": "Неизвестный агент: {id}",
   "error.agent.onlyUserWidensSettings":
     "Только пользователь может дать агенту полный доступ или включить управление компьютером. Попросите пользователя изменить это в настройках агента.",
@@ -60,6 +63,8 @@ export const messages = {
   "error.agent.duplicateIds": "Состояние агентов содержит повторяющиеся идентификаторы; перезапись отклонена.",
   "error.agent.copyNameFailed": "OpenBot не смог подобрать уникальное имя для копии агента.",
   "error.agent.endpointRemoved": "Эндпоинт, который использовал этот агент, удалён. Выберите для него другую модель.",
+  "error.agent.turnStalled":
+    "{provider} перестал отвечать, поэтому OpenBot завершил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
   "error.agent.selectedGone": "Выбранного агента больше нет.",
   "error.agent.profileEndpointsChanged": "Пользовательские эндпоинты изменились во время создания. Повторите попытку.",
   "error.agent.profileInvalid": "Провайдер вернул некорректный профиль. Попробуйте изменить запрос.",
@@ -86,6 +91,10 @@ export const messages = {
   "error.agent.queueEditRejected": "Изменение очереди отклонено: {reason}",
   "error.agent.computerUseLocalOnly": "Управление компьютером можно изменить только на компьютере, где работает агент.",
   "error.agent.automationLocalOnly": "Локальные скрипты можно разрешить только на компьютере, где работает агент.",
+  "error.agent.newChatLocalOnly": "Разрешить агенту начинать новые чаты можно только на компьютере, где он работает.",
+  "error.agent.quickAcknowledgementLocalOnly": "Изменить этот параметр можно только на компьютере, где работает агент.",
+  "error.agent.sideQuestionBusy": "Выполняется слишком много побочных вопросов. Повторите попытку чуть позже.",
+  "error.agent.sideQuestionFailed": "Агенту не удалось ответить на побочный вопрос. Повторите попытку.",
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",
@@ -105,11 +114,13 @@ export const messages = {
     "На этом сервере мало памяти. Ваше сообщение ждёт в очереди и начнётся, когда память освободится.",
   "error.agent.workspaceOnlyToolMissing":
     "Для режима «Только рабочее пространство» нужен {tool}, но OpenBot его не нашёл. Установите его или выберите «Полный доступ» в настройках агента.",
+  "error.agent.claudeSandboxUnavailable":
+    "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере: {reason}. Выберите «Полный доступ» или другого провайдера в настройках агента.",
   "error.agent.screenCaptureOff":
     "Снимки экрана для этого агента выключены. Пользователь может включить управление компьютером в настройках агента.",
   "error.agent.screenCaptureUnavailable": "Снимки экрана недоступны на этом компьютере.",
   "error.agent.screenCaptureShared":
-    "Снимки экрана не работают в канале и в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
+    "Снимки экрана не работают в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
   "error.agent.screenCaptureDeclined": "Пользователь не разрешил этот снимок экрана. Ничего не снято.",
   "error.agent.screenCaptureWindowMissing":
     "Это окно сейчас не открыто. Вызовите list_capture_sources, чтобы получить текущие ID окон.",

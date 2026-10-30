@@ -4,7 +4,7 @@
   "tagline": "Docs and knowledge base",
   "description": "Notion lets agents read and write pages, search the workspace, and keep meeting notes and specs where the team already works. Each user signs in to their own Notion account through the browser.",
   "category": "productivity",
-  "creatorName": "notion.so",
+  "creatorName": "Notion",
   "iconUrl": "https://www.notion.so/images/favicon.ico",
   "version": "1.0.0",
   "prompts": [

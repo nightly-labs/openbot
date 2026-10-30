@@ -16,7 +16,7 @@ type RoutineWeekdayPickerProps = (
   | { mode: "many"; days: number[]; onChange: (days: number[]) => void }
   | { mode: "one"; day: number; onChange: (day: number) => void }
 ) & {
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** The popover closed, so the edit is complete. */
   onClose?: () => void;
 };

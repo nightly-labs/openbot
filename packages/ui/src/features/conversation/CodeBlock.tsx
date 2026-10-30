@@ -8,7 +8,7 @@ import type { MessageCodeBlock } from "./DataTable";
 
 export interface CodeToken {
   text: string;
-  type?: ShjToken;
+  type?: ShjToken | undefined;
 }
 
 export type CodeLine = CodeToken[];
@@ -252,7 +252,7 @@ export function CodeBlock(props: {
 export function codeLanguage(language: string): ShjLanguage {
   const normalized = language.trim().toLowerCase();
   if (!normalized) return "plain";
-  const alias = LANGUAGE_ALIASES[normalized];
+  const alias = Object.hasOwn(LANGUAGE_ALIASES, normalized) ? LANGUAGE_ALIASES[normalized] : undefined;
   if (alias) return alias;
   return isSupportedLanguage(normalized) ? normalized : "plain";
 }
@@ -284,7 +284,10 @@ export function codeLanguageLabel(language: string, t: AppTranslate): string {
     return LANGUAGE_LABELS[normalized] ?? normalized.toUpperCase();
   }
   const original = language.trim();
-  const plainLabel = PLAIN_LANGUAGE_LABELS[original.toLowerCase()];
+  const plainLanguage = original.toLowerCase();
+  const plainLabel = Object.hasOwn(PLAIN_LANGUAGE_LABELS, plainLanguage)
+    ? PLAIN_LANGUAGE_LABELS[plainLanguage]
+    : undefined;
   if (plainLabel) return plainLabel;
   return original ? original.toUpperCase() : t(LANGUAGE_TEXT_KEYS.plain);
 }

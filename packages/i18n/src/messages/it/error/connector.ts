@@ -27,4 +27,11 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "Il file di connessione a 1Password è troppo grande.",
   "error.connector.bitwardenFailed":
     "Impossibile leggere Bitwarden. Installa la CLI bw, accedi, sbloccala e crea una cartella chiamata Shared with OpenBot. Connetti con una nuova chiave di sessione.",
+  "error.connector.bitwardenHostInput":
+    "Inserisci un indirizzo del server HTTPS, client_id e client_secret della chiave API e la password principale.",
+  "error.connector.bitwardenHostFailed":
+    "Impossibile aprire Bitwarden su questo server. Controlla l’indirizzo del server, la chiave API e la password principale, e verifica che una cartella si chiami Shared with OpenBot. Poi connetti di nuovo.",
+  "error.connector.bitwardenCliInstallFailed":
+    "Impossibile installare la CLI di Bitwarden su questo server. Controlla la sua connessione di rete, poi connetti di nuovo.",
+  "error.connector.bitwardenFileUnreadable": "Il file di connessione di Bitwarden non è leggibile.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -4,9 +4,16 @@ import {
   decodeHostAnalytics,
   decodeHostProviderAccounts,
   decodeInstalledSkills,
+  decodeProviderUsageResetOutcome,
+  decodeProviderUsageResets,
   type HostProviderAccounts,
   isAgentHostSettings,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
+  isAgentTask,
+  isAgentTaskReadState,
+  isAgentTasksSnapshot,
+  isConversationSnapshot,
   isHiddenAgentsSnapshot,
 } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
@@ -15,12 +22,15 @@ import {
 import type {
   AccountUsage,
   AgentMemory,
-  AgentModelOption,
   AgentStatus,
   AgentSummary,
+  ClientAgentModelOption,
+  ClientAgentSummary,
   DraftAttachment,
   DuplicateAgentResult,
   InstalledSkill,
+  ProviderUsageResetOutcome,
+  ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
   SidebarLayoutSnapshot,
@@ -28,10 +38,10 @@ import type {
 import {
   isAccountUsage,
   isAgentMemory,
-  isAgentModelOption,
   isAgentStatus,
-  isAgentSummary,
   isAttachmentSummary,
+  isClientAgentModelOption,
+  isClientAgentSummary,
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
@@ -41,10 +51,18 @@ import {
   isSidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
-import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
+export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
+  isAgentNotificationLevelsSnapshot,
+  "agent notification levels response",
+);
+export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
+export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
+export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
+export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");
@@ -59,14 +77,20 @@ export function decodeDraftAttachment(value: unknown): DraftAttachment {
   };
 }
 
-export function decodeAgentSummary(value: unknown): AgentSummary {
+export function decodeAgentSummary(value: unknown): ClientAgentSummary {
   // Backup models stay on their host, and this decoder drops them. A later host can save a provider
-  // or more models than this version accepts, so they are not checked.
-  const { backupModels: _backupModels, usageLimitReturn: _usageLimitReturn, ...record } = decodeRecord(value, "agent");
+  // or more models than this version accepts, so they are not checked. An owner or admin reads them
+  // on `agent-backup-models-v1`.
+  const {
+    backupModels: _backupModels,
+    usageLimitReturn: _usageLimitReturn,
+    pendingRuntime: _pendingRuntime,
+    ...record
+  } = decodeRecord(value, "agent");
   // Servers older than 63b55606 omit `avatarUrl` entirely. The shared guard requires the field, so
   // normalize the absent case to null before validating rather than loosening the guard for everyone.
   const candidate = record.avatarUrl === undefined ? { ...record, avatarUrl: null } : record;
-  if (!isAgentSummary(candidate)) throw new Error("Invalid agent.");
+  if (!isClientAgentSummary(candidate)) throw new Error("Invalid agent.");
   const marketplaceSource = decodeMarketplaceSource(candidate.marketplaceSource);
   return {
     id: candidate.id,
@@ -126,6 +150,17 @@ export function decodeHostProviderAccountsFromHost(value: unknown): HostProvider
   return decodeHostProviderAccounts(value);
 }
 
+/** The `provider-usage-reset-v1` list: an unknown provider is left out. */
+export function decodeProviderUsageResetsFromHost(value: unknown): ProviderUsageResets[] {
+  if (!isDynamicRecord(value)) throw new Error("Invalid provider usage resets.");
+  return decodeProviderUsageResets(value.accounts);
+}
+
+export function decodeProviderUsageResetOutcomeFromHost(value: unknown): ProviderUsageResetOutcome {
+  if (!isDynamicRecord(value)) throw new Error("Invalid provider usage reset.");
+  return decodeProviderUsageResetOutcome(value.outcome);
+}
+
 export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   if (!isAccountUsage(value)) {
     throw new Error("Invalid remote account usage.");
@@ -140,16 +175,17 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
 // `isAgentModel` having no square brackets in its character set, so a legitimate id read as
 // malformed; widening the set is the fix, and a model id is deliberately an opaque token there
 // rather than a closed list for exactly this reason. An id that still fails it is a host sending
-// something no version of this protocol allows, and a new provider or reasoning effort is an
-// additive change the contract routes through capability negotiation instead.
-export function decodeAgentModelOptions(value: unknown): AgentModelOption[] {
-  if (!Array.isArray(value) || !value.every(isAgentModelOption)) {
+// something no version of this protocol allows. A new reasoning effort is an additive change the
+// contract routes through capability negotiation instead. A provider that this build does not know
+// is not malformed from a protocol 8 host: its model stays in the list, and the picker disables it.
+export function decodeAgentModelOptions(value: unknown): ClientAgentModelOption[] {
+  if (!Array.isArray(value) || !value.every(isClientAgentModelOption)) {
     throw new Error("Invalid remote agent models.");
   }
   return value;
 }
 
-export function decodeAgentSummaries(value: unknown): AgentSummary[] {
+export function decodeAgentSummaries(value: unknown): ClientAgentSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid remote agent list.");
   return value.map(decodeAgentSummary);
 }
@@ -169,7 +205,6 @@ export const decodeRoutineRun = guardedDecoder(isRoutineRun, "remote routine run
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "remote routine history");
 export const decodeRemoteRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "remote routine flow canvas");
 export const decodeRemoteRoutineFlowLink = guardedDecoder(isRoutineFlowLink, "remote routine flow link");
-
 export function decodeSidebarLayoutSnapshot(value: unknown): SidebarLayoutSnapshot {
   if (!isSidebarLayoutSnapshot(value)) throw new Error("Invalid sidebar layout response.");
   return value;

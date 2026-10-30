@@ -12,10 +12,9 @@ import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_ROUTES } from "@openbot/contrac
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Fiber } from "effect";
-import { runCauseEffect } from "../backend/effect-boundary";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import type { RemoteRequestInit } from "./remote-server-client";
-import type { RemoteWorkflowError } from "./remote-service-effects";
+import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 import { type SignInRelayClient, signInRelayRemote } from "./sign-in-relay-client";
 
 const logger = createOpenBotLogger("message-link-relay");
@@ -57,66 +56,92 @@ export class MessageLinkRelay {
    * answer is the page that the renderer shows with a field for the address from the browser. A host
    * that cannot relay the link, such as for a member who is not an admin, gets the link opened as it is.
    */
-  async open(serverId: string, agentId: string, url: string): Promise<McpSignInRelayPage | null> {
+  readonly open = Effect.fn("MessageLinkRelay.open")(function* (
+    this: MessageLinkRelay,
+    serverId: string,
+    agentId: string,
+    url: string,
+  ): Effect.fn.Return<McpSignInRelayPage | null, RemoteWorkflowError> {
     const { remoteServers, relay, openUrl } = this.#dependencies;
     const page = relayableSignInLink(url);
     if (!page || !remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY)) {
-      await openUrl(url);
+      yield* remoteCall(() => openUrl(url));
       return null;
     }
     const key = linkKey(serverId, page);
-    await this.#stop(key);
+    yield* this.#stop(key);
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
-    const flow = await runCauseEffect(
-      post(SIGN_IN_RELAY_ROUTES.linkStart, decodeSignInRelayFlow, { agentId, url }),
-    ).catch((error: unknown) => {
-      logger.warn("The host did not relay a sign-in link, so it opens as it is:", toLogValue(error));
-      return null;
-    });
+    const flow = yield* post(SIGN_IN_RELAY_ROUTES.linkStart, decodeSignInRelayFlow, { agentId, url }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          logger.warn("The host did not relay a sign-in link, so it opens as it is:", toLogValue(error.cause));
+          return null;
+        }),
+      ),
+    );
     if (!flow) {
-      await openUrl(url);
+      yield* remoteCall(() => openUrl(url));
       return null;
     }
-    const shown = await new Promise<McpSignInRelayPage | Error | null>((resolve) => {
+    // The relay outlives this call: it waits for the callback until it ends, `paste` joins it or
+    // `cancel` interrupts it.
+    const shown = yield* Effect.callback<McpSignInRelayPage | null, RemoteWorkflowError>((resume) => {
       const fiber = Effect.runFork(
-        relay.run(key, signInRelayRemote(post, Effect.succeed(flow)), { page, onWaiting: resolve }),
+        relay.run(key, signInRelayRemote(post, Effect.succeed(flow)), {
+          page,
+          onWaiting: (waiting) => resume(Effect.succeed(waiting)),
+        }),
       );
       this.#running.set(key, fiber);
       fiber.addObserver((exit) => {
         if (this.#running.get(key) === fiber) this.#running.delete(key);
-        if (exit._tag === "Success") return resolve(exit.value.error === null ? null : new Error(exit.value.error));
+        if (exit._tag === "Success")
+          return resume(exit.value.error === null ? Effect.succeed(null) : relayFailure(exit.value.error));
         if (!Cause.hasInterruptsOnly(exit.cause))
           logger.warn("A relayed sign-in link did not finish:", toLogValue(Cause.squash(exit.cause)));
-        resolve(null);
+        resume(Effect.succeed(null));
       });
     });
-    if (shown instanceof Error) throw shown;
     return shown?.pasteable && !shown.listening ? shown : null;
-  }
+  });
 
-  /** The address that the user pasted from the browser. Resolves when the sign-in ended well. */
-  async paste(serverId: string, url: string, address: string): Promise<void> {
+  /** The address that the user pasted from the browser. Succeeds when the sign-in ended well. */
+  readonly paste = Effect.fn("MessageLinkRelay.paste")(function* (
+    this: MessageLinkRelay,
+    serverId: string,
+    url: string,
+    address: string,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
     const page = relayableSignInLink(url);
     const key = page && linkKey(serverId, page);
     const fiber = key ? this.#running.get(key) : undefined;
-    if (!key || !fiber) throw new Error(sourceText("error.mcp.relayEnded"));
-    this.#dependencies.relay.paste(key, address);
-    const result = await runCauseEffect(Fiber.join(fiber));
-    if (result.error !== null) throw new Error(result.error);
-  }
+    if (!key || !fiber) return yield* relayFailure(sourceText("error.mcp.relayEnded"));
+    yield* remoteDecode(() => this.#dependencies.relay.paste(key, address));
+    const result = yield* Fiber.join(fiber);
+    if (result.error !== null) return yield* relayFailure(result.error);
+  });
 
   /** Ends the relayed sign-in of a link, and cancels it on the host. */
-  async cancel(serverId: string, url: string): Promise<void> {
+  readonly cancel = Effect.fn("MessageLinkRelay.cancel")(function* (
+    this: MessageLinkRelay,
+    serverId: string,
+    url: string,
+  ): Effect.fn.Return<void> {
     const page = relayableSignInLink(url);
-    if (page) await this.#stop(linkKey(serverId, page));
-  }
+    if (page) yield* this.#stop(linkKey(serverId, page));
+  });
 
-  async #stop(key: string): Promise<void> {
+  readonly #stop = Effect.fn("MessageLinkRelay.stop")(function* (this: MessageLinkRelay, key: string) {
     const fiber = this.#running.get(key);
     this.#running.delete(key);
-    if (fiber) await Effect.runPromise(Fiber.interrupt(fiber));
-  }
+    if (fiber) yield* Fiber.interrupt(fiber);
+  });
+}
+
+/** A failure whose message the renderer shows as it is: a host answer or a `sourceText` key. */
+function relayFailure(message: string): Effect.Effect<never, RemoteWorkflowError> {
+  return Effect.fail(new RemoteWorkflowError({ cause: new Error(message) }));
 }
 
 function linkKey(serverId: string, page: string): string {

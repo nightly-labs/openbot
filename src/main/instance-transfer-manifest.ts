@@ -87,9 +87,25 @@ const Settings = Schema.Struct({
       id: name(64),
       name: name(128),
       baseUrl: name(2048),
-      models: Schema.Array(Schema.Struct({ id: name(256), name: text(256) })).check(Schema.isMaxLength(256)),
+      models: Schema.Array(
+        Schema.Struct({
+          id: name(256),
+          name: text(256),
+          /**
+           * Added after version 1 shipped. An older app ignores it and uses OpenCode's default. The import
+           * drops a value out of range, so that a newer limit cannot refuse the whole Settings section.
+           */
+          contextWindow: Schema.optionalKey(Schema.Number),
+        }),
+      ).check(Schema.isMaxLength(256)),
       /** The provider had a saved key. The key itself is never in the file. */
       needsApiKey: Schema.Boolean,
+      /**
+       * Added after version 1 shipped, and only for an endpoint that runs on Pi. An older app ignores
+       * it and runs the endpoint on OpenCode. The import drops an unknown value, so that a harness a
+       * newer app adds cannot refuse the whole Settings section.
+       */
+      harness: Schema.optionalKey(Schema.String),
     }),
   ).check(Schema.isMaxLength(32)),
   customAgents: Schema.Array(

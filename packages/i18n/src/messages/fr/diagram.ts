@@ -4,8 +4,37 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "Diagramme {name}",
   "diagram.board.label": "Canevas de {name}",
-  "diagram.board.emptyTitle": "Commencez par une routine",
-  "diagram.board.emptyBody": "Ajoutez une routine qui lance le travail, puis connectez-y des agents.",
+  "diagram.board.emptyLead": "Dessinez-la une fois.",
+  "diagram.board.emptyTitle": "Puis regardez-la {run}.",
+  "diagram.board.emptyRun": "tourner",
+  "diagram.board.emptyStart": "Une routine lance le travail.",
+  "diagram.board.emptyHandoff": "Chaque agent passe sa réponse au suivant.",
+  "diagram.board.sample.routine": "Point du matin",
+  "diagram.board.sample.instruction":
+    "Rassemblez ce qui a changé depuis hier sur le marché et dans le pipeline commercial, puis transformez-le en priorités du jour.",
+  "diagram.board.sample.researchName": "Recherche",
+  "diagram.board.sample.researchTitle": "Partenaire de recherche",
+  "diagram.board.sample.researchTask":
+    "Rassemblez les actualités du marché et des produits depuis hier, avec une source pour chaque point.",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind baisse ses prix d'API de 20 %.\n2. Les lignes directrices de l'UE pour les modèles à usage général sont définitives.\n3. Deux concurrents ont lancé des canevas d'agents cette semaine.",
+  "diagram.board.sample.salesName": "Ventes",
+  "diagram.board.sample.salesTitle": "Spécialiste prospection",
+  "diagram.board.sample.salesTask":
+    "Listez les affaires qui ont changé d'étape depuis hier et la prochaine étape de chacune.",
+  "diagram.board.sample.salesOutput":
+    "- Contoso est passé en négociation. Prochaine étape : envoyer la revue de sécurité.\n- Fabrikam est bloqué depuis 9 jours. Prochaine étape : appeler le sponsor.",
+  "diagram.board.sample.writerName": "Rédacteur",
+  "diagram.board.sample.writerTitle": "Rédacteur du point",
+  "diagram.board.sample.writerTask": "Rédigez un point à partir de la recherche et du pipeline. Moins de 200 mots.",
+  "diagram.board.sample.writerOutput":
+    "Northwind baisse ses prix d'API, les lignes directrices de l'UE sont définitives et Contoso est proche de signer. Fabrikam a besoin d'un appel aujourd'hui.",
+  "diagram.board.sample.chiefName": "Chef",
+  "diagram.board.sample.chiefTitle": "Chef de cabinet",
+  "diagram.board.sample.chiefTask":
+    "Lisez le point, choisissez les trois priorités du jour et publiez-les pour l'équipe.",
+  "diagram.board.sample.chiefOutput":
+    "Priorités du jour :\n1. Envoyer la revue de sécurité à Contoso.\n2. Répondre à la baisse de prix de Northwind.\n3. Appeler Fabrikam.",
   "diagram.menu.label": "Canevas",
   "diagram.menu.addAgent": "Ajouter un agent ici",
   "diagram.menu.noAgents": "Tous les agents sont sur le canevas",

@@ -76,7 +76,7 @@ export interface AgentDatabaseRows {
 export interface AgentDatabaseFailure {
   kind: "sqlite" | "not-authorized" | "size-limit" | "busy" | "missing" | "internal";
   message: string;
-  sqliteCode?: number;
+  sqliteCode?: number | undefined;
 }
 
 export type AgentDatabaseResponse =

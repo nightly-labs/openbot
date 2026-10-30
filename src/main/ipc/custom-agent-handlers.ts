@@ -1,6 +1,6 @@
 import { Effect, Semaphore } from "effect";
 
-// The user's own ACP agents: list, save, delete and check. This computer only: no Team API route
+// The user's own ACP agents: list, save, delete, check and the answers to their usage prompts. This computer only: no Team API route
 // reaches these. `custom-agent-changes.ts` owns the order of the writes.
 
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -10,13 +10,15 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 
 export function customAgentIpcHandlers(changes: CustomAgentChanges): Pick<IpcGroupHandlers, "customAgents"> {
   /**
-   * One check at a time. A check starts a program and waits up to 20 seconds, so a renderer that
-   * sent many at once would start many; the next one waits for the one before.
+   * One check at a time. A check starts a program and waits up to 20 seconds for its answer and 10
+   * more for its models, so a renderer that sent many at once would start many; the next one waits
+   * for the one before.
    */
   const checks = Semaphore.makeUnsafe(1);
   return {
     customAgents: {
       list: handler(() => Effect.runPromise(changes.list())),
+      usage: handler(() => Effect.runPromise(changes.usage())),
       save: payloadHandler(parseSaveCustomAgent, (input) => runCauseEffect(changes.save(input))),
       delete: payloadHandler(parseDeleteCustomAgent, ({ id }) => runCauseEffect(changes.remove(id))),
       check: payloadHandler(parseCheckCustomAgent, (input) => {

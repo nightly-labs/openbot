@@ -18,8 +18,8 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "このプロバイダーは実行中のターンの方向を修正できないため、メッセージはキューで待ちます。",
   "queue.item.steerFallback.steerFailed": "方向の修正に失敗したため、メッセージはキューで待ちます。",
-  "queue.item.runAsTask": "タスクとして実行",
-  "queue.item.runAsTaskLabel": "キューのメッセージ {position} をタスクとして実行",
+  "queue.item.runAsTask": "新しいスレッドで実行",
+  "queue.item.runAsTaskLabel": "キューのメッセージ {position} を新しいスレッドで実行",
   "queue.item.deleteLabel": "キューのメッセージ {position} を削除",
   "queue.item.deleteTooltip": "メッセージを削除",
   "queue.item.editLabel": "キューのメッセージ {position} を編集",

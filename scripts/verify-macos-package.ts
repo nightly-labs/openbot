@@ -1,16 +1,23 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, lstat, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
+import { isMissingFileError } from "../src/backend/file-errors";
 
 const logger = createOpenBotLogger("verify-macos-package");
 
 const FUSE_DISABLED = 48;
 const FUSE_ENABLED = 49;
+
+// Each launch step ends on a state or an event. This limit only turns a real hang into a clear failure:
+// a slow release runner can need much more time than usual to start the first instance.
+const launchStepLimitMs = 5 * 60_000;
+
 const EXPECTED_MACOS_ICON_FILES = [
   "icon_16x16.png",
   "icon_16x16@2x.png",
@@ -37,6 +44,8 @@ const executablePath = resolve(contentsPath, "MacOS/OpenBot");
 const resourcesPath = resolve(contentsPath, "Resources");
 const packagedIconPath = resolve(resourcesPath, "icon.icns");
 const sourceIconPath = resolve("build/icon-production.icns");
+const packagedIconCatalogPath = resolve(resourcesPath, "Assets.car");
+const sourceIconCatalogPath = resolve("build/macos/Assets.car");
 const plistPath = resolve(contentsPath, "Info.plist");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
 const voiceRuntimeFiles = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
@@ -46,6 +55,7 @@ const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
 // Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
 const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
+const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
 
 await Promise.all([
   access(executablePath),
@@ -59,10 +69,13 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),
   access(resolve(resourcesPath, "licenses/onnxruntime-LICENSE")),
   access(resolve(resourcesPath, "licenses/NVIDIA-Parakeet-TDT-0.6B-v3-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Underdog-Bark-3.0-Plus-LICENSE")),
   access(resolve(resourcesPath, "licenses/OpenAI-Whisper-LICENSE")),
+  access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(databaseHostPath),
   access(voiceHostPath),
+  access(speechHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),
@@ -93,6 +106,7 @@ await Promise.all(
 // entitlement that re-signing under OpenBot's inherited entitlements would drop.
 assertCuaDriverSignature(resolve(cuaDriverPath, "cua-driver"));
 await verifyPackagedIcon(packagedIconPath, sourceIconPath);
+await verifyPackagedIconCatalog(packagedIconCatalogPath, sourceIconCatalogPath);
 await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve(resourcesPath, name))));
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(
@@ -105,6 +119,7 @@ expectEqual(plist.CFBundleDisplayName, "OpenBot", "display name");
 expectEqual(plist.CFBundleExecutable, "OpenBot", "executable name");
 expectEqual(plist.CFBundleIdentifier, "app.openbot.desktop", "bundle identifier");
 expectEqual(plist.CFBundleIconFile, "icon.icns", "application icon");
+expectEqual(plist.CFBundleIconName, "Icon", "macOS 26 application icon");
 expectEqual(plist.LSMinimumSystemVersion, "13.0", "minimum macOS version");
 expectEqual(plist.ElectronTeamID, "ZTRDTUL87R", "Apple Team ID");
 if (!Array.isArray(plist.NSUserActivityTypes) || !plist.NSUserActivityTypes.includes("NSUserActivityTypeBrowsingWeb")) {
@@ -127,9 +142,13 @@ const databaseHost = await readFile(databaseHostPath, "utf8");
 if (/from "(?!node:|effect["/])/.test(databaseHost)) {
   throw new Error("The database host must import nothing but node: builtins and effect.");
 }
-const voiceHost = await readFile(voiceHostPath, "utf8");
-if (/from "(?!node:)/.test(voiceHost)) {
-  throw new Error("The voice transcription host must import nothing but node: builtins.");
+for (const [path, name] of [
+  [voiceHostPath, "voice transcription"],
+  [speechHostPath, "speech"],
+] as const) {
+  if (/from "(?!node:)/.test(await readFile(path, "utf8"))) {
+    throw new Error(`The ${name} host must import nothing but node: builtins.`);
+  }
 }
 
 const executableArchitecture = run("file", [executablePath]);
@@ -143,10 +162,14 @@ for (const name of voiceRuntimeFiles) {
     throw new Error(`Expected a ${machOArchitecture} voice runtime library: ${voiceArchitecture}`);
   }
 }
-// The Parakeet and Whisper models are downloaded on demand.
+// The Parakeet, Bark, Whisper and Supertonic models are downloaded on demand.
 if (
-  ["voice/model", "voice/whisper-turbo-int8"].some((path) => existsSync(resolve(resourcesPath, path))) ||
-  ["encoder.int8.onnx", "turbo-encoder.int8.onnx"].some((name) => existsSync(resolve(voiceRuntimePath, name)))
+  ["voice/model", "voice/bark-3.0-plus-int8", "voice/whisper-turbo-int8", "voice/supertonic-3-int8"].some((path) =>
+    existsSync(resolve(resourcesPath, path)),
+  ) ||
+  ["encoder.int8.onnx", "turbo-encoder.int8.onnx", "vocoder.int8.onnx"].some((name) =>
+    existsSync(resolve(voiceRuntimePath, name)),
+  )
 ) {
   throw new Error("The on-demand voice models must not be in the application.");
 }
@@ -210,6 +233,14 @@ async function verifyPackagedIcon(packagedPath: string, sourcePath: string): Pro
   }
 }
 
+/** macOS 26 reads the icon from this catalog. It holds the dark version that the `.icns` cannot. */
+async function verifyPackagedIconCatalog(packagedPath: string, sourcePath: string): Promise<void> {
+  const [packagedCatalog, sourceCatalog] = await Promise.all([readFile(packagedPath), readFile(sourcePath)]);
+  if (!packagedCatalog.equals(sourceCatalog)) {
+    throw new Error("The packaged macOS icon catalog does not match build/macos/Assets.car.");
+  }
+}
+
 /** The Computer Use driver keeps the signature it was published with, not OpenBot's. */
 function assertCuaDriverSignature(binary: string): void {
   const description = run("codesign", ["-dvvv", binary], true);
@@ -254,18 +285,39 @@ async function verifyLaunch(executable: string): Promise<void> {
     stderr = `${stderr}${chunk}`.slice(-4_000);
   });
 
+  const launchExit = new Promise<never>((_, reject) => {
+    child.once("exit", (code, signal) => {
+      reject(
+        new Error(`Packaged OpenBot exited during launch (${signal ?? `code ${String(code)}`}): ${stderr.trim()}`),
+      );
+    });
+  });
+
   try {
-    await Promise.race([
-      new Promise<never>((_, reject) => {
-        child.once("exit", (code, signal) => {
-          reject(
-            new Error(`Packaged OpenBot exited during launch (${signal ?? `code ${String(code)}`}): ${stderr.trim()}`),
-          );
-        });
-      }),
-      new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 15_000)),
-    ]);
-    await verifySecondInstanceExits(executable, userDataPath);
+    // Chromium makes `SingletonLock` in userData when main takes its single-instance lock. A second
+    // instance that starts before that does not forward to the first one: it takes the lock and stays open.
+    await waitForFirstInstance(
+      launchExit,
+      () => pathExists(join(userDataPath, "SingletonLock")),
+      "take its lock",
+      () => stderr,
+    );
+    // The lock is not enough. The second instance waits about 20 seconds for the first one to answer, and
+    // the answer needs a free main thread; with no answer, Chromium can kill the first instance. Main
+    // answers only after its start, and a launch that stops during the start must fail here. So this
+    // waits until the window has loaded and called main (`trace.ndjson`, see `rendererCalledMain`).
+    await waitForFirstInstance(
+      launchExit,
+      () => rendererCalledMain(userDataPath),
+      "load its window",
+      () => stderr,
+    );
+    await verifySecondInstanceExits(executable, userDataPath, launchExit);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `Packaged OpenBot exited when a second instance started (${child.signalCode ?? `code ${String(child.exitCode)}`}): ${stderr.trim()}`,
+      );
+    }
   } finally {
     child.kill("SIGTERM");
     await Promise.race([
@@ -281,7 +333,60 @@ async function verifyLaunch(executable: string): Promise<void> {
   }
 }
 
-async function verifySecondInstanceExits(executable: string, userDataPath: string): Promise<void> {
+/** Waits for a state of the first instance. It fails immediately when the first instance exits. */
+async function waitForFirstInstance(
+  launchExit: Promise<never>,
+  reached: () => Promise<boolean>,
+  step: string,
+  stderr: () => string,
+): Promise<void> {
+  const stop = new AbortController();
+  const waitForState = async () => {
+    const limit = Date.now() + launchStepLimitMs;
+    while (!(await reached())) {
+      if (Date.now() > limit) {
+        throw new Error(`Packaged OpenBot did not ${step} in 5 minutes: ${stderr().trim()}`);
+      }
+      await delay(200, undefined, { signal: stop.signal });
+    }
+  };
+  try {
+    await Promise.race([launchExit, waitForState()]);
+  } finally {
+    stop.abort();
+  }
+}
+
+// `SingletonLock` is a symbolic link to a host and process name, not to a file, so it must not be followed.
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Whether the window of the first instance has called main. The renderer asks main for `getAppInfo` when
+ * it mounts (src/renderer/src/platform.tsx), main records each trusted call in `logs/trace.ndjson`
+ * (`setIpcCallObserver` in src/main/index.ts), and a main-thread timer writes the line about one second later.
+ */
+async function rendererCalledMain(userDataPath: string): Promise<boolean> {
+  try {
+    return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
+  } catch (error) {
+    if (isMissingFileError(error)) return false;
+    throw error;
+  }
+}
+
+async function verifySecondInstanceExits(
+  executable: string,
+  userDataPath: string,
+  launchExit: Promise<never>,
+): Promise<void> {
   const second = spawn(executable, [`--user-data-dir=${userDataPath}`, "--use-mock-keychain"], {
     env: {
       ...process.env,
@@ -298,25 +403,27 @@ async function verifySecondInstanceExits(executable: string, userDataPath: strin
   second.stderr.on("data", (chunk: string) => {
     stderr = `${stderr}${chunk}`.slice(-4_000);
   });
-  let exitTimer: ReturnType<typeof setTimeout> | undefined;
-  const result = await Promise.race([
-    new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
-      second.once("exit", (code, signal) => resolveExit({ code, signal }));
-    }),
-    // The second instance exits only after the first one accepts its arguments. On the Intel release
-    // runner the first one can still be busy with its start after 10 seconds (v0.38.2, v0.39.1, v0.40.0).
-    new Promise<null>((resolveDelay) => {
-      exitTimer = setTimeout(() => resolveDelay(null), 30_000);
-    }),
-  ]);
-  clearTimeout(exitTimer);
-  if (!result) {
-    second.kill("SIGKILL");
-    throw new Error(`A second OpenBot instance did not exit in 30 seconds: ${stderr.trim()}`);
-  }
-  if (result.code !== 0 || result.signal) {
-    throw new Error(
-      `A second OpenBot instance exited unexpectedly (${result.signal ?? `code ${String(result.code)}`}).`,
-    );
+  const stop = new AbortController();
+  try {
+    // The second instance exits only after the first one accepts its arguments. A busy first instance
+    // accepts them later, so this waits for the exit and not for a fixed time.
+    const result = await Promise.race([
+      new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
+        second.once("exit", (code, signal) => resolveExit({ code, signal }));
+      }),
+      launchExit,
+      delay(launchStepLimitMs, null, { signal: stop.signal }),
+    ]);
+    if (!result) {
+      throw new Error(`A second OpenBot instance did not exit in 5 minutes: ${stderr.trim()}`);
+    }
+    if (result.code !== 0 || result.signal) {
+      throw new Error(
+        `A second OpenBot instance exited unexpectedly (${result.signal ?? `code ${String(result.code)}`}): ${stderr.trim()}`,
+      );
+    }
+  } finally {
+    stop.abort();
+    if (second.exitCode === null && second.signalCode === null) second.kill("SIGKILL");
   }
 }

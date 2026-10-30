@@ -1,6 +1,11 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("onboarding", {
+  // The saved setup could not be read. Retry, or set up again with no saved state.
+  "onboarding.readFailed.title": "OpenBot could not read your setup.",
+  "onboarding.readFailed.description":
+    "Your local data did not change. Try again. If the problem continues, set up OpenBot again.",
+  "onboarding.readFailed.setUpAgain": "Set up again",
   "onboarding.setup.saveFailed": "OpenBot could not save your local setup.",
   "onboarding.setup.verifyFailed": "OpenBot could not verify this invitation.",
   "onboarding.setup.connectFailed": "OpenBot could not connect to this host.",
@@ -36,6 +41,9 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.googlePlan": "Google AI Pro or Ultra plan",
   "onboarding.provider.cursorPlan": "Cursor plan or API key",
   "onboarding.provider.clineAccount": "Free models with a Cline account",
+  "onboarding.provider.inceptionKey": "Mercury models with an Inception API key",
+  "onboarding.provider.deepseekKey": "DeepSeek models with a DeepSeek API key",
+  "onboarding.provider.openrouterKey": "Many models with an OpenRouter API key",
   "onboarding.provider.tryFree": "Try it free",
   "onboarding.provider.noSignIn": "No sign-in needed",
   "onboarding.provider.more": "More providers",

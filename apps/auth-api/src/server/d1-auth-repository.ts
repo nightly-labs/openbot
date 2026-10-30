@@ -485,7 +485,7 @@ export class D1AuthRepository implements AuthRepository {
     function* (
       this: D1AuthRepository,
       input: {
-        host?: MobileConnectHostBinding;
+        host?: MobileConnectHostBinding | undefined;
         ticketHash: string;
         userId: string;
         serverId: string;
@@ -854,8 +854,12 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       userId: string,
       now: number,
+      hostId: string | null,
     ): Effect.fn.Return<MobileAuthDevice[], AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
+      // A phone opens each host of the account directory, not only the host of its code. With a host,
+      // the list keeps the phones only when that host is in the directory: the account has an active
+      // membership, and the host has a key (`RemoteControlPlane.listHosts` and the Team client).
       const result = yield* storeCall(() =>
         database
           .prepare(
@@ -867,9 +871,15 @@ export class D1AuthRepository implements AuthRepository {
          WHERE mobile_auth_sessions.user_id = ?
            AND auth_sessions.revoked_at IS NULL
            AND auth_sessions.expires_at > ?
+           AND (? IS NULL OR EXISTS (
+             SELECT 1 FROM remote_memberships m
+             JOIN remote_hosts h ON h.host_id = m.host_id
+             WHERE m.host_id = ? AND m.user_id = mobile_auth_sessions.user_id AND m.status = 'active'
+               AND COALESCE(h.device_public_key, '') <> ''
+           ))
          ORDER BY auth_sessions.last_used_at DESC, auth_sessions.created_at DESC`,
           )
-          .bind(userId, now)
+          .bind(userId, now, hostId, hostId)
           .all<{
             session_id: string;
             device_name: string;

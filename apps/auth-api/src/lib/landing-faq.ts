@@ -5,6 +5,8 @@
 export interface LandingQuestion {
   question: string;
   answer: string;
+  /** Shown after the answer on the page. Not in the JSON-LD text. */
+  link?: { label: string; href: string };
 }
 
 export const LANDING_FAQ: readonly LandingQuestion[] = [
@@ -14,9 +16,10 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
       "Yes. OpenBot costs $0, with no locked features. You pay only your AI provider, through the plan or API key you already have.",
   },
   {
-    question: "Is OpenBot open source?",
+    question: "Is OpenBot's source code open?",
     answer:
-      "The source code is public on GitHub, under the PolyForm Noncommercial License 1.0.0. You can read, change and run it for any noncommercial purpose. It is not an open-source license as the OSI defines one: commercial use needs a separate license.",
+      "Yes. All of the source code is open on GitHub, so you can check what OpenBot does. You can change and run it for free for noncommercial use, such as personal projects, study or research. Commercial use needs a separate license. The license is PolyForm Noncommercial 1.0.0.",
+    link: { label: "See the source code on GitHub", href: "https://github.com/nightly-labs/openbot" },
   },
   {
     question: "Can I use my ChatGPT or Claude plan?",
@@ -26,7 +29,12 @@ export const LANDING_FAQ: readonly LandingQuestion[] = [
   {
     question: "Which AI models can OpenBot use?",
     answer:
-      "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor and Cline. You can also connect any OpenAI-compatible endpoint, and local models in Ollama or LM Studio.",
+      "Codex, Claude Code, Gemini, Grok, OpenCode, Cursor, Cline, Muse Code and Pi, and Inception's Mercury models. You can also run any agent that speaks the Agent Client Protocol, such as Goose or Qwen Code, connect any OpenAI-compatible endpoint, and use local models in Ollama or LM Studio.",
+  },
+  {
+    question: "What happens when my plan reaches its limit?",
+    answer:
+      "An agent can move to a backup model on another provider when its plan reaches its limit, or when its provider is overloaded or down. It keeps its chat and workspace, and a note in the chat shows the switch.",
   },
   {
     question: "How do I start?",

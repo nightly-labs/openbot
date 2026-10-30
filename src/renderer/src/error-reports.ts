@@ -1,5 +1,6 @@
 import type { AppInfo, CentralAuthUser } from "@openbot/contracts/ipc";
 import {
+  ANALYTICS_GENERATIONS,
   classifyFailure,
   type FailureProperties,
   openPanelTransport,
@@ -10,12 +11,16 @@ import { indexedReportStorage } from "@openbot/telemetry/browser";
 import { Effect } from "effect";
 import { version } from "../../../package.json";
 
+/** The desktop schema generation. Product events and failure reports send the same value. */
+export const ANALYTICS_SCHEMA_VERSION = ANALYTICS_GENERATIONS.desktop;
+
 let queue: ReportQueue | undefined;
 let enabled = false;
 let configured = false;
 const startup: { properties: FailureProperties; timestamp: number }[] = [];
 let profileId: string | null = null;
-const WEB_PREFERENCE = "openbot:web:error-reports-enabled";
+/** The web analytics preference. The key keeps its first name, so stored choices stay. */
+export const WEB_PREFERENCE = "openbot:web:error-reports-enabled";
 
 export function configureDesktopReports(
   info: AppInfo,
@@ -30,7 +35,12 @@ export function configureDesktopReports(
       clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2",
       ...(capture === undefined ? {} : { endpoint: `${capture}/track` }),
     }),
-    { surface: "desktop", platform: info.platform, app_version: info.version, event_schema_version: 7 },
+    {
+      surface: "desktop",
+      platform: info.platform,
+      app_version: info.version,
+      event_schema_version: ANALYTICS_SCHEMA_VERSION,
+    },
   );
   configureErrorReports(tracking, user?.id ?? null);
 }
@@ -70,7 +80,7 @@ export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> 
   queue ??= new ReportQueue(
     indexedReportStorage("openbot-web-error-reports-v1"),
     openPanelTransport({ clientId: "6c989975-87ef-4f0c-857e-ab449a65b5c2" }),
-    { surface: "web", platform: "web", app_version: version, event_schema_version: 1 },
+    { surface: "web", platform: "web", app_version: version, event_schema_version: ANALYTICS_GENERATIONS.web },
   );
   configureErrorReports(webReportsEnabled(), user?.id ?? null);
 }

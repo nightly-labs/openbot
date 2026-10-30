@@ -35,10 +35,6 @@
   color: var(--openbot-text-muted);
 }
 
-.composer-wrap:has(.composer-attachment) .awaiting-replies:last-child {
-  margin-bottom: 0;
-}
-
 .awaiting-replies-item {
   align-items: center;
 }
@@ -91,6 +87,16 @@
 
 .awaiting-replies-item[data-state="failed"] .awaiting-replies-state-label {
   color: var(--openbot-danger-text);
+}
+
+/* An agent that was asked waits for the user or for its plan, so its work does not go on. */
+.awaiting-replies-item[data-wait] .awaiting-replies-state-label {
+  color: var(--openbot-warning-text);
+}
+
+.awaiting-replies-open,
+.awaiting-replies-steer {
+  flex: 0 0 auto;
 }
 
 .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {

@@ -74,6 +74,7 @@ interface Report {
     storedKeyReachedOtherOrigin: boolean;
     newAddressWithKeptKeyRefused: boolean;
   };
+  headers?: Record<string, boolean>;
   disabled?: { requestsSent: number; savedAcrossRestart: boolean };
 }
 
@@ -178,12 +179,13 @@ try {
   assert.deepEqual(cipherAfter, cipherBefore, "A kept key keeps its ciphertext.");
 
   // 4. Load models for the saved endpoint with an empty key field: the server gets the stored key.
+  // With no header rows, the saved header is not sent: the user removed it in the form.
   await Effect.runPromise(
     detection.discoverModels({ baseUrl: row.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
   );
   const loaded = primary.seen.at(-1);
   assert.equal(loaded?.authorization, `Bearer ${KEY}`);
-  assert.equal(loaded?.team, HEADER.value);
+  assert.equal(loaded?.team, null, "A removed header row is not sent.");
 
   // 5. The stored key never goes to another origin.
   await Effect.runPromise(
@@ -195,6 +197,80 @@ try {
     runCauseEffect(endpoints.update({ id: row.id, name: "Local server", baseUrl: other.baseUrl, models: [] })),
     "A new address with a kept key is refused.",
   );
+  // 5b. Edit shows the saved header names. A null value keeps the saved value of that name.
+  const savedHeaders = endpoints.list().find((summary) => summary.id === row.id)?.headerNames;
+  assert.deepEqual(savedHeaders, [HEADER.name], "The list names the saved header.");
+  const editBase = { id: row.id, name: "Local server", baseUrl: row.baseUrl, models: edited?.models ?? [] };
+  await runCauseEffect(endpoints.update({ ...editBase, headers: [{ name: HEADER.name, value: null }] }));
+  const cipherKept = JSON.parse(await readFile(join(root, "custom-providers.json"), "utf8")).providers[0].secret;
+  assert.deepEqual(cipherKept, cipherBefore, "Kept headers keep the ciphertext.");
+  await Effect.runPromise(
+    detection.discoverModels({
+      baseUrl: row.baseUrl,
+      apiKey: null,
+      headers: [{ name: HEADER.name, value: "" }],
+      savedProviderId: row.id,
+    }),
+  );
+  assert.equal(primary.seen.at(-1)?.team, HEADER.value, "A kept header row loads models with the saved value.");
+  await Effect.runPromise(
+    detection.discoverModels({
+      baseUrl: other.baseUrl,
+      apiKey: null,
+      headers: [{ name: HEADER.name, value: "" }],
+      savedProviderId: row.id,
+    }),
+  );
+  assert.equal(other.seen.at(-1)?.team, null, "Another origin gets no kept header value.");
+  await assert.rejects(
+    runCauseEffect(
+      endpoints.update({
+        ...editBase,
+        baseUrl: other.baseUrl,
+        apiKey: "sk-new",
+        headers: [{ name: HEADER.name, value: null }],
+      }),
+    ),
+    "A new address with a kept header is refused.",
+  );
+  await assert.rejects(
+    runCauseEffect(endpoints.update({ ...editBase, headers: [{ name: "X-Unknown", value: null }] })),
+    "A kept value for a name that is not saved is refused.",
+  );
+  await runCauseEffect(
+    endpoints.update({
+      ...editBase,
+      headers: [
+        { name: HEADER.name, value: null },
+        { name: "X-Extra", value: "extra-value" },
+      ],
+    }),
+  );
+  await runCauseEffect(endpoints.update({ ...editBase, headers: [{ name: "X-Extra", value: null }] }));
+  const afterRemove = endpoints.configs().find((config) => config.id === row.id);
+  assert.deepEqual(
+    afterRemove?.headers,
+    [{ name: "X-Extra", value: "extra-value" }],
+    "A removed row removes its header.",
+  );
+  assert.equal(afterRemove?.apiKey, KEY, "A header edit keeps the key.");
+  const reopened = new CustomProviderStore({ path: join(root, "custom-providers.json"), cipher });
+  await runCauseEffect(reopened.load());
+  assert.deepEqual(reopened.list().find((summary) => summary.id === row.id)?.headerNames, ["X-Extra"]);
+  await runCauseEffect(endpoints.update({ ...editBase, headers: [] }));
+  assert.deepEqual(endpoints.list().find((summary) => summary.id === row.id)?.headerNames, [], "No rows clear them.");
+  assert.equal(endpoints.configs().find((config) => config.id === row.id)?.apiKey, KEY);
+  report.headers = {
+    namesListed: true,
+    keptCiphertextUnchanged: true,
+    keptValueReachedSameOrigin: true,
+    keptValueReachedOtherOrigin: false,
+    newAddressWithKeptHeaderRefused: true,
+    unknownKeptNameRefused: true,
+    removedRowRemoved: true,
+    namesSurviveReload: true,
+    emptyListClears: true,
+  };
   report.edit = {
     keyKeptOnEdit: true,
     ciphertextUnchanged: true,

@@ -8,6 +8,8 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 
 import {
   assertStorageUsageScope,
+  decodeMachineMetrics,
+  decodeStorageDisk,
   decodeStorageUsage,
   parseClearStorageInput,
   parseDeleteStoredFileInput,
@@ -18,17 +20,23 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  MACHINE_RESOURCES_CAPABILITY,
+  MACHINE_RESOURCES_ROUTES,
+} from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
+import type { MachineAlertMonitor } from "../machine-alerts";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import { agentRequest } from "./agent-inputs";
 import { type OpenAttachmentDependencies, openAttachmentForServer } from "./attachment-handlers";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { scopedHandler } from "./scoped-handler";
+import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
@@ -43,8 +51,9 @@ interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteSe
 }
 
 export interface StorageIpcDependencies extends Omit<OpenAttachmentDependencies, "remoteServers"> {
-  storage: Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
-  providerRuntimes: Pick<ProviderRuntimeManager, "oldVersions" | "removeOldVersions">;
+  storage: Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+  machine: Pick<MachineAlertMonitor, "metrics">;
+  providerRuntimes: Pick<ProviderRuntimeManager, "removableRuntimes" | "removeRemovableRuntimes">;
   remoteServers: StorageRemoteServers;
   agents: () => StorageAgent[];
   openPath: (path: string) => Promise<string>;
@@ -59,6 +68,7 @@ function decodeStorageChange(value: unknown): undefined {
 
 export function storageIpcHandlers({
   storage,
+  machine,
   providerRuntimes,
   mailbox,
   remoteServers,
@@ -93,6 +103,27 @@ export function storageIpcHandlers({
           return assertStorageUsageScope(usage, parsed);
         },
       }),
+      getDisk: scopedQueryHandler({
+        local: () => runCauseEffect(storage.disk()),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, STORAGE_DISK_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, STORAGE_DISK_ROUTES.disk, decodeStorageDisk, { method: "POST", body: {} }),
+          );
+        },
+      }),
+      getMachineMetrics: scopedQueryHandler({
+        local: () => runCauseEffect(machine.metrics()),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
       deleteFile: scopedHandler(parseDeleteStoredFileInput, {
         local: (parsed) => runCauseEffect(storage.deleteFile(parsed.fileId)),
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
@@ -116,8 +147,8 @@ export function storageIpcHandlers({
         const error = await openPath(agent.workspacePath);
         if (error) throw new Error(error);
       }),
-      getOldRuntimeVersions: handler(() => runCauseEffect(providerRuntimes.oldVersions())),
-      removeOldRuntimeVersions: handler(() => runCauseEffect(providerRuntimes.removeOldVersions())),
+      getRemovableRuntimes: handler(() => runCauseEffect(providerRuntimes.removableRuntimes())),
+      removeRemovableRuntimes: handler(() => runCauseEffect(providerRuntimes.removeRemovableRuntimes())),
     },
   };
 }

@@ -9,7 +9,7 @@ export function IntroducingOpenBot() {
 
       <h2>What Is OpenBot?</h2>
       <p>
-        OpenBot is a free, open-source, local-first alternative to Grok Bot. It does not train its own AI model.
+        OpenBot is a free, source-available, local-first alternative to Grok Bot. It does not train its own AI model.
         Instead, it brings the models you already use into one desktop workspace.
       </p>
       <p>

@@ -35,7 +35,6 @@ export const messages = {
   "connector.github.statusConnected": "Connecté",
   "connector.github.statusConnecting": "Connexion en cours",
   "connector.github.statusExpired": "Expiré",
-  "connector.github.statusNotSetUp": "Non configuré",
   "connector.github.accountTitle": "Compte",
   "connector.github.filterPlaceholder": { one: "Filtrer {count} dépôt", other: "Filtrer {count} dépôts" },
   "connector.github.filterLabel": "Filtrer les dépôts",
@@ -72,20 +71,12 @@ export const messages = {
   "connector.github.keepConnected": "Rester connecté",
   "connector.github.close": "Fermer",
   "connector.dangerZone": "Zone de danger",
-
-  "connector.hub.onThisComputer": "Sur cet ordinateur",
-  "connector.hub.onHost": "Sur {host}",
-  "connector.hub.notSetUp": "Non configuré",
-  "connector.hub.available": "Disponible",
-  "connector.hub.localOnly": "Votre ordinateur uniquement",
-  "connector.hub.open": "Ouvrir {name}",
-  "connector.hub.setUp": "Configurer",
-  "connector.hub.usedBy": "Utilisé par {names}",
+  "connector.statusUnknown": "Inconnu",
+  "connector.readFailed": "OpenBot n'a pas pu lire l'état de cette connexion.",
 
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "Les utilisateurs mentionnent @OpenBot dans Slack ou lui envoient un message direct. Le Slack Orchestrator sollicite le bon agent et répond.",
-  "connector.slack.statusNotSetUp": "Non configuré",
   "connector.slack.statusConnected": "Connecté",
   "connector.slack.statusAttention": "Action requise",
   "connector.slack.summaryConnected": "{workspace} · Le Slack Orchestrator répond",
@@ -98,13 +89,19 @@ export const messages = {
   "connector.slack.connect": "Connecter Slack",
   "connector.slack.addAgent": "Ajouter un agent",
   "connector.slack.actionFailed": "Slack n’a pas accepté la modification",
-  "connector.slack.workspaceTitle": "Espace de travail",
+  "connector.slack.workspaceTitle": "Espaces de travail",
   "connector.slack.workspaceDescription": "Les utilisateurs mentionnent @OpenBot ou lui envoient un message direct.",
   "connector.slack.disconnectWorkspace": "Déconnecter",
+  "connector.slack.disconnectAllTitle": "Déconnecter Slack",
+  "connector.slack.disconnectAllSummary":
+    "Tous les espaces de travail sont déconnectés. Personne ne peut plus joindre vos agents via @OpenBot.",
+  "connector.slack.disconnectAllSummaryOrchestrator":
+    "Tous les espaces de travail sont déconnectés. Le Slack Orchestrator et ses conversations sont supprimés d’OpenBot.",
   "connector.slack.missingScopes":
     "OpenBot n’a pas ces autorisations dans Slack : {scopes}. Déconnectez l’espace de travail, puis connectez-le à nouveau.",
   "connector.slack.retryAt": "Slack a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "connector.slack.reconnect": "Reconnecter",
+  "connector.slack.pause": "Mettre en pause",
   "connector.slack.resume": "Reprendre",
   "connector.slack.rowAction": "{action} : {name}",
   "connector.slack.orchestratorTitle": "Slack Orchestrator",
@@ -147,11 +144,19 @@ export const messages = {
   "connector.slack.removeEffectDeleted": "Le Slack Orchestrator et ses conversations sont supprimés d’OpenBot.",
   "connector.slack.keep": "Rester connecté",
   "connector.slack.close": "Fermer",
+  "connector.slack.addWorkspace": "Ajouter un espace de travail",
+  "connector.slack.limitReached": {
+    one: "Vous pouvez connecter au maximum {count} espace de travail.",
+    other: "Vous pouvez connecter au maximum {count} espaces de travail.",
+  },
+  "connector.slack.summaryMany": {
+    one: "{count} espace de travail · Le Slack Orchestrator répond",
+    other: "{count} espaces de travail · Le Slack Orchestrator répond",
+  },
 
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "Les utilisateurs mentionnent @OpenBot dans un canal d’un serveur Discord. Le Discord Orchestrator sollicite le bon agent et répond.",
-  "connector.discord.statusNotSetUp": "Non configuré",
   "connector.discord.statusConnected": "Connecté",
   "connector.discord.statusAttention": "Action requise",
   "connector.discord.summaryConnected": "{workspace} · Le Discord Orchestrator répond",
@@ -164,13 +169,19 @@ export const messages = {
   "connector.discord.connect": "Connecter Discord",
   "connector.discord.addAgent": "Ajouter un agent",
   "connector.discord.actionFailed": "Discord n’a pas accepté la modification",
-  "connector.discord.workspaceTitle": "Serveur Discord",
+  "connector.discord.workspaceTitle": "Serveurs Discord",
   "connector.discord.workspaceDescription": "Mentionnez @OpenBot dans un canal. Répondez à OpenBot pour continuer.",
   "connector.discord.disconnectWorkspace": "Déconnecter",
+  "connector.discord.disconnectAllTitle": "Déconnecter Discord",
+  "connector.discord.disconnectAllSummary":
+    "Tous les serveurs sont déconnectés. Personne ne peut plus joindre vos agents via @OpenBot.",
+  "connector.discord.disconnectAllSummaryOrchestrator":
+    "Tous les serveurs sont déconnectés. Le Discord Orchestrator et ses conversations sont supprimés d’OpenBot.",
   "connector.discord.missingScopes":
     "OpenBot n’a pas ces autorisations dans Discord : {scopes}. Déconnectez le serveur Discord, puis connectez-le à nouveau.",
   "connector.discord.retryAt": "Discord a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "connector.discord.reconnect": "Reconnecter",
+  "connector.discord.pause": "Mettre en pause",
   "connector.discord.resume": "Reprendre",
   "connector.discord.rowAction": "{action} : {name}",
   "connector.discord.orchestratorTitle": "Discord Orchestrator",
@@ -211,11 +222,35 @@ export const messages = {
   "connector.discord.removeEffectDeleted": "Le Discord Orchestrator et ses conversations sont supprimés d’OpenBot.",
   "connector.discord.keep": "Rester connecté",
   "connector.discord.close": "Fermer",
+  "connector.discord.addWorkspace": "Ajouter un serveur Discord",
+  "connector.discord.limitReached": {
+    one: "Vous pouvez connecter au maximum {count} serveur Discord.",
+    other: "Vous pouvez connecter au maximum {count} serveurs Discord.",
+  },
+  "connector.discord.summaryMany": {
+    one: "{count} serveur Discord · Le Discord Orchestrator répond",
+    other: "{count} serveurs Discord · Le Discord Orchestrator répond",
+  },
+  "connector.discord.accessTitle": "Qui peut utiliser OpenBot",
+  "connector.discord.accessDescription":
+    "OpenBot répond uniquement à ces personnes. Il ignore les mentions des autres.",
+  "connector.discord.accessEveryone": "Tout le monde sur le serveur",
+  "connector.discord.accessEveryoneDescription":
+    "Toute personne qui peut publier dans un canal visible par OpenBot peut le mentionner.",
+  "connector.discord.accessRoles": "Membres avec {roles}",
+  "connector.discord.accessChoose": "Choisir des rôles",
+  "connector.discord.accessDialogTitle": "Qui peut utiliser OpenBot dans {workspace} ?",
+  "connector.discord.accessDialogDescription": "Sans rôle sélectionné, tout le monde peut mentionner OpenBot.",
+  "connector.discord.accessLoading": "Chargement des rôles…",
+  "connector.discord.accessLoadFailed": "Les rôles Discord ne se sont pas chargés",
+  "connector.discord.accessNoRoles": "Ce serveur n’a aucun rôle à choisir.",
+  "connector.discord.accessRoleDeleted": "{role} (supprimé)",
+  "connector.discord.accessSave": "Enregistrer",
+  "connector.discord.accessHostUpdate": "Mettez à jour OpenBot sur {host} pour choisir des rôles.",
 
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "Ajoutez le bot OpenBot à un groupe Telegram ou ouvrez une discussion directe avec lui. Le Telegram Orchestrator sollicite le bon agent et répond.",
-  "connector.telegram.statusNotSetUp": "Non configuré",
   "connector.telegram.statusConnected": "Connecté",
   "connector.telegram.statusAttention": "Action requise",
   "connector.telegram.summaryConnected": {
@@ -249,11 +284,13 @@ export const messages = {
   "connector.telegram.resume": "Reprendre",
   "connector.telegram.reconnect": "Reconnecter",
   "connector.telegram.disconnectChat": "Déconnecter",
+  "connector.telegram.disconnectAllTitle": "Déconnecter Telegram",
+  "connector.telegram.disconnectAllSummary":
+    "Toutes les discussions sont déconnectées. Personne ne peut plus joindre vos agents via le bot OpenBot.",
+  "connector.telegram.disconnectAllSummaryOrchestrator":
+    "Toutes les discussions sont déconnectées. Le Telegram Orchestrator et ses conversations sont supprimés d’OpenBot.",
   "connector.telegram.rowAction": "{action} : {name}",
-  "connector.telegram.linkTitle": "Associer une autre discussion",
-  "connector.telegram.linkDescription":
-    "Telegram s’ouvre dans votre navigateur. La discussion s’affiche ici une fois associée.",
-  "connector.telegram.linkWaiting": "En attente de Telegram. Sélectionnez la discussion dans Telegram.",
+  "connector.telegram.linkChat": "Associer une discussion",
   "connector.telegram.addToGroup": "Ajouter à un groupe",
   "connector.telegram.openDirectChat": "Discuter en privé",
   "connector.telegram.orchestratorTitle": "Telegram Orchestrator",
@@ -313,11 +350,14 @@ export const messages = {
     "Dans l’app 1Password, ouvrez Réglages > Développeur et activez « Intégrer avec 1Password CLI ».",
   "connector.onePassword.stepAppReady": "L’app 1Password permet à la CLI de créer le coffre partagé.",
   "connector.onePassword.openApp": "Ouvrir 1Password",
+  "connector.onePassword.openAppFailed": "OpenBot n'a pas pu ouvrir 1Password.",
   "connector.onePassword.checkAgain": "Revérifier",
   "connector.onePassword.stepVaultTitle": "Créer le coffre partagé",
   "connector.onePassword.stepVaultDescription":
     "OpenBot crée le coffre « Shared with OpenBot » et un compte de service qui peut seulement le lire. 1Password vous demande votre approbation.",
-  "connector.onePassword.useToken": "Utiliser plutôt un jeton de compte de service",
+  "connector.onePassword.useTokenDescription":
+    "Au lieu de ces étapes, collez un jeton de compte de service de 1Password.com.",
+  "connector.onePassword.useTokenAction": "Utiliser un jeton",
   "connector.onePassword.tokenLabel": "Jeton de compte de service",
   "connector.onePassword.tokenPlaceholder": "ops_…",
   "connector.onePassword.connectWithToken": "Connecter",
@@ -339,7 +379,6 @@ export const messages = {
   "connector.onePassword.actionFailed": "OpenBot n’a pas pu modifier la connexion 1Password.",
   "connector.onePassword.statusConnected": "Connecté",
   "connector.onePassword.statusConnecting": "Connexion en cours",
-  "connector.onePassword.statusNotSetUp": "Non configuré",
   "connector.onePassword.descriptionHost":
     "Partagez un coffre 1Password dédié avec OpenBot sur {host} via un compte de service, pour que les agents de {host} puissent se connecter aux sites dans son navigateur.",
   "connector.onePassword.howItWorksHost":
@@ -357,7 +396,29 @@ export const messages = {
   "connector.bitwarden.sessionKey": "Clé de session Bitwarden",
   "connector.bitwarden.connect": "Connecter Bitwarden",
   "connector.bitwarden.disconnect": "Déconnecter Bitwarden",
+  "connector.bitwarden.disconnectAction": "Déconnecter",
+  "connector.bitwarden.disconnectSummary":
+    "OpenBot oublie la clé de session. Les agents ne peuvent plus remplir les identifiants depuis Bitwarden. Les autres clients Bitwarden restent déverrouillés.",
+  "connector.bitwarden.disconnectSummaryHost":
+    "{host} supprime la clé d’API et le mot de passe principal. Les agents de {host} ne peuvent plus remplir les identifiants depuis Bitwarden.",
   "connector.bitwarden.connected": "Connecté",
-  "connector.bitwarden.disconnected": "Non connecté",
   "connector.bitwarden.actionFailed": "OpenBot n’a pas pu modifier la connexion Bitwarden.",
+  "connector.bitwarden.descriptionHost":
+    "Remplir les identifiants du navigateur sur {host} depuis Bitwarden ou Vaultwarden.",
+  "connector.bitwarden.setupHost":
+    "{host} se connecte avec sa propre CLI Bitwarden. Dans votre coffre, créez un dossier nommé « Shared with OpenBot » et placez-y uniquement les identifiants que les agents peuvent utiliser. Dans le coffre web, ouvrez Paramètres › Sécurité › Clés et affichez votre clé d’API. Saisissez ci-dessous l’adresse du serveur, client_id, client_secret et votre mot de passe principal.",
+  "connector.bitwarden.scopeHost":
+    "Tous les agents de {host} peuvent utiliser les identifiants correspondants de « Shared with OpenBot ». OpenBot utilise des origines HTTPS exactes. Il n’utilise pas les éléments qui demandent le mot de passe principal ni ceux qui ont une règle de correspondance d’URI personnalisée.",
+  "connector.bitwarden.sessionHost":
+    "{host} conserve la clé d’API et le mot de passe principal chiffrés, pour pouvoir déverrouiller à nouveau après un redémarrage. Cet ordinateur ne les conserve pas. Déconnecter les supprime de {host}. {host} doit joindre l’adresse du serveur en HTTPS.",
+  "connector.bitwarden.serverUrl": "Adresse du serveur",
+  "connector.bitwarden.folderTitle": "Dossier partagé",
+  "connector.bitwarden.folderDescription":
+    "Déplacez un identifiant dans ce dossier dans Bitwarden pour permettre aux agents de se connecter avec. Retirez-le pour arrêter.",
+  "connector.bitwarden.folderName": "Shared with OpenBot",
+  "connector.bitwarden.folderKind": "Dossier dans Bitwarden",
+  "connector.bitwarden.clientId": "client_id de la clé d’API",
+  "connector.bitwarden.clientSecret": "client_secret de la clé d’API",
+  "connector.bitwarden.masterPassword": "Mot de passe principal",
+  "connector.bitwarden.connecting": "Connexion",
 } as const satisfies PartialTranslation<typeof source>;

@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/error/agent";
 
 export const messages = {
   "error.agent.historyUnavailable":
-    "L’historique n’est pas disponible pour cette demande. Relisez l’historique récent.",
+    "L’historique n’est pas disponible pour cette demande. Relisez l’historique récent, ou utilisez channel_history pour le travail dans un canal.",
   "error.agent.toolRequestInvalid":
     "Arguments de découverte d’outils non valides. Utilisez le schéma déclaré et un nom d’outil qualifié d’origine.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
@@ -51,6 +51,9 @@ export const messages = {
     "Des tâches de cet agent sont en cours. Attendez qu’elles se terminent ou arrêtez-les avant de changer de fournisseur.",
   "error.agent.waitBeforeClearContext":
     "Attendez la fin du tour actif et de la file d’attente avant de commencer une nouvelle discussion.",
+  "error.agent.waitBeforeCompactContext":
+    "Attendez la fin du tour actif et de la file d’attente avant de compacter le contexte.",
+  "error.agent.compactContextUnavailable": "Cet agent ne peut pas compacter son contexte maintenant.",
   "error.agent.unknown": "Agent inconnu : {id}",
   "error.agent.onlyUserWidensSettings":
     "Seul l’utilisateur peut donner à un agent l’accès complet ou activer Computer Use. Demandez à l’utilisateur de le modifier dans les réglages de l’agent.",
@@ -67,6 +70,8 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot n’a pas pu créer un nom unique pour la copie de l’agent.",
   "error.agent.endpointRemoved":
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
+  "error.agent.turnStalled":
+    "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
   "error.agent.selectedGone": "L’agent sélectionné n’existe plus.",
   "error.agent.profileEndpointsChanged":
     "Les points de terminaison personnalisés ont changé pendant la génération. Réessayez.",
@@ -96,6 +101,11 @@ export const messages = {
   "error.agent.computerUseLocalOnly": "Computer Use ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.automationLocalOnly":
     "Les scripts locaux ne peuvent être autorisés que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.newChatLocalOnly":
+    "Seul l’ordinateur qui exécute l’agent peut l’autoriser à démarrer de nouvelles discussions.",
+  "error.agent.quickAcknowledgementLocalOnly": "Seul l’ordinateur qui exécute l’agent peut modifier ce réglage.",
+  "error.agent.sideQuestionBusy": "Trop de questions annexes sont en cours. Réessayez dans un instant.",
+  "error.agent.sideQuestionFailed": "L’agent n’a pas pu répondre à la question annexe. Réessayez.",
   "error.agent.busyMessageModeLocalOnly":
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":
@@ -116,11 +126,13 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.claudeSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":
     "La capture d’écran est désactivée pour cet agent. L’utilisateur peut activer Computer Use dans les réglages de l’agent.",
   "error.agent.screenCaptureUnavailable": "La capture d’écran n’est pas disponible sur cet ordinateur.",
   "error.agent.screenCaptureShared":
-    "La capture d’écran ne fonctionne pas dans un canal ni dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
+    "La capture d’écran ne fonctionne pas dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
   "error.agent.screenCaptureDeclined": "L’utilisateur n’a pas autorisé cette capture d’écran. Rien n’a été capturé.",
   "error.agent.screenCaptureWindowMissing":
     "Cette fenêtre n’est pas ouverte. Appelez list_capture_sources pour obtenir les identifiants actuels des fenêtres.",

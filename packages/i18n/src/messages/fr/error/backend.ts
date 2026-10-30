@@ -44,6 +44,15 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "Ce serveur ne prend pas en charge la suppression de canaux.",
   "error.backend.browserNavigateUnsupported":
     "Cet hôte distant ne prend pas en charge la navigation par la barre d’adresse dans un onglet existant.",
+  "error.backend.browserUserControlBusy":
+    "Cet onglet du navigateur attend un secret. Répondez d’abord à la demande de secret.",
+  "error.backend.browserUserControlUnsupported":
+    "Cet hôte distant ne permet pas de prendre le contrôle d’un onglet du navigateur.",
+  "error.backend.browserSignInUnsupported":
+    "Cet hôte distant ne peut pas recevoir une connexion depuis cet ordinateur.",
+  "error.backend.browserSignInOpenFailed": "OpenBot n’a pas pu ouvrir la fenêtre de connexion.",
+  "error.backend.browserSignInReadFailed": "OpenBot n’a pas pu lire la connexion dans la fenêtre.",
+  "error.backend.browserStopUnsupported": "Cet hôte distant ne peut pas arrêter le chargement d’une page.",
   "error.backend.sharedDataLocalOnly": "Les données partagées sont gérées sur l’ordinateur qui exécute ces agents.",
   "error.backend.browserUrlProtocol": "Seules les URL de navigateur HTTP(S) sont autorisées.",
   "error.backend.sunshineNotReady": "Sunshine n’est pas devenu prêt.",
@@ -56,8 +65,6 @@ export const messages = {
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
-  "error.backend.channelsRetired":
-    "Les canaux ne sont plus pris en charge. Placez les agents dans une section de la barre latérale pour qu’ils travaillent ensemble.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
   "error.backend.channelTaskComplete": "Cette tâche est déjà terminée.",
@@ -67,10 +74,20 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "Cette demande dépasse la limite de contexte de routage. Sélectionnez un membre ou envoyez une demande plus courte.",
   "error.backend.channelTaskMemberRequired": "Choisissez un membre pour cette tâche.",
+  "error.backend.channelTaskStopped": "Arrêtée. Continuez ou réassignez cette tâche.",
+  "error.backend.channelRoutingUnreadable":
+    "Le responsable n'a pas pu acheminer ce message. Réassignez-le à un membre.",
+  "error.backend.channelRoutingFailed": "Le routage a échoué. Choisissez un membre ou réessayez.",
+  "error.backend.channelLeadTimedOut":
+    "Le responsable du canal n'a pas répondu à temps. Choisissez un membre ou réessayez.",
+  "error.backend.channelLeadFailed":
+    "Le responsable du canal n'a pas pu router ce message. Choisissez un membre ou réessayez.",
   "error.backend.channelRequestMemberRequired": "Choisissez un membre pour cette demande.",
   "error.backend.channelDeliveryNotCreated": "La distribution dans le canal n’a pas été créée.",
   "error.backend.channelAssignmentStopped": "Cette tâche de canal a été arrêtée ou remplacée.",
   "error.backend.channelAssigneeUnavailable": "L’agent assigné est indisponible.",
+  "error.backend.channelAssigneeRemoved": "Le membre assigné a été retiré.",
+  "error.backend.channelAssigneeReassign": "Le membre assigné est indisponible. Réassignez cette tâche.",
   "error.backend.channelAssignmentChanged": "Cette tâche de canal a changé.",
   "error.backend.channelMemberRequired": "Sélectionnez un membre disponible de ce canal.",
   "error.backend.memoryEssentialBudget":
@@ -187,11 +204,16 @@ export const messages = {
     "Seule une exécution de l’une de vos routines réveille une attente, et vous n’avez aucune routine. Créez-en une avec openbot.create_routine, puis ouvrez l’attente.",
   "error.backend.agentWaitRemoteUnsupported":
     "Les attentes ouvertes ne sont disponibles que pour les agents de cet ordinateur.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marquer un message comme non lu n’est disponible que pour les agents de cet ordinateur.",
   "error.backend.routineFlowHandoffFailed": "La routine n’a pas pu transmettre le travail à cet agent.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",
+  "error.backend.mcpServerInvalid": "OpenBot ne peut pas enregistrer cette configuration de serveur MCP.",
   "error.backend.mcpServerNoAnswer": "Le serveur n’a pas répondu en {seconds} secondes.",
   "error.backend.mcpSignInNotAccepted": "Le serveur n’a pas accepté cette connexion.",
+  "error.backend.mcpSignInClientRefused":
+    "Le serveur de connexion n’a pas accepté OpenBot à la fin de la connexion. Connectez-vous à nouveau : OpenBot s’enregistre de nouveau auprès du serveur.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
   "error.backend.mcpRegistrationRefused":
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",
@@ -209,8 +231,15 @@ export const messages = {
   "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
   "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
   "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
+  "error.backend.mcpSignInMetadataUnreadable":
+    "OpenBot n’a pas pu lire les informations de connexion de ce serveur. Vérifiez l’adresse du serveur et réessayez.",
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
+  "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpOAuthProxyUnavailable":
+    "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
+  "error.backend.mcpOAuthSignInNeeded":
+    "La connexion à ce serveur MCP a pris fin. L’utilisateur doit se reconnecter dans OpenBot.",
   "error.backend.mcpServerUnreachable": "OpenBot n’a pas pu joindre le serveur. Vérifiez l’URL et votre réseau.",
   "error.backend.mcpLocalServerOff":
     "Aucun serveur ne répond à {address} sur cet ordinateur. Démarrez le serveur ou activez-le dans l’app qui l’exécute, puis réessayez.",
@@ -225,6 +254,12 @@ export const messages = {
   "error.backend.oauthTooManyRedirects": "Le point de terminaison OAuth a effectué trop de redirections.",
   "error.backend.oauthRedirectOrigin":
     "Le point de terminaison OAuth a redirigé vers {origin} : les identifiants n’ont pas été transmis.",
+  "error.backend.oauthTimedOut": "Le point de terminaison OAuth {origin} n’a pas répondu à temps.",
+  "error.backend.oauthResponseTooLarge":
+    "Le point de terminaison OAuth {origin} a envoyé une réponse trop volumineuse.",
+  "error.backend.oauthResponseUnreadable": "La réponse du point de terminaison OAuth {origin} n’a pas pu être lue.",
+  "error.backend.mcpOAuthPrivateEndpoint":
+    "Le point de terminaison OAuth {origin} est sur un réseau privé, mais le serveur MCP est public : les identifiants n’ont pas été envoyés.",
   "error.backend.sidebarSectionLimit": "Un serveur peut avoir jusqu’à {limit} sections de barre latérale.",
   "error.backend.sectionNameRequired": "Le nom de la section est requis.",
   "error.backend.sectionNameTooLong": "Le nom de la section est trop long.",
@@ -234,6 +269,7 @@ export const messages = {
   "error.backend.directMessageSelf": "Vous ne pouvez pas vous envoyer un message direct.",
   "error.backend.readBoundaryUnavailable": "La limite de lecture n’est plus disponible.",
   "error.backend.sharedFileOutside": "Le fichier partagé doit se trouver dans le dossier partagé.",
+  "error.backend.sharedPathIsFolder": "Le chemin partagé est un dossier, pas un fichier.",
   "error.backend.sharedPathNotFile": "Le chemin partagé n’est pas un fichier.",
   "error.backend.workspaceFileOutside": "Le fichier doit se trouver dans l’espace de travail de l’agent.",
   "error.backend.workspacePathNotFile": "Le chemin de l’espace de travail n’est pas un fichier.",
@@ -252,17 +288,28 @@ export const messages = {
   "error.backend.steerTurnChanged": "Le tour actif a changé avant que ce message puisse l’orienter.",
   "error.backend.steerUnsupported":
     "Ce fournisseur ne peut pas orienter un tour en cours. Votre message reste dans la file.",
+  "error.backend.steerRoutineRun":
+    "Une routine est en cours. Votre message reste dans la file et démarre après la routine.",
   "error.backend.steerQueuedOnly": "Seuls les messages en file d’attente peuvent orienter le tour.",
   "error.backend.promptInactive": "Cette question n’est plus active.",
   "error.backend.promptAnswerMismatch": "Une réponse ne correspond à aucune question active.",
   "error.backend.approvalInactive": "Cette approbation n’est plus active.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
+  "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
+  "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
+  "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
   "error.backend.authRequestInactive": "Cette demande d’authentification sécurisée n’est plus active.",
   "error.backend.secureAuthUnavailable": "L’authentification sécurisée est indisponible.",
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
   "error.backend.browserUrlTooLong": "L’URL du navigateur est trop longue.",
   "error.backend.browserTabLimit": "Le navigateur peut avoir jusqu’à {limit} onglets ouverts.",
+  "error.backend.browserProfileMissing":
+    "Le profil de navigateur de cet agent n’existe plus. Choisissez un autre profil dans les réglages de l’agent.",
+  "error.backend.browserProfileNotFound": "Ce profil de navigateur n’existe plus.",
+  "error.backend.browserProfileNameTaken": "Un profil de navigateur porte déjà ce nom.",
+  "error.backend.browserSessionInUse": "Un onglet utilise encore cette session de navigateur. Réessayez.",
+  "error.backend.browserProfileLimit": "Vous pouvez avoir jusqu’à {limit} profils de navigateur.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
@@ -300,6 +347,15 @@ export const messages = {
   "error.backend.taskNotFound": "Cette tâche n’est pas disponible.",
   "error.backend.taskClosed": "Cette tâche est fermée. Rouvrez-la pour envoyer un message.",
   "error.backend.taskStillRunning": "Cette tâche est toujours en cours. Attendez qu’elle s’arrête, puis fermez-la.",
+  "error.backend.threadNotFound": "Ce fil n’est pas disponible.",
+  "error.backend.threadStillRunning": "Ce fil est toujours en cours. Arrêtez-le, puis réessayez.",
+  "error.backend.threadArchived": "Ce fil est archivé. Restaurez-le pour envoyer un message.",
+  "error.backend.threadTitleRequired": "Donnez un titre court au fil.",
+  "error.backend.threadOpenLimitReached":
+    "Cet agent a {count} fils ouverts. Archivez un fil, puis lancez-en ou restaurez-en un autre.",
+  "error.backend.threadRemoteUnsupported": "Les fils sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.threadMoveRefused":
+    "Seul un message envoyé uniquement à cet agent peut s’exécuter dans un nouveau fil.",
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",
   "error.backend.taskToolInvalid":
     "Donnez à la tâche un titre de 120 caractères au plus et des consignes qui disent quoi faire.",

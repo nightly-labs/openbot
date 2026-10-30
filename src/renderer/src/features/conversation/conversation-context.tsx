@@ -1,10 +1,11 @@
-import type {
-  AgentEvent,
-  AgentRuntimeSnapshot,
-  ConversationPage,
-  ConversationPageInfo,
-  ConversationReadState,
-  ConversationSnapshot,
+import {
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  CONVERSATION_SNAPSHOT_MESSAGE_LIMIT,
+  type ConversationPage,
+  type ConversationPageInfo,
+  type ConversationReadState,
+  type ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -25,12 +26,13 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
-import { appendLatestRuntimeMessages } from "../agents/agent-runtime-snapshot";
+import { appendLatestRuntimeMessages, attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useServers } from "../servers/servers-context";
 import { notifyTeamTyping } from "../team/team-typing";
 import { useWindowPage } from "../window/window-page-context";
+import { takeAttachmentKinds } from "./attachment-analytics";
 import {
   agentConversationKey,
   agentMessageKey,
@@ -89,7 +91,7 @@ interface ConversationState {
   missingReferences?: Record<string, true>;
   olderLoading?: boolean;
   olderError?: string | null;
-  read?: ConversationReadState;
+  read?: ConversationReadState | undefined;
   recentReply?: boolean;
 }
 
@@ -109,7 +111,7 @@ const Conversation = createSimpleContext({
   name: "Conversation",
   init: () => {
     const windowPage = useWindowPage();
-    const { appFocused } = usePlatform();
+    const { appFocused, chatWindow } = usePlatform();
     const { activeServerId, activeServer } = useServers();
     const { agentChatsToMarkRead, agentChatsToRetryRead, autoReadAgentMessages } = useAgentReadTracking();
     const scopeIsCurrent = createScopeGuard();
@@ -167,13 +169,21 @@ const Conversation = createSimpleContext({
     const agentChatsRetriedOnOpen = new Set<string>();
     const conversationPageRequests = new Map<string, number>();
     const conversationReadOperations = new Map<string, Promise<void>>();
+    /** The chats that the user marked unread. They stay unread until the user opens them again. */
+    const heldUnreadAgentChats = new Set<string>();
 
     let conversationFrame: number | undefined;
+
+    /** The key of the wait in an agent's own chat: the conversations here are those chats. */
+    function ownChatAttentionKey(agentId: string): string {
+      const agent = agentList().find((candidate) => candidate.id === agentId);
+      return attentionKey(agentId, agent?.threadId ?? null);
+    }
 
     const activeMessages = createMemo(() => {
       const agent = activeAgent();
       if (!agent) return [];
-      const prompt = pendingPrompts()[agent.id];
+      const prompt = pendingPrompts()[attentionKey(agent.id, agent.threadId)];
       const requestKey = prompt?.type === "prompt" ? promptRequestKey(prompt.turnId, prompt.requestId) : null;
       const messages = (conversations[agent.id]?.messages ?? []).filter(
         (message) =>
@@ -288,7 +298,11 @@ const Conversation = createSimpleContext({
 
     function applyConversationReads(reads: Record<string, ConversationReadState>): void {
       setConversations((current) => {
-        for (const [agentId, conversation] of Object.entries(current)) conversation.read = reads[agentId];
+        for (const [agentId, conversation] of Object.entries(current)) {
+          const read = reads[agentId];
+          if (read === undefined) delete conversation.read;
+          else conversation.read = read;
+        }
         for (const [agentId, read] of Object.entries(reads)) {
           current[agentId] ??= { messages: [] };
           current[agentId].read = read;
@@ -304,6 +318,9 @@ const Conversation = createSimpleContext({
 
     function requestConversationRead(agentId: string, explicit = false): void {
       const trackingKey = agentConversationKey(activeServerId(), agentId);
+      // Only an open of the chat ends Mark unread: focus does not, and neither does a new message.
+      if (explicit) heldUnreadAgentChats.delete(trackingKey);
+      else if (heldUnreadAgentChats.has(trackingKey)) return;
       if (explicit) autoReadAgentMessages.delete(trackingKey);
       agentChatsToMarkRead.add(trackingKey);
       agentChatsRetriedOnOpen.delete(agentId);
@@ -356,7 +373,11 @@ const Conversation = createSimpleContext({
     }
 
     function isAgentChatReadable(agentId: string): boolean {
-      return appFocused() && isAgentChatOpen(agentId);
+      return (
+        appFocused() &&
+        isAgentChatOpen(agentId) &&
+        !heldUnreadAgentChats.has(agentConversationKey(activeServerId(), agentId))
+      );
     }
 
     /**
@@ -415,6 +436,7 @@ const Conversation = createSimpleContext({
     function autoMarkAgentMessageRead(agentId: string, messageId: string, optimisticallyClearUnread = false): void {
       const serverId = activeServerId();
       const trackingKey = agentConversationKey(serverId, agentId);
+      if (heldUnreadAgentChats.has(trackingKey)) return;
       const decision = decideAgentAutoRead({
         messageId,
         current: conversations[agentId]?.read,
@@ -530,9 +552,9 @@ const Conversation = createSimpleContext({
       const initialLoad = conversations[agentId]?.loaded !== true;
       const inactive = agentId !== activeAgentId();
       const windowMode = conversations[agentId]?.windowMode ?? "latest";
-      // A snapshot carries the whole thread. An agent that is not open shows none of it, and opening
-      // it reads the latest page again, so only the tail is converted and kept. A window around an
-      // older message, from a search, is not in the tail, so it keeps the whole snapshot.
+      // A snapshot carries the latest part of the thread. An agent that is not open shows none of it,
+      // and opening it reads the latest page again, so only the tail is converted and kept. A window
+      // around an older message, from a search, converts the whole snapshot.
       const sourceMessages =
         inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
           ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
@@ -543,12 +565,13 @@ const Conversation = createSimpleContext({
         const previous = conversation.messages;
         const previousById = new Map(previous.map((message) => [message.id, message]));
         const allMappedMessages = toAgentMessages(sourceMessages, snapshot.agentId);
-        const pageInfo = conversations[agentId]?.page;
         const mappedMessages = retainThinkingMessages(
           previous,
           windowedSnapshotMessages(previous, allMappedMessages, {
-            hasOlder: pageInfo?.hasOlder === true,
             mode: windowMode,
+            // Main also cuts a snapshot by size, so a window with older pages takes it as a tail too.
+            capped:
+              snapshot.messages.length >= CONVERSATION_SNAPSHOT_MESSAGE_LIMIT || conversation.page?.hasOlder === true,
           }),
         );
         const next = mappedMessages.map((mapped) => {
@@ -566,7 +589,8 @@ const Conversation = createSimpleContext({
         if (sourceMessages !== snapshot.messages) conversation.page = { hasOlder: true, olderCursor: null };
       });
       const presentedRequestKey = presentedPromptResolutions()[agentId];
-      const pendingPrompt = pendingPrompts()[agentId];
+      const promptKey = ownChatAttentionKey(agentId);
+      const pendingPrompt = pendingPrompts()[promptKey];
       const pendingRequestKey =
         pendingPrompt?.type === "prompt" ? promptRequestKey(pendingPrompt.turnId, pendingPrompt.requestId) : null;
       const submittedRequestKey = submittedPromptRequests()[agentId];
@@ -583,14 +607,14 @@ const Conversation = createSimpleContext({
             messagePromptRequestKey(message) === presentedRequestKey && message.questionPrompt?.resolution !== null,
         )
       ) {
-        setPendingPrompts((current) => ({ ...current, [agentId]: undefined }));
+        setPendingPrompts((current) => ({ ...current, [promptKey]: undefined }));
         setPresentedPromptResolutions((current) => ({ ...current, [agentId]: undefined }));
         setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
       } else if (
         resolvedPendingPrompt &&
         (activeAgent()?.id !== agentId || !submittedRequestKey || submittedRequestKey !== pendingRequestKey)
       ) {
-        setPendingPrompts((current) => ({ ...current, [agentId]: undefined }));
+        setPendingPrompts((current) => ({ ...current, [promptKey]: undefined }));
         setPresentedPromptResolutions((current) => ({ ...current, [agentId]: undefined }));
         setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
       }
@@ -631,7 +655,8 @@ const Conversation = createSimpleContext({
         const pageMessages = mapped.map((message) => {
           const stored = currentById.get(message.id);
           if (!stored) return createStoredMessage({ ...message, animate: false });
-          if (!agentMessagesEqual(stored, message)) updateStored(stored, { ...message, animate: stored.animate });
+          if (!agentMessagesEqual(stored, message))
+            updateStored(stored, stored.animate === undefined ? message : { ...message, animate: stored.animate });
           return stored;
         });
         conversation.messages = mergeConversationPage(currentMessages, pageMessages, merge);
@@ -775,12 +800,21 @@ const Conversation = createSimpleContext({
       replyToMessageId: string | null,
       target?: { agentId: string; serverId: string },
       clientMessageId?: string,
+      voiceRecordingDraftId?: string,
     ): Promise<SendMessageResult> {
       const agentId = target?.agentId ?? activeAgent()?.id;
       const serverId = target?.serverId ?? activeServerId();
       if (!agentId || (!body.trim() && attachmentDraftIds.length === 0))
         return { error: currentText().t("chat.errorStatus.send") };
-      return sendMessageToAgent(agentId, body, attachmentDraftIds, replyToMessageId, serverId, clientMessageId);
+      return sendMessageToAgent(
+        agentId,
+        body,
+        attachmentDraftIds,
+        replyToMessageId,
+        serverId,
+        clientMessageId,
+        voiceRecordingDraftId,
+      );
     }
 
     /** The failure goes back to the pending message, which shows it with Retry. */
@@ -791,9 +825,11 @@ const Conversation = createSimpleContext({
       replyToMessageId: string | null = null,
       serverId = activeServerId(),
       clientMessageId?: string,
+      voiceRecordingDraftId?: string,
     ): Promise<SendMessageResult> {
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
+      const attachmentKinds = takeAttachmentKinds(attachmentDraftIds);
       try {
         const input = {
           agentId,
@@ -801,6 +837,7 @@ const Conversation = createSimpleContext({
           attachmentDraftIds,
           ...(replyToMessageId ? { replyToMessageId } : {}),
           ...(clientMessageId ? { clientMessageId } : {}),
+          ...(voiceRecordingDraftId ? { voiceRecordingDraftId } : {}),
         };
         const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
@@ -809,6 +846,7 @@ const Conversation = createSimpleContext({
           ...(properties ?? {}),
           channel: "agent",
           attachment_count: attachmentDraftIds.length,
+          attachment_kinds: attachmentKinds,
           is_reply: replyToMessageId !== null,
           result: "succeeded",
           delivery_count: receipt.deliveries.length,
@@ -824,6 +862,7 @@ const Conversation = createSimpleContext({
           ...(properties ?? {}),
           channel: "agent",
           attachment_count: attachmentDraftIds.length,
+          attachment_kinds: attachmentKinds,
           is_reply: replyToMessageId !== null,
           result: "failed",
           failure_code: "send_failed",
@@ -841,6 +880,8 @@ const Conversation = createSimpleContext({
     ): Promise<void> {
       if (!agentId || !scopeIsCurrent()) return;
       const requestKey = agentConversationKey(serverId, agentId);
+      // Automatic reads stop before this for a chat marked unread, so this read is the user's.
+      heldUnreadAgentChats.delete(requestKey);
       const conversationAtStart = conversations[agentId];
       const visibleMessageIdAtStart = latestVisibleAgentMessageId(conversations[agentId]?.messages);
       const boundary =
@@ -904,6 +945,36 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * Marks an agent message and the messages after it unread. The open chat stays open and moves its
+     * NEW line to that message; the next open of the chat marks it read again.
+     */
+    async function markAgentMessagesUnread(
+      agentId: string,
+      fromMessageId: string,
+      serverId = activeServerId(),
+    ): Promise<void> {
+      const requestKey = agentConversationKey(serverId, agentId);
+      heldUnreadAgentChats.add(requestKey);
+      const operation: Promise<void> = (conversationReadOperations.get(requestKey) ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(async () => {
+          const state = await conversationPort().agent.markConversationUnread({ agentId, fromMessageId }, serverId);
+          // A finished automatic read would otherwise apply its read state again.
+          autoReadAgentMessages.delete(requestKey);
+          if (scopeIsCurrent()) applyConversationReadState(agentId, state);
+        });
+      conversationReadOperations.set(requestKey, operation);
+      try {
+        await operation;
+      } catch (error) {
+        heldUnreadAgentChats.delete(requestKey);
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+      } finally {
+        if (conversationReadOperations.get(requestKey) === operation) conversationReadOperations.delete(requestKey);
+      }
+    }
+
     /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
@@ -930,7 +1001,8 @@ const Conversation = createSimpleContext({
     function presentPromptResolution(agentId: string, turnId: string, requestId: string | number): void {
       const requestKey = promptRequestKey(turnId, requestId);
       if (!requestKey) return;
-      const currentPrompt = pendingPrompts()[agentId];
+      const promptKey = ownChatAttentionKey(agentId);
+      const currentPrompt = pendingPrompts()[promptKey];
       if (
         currentPrompt?.type !== "prompt" ||
         promptRequestKey(currentPrompt.turnId, currentPrompt.requestId) !== requestKey
@@ -941,7 +1013,7 @@ const Conversation = createSimpleContext({
         (message) => messagePromptRequestKey(message) === requestKey && message.questionPrompt?.resolution !== null,
       );
       if (persisted) {
-        setPendingPrompts((current) => ({ ...current, [agentId]: undefined }));
+        setPendingPrompts((current) => ({ ...current, [promptKey]: undefined }));
         setPresentedPromptResolutions((current) => ({ ...current, [agentId]: undefined }));
         setSubmittedPromptRequests((current) => ({ ...current, [agentId]: undefined }));
         return;
@@ -983,9 +1055,11 @@ const Conversation = createSimpleContext({
       searchAgentMessages,
       sendMessage,
       markAgentMessagesRead,
+      markAgentMessagesUnread,
       markAllAgentMessagesRead,
       presentPromptResolution,
-      setTeamTyping: notifyTeamTyping,
+      // See `AppProviders`: a chat window sends no typing state.
+      setTeamTyping: chatWindow ? () => undefined : notifyTeamTyping,
     };
   },
 });

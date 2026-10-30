@@ -4,14 +4,19 @@ import type { messages as source } from "../en/customProvider";
 export const messages = {
   "customProvider.registry.title": "ACP kayıt defteri",
   "customProvider.registry.description":
-    "Bu ana makineye ajan yükleyin. Çalışma zamanını kaldırmak ajan ayarlarını, kimlik bilgilerini ve konuşmaları korur.",
+    "Bu sunucuya ajan yükleyin. Çalışma zamanını kaldırmak ajan ayarlarını, kimlik bilgilerini ve konuşmaları korur.",
   "customProvider.registry.search": "Kayıt defterinde ara",
   "customProvider.registry.empty": "Bu aramayla eşleşen ajan yok.",
   "customProvider.registry.agentId": "Özel ajan kimliği",
   "customProvider.registry.install": "Yükle",
   "customProvider.registry.update": "Güncelle",
   "customProvider.registry.remove": "Çalışma zamanını kaldır",
-  "customProvider.registry.failed": "Kayıt defteri işlemi başarısız oldu.",
+  "customProvider.registry.searchFailed": "Kayıt defterinde arama yapılamadı. Tekrar deneyin.",
+  "customProvider.registry.statusFailed": "Yükleme ilerlemesi denetlenemedi. OpenBot tekrar deneyecek.",
+  "customProvider.registry.installFailed": "Ajan yüklenemedi. Tekrar deneyin.",
+  "customProvider.registry.updateFailed": "Ajan güncellenemedi. Tekrar deneyin.",
+  "customProvider.registry.removeFailed": "Çalışma zamanı kaldırılamadı. Tekrar deneyin.",
+  "customProvider.registry.cancelFailed": "Yükleme iptal edilemedi. Tekrar deneyin.",
   // Form doğrulama. Her mesaj özel sağlayıcı formunun bir alanını adlandırır.
   "customProvider.error.providerIdRequired": "Bir sağlayıcı kimliği girin.",
   "customProvider.error.providerIdPattern":
@@ -29,6 +34,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Bu sağlayıcıda zaten {id} listeleniyor.",
   "customProvider.error.modelIdInvalid":
     "Bu model kimliği kullanılamaz. Boşlukları, tırnak işaretlerini ve diğer noktalama işaretlerini kaldırın.",
+  "customProvider.error.contextWindowInvalid": "{min} ile {max} arasında tam sayı bir token sayısı girin.",
   "customProvider.error.headerNameRequired": "Bir başlık adı girin.",
   "customProvider.error.headerNameInvalid": "Geçerli bir HTTP başlık adı kullanın.",
   "customProvider.error.headerDuplicate": "Bu sağlayıcıda zaten {name} ayarlanmış.",
@@ -42,13 +48,11 @@ export const messages = {
 
   // Kaydetme veya kaldırma işleminden sonraki not. OpenCode'un yeni listeyi ne zaman okuduğunu belirtir.
   "customProvider.saved.restarted": "Kaydedildi. OpenBot modelleri yüklüyor.",
-  "customProvider.saved.skippedBusy":
-    "Kaydedildi. OpenCode listeyi geçerli görev durduktan sonra okur. Ardından Bağlan'a basın.",
-  "customProvider.saved.notRunning": "Kaydedildi. OpenCode bir sonraki başlatılışında listeyi okur.",
+  "customProvider.saved.skippedBusy": "Kaydedildi. Sağlayıcı listeyi geçerli görev durduktan sonra okur.",
+  "customProvider.saved.notRunning": "Kaydedildi. Sağlayıcı bir sonraki başlatılışında listeyi okur.",
   "customProvider.removed.restarted": "Kaldırıldı. OpenBot modelleri yüklüyor.",
-  "customProvider.removed.skippedBusy":
-    "Kaldırıldı. OpenCode listeyi geçerli görev durduktan sonra okur. Ardından Bağlan'a basın.",
-  "customProvider.removed.notRunning": "Kaldırıldı. OpenCode bir sonraki başlatılışında listeyi okur.",
+  "customProvider.removed.skippedBusy": "Kaldırıldı. Sağlayıcı listeyi geçerli görev durduktan sonra okur.",
+  "customProvider.removed.notRunning": "Kaldırıldı. Sağlayıcı bir sonraki başlatılışında listeyi okur.",
   "customProvider.saveFailed": "OpenBot bu uç noktayı kaydedemedi.",
   "customProvider.removeFailed": "OpenBot {name} öğesini kaldıramadı.",
   "customProvider.saveUnavailable": "Bu derleme bir uç noktayı kaydedemez.",
@@ -56,6 +60,7 @@ export const messages = {
 
   // Ekleme iletişim kutusu.
   "customProvider.form.title": "Özel sağlayıcı ekle",
+  "customProvider.form.editTitle": "Özel sağlayıcıyı düzenle",
   "customProvider.form.description": "OpenAI uyumlu bir uç noktayı ve sunduğu modelleri tanımlayın.",
   "customProvider.form.heading": "Özel sağlayıcı",
   "customProvider.form.subtitle": "Herhangi bir OpenAI uyumlu uç nokta.",
@@ -64,20 +69,24 @@ export const messages = {
   "customProvider.field.displayName": "Görünen ad",
   "customProvider.field.displayNamePlaceholder": "Sağlayıcım",
   "customProvider.field.baseUrl": "Temel URL",
+  "customProvider.field.harness": "Çalıştığı yer",
+  "customProvider.field.harnessHint": "Bu uç noktaya istekleri gönderen sağlayıcı.",
   "customProvider.field.apiKey": "API anahtarı",
   "customProvider.field.apiKeyHint": "İsteğe bağlı. Kimlik doğrulamasını başlıklarla yönetiyorsanız boş bırakın.",
-  "customProvider.field.apiKeyKeptHint":
-    "Bir anahtar kayıtlı. Bunu ve kayıtlı başlıkları korumak için burayı boş bırakın.",
+  "customProvider.field.apiKeyKeptHint": "Bir anahtar kayıtlı. Korumak için burayı boş bırakın.",
   "customProvider.models": "Modeller",
   "customProvider.model.id": "{number}. model kimliği",
   "customProvider.model.name": "{number}. model görünen adı",
   "customProvider.model.namePlaceholder": "Görünen Ad",
+  "customProvider.model.contextWindow": "Model {number} bağlam penceresi",
+  "customProvider.model.contextWindowPlaceholder": "Token'lar",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
   "customProvider.headers": "Başlıklar",
   "customProvider.header.name": "{number}. başlık adı",
   "customProvider.header.value": "{number}. başlık değeri",
   "customProvider.header.valuePlaceholder": "değer",
+  "customProvider.header.keptPlaceholder": "Kaydedildi. Korumak için boş bırakın.",
   "customProvider.header.remove": "{number}. başlığı kaldır",
   "customProvider.header.add": "Başlık ekle",
   "customProvider.submit": "Gönder",
@@ -97,7 +106,7 @@ export const messages = {
   "customProvider.preset.title": "Sağlayıcı veya ajan ekle",
   "customProvider.preset.description": "Yerel bir model sunucusu, bir uç nokta veya bir ACP ajanı seçin.",
   "customProvider.preset.heading": "Özel ekle",
-  "customProvider.preset.subtitle": "OpenCode için modeller veya kendine ait bir ajan.",
+  "customProvider.preset.subtitle": "OpenCode veya Pi için modeller ya da kendine ait bir ajan.",
   "customProvider.preset.models": "Modeller",
   "customProvider.preset.agents": "Ajanlar",
   "customProvider.preset.ollama": "Ollama",
@@ -165,6 +174,9 @@ export const messages = {
   "customProvider.acp.args": "Bağımsız değişkenler",
   "customProvider.acp.argsHint":
     "Bağımsız değişkenleri boşluklarla ayırın. Boşluk içeren bir bağımsız değişkenin etrafına tırnak işareti koyun.",
+  "customProvider.acp.usagePrompt": "Kullanım komutu",
+  "customProvider.acp.usagePromptHint":
+    "OpenBot bunu en fazla 5 dakikada bir gönderir ve son yanıtı gösterir. Ajanın kendisinin yanıtladığı bir komut kullanın, örneğin /usage.",
   "customProvider.acp.env": "Ortam değişkenleri",
   "customProvider.acp.env.name": "{number}. değişken adı",
   "customProvider.acp.env.value": "{number}. değişken değeri",
@@ -177,6 +189,10 @@ export const messages = {
   "customProvider.acp.checkOk": "{name} yanıt verdi",
   "customProvider.acp.checkOkVersion": "{name} {version} yanıt verdi",
   "customProvider.acp.checkProtocol": "ACP sürümü {version}",
+  "customProvider.acp.checkModels": {
+    one: "{count} model: {models}",
+    other: "{count} model: {models}",
+  },
   "customProvider.acp.checkFailed": "Ajan yanıt vermedi",
   "customProvider.acp.trustTitle": "Bu komut bilgisayarınızda çalışır",
   "customProvider.acp.trustDescription":
@@ -192,6 +208,7 @@ export const messages = {
   "customProvider.acp.error.envDuplicate": "Bu ajan zaten {name} değişkenini tanımlıyor.",
   "customProvider.acp.error.envValueRequired": "Bu değişken için bir değer girin.",
   "customProvider.acp.error.envValueLength": "Değeri en fazla {max} karakter tutun.",
+  "customProvider.acp.error.usagePromptInvalid": "En fazla {max} karakterlik tek bir satır kullanın.",
   "customProvider.acp.error.agentIdPattern":
     "Bir harf veya rakamla başlayan küçük harfler, rakamlar veya kısa çizgiler kullanın. En fazla 40 karakter kullanın.",
 
@@ -227,6 +244,8 @@ export const messages = {
   "customProvider.list.empty": "Henüz özel uç nokta yok.",
   "customProvider.list.label": "Özel uç noktalar",
   "customProvider.list.apiKeySaved": "API anahtarı kaydedildi",
+  "customProvider.list.runsOn": "{name} üzerinde çalışır",
+  "customProvider.list.editLabel": "{name} sağlayıcısını düzenle",
   "customProvider.list.deleteLabel": "{name} sağlayıcısını sil",
   "customProvider.list.confirmTitle": "{name} kaldırılsın mı?",
   "customProvider.list.confirmDescription":

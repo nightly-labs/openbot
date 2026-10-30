@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "Отмена…",
   "prompt.browser.pageFallback": "Страница браузера",
   "prompt.browser.hostFallback": "странице браузера",
+  "prompt.browser.signInBlocked.label": "Вход заблокирован",
+  "prompt.browser.signInBlocked.title": "{host} заблокировал вход с {server}",
+  "prompt.browser.signInBlocked.cancelledTitle": "Вход в {host} отменён",
+  "prompt.browser.signInBlocked.body":
+    "Войдите на этом компьютере. OpenBot отправит на {server} только вход в {host}, и {name} продолжит работу.",
+  "prompt.browser.signInBlocked.cancelledBody": "Вход отменён.",
+  "prompt.browser.signInBlocked.waiting": "Ожидание входа",
+  "prompt.browser.signInBlocked.waitingButton": "Ожидание входа…",
+  "prompt.browser.signInBlocked.page": "{host} на {server}",
   "prompt.inputRequiredAnnouncement": "Нужен ваш ответ. {question}",
 } as const satisfies PartialTranslation<typeof source>;

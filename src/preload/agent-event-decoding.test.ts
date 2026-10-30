@@ -44,6 +44,75 @@ const hiddenAgents = {
   event: { type: "hidden-agents-changed", agents: [{ agentId: "agent-1", hiddenAt: "2026-10-16T09:00:00.000Z" }] },
 } satisfies ScopedAgentEvent;
 
+const memoryChanges = {
+  serverId: "local",
+  event: {
+    type: "conversation",
+    snapshot: {
+      agentId: "agent-1",
+      threadId: "thread-1",
+      activeTurnId: null,
+      revision: 4,
+      messages: [
+        {
+          id: "turn-1:memory-changes",
+          turnId: "turn-1",
+          author: "system",
+          source: "system",
+          text: "Memory: 1 saved, 1 updated, 0 forgotten.",
+          createdAt: "2026-10-23T10:00:00.000Z",
+          status: "completed",
+          itemType: "memory-changes",
+          memoryChanges: [
+            { memoryId: "memory-1", action: "saved", text: "Keeps mornings for writing." },
+            { memoryId: "memory-2", action: "updated", text: "Uses Todoist.", previousText: "Uses Things." },
+          ],
+        },
+      ],
+    },
+  },
+} satisfies ScopedAgentEvent;
+
+/** The memory-changes event with its first change replaced by `change`. */
+function withMemoryChange(change: unknown) {
+  const [message] = memoryChanges.event.snapshot.messages;
+  return {
+    ...memoryChanges,
+    event: {
+      ...memoryChanges.event,
+      snapshot: { ...memoryChanges.event.snapshot, messages: [{ ...message, memoryChanges: [change] }] },
+    },
+  };
+}
+
+const threadContext = {
+  agentId: "agent-1",
+  threadId: "thread-2",
+  usage: { usedTokens: 148_000, windowTokens: 258_000, autoCompactAt: 0.8, nativeManaged: false },
+  compaction: null,
+};
+
+function withThreadContexts(threadContextStates: unknown[]) {
+  return {
+    serverId: "local",
+    event: {
+      type: "runtime-snapshot",
+      snapshot: {
+        threadContextStates,
+        agents: [],
+        activeTurns: [],
+        work: [],
+        latestMessages: [],
+        attentionComplete: true,
+        pendingPrompts: [],
+        pendingApprovals: [],
+        pendingBrowserTakeovers: [],
+        failedTurns: [],
+      },
+    },
+  };
+}
+
 describe("decodeScopedAgentEvent", () => {
   it.each([
     ["an event", delta],
@@ -53,7 +122,13 @@ describe("decodeScopedAgentEvent", () => {
     ],
     ["a hidden agents change", hiddenAgents],
     ["an empty hidden agents change", { serverId: "local", event: { type: "hidden-agents-changed", agents: [] } }],
+    ["the memory changes of a turn", memoryChanges],
   ] satisfies [string, ScopedAgentEvent][])("keeps %s", (_name, value) => {
+    expect(decodeScopedAgentEvent(value)).toEqual(value);
+  });
+
+  it("keeps the context of a side thread", () => {
+    const value = withThreadContexts([threadContext]);
     expect(decodeScopedAgentEvent(value)).toEqual(value);
   });
 
@@ -81,6 +156,20 @@ describe("decodeScopedAgentEvent", () => {
     ],
     ["hidden agents that are not a list", { ...hiddenAgents, event: { ...hiddenAgents.event, agents: null } }],
     ["a bufferedLive that is not a boolean", { ...delta, bufferedLive: "yes" }],
+    ["a memory change of an unknown action", withMemoryChange({ memoryId: "memory-1", action: "pinned", text: "x" })],
+    [
+      "a memory change with a text longer than a memory",
+      withMemoryChange({ memoryId: "memory-1", action: "saved", text: "x".repeat(501) }),
+    ],
+    [
+      "a side thread context with no window",
+      withThreadContexts([{ ...threadContext, usage: { ...threadContext.usage, windowTokens: 0 } }]),
+    ],
+    ["a side thread context with no thread", withThreadContexts([{ ...threadContext, threadId: undefined }])],
+    [
+      "more side thread contexts than the agents can have threads",
+      withThreadContexts(Array(100 * 50 + 1).fill(threadContext)),
+    ],
     ["a value that is not a record", "event"],
   ])("rejects %s", (_name, value) => {
     expect(() => decodeScopedAgentEvent(value)).toThrow(/^Invalid /);

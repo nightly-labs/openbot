@@ -21,9 +21,13 @@ export function ChannelStoppedTasks(props: {
             >
               <p class="channel-paused-task-reason">{task.error ? sourceText(task.error) : null}</p>
               <div class="channel-paused-task-actions">
-                <Button size="xs" onClick={() => void props.onResume(task.id, null)}>
-                  {t("common.continue")}
-                </Button>
+                {/* `resume` keeps the owner, and the service stops the task again when the owner left
+                    the channel, so only Reassign can start it. */}
+                <Show when={!task.ownerAgentId || props.members.some((member) => member.agentId === task.ownerAgentId)}>
+                  <Button size="xs" onClick={() => void props.onResume(task.id, null)}>
+                    {t("common.continue")}
+                  </Button>
+                </Show>
                 <DropdownMenu.Root placement="top-start">
                   <DropdownMenu.Trigger
                     class={buttonVariants({ variant: "ghost", size: "xs" })}

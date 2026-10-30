@@ -32,6 +32,10 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // Japanese has one form for every count.
   ja: () => "other",
+  // Korean has one form for every count.
+  ko: () => "other",
+  // CLDR Dutch: one is the integer 1 with no visible fraction digits.
+  nl: (count) => (Math.abs(count) === 1 ? "one" : "other"),
   // CLDR Polish: one for 1; few for 2–4, 22–24…; many for 0, 5–21, 25–31…; other for fractions.
   pl: (count) => {
     const absolute = Math.abs(count);
@@ -60,6 +64,8 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),
+  // CLDR Chinese has one form for every count, like Japanese.
+  zh: () => "other",
 };
 
 const rulesByLocale = new Map<string, Intl.PluralRules>();

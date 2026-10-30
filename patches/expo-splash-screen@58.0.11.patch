@@ -1,0 +1,20 @@
+diff --git a/android/src/main/java/expo/modules/splashscreen/SplashScreenManager.kt b/android/src/main/java/expo/modules/splashscreen/SplashScreenManager.kt
+index bc44b70..86bd5bf 100644
+--- a/android/src/main/java/expo/modules/splashscreen/SplashScreenManager.kt
++++ b/android/src/main/java/expo/modules/splashscreen/SplashScreenManager.kt
+@@ -41,6 +41,15 @@ object SplashScreenManager {
+       }
+     })
+ 
++    // On API 31-33 an exit animation listener makes the platform move the splash view into the
++    // app and hide the starting window leash on the first draw. When the starting window is
++    // already gone, the leash is null and SurfaceControl.checkNotReleased() crashes the app.
++    // Without a listener the platform removes the splash itself.
++    // https://issuetracker.google.com/issues/242118185
++    if (Build.VERSION.SDK_INT in Build.VERSION_CODES.S..Build.VERSION_CODES.TIRAMISU) {
++      return
++    }
++
+     splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
+       val splashScreenView = splashScreenViewProvider.view
+       splashScreenView

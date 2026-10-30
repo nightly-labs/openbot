@@ -293,7 +293,7 @@ function pluginsIndexStructuredData(url: string, siteUrl: string) {
 
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
-  const title = `${plugin.name} Plugin for AI Agents — OpenBot`;
+  const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;
   const description = searchDescription(plugin.description);
 
   return {

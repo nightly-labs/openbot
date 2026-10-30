@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot не удалось прочитать вашу настройку.",
+  "onboarding.readFailed.description":
+    "Ваши локальные данные не изменились. Повторите попытку. Если проблема не исчезнет, настройте OpenBot заново.",
+  "onboarding.readFailed.setUpAgain": "Настроить заново",
   "onboarding.setup.saveFailed": "OpenBot не удалось сохранить локальную настройку.",
   "onboarding.setup.verifyFailed": "OpenBot не удалось проверить это приглашение.",
   "onboarding.setup.connectFailed": "OpenBot не удалось подключиться к этому хосту.",
@@ -39,6 +43,9 @@ export const messages = {
   "onboarding.provider.googlePlan": "Тариф Google AI Pro или Ultra",
   "onboarding.provider.cursorPlan": "Тариф Cursor или API-ключ",
   "onboarding.provider.clineAccount": "Бесплатные модели с аккаунтом Cline",
+  "onboarding.provider.inceptionKey": "Модели Mercury с ключом API Inception",
+  "onboarding.provider.deepseekKey": "Модели DeepSeek с ключом API DeepSeek",
+  "onboarding.provider.openrouterKey": "Множество моделей с ключом API OpenRouter",
   "onboarding.provider.tryFree": "Попробовать бесплатно",
   "onboarding.provider.noSignIn": "Вход не нужен",
   "onboarding.provider.more": "Другие провайдеры",

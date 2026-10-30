@@ -2,6 +2,7 @@ import { type ChannelTask, isQueuedAgentReply, type QueueDelivery, type QueueSna
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AwaitingReplyItem, AwaitingReplyState } from "@openbot/ui/features/conversation/AwaitingReplies";
+import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { currentText } from "@openbot/ui/text";
 
 /**
@@ -20,6 +21,8 @@ export interface AgentAwaitingInput {
   agents: readonly AgentProfile[];
   /** The agent of this conversation. It reads each queued answer after its turn. */
   self: AgentProfile | undefined;
+  /** What stops each agent in its own chat. An agent that was asked and waits shows the wait. */
+  waits?: Record<string, SidebarAgentWait> | undefined;
 }
 
 export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyItem[] {
@@ -33,7 +36,7 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
       agent,
       name: agent?.name ?? t("chat.activity.agentFallback"),
       state,
-      ...(reply ? { preview: previewText(replyResult(reply.text)), detail: readsNext } : {}),
+      ...(reply ? { preview: previewText(replyResult(reply.text)), detail: readsNext, deliveryId: reply.id } : {}),
     };
   };
   // A failed question stays until the person writes again: then they have seen it.
@@ -59,7 +62,8 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
       }
       const state = deliveryState(delivery.status);
       if (!state || (state === "failed" && index < lastUserIndex)) continue;
-      rows.push(rowFor(delivery.recipientAgentId, state, id));
+      const wait = state === "failed" ? undefined : input.waits?.[delivery.recipientAgentId];
+      rows.push({ ...rowFor(delivery.recipientAgentId, state, id), ...(wait ? { wait } : {}) });
     }
     // The answers wait until every teammate of this request is done, so none is read next yet.
     const exchangeRows = rows.slice(firstRow);

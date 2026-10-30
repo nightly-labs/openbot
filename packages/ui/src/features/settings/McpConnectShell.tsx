@@ -8,8 +8,8 @@
  *
  * A server's ways in are not one dialog with a switch in it. Signing in at the server's own page and
  * pasting a key from its settings are different acts, so each has its own dialog: `McpSignInDialog`
- * and `McpKeyDialog`. What they share is here - the two marks, the header, the failure, the footer,
- * and the attempt behind them.
+ * and `McpKeyDialog`. What they share is here - the failure, the Cancel button, and the attempt
+ * behind them. The frame is `WizardDialog`, the same connect dialog that GitHub and Slack use.
  *
  * A connection that worked is not reported here. The dialog closes on it and the page behind says
  * the app is connected: an answer the user has to dismiss would make the working case the slow one.
@@ -19,23 +19,12 @@
  * stays out of the store until a connection with it worked.
  */
 
-import { AppLogo } from "@openbot/brand";
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
-  Dialog,
-  IconButton,
-  OctagonX,
-  X,
-} from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle, Button, OctagonX, Puzzle } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createStore, Show } from "solid-js";
+import { createSignal, createStore, Show } from "solid-js";
 import { useText } from "../../text";
-import { PluginIcon } from "../marketplace/PluginIcon";
+import { WizardDialog } from "./IntegrationLayout";
 
 /** What is being connected, in the words the listing uses for it. */
 export interface McpConnectSubject {
@@ -54,6 +43,8 @@ export interface McpConnectBaseProps {
   /** The connection worked, with the configuration that made it work. The dialog is done here. */
   onConnected: (config: McpServerConfig) => void;
   onCancel: () => void;
+  /** Starts the attempt when the dialog opens: the click that opened it already asked to connect. */
+  connectOnOpen?: boolean | undefined;
 }
 
 /**
@@ -139,7 +130,18 @@ export interface McpConnectShellProps extends Pick<McpConnectBaseProps, "open" |
   onCancelBusy?: (() => void) | undefined;
 }
 
-/** The parts both dialogs show: the two ends of the connection, the header, the failure, the button. */
+/** The icon of the app being connected, for the tile in the dialog head. */
+export function McpConnectMark(props: { iconUrl: string | null | undefined }) {
+  const [failed, setFailed] = createSignal<string | null>(null);
+  const url = () => (props.iconUrl && props.iconUrl !== failed() ? props.iconUrl : null);
+  return (
+    <Show when={url()} fallback={<Puzzle aria-hidden="true" />} keyed>
+      {(src) => <img src={src} alt="" onError={() => setFailed(src)} />}
+    </Show>
+  );
+}
+
+/** The parts every plugin connect dialog shows, in the shared connect dialog: the failure and the buttons. */
 export function McpConnectShell(props: McpConnectShellProps) {
   const { t } = useText();
   const close = () => {
@@ -148,76 +150,43 @@ export function McpConnectShell(props: McpConnectShellProps) {
     props.onCancelBusy();
     props.onCancel();
   };
+  const stuck = () => props.busy() && !props.onCancelBusy;
   return (
-    <Dialog.Root
+    <WizardDialog
       open={props.open}
-      onOpenChange={(open) => {
-        if (!open) close();
-      }}
+      nested
+      wide={props.wide}
+      closeLabel={t("mcp.connect.close", { name: props.subject.name })}
+      closeDisabled={stuck()}
+      dismissible={!props.busy()}
+      onClose={close}
+      logo={<McpConnectMark iconUrl={props.subject.iconUrl} />}
+      link={props.state.phase === "failed" ? "broken" : "connecting"}
+      title={t("mcp.connect.title", { name: props.subject.name })}
+      description={props.description}
+      onSubmit={props.onSubmit}
+      footer={
+        <>
+          <Button type="button" size="sm" variant="ghost" disabled={stuck()} onClick={close}>
+            {t("common.cancel")}
+          </Button>
+          {props.action}
+        </>
+      }
     >
-      <Dialog.Portal>
-        <Dialog.Overlay class="mcp-connect-backdrop">
-          <Dialog.Content class="mcp-connect-dialog" data-page={props.wide ? "" : undefined} as="section">
-            <header class="mcp-connect-header">
-              {/* The two ends of the connection, side by side: this computer, and the app. It is the
-                  one picture the dialog needs, and it says what is about to be joined. */}
-              <div class="mcp-connect-marks" aria-hidden="true">
-                <span class="mcp-connect-mark">
-                  <AppLogo variant="production" animation="look-around" />
-                </span>
-                <span class="mcp-connect-dots" />
-                <PluginIcon iconUrl={props.subject.iconUrl} class="mcp-connect-mark-icon" />
-              </div>
-              <Dialog.Title class="mcp-connect-title">
-                {t("mcp.connect.title", { name: props.subject.name })}
-              </Dialog.Title>
-              <Dialog.Description class="mcp-connect-description">{props.description}</Dialog.Description>
-            </header>
-
-            <form
-              class="mcp-connect-form"
-              /* A missing key is reported under the field, in the field's own words. Left to the
-                 browser, the same miss is a native bubble that blocks the submit. */
-              novalidate
-              onSubmit={(event) => {
-                event.preventDefault();
-                props.onSubmit();
-              }}
-            >
-              {props.children}
-
-              {/* Only what the user can act on: the connection that worked has closed the dialog. */}
-              <div class="mcp-connect-status" aria-live="polite">
-                <Show when={props.state.phase === "failed"}>
-                  <Alert tone="danger" role="alert">
-                    <AlertIcon>
-                      <OctagonX />
-                    </AlertIcon>
-                    <AlertContent>
-                      <AlertTitle>{t("mcp.connect.notConnected")}</AlertTitle>
-                      <AlertDescription>{props.state.error}</AlertDescription>
-                    </AlertContent>
-                  </Alert>
-                </Show>
-              </div>
-
-              {props.action}
-            </form>
-
-            {/* Last in the order, first in the corner: the dialog opens with what it asks for
-                focused, not with the way out focused. */}
-            <IconButton
-              class="mcp-connect-close"
-              label={t("mcp.connect.close", { name: props.subject.name })}
-              variant="ghost"
-              disabled={props.busy() && !props.onCancelBusy}
-              onClick={close}
-            >
-              <X />
-            </IconButton>
-          </Dialog.Content>
-        </Dialog.Overlay>
-      </Dialog.Portal>
-    </Dialog.Root>
+      {props.children}
+      {/* Only what the user can act on: the connection that worked has closed the dialog. */}
+      <Show when={props.state.phase === "failed"}>
+        <Alert tone="danger" role="alert">
+          <AlertIcon>
+            <OctagonX />
+          </AlertIcon>
+          <AlertContent>
+            <AlertTitle>{t("mcp.connect.notConnected")}</AlertTitle>
+            <AlertDescription>{props.state.error}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      </Show>
+    </WizardDialog>
   );
 }

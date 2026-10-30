@@ -3,7 +3,6 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
 import { memo, type PropsWithChildren, useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
@@ -25,13 +24,17 @@ import { useAgentPinTransition } from "@/features/agents/components/agent-pin-tr
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
+import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
-import { isAndroid } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { typeScale } from "@/shared/lib/type-scale";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -99,13 +102,20 @@ interface AgentListRowProps {
  */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
-  const [background] = useThemeColor(["background"]);
-  const pinBlocked = useMobileWorkspaceSelector(({ pinnedAgentIds }) => !canToggleAgentPin(pinnedAgentIds, agent.id));
+  const background = useChatRowBackground(agent.id);
+  const pinBlocked = useMobileWorkspaceSelector(
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+  );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const agentChatPreview = useAgentChatPreview(agent);
-  const previewLine = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
+  // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
+  const waitingChannel = useWaitingChannel(agent.id, agent.serverId);
+  const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
+  const previewLine = waitingChannel
+    ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
+    : lastMessage;
   const isUnread = useAgentUnread(agent.id);
   const waitReason = useAgentWaitReason(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
@@ -148,7 +158,11 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       }}
       className="w-full"
       onPressIn={agentChatPreview.onPressIn}
-      onLongPress={isAndroid ? () => setMenuKey((key) => key + 1) : undefined}
+      delayLongPress={longPressDelay}
+      onLongPress={() => {
+        void haptics.longPress();
+        if (isAndroid) setMenuKey((key) => key + 1);
+      }}
     >
       {({ pressed }) => (
         <View
@@ -162,28 +176,30 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
         >
           {avatar}
           <AgentRowTextReveal active={isUnpinTarget}>
-            <View className="min-w-0 flex-1 gap-1">
-              <View className="gap-0">
-                <View className="flex-row items-center gap-2">
-                  {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
-                  <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={2}>
-                    {agent.name}
+            <View className="min-w-0 flex-1 gap-0.5">
+              <View className="flex-row items-center gap-2">
+                {isUnread ? <View className="size-2 rounded-full bg-accent" /> : null}
+                <Typography.Paragraph
+                  className="font-semibold min-w-0 flex-1"
+                  numberOfLines={1}
+                  style={typeScale.rowTitle}
+                >
+                  {agent.name}
+                </Typography.Paragraph>
+                {waitReason ? (
+                  <AgentWaitChip reason={waitReason} />
+                ) : (
+                  <Typography.Paragraph className="text-muted" style={typeScale.caption}>
+                    {agent.updatedLabel}
                   </Typography.Paragraph>
-                  {waitReason ? (
-                    <AgentWaitChip reason={waitReason} />
-                  ) : (
-                    <Typography.Paragraph type="body-xs" className="text-muted">
-                      {agent.updatedLabel}
-                    </Typography.Paragraph>
-                  )}
-                </View>
-                {agent.title.trim() ? (
-                  <Typography.Paragraph type="body-xs" className="-mt-1.5 text-muted" numberOfLines={2}>
-                    {agent.title.trim()}
-                  </Typography.Paragraph>
-                ) : null}
+                )}
               </View>
-              <Typography.Paragraph type="body-xs" className="text-text-secondary -mt-1" numberOfLines={1}>
+              {agent.title.trim() ? (
+                <Typography.Paragraph className="text-muted" numberOfLines={1} style={typeScale.caption}>
+                  {agent.title.trim()}
+                </Typography.Paragraph>
+              ) : null}
+              <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.preview}>
                 {previewLine}
               </Typography.Paragraph>
             </View>

@@ -3,6 +3,9 @@ import type { messages as source } from "../../en/error/host";
 
 export const messages = {
   "error.host.iceServersMissing": "Remote Signal non ha fornito server ICE.",
+  "error.host.keyRotationUnavailable": "Questo server non può cambiare la chiave senza il servizio account.",
+  "error.host.keyRotationRefused":
+    "Il servizio account non ha accettato la nuova chiave del server. La chiave attuale resta in uso.",
   "error.host.webRtcNotConfigured": "Il servizio host WebRTC non è configurato.",
   "error.host.runtimeNotInstalled": "L'ambiente del desktop remoto non è installato.",
   "error.host.setupUnavailable": "La configurazione dei permessi non è disponibile.",

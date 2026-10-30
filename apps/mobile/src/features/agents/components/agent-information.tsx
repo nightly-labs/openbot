@@ -1,10 +1,11 @@
-import { analyticsRange, canAdministerServer, type InstalledSkill } from "@openbot/contracts/ipc";
+import { analyticsRange, canAdministerServer } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { agentSkillsQuery } from "@/features/agents/model/agent-skills-query";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -96,7 +97,7 @@ export function AgentInformation({
   section: "usage" | "memories" | "routines" | "memory" | "routine" | "skills" | "files";
 }) {
   useEffect(() => {
-    if (section === "usage") mobileAnalytics.track("usage_viewed", {});
+    if (section === "usage") mobileAnalytics.track("usage_viewed", { scope: "agent" });
   }, [section]);
   const { t, format } = useText();
   const { recordId } = useLocalSearchParams<{ recordId?: string }>();
@@ -135,16 +136,9 @@ export function AgentInformation({
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = useMobileWorkspaceSelector((current) => current.canManageAgentSkills(agent.serverId));
-  const skillsKey = queryKeys.agentSkills(queryScope, agent.serverId, agent.id, manageSkills);
-  const skills = useQuery({
-    ...options,
-    enabled: available && section === "skills",
-    queryKey: skillsKey,
-    queryFn: async () => {
-      const installed = await workspace.loadAgentSkills(agent.id, agent.serverId, manageSkills);
-      return installed && userAssignedSkills(installed);
-    },
-  });
+  const skillsQuery = agentSkillsQuery(queryScope, agent.serverId, agent.id, manageSkills, workspace.loadAgentSkills);
+  const skillsKey = skillsQuery.queryKey;
+  const skills = useQuery({ ...options, ...skillsQuery, enabled: available && section === "skills" });
   // The host caches a scan. A retry or a deletion measures again, as on desktop.
   const forceStorageScan = useRef(false);
   const storage = useQuery({
@@ -403,7 +397,11 @@ export function AgentInformation({
                 key={recordId}
                 agent={agent}
                 available={available && !routines.isError && !(eventsEnabled && eventRoutines.isError)}
-                routine={allRoutines.find((item) => item.id === recordId)}
+                // The event record carries what the routine does with missed runs; the released one does not.
+                routine={
+                  eventRoutines.data?.find((item) => item.id === recordId) ??
+                  allRoutines.find((item) => item.id === recordId)
+                }
               />
             ) : (
               <SettingsRow>
@@ -494,14 +492,4 @@ function InformationSection({
       </SettingsRow>
     </SettingsSection>
   );
-}
-
-/** The skills the user assigned, as the desktop agent settings list them: built-in skills are hidden. */
-function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
-  return skills
-    .filter(
-      (skill) =>
-        skill.origin !== "managed" && skill.slug !== "openbot-site-hosting" && skill.skillId !== "openbot-site-hosting",
-    )
-    .sort((left, right) => left.name.localeCompare(right.name));
 }

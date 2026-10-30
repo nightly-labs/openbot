@@ -8,6 +8,7 @@ import {
   IconButton,
   Plug,
   Puzzle,
+  Skeleton,
   Sparkles,
   Text,
 } from "@openbot/ui";
@@ -18,6 +19,7 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
 import { LogoTile } from "../settings/IntegrationLayout";
+import type { MarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceApp } from "./marketplace-model";
 
 /** The top of an agent or skill page. The window moves the focus to the title when the page opens. */
@@ -261,5 +263,70 @@ export function TryCard(props: {
         )}
       </Show>
     </div>
+  );
+}
+
+/** A listing's first load, its failure, its rows, and "Load more" while the server has more. */
+export function ListingPanel(props: {
+  listing: MarketplaceListing<unknown>;
+  loadingLabel: string;
+  count: number;
+  /** False: no "Load more", as on the Skills tab, where each group has its own page. */
+  paged?: boolean;
+  empty: JSX.Element;
+  children: JSX.Element;
+}) {
+  const { t } = useText();
+  const failure = () => (
+    <div class="marketplace-empty" role="alert">
+      <Text as="p" variant="body-sm" tone="muted">
+        {props.listing.error()}
+      </Text>
+      <Button type="button" variant="outline" size="sm" onClick={props.listing.retry}>
+        {t("common.retry")}
+      </Button>
+    </div>
+  );
+  return (
+    <Show
+      when={!props.listing.loading()}
+      fallback={
+        <div class="marketplace-grid" role="status" aria-label={props.loadingLabel}>
+          <For each={Array.from({ length: 6 }, (_, index) => index)}>
+            {() => (
+              <div class="marketplace-card marketplace-card-skeleton" aria-hidden="true">
+                <Skeleton class="marketplace-skeleton-mark" />
+                <Skeleton class="marketplace-skeleton-line" />
+                <Skeleton class="marketplace-skeleton-line" />
+              </div>
+            )}
+          </For>
+        </div>
+      }
+    >
+      {/* A failed "Load more" keeps the rows that loaded. */}
+      <Show when={!props.listing.error() || props.count > 0} fallback={failure()}>
+        <div class="marketplace-stack">
+          <Show when={props.count > 0 || props.listing.pending()} fallback={props.empty}>
+            {props.children}
+          </Show>
+          <Show when={!props.listing.error()} fallback={failure()}>
+            {/* A filter can hide each loaded row while a later page still holds a match. */}
+            <Show when={props.paged !== false && props.listing.hasMore()}>
+              <Button
+                type="button"
+                variant="outline"
+                class="marketplace-load-more"
+                data-cuelume-tap="navigate"
+                loading={props.listing.loadingMore()}
+                onClick={props.listing.loadMore}
+              >
+                {t("marketplace.loadMore")}
+              </Button>
+            </Show>
+          </Show>
+        </div>
+      </Show>
+    </Show>
   );
 }

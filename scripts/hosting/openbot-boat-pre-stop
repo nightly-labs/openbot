@@ -9,8 +9,10 @@
 # until the next boot.
 set -u
 
-# /run is empty at each boot, so the flag stops only the starts until boat saves the disk: the
-# Restart= of the unit, and the start at the end of an update request (openbot.service).
+# The flag stops the starts until boat saves the disk: the Restart= of the unit, and the start at the
+# end of an update request (openbot.service). /run is empty at each boot. boat can also keep the
+# stopped machine in memory and continue it with no boot; then the account server removes the flag
+# and starts OpenBot (HELD_RESUME_START_COMMAND in apps/auth-api).
 sudo -n touch /run/openbot-pre-stop || exit 1
 # The unit stops OpenBot with SIGTERM, and OpenBot closes its database last. OpenBot exits after 30
 # seconds by itself. The 60 seconds of TimeoutStopSec are too long for the limit of boat. A killed

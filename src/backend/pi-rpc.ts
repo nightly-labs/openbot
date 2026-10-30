@@ -2,6 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { StringDecoder } from "node:string_decoder";
+import type { KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { RequestTimeoutError } from "./agent-client";
@@ -22,7 +23,10 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
   readonly #pending = new Map<string, (result: Effect.Effect<DynamicRecord, ProviderClientOperationError>) => void>();
   #child: ChildProcessWithoutNullStreams | null = null;
   #stopping = false;
-  constructor(private readonly redact: (text: string) => string) {
+  constructor(
+    private readonly redact: (text: string) => string,
+    private readonly provider: "pi" | KeyOnlyProviderId = "pi",
+  ) {
     super();
   }
 
@@ -37,7 +41,7 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
       detached: process.platform !== "win32",
     });
     this.#child = child;
-    registerProviderProcess(child, "pi");
+    registerProviderProcess(child, this.provider);
     const decoder = new StringDecoder("utf8");
     let buffered = "";
     const diagnostics = createDiagnosticStream({ redact: this.redact, emit: (line) => this.emit("diagnostic", line) });

@@ -174,10 +174,15 @@ class ProviderDiscovery extends Context.Service<
             ? dependencies.customProviders.configs().find((config) => config.id === input.savedProviderId)
             : undefined;
           // Blank fields retain credentials only when the destination keeps the stored origin.
+          // An empty header value is a saved header that the form shows by name only. A saved header
+          // that the form no longer lists is not sent.
           if (saved && sameCustomProviderOrigin(saved.baseUrl, input.baseUrl)) {
             if (!apiKey) apiKey = saved.apiKey;
-            if (headers.length === 0) headers = [...saved.headers];
+            headers = headers.map((header) =>
+              header.value ? header : (saved.headers.find((entry) => entry.name === header.name) ?? header),
+            );
           }
+          headers = headers.filter((header) => header.value);
           const request = yield* Effect.forkIn(
             probe({ baseUrl: input.baseUrl, apiKey, headers }, DISCOVER_TIMEOUT_MS),
             scope,

@@ -17,10 +17,18 @@ and was omitted. It now has `typecheck:mobile`; the old name remains an alias fo
 `@openbot/brand`, `@openbot/contracts`, and `@openbot/team-client`. Its Expo and Uniwind generation
 writes ignored files before TypeScript runs.
 
-Each `typecheck` script starts TypeScript through `node_modules/typescript/bin/tsc`, not a bare
-`tsc`. `storybook-solidjs-vite` installs typescript@6 as `@typescript/old`, and bun links that
-package's `tsc` into `node_modules/.bin` in place of the TypeScript 7 one. A bare `tsc` therefore
-checks with TypeScript 6 without a warning.
+Each `typecheck` script starts `scripts/type-checker.ts`, not a bare `tsc`. The script runs tsrs, the
+Rust port of TypeScript, when tsrs has a binary for the computer: macOS arm64 and Linux, so CI too.
+On Windows and Intel Macs it runs `node_modules/typescript/bin/tsc`. tsrs checked the 14 projects in
+about 2.6 seconds and 1 GB per large project; `tsc` took about 13 seconds and 2.5 GB (M4 Pro,
+2026-10-20). tsrs follows a TypeScript 7.1 build and the catalog `typescript` is 7.0, so the two can
+report different errors. CI uses tsrs; for this reason the Windows release job does not check types.
+Editors still use the catalog `typescript`. The script calls
+`tsc` by path because `storybook-solidjs-vite` installs typescript@6 as `@typescript/old`, and bun
+links that package's `tsc` into `node_modules/.bin` in place of the TypeScript 7 one. A bare `tsc`
+therefore checks with TypeScript 6 without a warning.
+
+The `tsrs` version is exact and must be older than `minimumReleaseAge` in `bunfig.toml` (3 days).
 
 Signal had a similar gap: `remote:check` was its only entry point and also required Compose
 validation. `typecheck:remote` now runs in CI. `remote:check:compose` validates both
@@ -95,9 +103,13 @@ Its main jobs are:
 | Job | Runner | Commands |
 | --- | --- | --- |
 | Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:doc-links`, `bun run check:desktop:static`, then `bun run i18n:check` and `bun run types:ratchet` in parallel |
-| Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
+| Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser`, then `xvfb-run -a bun run test:browser-agent-session` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Signal E2E | `ubuntu-latest` | `bun run test:signal`, when `remote/` or `scripts/` changes |
+| Local scripts CLI E2E | `ubuntu-latest` | `bun run test:automation-cli` |
+| Team API routes E2E | `ubuntu-latest` | `bun run test:team-api-routes`, when desktop code changes |
+| Team API and reverse actions E2E | `ubuntu-latest` | `test:team-legacy-clients`, `test:team-session-revoke`, `test:sign-in-relay-paste`, `test:server-mute`, `test:routine-pause-resume`, `test:agent-hide-restore`, `test:messaging-pause-resume`, `test:messaging-discord-access`, `test:turn-input`, `test:provider-update-busy`, `test:provider-update-after-app-upgrade`, `test:provider-runtime-remove`, `test:provider-exit-session`, `test:codex-hung-app-server`, `test:codex-missing-rollout`, `test:zip-attachments` and `test:mp4-attachments`, each with `bun run` in its own step, when the `desktop` lane runs |
+| Provider fakes E2E | `ubuntu-latest` | `test:custom-agents`, `test:custom-agents:login-path`, `test:acp-directories`, `test:acp-flavors`, `test:acp-turn-stall`, `test:acp-mcp-names`, `test:provider-conformance`, `test:opencode-expired-key`, `test:opencode-downgraded-session`, `test:cline-free-models` and `test:provider-transcript-replay`, each with `bun run` in its own step, when the `desktop` lane runs. The fake agents are in `scripts/provider-fakes/`; the replayed transcripts of released CLIs are in `scripts/provider-fakes/transcripts/`, and `bun scripts/record-provider-transcript.ts` records a new one |
 | Surfaces | `ubuntu-latest` | Parallel groups described below, then `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api`, then, for a pull request from this repository, upload `apps/auth-api/dist` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
@@ -111,7 +123,7 @@ if a step fails. The steps have separate logs. The groups run in this order:
 - `Browser smoke` completes checkout, then runs `Set up Bun` and virtual-display installation
   together. The smoke test starts only after both succeed.
 - `Surfaces` completes setup, then runs three groups: `mobile:typecheck` with
-  `typecheck:team-client`; `typecheck:sites` with `typecheck:remote`; and `typecheck:logging`,
+  `typecheck:team-client`; `typecheck:sites`, `typecheck:remote` and `typecheck:status`; and `typecheck:logging`,
   `typecheck:telemetry`, `typecheck:user-errors`, and `typecheck:i18n`. Each command uses `bun run`
   in its own step. Mobile generation stays inside `mobile:typecheck`. Compose validation starts
   after all groups succeed.
@@ -119,6 +131,10 @@ if a step fails. The steps have separate logs. The groups run in this order:
 The desktop test shards keep separate runners. The API checks, artifact uploads, and production
 deployment dependencies keep their existing order. Local commands do not change. Compare job
 times on GitHub before claiming a time reduction; parallel steps share the runner's resources.
+
+The `Provider CLI canary` workflow is not a pull request check. It runs every six hours on the newest
+upstream provider CLIs, which reach users without an OpenBot release; see
+[Provider CLI updates](architecture/providers.md#provider-cli-updates).
 
 `check:api` ends with `api:build:check`, which is the preview build of the Worker, so the API job
 uploads that build as the `cloudflare-preview` artifact. The job has no secrets. After the CI run completes, the trusted
@@ -136,19 +152,20 @@ These long suites belong in CI; local desktop runs can reach their time limits u
 The `Detect changed areas` job lets a pull request skip the lanes it cannot affect. It compares the
 merge commit with its first parent and first removes Markdown that no build or test reads: `docs/`,
 `plans/` and `changelog.d/` Markdown, every `AGENTS.md`, and the root Markdown files except
-`CHANGELOG.md`, which the API bundles. Markdown under `resources/` is not removed either, because the
+`CHANGELOG.md`, which the API bundles, and `CLA.md`. Markdown under `resources/` is not removed either, because the
 renderer bundles it. Then it selects the lanes:
 
 | Lane | Jobs | Runs when a changed path is |
 | --- | --- | --- |
 | `code` | Check, Tests (desktop) | anything that is left |
 | `docs` | Check, with only `check:doc-links` when `code` is off | any Markdown file, before the removal above, or `scripts/check-doc-links.ts` |
-| `desktop` | Browser smoke | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `remote` and `docker` |
+| `desktop` | Browser smoke, Local scripts CLI E2E, Team API and reverse actions E2E | outside `apps/auth-api`, `apps/mobile`, `apps/site-router`, `apps/status`, `remote` and `docker` |
 | `api` | API | in `apps/auth-api`, `apps/site-router`, `src/renderer` or `resources`, or a `CHANGELOG.md` |
-| `storybook` | Storybook build | in `src`, `apps/auth-api`, `.storybook`, `resources`, `marketplace` or `build` |
-| `surfaces` | Surfaces | in `apps/mobile`, `apps/site-router`, `remote` or `scripts` |
+| `remote` | Signal E2E | in `remote` or `scripts` |
+| `storybook` | Storybook build | in `src`, `apps/auth-api`, `apps/status`, `.storybook`, `resources`, `marketplace` or `build` |
+| `surfaces` | Surfaces | in `apps/mobile`, `apps/site-router`, `apps/status`, `remote` or `scripts` |
 
-A path every workspace reads (`package.json`, `bun.lock`, `tsconfig*.json`, `biome.json`,
+A path every workspace reads (`package.json`, `bun.lock`, `bunfig.toml`, `.nvmrc`, `tsconfig*.json`, `biome.json`,
 `.github/`, `packages/`, `tools/`, `patches/`, `vendor/`) runs every lane. `code` runs for a
 mobile-only pull request: the desktop test run holds a mobile test, and lint and knip cover every
 workspace. The API Worker bundles the
@@ -182,8 +199,9 @@ where it checks the machine that builds the release.
 
 `bun run knip:check` fails on unused files, unused exports and exported types, unused or unlisted
 dependencies, unresolved imports and unlisted binaries in every workspace. It takes about 6 seconds. `knip.config.ts` names the entry
-points that knip cannot find by itself: the electron-vite inputs, the modules that the renderer HTML
-pages load, the Metro shims, and every command in `scripts/`. Each ignore entry states its reason.
+points that knip cannot find by itself: the Metro shims and stylesheet, and every command in
+`scripts/`. Its electron-vite and wrangler plugins find the electron-vite inputs, the modules that
+the renderer HTML pages load, and the Worker entries. Each ignore entry states its reason.
 Stylesheets go through a small compiler so that `@import "<package>"` counts as a use. The frozen
 Team API protocol files (`packages/contracts/src/team-protocol/v*.ts` and `*-v*.ts`) are exempt
 from the export checks: a released codec keeps its full API. When knip names an unused export,
@@ -199,6 +217,9 @@ change; removing the restore also requires fresh package downloads on a new runn
 The Electron download is
 deliberately not cached: `install-electron` takes 2.6s on a runner, and a measured cache hit
 restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no cache at all.
+`scripts/install-electron.ts` runs `install-electron` in the root `postinstall`. It tries again,
+two times at most, only when the download fails with HTTP 429 or 5xx or a lost connection, because
+`@electron/get` has no retry. Each attempt checks the archive against the package checksums.
 
 ## Focused tests
 
@@ -231,7 +252,8 @@ A shared module can have many dependents. Do a list first to see the set without
 `tools/vitest/hermetic-setup.ts` is the first setup file of the `node` and `renderer` projects, so it
 runs before each test file imports anything. It deletes credential-shaped variables (`*_API_KEY`,
 `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_PRIVATE_KEY`, and `ANTHROPIC_*`, `OPENAI_*`, `OPENROUTER_*`,
-`XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `XDG_*`,
+`XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`,
+`XDG_STATE_HOME` and `XDG_CACHE_HOME`,
 and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME`, `USERPROFILE`,
 `APPDATA` and `LOCALAPPDATA` at a temporary directory for the file, which it removes after the file. The `renderer` project runs
 files in worker threads, and a thread's `process.env` does not reach the native `homedir()`, so
@@ -343,16 +365,37 @@ with `[<name>]`. A new GritQL rule must start with no findings.
 ### Type debt ratchet
 
 `bun run types:ratchet` holds TypeScript options that are not on yet to a baseline. For each option
-in `tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
-extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares the errors of each
-file to the baseline. An error that two projects report counts once. `apps/mobile` extends the Expo
-base config, so the ratchet does not check it. A higher count fails, so an option stops new debt
-before the old debt is fixed. A lower count also fails until `--write` lowers the baseline: this
-keeps the baseline tight. The script never raises a count; a higher count is a hand edit that a
-reviewer sees. `--add=<option>` starts an option at its current counts. `scripts/debt-ratchet.ts`
-holds these rules. The run takes about 4 seconds. When an option has no errors left, turn it on in
-`tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
+in `tools/typescript/type-baseline.json`, it runs `scripts/type-checker.ts` with the option on for
+every project that extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares
+the errors of each file to the baseline. An error that two projects report counts once.
+`apps/mobile` extends the Expo base config, so the ratchet does not check it. A higher count fails,
+so an option stops new debt before the old debt is fixed. A lower count also fails until `--write`
+lowers the baseline: this keeps the baseline tight. The script never raises a count; a higher count
+is a hand edit that a reviewer sees. `--add=<option>` starts an option at its current counts.
+`scripts/debt-ratchet.ts` holds these rules. The run takes about 2 seconds with tsrs and 4 with
+`tsc`. When an option has no errors left, turn it on in `tsconfig.base.json` and remove it from the
+baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
+
+### Agent context budget
+
+`bun run check:agent-context` holds the text that OpenBot adds to an agent's context to the byte
+counts in `tools/agent-context/budget.json`. It uses the same rules as the type debt ratchet
+(`scripts/debt-ratchet.ts`): more bytes fail, and fewer bytes fail until `--write` lowers the
+baseline. A raise is a hand edit that a reviewer sees. The fixture agent has no memories, teammates,
+skills, or connected vault, so the counts measure only OpenBot's own text:
+
+- `instructions.claude` and `instructions.codex`: `developerInstructions()` with the options of each
+  provider.
+- `visible-tools`: the visible tool definitions that Codex and the local MCP bridge receive.
+- `catalog.schemas` and `catalog.descriptions`: all built-in catalog tools, which `tool_search` and
+  `tool_describe` return.
+- `guidance`: the distinct `agent/tool-guidance.ts` texts.
+- `list-models.fixture`: the `list_models` result for a synthetic catalog of 200 models.
+
+The script writes the counts to `.openbot-build/agent-context-budget/report.json`. It does not
+measure the schemas that the Claude Agent SDK makes from the Zod shapes of Claude's visible tools.
+CI runs it in the `check` job.
 
 ### Plugin cost
 

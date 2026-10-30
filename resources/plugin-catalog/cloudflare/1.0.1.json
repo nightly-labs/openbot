@@ -1,0 +1,33 @@
+{
+  "slug": "cloudflare",
+  "name": "Cloudflare",
+  "tagline": "Workers, DNS, storage and logs",
+  "description": "Cloudflare lets agents list and manage Workers, DNS records, R2, D1 and KV through the Cloudflare API, query Workers logs, and search the Cloudflare docs. Each user signs in to their own Cloudflare account through the browser. On Cloudflare's consent page, choose Read only: the default, Minimal, does not let agents see Workers, logs or DNS records. With write permissions, agents can deploy and delete Workers, change DNS records and change other account settings.",
+  "category": "coding",
+  "creatorName": "Cloudflare",
+  "iconUrl": "https://developers.cloudflare.com/favicon.png",
+  "version": "1.0.1",
+  "prompts": [
+    { "id": "prompt-workers", "text": "Which Workers are deployed in my Cloudflare account?" },
+    { "id": "prompt-errors", "text": "Which Cloudflare Workers logged errors in the last hour?" },
+    { "id": "prompt-dns", "text": "List the DNS records of each zone in my Cloudflare account." }
+  ],
+  "apps": [
+    {
+      "id": "app-cloudflare-mcp",
+      "name": "Cloudflare",
+      "description": "Workers, DNS, storage, and logs, over Cloudflare's API MCP server with browser sign-in.",
+      "iconUrl": "https://developers.cloudflare.com/favicon.png",
+      "server": {
+        "name": "cloudflare",
+        "transport": "http",
+        "url": "https://mcp.cloudflare.com/mcp",
+        "auth": [{ "id": "cloudflare-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.cloudflare.com",
+  "privacyPolicyUrl": "https://www.cloudflare.com/privacypolicy/",
+  "termsUrl": "https://www.cloudflare.com/website-terms/",
+  "skills": []
+}

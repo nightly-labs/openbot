@@ -8,19 +8,44 @@ import {
   type AddedAgent,
   type AgentAdminSettings,
   decodeAgentAdminSettings,
+  decodeAgentBackupModelSettings,
+  decodeAgentBrowserProfile,
+  decodeAgentTaskLimitSettings,
+  decodeBrowserProfileList,
+  decodeBrowserProfileSummary,
   decodeHostAddedAgent,
+  decodeHostBrowserTabProfiles,
   decodeInstalledSkills,
   type InstalledSkill,
+  parseBrowserProfileId,
+  parseBrowserProfileName,
+  parseClearBrowserDataInput,
   parseUpdateAgentAdminSettingsInput,
+  parseUpdateAgentBackupModelsInput,
+  parseUpdateAgentBrowserProfileInput,
   parseUpdateAgentHostSettingsInput,
+  parseUpdateAgentTaskLimitInput,
+  parseUpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import {
+  AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BACKUP_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import {
+  AGENT_TASK_LIMIT_CAPABILITY,
+  AGENT_TASK_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
+import {
+  BROWSER_PROFILES_CAPABILITY,
+  BROWSER_PROFILES_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -29,6 +54,7 @@ import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
+import type { BrowserProfileService } from "../browser-profile-service";
 import { decodeAgentHostSettingsFromHost } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -41,7 +67,7 @@ import {
   parseUninstallSkill,
 } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
-import { scopedHandler } from "./scoped-handler";
+import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { requireString } from "./validation";
 
 interface AgentAdminRemoteServers {
@@ -57,6 +83,7 @@ interface AgentAdminRemoteServers {
 interface AgentAdminIpcDependencies {
   settings: AgentAdminSettingsService;
   hostSettings: AgentHostSettingsService;
+  browserProfiles: BrowserProfileService;
   skills: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
   marketplaceAgents: Pick<AgentMarketplaceService, "install">;
   agentTemplates: Pick<AgentTemplateService, "install">;
@@ -72,6 +99,7 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
 export function agentAdminIpcHandlers({
   settings,
   hostSettings,
+  browserProfiles,
   skills,
   marketplaceAgents,
   agentTemplates,
@@ -115,6 +143,64 @@ export function agentAdminIpcHandlers({
       updateAgentHostSettings: scopedHandler(parseUpdateAgentHostSettingsInput, {
         local: (input) => runCauseEffect(hostSettings.update(input)),
         remote: (input, serverId) => remoteHostSettings(serverId, AGENT_HOST_SETTINGS_ROUTES.update, input),
+      }),
+      getAgentBackupModels: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.readBackupModels(agentId),
+        remote: (agentId, serverId) => remoteBackupModels(serverId, AGENT_BACKUP_MODELS_ROUTES.settings, { agentId }),
+      }),
+      updateAgentBackupModels: scopedHandler(parseUpdateAgentBackupModelsInput, {
+        local: (input) => runCauseEffect(hostSettings.updateBackupModels(input)),
+        remote: (input, serverId) => remoteBackupModels(serverId, AGENT_BACKUP_MODELS_ROUTES.update, input),
+      }),
+      getAgentTaskLimit: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.readTaskLimit(agentId),
+        remote: (agentId, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.settings, { agentId }),
+      }),
+      updateAgentTaskLimit: scopedHandler(parseUpdateAgentTaskLimitInput, {
+        local: (input) => runCauseEffect(hostSettings.updateTaskLimit(input)),
+        remote: (input, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.update, input),
+      }),
+      listBrowserProfiles: scopedQueryHandler({
+        local: () => browserProfiles.list(),
+        remote: (serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.list, {}, decodeBrowserProfileList),
+      }),
+      createBrowserProfile: scopedHandler(parseBrowserProfileName, {
+        local: (name) => runCauseEffect(browserProfiles.create(name)),
+        remote: (name, serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.create, { name }, decodeBrowserProfileSummary),
+      }),
+      updateBrowserProfile: scopedHandler(parseUpdateBrowserProfileInput, {
+        local: (input) => runCauseEffect(browserProfiles.update(input)),
+        remote: (input, serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.update, input, decodeBrowserProfileSummary),
+      }),
+      clearBrowserData: scopedHandler(parseClearBrowserDataInput, {
+        local: (input) => runCauseEffect(browserProfiles.clear(input)),
+        remote: (input, serverId) => remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.clear, input, acceptEmpty),
+      }),
+      deleteBrowserProfile: scopedHandler(parseBrowserProfileId, {
+        local: (profileId) => runCauseEffect(browserProfiles.delete(profileId)),
+        remote: (profileId, serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.delete, { profileId }, acceptEmpty),
+      }),
+      getAgentBrowserProfile: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => browserProfiles.readAgent(agentId),
+        remote: (agentId, serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.agent, { agentId }, decodeAgentBrowserProfile),
+      }),
+      updateAgentBrowserProfile: scopedHandler(parseUpdateAgentBrowserProfileInput, {
+        local: (input) => runCauseEffect(browserProfiles.updateAgent(input)),
+        remote: (input, serverId) =>
+          remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.updateAgent, input, decodeAgentBrowserProfile),
+      }),
+      listBrowserTabProfiles: scopedQueryHandler({
+        local: () => browserProfiles.tabProfiles(),
+        // A host without the capability shows no label: its tabs are all in its one shared session.
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY)
+            ? remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.tabs, {}, decodeHostBrowserTabProfiles)
+            : [],
       }),
       getAgentAdminSettings: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => settings.read(agentId),
@@ -164,6 +250,29 @@ export function agentAdminIpcHandlers({
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, path, decodeAgentHostSettingsFromHost, { method: "POST", body }),
+    );
+  }
+
+  function remoteBackupModels(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_BACKUP_MODELS_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeAgentBackupModelSettings, { method: "POST", body }),
+    );
+  }
+
+  // A joined server has no browser profile routes yet.
+  function remoteBrowserProfiles<A>(serverId: string, path: string, body: unknown, decode: ResponseDecoder<A>) {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
+  }
+
+  function remoteTaskLimit(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_TASK_LIMIT_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeAgentTaskLimitSettings, { method: "POST", body }),
     );
   }
 }

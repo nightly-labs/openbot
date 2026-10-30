@@ -2,6 +2,11 @@
   max-width: min(420px, 100%);
 }
 
+/* A table needs the width of an agent table. The bubble still fits a short table. */
+.message-entry-user .ui-bubble:has(.message-markdown-table-scroll) {
+  max-width: min(720px, 100%);
+}
+
 .message-copy {
   margin: 0;
   font-size: var(--openbot-text-lg);
@@ -156,8 +161,11 @@
   box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
 }
 
+/* Each column keeps the data table minimum, so a narrow message scrolls sideways and does not
+   break words. */
 .message-markdown-table {
   width: 100%;
+  min-width: calc(var(--message-markdown-table-columns) * 112px);
   border-collapse: collapse;
   background: var(--openbot-bg-canvas);
   color: var(--openbot-data-table-text);
@@ -202,7 +210,7 @@
 /* The passage that a quote points to, after a click on the quote. */
 ::highlight(openbot-quote-target) {
   background: var(--openbot-warning);
-  color: var(--openbot-text-on-light);
+  color: var(--openbot-paper-text);
 }
 
 .selection-highlight-layer {
@@ -417,12 +425,6 @@
   width: 28px;
 }
 
-.selection-actions-kbd {
-  height: 18px;
-  margin-left: 2px;
-  font-size: var(--openbot-text-xs);
-}
-
 .selection-actions-icon-button {
   background: transparent;
   color: var(--openbot-text-secondary);
@@ -537,10 +539,6 @@
     padding: 0;
   }
 
-  .selection-actions-kbd {
-    display: none;
-  }
-
   .selection-actions-label {
     position: absolute;
     width: 1px;
@@ -579,8 +577,12 @@
   }
 }
 
+/* One column as wide as the bubble. The implicit `auto` column grew to the content's min-content
+   width, and a file chip's percentage cap does not count there, so a long path made the text run
+   past the bubble and the chat ask for a column wider than the window. */
 .message-content-blocks {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 10px;
 }
@@ -773,7 +775,6 @@
 
 .message-code-scroll > code {
   min-width: 100%;
-  width: max-content;
   display: block;
   font: inherit;
 }
@@ -796,7 +797,8 @@
 .message-code-line-source {
   min-width: 0;
   padding-right: 12px;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .message-code-caret {
@@ -1039,7 +1041,7 @@
 
 .anchored-tooltip {
   position: fixed;
-  z-index: 240;
+  z-index: var(--openbot-layer-tooltip);
   box-sizing: border-box;
   width: max-content;
   max-width: min(280px, calc(100vw - 16px));
@@ -1203,7 +1205,7 @@
   color: var(--openbot-text-secondary);
 }
 
-.message-reply-context span {
+.message-reply-context > span {
   display: block;
   margin-bottom: 1px;
   font-size: var(--openbot-text-sm);
@@ -1211,13 +1213,47 @@
   line-height: 14px;
 }
 
-.message-reply-context p {
+/*
+ * The quoted message, rendered as Markdown and cut to four lines. The full body is parsed before
+ * the cut, so an open code fence or a long heading cannot spill into the message under it.
+ */
+.message-reply-quote {
+  max-height: 60px;
   overflow: hidden;
-  margin: 0;
   font-size: var(--openbot-text-sm);
   line-height: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Only a quote that the cut shortens fades out. A mask reads only alpha, and the text colour can be
+ * translucent, so the mask uses an opaque token.
+ */
+.message-reply-quote[data-clipped] {
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 45px, transparent 60px);
+}
+
+.message-reply-quote blockquote > :not(:first-child) {
+  margin-top: var(--openbot-space-1);
+}
+
+.message-reply-quote > .message-markdown > :not(:first-child) {
+  margin-top: var(--openbot-space-1);
+}
+
+.message-reply-quote .message-markdown-heading {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.message-reply-quote :not(pre) > code {
+  padding-block: 0;
+  font-size: inherit;
+}
+
+.message-reply-quote .message-markdown-excerpt-code {
+  font-family: var(--openbot-font-mono);
+  white-space: pre-wrap;
 }
 
 [data-slot="bubble"][data-author="user"] .message-reply-context {

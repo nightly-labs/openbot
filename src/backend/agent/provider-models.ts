@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentModelOption } from "@openbot/contracts/ipc";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import type { AgentProvider } from "./../agent-client";
+import type { ModelListResponse } from "./../protocol";
 
 /**
  * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
@@ -266,4 +267,15 @@ export const FALLBACK_MODELS: AgentModelOption[] = [
  */
 export function modelsAfterOpenCodeDiscoveryFailure(previous: AgentModelOption[]): AgentModelOption[] {
   return previous.length ? previous : OPENCODE_FREE_MODEL_FALLBACKS;
+}
+
+/**
+ * The tier that Codex names "Fast". Codex lists it in `serviceTiers` (`priority` in 0.163); an older
+ * release lists only the deprecated `additionalSpeedTiers`, where it is `fast`.
+ */
+export function codexFastServiceTier(server: ModelListResponse["data"][number]): { fastServiceTier?: string } {
+  const tier =
+    server.serviceTiers?.find((candidate) => candidate.name?.trim().toLowerCase() === "fast")?.id ??
+    (server.additionalSpeedTiers?.includes("fast") ? "fast" : undefined);
+  return tier && tier.length <= INPUT_LIMITS.serviceTier ? { fastServiceTier: tier } : {};
 }

@@ -18,7 +18,9 @@ export function skillExamplePrompt(
 }
 
 /** The SKILL.md body without its first heading, when that heading only repeats the name. */
-export function skillInstructions(skill: MarketplaceSkillDetail): string {
+export function skillInstructions(
+  skill: Pick<MarketplaceSkillDetail, "name" | "description" | "instructions">,
+): string {
   const instructions = skill.instructions || skill.description;
   const [first, ...rest] = instructions.split(/\r?\n/u);
   return first?.replace(/^#\s+/u, "").trim() === skill.name ? rest.join("\n").trim() : instructions;
@@ -26,8 +28,8 @@ export function skillInstructions(skill: MarketplaceSkillDetail): string {
 
 export function SkillPreview(props: {
   onOpenUrl: (url: string) => Promise<void>;
-  skill: MarketplaceSkillDetail;
-  onTry?: () => void;
+  skill: Pick<MarketplaceSkillDetail, "name" | "description" | "iconUrl" | "instructions" | "examplePrompt">;
+  onTry?: (() => void) | undefined;
   unavailableReason?: string;
   /** The creator line under the name, where the page that shows the preview names one. */
   creatorName?: string;

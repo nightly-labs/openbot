@@ -1,8 +1,10 @@
-import type {
-  MarketplaceAgentSummary,
-  MarketplaceSkillSummary,
-  McpServerConfig,
-  SkillCategory,
+import {
+  type MarketplaceAgentSummary,
+  type MarketplaceSkillSort,
+  type MarketplaceSkillSummary,
+  type McpServerConfig,
+  SKILL_CATEGORIES,
+  type SkillCategory,
 } from "@openbot/contracts/ipc";
 import { errorReference } from "@openbot/user-errors";
 import { createStore, onCleanup, onSettled, untrack } from "solid-js";
@@ -13,9 +15,29 @@ export type MarketplaceView =
   | { kind: "browse" }
   | { kind: "agent"; listing: MarketplaceAgentSummary }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
-  | { kind: "app"; id: string };
+  | { kind: "app"; id: string }
+  /** "Your skills" or one catalog category, on its own page. */
+  | { kind: "skillGroup"; group: SkillGroup }
+  /** A skill made on this computer. It has no catalog listing. */
+  | { kind: "localSkill"; skillId: string };
 
-export type MarketplaceTab = "agents" | "apps" | "skills";
+/** "Your skills", or a catalog category. */
+export type SkillGroup = "yours" | SkillCategory;
+
+/** Which catalog skills the Skills tab shows. No source shows all of them. */
+export type SkillSource = "verified" | "public";
+
+export type MarketplaceTab = "apps" | "agents" | "skills";
+
+/** The kinds, in the order of the side panel. */
+export const MARKETPLACE_TABS: readonly MarketplaceTab[] = ["apps", "agents", "skills"];
+
+/** The name of each tab. The header names the browse view after its tab. */
+export const MARKETPLACE_TAB_LABEL = {
+  agents: "marketplace.tab.agents",
+  apps: "marketplace.tab.apps",
+  skills: "marketplace.tab.skills",
+} as const satisfies Record<MarketplaceTab, string>;
 
 /** "yes": only what the user has. "no": only what the user does not have. */
 export type OwnedFilter = "yes" | "no";
@@ -27,10 +49,17 @@ export interface MarketplaceNavigationState {
   query: string;
   agentCategory: SkillCategory | null;
   agentsOwned: OwnedFilter | null;
-  skillCategory: SkillCategory | null;
-  skillsOwned: OwnedFilter | null;
+  /** The order of a skill group page. */
+  skillSort: MarketplaceSkillSort;
+  skillSource: SkillSource | null;
   /** The slug of a link that names no app of this catalog. */
   missingApp: string | null;
+}
+
+/** The `verified` value of a catalog query for a source. */
+export function sourceVerified(source: SkillSource | null): boolean | undefined {
+  if (source === null) return undefined;
+  return source === "verified";
 }
 
 export interface MarketplaceNavigation {
@@ -40,6 +69,8 @@ export interface MarketplaceNavigation {
   back: () => void;
   /** Goes back to the view at `index` of the stack. */
   backTo: (index: number) => void;
+  /** The list of a kind, or a page on top of it. The search stays. */
+  show: (tab: MarketplaceTab, view?: MarketplaceView) => void;
   /** The browse view on its first tab, with no search and no filter. */
   reset: () => void;
 }
@@ -47,12 +78,12 @@ export interface MarketplaceNavigation {
 function initialState(): MarketplaceNavigationState {
   return {
     stack: [{ kind: "browse" }],
-    tab: "agents",
+    tab: "apps",
     query: "",
     agentCategory: null,
     agentsOwned: null,
-    skillCategory: null,
-    skillsOwned: null,
+    skillSort: "installs",
+    skillSource: null,
     missingApp: null,
   };
 }
@@ -83,12 +114,20 @@ export function createMarketplaceNavigation(): MarketplaceNavigation {
       set((draft) => {
         draft.stack = draft.stack.slice(0, Math.max(1, index + 1));
       }),
+    show: (tab, view) =>
+      set((draft) => {
+        draft.tab = tab;
+        draft.missingApp = null;
+        // The list stays the same element, so it keeps its place.
+        if (view) draft.stack = [draft.stack[0] ?? { kind: "browse" }, view];
+        else draft.stack = draft.stack.slice(0, 1);
+      }),
     reset: () => set((draft) => Object.assign(draft, initialState())),
   };
 }
 
 export function isMarketplaceTab(value: string): value is MarketplaceTab {
-  return value === "agents" || value === "apps" || value === "skills";
+  return value === "apps" || value === "agents" || value === "skills";
 }
 
 /**
@@ -111,26 +150,18 @@ export function matchesApp(app: MarketplaceApp, query: string): boolean {
   return !text || app.name.toLowerCase().includes(text) || app.tagline.toLowerCase().includes(text);
 }
 
-/**
- * The apps the user has (attention first), then the others, with a sign-in that still waits. An
- * empty group is left out.
- */
-export function appGroups(
-  apps: readonly MarketplaceApp[],
-): { id: string; key: "marketplace.app.yourApps" | "marketplace.app.moreApps"; apps: MarketplaceApp[] }[] {
-  const groups: ReturnType<typeof appGroups> = [
-    {
-      id: "marketplace-apps-yours",
-      key: "marketplace.app.yourApps",
-      apps: [...apps.filter((app) => app.status === "attention"), ...apps.filter((app) => app.status === "connected")],
-    },
-    {
-      id: "marketplace-apps-more",
-      key: "marketplace.app.moreApps",
-      apps: apps.filter((app) => app.status === "idle" || app.status === "connecting"),
-    },
-  ];
-  return groups.filter((group) => group.apps.length > 0);
+/** The apps of each category, in the catalog order. A server that the user added is in Other. */
+export function appCategories(apps: readonly MarketplaceApp[]): { category: SkillCategory; apps: MarketplaceApp[] }[] {
+  const categoryOf = (app: MarketplaceApp): SkillCategory => (app.kind === "custom" ? "other" : app.category);
+  return SKILL_CATEGORIES.map((category) => ({
+    category,
+    apps: apps.filter((app) => categoryOf(app) === category),
+  })).filter((group) => group.apps.length > 0);
+}
+
+/** The apps that the user connected, and the ones that need attention. */
+export function ownedApps(apps: readonly MarketplaceApp[]): MarketplaceApp[] {
+  return apps.filter((app) => app.status === "connected" || app.status === "attention");
 }
 
 /**

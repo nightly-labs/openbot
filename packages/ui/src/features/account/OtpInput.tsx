@@ -6,6 +6,9 @@ import { useText } from "../../text";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
 
+/** `compact` fits the slots to the width of a card and puts them and the message at its start. */
+export type OtpInputSize = "default" | "compact";
+
 interface OtpInputProps {
   value: string;
   length?: number;
@@ -13,6 +16,7 @@ interface OtpInputProps {
   masked?: boolean;
   label?: string;
   status?: OtpInputStatus;
+  size?: OtpInputSize;
   hint?: string;
   errorMessage?: string | null;
   successMessage?: string;
@@ -276,7 +280,7 @@ export function OtpInput(props: OtpInputProps) {
   }
 
   return (
-    <div class="otp-input" data-status={status()}>
+    <div class="otp-input" data-status={status()} data-size={props.size ?? "default"}>
       {/*
         The slot characters below are loose text in the accessibility tree.
         Naming this group is what lets both consumers tell what they are:

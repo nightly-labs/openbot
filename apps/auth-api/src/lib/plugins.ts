@@ -10,6 +10,7 @@
 
 import { SKILL_CATEGORY_LABELS } from "@openbot/contracts/ipc-skills";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { PLUGIN_CATALOG_DETAILS, PLUGIN_CATALOG_INDEX, type PluginCatalogDetail } from "./plugin-catalog.generated";
 import { OPENBOT_SITE_URL } from "./site-metadata";
 
@@ -83,6 +84,76 @@ export function pluginSkills(plugin: SitePlugin): SitePluginSkill[] {
       ? [{ slug: skill.slug, description: skill.description }]
       : [],
   );
+}
+
+/** One value a `key` sign-in asks for: what the app's field calls it, and where to find it. */
+interface SitePluginKeyField {
+  label: string;
+  hint: string | null;
+  optional: boolean;
+}
+
+/**
+ * What the app asks for before one of a listing's apps can work. Built from the catalog's `auth`
+ * entries, and from nothing else, so the page says what the install says.
+ */
+export type SitePluginConnectStep =
+  | { kind: "link"; app: string }
+  | { kind: "key"; app: string; fields: SitePluginKeyField[]; docsUrl: string | null; docsLabel: string | null }
+  | {
+      kind: "local";
+      app: string;
+      label: string;
+      steps: string[];
+      note: string | null;
+      docsUrl: string | null;
+      docsLabel: string | null;
+    };
+
+function readString(record: DynamicRecord, key: string): string | null {
+  const value = record[key];
+  return isString(value) && value.trim() ? value : null;
+}
+
+function readKeyFields(entry: DynamicRecord): SitePluginKeyField[] {
+  const fields = entry.fields;
+  if (!Array.isArray(fields)) return [];
+  return fields.flatMap((field) => {
+    if (!isDynamicRecord(field)) return [];
+    const label = readString(field, "label");
+    return label ? [{ label, hint: readString(field, "hint"), optional: field.optional === true }] : [];
+  });
+}
+
+function readConnectStep(app: string, entry: unknown): SitePluginConnectStep[] {
+  if (!isDynamicRecord(entry)) return [];
+  const kind = readString(entry, "kind");
+  const docsUrl = pluginExternalHref(readString(entry, "docsUrl"));
+  const docsLabel = readString(entry, "docsLabel");
+  if (kind === "link") return [{ kind, app }];
+  if (kind === "key") {
+    const fields = readKeyFields(entry);
+    return fields.length > 0 ? [{ kind, app, fields, docsUrl, docsLabel }] : [];
+  }
+  const label = readString(entry, "label");
+  if (kind === "local" && label) {
+    const steps = Array.isArray(entry.steps) ? entry.steps.filter(isString) : [];
+    return [{ kind, app, label, steps, note: readString(entry, "note"), docsUrl, docsLabel }];
+  }
+  return [];
+}
+
+/**
+ * The sign-in steps of every app in a listing. The generated detail holds `auth` as unknown, so each
+ * entry is read here the same way `pluginSkills` reads a skill: an entry of a kind this page does not
+ * know is left out. An app with no `auth` needs no step. The server address is never read: the
+ * page does not show it (`docs/plugin-distribution.md`).
+ */
+export function pluginConnectSteps(plugin: SitePlugin): SitePluginConnectStep[] {
+  return plugin.apps.flatMap((app) => {
+    const auth = app.server.auth;
+    return Array.isArray(auth) ? auth.flatMap((entry) => readConnectStep(app.name, entry)) : [];
+  });
 }
 
 export function pluginPath(slug: string): string {

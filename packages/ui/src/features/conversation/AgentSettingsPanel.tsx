@@ -1,12 +1,13 @@
-import { agentProviderDescriptor, agentProviderName } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, agentProviderName, foreignProvider } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
   type AgentBackupModels,
+  type AgentBrowserProfile,
+  type AgentDefaults,
   type AgentModelChoice,
   type AgentModelId,
-  type AgentModelOption,
   type AgentPermissionLevel,
   type AgentProviderId,
   type AgentReasoningEffort,
@@ -14,16 +15,24 @@ import {
   type AvatarHue,
   type AvatarImageInput,
   agentAutomationAllowed,
+  agentBrowserProfile,
   agentComputerUseEnabled,
+  agentNewChatAllowed,
+  agentNextProviderAccountId,
   agentPermissionLevel,
   agentPermissionLevels,
   agentPermissionUpdate,
+  agentQuickAcknowledgementEnabled,
+  type BrowserProfileSummary,
   type BusyMessageMode,
+  type ClientAgentModelOption,
   type CustomAgentSummary,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
+  DEFAULT_AGENT_DEFAULTS,
   DEFAULT_BUSY_MESSAGE_MODE,
   type ProviderRuntimeStatus,
+  type ServerNotificationLevel,
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
   widensAgentPermission,
@@ -52,11 +61,11 @@ import {
   SlidersHorizontal,
   Switch,
   Text,
-  Textarea,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHueSwatch } from "@openbot/ui/bloub-avatar";
 import { ProviderModelPicker, reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
+import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import {
   SettingsField,
   SettingsLinkGroup,
@@ -67,7 +76,9 @@ import {
 } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
-import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
+import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
+import { type BrowserProfileChoice, BrowserProfileSelect } from "@openbot/ui/features/browser/BrowserProfileSelect";
+import { errorReference } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import {
   createEffect,
@@ -82,6 +93,9 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
+import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
+import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
+import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
 
 export interface AgentRuntimeSettings {
@@ -99,37 +113,51 @@ export interface AgentSettingsPanelProps {
   agent: AgentProfile;
   runtimeSettings: AgentRuntimeSettings;
   agentStatus: AgentStatus;
-  modelOptions: AgentModelOption[];
+  modelOptions: ClientAgentModelOption[];
   working: boolean;
   /** Unknown while a remote host has not sent it; the level then shows as if it were on. */
-  autoApprove?: boolean;
+  autoApprove?: boolean | undefined;
   /** Writes the Permissions level. Without it, the level is read-only. */
-  onUpdatePermissions?: (input: UpdateAgentAdminSettingsInput) => Promise<void>;
+  onUpdatePermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
   /** Computer Use is local-only too, and no remote host administers it yet. */
   computerUseEditable?: boolean;
   /** Local scripts can be changed locally or through the host's administrator route. */
   automationEditable?: boolean;
-  /** The busy-message setting is local-only too: the Team API does not carry it. */
+  /** Whether the agent can start a new chat. Local-only: the Team API does not carry it. */
+  newChatEditable?: boolean;
+  /** Whether the agent shows its plan before a long task. Local-only: the Team API does not carry it. */
+  quickAcknowledgementEditable?: boolean;
+  /** The browser profile of the agent's tabs. Left out when the host cannot change it. */
+  browserProfiles?: AgentBrowserProfileOptions | undefined;
+  /** The user's own notification level for the agent. Left out when the server cannot keep it. */
+  notificationLevel?: AgentNotificationLevelOptions | undefined;
+  /** The busy-message setting can be changed locally or through the host's administrator route. */
   busyMessageModeEditable?: boolean;
+  /** Whether the busy-message default belongs to a joined server's host, not to this app. */
+  busyMessageDefaultIsHost?: boolean;
   /** Tasks run only on this computer: the Team API has no task route. */
   taskLimitEditable?: boolean;
   /** Backup models are local-only too: the Team API does not carry them. */
   backupModelsEditable?: boolean;
+  /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
+  folders?: AgentFolderCalls | undefined;
   /** Whether a usage limit holds this model and account now, for the backup models page. */
-  usageLimited?: (choice: AgentModelChoice) => boolean;
-  /** The app default an agent without its own busy-message setting follows. */
-  defaultBusyMessageMode?: BusyMessageMode;
-  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** The app or host default an agent without its own busy-message setting follows. */
+  defaultBusyMessageMode?: BusyMessageMode | undefined;
+  /** The account defaults an agent without its own value follows. Absent for a remote agent. */
+  agentDefaults?: AgentDefaults | undefined;
+  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /** The caller supplies providers available on the selected host. */
-  customProviders?: readonly CustomProviderSummary[];
+  customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
-  customAgents?: readonly CustomAgentSummary[];
-  onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
-  onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  canConnectProvider?: (provider: AgentProviderId) => boolean;
+  customAgents?: readonly CustomAgentSummary[] | undefined;
+  onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
   /** Opens the provider settings from the model picker. */
-  onManageProviders?: (trigger: HTMLElement) => void;
+  onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
   maxWidth: () => number;
   onClose: () => void;
   width: number;
@@ -150,7 +178,40 @@ export interface AgentSettingsPanelProps {
    * Starts a new chat with the agent after the user confirms. The agent forgets the messages before
    * it and keeps its setup. Left out when the host cannot do it.
    */
-  onStartNewChat?: () => Promise<void>;
+  onStartNewChat?: (() => Promise<void>) | undefined;
+}
+
+export interface AgentBrowserProfileOptions {
+  /** The named profiles of the computer that runs the agent. Undefined while they load. */
+  profiles: readonly Pick<BrowserProfileSummary, "id" | "name" | "hue">[] | undefined;
+  /**
+   * The agent's choice, as its host gives it. The summary of an agent on a joined server does not
+   * carry it; absent, the panel reads it from the agent.
+   */
+  current?: AgentBrowserProfile | undefined;
+  /** Saves the choice. The host closes the agent's open tabs. */
+  onChange: (agentId: string, profile: AgentBrowserProfile) => Promise<void>;
+  /** Makes a named profile and returns its id. */
+  onCreate: (name: string) => Promise<string>;
+  /** Opens the profiles in the settings of the computer that runs the agent. */
+  onManage: (trigger: HTMLElement) => void;
+}
+
+export interface AgentNotificationLevelOptions {
+  /** The level that the user chose for the agent. Null follows the server level. */
+  current: ServerNotificationLevel | null;
+  /** The level of the server. It applies while `current` is null. */
+  serverLevel: ServerNotificationLevel;
+  /** Opens the notification settings, the one place where the user changes the level. */
+  onOpen: (trigger: HTMLElement) => void;
+}
+
+function browserProfileChoice(profile: AgentBrowserProfile): BrowserProfileChoice {
+  return profile.kind === "profile" ? profile.profileId : profile.kind;
+}
+
+function choiceBrowserProfile(choice: BrowserProfileChoice): AgentBrowserProfile {
+  return choice === "shared" || choice === "agent" ? { kind: choice } : { kind: "profile", profileId: choice };
 }
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
@@ -159,10 +220,11 @@ const INSTRUCTIONS_SAVE_DELAY_MS = 400;
  * The pages behind the root list. The root edits the agent's face, name, title and instructions
  * in place, as the mobile app does, and shows one row for each page.
  */
-type AgentSettingsPage = "permissions" | "backup-models" | "advanced";
+type AgentSettingsPage = "permissions" | "folders" | "backup-models" | "advanced";
 
 const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
   permissions: "agentSettings.permissions.title",
+  folders: "agentSettings.folders.title",
   "backup-models": "agentSettings.backupModels.title",
   advanced: "agentSettings.advanced.title",
 };
@@ -196,6 +258,9 @@ interface AgentSettingsDraft {
   permission: AgentPermissionLevel;
   computerUse: boolean;
   allowAutomation: boolean;
+  allowNewChat: boolean;
+  quickAcknowledgement: boolean;
+  browserProfile: BrowserProfileChoice;
   /** `default` follows the app setting. */
   busyMessage: BusyMessageChoice;
   /** `default` is `AGENT_TASK_LIMIT_DEFAULT`. */
@@ -219,20 +284,8 @@ interface TextSaveRequest {
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage, format } = useText();
+  const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
-  const [newChatError, setNewChatError] = createSignal<UserErrorDetails | null>(null);
-  async function startNewChat(start: () => Promise<void>): Promise<void> {
-    setNewChatError(null);
-    try {
-      await start();
-      setNewChatOpen(false);
-    } catch (error) {
-      setNewChatError({
-        message: errorMessage(error, t("agentSettings.newChat.failed")),
-        reference: errorReference(error),
-      });
-    }
-  }
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       batch: 0,
@@ -248,6 +301,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     permission: untrack(() => currentPermission()),
     computerUse: true,
     allowAutomation: false,
+    allowNewChat: false,
+    quickAcknowledgement: false,
+    browserProfile: "shared",
     busyMessage: "default",
     taskLimit: "default",
     backupModels: null,
@@ -279,8 +335,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     setPage(target);
     queueMicrotask(() =>
       (
-        pageRoot?.querySelector<HTMLElement>("button:not(:disabled), input, textarea, select") ??
-        pageRoot?.closest("aside")?.querySelector<HTMLElement>(".settings-panel-nav-button")
+        pageRoot?.querySelector<HTMLElement>(
+          'button:not(:disabled, [aria-disabled="true"]), input, textarea, select',
+        ) ?? pageRoot?.closest("aside")?.querySelector<HTMLElement>(".settings-panel-nav-button")
       )?.focus(),
     );
   }
@@ -288,6 +345,43 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   function closePage(): void {
     returnFocusPage = page();
     setPage(null);
+  }
+
+  function folderSource() {
+    const calls = props.folders;
+    return calls ? { agentId: props.agent.id, agentName: props.agent.name, calls } : undefined;
+  }
+  const agentFolders = createAgentFolders(folderSource);
+  // Each activity of the agent gives a new agent object, so the list loads again only when the
+  // agent, its saved or excluded folders or the page change. The page opening reads which folders
+  // are gone.
+  const folderLoadKey = createMemo(() =>
+    props.folders
+      ? [
+          props.agent.id,
+          page() === "folders",
+          ...(props.agent.additionalFolders ?? []),
+          "",
+          ...(props.agent.excludedFolders ?? []),
+        ].join("\n")
+      : "",
+  );
+  createEffect(
+    () => {
+      folderLoadKey();
+      return untrack(folderSource);
+    },
+    (source) => agentFolders.load(source),
+  );
+
+  /**
+   * The access label when the agent can change all files: the folders then do not apply. They still
+   * apply to a provider whose own file tools reach only its folders.
+   */
+  function wideAccess(): string | null {
+    const provider = knownProvider();
+    if (provider !== undefined && agentProviderDescriptor(provider).foldersInFullAccess) return null;
+    return draft.permission === "workspace" ? null : t(ACCESS_LABEL[draft.permission]);
   }
 
   function workspaceEnforcementNote(provider: AgentProviderId): string {
@@ -332,6 +426,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const reasoningOptions = createMemo(() => selectedModel()?.supportedReasoningEfforts ?? ["medium" as const]);
   // The provider has no reasoning setting for this model, and the `medium` it lists is never sent.
   const reasoningSetByProvider = () => selectedModel()?.reasoningEffortConfigurable === false;
+  /** The agent's provider when this build does not know it: its runtime rows cannot change. */
+  const agentForeignProvider = () => foreignProvider(props.agent.provider);
+  /** The provider whose capabilities apply. A foreign agent leaves `draft.runtime.provider` stale. */
+  const knownProvider = () => (agentForeignProvider() === undefined ? draft.runtime.provider : undefined);
   const avatarCandidates = createMemo(() =>
     avatarCandidateSeeds(props.agent.id, draft.avatar.candidateSeed, draft.avatar.batch),
   );
@@ -350,9 +448,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     () => {
       const agent = props.agent;
       const runtimeSettings = props.runtimeSettings;
+      const browserProfile = browserProfileChoice(props.browserProfiles?.current ?? agentBrowserProfile(agent));
       return {
         agent,
         runtimeSettings,
+        browserProfile,
         signature: [
           agent.id,
           agent.name,
@@ -361,7 +461,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agent.notifications),
           currentPermission(),
           String(agentComputerUseEnabled(agent)),
-          String(agentAutomationAllowed(agent)),
+          String(agentAutomationAllowed(agent, agentDefaults())),
+          String(agentNewChatAllowed(agent, agentDefaults())),
+          String(agentQuickAcknowledgementEnabled(agent, agentDefaults())),
+          browserProfile,
           agent.busyMessageMode ?? "default",
           String(agent.taskLimit ?? "default"),
           JSON.stringify(agent.backupModels ?? null),
@@ -373,7 +476,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         ].join("\u0000"),
       };
     },
-    ({ agent, runtimeSettings, signature }) =>
+    ({ agent, runtimeSettings, browserProfile, signature }) =>
       untrack(() => {
         if (signature === lastSignature) return;
         const agentChanged = agent.id !== lastAgentId;
@@ -403,7 +506,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.notifications = agent.notifications;
           state.permission = currentPermission();
           state.computerUse = agentComputerUseEnabled(agent);
-          state.allowAutomation = agentAutomationAllowed(agent);
+          state.allowAutomation = agentAutomationAllowed(agent, agentDefaults());
+          state.allowNewChat = agentNewChatAllowed(agent, agentDefaults());
+          state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
+          state.browserProfile = browserProfile;
           state.busyMessage = agent.busyMessageMode ?? "default";
           state.taskLimit = taskLimitChoice(agent.taskLimit);
           state.backupModels = agent.backupModels ?? null;
@@ -489,6 +595,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function queueTextSave(request: TextSaveRequest): void {
+    // Instructions over the limit stay in the field, unsaved, until the user shortens them.
+    if (request.field === "description" && instructionsTooLong(request.storedValue)) return;
     if (
       activeTextSave?.agentId === request.agentId &&
       activeTextSave.field === request.field &&
@@ -710,6 +818,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
+  /** "Server default (All activity)" while the agent follows the server, else the level of the agent. */
+  const notificationLevelLabel = (options: AgentNotificationLevelOptions) =>
+    options.current === null
+      ? t("agentSettings.notificationLevel.server", { level: t(SERVER_NOTIFICATION_LEVEL_LABELS[options.serverLevel]) })
+      : t(SERVER_NOTIFICATION_LEVEL_LABELS[options.current]);
+
   async function saveBusyMessage(next: BusyMessageChoice): Promise<void> {
     const agentId = props.agent.id;
     const previous = draft.busyMessage;
@@ -780,14 +894,24 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return count > 0 ? t("agentSettings.backupModels.valueCount", { mode, count }) : mode;
   };
 
-  const appBusyMessageMode = () => props.defaultBusyMessageMode ?? DEFAULT_BUSY_MESSAGE_MODE;
+  const defaultBusyMessageMode = () => props.defaultBusyMessageMode ?? DEFAULT_BUSY_MESSAGE_MODE;
+  const defaultBusyMessageLabels = () =>
+    props.busyMessageDefaultIsHost ? HOST_DEFAULT_BUSY_MESSAGE_LABEL : APP_DEFAULT_BUSY_MESSAGE_LABEL;
   const busyMessageLabel = (choice: BusyMessageChoice) =>
-    t(choice === "default" ? APP_DEFAULT_BUSY_MESSAGE_LABEL[appBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
-  const steerUnsupported = () =>
-    (draft.busyMessage === "default" ? appBusyMessageMode() : draft.busyMessage) === "steer" &&
-    agentProviderDescriptor(draft.runtime.provider).steer !== "native";
+    t(choice === "default" ? defaultBusyMessageLabels()[defaultBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
+  const steerUnsupported = () => {
+    const provider = knownProvider();
+    return (
+      provider !== undefined &&
+      (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
+      agentProviderDescriptor(provider).steer !== "native"
+    );
+  };
 
-  const oneTurnAtATime = () => !agentProviderDescriptor(draft.runtime.provider).concurrentTurns;
+  const oneTurnAtATime = () => {
+    const provider = knownProvider();
+    return provider !== undefined && !agentProviderDescriptor(provider).concurrentTurns;
+  };
   const taskLimitLabel = (choice: TaskLimitChoice) =>
     choice === "default"
       ? t("agentSettings.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
@@ -816,6 +940,51 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       setDraft((state) => {
         state.allowAutomation = !next;
       });
+    }
+  }
+
+  async function saveAllowNewChat(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.allowNewChat = next;
+    });
+    if (await saveAgentPatch({ allowNewChat: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.allowNewChat === next) {
+      setDraft((state) => {
+        state.allowNewChat = !next;
+      });
+    }
+  }
+
+  async function saveQuickAcknowledgement(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.quickAcknowledgement = next;
+    });
+    if (await saveAgentPatch({ quickAcknowledgement: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.quickAcknowledgement === next) {
+      setDraft((state) => {
+        state.quickAcknowledgement = !next;
+      });
+    }
+  }
+
+  async function saveBrowserProfile(options: AgentBrowserProfileOptions, next: BrowserProfileChoice): Promise<void> {
+    const agentId = props.agent.id;
+    const previous = draft.browserProfile;
+    setDraft((state) => {
+      state.browserProfile = next;
+    });
+    setSaveError(null);
+    try {
+      await options.onChange(agentId, choiceBrowserProfile(next));
+    } catch (error) {
+      if (disposed || props.agent.id !== agentId) return;
+      setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
+      if (draft.browserProfile === next)
+        setDraft((state) => {
+          state.browserProfile = previous;
+        });
     }
   }
 
@@ -885,7 +1054,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                       class="sr-only"
                       type="file"
                       aria-label={t("agentSettings.avatar.attachFiles")}
-                      accept="image/png,image/jpeg,image/webp"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
                       onChange={(event) => void uploadAgentAvatar(event.currentTarget.files?.[0])}
                     />
                     <div class="avatar-editor-heading">
@@ -1068,13 +1237,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 />
               </SettingsField>
               <SettingsField label={t("agentSettings.instructions")}>
-                <Textarea
+                <ResizableTextarea
                   class="settings-instructions-input"
                   rows="5"
                   value={draft.fields.description}
                   aria-label={t("agentSettings.instructionsLabel")}
+                  resizeLabel={t("agentSettings.instructionsResize")}
                   placeholder={t("agentSettings.instructionsPlaceholder")}
-                  maxlength={INPUT_LIMITS.agentDescription}
+                  invalid={instructionsTooLong(draft.fields.description)}
                   onValueChange={(value) => {
                     setDraft((state) => {
                       state.fields.description = value;
@@ -1084,6 +1254,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }}
                   onBlur={saveDescription}
                 />
+                <InstructionsLimit text={draft.fields.description} />
               </SettingsField>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
                 <ProviderModelPicker
@@ -1095,6 +1266,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                   ariaLabel={t("agentSettings.runtime.model")}
                   provider={draft.runtime.provider}
+                  foreignProvider={agentForeignProvider()}
                   value={draft.runtime.model}
                   agentStatus={props.agentStatus}
                   modelOptions={props.modelOptions}
@@ -1106,19 +1278,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onConnectProvider={props.onConnectProvider}
                   canConnectProvider={props.canConnectProvider}
                   onManageProviders={props.onManageProviders}
-                  disabled={props.working}
-                  disabledReason={
-                    props.working ? t("agentSettings.runtime.modelBusy") : t("agentSettings.runtime.modelUnavailable")
-                  }
+                  disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
-                  providerAccountId={props.agent.providerAccountId}
+                  providerAccountId={agentNextProviderAccountId(props.agent)}
                   onChange={(nextModel, provider, accountId) => void selectModel(nextModel, provider, accountId)}
                 />
                 <Select<AgentReasoningEffort>
                   class="agent-settings-runtime-select"
                   options={reasoningOptions()}
                   value={draft.runtime.reasoningEffort}
-                  disabled={reasoningSetByProvider()}
+                  disabled={reasoningSetByProvider() || agentForeignProvider() !== undefined}
                   onChange={(nextReasoning) => {
                     if (!nextReasoning || nextReasoning === draft.runtime.reasoningEffort) return;
                     void selectReasoning(nextReasoning);
@@ -1170,25 +1339,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   value={t(ACCESS_LABEL[draft.permission])}
                   onClick={() => openPage("permissions")}
                 />
-                <div class="agent-settings-switch-row">
-                  <span class="settings-link-label">
-                    <span class="settings-link-icon">
-                      <Bell aria-hidden="true" />
-                    </span>
-                    {t("agentSettings.notifications.title")}
-                  </span>
-                  <Switch
-                    size="sm"
-                    aria-label={t("agentSettings.notifications.title")}
-                    checked={draft.notifications}
-                    onChange={(next) => {
-                      setDraft((state) => {
-                        state.notifications = next;
-                      });
-                      void saveAgentPatch({ notifications: next });
-                    }}
+                <Show when={props.folders}>
+                  <AgentFoldersRow
+                    ref={pageRowRef("folders")}
+                    folders={agentFolders}
+                    wideAccess={wideAccess()}
+                    onOpen={() => openPage("folders")}
                   />
-                </div>
+                </Show>
                 <SettingsLinkRow
                   ref={pageRowRef("advanced")}
                   icon={<SlidersHorizontal aria-hidden="true" />}
@@ -1196,13 +1354,32 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onClick={() => openPage("advanced")}
                 />
               </SettingsLinkGroup>
+              <Show when={props.notificationLevel}>
+                {(options) => (
+                  <>
+                    <SettingsLinkGroup inset class="agent-settings-runtime-rows">
+                      <SettingsLinkRow
+                        icon={<Bell aria-hidden="true" />}
+                        label={t("agentSettings.notificationLevel.title")}
+                        value={notificationLevelLabel(options())}
+                        onClick={(trigger) => options().onOpen(trigger)}
+                      />
+                    </SettingsLinkGroup>
+                    <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+                      {draft.notifications
+                        ? t("agentSettings.notificationLevel.note")
+                        : t("agentSettings.notificationLevel.sharedOff")}
+                    </Text>
+                  </>
+                )}
+              </Show>
             </Show>
             <Show when={page() === "permissions"}>
               <Show when={props.onUpdatePermissions}>
                 <SettingsLinkGroup inset class="agent-settings-runtime-rows">
                   <Select<AgentPermissionLevel>
                     class="agent-settings-runtime-select"
-                    options={[...agentPermissionLevels(draft.runtime.provider, currentPermission())]}
+                    options={[...agentPermissionLevels(knownProvider(), currentPermission())]}
                     value={draft.permission}
                     onChange={(next) => {
                       if (!next || next === draft.permission) return;
@@ -1243,7 +1420,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     </>
                   }
                 >
-                  {t("agentSettings.runtime.workspaceNote")} {workspaceEnforcementNote(draft.runtime.provider)}{" "}
+                  {t("agentSettings.runtime.workspaceNote")}{" "}
+                  {agentForeignProvider() === undefined ? workspaceEnforcementNote(draft.runtime.provider) : null}{" "}
                   {t("agentSettings.runtime.workspaceUnlimited")}
                 </Show>
               </Text>
@@ -1275,6 +1453,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   />
                 </div>
               </Show>
+            </Show>
+            <Show when={page() === "folders"}>
+              <AgentFoldersPage
+                folders={agentFolders}
+                agentName={props.agent.name}
+                wideAccess={wideAccess()}
+                workspaceAccess={t(ACCESS_LABEL.workspace)}
+                showExclusions={draft.permission === "workspace" || wideAccess() !== null}
+                onChangeAccess={() => openPage("permissions")}
+              />
             </Show>
             <Show when={page() === "backup-models"}>
               <BackupModelsPage
@@ -1343,6 +1531,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     <SelectContent />
                   </Select>
                 </Show>
+                <Show when={props.browserProfiles}>
+                  {(options) => (
+                    <BrowserProfileSelect
+                      value={draft.browserProfile}
+                      profiles={options().profiles}
+                      onChange={(next) => void saveBrowserProfile(options(), next)}
+                      onCreate={options().onCreate}
+                    />
+                  )}
+                </Show>
                 <div class="agent-settings-runtime-path">
                   <span class="agent-settings-runtime-label">{t("agentSettings.runtime.workingDirectory")}</span>
                   <span>
@@ -1376,14 +1574,56 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     aria-label={t("agentSettings.newChat.confirm")}
                     aria-haspopup="dialog"
                     disabled={props.working}
-                    onClick={() => {
-                      setNewChatError(null);
-                      setNewChatOpen(true);
-                    }}
+                    onClick={() => setNewChatOpen(true)}
                   >
                     {t("agentSettings.newChat.button")}
                   </Button>
                 </div>
+              </Show>
+              <Show when={props.newChatEditable}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.agentNewChat.title")}</strong>
+                    <span>{t("agentSettings.agentNewChat.description")}</span>
+                  </div>
+                  <Switch
+                    size="sm"
+                    aria-label={t("agentSettings.agentNewChat.title")}
+                    checked={draft.allowNewChat}
+                    onChange={(next) => void saveAllowNewChat(next)}
+                  />
+                </div>
+              </Show>
+              <Show when={props.quickAcknowledgementEditable}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.quickAcknowledgement.title")}</strong>
+                    <span>{t("agentSettings.quickAcknowledgement.description")}</span>
+                  </div>
+                  <Switch
+                    size="sm"
+                    aria-label={t("agentSettings.quickAcknowledgement.title")}
+                    checked={draft.quickAcknowledgement}
+                    onChange={(next) => void saveQuickAcknowledgement(next)}
+                  />
+                </div>
+              </Show>
+              <Show when={props.browserProfiles}>
+                {(options) => (
+                  <div class="agent-settings-notifications">
+                    <div>
+                      <strong>{t("agentSettings.browserProfile.manageTitle")}</strong>
+                      <span>{t("agentSettings.browserProfile.manageDescription")}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={(event) => options().onManage(event.currentTarget)}
+                    >
+                      {t("agentSettings.browserProfile.manage")}
+                    </Button>
+                  </div>
+                )}
               </Show>
             </Show>
             <Show when={draft.saveError}>
@@ -1398,24 +1638,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         </SettingsPanelContent>
         <Show when={props.onStartNewChat}>
           {(start) => (
-            <ConfirmDialog
+            <AgentNewChatDialog
+              agent={props.agent}
               open={newChatOpen()}
-              tone="default"
-              initialFocus="cancel"
-              media={<AgentAvatar agent={props.agent} style={{ width: "44px", height: "44px" }} />}
-              title={t("agentSettings.newChat.confirmTitle", { name: props.agent.name })}
-              description={t("agentSettings.newChat.confirmDescription")}
-              confirmLabel={t("agentSettings.newChat.confirm")}
-              error={
-                newChatError() ? (
-                  <>
-                    {newChatError()?.message}
-                    <ErrorReference reference={newChatError()?.reference} />
-                  </>
-                ) : undefined
-              }
-              onCancel={() => setNewChatOpen(false)}
-              onConfirm={() => startNewChat(start())}
+              onClose={() => setNewChatOpen(false)}
+              start={() => start()()}
             />
           )}
         </Show>
@@ -1499,6 +1726,11 @@ const BUSY_MESSAGE_LABEL = {
 const APP_DEFAULT_BUSY_MESSAGE_LABEL = {
   queue: "agentSettings.busyMessage.appDefaultQueue",
   steer: "agentSettings.busyMessage.appDefaultSteer",
+} as const satisfies Record<BusyMessageMode, AppTextKey>;
+
+const HOST_DEFAULT_BUSY_MESSAGE_LABEL = {
+  queue: "agentSettings.busyMessage.hostDefaultQueue",
+  steer: "agentSettings.busyMessage.hostDefaultSteer",
 } as const satisfies Record<BusyMessageMode, AppTextKey>;
 
 const ACCESS_LABEL = {

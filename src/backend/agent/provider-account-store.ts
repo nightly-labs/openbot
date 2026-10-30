@@ -112,11 +112,26 @@ export class ProviderAccountStore {
       return yield* new ProviderAccountStoreFailed({
         cause: new Error("Custom agents do not have provider accounts."),
       });
-    return yield* this.#change((file) =>
+    return yield* this.#add(provider, `a${randomBytes(8).toString("hex")}`);
+  }).bind(this);
+
+  /** The account with this fixed id, made as `create` makes one when it does not exist yet. */
+  readonly ensure = Effect.fn("ProviderAccountStore.ensure")(function* (
+    this: ProviderAccountStore,
+    provider: AccountProvider,
+    accountId: string,
+  ) {
+    return this.get(provider, accountId) ?? (yield* this.#add(provider, accountId));
+  }).bind(this);
+
+  #add(provider: AccountProvider, accountId: string) {
+    return this.#change((file) =>
       Effect.gen({ self: this }, function* () {
+        const existing = file.accounts.find((account) => account.id === accountId && account.provider === provider);
+        if (existing) return { file, result: existing };
         if (file.accounts.filter((account) => account.provider === provider).length + 1 >= MAX_PROVIDER_ACCOUNTS)
           return { file, result: null };
-        const account: StoredProviderAccount = { id: `a${randomBytes(8).toString("hex")}`, provider, label: null };
+        const account: StoredProviderAccount = { id: accountId, provider, label: null };
         const home = this.home(account);
         yield* Effect.tryPromise({
           try: async () => {
@@ -129,7 +144,7 @@ export class ProviderAccountStore {
         return { file: { ...file, accounts: [...file.accounts, account] }, result: account };
       }),
     );
-  }).bind(this);
+  }
 
   readonly rename = Effect.fn("ProviderAccountStore.rename")(function* (
     this: ProviderAccountStore,

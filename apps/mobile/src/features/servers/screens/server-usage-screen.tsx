@@ -9,15 +9,11 @@ import { UsageLoading } from "@/features/agents/components/usage-motion";
 import { lastUsageDays, UsageRangePicker } from "@/features/agents/components/usage-range-picker";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -34,7 +30,7 @@ export function ServerUsageScreen() {
   const [range, setRange] = useState(() => lastUsageDays());
   const [agentId, setAgentId] = useState<string>();
   useEffect(() => {
-    mobileAnalytics.track("usage_viewed", {});
+    mobileAnalytics.track("usage_viewed", { scope: "server" });
   }, []);
   const usage = useQuery({
     queryKey: queryKeys.serverUsage(queryScope, serverId, range, agentId),
@@ -53,15 +49,16 @@ export function ServerUsageScreen() {
     setAgentId(id);
   }
 
+  const title = t("mobile.app.route.usage");
   if (!server)
     return (
-      <SettingsContent>
+      <LargeTitleScrollView title={title} contentContainerClassName="px-4 pt-3">
         <SettingsNote>{t("mobile.server.unavailable")}</SettingsNote>
-      </SettingsContent>
+      </LargeTitleScrollView>
     );
 
   return (
-    <SettingsContent>
+    <LargeTitleScrollView title={title} caption={server.name} contentContainerClassName="px-4 pt-3">
       <View className="gap-4">
         <SettingsSection>
           <SettingsRow
@@ -109,6 +106,6 @@ export function ServerUsageScreen() {
           <Typography.Paragraph>{t("mobile.server.usage.unsupported")}</Typography.Paragraph>
         )}
       </View>
-    </SettingsContent>
+    </LargeTitleScrollView>
   );
 }

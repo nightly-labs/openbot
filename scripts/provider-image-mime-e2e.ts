@@ -287,7 +287,7 @@ try {
             customProviders: () => [],
             mcpServers: () => [],
             customAgents: () => [
-              { id: "image-fixture", name: "Image fixture", command: executable, args: [], env: [] },
+              { id: "image-fixture", name: "Image fixture", command: executable, args: [], env: [], usagePrompt: null },
             ],
           },
           undefined,

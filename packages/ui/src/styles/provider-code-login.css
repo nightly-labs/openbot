@@ -10,14 +10,7 @@
  */
 
 .provider-code-login-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: calc(var(--openbot-layer-dialog) + 1);
-  display: grid;
-  place-items: center;
-  padding: var(--openbot-space-6);
-  background: var(--openbot-dialog-overlay);
-  animation: provider-code-login-backdrop-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
 }
 
 .provider-code-login-dialog {
@@ -167,12 +160,6 @@
   position: absolute;
   top: var(--openbot-space-3);
   right: var(--openbot-space-3);
-}
-
-@keyframes provider-code-login-backdrop-in {
-  from {
-    opacity: 0;
-  }
 }
 
 @keyframes provider-code-login-dialog-in {

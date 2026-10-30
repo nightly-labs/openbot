@@ -81,10 +81,14 @@ function renderStep(item: DynamicRecord): string | null {
 /** How many of a session's newest turns with work steps a capture keeps. */
 const CAPTURED_TURNS = 60;
 
-/** Keep only rendered steps, never the provider's full tool results. */
+/**
+ * Keep only rendered steps, never the provider's full tool results. With `turnId`, the read stops
+ * when that turn is complete.
+ */
 export const readCapturedSteps = Effect.fn("ProviderHistory.readCapturedSteps")(function* (
   client: AgentClient,
   threadId: string,
+  turnId?: string,
 ) {
   if (!client.readHistory) return yield* providerFailure(new Error("Provider history reader is unavailable."));
   const captured = new Map<string, string>();
@@ -118,6 +122,7 @@ export const readCapturedSteps = Effect.fn("ProviderHistory.readCapturedSteps")(
         kept = [];
         size = 0;
         omitted = 0;
+        if (fragment.turnId === turnId) return false;
       }
       return captured.size < CAPTURED_TURNS;
     }),

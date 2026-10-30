@@ -14,9 +14,9 @@ const options: AppLanguageOption[] = [...APP_LANGUAGE_OPTIONS];
 export interface LanguageSelectProps {
   value: AppLanguage;
   onChange: (value: AppLanguage) => void;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** The dialog element the popover portals into, as the other Settings selects receive it. */
-  mount?: HTMLElement;
+  mount?: HTMLElement | undefined;
 }
 
 /**
@@ -39,7 +39,7 @@ export function LanguageSelect(props: LanguageSelectProps): JSX.Element {
       optionValue="id"
       optionTextValue={label}
       value={appLanguageOption(props.value)}
-      disabled={props.disabled}
+      disabled={props.disabled ?? false}
       onChange={(option) => option && props.onChange(option.id)}
       placement="bottom-end"
       itemComponent={(itemProps) => (

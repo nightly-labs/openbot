@@ -28,9 +28,10 @@ export default defineConfig({
           // The database host is its own process. Only node:* and the installed Effect package
           // are runtime imports; the unpacked host must not load the main process bundle.
           "agent-database-host": resolve("src/backend/agent-data/agent-database-host.ts"),
-          // The voice host is its own process too. It imports only node:* and loads the speech
-          // recognition addon by path.
+          // The voice hosts are their own processes too. They import only node:* and load the
+          // sherpa-onnx addon by path.
           "voice-transcription-host": resolve("src/main/voice-transcription-host.ts"),
+          "voice-speech-host": resolve("src/main/voice-speech-host.ts"),
         },
       },
     },
@@ -58,7 +59,7 @@ export default defineConfig({
     resolve: {
       dedupe: ["solid-js", "@solidjs/web"],
     },
-    server: rendererPort ? { port: rendererPort, strictPort: true } : undefined,
+    ...(rendererPort ? { server: { port: rendererPort, strictPort: true } } : {}),
     build: {
       rollupOptions: {
         input: {

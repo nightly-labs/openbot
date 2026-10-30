@@ -1,0 +1,370 @@
+/*
+ * The offer of a hosted server: a notice at the routine list, a modal after a new routine, and a
+ * line in the offline notice. A border beam marks it as an offer, not a fault.
+ */
+
+/* The notice: the icon on the title line, and the actions under the text. */
+.hosted-upsell-notice {
+  flex: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  margin-top: var(--openbot-space-3);
+  padding: var(--openbot-space-3);
+}
+
+.hosted-upsell-notice .ui-alert-icon {
+  width: var(--openbot-space-8);
+  height: var(--openbot-space-8);
+  padding: var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  background: linear-gradient(135deg, var(--openbot-beam-blue), var(--openbot-beam-pink));
+  color: var(--openbot-text-on-accent);
+}
+
+.hosted-upsell-notice .ui-alert-title {
+  text-wrap: balance;
+}
+
+.hosted-upsell-notice .ui-alert-actions {
+  justify-content: flex-start;
+  margin-top: var(--openbot-space-2);
+}
+
+/*
+ * The border beam, after libraries.dev/beam: a conic gradient that turns around the border, and a
+ * soft glow outside it.
+ */
+@property --hosted-upsell-beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.hosted-upsell-beam {
+  position: relative;
+  border-color: transparent;
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--openbot-beam-blue) 12%, transparent), transparent 60%),
+    var(--openbot-bg-surface-raised);
+}
+
+/* The sharp line: the gradient, masked to a 1px ring. */
+.hosted-upsell-beam::before,
+.hosted-upsell-beam-glow > span {
+  position: absolute;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  mask:
+    linear-gradient(currentColor 0 0) content-box exclude,
+    linear-gradient(currentColor 0 0);
+  animation: hosted-upsell-beam-turn 6s linear infinite;
+}
+
+.hosted-upsell-beam::before {
+  inset: 0;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--hosted-upsell-beam-angle),
+    color-mix(in srgb, var(--openbot-beam-blue) 18%, transparent) 0deg,
+    color-mix(in srgb, var(--openbot-beam-blue) 18%, transparent) 180deg,
+    var(--openbot-beam-teal) 240deg,
+    var(--openbot-beam-blue) 290deg,
+    var(--openbot-beam-pink) 330deg,
+    color-mix(in srgb, var(--openbot-beam-blue) 18%, transparent) 360deg
+  );
+}
+
+/* The glow: a wider ring of the beam colours, blurred by its parent, so the mask does not cut the blur. */
+.hosted-upsell-beam-glow {
+  position: absolute;
+  inset: calc(-1 * var(--openbot-space-3));
+  border-radius: inherit;
+  filter: blur(6px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.hosted-upsell-beam-glow > span {
+  inset: var(--openbot-space-3);
+  padding: 2px;
+  background: conic-gradient(
+    from var(--hosted-upsell-beam-angle),
+    transparent 0deg,
+    transparent 210deg,
+    var(--openbot-beam-teal) 250deg,
+    var(--openbot-beam-blue) 290deg,
+    var(--openbot-beam-pink) 330deg,
+    transparent 360deg
+  );
+}
+
+@keyframes hosted-upsell-beam-turn {
+  to {
+    --hosted-upsell-beam-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hosted-upsell-beam::before,
+  .hosted-upsell-beam-glow > span {
+    animation: none;
+  }
+}
+
+/* The modal. It portals out of the workspace, so the rules match the content element itself. */
+.hosted-upsell-modal {
+  width: min(420px, 100%);
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-6);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-modal);
+  outline: 0;
+  color: var(--openbot-text-primary);
+  background: var(--openbot-bg-sidebar);
+}
+
+.hosted-upsell-modal .hosted-upsell-modal-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-lg);
+  text-wrap: balance;
+}
+
+.hosted-upsell-modal .hosted-upsell-modal-description {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-wrap: pretty;
+}
+
+.hosted-upsell-modal .hosted-upsell-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-3);
+}
+
+/* The picture: a laptop and a server, drawn with plain lines. */
+.hosted-upsell-modal .hosted-upsell-scene {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: var(--openbot-space-4);
+  padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.hosted-upsell-modal .hosted-upsell-device {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: var(--openbot-space-3);
+  margin: 0;
+}
+
+.hosted-upsell-modal .hosted-upsell-device figcaption {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.hosted-upsell-modal .hosted-upsell-laptop {
+  display: grid;
+  justify-items: center;
+}
+
+.hosted-upsell-modal .hosted-upsell-laptop-lid {
+  width: 88px;
+  height: 58px;
+  padding: 4px;
+  border: 2px solid var(--openbot-border-strong);
+  border-bottom: 0;
+  border-radius: var(--openbot-radius-sm) var(--openbot-radius-sm) 0 0;
+  transform-origin: bottom;
+  animation: hosted-upsell-lid 5s ease-in-out infinite;
+}
+
+.hosted-upsell-modal .hosted-upsell-laptop-screen {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: var(--openbot-radius-xs);
+  color: var(--openbot-text-secondary);
+  background: var(--openbot-bg-control);
+}
+
+.hosted-upsell-modal .hosted-upsell-laptop-screen svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  animation: hosted-upsell-shown-open 5s ease-in-out infinite;
+}
+
+.hosted-upsell-modal .hosted-upsell-laptop-base {
+  width: 108px;
+  height: 6px;
+  border-radius: 0 0 var(--openbot-radius-sm) var(--openbot-radius-sm);
+  background: var(--openbot-border-strong);
+}
+
+.hosted-upsell-modal .hosted-upsell-rack {
+  width: 64px;
+  display: grid;
+  gap: 4px;
+}
+
+.hosted-upsell-modal .hosted-upsell-rack span {
+  position: relative;
+  height: 18px;
+  border: 2px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+}
+
+/* One light on each unit; the lights stay on. */
+.hosted-upsell-modal .hosted-upsell-rack span::after {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
+  transform: translateY(-50%);
+  animation: hosted-upsell-light 1.6s ease-in-out infinite;
+  content: "";
+}
+
+.hosted-upsell-modal .hosted-upsell-rack span:nth-child(2)::after {
+  animation-delay: 0.5s;
+}
+
+.hosted-upsell-modal .hosted-upsell-rack span:nth-child(3)::after {
+  animation-delay: 1s;
+}
+
+/* Status: one chip. The laptop chip changes with the lid. */
+.hosted-upsell-modal .hosted-upsell-status {
+  display: grid;
+  justify-items: center;
+  font-weight: var(--openbot-weight-medium);
+}
+
+.hosted-upsell-modal .hosted-upsell-status > span {
+  grid-area: 1 / 1;
+  padding: 2px var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  white-space: nowrap;
+}
+
+.hosted-upsell-modal .hosted-upsell-status .hosted-upsell-status-on {
+  color: var(--openbot-success-text);
+  background: color-mix(in srgb, var(--openbot-success) 16%, transparent);
+}
+
+.hosted-upsell-modal .hosted-upsell-status .hosted-upsell-status-off {
+  color: var(--openbot-warning-text);
+  background: color-mix(in srgb, var(--openbot-warning-text) 14%, transparent);
+}
+
+.hosted-upsell-modal .hosted-upsell-status-flip .hosted-upsell-status-on {
+  animation: hosted-upsell-shown-open 5s ease-in-out infinite;
+}
+
+.hosted-upsell-modal .hosted-upsell-status-flip .hosted-upsell-status-off {
+  animation: hosted-upsell-shown-closed 5s ease-in-out infinite;
+}
+
+@keyframes hosted-upsell-lid {
+  0%,
+  25% {
+    transform: scaleY(1);
+  }
+  40%,
+  85% {
+    transform: scaleY(0.08);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes hosted-upsell-shown-open {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  38%,
+  88% {
+    opacity: 0;
+  }
+  96%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes hosted-upsell-shown-closed {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  38%,
+  88% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hosted-upsell-light {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* With reduced motion, the picture shows the end state: lid closed, routine stopped, server on. */
+@media (prefers-reduced-motion: reduce) {
+  .hosted-upsell-modal .hosted-upsell-laptop-lid,
+  .hosted-upsell-modal .hosted-upsell-laptop-screen svg,
+  .hosted-upsell-modal .hosted-upsell-rack span::after,
+  .hosted-upsell-modal .hosted-upsell-status-flip .hosted-upsell-status-on,
+  .hosted-upsell-modal .hosted-upsell-status-flip .hosted-upsell-status-off {
+    animation: none;
+  }
+
+  .hosted-upsell-modal .hosted-upsell-laptop-lid {
+    transform: scaleY(0.08);
+  }
+
+  .hosted-upsell-modal .hosted-upsell-laptop-screen svg,
+  .hosted-upsell-modal .hosted-upsell-status-flip .hosted-upsell-status-on {
+    opacity: 0;
+  }
+}
+
+/* The line in the offline notice. */
+.hosted-upsell-offline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: var(--openbot-space-1) 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.app-loading .hosted-upsell-offline {
+  justify-content: center;
+}

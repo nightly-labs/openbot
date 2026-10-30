@@ -3,6 +3,7 @@ import { Button, Dialog, Maximize2, SlidingTabs } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import { documentColorScheme } from "../../document-color-scheme";
 import { useText } from "../../text";
 import { CodeBlock } from "./CodeBlock";
 import { CloseIcon } from "./ConversationIcons";
@@ -42,13 +43,15 @@ export function CodePreview(props: {
   createEffect(
     () => {
       diagramAttempt();
-      return props.kind === "mermaid" && !props.streaming ? props.block.code : null;
+      return props.kind === "mermaid" && !props.streaming
+        ? { source: props.block.code, scheme: documentColorScheme() }
+        : null;
     },
-    (source) => {
+    (drawn) => {
       const run = ++diagramRun;
-      if (source === null) return;
+      if (drawn === null) return;
       setDiagram({ status: "drawing" });
-      void mermaidDiagram(source).then((result) => {
+      void mermaidDiagram(drawn.source, drawn.scheme).then((result) => {
         if (run === diagramRun) setDiagram(result);
       });
     },

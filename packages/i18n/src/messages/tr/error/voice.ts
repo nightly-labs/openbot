@@ -5,6 +5,8 @@ export const messages = {
   // Ses dökümü hataları.
   "error.voice.downloadFailed": "Ses modeli indirilemedi. Tekrar deneyin.",
   "error.voice.downloadStopped": "Ses modeli indirmesi durduruldu.",
+  "error.voice.removeBusy": "Ses dökümü bitene kadar bekleyin, sonra modeli kaldırın.",
+  "error.voice.removeFailed": "Ses modeli kaldırılamadı. Tekrar deneyin.",
   "error.voice.runtimeUnavailable": "Yerel ses dökümü bu platformda kullanılamıyor.",
   "error.voice.busy": "Zaten bir ses dökümü işlemi devam ediyor.",
   "error.voice.modelUnavailable": "Ses modeli kullanılamıyor.",
@@ -21,4 +23,9 @@ export const messages = {
   "error.voice.cloud.streamEnded": "Dikte aktarımı sona erdi. Yeniden kaydedin.",
   "error.voice.cloud.tooLong": "Kayıt çok uzun.",
   "error.voice.cloud.keySaveFailed": "ElevenLabs API anahtarı kaydedilemedi.",
+  "error.voice.speech.runtimeUnavailable": "Yerel konuşma sentezi bu platformda kullanılamıyor.",
+  "error.voice.speech.modelRequired": "Konuşma modelini Ayarlar → Ses bölümünden indirin.",
+  "error.voice.speech.timedOut": "Yanıtı sesli okuma zaman aşımına uğradı.",
+  "error.voice.speech.failed": "OpenBot yanıtı sesli okuyamadı.",
+  "error.voice.recordingNotKept": "OpenBot ses kaydını saklayamadı.",
 } as const satisfies PartialTranslation<typeof source>;

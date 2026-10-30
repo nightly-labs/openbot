@@ -33,6 +33,10 @@ UNIT_DIRECTORY=/etc/systemd/system
 UPDATE_UNIT=openbot-instance-update
 BACKUP_UNIT=openbot-instance-backup
 LOCKS=/run
+# LXCFS shows each container its own CPU and memory limits in these files. See lxcfs.yaml.
+LXCFS=/var/lib/lxcfs
+LXCFS_FILES=(proc/cpuinfo proc/stat proc/meminfo proc/swaps)
+LXCFS_DROP_IN=/etc/systemd/system/lxcfs.service.d/openbot.conf
 # The files without which a backup cannot open: the database and the keyring with its password.
 REQUIRED_FILES=(.config/OpenBot/openbot.db .local/share/keyrings/login.keyring .config/openbot-container/keyring-password)
 SHARED_DATABASE=OpenBot/Shared/Data/agent-data.db
@@ -89,7 +93,53 @@ compose() {
   shift
   check_name "$name"
   [ -f "$(env_file "$name")" ] || fail "There is no instance $name."
-  docker compose --project-name "openbot-$name" --file "$COMPOSE" --env-file "$(env_file "$name")" "$@"
+  local files=(--file "$COMPOSE")
+  # Without LXCFS, an instance still starts, so an update from the app works. OpenBot then limits
+  # only the Node programs of agents to the CPU limit (resources/agent-runtime/cpu-limit.cjs).
+  if lxcfs_ready; then files+=(--file "$HERE/lxcfs.yaml"); fi
+  docker compose --project-name "openbot-$name" "${files[@]}" --env-file "$(env_file "$name")" "$@"
+}
+
+# LXCFS runs and has all the files of lxcfs.yaml. Docker cannot start a container whose mount source
+# is missing.
+lxcfs_ready() {
+  systemctl is-active --quiet lxcfs.service || return
+  local file
+  for file in "${LXCFS_FILES[@]}"; do [ -e "$LXCFS/$file" ] || return; done
+}
+
+# Installs LXCFS with --enable-cfs. A restart of LXCFS breaks its files in the containers that run, so
+# a change of the options waits until no container uses them. The instances start without LXCFS, so
+# each problem here is a warning, and setup runs it after everything that the instances need.
+setup_lxcfs() {
+  local skip="The instances start without LXCFS and see the CPUs of the host."
+  if ! command -v lxcfs >/dev/null; then
+    if ! command -v apt-get >/dev/null; then
+      echo "Install lxcfs, then run setup again. $skip" >&2
+      return 0
+    fi
+    if ! DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet lxcfs >/dev/null; then
+      echo "lxcfs did not install. $skip" >&2
+      return 0
+    fi
+  fi
+  if ! cmp --silent "$HERE/lxcfs-openbot.conf" "$LXCFS_DROP_IN"; then
+    install -d -m 0755 "$(dirname "$LXCFS_DROP_IN")"
+    install -m 0644 "$HERE/lxcfs-openbot.conf" "$LXCFS_DROP_IN"
+    systemctl daemon-reload
+    if docker ps --format '{{.Mounts}}' | grep -qF "$LXCFS"; then
+      echo "LXCFS has new options, but containers use it. Stop the instances, run 'systemctl restart lxcfs', and start them." >&2
+    else
+      systemctl restart lxcfs.service || true
+    fi
+  fi
+  if ! systemctl enable --now --quiet lxcfs.service || ! lxcfs_ready; then
+    echo "LXCFS does not show its files in $LXCFS. $skip" >&2
+    return 0
+  fi
+  # Each setup says it again until LXCFS runs with the options of the drop-in.
+  tr '\0' ' ' <"/proc/$(systemctl show --property MainPID --value lxcfs.service)/cmdline" | grep -q -- --enable-cfs ||
+    echo "LXCFS runs without --enable-cfs, so the containers see the CPUs of the host. Stop the instances, run 'systemctl restart lxcfs', and start them." >&2
 }
 
 setup() {
@@ -133,6 +183,7 @@ setup() {
   fi
   docker info --format '{{.SecurityOptions}}' | grep -q name=userns ||
     echo "Docker runs without userns-remap: UID 1000 in a container is UID 1000 on the host." >&2
+  setup_lxcfs
 }
 
 # Starts nothing without the firewall, the network and the log socket.
@@ -141,12 +192,30 @@ ready() {
   systemctl is-active --quiet "$FIREWALL" || fail "The firewall of the instances is off. Run: openbot-instance setup"
   docker network inspect "$NETWORK" >/dev/null 2>&1 || fail "The network $NETWORK is missing. Run: openbot-instance setup"
   [ -e "$UNIT_DIRECTORY/$UPDATE_UNIT@.service" ] || fail "The update units are missing. Run: openbot-instance setup"
+  lxcfs_ready ||
+    echo "LXCFS does not run, so the instances see the CPUs and the memory of the host. Run: openbot-instance setup" >&2
 }
 
 start() {
   ready
   update_folders "$1" || fail "The update folders of $1 could not be made."
-  compose "$1" up --detach
+  # update_request runs start in a subshell on the left of `||`, where `set -e` is off: a failed
+  # `up` must still be the result of start.
+  compose "$1" up --detach || return
+  check_swap "$1"
+}
+
+# compose.yaml gives no swap above the memory limit. A container that swaps stops for seconds at a
+# time when it is full, and its clients lose the connection, so a limit that Docker did not apply is
+# reported.
+check_swap() {
+  local id swap
+  id=$(docker inspect --format '{{.Id}}' "openbot-$1") || return 0
+  if ! swap=$(cat "/sys/fs/cgroup/system.slice/docker-$id.scope/memory.swap.max" 2>/dev/null); then
+    echo "The swap limit of openbot-$1 cannot be read. Check that Docker uses cgroup v2 with the systemd driver and swap accounting." >&2
+    return 0
+  fi
+  [ "$swap" = 0 ] || echo "openbot-$1 can use swap (memory.swap.max is $swap). Check the swap accounting of Docker." >&2
 }
 
 # The folders that compose.yaml mounts for updates from the app. Docker would make a missing one as

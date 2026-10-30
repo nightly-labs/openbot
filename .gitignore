@@ -37,6 +37,9 @@ Shared/
 index-*.css
 .openbot-browser-test/
 .openbot-build/
+# The home page beam, a React Bits port. Its license forbids a public copy; CI checks it out
+# from the private nightly-labs/openbot-laser-flow repository.
+/apps/auth-api/src/vendor/laser-flow/
 .worktrees/
 # Claude Code creates git worktrees here; they carry a nested biome.json.
 .claude/worktrees/

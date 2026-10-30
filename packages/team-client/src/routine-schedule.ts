@@ -80,6 +80,7 @@ function hasRunsTooClose(spec: CronSpec, timezone: string): boolean {
  */
 export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
   validateStoredRoutineSchedule(schedule, timezone);
+  if (schedule.kind === "custom") validateCronSaveSyntax(schedule.expression);
   if (
     schedule.kind === "advanced" &&
     schedule.time.kind === "every" &&
@@ -228,9 +229,7 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
   const start = zonedParts(after, timezone);
   const calendar = new Date(Date.UTC(start.year, start.month - 1, start.day));
   const exactTimes = spec.exactTimes;
-  const repeatedStartHour =
-    zonedDateTimeCandidates({ ...start, minute: 0 }, timezone).length > 1 ||
-    zonedDateTimeCandidates({ ...start, minute: 30 }, timezone).length > 1;
+  const repeatedStart = zonedDateTimeCandidates(start, timezone).length > 1;
   for (let offset = 0; offset <= MAX_SEARCH_DAYS; offset += 1) {
     const current = new Date(calendar.getTime() + offset * 86_400_000);
     const year = current.getUTCFullYear();
@@ -250,22 +249,30 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
             : dayMatches || weekdayMatches;
     if (!calendarMatches) continue;
 
+    let repeatedCandidate: Date | undefined;
     for (const hour of spec.hour.values) {
       for (const minute of spec.minute.values) {
         if (exactTimes && !exactTimes.has(`${hour}:${minute}`)) continue;
-        if (
-          offset === 0 &&
-          (hour < start.hour || (hour === start.hour && minute < start.minute)) &&
-          !(repeatedStartHour && hour === start.hour)
-        ) {
+        if (offset === 0 && (hour < start.hour || (hour === start.hour && minute < start.minute)) && !repeatedStart) {
           continue;
         }
-        for (const candidate of zonedDateTimeCandidates({ year, month, day, weekday, hour, minute }, timezone)) {
+        const candidates = zonedDateTimeCandidates({ year, month, day, weekday, hour, minute }, timezone);
+        for (const [index, candidate] of candidates.entries()) {
           if (candidate.getTime() <= after.getTime()) continue;
-          return candidate;
+          // First occurrences follow wall-clock order. A second occurrence can precede a later
+          // wall time's first occurrence, even across hours when the clock moves back several hours.
+          if (index === 0) {
+            return repeatedCandidate && repeatedCandidate.getTime() < candidate.getTime()
+              ? repeatedCandidate
+              : candidate;
+          }
+          if (!repeatedCandidate || candidate.getTime() < repeatedCandidate.getTime()) {
+            repeatedCandidate = candidate;
+          }
         }
       }
     }
+    if (repeatedCandidate) return repeatedCandidate;
   }
   throw new RoutineInputError(sourceText("error.backend.routineNoOccurrence"));
 }
@@ -342,6 +349,32 @@ function parseCron(expression: string): CronSpec {
     parseCronField(values[3], 1, 12, "month"),
     parseCronField(values[4], 0, 6, "weekday", true),
   );
+}
+
+/** Only ASCII digits. `Number` also reads forms such as `0x5`, `1e1`, `+5` and `5.0`. */
+const CRON_DECIMAL = /^[0-9]+$/;
+
+/** Reject tokens the released parser ignores or reads loosely, but keep stored schedules readable. */
+function validateCronSaveSyntax(expression: string): void {
+  const values = expression.trim().split(/\s+/);
+  if (!hasFiveFields(values)) throw new RoutineInputError(sourceText("error.backend.routineCronFields"));
+  const fields = [
+    [values[0], "minute"],
+    [values[1], "hour"],
+    [values[2], "day"],
+    [values[3], "month"],
+    [values[4], "weekday"],
+  ] as const;
+  for (const [source, label] of fields) {
+    for (const segment of source.split(",")) {
+      const [rangeSource = "", stepSource, ...extra] = segment.split("/");
+      const bounds = rangeSource === "*" ? [] : rangeSource.split("-");
+      const step = stepSource === undefined ? [] : [stepSource];
+      if (extra.length > 0 || ![...bounds, ...step].every((value) => CRON_DECIMAL.test(value))) {
+        throw new RoutineInputError(sourceText("error.backend.routineCronValueInvalid", { field: label }));
+      }
+    }
+  }
 }
 
 function hasFiveFields(values: string[]): values is [string, string, string, string, string] {

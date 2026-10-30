@@ -16,7 +16,19 @@ afterEach(() => {
 const RESULT_TABLES = {
   routine_result_deliveries: [],
   routine_result_destinations: [],
-  projection_agent_tasks: [],
+  projection_agent_threads: [],
+  projection_messaging_allowed_roles: [],
+  browser_profiles: [],
+  workflow_edges: [],
+  workflow_nodes: [],
+  workflow_output_deliveries: [],
+  workflow_runs: [],
+  workflow_steps: [],
+  workflow_trigger_webhooks: [],
+  workflow_triggers: [],
+  workflow_versions: [],
+  workflow_webhook_receipts: [],
+  workflows: [],
 };
 
 function databaseAt(version: number): DatabaseSync {
@@ -106,7 +118,7 @@ describe("routine result migration", () => {
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({ ...before, ...RESULT_TABLES });
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 43 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 47 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -131,9 +143,9 @@ describe("routine result migration", () => {
   it("rejects newer and incomplete migration histories before it creates the tables", () => {
     const db = databaseAtWithSeed(36);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(44,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(48,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=44; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=48; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(resultTables(db)).toEqual([]);

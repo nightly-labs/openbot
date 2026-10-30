@@ -1,6 +1,14 @@
 import { DISCONNECTED_ONEPASSWORD_CONNECTOR, type OnePasswordConnectorStatus } from "@openbot/contracts/ipc";
+import { classifyFailure } from "@openbot/telemetry";
+import { currentText } from "@openbot/ui/text";
 import { createSignal, onCleanup, onSettled } from "solid-js";
-import { type ConnectorController, createConnectorActions, NO_WATCH } from "./connector-controller";
+import { actionToast } from "../../action-toast";
+import {
+  type ConnectorAnalyticsAction,
+  type ConnectorController,
+  createConnectorActions,
+  NO_WATCH,
+} from "./connector-controller";
 import { type OnePasswordConnectorPort, onePasswordConnectorPort } from "./onepassword-connector-port";
 
 /**
@@ -19,38 +27,70 @@ export function createOnePasswordConnector(
   hostName?: () => string | undefined,
 ): ConnectorController {
   const [status, setStatus] = createSignal<OnePasswordConnectorStatus>(DISCONNECTED_ONEPASSWORD_CONNECTOR);
-  const actions = createConnectorActions("connector.onePassword.actionFailed");
+  /** False until the first status read ends. Until then, the page does not show the default status. */
+  const [read, setRead] = createSignal(false);
+  /** Why the last status read failed, until a newer status comes. While it is set, the state is not known. */
+  const [statusError, setStatusError] = createSignal<string | null>(null);
+  const actions = createConnectorActions("connector.onePassword.actionFailed", "onepassword");
+  /** Counts the statuses that came, so a failed read does not hide a status that came after it started. */
+  let statuses = 0;
+  const show = (next: OnePasswordConnectorStatus) => {
+    statuses += 1;
+    setStatus(next);
+    setStatusError(null);
+  };
 
   const unsubscribe = port().onChanged((next) => {
-    if (!actions.disposed()) setStatus(next);
+    if (!actions.disposed()) show(next);
   });
   const reload = () => {
+    const before = statuses;
     void port()
       .status()
       .then((next) => {
-        if (!actions.disposed()) setStatus(next);
+        if (!actions.disposed()) show(next);
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (actions.disposed() || before !== statuses) return;
+        const { t, errorMessage } = currentText();
+        setStatusError(errorMessage(error, t("connector.readFailed")));
+      })
+      .finally(() => {
+        if (!actions.disposed()) setRead(true);
+      });
   };
   onSettled(reload);
   onCleanup(unsubscribe);
 
-  const run = (action: () => Promise<OnePasswordConnectorStatus>, waits = true) =>
-    actions.run(action, { waits, done: setStatus });
+  const run = (action: () => Promise<OnePasswordConnectorStatus>, waits = true, track?: ConnectorAnalyticsAction) =>
+    actions.run(action, { waits, done: show, ...(track ? { track } : {}) });
 
   // A failed check keeps the last status. The next focus or action checks again.
   const checkSetup = () => {
     void port()
       .checkSetup()
       .then((next) => {
-        if (!actions.disposed()) setStatus(next);
+        if (!actions.disposed()) show(next);
       })
       .catch(() => undefined);
   };
 
+  // Opening the app does not change the connection, so it does not wait for an action or lock a button.
+  const openApp = () => {
+    void port()
+      .openApp()
+      .catch((error: unknown) => {
+        if (actions.disposed()) return;
+        const { t, errorMessage } = currentText();
+        actionToast.error(errorMessage(error, t("connector.onePassword.openAppFailed")), {
+          report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
+        });
+      });
+  };
+
   return {
     id: "onepassword",
-    ready: () => true,
+    ready: read,
     available: () => true,
     busy: actions.busy,
     reload,
@@ -67,6 +107,10 @@ export function createOnePasswordConnector(
         get hostName() {
           return hostName?.();
         },
+        get statusError() {
+          return statusError();
+        },
+        onRetry: reload,
         // The user turns on the CLI integration or adds logins in the 1Password app, outside this window.
         onWatchSetup: () => {
           checkSetup();
@@ -75,15 +119,11 @@ export function createOnePasswordConnector(
         },
         onCheckSetup: checkSetup,
         onInstallCli: () => run(() => port().installCli()),
-        onOpenApp: () => {
-          void port()
-            .openApp()
-            .catch(() => undefined);
-        },
-        onConnect: (accountId) => run(() => port().connect({ accountId })),
-        onConnectWithToken: (token) => run(() => port().connectWithToken(token)),
+        onOpenApp: openApp,
+        onConnect: (accountId) => run(() => port().connect({ accountId }), true, "connect_started"),
+        onConnectWithToken: (token) => run(() => port().connectWithToken(token), true, "connected"),
         onCancel: () => run(() => port().cancel(), false),
-        onDisconnect: () => run(() => port().disconnect()),
+        onDisconnect: () => run(() => port().disconnect(), true, "disconnected"),
       },
     },
   };

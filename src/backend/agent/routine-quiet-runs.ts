@@ -1,5 +1,6 @@
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
   type ConversationSnapshot,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
@@ -21,6 +22,12 @@ const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
  * the language. It has no arguments, so the provider history shows the decision by the tool name.
  */
 export const ROUTINE_NO_UPDATE_TOOL = "routine_no_update";
+
+/**
+ * The OpenBot tool that a routine run calls when its task could not be done. The run then ends
+ * `failed` with the reason, while its delivery stays `completed`: the agent did answer.
+ */
+export const ROUTINE_REPORT_FAILURE_TOOL = "routine_report_failure";
 
 /**
  * A call to the no-update tool in provider history: a Codex, Pi or Muse tool item names the tool,
@@ -102,9 +109,13 @@ export function isTextAnswer(message: ConversationMessage): boolean {
   );
 }
 
-/** Thinking and the plan: how the agent worked, not what it reports. */
+/** Thinking, the plan and the subagents: how the agent worked, not what it reports. */
 function isWorkNote(message: ConversationMessage): boolean {
-  return message.itemType === "commentary" || message.itemType === CONVERSATION_PLAN_ITEM_TYPE;
+  return (
+    message.itemType === "commentary" ||
+    message.itemType === CONVERSATION_PLAN_ITEM_TYPE ||
+    message.itemType === CONVERSATION_SUBAGENTS_ITEM_TYPE
+  );
 }
 
 function carriesContent(message: ConversationMessage): boolean {

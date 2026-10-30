@@ -40,9 +40,14 @@ export interface MarketplaceSkillSummary {
   version: number;
   installs: number;
   featured: boolean;
+  /** OpenBot checked the skill beyond the listing review. Absent from a Worker that has no such flag. */
+  verified?: boolean;
   iconUrl: string | null;
   updatedAt: string;
 }
+
+/** The orders of a catalog page. No order is the default one: featured first, then the latest update. */
+export type MarketplaceSkillSort = "installs" | "updated" | "name";
 
 export interface MarketplaceSkillDetail extends MarketplaceSkillSummary {
   versionId: string;
@@ -58,11 +63,13 @@ export interface MarketplaceSkillPage {
 }
 
 export interface MarketplaceSkillQuery {
-  query?: string;
+  query?: string | undefined;
   category?: SkillCategory;
   featured?: boolean;
-  sort?: "installs";
-  cursor?: string;
+  /** True: only verified skills. False: only the other skills. */
+  verified?: boolean | undefined;
+  sort?: MarketplaceSkillSort | undefined;
+  cursor?: string | undefined;
   limit?: number;
 }
 
@@ -103,6 +110,17 @@ export interface SubmitSkillInput {
  * agent workspace that OpenBot did not install. OpenBot lists it read-only and never writes to it.
  */
 export const INSTALLED_SKILL_ORIGINS = ["marketplace", "managed", "local", "workspace"] as const;
+
+/**
+ * The id of a skill in the host user's `~/.agents/skills` is `home:<slug>`. Only the `$` list of a
+ * host has these skills, with the `workspace` origin, so an older client decodes them. They are the
+ * same for every agent and are not in the agent's workspace.
+ */
+export const HOME_SKILL_ID_PREFIX = "home:";
+
+export function isHomeSkillId(skillId: string): boolean {
+  return skillId.startsWith(HOME_SKILL_ID_PREFIX);
+}
 export type InstalledSkillOrigin = (typeof INSTALLED_SKILL_ORIGINS)[number];
 
 /**
@@ -135,6 +153,47 @@ export interface InstalledSkill {
    * the agent's provider does not read its folder. A provider can skip such a skill.
    */
   problem?: string;
+}
+
+/*
+ * What an installed skill of an agent is to the user. The agent skills dialog and the Marketplace
+ * apply the same rules, so the count and the cap of one agent are the same in both.
+ */
+
+/** A skill that OpenBot puts on the agent. The user does not remove it. */
+export function isBuiltInSkill(skill: InstalledSkill): boolean {
+  return (
+    skill.origin === "managed" || skill.slug === "openbot-site-hosting" || skill.skillId === "openbot-site-hosting"
+  );
+}
+
+/** A skill in a skill folder that OpenBot lists but does not manage. */
+export function isFolderSkill(skill: InstalledSkill): boolean {
+  return skill.origin === "workspace";
+}
+
+export function isSkillEnabled(skill: InstalledSkill): boolean {
+  return skill.enabled !== false;
+}
+
+/** A skill that OpenBot can remove from the agent: not built in, not in a folder, not a home skill. */
+export function isRemovableSkill(skill: InstalledSkill): boolean {
+  return !isBuiltInSkill(skill) && !isFolderSkill(skill) && !isHomeSkillId(skill.skillId);
+}
+
+/** A skill that the user added or made. A home skill comes with the `$` list; it is not in the agent's workspace. */
+export function isUserAssignedSkill(skill: InstalledSkill): boolean {
+  return !isBuiltInSkill(skill) && !isHomeSkillId(skill.skillId);
+}
+
+/** The skills that the user added or made, by name. */
+export function userAssignedSkills(skills: readonly InstalledSkill[]): InstalledSkill[] {
+  return skills.filter(isUserAssignedSkill).sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** A skill in a folder OpenBot did not write is not an assignment, so it does not count toward the cap. */
+export function assignedSkillCount(skills: readonly InstalledSkill[]): number {
+  return skills.filter((skill) => !isBuiltInSkill(skill) && !isFolderSkill(skill)).length;
 }
 
 export interface InstallSkillInput {
@@ -213,6 +272,7 @@ export function marketplaceQueryParams(query: MarketplaceSkillQuery): URLSearchP
   if (query.query) params.set("query", query.query);
   if (query.category) params.set("category", query.category);
   if (query.featured) params.set("featured", "true");
+  if (query.verified !== undefined) params.set("verified", String(query.verified));
   if (query.sort) params.set("sort", query.sort);
   if (query.cursor) params.set("cursor", query.cursor);
   if (query.limit) params.set("limit", String(query.limit));
@@ -223,12 +283,17 @@ export function decodeMarketplaceSkillPage(value: unknown): MarketplaceSkillPage
   if (!isDynamicRecord(value) || !Array.isArray(value.skills) || !value.skills.every(isMarketplaceSkillSummary))
     throw new Error("Invalid skill marketplace response.");
   if (value.nextCursor !== null && !isString(value.nextCursor)) throw new Error("Invalid skill marketplace response.");
-  return { skills: value.skills, nextCursor: value.nextCursor };
+  return {
+    skills: value.skills.map(({ verified, ...skill }) => (isBoolean(verified) ? { ...skill, verified } : skill)),
+    nextCursor: value.nextCursor,
+  };
 }
 
+/** An older Worker sends no `verified`. A value that is not a boolean decodes as absent. */
 export function decodeMarketplaceSkillDetail(value: unknown): MarketplaceSkillDetail {
   if (!isMarketplaceSkillDetail(value)) throw new Error("Invalid skill detail response.");
-  return value;
+  const { verified, ...skill } = value;
+  return isBoolean(verified) ? { ...skill, verified } : skill;
 }
 
 function isMarketplaceSkillSummary(value: unknown): value is MarketplaceSkillSummary {
@@ -275,7 +340,7 @@ export interface ReviseLocalSkillInput extends CreateLocalSkillInput {
 }
 export interface LocalSkillRevisionInput {
   skillId: string;
-  revision?: number;
+  revision?: number | undefined;
 }
 /** Installs one exact revision, so the agent gets the copy the user read. */
 export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };

@@ -9,12 +9,19 @@ import {
   isAgentProvider,
   type ProviderAccountStatus,
 } from "@openbot/contracts/ipc";
-import { providerAccountName } from "../../components/provider-accounts";
+import {
+  type PlanLimitTone,
+  planLimitWindowKind,
+  reportedUsageWindows,
+  usageRemainingPercent,
+  usageTone,
+} from "@openbot/team-client/plan-limits";
+import { isApiKeyAccount, providerAccountName } from "../../components/provider-accounts";
 import { currentText, type TextValue } from "../../text";
 
 type UsageText = Pick<TextValue, "t" | "format">;
 
-export type AccountUsageTone = "neutral" | "warning" | "critical";
+export type AccountUsageTone = PlanLimitTone;
 
 /** One limit window that a provider reported, such as its 5-hour or its weekly window. */
 export interface AccountUsageWindowRow {
@@ -35,20 +42,17 @@ export interface AccountUsageProviderRow {
   /** The window that stops work first. The dock chip shows it. */
   remainingPercent: number | null;
   tone: AccountUsageTone;
-  /** Every reported window, the shortest first, so a weekly limit does not hide the 5-hour one. */
+  /**
+   * Every reported window, the shortest first, so a weekly limit does not hide the 5-hour one. For a
+   * provider that names quota groups, the windows of each group in the provider's order.
+   */
   windows: AccountUsageWindowRow[];
+  /** The reading's own windows, the shortest first. The rail ring shows them, not the quota groups. */
+  ringWindows: AccountUsageWindowRow[];
   /** `false` for a provider that has no usage reading, so a missing amount is not a failure. */
   reportsUsage: boolean;
-}
-
-/** Remaining quota from a provider-reported used percentage. */
-export function usageRemainingPercent(usedPercent: number): number {
-  return Math.max(0, Math.round(100 - usedPercent));
-}
-
-export function usageTone(remainingPercent: number | null): AccountUsageTone {
-  if (remainingPercent === null || remainingPercent >= 30) return "neutral";
-  return remainingPercent < 10 ? "critical" : "warning";
+  /** The provider whose plan quota this reading also counts, such as Grok for a merged Cursor plan. */
+  sharedQuotaWith: AgentProviderId | null;
 }
 
 /**
@@ -75,7 +79,11 @@ export function accountUsageProviderRows(
     const accounts = accountsOf(provider.id);
     const ids = accounts.length
       ? accounts.flatMap((account) =>
-          account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? [null] : account.state === "connected" ? [account.id] : [],
+          account.id === DEFAULT_PROVIDER_ACCOUNT_ID
+            ? [null]
+            : account.state === "connected" && !isApiKeyAccount(account.id)
+              ? [account.id]
+              : [],
         )
       : [null];
     for (const accountId of ids) {
@@ -108,18 +116,48 @@ function usageRow(
   limit: AccountUsageLimit | null,
   text: UsageText,
 ): AccountUsageProviderRow {
-  const windows = (limit ? reportedWindows(limit) : []).map((window): AccountUsageWindowRow => {
+  const windowRow = (window: AccountUsageWindow, label: string): AccountUsageWindowRow => {
     const remainingPercent = usageRemainingPercent(window.usedPercent);
     return {
-      label: usageWindowLabel(window.windowDurationMins, text),
+      label,
       remainingPercent,
       tone: usageTone(remainingPercent),
       resetsAt: window.resetsAt,
       resetsAtLabel: formatUsageReset(window.resetsAt, text),
     };
-  });
+  };
+  const ownWindows = (limit ? reportedUsageWindows(limit) : []).map((window) =>
+    windowRow(
+      window,
+      // Cursor's two windows share one billing cycle and differ by the models they cover. One
+      // window alone is the whole plan.
+      provider === "cursor" && limit?.primary && limit.secondary
+        ? text.t(window === limit?.primary ? "account.usage.window.cursorModels" : "account.usage.window.otherModels")
+        : usageWindowLabel(window.windowDurationMins, text),
+    ),
+  );
+  // Antigravity limits each group of models apart, such as Gemini 4 Argon: one line per group, by
+  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group.
+  const groups = limit?.groups ?? [];
+  const windows =
+    groups.length > 1
+      ? groups.flatMap((group) => {
+          const groupWindows = reportedUsageWindows(group);
+          return groupWindows.map((window) =>
+            windowRow(
+              window,
+              groupWindows.length > 1
+                ? text.t("account.usage.window.group", {
+                    group: group.name,
+                    window: usageWindowLabel(window.windowDurationMins, text),
+                  })
+                : group.name,
+            ),
+          );
+        })
+      : ownWindows;
   // The shortest window comes first, so on a tie the shorter window stops work first.
-  const binding = windows.reduce<AccountUsageWindowRow | null>(
+  const binding = ownWindows.reduce<AccountUsageWindowRow | null>(
     (lowest, window) => (lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest),
     null,
   );
@@ -133,22 +171,31 @@ function usageRow(
     remainingPercent,
     tone: usageTone(remainingPercent),
     windows,
+    ringWindows: ownWindows,
     reportsUsage: agentProviderDescriptor(provider).reportsUsage,
+    sharedQuotaWith: limit?.sharedQuotaWith ?? null,
   };
 }
 
 export function usageWindowLabel(durationMins: number | null, text: UsageText = currentText()): string {
   const { t } = text;
-  if (durationMins === null) return t("account.usage.window.limit");
-  if (nearDuration(durationMins, 10_080)) return t("account.usage.window.weekly");
-  if (nearDuration(durationMins, 43_200) || nearDuration(durationMins, 40_320))
-    return t("account.usage.window.monthly");
-  if (nearDuration(durationMins, 1_440)) return t("account.usage.window.daily");
-  if (nearDuration(durationMins, 300)) return t("account.usage.window.fiveHour");
-  if (durationMins >= 60 && durationMins % 60 === 0) {
-    return t("account.usage.window.hours", { count: durationMins / 60 });
+  const window = planLimitWindowKind(durationMins);
+  switch (window.kind) {
+    case "limit":
+      return t("account.usage.window.limit");
+    case "weekly":
+      return t("account.usage.window.weekly");
+    case "monthly":
+      return t("account.usage.window.monthly");
+    case "daily":
+      return t("account.usage.window.daily");
+    case "fiveHour":
+      return t("account.usage.window.fiveHour");
+    case "hours":
+      return t("account.usage.window.hours", { count: window.hours });
+    case "minutes":
+      return t("account.usage.window.minutes", { minutes: window.minutes });
   }
-  return t("account.usage.window.minutes", { minutes: Math.round(durationMins) });
 }
 
 export function formatUsageReset(resetsAt: number | null, text: UsageText = currentText()): string | null {
@@ -197,17 +244,4 @@ export function accountUsageRowLabel(
     if (window.resetsAtLabel) parts.push(t("account.usage.row.resets", { time: window.resetsAtLabel }));
   }
   return parts.join(", ");
-}
-
-function reportedWindows(limit: AccountUsageLimit): AccountUsageWindow[] {
-  return [limit.primary, limit.secondary]
-    .filter((window): window is AccountUsageWindow => window !== null)
-    .sort(
-      (left, right) =>
-        (left.windowDurationMins ?? Number.POSITIVE_INFINITY) - (right.windowDurationMins ?? Number.POSITIVE_INFINITY),
-    );
-}
-
-function nearDuration(durationMins: number, targetMins: number): boolean {
-  return Math.abs(durationMins - targetMins) <= targetMins * 0.05;
 }

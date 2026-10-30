@@ -3,7 +3,7 @@ import { useCSSVariable } from "uniwind";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 
-export const unstable_settings = { initialRouteName: "index" };
+export const unstable_settings = { anchor: "index" };
 
 // One sheet owns the whole flow. The scanner is an inner page, so opening it never dismisses the
 // sheet or puts a second modal over it. Both pages draw their own title, so the header stays off.

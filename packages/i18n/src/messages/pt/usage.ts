@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Custo diário estimado em USD por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
   "usage.chart.tokensDescription":
-    "Tokens processados por dia e por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
+    "Tokens sem leituras de cache por dia e por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
   "usage.chart.costLabel": "Custo diário estimado em USD por provedor",
-  "usage.chart.tokensLabel": "Tokens processados por dia e por provedor",
+  "usage.chart.tokensLabel": "Tokens sem leituras de cache por dia e por provedor",
   "usage.column.cost": "Custo",
   "usage.column.share": "Participação",
   "usage.column.tokens": "Tokens",
@@ -28,7 +28,7 @@ export const messages = {
   "usage.summary": "Resumo de uso",
   "usage.sessions": { one: "{sessions} sessão", other: "{sessions} sessões" },
   "usage.costEstimate": "Estimativa de API · USD",
-  "usage.knownTokens": "Tokens processados conhecidos",
+  "usage.knownTokens": "Tokens conhecidos sem leituras de cache",
   "usage.provider.shareOfCost": "{share} do custo conhecido",
   "usage.provider.shareOfTokens": "{share} dos tokens conhecidos",
   "usage.dailyTrend": "Tendência diária",
@@ -36,7 +36,8 @@ export const messages = {
   "usage.dailyTokens": "Tokens diários",
   "usage.viewDailyData": "Ver dados diários",
   "usage.totals.title": "Totais",
-  "usage.totals.processedTokens": "Tokens processados",
+  "usage.totals.tokens": "Tokens sem leituras de cache",
+  "usage.totals.processedTokens": "Tokens processados com leituras de cache",
   "usage.totals.cachedInput": "Entrada em cache",
   "usage.totals.uncachedInput": "Entrada sem cache",
   "usage.totals.cacheCreation": "Criação de cache",
@@ -57,9 +58,12 @@ export const messages = {
   "usage.about.title": "Sobre estas estimativas",
   "usage.about.body":
     "Custo de tokens equivalente ao da API em USD. Esta é uma estimativa, não uma cobrança de assinatura. Taxas separadas de ferramentas e mídia não são calculadas. Preços desconhecidos e uso incompleto ficam indisponíveis. As participações usam apenas valores conhecidos; dados parciais podem subestimar os totais.",
+  "usage.about.tokens":
+    "As contagens de tokens não incluem leituras de cache. Cada solicitação ao modelo em um turno lê de novo a conversa em cache, então as leituras de cache podem ser muitas vezes maiores que os outros tokens. Os totais as mostram como Entrada em cache.",
   "usage.panel.label": "Uso dos agentes",
   "usage.panel.title": "Uso",
   "usage.panel.allAgents": "Todos os agentes",
+  "usage.panel.workflows": "Fluxos de trabalho",
   "usage.panel.agents": "Agentes do relatório de uso",
   "usage.panel.metric": "Métrica de uso",
   "usage.panel.period": "Período de uso",

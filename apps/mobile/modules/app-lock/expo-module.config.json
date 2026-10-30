@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["AppLockModule"]
+  },
+  "android": {
+    "modules": ["run.openbot.applock.AppLockModule"]
+  }
+}

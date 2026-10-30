@@ -3,15 +3,19 @@ import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 
 /**
- * The host pane over the middle of the workspace: the usage report or the routine schedule. One
- * state holds both, so each path that uncovers the conversation closes either of them.
+ * The host pane over the middle of the workspace: the usage report, the routine schedule, the
+ * tasks or the workflows. One state holds them, so each path that uncovers the conversation closes any of them.
  */
-type HostPaneView = "usage" | "schedule";
+type HostPaneView = "usage" | "schedule" | "tasks" | "workflows";
 
 const context = createSimpleContext({
   name: "UsageProvider",
   init: () => {
-    const [state, setState] = createStore<{ serverId: string | null; agentId?: string; view: HostPaneView }>({
+    const [state, setState] = createStore<{
+      serverId: string | null;
+      agentId?: string | undefined;
+      view: HostPaneView;
+    }>({
       serverId: null,
       view: "usage",
     });
@@ -22,7 +26,8 @@ const context = createSimpleContext({
       trigger = source;
       setState((draft) => {
         draft.serverId = serverId;
-        draft.agentId = agentId;
+        if (agentId === undefined) delete draft.agentId;
+        else draft.agentId = agentId;
         draft.view = view;
       });
     }
@@ -33,6 +38,14 @@ const context = createSimpleContext({
 
     function openSchedule(serverId: string, source: HTMLElement | null) {
       open("schedule", serverId, source);
+    }
+
+    function openTasks(serverId: string, source: HTMLElement | null) {
+      open("tasks", serverId, source);
+    }
+
+    function openWorkflows(serverId: string, source: HTMLElement | null) {
+      open("workflows", serverId, source);
     }
 
     /**
@@ -62,7 +75,7 @@ const context = createSimpleContext({
     function clear() {
       setState((draft) => {
         draft.serverId = null;
-        draft.agentId = undefined;
+        delete draft.agentId;
       });
     }
 
@@ -70,6 +83,8 @@ const context = createSimpleContext({
       state,
       openUsage,
       openSchedule,
+      openTasks,
+      openWorkflows,
       closeUsage() {
         clear();
         queueMicrotask(() => {

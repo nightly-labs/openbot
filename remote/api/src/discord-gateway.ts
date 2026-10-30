@@ -4,7 +4,8 @@
 
 import { DiscordAPIError, HTTPError, RateLimitError, REST, RequestMethod } from "@discordjs/rest";
 import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
-import { DISCORD_GATEWAY_INTENTS } from "@openbot/contracts/discord-app";
+import { DISCORD_GATEWAY_INTENTS, DISCORD_MESSAGE_CONTENT_INTENT } from "@openbot/contracts/discord-app";
+import { GatewayCloseCodes } from "discord-api-types/v10";
 import { Context, Effect, FiberSet, Layer, Schedule, Schema } from "effect";
 import type { DiscordBotConfig } from "./config";
 import {
@@ -171,50 +172,76 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           );
         };
 
-        const manager = yield* Effect.acquireRelease(
-          Effect.sync(() => {
-            const gateway = new WebSocketManager({ token: config.botToken, intents: DISCORD_GATEWAY_INTENTS, rest });
-            gateway.on(WebSocketShardEvents.Dispatch, (payload) => {
-              let actions: DiscordAction[];
-              try {
-                actions = state.handle(payload);
-              } catch {
-                // The event name only: the payload can hold a message.
-                console.error(`OpenBot Discord could not read a ${payload.t} event.`);
-                return;
-              }
-              // The acknowledgement goes first: Discord waits 3 seconds for it.
-              for (const action of actions) act(action);
-            });
-            gateway.on(WebSocketShardEvents.Ready, () => console.log("OpenBot Discord Gateway is ready."));
-            gateway.on(WebSocketShardEvents.Resumed, (shardId) => {
-              console.log("OpenBot Discord Gateway resumed.");
-              for (const action of state.shardResumed(shardId)) act(action);
-            });
-            gateway.on(WebSocketShardEvents.Closed, (code, shardId) => {
-              // Until the shard resumes or is ready again, its guild list can be stale: a reconcile with
-              // it could unlink a guild that installed the bot meanwhile.
-              state.shardClosed(shardId);
-              console.log(`OpenBot Discord Gateway closed with code ${code}.`);
-            });
-            gateway.on(WebSocketShardEvents.Error, () => console.error("OpenBot Discord Gateway failed."));
-            return gateway;
-          }),
-          (gateway) =>
-            Effect.tryPromise({ try: async () => gateway.destroy(), catch: () => undefined }).pipe(
-              Effect.catch(() => Effect.void),
-              Effect.ensuring(Effect.sync(() => gateway.removeAllListeners())),
+        /**
+         * Connects a manager, and tries again until Signal stops; the library reconnects by itself after.
+         * A manager that the intent fallback replaced is not tried again: its first connect fails too,
+         * because the refused intent ends it.
+         */
+        const connect = (gateway: WebSocketManager) =>
+          run(
+            Effect.suspend(() =>
+              current === gateway
+                ? Effect.tryPromise({ try: () => gateway.connect(), catch: () => new DiscordGatewayConnectError() })
+                : Effect.void,
+            ).pipe(
+              Effect.tapError(() => Effect.sync(() => console.error("OpenBot Discord Gateway could not connect."))),
+              Effect.retry(DISCORD_CONNECT_RETRY),
+              Effect.ignore,
             ),
+          );
+        const release = (gateway: WebSocketManager) =>
+          Effect.tryPromise({ try: async () => gateway.destroy(), catch: () => undefined }).pipe(
+            Effect.catch(() => Effect.void),
+            Effect.ensuring(Effect.sync(() => gateway.removeAllListeners())),
+          );
+
+        const open = (intents: number): WebSocketManager => {
+          const gateway = new WebSocketManager({ token: config.botToken, intents, rest });
+          gateway.on(WebSocketShardEvents.Dispatch, (payload) => {
+            let actions: DiscordAction[];
+            try {
+              actions = state.handle(payload);
+            } catch {
+              // The event name only: the payload can hold a message.
+              console.error(`OpenBot Discord could not read a ${payload.t} event.`);
+              return;
+            }
+            // The acknowledgement goes first: Discord waits 3 seconds for it.
+            for (const action of actions) act(action);
+          });
+          gateway.on(WebSocketShardEvents.Ready, () => console.log("OpenBot Discord Gateway is ready."));
+          gateway.on(WebSocketShardEvents.Resumed, (shardId) => {
+            console.log("OpenBot Discord Gateway resumed.");
+            for (const action of state.shardResumed(shardId)) act(action);
+          });
+          gateway.on(WebSocketShardEvents.Closed, (code, shardId) => {
+            // Until the shard resumes or is ready again, its guild list can be stale: a reconcile with
+            // it could unlink a guild that installed the bot meanwhile.
+            state.shardClosed(shardId);
+            console.log(`OpenBot Discord Gateway closed with code ${code}.`);
+            // The library does not reconnect after a refused intent. Without the Message Content
+            // intent in the Developer Portal, the bot connects without it.
+            if (
+              code === GatewayCloseCodes.DisallowedIntents &&
+              intents !== DISCORD_GATEWAY_INTENTS &&
+              current === gateway
+            ) {
+              console.error("OpenBot Discord Gateway refused the Message Content intent. It connects without it.");
+              current = open(DISCORD_GATEWAY_INTENTS);
+              run(release(gateway));
+              connect(current);
+            }
+          });
+          gateway.on(WebSocketShardEvents.Error, () => console.error("OpenBot Discord Gateway failed."));
+          return gateway;
+        };
+
+        let current = open(
+          config.messageContent ? DISCORD_GATEWAY_INTENTS | DISCORD_MESSAGE_CONTENT_INTENT : DISCORD_GATEWAY_INTENTS,
         );
-        // Signal starts without waiting for Discord; the library reconnects by itself after it connects.
-        // The fiber ends with the runtime, which stops the retries.
-        run(
-          Effect.tryPromise({ try: () => manager.connect(), catch: () => new DiscordGatewayConnectError() }).pipe(
-            Effect.tapError(() => Effect.sync(() => console.error("OpenBot Discord Gateway could not connect."))),
-            Effect.retry(DISCORD_CONNECT_RETRY),
-            Effect.ignore,
-          ),
-        );
+        yield* Effect.addFinalizer(() => Effect.suspend(() => release(current)));
+        // Signal starts without waiting for Discord. The fibers end with the runtime, which stops the retries.
+        connect(current);
         return DiscordGateway.of({ api: makeDiscordApi(transport, state) });
       }),
     );

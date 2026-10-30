@@ -64,6 +64,12 @@ export function useAgentBrowserTabs(serverId: string, agentId: string, threadId:
   const state = useSyncExternalStore(liveState.subscribe, select);
   return useMemo(() => agentBrowserTabs(state, agentId, threadId), [state, agentId, threadId]);
 }
+/** Whether the host's browser tab list has arrived. Re-renders only when that changes. */
+export function useBrowserTabsLoaded(serverId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().browserTabs[serverId] !== undefined, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
 /** The approvals this server waits on, in the order they arrived. Re-renders only when that list changes. */
 export function useApprovalRequests(serverId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);

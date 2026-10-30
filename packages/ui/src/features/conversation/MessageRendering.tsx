@@ -1,8 +1,19 @@
+import { fileReferenceName } from "@openbot/brand/file-reference";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { parseSelectionInstruction } from "@openbot/contracts/selection-instruction";
-import { type BubbleVariant, Button, DropdownMenu, Info, LoaderCircle } from "@openbot/ui";
+import {
+  AudioLines,
+  type BubbleVariant,
+  Button,
+  ChevronRight,
+  CircleDot,
+  ContextMenu,
+  DropdownMenu,
+  Info,
+  LoaderCircle,
+} from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import {
   createEffect,
@@ -22,14 +33,20 @@ import { AttachmentCards, type AttachmentMediaSource } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { CodePreview } from "./CodePreview";
 import { ComparisonTable } from "./ComparisonTable";
-import { CheckIcon, CopyIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
+import { CheckIcon, CopyIcon, PlusIcon, ReactionIcon, ReplyIcon, StopIcon } from "./ConversationIcons";
 import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
 import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
-import { MarkdownInlineText, MarkdownMessageText, markdownImageName } from "./MarkdownMessageText";
-import { RichMessageText } from "./RichMessageText";
+import {
+  MarkdownInlineText,
+  MarkdownMessageText,
+  type MessageImageFile,
+  markdownImageName,
+  messageImageFiles,
+} from "./MarkdownMessageText";
+import { ReplyQuote } from "./ReplyQuote";
 import {
   nextStreamingReveal,
   type StreamingRevealChunk,
@@ -245,18 +262,35 @@ const comparisonTableContent = (block: MessageContentBlock) => (block.type === "
 const dataTableContent = (block: MessageContentBlock) => (block.type === "table" ? block : undefined);
 const codeContent = (block: MessageContentBlock) => (block.type === "code" ? block : undefined);
 const textContent = (block: MessageContentBlock) => (block.type === "text" ? block : undefined);
+const imageFileKeys = (files: readonly MessageImageFile[]) =>
+  files.map((file) => `${file.kind}:${file.path}`).join("\n");
+
+const fileImageId = (file: MessageImageFile) => `file:${file.kind}:${file.path}`;
+
+/** A named image file in the shape of an image attachment, so the gallery and the viewer show it. */
+function fileImage(file: MessageImageFile, url: string): AttachmentSummary {
+  return {
+    id: fileImageId(file),
+    name: fileReferenceName(file.path),
+    size: 0,
+    kind: "image",
+    mimeType: "image/*",
+    previewKind: "image",
+    previewUrl: url,
+  };
+}
 
 export function MessageBody(props: {
-  animate?: boolean;
+  animate?: boolean | undefined;
   message: AgentMessage;
-  referencedMessage?: AgentMessage;
+  referencedMessage?: AgentMessage | undefined;
   /**
    * Who wrote the quoted message. A chat with several authors has to name the one it quotes, and
    * an agent chat names another person the reader quotes. Absent, the quote says "You" or "Agent".
    */
-  referencedAuthorName?: string;
+  referencedAuthorName?: string | undefined;
   /** Opens the quoted message in the chat. Absent, the quote is not a control. */
-  onOpenReference?: () => void;
+  onOpenReference?: (() => void) | undefined;
   /**
    * `loading` while the chat loads the history around the original. `unavailable` when the chat did
    * not find it: a note says so. A quote stays open to a new try, because a load can fail for a
@@ -264,17 +298,26 @@ export function MessageBody(props: {
    */
   referenceState?: "loading" | "unavailable" | undefined;
   agents: AgentProfile[];
-  skills?: InstalledSkill[];
+  skills?: InstalledSkill[] | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  onOpenSharedFile?: (path: string) => void;
-  onOpenWorkspaceFile?: (path: string) => void;
+  onOpenSharedFile?: ((path: string) => void) | undefined;
+  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   /** Opens the passage that a quote in the message points to. */
-  onOpenQuote?: (messageId: string, text: string) => void;
-  onDownload?: (attachment: AttachmentSummary) => void;
+  onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
+  onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /**
+   * Reads an image file that an agent message names, for a preview under the text. Resolves the
+   * image as a `data:` URL, or `null` when it cannot show. Absent, a named file is only a chip.
+   */
+  loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
+  /** Downloads an image file that an agent message names. Absent, its preview has no download. */
+  onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
+  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  macWindowControls?: boolean | undefined;
 }) {
   const { t } = useText();
   const streamingBody = createStreamingBody(
@@ -299,17 +342,64 @@ export function MessageBody(props: {
       imageGenerationStatus(props.message.streaming, props.message.status) !== "completed"
     );
   });
+  const referencedAttachmentIds = createMemo(
+    () =>
+      new Set(
+        messageFileReferences(props.message.body, props.message.attachments ?? [])
+          .filter((reference) => reference.kind === "attachment")
+          .map((reference) => reference.attachment.id),
+      ),
+  );
   const standaloneAttachments = createMemo(() => {
-    const referencedIds = new Set(
-      messageFileReferences(props.message.body, props.message.attachments ?? [])
-        .filter((reference) => reference.kind === "attachment")
-        .map((reference) => reference.attachment.id),
-    );
+    const referencedIds = referencedAttachmentIds();
     const generatedAttachmentId = generatedImageShown() ? props.message.attachments?.[0]?.id : undefined;
     return (props.message.attachments ?? []).filter(
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
+  /* The image files that a finished agent message names show under it like attached images. A
+     file that the message also attaches shows once, as the attachment. An attachment that the text
+     names by path does not show on its own, so its image shows here. */
+  const namedImageFiles = createMemo(
+    () => {
+      if (props.message.author !== "agent" || props.message.streaming || !props.loadImageFile) return [];
+      const referencedIds = referencedAttachmentIds();
+      const attached = new Set(
+        (props.message.attachments ?? [])
+          .filter((attachment) => !referencedIds.has(attachment.id))
+          .map((attachment) => attachment.name),
+      );
+      const texts = messageContentBlocks(props.message.body, false).flatMap((block) =>
+        block.type === "text" ? [block.text] : [],
+      );
+      return messageImageFiles(texts).filter((file) => !attached.has(fileReferenceName(file.path)));
+    },
+    { equals: (previous, next) => imageFileKeys(previous) === imageFileKeys(next) },
+  );
+  const [fileImages, setFileImages] = createSignal<AttachmentSummary[]>([]);
+  createEffect(
+    () => ({ files: namedImageFiles(), load: untrack(() => props.loadImageFile) }),
+    ({ files, load }) => {
+      let current = true;
+      if (!load || files.length === 0) {
+        setFileImages([]);
+        return;
+      }
+      void Promise.all(
+        files.map((file) =>
+          load(file).then(
+            (url) => (url ? fileImage(file, url) : null),
+            () => null,
+          ),
+        ),
+      ).then((images) => {
+        if (current) setFileImages(images.filter((image) => image !== null));
+      });
+      return () => {
+        current = false;
+      };
+    },
+  );
   const standaloneImageAttachments = createMemo(() =>
     props.message.author === "agent" ? standaloneAttachments().filter(isLightboxImage) : [],
   );
@@ -347,16 +437,28 @@ export function MessageBody(props: {
     content: () => messageContent,
     enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
   });
-  // A markdown image is a web address, not an attachment, so the viewer has no download for it.
+  /* A named image file downloads by its path. A markdown image is a web address, so it has no download. */
+  const namedImageFile = (image: AttachmentSummary) => namedImageFiles().find((file) => fileImageId(file) === image.id);
+  const downloadImage = (image: AttachmentSummary) => {
+    const file = namedImageFile(image);
+    if (file) props.onDownloadImageFile?.(file);
+    else props.onDownload?.(image);
+  };
   const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
   const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
   const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
     if (isLightboxImage(attachment)) {
-      const siblings = lightboxImages();
+      const named = fileImages().some((image) => image.id === attachment.id);
+      const siblings = named ? fileImages() : lightboxImages();
       const images = siblings.some((image) => image.id === attachment.id) ? siblings : [attachment];
-      setLightbox({ images, index: images.findIndex((image) => image.id === attachment.id), origin });
+      setLightbox({
+        images,
+        index: images.findIndex((image) => image.id === attachment.id),
+        origin,
+        markdown: named,
+      });
     } else if (canPreviewAttachment(attachment)) {
       props.onPreview(attachment);
     } else {
@@ -450,22 +552,14 @@ export function MessageBody(props: {
               {props.referencedAuthorName ??
                 (referenced().author === "you" ? t("chat.message.you") : t("chat.message.agentFallback"))}
             </span>
-            <p id={referenceTextId} inert={referenceOpens() ? true : undefined}>
-              <RichMessageText
-                body={referenced().body || t("chat.message.attachment")}
-                agents={props.agents}
-                skills={props.skills}
-                attachments={referenced().attachments}
-                citations={referenced().citations}
-                onSelectAgent={props.onSelectAgent}
-                onOpenLink={props.onOpenLink}
-                onOpenAttachment={openAttachment}
-                onOpenSharedFile={props.onOpenSharedFile}
-                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                onOpenQuote={props.onOpenQuote}
-                showCitationFooter={false}
-              />
-            </p>
+            <ReplyQuote
+              id={referenceTextId}
+              body={referenced().body || t("chat.message.attachment")}
+              agents={props.agents}
+              skills={props.skills}
+              attachments={referenced().attachments}
+              citations={referenced().citations}
+            />
             <Show when={props.referenceState === "loading"}>
               <LoaderCircle class="message-reply-loading" aria-hidden="true" />
             </Show>
@@ -495,24 +589,29 @@ export function MessageBody(props: {
                     </Match>
                     <Match when={codeContent(block())}>
                       {(code) => (
-                        <Show
-                          when={chatPreviewKind(code().language)}
-                          fallback={
-                            <CodeBlock
-                              block={code()}
-                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                            />
-                          }
+                        // The id lets the selection actions open for text selected in the code.
+                        <div
+                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
                         >
-                          {(preview) => (
-                            <CodePreview
-                              block={code()}
-                              kind={preview()}
-                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                              onOpenLink={props.onOpenLink}
-                            />
-                          )}
-                        </Show>
+                          <Show
+                            when={chatPreviewKind(code().language)}
+                            fallback={
+                              <CodeBlock
+                                block={code()}
+                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                              />
+                            }
+                          >
+                            {(preview) => (
+                              <CodePreview
+                                block={code()}
+                                kind={preview()}
+                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                onOpenLink={props.onOpenLink}
+                              />
+                            )}
+                          </Show>
+                        </div>
                       )}
                     </Match>
                     <Match when={textContent(block())}>
@@ -587,6 +686,26 @@ export function MessageBody(props: {
           </div>
         </Match>
       </Switch>
+      <Switch>
+        <Match when={fileImages().length > 1}>
+          <ImageGallery images={fileImages()} onOpen={openAttachment} />
+        </Match>
+        <Match when={fileImages()[0]}>
+          {(image) => (
+            <div class="message-image-attachments">
+              <ImageGeneration
+                presentation="attachment"
+                status="completed"
+                prompt={image().name}
+                aspectRatio="square"
+                attachment={image()}
+                onPreview={openAttachment}
+                onDownload={props.onDownloadImageFile ? downloadImage : undefined}
+              />
+            </div>
+          )}
+        </Match>
+      </Switch>
       <Show when={standaloneFileAttachments().length > 0}>
         <div class="message-attachments-group">
           <AttachmentCards
@@ -602,7 +721,13 @@ export function MessageBody(props: {
           <ImageLightbox
             opening={opening()}
             thumbnail={imageThumbnail}
-            onDownload={opening().markdown ? undefined : props.onDownload}
+            onDownload={downloadImage}
+            canDownload={(image) =>
+              namedImageFile(image)
+                ? Boolean(props.onDownloadImageFile)
+                : !opening().markdown && Boolean(props.onDownload)
+            }
+            macWindowControls={props.macWindowControls}
             onClose={() => setLightbox(null)}
           />
         )}
@@ -624,7 +749,7 @@ function imageGenerationStatus(
 export function MessageActions(props: {
   message: AgentMessage;
   /** Names the toolbar for a screen reader. A channel has more authors than "Agent". */
-  authorName?: string;
+  authorName?: string | undefined;
   /**
    * Whether the reaction button stands in the toolbar. A channel message has no owner to hold a
    * reaction yet, so the chats share one toolbar and the channel leaves that button out.
@@ -636,8 +761,10 @@ export function MessageActions(props: {
   onTogglePicker: () => void;
   onExpandEmoji: () => void;
   onReact: (emoji: MessageReaction | null) => void;
-  onReply?: () => void;
+  onReply?: (() => void) | undefined;
   onCopy: () => void;
+  /** Reads the message aloud, or stops it while it is read. Absent where replies cannot be read aloud. */
+  readAloud?: { reading: boolean; onToggle: () => void } | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
@@ -658,6 +785,19 @@ export function MessageActions(props: {
       >
         {props.copied ? <CheckIcon /> : <CopyIcon />}
       </Button>
+      <Show when={props.readAloud}>
+        {(readAloud) => (
+          <Button
+            variant="ghost"
+            type="button"
+            class="message-action-button"
+            aria-label={readAloud().reading ? t("chat.actions.stopReading") : t("chat.actions.readAloud")}
+            onClick={() => readAloud().onToggle()}
+          >
+            {readAloud().reading ? <StopIcon /> : <AudioLines aria-hidden="true" />}
+          </Button>
+        )}
+      </Show>
       <Show when={props.reactions !== false}>
         <div class="message-action-popover-anchor">
           <DropdownMenu.Root
@@ -736,5 +876,103 @@ export function MessageActions(props: {
         </Button>
       </Show>
     </div>
+  );
+}
+
+/**
+ * The right-click menu of a message, for `ChatMessageRow`'s `menu` slot. It holds the actions of
+ * `MessageActions` with text labels; React opens a submenu with every reaction.
+ */
+export function MessageMenu(props: {
+  message: AgentMessage;
+  /** Names the menu for a screen reader. A channel has more authors than "Agent". */
+  authorName?: string | undefined;
+  /** Whether React stands in the menu. A channel message has no owner to hold a reaction yet. */
+  reactions?: boolean;
+  onReact: (emoji: MessageReaction | null) => void;
+  onReply?: (() => void) | undefined;
+  onCopy: () => void;
+  readAloud?: { reading: boolean; onToggle: () => void } | undefined;
+  /** Marks this message and the messages after it unread. Without it, the menu has no such item. */
+  onMarkUnread?: (() => void) | undefined;
+}) {
+  const { t } = useText();
+  const authorName = () => props.authorName ?? t("chat.message.agentFallback");
+  const react = (emoji: MessageReaction) => props.onReact(props.message.reaction === emoji ? null : emoji);
+  return (
+    <ContextMenu.Content
+      aria-label={
+        props.message.author === "you" ? t("chat.actions.userLabel") : t("chat.actions.label", { name: authorName() })
+      }
+    >
+      <Show when={props.onReply}>
+        {(onReply) => (
+          <ContextMenu.Item onSelectAfterClose={onReply()}>
+            <ReplyIcon />
+            <span>{t("chat.menu.reply")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <ContextMenu.Item onSelect={props.onCopy}>
+        <CopyIcon />
+        <span>{t("chat.menu.copy")}</span>
+      </ContextMenu.Item>
+      <Show when={props.reactions !== false}>
+        <ContextMenu.Sub>
+          <ContextMenu.SubTrigger>
+            <ReactionIcon />
+            <span>{t("chat.menu.react")}</span>
+            <ChevronRight class="ui-menu-trailing" aria-hidden="true" />
+          </ContextMenu.SubTrigger>
+          <ContextMenu.Portal>
+            <ContextMenu.SubContent
+              class="ui-action-menu reaction-picker"
+              data-menu-layout="grid"
+              aria-label={t("chat.actions.chooseReaction")}
+            >
+              <For each={[MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS]}>
+                {(row, index) => (
+                  <div class={["reaction-picker-row", { "reaction-picker-more": index() > 0 }]}>
+                    <ContextMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
+                      <For each={row}>
+                        {(emoji) => (
+                          <ContextMenu.RadioItem
+                            value={emoji}
+                            closeOnSelect
+                            aria-label={t("chat.actions.react", { emoji })}
+                            onSelect={() => react(emoji)}
+                          >
+                            {emoji}
+                          </ContextMenu.RadioItem>
+                        )}
+                      </For>
+                    </ContextMenu.RadioGroup>
+                  </div>
+                )}
+              </For>
+            </ContextMenu.SubContent>
+          </ContextMenu.Portal>
+        </ContextMenu.Sub>
+      </Show>
+      <Show when={props.readAloud}>
+        {(readAloud) => (
+          <ContextMenu.Item onSelect={() => readAloud().onToggle()}>
+            {readAloud().reading ? <StopIcon /> : <AudioLines aria-hidden="true" />}
+            <span>{readAloud().reading ? t("chat.actions.stopReading") : t("chat.actions.readAloud")}</span>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onMarkUnread}>
+        {(onMarkUnread) => (
+          <>
+            <ContextMenu.Separator />
+            <ContextMenu.Item onSelect={onMarkUnread()}>
+              <CircleDot aria-hidden="true" />
+              <span>{t("chat.menu.markUnread")}</span>
+            </ContextMenu.Item>
+          </>
+        )}
+      </Show>
+    </ContextMenu.Content>
   );
 }

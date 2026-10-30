@@ -6,7 +6,7 @@ import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
 
 /** The default is also the minimum: a narrower panel breaks the avatar editor and the setting rows. */
-export const SETTINGS_PANEL_DEFAULT = 296;
+export const SETTINGS_PANEL_DEFAULT = 360;
 export const SETTINGS_PANEL_MAX = 1600;
 /** What the chat under the panel keeps for itself, however far the panel is dragged. */
 const CONVERSATION_PANEL_MIN = 96;

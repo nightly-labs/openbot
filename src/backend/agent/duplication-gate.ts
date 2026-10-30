@@ -314,9 +314,12 @@ export const duplicateAgentIntoLayout = Effect.fn("Agent.duplicateIntoLayout")(f
   sidebar: DuplicateSidebar,
   sourceAgentId: string,
   operationId?: string,
+  // Runs before the commit shows the copy to clients, for example to copy the source's access.
+  beforeCommit?: (agentId: string) => Effect.Effect<void>,
 ) {
   const agent = yield* agents.duplicateAgent(sourceAgentId, operationId).pipe(toAgentDuplicationFailed);
   return yield* Effect.gen(function* () {
+    if (beforeCommit) yield* beforeCommit(agent.id);
     const layout = yield* sidebar
       .placeDuplicateAfter(sourceAgentId, agent.id, [...agents.sidebarChatIds(), agent.id])
       .pipe(toAgentDuplicationFailed);

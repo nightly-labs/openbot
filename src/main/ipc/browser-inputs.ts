@@ -1,6 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   BrowserBounds,
+  BrowserLocalSignInFinish,
+  BrowserLocalSignInInput,
   BrowserNavigateInput,
   BrowserOpenInput,
   BrowserVisibilityInput,
@@ -50,7 +52,7 @@ export function parseVisibility(value: unknown): BrowserVisibilityInput {
   }
   return {
     visible: value.visible,
-    bounds: value.bounds === undefined ? undefined : parseBounds(value.bounds),
+    ...(value.bounds === undefined ? {} : { bounds: parseBounds(value.bounds) }),
     ...(value.target === undefined ? {} : { target: parseBrowserViewTarget(value.target) }),
   };
 }
@@ -79,4 +81,17 @@ function finiteBound(value: unknown, field: string): number {
     throw new Error(`Invalid browser bound: ${field}.`);
   }
   return value;
+}
+
+export function parseLocalSignIn(value: unknown): BrowserLocalSignInInput {
+  if (!isObject(value)) throw new Error("Invalid browser sign-in request.");
+  const url = requireString(value.url, "url", INPUT_LIMITS.browserUrl);
+  if (!/^https?:\/\//i.test(url)) throw new Error(sourceText("error.backend.browserUrlProtocol"));
+  return { tabId: requireString(value.tabId, "tabId"), url };
+}
+
+export function parseLocalSignInFinish(value: unknown): BrowserLocalSignInFinish {
+  if (!isObject(value) || !isBoolean(value.send)) throw new Error("Invalid browser sign-in request.");
+  if (value.check !== undefined && !isBoolean(value.check)) throw new Error("Invalid browser sign-in request.");
+  return { send: value.send, check: value.check === true };
 }

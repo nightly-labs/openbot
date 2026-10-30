@@ -23,6 +23,14 @@
   height: 55%;
 }
 
+/* An app icon fills its tile. */
+.integration-logo-tile > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .integration-status {
   gap: var(--openbot-space-1);
 }
@@ -40,6 +48,12 @@
 }
 
 /* ------------------------------------------------ page header */
+
+/* One gap between every part of an integration page. */
+.integration-page {
+  display: grid;
+  gap: var(--openbot-space-6);
+}
 
 .integration-detail-header {
   display: flex;
@@ -159,6 +173,16 @@
   gap: var(--openbot-space-3);
 }
 
+/* A body whose parts are all hidden, such as a plugin dialog before a failure, takes no gap. */
+.integration-wizard-body:empty {
+  display: none;
+}
+
+.integration-wizard-form {
+  display: grid;
+  gap: var(--openbot-space-4);
+}
+
 .integration-wizard-foot {
   display: flex;
   gap: var(--openbot-space-2);
@@ -173,10 +197,7 @@
 
 /* Above the settings window the flow opens from. */
 .integration-dialog-backdrop {
-  position: fixed;
-  inset: 0;
   z-index: calc(var(--openbot-layer-dialog) + 1);
-  background: var(--openbot-dialog-overlay);
 }
 
 .integration-wizard-dialog {
@@ -189,6 +210,17 @@
   overflow-y: auto;
   outline: 0;
   transform: translate(-50%, -50%);
+}
+
+/* A page drawn in the dialog, such as a joined server's sign-in page, needs room to type in. */
+.integration-wizard-dialog[data-wide] {
+  width: min(720px, calc(100vw - var(--openbot-space-6) * 2));
+}
+
+/* Over the Marketplace window and the menus it opens. Both portals are children of `body`, so the
+   order of insertion alone cannot put this one on top. */
+:is(.integration-dialog-backdrop, .integration-wizard-dialog)[data-nested] {
+  z-index: calc(var(--openbot-layer-dialog-host) + 2);
 }
 
 .integration-wizard-dialog h2 {
@@ -295,12 +327,88 @@
   color: var(--openbot-success);
 }
 
-/* ------------------------------------------------ Connectors list */
+/* ------------------------------------------------ card content */
 
-.integrations-hub {
+/* Content of a card that is not rows: a form, a list, information. One body, so no row divider cuts it. */
+.integration-card-body {
   display: grid;
-  gap: var(--openbot-space-6);
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
 }
+
+/* A field in a card has the size of the buttons beside it, as in Server settings. */
+.integration-card-body :where(.ui-input) {
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+/* The last line of a card: what the rows above it mean. */
+.integration-card-note {
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+/* On the card fill, the danger tone needs its text step for contrast. */
+.integration-card-note[data-tone="danger"] {
+  color: var(--openbot-danger-text);
+}
+
+/* ------------------------------------------------ disconnect dialog */
+
+/* What a disconnect removes and what it keeps, one line each. */
+.integration-effects {
+  display: grid;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.integration-effects li {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-2);
+}
+
+.integration-effects li + li {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.integration-effect-icon {
+  display: inline-grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-muted);
+}
+
+.integration-effects .integration-effect-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.integration-effects li[data-tone="danger"] .integration-effect-icon {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger-text);
+}
+
+.integration-effects li[data-tone="success"] .integration-effect-icon {
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success);
+}
+
+/* The label on the soft danger fill reads the text step, as the shared confirmation does for contrast. */
+.integration-confirm.ui-button-variant-destructive {
+  color: var(--openbot-danger-text);
+}
+
+/* ------------------------------------------------ linked rows */
 
 /* The whole row opens the integration, as on Marketplace cards. Buttons in the row stay on top. */
 .integrations-hub-row {
@@ -332,7 +440,7 @@
 }
 
 .integrations-hub-hitarea:focus-visible {
-  outline: 2px solid var(--openbot-accent-strong);
+  outline: 2px solid var(--openbot-border-focus);
   outline-offset: -2px;
 }
 
@@ -350,16 +458,6 @@
   height: var(--openbot-icon-sm);
   margin: 0 var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
-}
-
-.integrations-hub-title {
-  display: inline-flex;
-  gap: var(--openbot-space-2);
-  align-items: center;
-}
-
-.integrations-hub-summary[data-status="attention"] {
-  color: var(--openbot-warning-text);
 }
 
 .integrations-face-stack {
@@ -381,18 +479,20 @@
 }
 
 .integrations-agent-face {
+  --integrations-agent-face-size: 32px;
   display: inline-block;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: var(--integrations-agent-face-size);
+  height: var(--integrations-agent-face-size);
 }
 
 .integrations-agent-face[data-size="sm"] {
-  width: 24px;
-  height: 24px;
+  --integrations-agent-face-size: 24px;
 }
 
+/* An agent avatar stands low in its box. Lift it to the middle, as the marketplace avatar does. */
 .integrations-agent-face > * {
+  --agent-avatar-optical-offset: calc(var(--integrations-agent-face-size) * -0.14);
   width: 100%;
   height: 100%;
 }

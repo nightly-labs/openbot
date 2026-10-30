@@ -13,7 +13,7 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * held in memory after `load` rather than read from disk each time.
  *
  * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default, which was the fixed cap before the setting existed. Writes are chained for the reason
+ * default. Writes are chained for the reason
  * `update-preference-store.ts` chains its own.
  */
 export class AgentMemoryLimitPreferenceStore {
@@ -62,4 +62,36 @@ export class AgentMemoryLimitPreferenceStore {
     );
     return this.get();
   });
+}
+
+/** The limit as Settings and a joined server's admin set it. */
+export interface AgentMemoryLimitSetting {
+  get(): AgentMemoryLimitPreference;
+  set(preference: AgentMemoryLimitPreference): Effect.Effect<AgentMemoryLimitPreference, PreferenceFileFailure>;
+  /** Calls `listener` with each saved limit, so the window of this computer shows a remote change. */
+  subscribe(listener: (preference: AgentMemoryLimitPreference) => void): () => void;
+}
+
+/** The developer instructions state the limit, so a new limit reloads every agent's threads. */
+export function reloadingAgentMemoryLimit(
+  store: AgentMemoryLimitPreferenceStore,
+  agents: { memoryLimitChanged(): void },
+): AgentMemoryLimitSetting {
+  const listeners = new Set<(preference: AgentMemoryLimitPreference) => void>();
+  return {
+    get: () => store.get(),
+    set: (preference) =>
+      store.set(preference).pipe(
+        Effect.tap((saved) =>
+          Effect.sync(() => {
+            agents.memoryLimitChanged();
+            for (const listener of listeners) listener(saved);
+          }),
+        ),
+      ),
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
 }

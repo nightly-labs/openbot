@@ -12,6 +12,9 @@ export interface MockProviderRuntimeOptions {
   providerRuntimeFailure?: boolean;
 }
 
+/** The size of each downloaded provider CLI in the preview. */
+const MOCK_DOWNLOAD = { bytes: 612_000_000, versions: 2 };
+
 /** The provider CLIs and tool runtimes the app downloads, with progress the preview makes up. */
 export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, { schedule }: MockRuntime) {
   const runtimeSnapshot: ProviderRuntimeSnapshot = clone(
@@ -94,6 +97,15 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
       if (current.phase !== "downloading") return clone(runtimeSnapshot);
       runtimeTransfers.delete(provider);
       setRuntimeStatus(provider, { ...current, phase: "not-downloaded", progress: null, message: null });
+      return clone(runtimeSnapshot);
+    },
+    // The preview does not know which providers are off: the page asks only for one that is.
+    measureDownload: async (provider) =>
+      runtimeSnapshot.providers[provider].phase === "ready" ? MOCK_DOWNLOAD : { bytes: 0, versions: 0 },
+    removeDownload: async (provider) => {
+      if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
+      if (runtimeTransfers.has(provider)) throw new Error("Wait for the download to end.");
+      setRuntimeStatus(provider, { phase: "not-downloaded", progress: null, message: null, version: null });
       return clone(runtimeSnapshot);
     },
     onEvent: (listener) => {

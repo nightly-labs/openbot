@@ -7,17 +7,20 @@ import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { HeroUINativeProvider } from "heroui-native/provider";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ReducedMotionConfig, ReduceMotion } from "react-native-reanimated";
 import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
+import { AppLockOverlay } from "@/features/app-lock/components/app-lock-overlay";
+import { installAppLock } from "@/features/app-lock/model/app-lock";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
+import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
 import { installQuickActions, resetQuickActions } from "@/features/quick-actions/quick-actions-native";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
@@ -28,178 +31,152 @@ import { loadAgentColorMessages } from "@/features/settings/model/message-color"
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
+import { resetShareExtension } from "@/features/share/model/share-extension";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
+import { parakeetModel } from "@/features/voice/model/parakeet-model";
+import { supertonicModel } from "@/features/voice/model/supertonic-model";
+import { loadVoiceSettings } from "@/features/voice/model/voice-settings";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
-import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
-import { SplashBackdrop } from "@/shared/components/splash-backdrop";
+import { BloubStage } from "@/shared/components/bloub-stage/bloub-stage";
+import { BloubStageProvider, useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
+import { BLOUB_PRIORITY } from "@/shared/components/bloub-stage/bloub-stage-store";
+import { headerFontOptions, navigationFonts } from "@/shared/lib/app-font";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { nativeSplash } from "@/shared/lib/native-splash";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
-import { SPLASH_LOGO_SIZE } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 import { untilForeground } from "@/shared/lib/until-foreground";
-import { useAppForeground } from "@/shared/lib/use-app-foreground";
-import {
-  SplashContentReadyContext,
-  type SplashLogoTarget,
-  SplashMotionContext,
-  useSplashGate,
-} from "@/shared/lib/use-splash-gate";
-import { useSplashMotion } from "@/shared/lib/use-splash-motion";
+import { SplashContentReadyContext, useSplashGate } from "@/shared/lib/use-splash-gate";
 
 export const unstable_settings = {
-  initialRouteName: "index",
+  anchor: "index",
 };
-
-// The sign-in screen and the app replace each other with this fade (iOS). The sign-in logo flies
-// into the loader above it, so the fade only has to bring in the background.
-const SESSION_FADE_MS = 300;
 
 installSupportLog();
 installQuickActions();
+installAppLock();
+installNotificationHandler();
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
+const lightTheme = { ...DefaultTheme, fonts: navigationFonts };
+
+// The sign-in screen and the app replace each other with this fade (iOS). After sign-in the stage
+// covers both, so the fade only shows when the user signs out.
+const SESSION_FADE_MS = 300;
+// A launch that takes longer than this shows what it waits for.
+const SLOW_LAUNCH_MS = 700;
 
 function RootNavigator() {
   const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
-  const { setLoadingLabel, isLoaderPresent, isLoaderRequested, isLoaderFlying, handOff, holdLoader } =
-    useAppLoadingOverlay();
+  const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
   // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
   const motionReady = useMotionPreferences((state) => state.ready);
   const preferencesReady = appearanceReady && motionReady;
-  // A loader without a session keeps the splash up, but the email sign-in's logo flight into the
-  // loader does not: the session comes right after it, and the splash must not cover it again.
-  const busy = loading || !preferencesReady || (!session && isLoaderPresent && !isLoaderFlying);
-  const { covered, reportArtwork, reportContentReady } = useSplashGate(busy, nativeSplash, preferencesReady);
-
-  const container = useRef<View>(null);
-  const reducedMotion = useReducedMotion();
-  const foreground = useAppForeground();
-  const [target, setTarget] = useState<SplashLogoTarget | null>(null);
-  const motion = useSplashMotion({ covered, hasTarget: Boolean(target), foreground, reducedMotion });
-  const reportReady = useCallback(
-    (logo?: SplashLogoTarget) => {
-      if (!logo) {
-        reportContentReady();
-        return;
-      }
-      container.current?.measureInWindow((x, y) => {
-        const next = { x: logo.x - x, y: logo.y - y, size: logo.size };
-        setTarget((current) =>
-          current?.x === next.x && current?.y === next.y && current?.size === next.size ? current : next,
-        );
-        reportContentReady();
-      });
-    },
-    [reportContentReady],
+  const busy = loading || !preferencesReady;
+  const { covered, nativeHidden, reportArtwork, reportContentReady } = useSplashGate(
+    busy,
+    nativeSplash,
+    preferencesReady,
   );
+  const reducedMotion = useReducedMotion();
 
-  // A signed-in launch: the home screen asks for the loader while the splash still covers it. The
-  // loader waits out of sight, then grows out of the splash mark as the splash lifts, so the user
-  // sees the mark turn into the loader instead of a second face drawn over it.
-  const splashHandOff = useRef(false);
-  useLayoutEffect(() => {
-    if (!session) {
-      holdLoader(false);
+  // The stage takes over from the native splash with the same block and eyes. When the launch is
+  // slow, the eyes start to think and the status shows under them.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!covered) {
+      setSlow(false);
       return;
     }
-    if (covered) {
-      splashHandOff.current = false;
-      holdLoader(true);
-      return;
-    }
-    // Only the launch reveal hands off. A loader asked for later enters on its own. The flight
-    // starts in the same commit that releases the hold, so the loader never shows before it.
-    if (!splashHandOff.current && !motion.complete && isLoaderRequested) {
-      void handOff({ centered: true, size: SPLASH_LOGO_SIZE, mark: null });
-    }
-    splashHandOff.current = true;
-    holdLoader(false);
-  }, [covered, handOff, holdLoader, isLoaderRequested, motion.complete, session]);
+    const timer = setTimeout(() => setSlow(true), SLOW_LAUNCH_MS);
+    return () => clearTimeout(timer);
+  }, [covered]);
+  useBloubStageRequest(
+    covered
+      ? {
+          shape: { kind: "cover" },
+          mood: slow ? "think" : "idle",
+          caption: slow ? { text: t("mobile.shared.splash.loading") } : undefined,
+          loader: true,
+        }
+      : null,
+    BLOUB_PRIORITY.splash,
+  );
+  const blocked = covered || isLoaderPresent;
 
   // A quick action stays on the app icon after the session ends, such as one that another device revoked.
+  // The share extension keeps its copy of the session and the share sheet its agents, so both go too.
   useEffect(() => {
-    if (!loading && !session) resetQuickActions();
+    if (loading || session) return;
+    resetQuickActions();
+    resetShareExtension();
   }, [loading, session]);
 
   useLayoutEffect(() => {
     if (loading || !session || (pathname !== "/" && pathname !== "/connected")) setLoadingLabel(null);
-    // The splash backdrop covers account loading on its own, so it never raises
-    // the overlay loader. Keep the loader down until ConnectedScreen reports the
-    // workspace state.
+    // The splash covers account loading on its own. Keep the loader down until ConnectedScreen
+    // reports the workspace state.
   }, [loading, pathname, session, setLoadingLabel]);
 
   return (
-    <SplashContentReadyContext.Provider value={reportReady}>
-      <SplashMotionContext.Provider value={motion}>
-        <View ref={container} collapsable={false} className="flex-1">
-          <View
-            className="flex-1"
-            pointerEvents={covered ? "none" : "auto"}
-            accessibilityElementsHidden={covered}
-            importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
-          >
-            {!loading && preferencesReady ? (
-              <View className="flex-1" onLayout={session || pathname !== "/" ? () => reportReady() : undefined}>
-                <Stack
-                  screenOptions={{
-                    headerBackButtonDisplayMode: "minimal",
-                    headerShadowVisible: false,
-                    headerTransparent: isIOS,
-                  }}
-                >
-                  <Stack.Protected guard={!session}>
-                    {/* Signing out goes back, so it fades like signing in instead of sliding forward. */}
-                    <Stack.Screen
-                      name="index"
-                      options={{ animation: "fade", animationDuration: SESSION_FADE_MS, headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="scan-qr-code"
-                      options={{
-                        animation: reducedMotion ? "fade" : "slide_from_right",
-                        title: t("mobile.app.route.scanQrCode"),
-                      }}
-                    />
-                  </Stack.Protected>
-                  <Stack.Protected guard={Boolean(session)}>
-                    <Stack.Screen
-                      name="(app)"
-                      options={{
-                        animation: "fade",
-                        animationDuration: SESSION_FADE_MS,
-                        gestureEnabled: false,
-                        headerShown: false,
-                      }}
-                    />
-                  </Stack.Protected>
-                  <Stack.Screen name="incoming-link" options={{ headerShown: false }} />
-                  <Stack.Screen name="incoming-share" options={{ headerShown: false }} />
-                </Stack>
-              </View>
-            ) : null}
-          </View>
-          <View
-            style={StyleSheet.absoluteFill}
-            pointerEvents={covered ? "auto" : "none"}
-            accessibilityElementsHidden={!covered}
-            importantForAccessibility={covered ? "auto" : "no-hide-descendants"}
-          >
-            {preferencesReady && (covered || !motion.complete) ? (
-              <SplashBackdrop
-                onArtworkDisplay={reportArtwork}
-                progress={motion.progress}
-                target={!session && pathname === "/" ? target : null}
-                reducedMotion={reducedMotion}
-              />
-            ) : null}
-          </View>
+    <SplashContentReadyContext.Provider value={reportContentReady}>
+      <View className="flex-1">
+        <View
+          className="flex-1"
+          pointerEvents={blocked ? "none" : "auto"}
+          accessibilityElementsHidden={blocked}
+          importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
+        >
+          {!loading && preferencesReady ? (
+            <View className="flex-1" onLayout={session || pathname !== "/" ? reportContentReady : undefined}>
+              <Stack
+                screenOptions={{
+                  headerBackButtonDisplayMode: "minimal",
+                  ...headerFontOptions,
+                  headerShadowVisible: false,
+                  headerTransparent: isIOS,
+                }}
+              >
+                {/* A blocked route redirects. Without `redirectTo`, Expo Router uses the first open route, the
+                    `(app)` group, whose URL is `/`, and `/` is the blocked sign-in screen. */}
+                <Stack.Protected guard={!session} redirectTo="/connected">
+                  {/* Signing out goes back, so it fades like signing in instead of sliding forward. */}
+                  <Stack.Screen
+                    name="index"
+                    options={{ animation: "fade", animationDuration: SESSION_FADE_MS, headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="scan-qr-code"
+                    options={{
+                      animation: reducedMotion ? "fade" : "slide_from_right",
+                      title: t("mobile.app.route.scanQrCode"),
+                    }}
+                  />
+                </Stack.Protected>
+                <Stack.Protected guard={Boolean(session)} redirectTo="/">
+                  <Stack.Screen
+                    name="(app)"
+                    options={{
+                      animation: "fade",
+                      animationDuration: SESSION_FADE_MS,
+                      gestureEnabled: false,
+                      headerShown: false,
+                    }}
+                  />
+                </Stack.Protected>
+                <Stack.Screen name="incoming-link" options={{ headerShown: false }} />
+                <Stack.Screen name="incoming-share" options={{ headerShown: false }} />
+              </Stack>
+            </View>
+          ) : null}
         </View>
-      </SplashMotionContext.Provider>
+        <BloubStage nativeSplashHidden={nativeHidden} onLayout={() => reportArtwork("stage")} />
+        <AppLockOverlay />
+      </View>
     </SplashContentReadyContext.Provider>
   );
 }
@@ -210,7 +187,10 @@ export default function RootLayout() {
   const heroConfig = useMemo(() => (animations ? {} : { animation: "disable-all" as const }), [animations]);
   const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
   // React Navigation paints its near-black dark background behind screens during transitions.
-  const darkTheme = useMemo(() => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas } }), [canvas]);
+  const darkTheme = useMemo(
+    () => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas }, fonts: navigationFonts }),
+    [canvas],
+  );
   // Android shows the window background behind the system bars. Without this it keeps the light splash color.
   // iOS shows the window background behind sheets, so it keeps its default.
   useEffect(() => {
@@ -228,6 +208,9 @@ export default function RootLayout() {
       void loadPushNotificationPreference().catch(() => undefined);
       void loadMotionPreferences().catch(() => undefined);
       void loadDictationLanguage().catch(() => undefined);
+      void loadVoiceSettings().catch(() => undefined);
+      supertonicModel.check();
+      parakeetModel.check();
       void loadAppLanguage().catch(() => undefined);
       void loadOnboardingProgress().catch(() => undefined);
     });
@@ -247,9 +230,9 @@ export default function RootLayout() {
           <HeroUINativeProvider config={heroConfig}>
             {/* Off in Settings reduces every animation that follows the system Reduce Motion setting. */}
             {animations ? null : <ReducedMotionConfig mode={ReduceMotion.Always} />}
-            <ThemeProvider value={colorScheme === "dark" ? darkTheme : DefaultTheme}>
+            <ThemeProvider value={colorScheme === "dark" ? darkTheme : lightTheme}>
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-              <BloubAnimationProvider>
+              <BloubStageProvider>
                 <MobileSessionProvider>
                   <MobileAnalyticsLifecycle />
                   {__DEV__ ? <DevelopmentConnectLinkHandler /> : null}
@@ -257,7 +240,7 @@ export default function RootLayout() {
                     <RootNavigator />
                   </AppLoadingOverlayProvider>
                 </MobileSessionProvider>
-              </BloubAnimationProvider>
+              </BloubStageProvider>
             </ThemeProvider>
           </HeroUINativeProvider>
         </QueryClientProvider>

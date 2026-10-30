@@ -1,5 +1,5 @@
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
-import type { AgentSummary } from "./ipc-agents";
+import type { ClientAgentSummary } from "./ipc-agents";
 import { isReleasedRoutineSchedule, type ReleasedRoutineSchedule } from "./ipc-routines";
 import { isSkillCategory, type SkillCategory } from "./ipc-skills";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
@@ -54,10 +54,10 @@ export interface MarketplaceAgentPage {
 
 export interface MarketplaceAgentQuery {
   category?: SkillCategory;
-  query?: string;
+  query?: string | undefined;
   featured?: boolean;
-  sort?: "installs";
-  cursor?: string;
+  sort?: "installs" | undefined;
+  cursor?: string | undefined;
   limit?: number;
 }
 
@@ -108,7 +108,7 @@ export interface InstallMarketplaceAgentInput {
 }
 
 export interface InstallMarketplaceAgentResult {
-  agent: AgentSummary;
+  agent: ClientAgentSummary;
 }
 
 export function decodeMarketplaceAgentPage(value: unknown): MarketplaceAgentPage {

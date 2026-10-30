@@ -6,6 +6,7 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   decodeMobileBrowserTab,
   decodeMobileBrowserTabs,
@@ -42,6 +43,7 @@ export function createBrowserActions({
         clipboard: view && advertised.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
         contextMenu: view && advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
         viewport: view && advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
+        navigation: view && advertised.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY),
       };
     },
     openBrowserView: (serverId, tabId, listener) => {
@@ -92,6 +94,10 @@ export function createBrowserActions({
       if (action.type === "navigate") {
         const body = { tabId: action.tabId, direction: action.direction };
         await request("POST", TEAM_API_ROUTES.browser.navigate, ignoreResponse, body, serverId);
+      } else if (action.type === "load") {
+        // Behind `browser-navigation`: the screen opens a new tab on a host without it.
+        const body = { tabId: action.tabId, url: action.url };
+        await request("POST", TEAM_API_ROUTES.browser.load, ignoreResponse, body, serverId);
       } else if (action.type === "reload") {
         await request("POST", TEAM_API_ROUTES.browser.reload, ignoreResponse, { tabId: action.tabId }, serverId);
       } else {

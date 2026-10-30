@@ -37,11 +37,14 @@ export function createWebChannelsPort(
   hostId: () => string,
   eventsEnabled: () => boolean,
   routineRecoveryEnabled: () => boolean,
+  webhookTestsEnabled: () => boolean,
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote, hostId);
   const channels = remote.channels;
   const admin = remote.admin;
-  const eventRoutines = admin ? webEventRoutinesApi(admin.request, routineRecoveryEnabled) : undefined;
+  const eventRoutines = admin
+    ? webEventRoutinesApi(admin.request, routineRecoveryEnabled, webhookTestsEnabled)
+    : undefined;
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => attachmentMedia.dispose());
   async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {

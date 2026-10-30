@@ -1,0 +1,100 @@
+name: Announce mobile release on Discord
+
+# One post per mobile version, when the second store has it. Android and iOS review a build on
+# their own, often days apart. The source is apps/mobile/CHANGELOG.md, not the stores:
+# `bun run mobile:release:published` writes each store's date in the version heading. A push to
+# main that gives a version its second store date posts the highlights of
+# apps/mobile/release-announcement.json and mentions the Mobile Release Pings role. The desktop
+# release has its own post in `release.yml`. See apps/mobile/README.md#discord-announcement.
+on:
+  push:
+    branches: [main]
+    paths: [apps/mobile/CHANGELOG.md]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Mobile version to post again, such as 1.4.0. Both stores must have it in apps/mobile/CHANGELOG.md.
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: mobile-release-announcement
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Find the version that both stores have now
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      # A push compares the changelog with the one before the push, so a later edit of a section
+      # that already had both stores does not post again. A dispatch names the version.
+      - name: Find the version
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          DISPATCHED_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$DISPATCHED_VERSION"
+          elif [[ "$BEFORE" =~ ^0+$ ]]; then
+            echo "The push has no earlier commit to compare with."
+            exit 0
+          else
+            gh api -H "Accept: application/vnd.github.raw" \
+              "repos/$GITHUB_REPOSITORY/contents/apps/mobile/CHANGELOG.md?ref=$BEFORE" > "$RUNNER_TEMP/CHANGELOG.before.md"
+            version="$(bun scripts/discord-mobile-release-announcement.ts available "$RUNNER_TEMP/CHANGELOG.before.md")"
+          fi
+          if [[ -z "$version" ]]; then
+            echo "No version got its second store in this push."
+            exit 0
+          fi
+          bun scripts/discord-mobile-release-announcement.ts check "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # A failed post does not change a release: re-run this job. A re-run after a success posts again.
+  announce:
+    name: Post on Discord
+    needs: detect
+    if: needs.detect.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release-mobile
+    permissions:
+      contents: read
+    steps:
+      - name: Check out pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      - name: Post the announcement
+        env:
+          DISCORD_MOBILE_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_MOBILE_RELEASE_WEBHOOK_URL }}
+          DISCORD_MOBILE_RELEASE_ROLE_ID: ${{ vars.DISCORD_MOBILE_RELEASE_ROLE_ID }}
+          RELEASE_VERSION: ${{ needs.detect.outputs.version }}
+        run: bun scripts/discord-mobile-release-announcement.ts send "$RELEASE_VERSION"

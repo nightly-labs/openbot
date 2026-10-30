@@ -1,0 +1,39 @@
+diff --git a/dist/audio/engine.d.ts b/dist/audio/engine.d.ts
+index 38311d6..0210366 100644
+--- a/dist/audio/engine.d.ts
++++ b/dist/audio/engine.d.ts
+@@ -45,6 +45,8 @@ export type PlayOptions = {
+     duration?: number;
+     /** The material for this play only; the active theme is unchanged. Unknown names play the active theme. */
+     theme?: ThemeName;
++    /** Plays while sounds are off and before a user action, for a sound that the app plays on its own. */
++    force?: boolean;
+ };
+ /**
+  * Plays a sound immediately. Safe to call from anywhere — lazily creates
+diff --git a/dist/audio/engine.js b/dist/audio/engine.js
+index c1efb7d..4c41779 100644
+--- a/dist/audio/engine.js
++++ b/dist/audio/engine.js
+@@ -136,9 +136,10 @@ export function release(sound = "tap") {
+  */
+ export function playInContext(sound, options, interaction, part = "both", gesture) {
+     const name = resolveSound(sound);
+-    if (!enabled || !name)
++    const force = options?.force === true;
++    if ((!enabled && !force) || !name)
+         return;
+-    if (isBlocked())
++    if (!force && isBlocked())
+         return;
+     const holding = gesture ? `${name}:${gesture}` : name;
+     let played;
+@@ -174,7 +175,7 @@ export function playInContext(sound, options, interaction, part = "both", gestur
+     else {
+         try {
+             void context.resume().then(() => {
+-                if (enabled && context.state === "running")
++                if ((enabled || force) && context.state === "running")
+                     renderRecipe(context, getBus, voices, name, played, part);
+             }, () => { });
+         }

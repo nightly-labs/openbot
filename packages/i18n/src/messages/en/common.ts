@@ -23,6 +23,7 @@ export const messages = defineMessages("common", {
   "common.create": "Create",
   "common.open": "Open",
   "common.search": "Search",
+  "common.noMatches": "No matches",
   "common.loading": "Loading…",
   "common.saving": "Saving…",
   "common.tryAgain": "Try again",

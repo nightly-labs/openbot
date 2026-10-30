@@ -288,6 +288,30 @@ export const AgentMessageGroup: Story = {
   ),
 };
 
+/** The chat draws the text of an open message in the slot under its marker. */
+export const AgentMessageText: Story = {
+  render: () => {
+    const [open, setOpen] = createSignal(true);
+    return (
+      <main class="foundation-story">
+        <Heading as="h1" size="lg">
+          Agent message text
+        </Heading>
+        <Text tone="secondary">The chevron of an agent message opens its text under the marker.</Text>
+        <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Agent message text">
+          <ChatActionMarker
+            marker={{ ...agentMarker([{ agentId: "research", status: "completed" }], "completed"), expanded: open() }}
+            agents={agents}
+            onSelectAgent={onSelectAgent}
+            onToggleAgentMessage={() => setOpen((value) => !value)}
+            agentMessageText={() => <Text>Which launch sources are still not confirmed?</Text>}
+          />
+        </section>
+      </main>
+    );
+  },
+};
+
 const timestamp = "2026-09-01T08:00:00.000Z";
 const routineStatuses: Array<Extract<ChatActionMarkerModel, { kind: "routine-run" }>["status"]> = [
   "queued",

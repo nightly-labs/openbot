@@ -4,8 +4,7 @@
 
 import { decodeRecord, requiredBoolean } from "@openbot/contracts/ipc-decoding";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
-import type { Effect } from "effect";
-import { runCauseEffect } from "../backend/effect-boundary";
+import { Effect } from "effect";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import type { RemoteRequestInit } from "./remote-server-client";
 import type { RemoteWorkflowError } from "./remote-service-effects";
@@ -41,20 +40,23 @@ export class RelayedMessagingInstalls {
    * Sends a grant to the server whose install this computer opened. False when this computer opened
    * no install with this nonce for this platform: a link that this run did not start does nothing.
    */
-  async forward(platform: RelayedPlatform, nonce: string, grant: string): Promise<boolean> {
+  readonly forward = Effect.fn("RelayedMessagingInstalls.forward")(function* (
+    this: RelayedMessagingInstalls,
+    platform: RelayedPlatform,
+    nonce: string,
+    grant: string,
+  ): Effect.fn.Return<boolean, RemoteWorkflowError> {
     this.#prune();
     const pending = this.#pending.get(nonce);
     if (pending?.platform !== platform) return false;
     this.#pending.delete(nonce);
-    return runCauseEffect(
-      this.#remote.request(
-        pending.serverId,
-        CONNECTORS_ROUTES.messagingComplete,
-        (value) => requiredBoolean(decodeRecord(value, "Messaging install"), "accepted"),
-        { method: "POST", body: { platform, nonce, grant } },
-      ),
+    return yield* this.#remote.request(
+      pending.serverId,
+      CONNECTORS_ROUTES.messagingComplete,
+      (value) => requiredBoolean(decodeRecord(value, "Messaging install"), "accepted"),
+      { method: "POST", body: { platform, nonce, grant } },
     );
-  }
+  });
 
   #prune(): void {
     const now = Date.now();

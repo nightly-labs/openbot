@@ -3,6 +3,9 @@ import { TELEGRAM_BOT_ID_PATTERN } from "@openbot/contracts/signal-protocol/tele
 export interface RemoteApiConfig {
   host: string;
   port: number;
+  // The health and metrics server. Compose binds it to all addresses in the container and publishes it
+  // on the loopback address of the host only, for the capacity reporter.
+  healthHost: string;
   healthPort: number;
   tlsCertificatePath: string | null;
   tlsPrivateKeyPath: string | null;
@@ -37,6 +40,8 @@ export interface RemoteApiConfig {
 export interface DiscordBotConfig {
   botToken: string;
   applicationId: string;
+  /** Asks for the privileged Message Content intent, by default. Signal falls back without it when Discord refuses. */
+  messageContent: boolean;
 }
 
 interface SlackSigningSecret {
@@ -122,14 +127,19 @@ function httpsOrigin(value: string): string | null {
 /**
  * `DISCORD_BOT_TOKEN` and `DISCORD_APPLICATION_ID` turn on the Discord bot together. A missing or
  * malformed value turns off only Discord: the remote sessions and the Slack route keep running.
+ * Signal asks for the Message Content intent unless `DISCORD_MESSAGE_CONTENT` is `false`.
  */
-function readDiscordBot(token: string | undefined, applicationId: string | undefined): DiscordBotConfig | null {
+function readDiscordBot(
+  token: string | undefined,
+  applicationId: string | undefined,
+  messageContent: string | undefined,
+): DiscordBotConfig | null {
   const botToken = token?.trim();
   const id = applicationId?.trim();
   if (!botToken || !id) return null;
   if (!/^[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,128}\.[A-Za-z0-9_-]{1,256}$/u.test(botToken)) return null;
   if (!/^[0-9]{17,20}$/u.test(id)) return null;
-  return { botToken, applicationId: id };
+  return { botToken, applicationId: id, messageContent: messageContent !== "false" };
 }
 
 export function readRemoteApiConfig(environment: Record<string, string | undefined> = process.env): RemoteApiConfig {
@@ -141,6 +151,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
   return {
     host: environment.REMOTE_SIGNAL_HOST ?? "0.0.0.0",
     port: positiveInteger(environment.REMOTE_SIGNAL_PORT, tlsDisabled ? 8081 : 8443),
+    healthHost: environment.REMOTE_HEALTH_HOST ?? "127.0.0.1",
     healthPort: positiveInteger(environment.REMOTE_HEALTH_PORT, 8080),
     tlsCertificatePath: tlsDisabled ? null : required(environment.REMOTE_TLS_CERT_PATH, "REMOTE_TLS_CERT_PATH"),
     tlsPrivateKeyPath: tlsDisabled ? null : required(environment.REMOTE_TLS_KEY_PATH, "REMOTE_TLS_KEY_PATH"),
@@ -161,7 +172,11 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     sourceCommit: optional(environment.OPENBOT_SOURCE_COMMIT) ?? "unknown",
     slackSigningSecrets: readSlackSigningSecrets(environment.SLACK_SIGNING_SECRET),
     telegram: readTelegramConfig(environment),
-    discord: readDiscordBot(environment.DISCORD_BOT_TOKEN, environment.DISCORD_APPLICATION_ID),
+    discord: readDiscordBot(
+      environment.DISCORD_BOT_TOKEN,
+      environment.DISCORD_APPLICATION_ID,
+      environment.DISCORD_MESSAGE_CONTENT,
+    ),
   };
 }
 

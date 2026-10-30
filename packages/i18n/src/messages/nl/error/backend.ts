@@ -1,0 +1,364 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/backend";
+
+export const messages = {
+  "error.backend.eventsUnavailable": "Events zijn niet beschikbaar op deze host.",
+  "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
+  "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
+  "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
+  "error.backend.webhookRouteUnavailable":
+    "De openbare webhookroute is niet klaar. Controleer de verbinding met de host en probeer het opnieuw.",
+  "error.backend.webhookTestUnavailable":
+    "De host kan het testevent nu niet aannemen. Zorg dat de host is ingelogd en probeer het opnieuw.",
+  "error.backend.webhookTestFailed": "Het testevent heeft de routine niet bereikt. Probeer het opnieuw.",
+  "error.backend.browserViewRemoteOnly": "Een live browserweergave is alleen voor een externe host.",
+  "error.backend.browserViewUnsupported": "Deze externe host ondersteunt geen live browserweergave.",
+  "error.backend.browserViewLimit": "Er zijn te veel browserweergaven open op deze host.",
+  "error.backend.browserViewEnded": "De live weergave van deze pagina is beëindigd.",
+  "error.backend.browserViewFailed": "De live weergave van deze pagina is mislukt.",
+  "error.backend.windowTemporarilyUnavailable": "Het venster van OpenBot is tijdelijk niet beschikbaar.",
+  "error.backend.windowUnavailable": "Het venster van OpenBot is niet beschikbaar.",
+  "error.backend.sunshineApiHttp": "Sunshine-API is mislukt met HTTP {status}.",
+  "error.backend.sunshinePortsUnavailable": "Kan geen vrije Sunshine-poortgroep reserveren voor extern bureaublad.",
+  "error.backend.moonlightPortsUnavailable":
+    "Kan geen vrij Moonlight WebRTC-poortbereik reserveren voor extern bureaublad.",
+  "error.backend.iceServerNoPort": "De ICE-server van extern bureaublad heeft geen poort gekregen.",
+  "error.backend.remoteDesktopStoppedWhileStarting": "De runtime van extern bureaublad is gestopt tijdens het starten.",
+  "error.backend.sunshineNotStarted": "Sunshine is niet gestart op een gereserveerde poortgroep.",
+  "error.backend.moonlightNoHost": "Moonlight heeft geen gekoppelde lokale host.",
+  "error.backend.sunshineNoDesktop": "Sunshine heeft de Desktop-app niet gepubliceerd.",
+  "error.backend.sunshineAmbiguousPairing": "Sunshine gaf onduidelijke lokale koppelverzoeken terug.",
+  "error.backend.sunshineNoPairingRequest": "Sunshine heeft het verwachte lokale koppelverzoek niet ontvangen.",
+  "error.backend.moonlightPairingHttp": "Koppelen met Moonlight is mislukt met HTTP {status}.",
+  "error.backend.moonlightRejectedPairing": "Moonlight heeft het koppelen met Sunshine geweigerd.",
+  "error.backend.moonlightNoPin": "Moonlight heeft geen koppelpincode teruggegeven.",
+  "error.backend.moonlightPairingIncomplete": "Koppelen met Moonlight is niet voltooid.",
+  "error.backend.moonlightWebNotEmbedded": "Moonlight Web is geen ingebouwde build van OpenBot.",
+  "error.backend.moonlightEmptyResponse": "Moonlight gaf een leeg antwoord terug.",
+  "error.backend.remoteDesktopTimeout": "Het verzoek voor extern bureaublad duurde te lang.",
+  "error.backend.moonlightApiHttp": "Moonlight-API is mislukt met HTTP {status}.",
+  "error.backend.sunshineExited": "Sunshine is gestopt voordat de HTTPS-API op poort {port} klaar was.",
+  "error.backend.sunshineNoAnswer": "Sunshine reageerde niet.",
+  "error.backend.sunshineTlsUnexpected": "Sunshine gaf een onverwacht TLS-certificaat terug.",
+  "error.backend.moonlightWebExited": "Moonlight Web is gestopt voordat {url} klaar was.",
+  "error.backend.moonlightWebNotReady": "Moonlight Web is niet klaar geworden.",
+  "error.backend.channelDeleteUnsupported": "Deze server ondersteunt het verwijderen van kanalen niet.",
+  "error.backend.browserNavigateUnsupported":
+    "Deze externe host ondersteunt geen navigatie via de adresbalk in een bestaand tabblad.",
+  "error.backend.browserUserControlBusy":
+    "Dit browsertabblad wacht op een geheim. Beantwoord eerst het verzoek om het geheim.",
+  "error.backend.browserUserControlUnsupported":
+    "Deze externe host ondersteunt het overnemen van een browsertabblad niet.",
+  "error.backend.browserSignInUnsupported": "Deze externe host kan geen inlog van deze computer overnemen.",
+  "error.backend.browserSignInOpenFailed": "OpenBot kon het inlogvenster niet openen.",
+  "error.backend.browserSignInReadFailed": "OpenBot kon de inlog niet uit het venster lezen.",
+  "error.backend.browserStopUnsupported": "Deze externe host kan het laden van een pagina niet stoppen.",
+  "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
+  "error.backend.browserUrlProtocol": "Alleen HTTP(S)-URL’s zijn toegestaan in de browser.",
+  "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
+  "error.backend.sunshineNotReadyReason": "Sunshine is niet klaar geworden. {reason}",
+  "error.backend.channelLeadModelUnavailable": "Het model van de kanaalleider is niet beschikbaar.",
+  "error.backend.sharedDataUnavailable": "Gedeelde gegevens zijn niet beschikbaar.",
+  "error.backend.shuttingDown": "OpenBot wordt afgesloten.",
+  "error.backend.channelUnconfirmedStart":
+    "Het kanaal heeft een start van een opdracht die niet is bevestigd. Controleer het resultaat voordat je het verwijdert.",
+  "error.backend.channelNotFound": "Kanaal niet gevonden.",
+  "error.backend.channelMemberUnavailable": "Een lid van het kanaal is niet beschikbaar.",
+  "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
+  "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
+  "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
+  "error.backend.channelTaskComplete": "Deze taak is al voltooid.",
+  "error.backend.channelSelectAgent": "Kies een agent.",
+  "error.backend.channelLeadRequired": "Kies een beschikbare kanaalleider of wijs deze taak toe aan een lid.",
+  "error.backend.channelRoutingTooLong":
+    "Dit verzoek overschrijdt de contextlimiet voor routering. Kies een lid of stuur een korter verzoek.",
+  "error.backend.channelTaskMemberRequired": "Kies een lid voor deze taak.",
+  "error.backend.channelTaskStopped": "Gestopt. Ga verder of wijs deze taak opnieuw toe.",
+  "error.backend.channelRoutingUnreadable": "De leider kon dit bericht niet toewijzen. Wijs het toe aan een lid.",
+  "error.backend.channelRoutingFailed": "Routering is mislukt. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelLeadFailed":
+    "De kanaalleider kon dit bericht niet doorsturen. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelRequestMemberRequired": "Kies een lid voor dit verzoek.",
+  "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
+  "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",
+  "error.backend.channelAssigneeUnavailable": "De toegewezen agent is niet beschikbaar.",
+  "error.backend.channelAssigneeRemoved": "Het toegewezen lid is verwijderd.",
+  "error.backend.channelAssigneeReassign": "Het toegewezen lid is niet beschikbaar. Wijs deze taak opnieuw toe.",
+  "error.backend.channelAssignmentChanged": "Deze kanaalopdracht is gewijzigd.",
+  "error.backend.channelMemberRequired": "Kies een beschikbaar lid van dit kanaal.",
+  "error.backend.memoryEssentialBudget":
+    "De essentiële herinneringen overschrijden de promptlimiet. Stel een item in op zoeken wanneer nodig en probeer het opnieuw.",
+  "error.backend.memorySelectionConflict": "Het geheugen is gewijzigd. Laad het opnieuw en probeer het nog eens.",
+  "error.backend.memorySelectionUserControlled":
+    "De gebruiker bepaalt deze geheugenselectie. Behoud de keuze van de gebruiker.",
+  "error.backend.memorySearchQuery": "Voer een of meer zoekwoorden in, tot 256 tekens.",
+  "error.backend.memoryOperationFailed": "De geheugenbewerking is mislukt. Probeer het opnieuw.",
+  "error.backend.memoryGone": "Deze herinnering bestaat niet meer.",
+  "error.backend.routineGone": "Deze routine bestaat niet meer.",
+  "error.backend.turnNotStarted": "De aanbieder heeft deze beurt niet gestart.",
+  "error.backend.routineResultConnectionOff":
+    "Deze berichtenverbinding staat uit of is verwijderd. Kies een andere plek.",
+  "error.backend.routineResultNoDelivery": "Deze run heeft geen antwoord om opnieuw te sturen.",
+  "error.backend.channelMemoryLimit": "Een kanaal kan maximaal {limit} herinneringen hebben.",
+  "error.backend.channelRoutineLimit": "Een kanaal kan maximaal {limit} routines hebben.",
+  "error.backend.agentRoutineLimit": "Een agent kan maximaal {limit} routines hebben.",
+  "error.backend.agentMemoryLimit": "Een agent kan maximaal {limit} herinneringen hebben.",
+  "error.backend.agentMemoryLimitReached":
+    "Je hebt {saved} van {limit} herinneringen. Maak ruimte: werk één herinnering bij via memoryId met de gecombineerde tekst van twee verwante herinneringen en vergeet dan de andere, of vergeet een herinnering die niet meer klopt. Probeer het daarna opnieuw.",
+  "error.backend.agentMemoryLimitExceeded":
+    "Je hebt {saved} herinneringen en de limiet is {limit}. De gebruiker heeft de limiet lager ingesteld dan het aantal opgeslagen herinneringen. Vergeet geen herinneringen om ruimte te maken. Vertel de gebruiker dat deze herinnering niet is opgeslagen.",
+  "error.backend.channelHistoryLeadRequired": "Kies een kanaalleider om de gedeelde geschiedenis voor te bereiden.",
+  "error.backend.channelHistoryArriving": "Er komt nog een gedeeld bericht binnen. Ga verder als het compleet is.",
+  "error.backend.channelHistoryInvalid":
+    "De samenvatting van de geschiedenis is ongeldig. Ga verder om het opnieuw te proberen.",
+  "error.backend.channelContextTooLong":
+    "Deze opdracht overschrijdt de gedeelde contextlimiet. Stuur een korter verzoek of wijs de opdracht opnieuw toe.",
+  "error.backend.draftAttachmentLimit": "Bewaar maximaal {limit} conceptbijlagen.",
+  "error.backend.recipientRequired": "Minstens één ontvanger is verplicht.",
+  "error.backend.recipientLimit": "Een bericht kan maximaal {limit} ontvangers hebben.",
+  "error.backend.attachmentDraftGone": "Conceptbijlage bestaat niet meer: {id}",
+  "error.backend.attachmentInQueueEdit": "Een bijlage hoort bij een wijziging in de wachtrij.",
+  "error.backend.messageEmpty": "Het bericht mag niet leeg zijn.",
+  "error.backend.attachLimit": "Voeg maximaal {limit} bestanden toe.",
+  "error.backend.queuedMessageNotFound": "Het bericht in de wachtrij is niet gevonden.",
+  "error.backend.cancelQueuedOnly": "Alleen berichten in de wachtrij kunnen worden geannuleerd.",
+  "error.backend.messageBeingEdited": "Dit bericht wordt bewerkt. Sla de wijziging eerst op of annuleer deze.",
+  "error.backend.queuedMessageUnavailable": "Dit bericht in de wachtrij is niet meer beschikbaar.",
+  "error.backend.editedOnOtherDevice": "Dit bericht wordt op een ander apparaat bewerkt.",
+  "error.backend.editUnavailable": "Deze wijziging is niet meer beschikbaar.",
+  "error.backend.attachmentInOtherEdit": "Een bijlage hoort bij een andere wijziging.",
+  "error.backend.messageBeingSaved": "Dit bericht wordt opgeslagen. Probeer het opnieuw als dit klaar is.",
+  "error.backend.editQueuedOnly": "Alleen berichten in de wachtrij kunnen worden bewerkt.",
+  "error.backend.attachmentNotInMessage": "Een bijlage hoort niet bij het bericht in de wachtrij.",
+  "error.backend.queueOrderStale":
+    "De volgorde van de wachtrij is verouderd. Vernieuw de wachtrij en probeer het opnieuw.",
+  "error.backend.fileGone": "Het bestand bestaat niet of is al verwijderd.",
+  "error.backend.managedAttachmentChanged": "Beheerde bijlage ontbreekt of is gewijzigd: {name}",
+  "error.backend.mailboxStateCorrupt":
+    "De status van de postbus is beschadigd of komt van een nieuwere versie van OpenBot; OpenBot overschrijft deze niet.",
+  "error.backend.recipientDeleting": "De ontvanger wordt verwijderd. Probeer het opnieuw als dit klaar is.",
+  "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
+  "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
+  "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
+  "error.backend.attachSvg":
+    "{name} is een SVG-bestand en kan niet worden bijgevoegd. Schrijf het absolute pad in je antwoord: de chat toont de afbeelding daar.",
+  "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
+  "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
+  "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
+  "error.backend.routineNameRequired": "Een naam voor de routine is verplicht.",
+  "error.backend.routineNameTooLong": "De naam van de routine is te lang.",
+  "error.backend.routineInstructionRequired": "Een instructie voor de routine is verplicht.",
+  "error.backend.routineInstructionTooLong": "De instructie van de routine is te lang.",
+  "error.backend.routineScheduleInvalid": "De planning van de routine is ongeldig.",
+  "error.backend.routineIntervalTooShort":
+    "Intervallen van routines moeten minstens {minutes} minuten zijn. Gebruik {minutes} minuten of meer, of een dagelijkse, wekelijkse of cron-planning.",
+  "error.backend.routineIntervalTooShortFixed":
+    "Intervallen van routines moeten minstens {minutes} minuten zijn. Gebruik {minutes} minuten of meer, of een vast tijdstip.",
+  "error.backend.routineCronTooOften": "Aangepaste planningen mogen niet vaker draaien dan elke {minutes} minuten.",
+  "error.backend.routineAnchorInvalid": "Het ankerpunt van het interval van de routine is ongeldig.",
+  "error.backend.routineNoOccurrence": "De planning heeft geen moment binnen de komende vijf jaar.",
+  "error.backend.routineOncePassed":
+    "Het tijdstip van deze eenmalige routine ligt in het verleden. Kies een latere datum of tijd.",
+  "error.backend.routineTimezoneInvalid": "De tijdzone van de routine is ongeldig.",
+  "error.backend.routineCronFields": "Aangepaste planningen moeten vijf cron-velden gebruiken.",
+  "error.backend.routineCronValueInvalid": "De cron-waarde voor {field} is ongeldig.",
+  "error.backend.routineCronFieldEmpty": "Het cron-veld {field} is leeg.",
+  "error.backend.routineDeletionBusy": "Er wordt al een andere routine van deze agent verwijderd.",
+  "error.backend.routineWaitForAgent": "Wacht tot de bewerking van de agent klaar is voordat je een routine uitvoert.",
+  "error.backend.routineRunStarting": "Deze run van de routine start nog. Probeer het opnieuw als de beurt is gestart.",
+  "error.backend.routineRunNoSession":
+    "OpenBot kan de actieve run van de routine niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
+  "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
+  "error.backend.interruptOtherWork":
+    "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
+  "error.backend.interruptNoSession":
+    "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
+  "error.backend.memoryTextRequired": "Tekst voor de herinnering is verplicht.",
+  "error.backend.memoryTextTooLong": "De tekst van de herinnering is te lang.",
+  "error.backend.mcpServerGone": "Deze MCP-server bestaat niet meer.",
+  "error.backend.routineFlowLinkGone": "Deze verbinding bestaat niet meer.",
+  "error.backend.routineFlowSameAgent": "Een agent kan geen werk aan zichzelf overdragen.",
+  "error.backend.routineFlowIntoOwner":
+    "De routine begint bij de eigen agent, dus die agent kan geen werk van een andere agent overnemen.",
+  "error.backend.routineFlowNotOnPath":
+    "Deze agent hoort nog niet bij de routine. Verbind de agent eerst met de routine.",
+  "error.backend.routineFlowDuplicate": "Deze agents zijn al verbonden in deze routine.",
+  "error.backend.routineFlowCycle": "Deze verbinding zou een lus maken.",
+  "error.backend.routineFlowLinkLimit": "Een routine kan maximaal {limit} verbindingen hebben.",
+  "error.backend.agentWaitLimit":
+    "Deze agent heeft al {count} open wachtpunten. Sluit een wachtpunt met openbot.close_wait voordat je een nieuw opent.",
+  "error.backend.agentWaitGone":
+    "Dit wachtpunt is niet open. De agent heeft het gesloten, of iemand heeft het geannuleerd.",
+  "error.backend.agentWaitNoRequest":
+    "Een wachtpunt heeft een bericht nodig om verder te gaan. Deze beurt heeft geen bericht.",
+  "error.backend.agentWaitOwnChatOnly":
+    "Open een wachtpunt alleen in je eigen chat. Een kanaal- of berichtentaak kan niet wachten.",
+  "error.backend.agentWaitNoteRequired": "Geef een korte notitie die zegt waarvoor het wachtpunt is.",
+  "error.backend.agentWaitRoutineGone": "Deze agent heeft geen routine met deze id.",
+  "error.backend.agentWaitNoRoutine":
+    "Alleen een run van een van je routines wekt een wachtpunt, en je hebt geen routine. Maak er een met openbot.create_routine en open dan het wachtpunt.",
+  "error.backend.agentWaitRemoteUnsupported": "Open wachtpunten zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Een bericht als ongelezen markeren is alleen beschikbaar voor agents op deze computer.",
+  "error.backend.routineFlowHandoffFailed": "De routine kon het werk niet aan deze agent doorgeven.",
+  "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
+  "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
+  "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
+  "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
+  "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInClientRefused":
+    "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
+  "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
+  "error.backend.mcpRegistrationRefused":
+    "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
+  "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
+  "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
+  "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
+  "error.backend.mcpSignInNoBrowser": "Deze MCP-inlog kan geen browser openen.",
+  "error.backend.mcpSignInNotWebPage": "Het inlogadres is geen webpagina.",
+  "error.backend.mcpSignInRequired":
+    "Deze server vraagt je om in te loggen. Kies Inloggen om verder te gaan in je browser.",
+  "error.backend.mcpSignInOnHost": "Deze server vraagt om in te loggen. Log in via OpenBot op de hostcomputer.",
+  "error.backend.mcpSignInNeedsHttps":
+    "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
+  "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
+  "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
+  "error.backend.mcpSignInResponseTimedOut": "Het antwoord op het inloggen kwam niet op tijd.",
+  "error.backend.mcpSignInMetadataUnreadable":
+    "OpenBot kon de inloggegevens van deze server niet lezen. Controleer het serveradres en probeer het opnieuw.",
+  "error.backend.mcpServerExited":
+    "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
+  "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpOAuthProxyUnavailable":
+    "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
+  "error.backend.mcpOAuthSignInNeeded":
+    "De inlog bij deze MCP-server is verlopen. De gebruiker moet opnieuw inloggen in OpenBot.",
+  "error.backend.mcpServerUnreachable": "OpenBot kan de server niet bereiken. Controleer de URL en je netwerk.",
+  "error.backend.mcpLocalServerOff":
+    "Er reageert geen server op {address} op deze computer. Start de server, of zet hem aan in de app die hem draait, en probeer het opnieuw.",
+  "error.backend.mcpServerBlocked":
+    "Deze computer heeft de verbinding met de server geblokkeerd. Controleer je firewall of beveiligingssoftware en probeer het opnieuw.",
+  "error.backend.mcpServerIncompatible":
+    "Er reageerde iets op dit adres, maar niet als MCP-server via Streamable HTTP. Controleer de URL en werk de app bij die de server draait.",
+  "error.backend.mcpRemoteBridge":
+    "{reason} Deze opdracht draait de mcp-remote-brug. Kies in plaats daarvan Streamable HTTP met de URL {url}, dan logt OpenBot je in.",
+  "error.backend.oauthNotHttps": "Het OAuth-endpoint {origin} is geen https, dus de inloggegevens zijn niet verstuurd.",
+  "error.backend.oauthTooManyRedirects": "Het OAuth-endpoint heeft te vaak doorgestuurd.",
+  "error.backend.oauthRedirectOrigin":
+    "Het OAuth-endpoint stuurde door naar {origin}, dus de inloggegevens zijn niet doorgegeven.",
+  "error.backend.oauthTimedOut": "Het OAuth-endpoint {origin} gaf niet op tijd antwoord.",
+  "error.backend.oauthResponseTooLarge": "Het OAuth-endpoint {origin} stuurde een te groot antwoord.",
+  "error.backend.oauthResponseUnreadable": "Het antwoord van het OAuth-endpoint {origin} kon niet worden gelezen.",
+  "error.backend.mcpOAuthPrivateEndpoint":
+    "Het OAuth-endpoint {origin} staat op een privénetwerk, maar de MCP-server is openbaar, dus de inloggegevens zijn niet verstuurd.",
+  "error.backend.sidebarSectionLimit": "Een server kan maximaal {limit} zijbalksecties hebben.",
+  "error.backend.sectionNameRequired": "Een naam voor de sectie is verplicht.",
+  "error.backend.sectionNameTooLong": "De naam van de sectie is te lang.",
+  "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
+  "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
+  "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
+  "error.backend.directMessageSelf": "Je kunt geen direct bericht naar jezelf sturen.",
+  "error.backend.readBoundaryUnavailable": "De leesgrens is niet meer beschikbaar.",
+  "error.backend.sharedFileOutside": "Een gedeeld bestand moet in de gedeelde map staan.",
+  "error.backend.sharedPathIsFolder": "Het gedeelde pad is een map, geen bestand.",
+  "error.backend.sharedPathNotFile": "Het gedeelde pad is geen bestand.",
+  "error.backend.workspaceFileOutside": "Een werkruimtebestand moet in de werkruimte van de agent staan.",
+  "error.backend.workspacePathNotFile": "Het werkruimtepad is geen bestand.",
+  "error.backend.workspacePathNotDirectory": "Het werkruimtepad is geen map.",
+  "error.backend.workspacePathMissing": "Er bestaat niets op {path} in de werkruimte {root} van de agent.",
+  "error.backend.workspacePathMissingForMember": "Er bestaat niets op {path} in de werkruimte van de agent.",
+  "error.backend.useChannelTaskControls": "Gebruik de knoppen voor kanaaltaken voor deze opdracht.",
+  "error.backend.editFinished": "Deze wijziging is al klaar.",
+  "error.backend.editCancelled": "Deze wijziging is geannuleerd, dus het bericht behoudt de oorspronkelijke tekst.",
+  "error.backend.editSaved": "Deze wijziging is al opgeslagen.",
+  "error.backend.editSavedDifferent":
+    "Deze wijziging is al opgeslagen met een andere inhoud. Je wijzigingen zijn niet opgeslagen.",
+  "error.backend.useChannelTaskControlsWork": "Gebruik de knoppen voor kanaaltaken voor werk in een kanaal.",
+  "error.backend.steerTurnChanged": "De actieve beurt is gewijzigd voordat dit bericht kon bijsturen.",
+  "error.backend.steerUnsupported":
+    "Deze aanbieder kan een lopende beurt niet bijsturen. Je bericht blijft in de wachtrij.",
+  "error.backend.steerRoutineRun": "Er draait nu een routine. Je bericht blijft in de wachtrij en start na de routine.",
+  "error.backend.steerQueuedOnly": "Alleen berichten in de wachtrij kunnen bijsturen.",
+  "error.backend.promptInactive": "Deze prompt is niet meer actief.",
+  "error.backend.promptAnswerMismatch": "Een antwoord op de prompt past niet bij een actieve vraag.",
+  "error.backend.uiBlockAnswerInvalid": "Dit antwoord past niet bij het blok van de agent.",
+  "error.backend.uiBlockActionNotAllowed": "Alleen de eigenaar van de server of een beheerder kan deze actie kiezen.",
+  "error.backend.approvalInactive": "Deze goedkeuring is niet meer actief.",
+  "error.backend.approvalOwnerOnly": "Alleen de eigenaar van de server kan deze actie goedkeuren.",
+  "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
+  "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
+  "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
+  "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
+  "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
+  "error.backend.browserUrlRequired": "Een URL voor de browser is verplicht.",
+  "error.backend.browserUrlTooLong": "De URL voor de browser is te lang.",
+  "error.backend.browserTabLimit": "De browser kan maximaal {limit} open tabbladen hebben.",
+  "error.backend.browserProfileMissing":
+    "Het browserprofiel van deze agent bestaat niet meer. Kies een ander profiel in de instellingen van de agent.",
+  "error.backend.browserProfileNotFound": "Dit browserprofiel bestaat niet meer.",
+  "error.backend.browserProfileNameTaken": "Er bestaat al een browserprofiel met deze naam.",
+  "error.backend.browserSessionInUse": "Een tabblad gebruikt deze browsersessie nog. Probeer het opnieuw.",
+  "error.backend.browserProfileLimit": "Je kunt maximaal {limit} browserprofielen hebben.",
+  "error.backend.browserLowMemory":
+    "Deze server heeft weinig geheugen, dus de browser kan geen tabblad meer openen. Sluit een tabblad, of wacht tot andere agents klaar zijn.",
+  "error.backend.browserOpenFailed": "Kan {url} niet openen: {reason}",
+  "error.backend.popupSecureInput":
+    "Pop-ups worden geblokkeerd tijdens beveiligde invoer. Rond de beveiligde invoer af of annuleer deze, en probeer het opnieuw vanaf de pagina.",
+  "error.backend.popupUnsupportedType":
+    "Dit type pop-up wordt niet ondersteund. Gebruik een gewone link of inlogknop op de pagina.",
+  "error.backend.popupUnsupportedAddress":
+    "Deze pop-up gebruikt een adres dat niet wordt ondersteund. Gebruik een inlogoptie via HTTP of HTTPS op de pagina.",
+  "error.backend.popupTabLimit":
+    "Het maximumaantal browsertabbladen is bereikt. Sluit een tabblad en probeer het opnieuw vanaf de pagina.",
+  "error.backend.popupLoadFailed":
+    "De pop-up kon niet laden. Probeer opnieuw in te loggen vanaf de oorspronkelijke pagina.",
+  "error.backend.browserTabNotFound": "Browsertabblad niet gevonden.",
+  "error.backend.authActive": "Verificatie is al actief.",
+  "error.backend.authHttpsRequired": "Beveiligde verificatie vereist HTTPS.",
+  "error.backend.authDigitsRange": "Verificatiecodes moeten 4–12 cijfers hebben.",
+  "error.backend.authExpired": "Het verificatieverzoek is verlopen.",
+  "error.backend.authDigitsRequired": "Voer het gevraagde aantal cijfers in.",
+  "error.backend.browserViewProtected": "De browserweergave is beveiligd tijdens de verificatie.",
+  "error.backend.browserPreviewPageChanged":
+    "De browserpagina is gewijzigd tijdens de voorvertoning. Probeer het opnieuw.",
+  "error.backend.browserInputProtected": "Browserinvoer is beveiligd tijdens de verificatie.",
+  "error.backend.mcpServerHttpCredentials":
+    "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
+  "error.backend.mcpServerHttpUrl":
+    "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
+  "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
+  "error.backend.mcpSignInAppIssuerChanged":
+    "De inlogserver van deze MCP-server is gewijzigd, dus OpenBot heeft de inlogapp niet verstuurd. Als de wijziging klopt, verwijder je de inlogapp en voeg je deze opnieuw toe.",
+  "error.backend.mcpSignInAppNoServer": "Sla deze MCP-server op als URL-server voordat je een inlogapp toevoegt.",
+  "error.backend.mcpSignInAppUnavailable": "Deze computer kan geen inlogapp bewaren.",
+  "error.backend.taskMoveRefused":
+    "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan als taak draaien.",
+  "error.backend.taskNotFound": "Deze taak is niet beschikbaar.",
+  "error.backend.taskClosed": "Deze taak is gesloten. Open de taak opnieuw om een bericht te sturen.",
+  "error.backend.taskStillRunning": "Deze taak draait nog. Wacht tot de taak stopt en sluit hem dan.",
+  "error.backend.threadNotFound": "Deze thread is niet beschikbaar.",
+  "error.backend.threadStillRunning": "Deze thread draait nog. Stop de thread en probeer het opnieuw.",
+  "error.backend.threadArchived": "Deze thread is gearchiveerd. Herstel de thread om een bericht te sturen.",
+  "error.backend.threadTitleRequired": "Geef de thread een korte titel.",
+  "error.backend.threadOpenLimitReached":
+    "Deze agent heeft {count} open threads. Archiveer een thread en start of herstel dan een andere.",
+  "error.backend.threadRemoteUnsupported": "Threads zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.threadMoveRefused":
+    "Alleen een bericht dat je alleen naar deze agent hebt gestuurd, kan in een nieuwe thread draaien.",
+  "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
+  "error.backend.taskToolInvalid":
+    "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
+  "error.backend.taskOwnChatOnly":
+    "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
+  "error.backend.taskOpenLimit":
+    "Deze agent heeft al {count} open taken. Wacht tot de gebruiker er een sluit voordat je een nieuwe taak start.",
+  "error.backend.taskOpenLimitReached":
+    "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
+  "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
+} as const satisfies PartialTranslation<typeof source>;

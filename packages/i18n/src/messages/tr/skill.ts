@@ -14,7 +14,6 @@ export const messages = {
   "skill.emptyEnabled": "Bu ajanın etkinleştirilmiş becerisi yok.",
   "skill.emptyAssigned": "Bu ajanın henüz atanmış becerisi yok.",
   "skill.folderSkill": "OpenBot bu beceriyi yüklemedi. {location} içinde düzenleyin veya kaldırın.",
-  "skill.localOnHost": "Bu yerel beceri ana makinede depolanır. Ayrıntılarını o bilgisayarda açın.",
   "skill.moreFor": "{name} için daha fazlası",
   "skill.update": "Güncelle",
   "skill.updateName": "Güncelle: {name}",
@@ -63,4 +62,17 @@ export const messages = {
   "skill.preview.examplePrompt": "Bu beceriyi kullanmama yardım et.",
   "skill.preview.try": "Beceriyi dene",
   "skill.preview.linkFailed": "Bağlantı açılamadı.",
+
+  "skill.marketplace.changed": {
+    one: "{name} {count} ajanda değiştirildi.",
+    other: "{name} {count} ajanda değiştirildi.",
+  },
+  "skill.marketplace.updated": {
+    one: "{name} {count} ajanda güncellendi.",
+    other: "{name} {count} ajanda güncellendi.",
+  },
+  "skill.marketplace.undone": "{name} değişikliği geri alındı.",
+  "skill.marketplace.confirmAgents": "Ajanlar: {agents}.",
+  "skill.marketplace.limitReason": "Bir ajanın en fazla {limit} becerisi olabilir.",
+  "skill.marketplace.cannotRemove": "OpenBot yerleşik bir beceriyi veya kendisinin kurmadığı bir beceriyi kaldıramaz.",
 } as const satisfies PartialTranslation<typeof source>;

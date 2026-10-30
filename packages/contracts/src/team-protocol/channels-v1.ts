@@ -1,5 +1,4 @@
 // Frozen optional channel-chats-v1 wire contract. Keep IPC types and limits out of this file.
-// Deprecated: hosts no longer advertise channel-chats-v1. Clients without the capability hide channels.
 import { isDynamicRecord, isString } from "../runtime-values";
 import { decodeTeamProtocolV1HttpRequest, decodeTeamProtocolV1HttpResponse } from "./v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";

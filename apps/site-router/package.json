@@ -11,7 +11,7 @@
     "cf:typegen": "wrangler types",
     "deploy": "wrangler deploy --keep-vars",
     "dev": "wrangler dev",
-    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

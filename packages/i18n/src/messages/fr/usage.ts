@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "Coût quotidien estimé en USD par fournisseur. Les valeurs exactes sont disponibles avec « Voir par jour ».",
   "usage.chart.tokensDescription":
-    "Jetons traités par jour et par fournisseur. Les valeurs exactes sont disponibles avec « Voir par jour ».",
+    "Jetons hors lectures du cache par jour et par fournisseur. Les valeurs exactes sont disponibles avec « Voir par jour ».",
   "usage.chart.costLabel": "Coût quotidien estimé en USD par fournisseur",
-  "usage.chart.tokensLabel": "Jetons traités par jour et par fournisseur",
+  "usage.chart.tokensLabel": "Jetons hors lectures du cache par jour et par fournisseur",
   "usage.column.cost": "Coût",
   "usage.column.share": "Part",
   "usage.column.tokens": "Jetons",
@@ -28,7 +28,7 @@ export const messages = {
   "usage.summary": "Résumé de l’utilisation",
   "usage.sessions": { one: "{sessions} session", other: "{sessions} sessions" },
   "usage.costEstimate": "Estimation API · USD",
-  "usage.knownTokens": "Jetons traités connus",
+  "usage.knownTokens": "Jetons connus hors lectures du cache",
   "usage.provider.shareOfCost": "{share} du coût connu",
   "usage.provider.shareOfTokens": "{share} des jetons connus",
   "usage.dailyTrend": "Tendance quotidienne",
@@ -36,7 +36,8 @@ export const messages = {
   "usage.dailyTokens": "Jetons par jour",
   "usage.viewDailyData": "Voir par jour",
   "usage.totals.title": "Totaux",
-  "usage.totals.processedTokens": "Jetons traités",
+  "usage.totals.tokens": "Jetons hors lectures du cache",
+  "usage.totals.processedTokens": "Jetons traités avec lectures du cache",
   "usage.totals.cachedInput": "Entrée en cache",
   "usage.totals.uncachedInput": "Entrée hors cache",
   "usage.totals.cacheCreation": "Création de cache",
@@ -57,9 +58,12 @@ export const messages = {
   "usage.about.title": "À propos de ces estimations",
   "usage.about.body":
     "Coût des jetons en équivalent API, en USD. Il s’agit d’une estimation, pas d’un montant d’abonnement. Les frais distincts des outils et des médias ne sont pas calculés. Les prix inconnus et l’utilisation incomplète restent indisponibles. Les parts utilisent uniquement les montants connus ; des données partielles peuvent sous-estimer les totaux.",
+  "usage.about.tokens":
+    "Les nombres de jetons n’incluent pas les lectures du cache. Chaque requête au modèle dans un tour relit la conversation en cache : les lectures du cache peuvent donc dépasser largement les autres jetons. Les totaux les affichent comme « Entrée en cache ».",
   "usage.panel.label": "Utilisation des agents",
   "usage.panel.title": "Utilisation",
   "usage.panel.allAgents": "Tous les agents",
+  "usage.panel.workflows": "Workflows",
   "usage.panel.agents": "Agents affichés",
   "usage.panel.metric": "Mesure de l’utilisation",
   "usage.panel.period": "Période d’utilisation",

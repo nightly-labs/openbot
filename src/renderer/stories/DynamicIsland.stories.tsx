@@ -287,7 +287,7 @@ function toIslandAgent(agent: (typeof STORY_AGENTS)[number]): DynamicIslandAgent
 }
 
 const meta = {
-  title: "Experiments/macOS Dynamic Island",
+  title: "Window/Dynamic Island",
   component: DynamicIslandDemo,
   args: { scenario: "working", defaultState: "compact", onAction: fn() },
   argTypes: {

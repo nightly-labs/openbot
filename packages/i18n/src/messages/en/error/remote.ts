@@ -179,6 +179,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.directoryTimeout": "The OpenBot service did not answer in time. Try again.",
   "error.remote.inviteAlreadyUsed": "This invitation was already used. Ask for a new invitation.",
   "error.remote.inviteNotFound": "This invitation does not exist or has expired. Ask for a new invitation.",
+  "error.remote.licenseUsersFull":
+    "The server owner's license has no free user. Ask the owner to add a user to the license.",
   "error.remote.memberLimitReached": "This host has reached its member limit. Ask the owner to make space.",
   "error.remote.hostNotRegistered": "This host is no longer registered with the OpenBot service.",
   "error.remote.membershipEnded": "You are no longer a member of this host. Ask the owner for a new invitation.",
@@ -186,5 +188,18 @@ export const messages = defineMessages("error.remote", {
   "error.remote.hostOtherAccount": "This host belongs to another account.",
   "error.remote.remoteNotConfigured": "Remote connections are not set up on this OpenBot service.",
   "error.remote.hostRefused": "The host refused the request ({status}).",
+  // Channel actions on mobile.
+  "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
+  "error.remote.channelsUnsupported": "Update this desktop server to use channels.",
+  "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
+  "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
+  "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
+  // Servers that the desktop app starts on this computer.
+  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.localServerNotFound": "This server is not on this computer.",
+  "error.remote.localServerLimit":
+    "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "error.remote.localServersReadOnly":
+    "This version of OpenBot cannot read the list of servers on this computer. Update OpenBot.",
 });

@@ -53,3 +53,58 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The community invitation uses the same card. Discord takes the free width; X is an icon button. */
+.sidebar-community-actions {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+}
+
+.sidebar-community-actions > .ui-button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sidebar-community-mark {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The storage card uses the same card. At "full" the card uses the danger tone, and the ring follows the level. */
+.sidebar-storage[data-level="full"] {
+  border-color: var(--openbot-danger-border);
+  background: var(--openbot-danger-soft);
+}
+
+.sidebar-storage-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.sidebar-storage-row > .sidebar-mobile-app-dismiss {
+  align-self: start;
+}
+
+.sidebar-storage-ring {
+  width: 48px;
+}
+
+.sidebar-storage-percent {
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 1;
+}
+
+.sidebar-storage-text {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-0-5);
+}
+
+.sidebar-storage-text > strong {
+  font-weight: var(--openbot-weight-semibold);
+}

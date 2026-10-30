@@ -20,7 +20,6 @@ import {
   ItemTitle,
   Link2Off,
   Lock,
-  OctagonX,
   Search,
   SettingsSection,
   Spinner,
@@ -30,17 +29,18 @@ import {
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
+import { GitHubMark } from "./brand-marks";
 import {
   DangerZone,
-  DetailHeader,
-  GitHubMark,
+  IntegrationPage,
+  type IntegrationPageSlots,
   type IntegrationStatus,
   Stepper,
   WizardDialog,
   type WizardLink,
 } from "./IntegrationLayout";
 
-export interface GitHubConnectorPanelProps {
+export interface GitHubConnectorPanelProps extends IntegrationPageSlots {
   /** The joined server whose connection this is. Absent: this computer's. */
   hostName?: string | undefined;
   status: GitHubConnectorStatus;
@@ -71,7 +71,7 @@ function connectStep(status: GitHubConnectorStatus, busy: boolean): ConnectStep 
 
 /** The status of the connection, as its page header and every list of connectors show it. */
 export const GITHUB_STATUS = {
-  disconnected: { status: "idle", label: "connector.github.statusNotSetUp" },
+  disconnected: { status: "idle", label: "marketplace.app.notConnected" },
   pending: { status: "connecting", label: "connector.github.statusConnecting" },
   connected: { status: "connected", label: "connector.github.statusConnected" },
   expired: { status: "attention", label: "connector.github.statusExpired" },
@@ -96,6 +96,11 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   );
   const header = () => GITHUB_STATUS[props.status.state];
   const login = () => props.status.login ?? "";
+  const failure = () => {
+    const message = props.status.error;
+    if (connectOpen() || props.status.state === "expired" || !message) return null;
+    return { title: t("connector.github.actionFailed"), message };
+  };
 
   const connect = () => {
     setConnectOpen(true);
@@ -113,48 +118,59 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   };
 
   return (
-    <div class="github-connector">
-      <DetailHeader
-        logo={<GitHubMark />}
-        name={t("connector.github.title")}
-        status={header().status}
-        statusLabel={t(header().label)}
-        subtitle={
-          props.hostName
-            ? t("connector.github.descriptionHost", { host: props.hostName })
-            : t("connector.github.description")
-        }
-        actions={
-          <Show when={props.status.state === "disconnected"}>
-            <Button type="button" size="sm" loading={props.busy} onClick={connect}>
-              {t("connector.github.connect")}
-            </Button>
-          </Show>
-        }
-      />
-
-      {/* The dialog shows a failure while it is open, and the expired alert already tells the user why. */}
-      <Show when={!connectOpen() && props.status.state !== "expired" && props.status.error}>
-        {(message) => <FailedAlert message={message()} />}
-      </Show>
-
-      <Show when={props.status.state === "expired"}>
-        <Alert tone="warning">
-          <AlertIcon>
-            <TriangleAlert />
-          </AlertIcon>
-          <AlertContent>
-            <AlertTitle>{t("connector.github.expiredTitle")}</AlertTitle>
-            <AlertDescription>{t("connector.github.expiredDescription", { login: login() })}</AlertDescription>
-          </AlertContent>
-          <AlertActions>
-            <Button type="button" size="sm" loading={props.busy} onClick={connect}>
-              {t("connector.github.reconnect")}
-            </Button>
-          </AlertActions>
-        </Alert>
-      </Show>
-
+    <IntegrationPage
+      class="github-connector"
+      logo={<GitHubMark />}
+      name={t("connector.github.title")}
+      status={header().status}
+      statusLabel={t(header().label)}
+      subtitle={
+        props.hostName
+          ? t("connector.github.descriptionHost", { host: props.hostName })
+          : t("connector.github.description")
+      }
+      actions={
+        <Show when={props.status.state === "disconnected"}>
+          <Button type="button" size="sm" loading={props.busy} onClick={connect}>
+            {t("connector.github.connect")}
+          </Button>
+        </Show>
+      }
+      // The dialog shows a failure while it is open, and the expired alert already tells the user why.
+      failure={failure()}
+      alert={
+        <Show when={props.status.state === "expired"}>
+          <Alert tone="warning" role="alert">
+            <AlertIcon>
+              <TriangleAlert />
+            </AlertIcon>
+            <AlertContent>
+              <AlertTitle>{t("connector.github.expiredTitle")}</AlertTitle>
+              <AlertDescription>{t("connector.github.expiredDescription", { login: login() })}</AlertDescription>
+            </AlertContent>
+            <AlertActions>
+              <Button type="button" size="sm" loading={props.busy} onClick={connect}>
+                {t("connector.github.reconnect")}
+              </Button>
+            </AlertActions>
+          </Alert>
+        </Show>
+      }
+      tagline={props.tagline}
+      intro={props.intro}
+      details={props.details}
+      danger={
+        <Show when={props.status.state === "connected" || props.status.state === "expired"}>
+          <DangerZone
+            title={t("connector.github.disconnectTitle")}
+            description={t("connector.github.disconnectSummary")}
+            action={t("connector.github.disconnect")}
+            busy={props.busy}
+            onAction={() => setConfirmOpen(true)}
+          />
+        </Show>
+      }
+    >
       <Show when={props.status.state === "connected" || props.status.state === "expired"}>
         <SettingsSection title={t("connector.github.accountTitle")}>
           <ItemGroup class="settings-modal-card">
@@ -179,16 +195,6 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
         />
       </Show>
 
-      <Show when={props.status.state === "connected" || props.status.state === "expired"}>
-        <DangerZone
-          title={t("connector.github.disconnectTitle")}
-          description={t("connector.github.disconnectSummary")}
-          action={t("connector.github.disconnect")}
-          busy={props.busy}
-          onAction={() => setConfirmOpen(true)}
-        />
-      </Show>
-
       <ConnectDialog {...props} open={connectOpen()} onRetry={props.onConnect} onClose={closeConnect} />
       <DisconnectDialog
         open={confirmOpen()}
@@ -197,22 +203,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
         onConfirm={confirmDisconnect}
         onClose={() => setConfirmOpen(false)}
       />
-    </div>
-  );
-}
-
-function FailedAlert(props: { message: string }) {
-  const { t, sourceText } = useText();
-  return (
-    <Alert tone="danger" role="alert">
-      <AlertIcon>
-        <OctagonX />
-      </AlertIcon>
-      <AlertContent>
-        <AlertTitle>{t("connector.github.actionFailed")}</AlertTitle>
-        <AlertDescription>{sourceText(props.message)}</AlertDescription>
-      </AlertContent>
-    </Alert>
+    </IntegrationPage>
   );
 }
 
@@ -254,7 +245,7 @@ function RepositoriesSection(props: {
       <ItemGroup class="settings-modal-card">
         <Show when={props.repositoriesError}>
           {(message) => (
-            <Text class="github-connector-line" tone="danger" variant="caption" role="alert">
+            <Text class="integration-card-note" tone="danger" variant="caption" role="alert">
               {message()}
             </Text>
           )}
@@ -263,7 +254,7 @@ function RepositoriesSection(props: {
           when={props.repositories}
           fallback={
             <Show when={!props.repositoriesError}>
-              <Text class="github-connector-line" tone="muted" variant="caption">
+              <Text class="integration-card-note" tone="muted" variant="caption">
                 {t("connector.github.repositoriesLoading")}
               </Text>
             </Show>
@@ -273,56 +264,58 @@ function RepositoriesSection(props: {
             <Show
               when={list().repositories.length > 0}
               fallback={
-                <Text class="github-connector-line" tone="muted" variant="caption">
+                <Text class="integration-card-note" tone="muted" variant="caption">
                   {t("connector.github.noRepositories")}
                 </Text>
               }
             >
-              <div class="github-connector-search">
-                <Search aria-hidden="true" />
-                <Input
-                  type="search"
-                  size="sm"
-                  placeholder={t("connector.github.filterPlaceholder", { count: list().repositories.length })}
-                  aria-label={t("connector.github.filterLabel")}
-                  value={query()}
-                  onInput={(event) => setQuery(event.currentTarget.value)}
-                />
+              <div class="integration-card-body">
+                <div class="github-connector-search">
+                  <Search aria-hidden="true" />
+                  <Input
+                    type="search"
+                    size="sm"
+                    placeholder={t("connector.github.filterPlaceholder", { count: list().repositories.length })}
+                    aria-label={t("connector.github.filterLabel")}
+                    value={query()}
+                    onInput={(event) => setQuery(event.currentTarget.value)}
+                  />
+                </div>
+                <Show
+                  when={matches().length > 0}
+                  fallback={
+                    <Text variant="caption" tone="muted">
+                      {t("connector.github.noMatch", { query: query().trim() })}
+                    </Text>
+                  }
+                >
+                  <ul class="github-connector-repository-list" aria-label={t("connector.github.repositoriesTitle")}>
+                    <For each={matches()} keyed={(repository) => repository.fullName}>
+                      {(repository) => {
+                        const slash = () => repository().fullName.indexOf("/");
+                        return (
+                          <li class="github-connector-repository">
+                            <Text as="span" class="github-connector-repository-name" variant="body-sm" truncate>
+                              <span class="github-connector-repository-owner">
+                                {repository().fullName.slice(0, slash() + 1)}
+                              </span>
+                              {repository().fullName.slice(slash() + 1)}
+                            </Text>
+                            <Show when={repository().private}>
+                              <Badge variant="secondary" class="github-connector-private">
+                                <Lock size={12} aria-hidden="true" />
+                                {t("connector.github.private")}
+                              </Badge>
+                            </Show>
+                          </li>
+                        );
+                      }}
+                    </For>
+                  </ul>
+                </Show>
               </div>
-              <Show
-                when={matches().length > 0}
-                fallback={
-                  <Text class="github-connector-line" variant="caption" tone="muted">
-                    {t("connector.github.noMatch", { query: query().trim() })}
-                  </Text>
-                }
-              >
-                <ul class="github-connector-repository-list" aria-label={t("connector.github.repositoriesTitle")}>
-                  <For each={matches()} keyed={(repository) => repository.fullName}>
-                    {(repository) => {
-                      const slash = () => repository().fullName.indexOf("/");
-                      return (
-                        <li class="github-connector-repository">
-                          <Text as="span" class="github-connector-repository-name" variant="body-sm" truncate>
-                            <span class="github-connector-repository-owner">
-                              {repository().fullName.slice(0, slash() + 1)}
-                            </span>
-                            {repository().fullName.slice(slash() + 1)}
-                          </Text>
-                          <Show when={repository().private}>
-                            <Badge variant="secondary" class="github-connector-private">
-                              <Lock size={12} aria-hidden="true" />
-                              {t("connector.github.private")}
-                            </Badge>
-                          </Show>
-                        </li>
-                      );
-                    }}
-                  </For>
-                </ul>
-              </Show>
               <Show when={list().total > list().repositories.length}>
-                <Text class="github-connector-line" tone="muted" variant="caption">
+                <Text class="integration-card-note" tone="muted" variant="caption">
                   {t("connector.github.moreRepositories", { count: list().total - list().repositories.length })}
                 </Text>
               </Show>
@@ -550,7 +543,7 @@ function DisconnectDialog(props: {
           <Button
             type="button"
             variant="destructive"
-            class="github-connector-confirm"
+            class="integration-confirm"
             data-cuelume-tap="close"
             data-cuelume-emphasis="strong"
             onClick={props.onConfirm}
@@ -561,21 +554,21 @@ function DisconnectDialog(props: {
         </>
       }
     >
-      <ul class="github-connector-effects">
+      <ul class="integration-effects">
         <li data-tone="danger">
-          <span class="github-connector-effect-icon" aria-hidden="true">
+          <span class="integration-effect-icon" aria-hidden="true">
             <Link2Off />
           </span>
           {t("connector.github.disconnectEffectTools")}
         </li>
         <li>
-          <span class="github-connector-effect-icon" aria-hidden="true">
+          <span class="integration-effect-icon" aria-hidden="true">
             <ExternalLink />
           </span>
           {t("connector.github.disconnectEffectRevoke")}
         </li>
         <li data-tone="success">
-          <span class="github-connector-effect-icon" aria-hidden="true">
+          <span class="integration-effect-icon" aria-hidden="true">
             <Check />
           </span>
           {props.hostName

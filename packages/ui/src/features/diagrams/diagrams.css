@@ -100,6 +100,14 @@
   padding-right: var(--diagram-inspector-width);
 }
 
+/* The board, or the empty canvas, and the chat panel over it. The panel keeps to this box. */
+.diagram-view-canvas {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
 .diagram-view-chat {
   position: absolute;
   bottom: var(--openbot-space-4);
@@ -151,29 +159,6 @@
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-.diagram-board-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  max-width: 280px;
-  gap: var(--openbot-space-1);
-  translate: -50% -50%;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  pointer-events: none;
-  text-align: center;
-}
-
-.diagram-board-empty strong {
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-}
-
-.diagram-board-empty p {
-  margin: 0;
-}
-
 /* The right-click menu's trigger wraps the viewport without a box of its own. */
 .diagram-board-menu-area {
   display: contents;
@@ -210,7 +195,11 @@
 /* A new agent, asked for at the spot the user right-clicked and kept inside the canvas. */
 .diagram-new-agent {
   position: absolute;
-  top: clamp(var(--openbot-space-2), var(--diagram-new-agent-y), calc(100% - 196px));
+  top: clamp(
+    var(--openbot-space-2),
+    var(--diagram-new-agent-y),
+    calc(100% - var(--diagram-new-agent-height, 188px) - var(--openbot-space-2))
+  );
   left: clamp(var(--openbot-space-2), var(--diagram-new-agent-x), calc(100% - 288px));
   z-index: 3;
   display: grid;
@@ -261,7 +250,6 @@
 .diagram-new-agent .provider-model-trigger-field:focus-visible {
   border-color: var(--openbot-border-focus);
   outline: none;
-  box-shadow: var(--openbot-focus-ring);
 }
 
 .diagram-new-agent-actions {
@@ -1431,4 +1419,219 @@
   .diagram-edge-remove.ui-button {
     transition: none;
   }
+}
+
+/*
+ * The canvas before its first routine: a faint sample diagram builds itself behind the pitch, one
+ * run passes through it, and it fades and starts again. The dots move into the backdrop, so they
+ * clear behind the pitch with the cards.
+ */
+.diagram-empty {
+  container-type: inline-size;
+}
+
+.diagram-empty-viewport {
+  display: grid;
+  background-image: none;
+  cursor: default;
+}
+
+.diagram-empty-backdrop {
+  position: relative;
+  grid-area: 1 / 1;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.62;
+  mask-image:
+    radial-gradient(ellipse 30% 30% at 50% 50%, var(--openbot-transparent) 55%, var(--openbot-text-primary) 100%),
+    radial-gradient(ellipse 80% 85% at 50% 50%, var(--openbot-text-primary) 55%, var(--openbot-transparent) 100%);
+  mask-composite: intersect;
+}
+
+.diagram-empty-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, var(--openbot-border-strong) 1px, var(--openbot-transparent) 0);
+  background-size: 24px 24px;
+}
+
+.diagram-empty-world {
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  transform-origin: center;
+  scale: var(--diagram-empty-scale);
+  transition:
+    opacity 900ms var(--openbot-ease-out),
+    filter 900ms var(--openbot-ease-out);
+}
+
+.diagram-empty-backdrop[data-leaving] .diagram-empty-world {
+  opacity: 0;
+  filter: blur(4px);
+}
+
+/* A card lands: it rises out of a blur. */
+.diagram-empty-node {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(12px) scale(0.96);
+  transition:
+    opacity 700ms var(--openbot-ease-out),
+    filter 700ms var(--openbot-ease-out),
+    transform 700ms var(--openbot-ease-out);
+}
+
+.diagram-empty-node[data-shown] {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+
+.diagram-empty-node .diagram-node {
+  cursor: default;
+}
+
+/* A connection draws from its output to its input, after the card it enters has landed. */
+.diagram-empty .diagram-empty-edge[data-state="idle"] .diagram-edge-line {
+  stroke-dasharray: 1600;
+  stroke-dashoffset: 1600;
+  transition: stroke-dashoffset 900ms var(--openbot-ease-in-out) 350ms;
+}
+
+.diagram-empty .diagram-empty-edge[data-drawn] .diagram-edge-line {
+  stroke-dashoffset: 0;
+}
+
+.diagram-empty .diagram-empty-edge[data-state] .diagram-edge-arrow {
+  opacity: 0;
+  transition: opacity 300ms var(--openbot-ease-out) 1100ms;
+}
+
+.diagram-empty .diagram-empty-edge[data-drawn] .diagram-edge-arrow {
+  opacity: 1;
+}
+
+/* The run pulse rides one connection, once, in the colour of the routine that fired. */
+.diagram-empty-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--diagram-routine-color, var(--openbot-accent));
+  outline: 4px solid var(--diagram-routine-soft, var(--openbot-accent-soft));
+  offset-rotate: 0deg;
+  animation: diagram-empty-pulse 900ms var(--openbot-ease-in-out) both;
+}
+
+@keyframes diagram-empty-pulse {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.diagram-empty-pitch {
+  z-index: 1;
+  display: grid;
+  grid-area: 1 / 1;
+  max-width: 34rem;
+  place-self: center;
+  justify-items: center;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-6);
+  text-align: center;
+}
+
+.diagram-empty-title {
+  margin: 0;
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.diagram-empty-title > span {
+  display: block;
+}
+
+.diagram-empty-lead {
+  color: var(--openbot-text-muted);
+}
+
+/* The one handwritten word of the title. It writes itself once. The app has no hand font, so it
+   uses the system ones; their small x-height is brought up to the title's. */
+.diagram-empty-title .diagram-empty-hand {
+  display: inline;
+  color: var(--openbot-accent-text);
+  font-family: "Bradley Hand", "Noteworthy", "Segoe Print", cursive;
+  font-size-adjust: 0.62;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 1;
+  clip-path: inset(-0.4em 100% -0.4em -0.2em);
+  animation: diagram-empty-write 520ms linear 500ms forwards;
+}
+
+@keyframes diagram-empty-write {
+  to {
+    clip-path: inset(-0.4em -0.2em -0.4em -0.2em);
+  }
+}
+
+.diagram-empty-lines {
+  display: grid;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-xl);
+  line-height: 1.5;
+}
+
+.diagram-empty-action.ui-button {
+  width: 100%;
+  max-width: 22rem;
+  height: var(--openbot-control-lg);
+  margin-top: var(--openbot-space-2);
+}
+
+/* A narrow pane: a smaller title, and a stronger fade so the cards stay behind the words. */
+@container (max-width: 720px) {
+  .diagram-empty-title {
+    font-size: var(--openbot-text-3xl);
+  }
+
+  .diagram-empty-lines {
+    font-size: var(--openbot-text-lg);
+  }
+
+  .diagram-empty-backdrop {
+    opacity: 0.45;
+  }
+}
+
+/* Less motion: a still frame with the finished run. */
+.diagram-empty[data-still] :is(.diagram-empty-world, .diagram-empty-node, .diagram-empty-hand),
+.diagram-empty[data-still] .diagram-empty-edge[data-state] path {
+  animation: none;
+  transition: none;
+  clip-path: none;
+}
+
+.diagram-empty[data-still] .diagram-empty-pulse {
+  display: none;
 }

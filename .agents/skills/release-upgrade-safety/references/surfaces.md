@@ -55,11 +55,11 @@ use the key-inventory diff there instead. Derive the set rather than reading it 
 | `openbot:sidebar-collapsed:v1` | `src/renderer/src/features/sidebar/sidebar-sections.ts` |
 | `openbot:sidebar-people-order:v1` | `src/renderer/src/features/sidebar/sidebar-people-order.ts` |
 | `openbot:left-panel-collapsed`, `openbot:left-panel-width` | `src/renderer/src/layout.tsx`, `layout-constants.ts` |
-| `openbot:browser-panel-width`, `openbot:browser-pip-native-bounds` | `src/renderer/src/features/conversation/BrowserPanel.tsx` |
+| `openbot:browser-panel-width`, `openbot:browser-pip-native-bounds` | `src/renderer/src/features/conversation/FilePreviewPanel.tsx`, `conversation-controller.ts` |
 | `openbot:settings-panel-width` | `src/renderer/src/features/settings/settings-context.tsx` |
 | `openbot:completion-sound-enabled`, `openbot:task-sound` | `src/renderer/src/completion-sound.ts`. The app writes both keys; `"false"` in the old key reads as Off, so an older version keeps the choice |
 | `openbot:analytics-app-version` | `src/renderer/src/App.tsx` |
-| `openbot:landing-preview-ready`, `openbot:landing-preview-start` | `src/renderer/src/preview/landing-demo-messages.ts` |
+| `openbot:landing-preview-ready`, `openbot:landing-preview-start` | `packages/contracts/src/landing-preview-messages.ts` |
 
 The three `:v1` suffixes are the renderer's own version handling: bumping one to `:v2` abandons the
 old entry rather than migrating it, so it resets that state for every installed user.

@@ -182,6 +182,53 @@
     max-width: 100%;
   }
 
+  /*
+   * A phone has no room beside the chat. An open pane takes the full width under the chat header,
+   * which keeps its panel button, and the tab row is a second row. A maximized pane covers the chat
+   * header, as on desktop.
+   */
+  .web-app-frame[data-web-mobile-pane="conversation"]
+    .side-panel-docked:not(.side-panel-maximized)
+    > .conversation-header {
+    width: 100%;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"]
+    .side-panel-docked
+    > :is(.conversation-scroll, .composer-wrap, .unread-messages-banner, .chat-search) {
+    visibility: hidden;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked > .side-panel-header {
+    width: 100%;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"]
+    .side-panel-docked:not(.side-panel-maximized)
+    > .side-panel-header {
+    top: var(--left-header-height, 38px);
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked > .side-panel-header::before,
+  .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked .right-panel-resizer {
+    display: none;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"]
+    .side-panel-docked:not(.side-panel-maximized)
+    > :is(.browser-panel, .settings-panel) {
+    top: calc(2 * var(--left-header-height, 38px));
+  }
+
+  /* The pane list has no tabs, so it starts under the chat header. */
+  .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked:has(> .side-panel-empty) > .side-panel-header {
+    display: none;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked:has(> .side-panel-empty) > .side-panel-empty {
+    top: var(--left-header-height, 38px);
+  }
+
   .web-app .join-server-backdrop {
     padding: var(--openbot-space-3);
   }
@@ -309,15 +356,31 @@
 }
 
 /* The public site sets `a { color: inherit }`, which beats the zero-specificity button colour. */
-.web-connect-download.ui-button,
-.web-connect-download.ui-button:hover {
+.web-connect-download.ui-button-variant-default,
+.web-connect-download.ui-button-variant-default:hover {
   color: var(--openbot-text-on-light);
+}
+
+.web-connect-download.ui-button-variant-outline {
+  color: var(--openbot-text-secondary);
+}
+
+/* The same hover query as the shared outline button, so a tap leaves no hover colour. */
+@media (hover: hover) and (pointer: fine) and (min-width: 601px) {
+  .web-connect-download.ui-button-variant-outline:hover {
+    color: var(--openbot-text-primary);
+  }
+}
+
+.web-connect-hosted.ui-button {
+  width: 100%;
 }
 
 .web-connect-refresh.ui-button {
   color: var(--openbot-text-muted);
 }
 
+.web-connect-hosted.ui-button svg,
 .web-connect-actions .ui-button svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);

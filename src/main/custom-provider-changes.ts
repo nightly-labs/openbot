@@ -7,11 +7,14 @@ import { type ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } fr
 // This module owns the order of the two writes, so the backend never has to know that a store
 // exists: it is given a getter, and reads it again at every provider spawn.
 
-import type {
-  CustomProviderResult,
-  CustomProviderSummary,
-  SaveCustomProviderInput,
-  UpdateCustomProviderInput,
+import {
+  type CustomProviderHarness,
+  type CustomProviderRestart,
+  type CustomProviderResult,
+  type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  type SaveCustomProviderInput,
+  type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { AgentLifecycleFailed, type AgentService } from "../backend/agent-service";
 import type { CustomProviderStore } from "./custom-provider-store";
@@ -21,7 +24,11 @@ export interface CustomProviderChangeDependencies {
   // backend.
   service: Pick<
     AgentService,
-    "saveCustomProvider" | "updateCustomProvider" | "removeCustomProvider" | "reloadOpenCodeConfig"
+    | "saveCustomProvider"
+    | "updateCustomProvider"
+    | "removeCustomProvider"
+    | "reloadCustomProviderConfig"
+    | "startHarnessForMovedAgents"
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
 }
@@ -50,6 +57,25 @@ export function createCustomProviderChanges({
    * its own caller.
    */
   const gate = Semaphore.makeUnsafe(1);
+  const harnessOf = (id: string) => customProviders.list().find((provider) => provider.id === id)?.harness;
+  /**
+   * Restarts the harness that runs the endpoint now, and the one that ran it before when it moved.
+   * The answer is the current harness's, except that a restart a turn holds back on either one wins:
+   * until it runs, the endpoint is in neither catalogue.
+   */
+  const restart = Effect.fn("CustomProviderChanges.restart")(function* (
+    current: CustomProviderHarness | undefined,
+    previous: CustomProviderHarness | undefined,
+  ) {
+    const now = current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+    const outcome: CustomProviderRestart = yield* service.reloadCustomProviderConfig(now);
+    if (previous === undefined || previous === now) return outcome;
+    const before = yield* service.reloadCustomProviderConfig(previous);
+    // The agents on the endpoint move to `now` when it activates, and a harness that is not running
+    // does not activate by itself.
+    if (outcome === "not-running") yield* service.startHarnessForMovedAgents(now);
+    return before === "skipped-busy" ? before : outcome;
+  });
   function serialize<T>(run: () => Effect.Effect<T, ProviderRuntimeFailure>): Effect.Effect<T, ProviderRuntimeFailure> {
     return gate.withPermit(Effect.suspend(run));
   }
@@ -69,8 +95,9 @@ export function createCustomProviderChanges({
           // from the provider runtime. A restart that is skipped or that fails leaves the CLI
           // answering on the endpoints as they were, so the id stays out -- whether it was removed
           // before this write or already named models in that process's catalogue.
+          const previous = harnessOf(input.id);
           const providers = yield* service
-            .saveCustomProvider(input.id, () =>
+            .saveCustomProvider(input.id, input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, () =>
               customProviders
                 .save(input)
                 .pipe(
@@ -82,7 +109,7 @@ export function createCustomProviderChanges({
             .pipe(toProviderRuntimeFailure);
           return {
             providers,
-            restart: yield* service.reloadOpenCodeConfig().pipe(toProviderRuntimeFailure),
+            restart: yield* restart(harnessOf(input.id), previous).pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),
@@ -95,10 +122,11 @@ export function createCustomProviderChanges({
         Effect.fn("CustomProviderChanges.update")(function* () {
           yield* runtimeSync(() => customProviders.checkUpdate(input));
           const saved = customProviders.list().find((provider) => provider.id === input.id);
+          const previous = saved?.harness;
           const kept = new Set(input.models.map((model) => model.id));
           const removed = (saved?.models ?? []).filter((model) => !kept.has(model.id)).map((model) => model.id);
           const providers = yield* service
-            .updateCustomProvider(input.id, removed, () =>
+            .updateCustomProvider(input.id, input.harness ?? previous ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, removed, () =>
               customProviders
                 .update(input)
                 .pipe(
@@ -110,7 +138,7 @@ export function createCustomProviderChanges({
             .pipe(toProviderRuntimeFailure);
           return {
             providers,
-            restart: yield* service.reloadOpenCodeConfig().pipe(toProviderRuntimeFailure),
+            restart: yield* restart(harnessOf(input.id), previous).pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),
@@ -124,6 +152,7 @@ export function createCustomProviderChanges({
           // The backend owns this order: it excludes the endpoint, moves the agents off it, and runs
           // the write as one change no agent update can interleave with. A write that throws gives the
           // exclusion back, because the endpoint is then still saved and still served.
+          const previous = harnessOf(id);
           const providers = yield* service
             .removeCustomProvider(id, () =>
               customProviders
@@ -137,7 +166,7 @@ export function createCustomProviderChanges({
             .pipe(toProviderRuntimeFailure);
           return {
             providers,
-            restart: yield* service.reloadOpenCodeConfig().pipe(toProviderRuntimeFailure),
+            restart: yield* restart(previous, undefined).pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),

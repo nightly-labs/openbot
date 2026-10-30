@@ -12,6 +12,9 @@ export const WEBHOOK_TIMESTAMP_HEADER = "x-openbot-timestamp";
 export const WEBHOOK_DELIVERY_ID_HEADER = "x-openbot-delivery-id";
 export const WEBHOOK_SIGNATURE_HEADER = "x-openbot-signature";
 
+// The host refuses a signature whose timestamp is further than this from its clock: a replay.
+export const WEBHOOK_MAX_CLOCK_SKEW_SECONDS = 5 * 60;
+
 // The syntax of the opaque route ID in the public URL and of the three signed header values.
 // Signal refuses other values before it reads the body; the host checks them again.
 export const WEBHOOK_ROUTE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;

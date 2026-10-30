@@ -9,15 +9,26 @@ import {
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
+import { isPrivateNetworkCandidate, privateNetworkSdp } from "./team-webrtc-private-network";
 
 export interface BridgeCommand {
   commandId: string;
-  type: "connect" | "prepare-signal" | "disconnect" | "disconnect-peer" | "send" | "restart-ice" | "close";
+  type:
+    | "connect"
+    | "prepare-signal"
+    | "disconnect"
+    | "disconnect-peer"
+    | "send"
+    | "restart-ice"
+    | "set-private-network"
+    | "close";
   peerId: string;
   signalUrl?: string;
   token?: string;
   peer?: "host" | "client";
   iceTransportPolicy?: "all" | "relay";
+  /** For a host: devices connect only over a private network, with no STUN or TURN. */
+  privateNetwork?: boolean;
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
 }
@@ -58,6 +69,8 @@ interface PeerState {
   peerConnection: RTCPeerConnection | null;
   iceServers: RTCIceServer[];
   iceTransportPolicy: "all" | "relay";
+  /** A host and its device connections use only private network candidates and no ICE servers. */
+  privateNetwork: boolean;
   channels: Partial<Record<"rpc" | "events" | "files" | "desktop", RTCDataChannel>>;
   payloadDecoders: Partial<Record<"rpc" | "events" | "files" | "desktop", TeamWebRtcPayloadDecoder>>;
   reconnectAttempt: number;
@@ -74,6 +87,8 @@ interface PeerState {
   iceRestarts: number;
   /** Set by `replaceSignal`: after a network change the path can be dead while it still reports `connected`. */
   restartIceOnReady: boolean;
+  /** A host child whose path failed. Main counts the phone as away until the path comes back. */
+  pathLost: boolean;
   signalChain: Promise<void>;
   closed: boolean;
 }
@@ -155,6 +170,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         peerConnection: null,
         iceServers: [],
         iceTransportPolicy: command.iceTransportPolicy,
+        privateNetwork: command.peer === "host" && command.privateNetwork === true,
         channels: {},
         payloadDecoders: {},
         reconnectAttempt: 0,
@@ -167,6 +183,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceRestarting: false,
         iceRestarts: 0,
         restartIceOnReady: false,
+        pathLost: false,
         signalChain: Promise.resolve(),
         closed: false,
       };
@@ -189,6 +206,10 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       await sendChannelPayload(state, channel, command.data);
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
+    } else if (command.type === "set-private-network") {
+      // A host that is not connected now reads the route again when it connects.
+      const host = peers.get(command.peerId);
+      if (host) setPrivateNetwork(host, command.privateNetwork === true);
     } else if (command.type === "close") {
       for (const peerId of [...preparedSignals.keys()]) dropPreparedSignal(peerId);
       for (const peerId of [...peers.keys()]) disconnect(peerId);
@@ -414,15 +435,15 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     for (const client of state.clients.values()) {
       client.iceServers = state.iceServers;
       client.peerConnection?.setConfiguration({
-        iceServers: client.iceServers,
+        iceServers: usableIceServers(client),
         bundlePolicy: "max-bundle",
         iceTransportPolicy: client.iceTransportPolicy,
       });
-      post({ type: "ice-servers", peerId: client.id, iceServers: client.iceServers });
+      post({ type: "ice-servers", peerId: client.id, iceServers: usableIceServers(client) });
     }
     if (state.peerConnection)
       state.peerConnection.setConfiguration({
-        iceServers: state.iceServers,
+        iceServers: usableIceServers(state),
         bundlePolicy: "max-bundle",
         iceTransportPolicy: state.iceTransportPolicy,
       });
@@ -431,7 +452,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     if (state.role === "client" && state.peerConnection && !shouldRestartIce && !turnRefresh)
       scheduleTurnRefresh(state, Math.max(0, state.turnRefreshDueAt - Date.now()));
     else scheduleTurnRefresh(state);
-    post({ type: "ice-servers", peerId: state.id, iceServers: state.iceServers });
+    post({ type: "ice-servers", peerId: state.id, iceServers: usableIceServers(state) });
     post({ type: "signal-ready", peerId: state.id });
     if (shouldRestartIce) state.iceRestartPending = true;
     if (state.iceRestartPending) await retryPendingIceRestart(state);
@@ -475,6 +496,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
         disconnectedTimer: null,
+        pathLost: false,
         signalChain: Promise.resolve(),
       };
       state.clients.set(message.sessionId, client);
@@ -540,7 +562,10 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       dropConnection(state);
       return;
     }
-    await connection.setRemoteDescription({ type: "offer", sdp: message.sdp });
+    await connection.setRemoteDescription({
+      type: "offer",
+      sdp: state.privateNetwork ? privateNetworkSdp(message.sdp) : message.sdp,
+    });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
     sendSignal(state, {
@@ -548,7 +573,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       version: SIGNAL_PROTOCOL_VERSION,
       connectionId: message.connectionId,
       channel: "team",
-      sdp: requiredDescriptionSdp(answer),
+      // An answer after gathering, such as on an ICE restart, can already hold candidates.
+      sdp: state.privateNetwork ? privateNetworkSdp(requiredDescriptionSdp(answer)) : requiredDescriptionSdp(answer),
     });
   } else if (message.type === "answer") {
     const previousFingerprint = sdpFingerprint(state.peerConnection?.remoteDescription?.sdp);
@@ -560,6 +586,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     }
     await state.peerConnection?.setRemoteDescription({ type: "answer", sdp: message.sdp });
   } else if (message.type === "ice-candidate") {
+    if (state.privateNetwork && !isPrivateNetworkCandidate(message.candidate)) return;
     await state.peerConnection?.addIceCandidate({
       candidate: message.candidate,
       sdpMid: message.sdpMid,
@@ -572,7 +599,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
 
 function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTCPeerConnection {
   const connection = new RTCPeerConnection({
-    iceServers,
+    iceServers: state.privateNetwork ? [] : iceServers,
     bundlePolicy: "max-bundle",
     iceTransportPolicy: state.iceTransportPolicy,
   });
@@ -581,6 +608,7 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
   connection.onicecandidate = (event) => {
     // An empty candidate marks the end of gathering. Signal v1 accepts only candidates.
     if (!event.candidate?.candidate || !state.connectionId) return;
+    if (state.privateNetwork && !isPrivateNetworkCandidate(event.candidate.candidate)) return;
     sendSignal(state, {
       type: "ice-candidate",
       version: SIGNAL_PROTOCOL_VERSION,
@@ -600,12 +628,22 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     if (connection.connectionState === "connected") {
       clearPathRecovery(state);
       void reportSelectedPath(state, connection).catch(() => undefined);
+      if (state.signalHost && state.pathLost) {
+        state.pathLost = false;
+        post({ type: "peer-path-restored", peerId: state.id });
+      }
     }
     if (connection.connectionState === "disconnected" || connection.connectionState === "failed")
       recoverPath(state, connection);
     if (connection.connectionState === "failed") {
       state.iceRestartPending = true;
       void retryPendingIceRestart(state);
+      // ICE consent expired: the phone did not answer for 30 s, as when iOS suspends the app. The
+      // host keeps the peer for its return, but the phone cannot update its Live Activity now.
+      if (state.signalHost && !state.pathLost) {
+        state.pathLost = true;
+        post({ type: "peer-path-lost", peerId: state.id });
+      }
     }
     if (connection.connectionState === "closed") post({ type: "peer-disconnected", peerId: state.id });
   };
@@ -772,6 +810,26 @@ function iceUfrag(sdp: string): string | undefined {
   return sdp.match(/^a=ice-ufrag:(\S+)$/mu)?.[1];
 }
 
+/** The ICE servers that a connection of this peer may use. The private network route uses none. */
+function usableIceServers(state: PeerState): RTCIceServer[] {
+  return state.privateNetwork ? [] : state.iceServers;
+}
+
+/**
+ * Turns the private network route on or off for a host. Turning it on closes every device
+ * connection, so no connection keeps a relayed or public path. Each device then connects again
+ * with private candidates only. Connections that are already private stay valid when it turns off.
+ */
+function setPrivateNetwork(host: PeerState, privateNetwork: boolean): void {
+  if (host.role !== "host" || host.signalHost || host.privateNetwork === privateNetwork) return;
+  host.privateNetwork = privateNetwork;
+  for (const client of [...host.clients.values()]) {
+    client.privateNetwork = privateNetwork;
+    if (privateNetwork) dropConnection(client);
+  }
+  post({ type: "ice-servers", peerId: host.id, iceServers: usableIceServers(host) });
+}
+
 /**
  * Closes a connection that has used up its ICE restarts or lost a data channel. Signal tells the
  * other end, which closes its own connection, and the client connects again with a new one.
@@ -853,7 +911,13 @@ function replaceSignal(state: PeerState): void {
 
 function scheduleSignalReconnect(state: PeerState): void {
   if (state.reconnectTimer !== null) return;
-  const delay = Math.max(signalRetryAt - Date.now(), Math.min(30_000, 500 * 2 ** state.reconnectAttempt++));
+  // A Signal restart disconnects all hosts at the same time, and each resume asks the account service.
+  // The first retry is spread over 0.5–4 s (before: 0.25–0.5 s). Later retries double up to 30 s.
+  const attempt = state.reconnectAttempt++;
+  const delay = Math.max(
+    signalRetryAt - Date.now(),
+    attempt === 0 ? 500 + Math.random() * 3_500 : Math.min(30_000, 500 * 2 ** attempt) * (0.5 + Math.random() / 2),
+  );
   state.reconnectTimer = window.setTimeout(() => {
     state.reconnectTimer = null;
     connectSignal(state);

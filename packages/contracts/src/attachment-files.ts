@@ -2,6 +2,11 @@ export const IMAGE_ATTACHMENT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp",
 
 export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "mov"] as const;
 
+export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
+
+/** MP4 came after `media-attachments`, so a remote host advertises it with its own capability. */
+export const MP4_ATTACHMENT_EXTENSIONS = ["mp4"] as const;
+
 export const CONTEXT_ATTACHMENT_EXTENSIONS = [
   "pdf",
   "doc",
@@ -73,6 +78,8 @@ export const CONTEXT_ATTACHMENT_EXTENSIONS = [
 export const ATTACHMENT_FILE_EXTENSIONS = [
   ...IMAGE_ATTACHMENT_EXTENSIONS,
   ...MEDIA_ATTACHMENT_EXTENSIONS,
+  ...ARCHIVE_ATTACHMENT_EXTENSIONS,
+  ...MP4_ATTACHMENT_EXTENSIONS,
   ...CONTEXT_ATTACHMENT_EXTENSIONS,
 ] as const;
 
@@ -87,6 +94,7 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
 export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   ...IMAGE_ATTACHMENT_EXTENSIONS,
   ...MEDIA_ATTACHMENT_EXTENSIONS,
+  ...MP4_ATTACHMENT_EXTENSIONS,
   "pdf",
   "docx",
   "odt",
@@ -103,23 +111,27 @@ export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   "log",
 ] as const;
 
-/** What a host accepts beyond the base list. An older remote host rejects EML, MP3, and MOV. */
+/** What a host accepts beyond the base list. An older remote host rejects EML, MP3, MOV, ZIP, and MP4. */
 export interface AttachmentSupport {
   eml: boolean;
   media: boolean;
+  zip: boolean;
+  mp4: boolean;
 }
 
 export function supportedAttachmentExtensions(support: AttachmentSupport): string[] {
   return ATTACHMENT_FILE_EXTENSIONS.filter(
     (extension) =>
       (support.eml || extension !== "eml") &&
-      (support.media || !MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)),
+      (support.media || !MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)) &&
+      (support.zip || !ARCHIVE_ATTACHMENT_EXTENSIONS.some((archive) => archive === extension)) &&
+      (support.mp4 || !MP4_ATTACHMENT_EXTENSIONS.some((mp4) => mp4 === extension)),
   );
 }
 
 export const ATTACHMENT_FILE_ACCEPT = ATTACHMENT_FILE_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 export const SUPPORTED_ATTACHMENT_DESCRIPTION =
-  "images, MP3 audio, MOV video, PDF, Office documents, EML, text, Markdown, data, or source files";
+  "images, MP3 audio, MOV or MP4 video, ZIP archives, PDF, Office documents, EML, text, Markdown, data, or source files";
 
 export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -155,6 +167,8 @@ export function isSupportedAttachmentNameFor(name: string, support: AttachmentSu
   const extension = attachmentFileExtension(name);
   if (extension === "eml") return support.eml;
   if (MEDIA_ATTACHMENT_EXTENSIONS.some((media) => media === extension)) return support.media;
+  if (ARCHIVE_ATTACHMENT_EXTENSIONS.some((archive) => archive === extension)) return support.zip;
+  if (MP4_ATTACHMENT_EXTENSIONS.some((mp4) => mp4 === extension)) return support.mp4;
   return true;
 }
 
@@ -167,7 +181,7 @@ export function isSupportedAttachmentNameFor(name: string, support: AttachmentSu
 export function assertSupportedAttachmentName(name: string): void {
   if (isSupportedAttachmentName(name)) return;
   throw new Error(
-    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3 or MOV, or attach a text transcript.`,
+    `${name} is not supported. Attach ${SUPPORTED_ATTACHMENT_DESCRIPTION}. For other audio or video formats, export as MP3, MOV, or MP4, or attach a text transcript.`,
   );
 }
 
@@ -188,6 +202,10 @@ export function attachmentMimeTypeForName(name: string) {
       return "audio/mpeg";
     case "mov":
       return "video/quicktime";
+    case "mp4":
+      return "video/mp4";
+    case "zip":
+      return "application/zip";
     case "pdf":
       return "application/pdf";
     // SVG is not in ATTACHMENT_FILE_EXTENSIONS, so it cannot be attached: an attachment with an

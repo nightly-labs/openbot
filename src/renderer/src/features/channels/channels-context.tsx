@@ -1,3 +1,4 @@
+import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -26,7 +27,7 @@ export function ChannelsControllerProvider(props: ParentProps<{ controller: Chan
 
 /** The desktop channels domain: preload is the runtime, and the app's contexts are the environment. */
 export function ChannelsProvider(props: ParentProps) {
-  const { activeServer, activeServerId } = useServers();
+  const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
   const { agentList, setAgentSetupOpen } = useAgents();
   const { clearDirectSelection, setDirectTyping } = useDirectMessages();
   const windowPage = useWindowPage();
@@ -50,8 +51,7 @@ export function ChannelsProvider(props: ParentProps) {
         writeChannelSelection(accountKey(), selectionServerId, channelId);
       }
     },
-    // Channels are deprecated: the host archives them at start, and no server offers them.
-    supported: () => false,
+    supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     beforeOpen: () => {
       setAgentSetupOpen(false);

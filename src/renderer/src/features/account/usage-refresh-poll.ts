@@ -1,6 +1,6 @@
 import { createEffect, untrack } from "solid-js";
 
-/** How old a plan limits reading may get before it is fetched again. The rail rings always show it. */
+/** How old a reading may get before it is fetched again. The rail rings always show the plan limits. */
 const USAGE_AUTO_REFRESH_MS = 5 * 60_000;
 /** The poll asks more often than it refreshes, and each tick compares the age of the reading. */
 const USAGE_AUTO_REFRESH_CHECK_MS = 30_000;
@@ -17,8 +17,9 @@ export interface UsageRefreshPollOptions {
 }
 
 /**
- * Keeps the plan limits of the usage target fresh, on desktop and on the web. A hidden window or tab
- * does not poll; coming back to it refreshes at once when the interval has passed.
+ * Keeps a reading of the target fresh: the plan limits, on desktop and on the web, and the disk of the
+ * sidebar storage card. A hidden window or tab does not poll; coming back to it refreshes at once when
+ * the interval has passed.
  */
 export function createUsageRefreshPoll(options: UsageRefreshPollOptions) {
   let lastRefreshAt = 0;

@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "Anulowanie…",
   "prompt.browser.pageFallback": "Strona przeglądarki",
   "prompt.browser.hostFallback": "przeglądarka",
+  "prompt.browser.signInBlocked.label": "Logowanie zablokowane",
+  "prompt.browser.signInBlocked.title": "Strona {host} zablokowała logowanie z {server}",
+  "prompt.browser.signInBlocked.cancelledTitle": "Logowanie do {host} anulowane",
+  "prompt.browser.signInBlocked.body":
+    "Zaloguj się na tym komputerze. OpenBot wyśle do {server} tylko logowanie do {host}, a {name} będzie kontynuować.",
+  "prompt.browser.signInBlocked.cancelledBody": "Logowanie zostało anulowane.",
+  "prompt.browser.signInBlocked.waiting": "Czekam na logowanie",
+  "prompt.browser.signInBlocked.waitingButton": "Czekam na logowanie…",
+  "prompt.browser.signInBlocked.page": "{host} na {server}",
   "prompt.inputRequiredAnnouncement": "Wymagana odpowiedź. {question}",
 } as const satisfies PartialTranslation<typeof source>;

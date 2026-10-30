@@ -97,6 +97,10 @@ export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreferenc
   return preference.autoApproveOverrides[agentId] === true;
 }
 
+/** `sign-in-blocked`: the site refused the sign-in from the host's address. */
+export const BROWSER_TAKEOVER_REASONS = ["sign-in-blocked"] as const;
+export type BrowserTakeoverReason = (typeof BROWSER_TAKEOVER_REASONS)[number];
+
 export interface BrowserTakeoverRequest {
   requestId: string | number;
   agentId: string;
@@ -104,6 +108,7 @@ export interface BrowserTakeoverRequest {
   turnId: string;
   tabId: string;
   secret?: BrowserSecretRequest;
+  reason?: BrowserTakeoverReason;
 }
 
 export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeoverRequest {
@@ -114,7 +119,8 @@ export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeov
     isIdentifier(value.threadId) &&
     isIdentifier(value.turnId) &&
     isIdentifier(value.tabId) &&
-    (value.secret === undefined || isBrowserSecretRequest(value.secret))
+    (value.secret === undefined || isBrowserSecretRequest(value.secret)) &&
+    (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason))
   );
 }
 

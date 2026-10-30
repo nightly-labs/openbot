@@ -1,6 +1,7 @@
 import {
   type AgentSummary,
   COMPUTER_USE_MCP_SERVER_NAME,
+  isHomeSkillId,
   type McpServerConfig,
   RESERVED_MCP_SERVER_NAMES,
   type Routine,
@@ -41,6 +42,7 @@ const BUILTIN_SERVER_NAMES = new Set<string>([...RESERVED_MCP_SERVER_NAMES, COMP
 export interface AnalyticsInventorySources {
   agents: () => AgentSummary[];
   routines: (agentId: string) => Routine[];
+  workflowCount: () => number;
   skills: SkillMarketplaceService["listInstalledForChatTags"];
   mcpServers: () => McpServerConfig[];
   pluginSlug: (config: McpServerConfig) => string | null;
@@ -71,7 +73,8 @@ export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")
     enabledRoutineCount += sources.routines(agent.id).filter((routine) => routine.active).length;
     const skills = yield* sources.skills(agent.id).pipe(Effect.catch(() => Effect.succeed([])));
     for (const skill of skills) {
-      if (skill.enabled === false) continue;
+      // A home skill is the host user's and the same for every agent, so it is not counted per agent.
+      if (skill.enabled === false || isHomeSkillId(skill.skillId)) continue;
       if (skill.skillId.startsWith(CURATED_SKILL_PREFIX))
         curatedSkills.add(skill.skillId.slice(CURATED_SKILL_PREFIX.length));
       else if (skill.origin === "local" || skill.origin === "workspace") localSkillCount += 1;
@@ -85,6 +88,7 @@ export const collectAnalyticsInventory = Effect.fn("Analytics.collectInventory")
   return {
     agentCount: agents.length,
     enabledRoutineCount,
+    workflowCount: sources.workflowCount(),
     customMcpServerCount,
     plugins: [...plugins],
     curatedSkills: [...curatedSkills],

@@ -1,3 +1,4 @@
+import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { isConnectorId } from "@openbot/ui/features/connectors/connectors";
@@ -5,6 +6,7 @@ import {
   MarketplaceSuggestionCard,
   type MarketplaceSuggestionState,
 } from "@openbot/ui/features/conversation/MarketplaceSuggestionCard";
+import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
 import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
@@ -17,6 +19,8 @@ export interface MarketplaceSuggestionChatCardProps {
   appId: string;
   /** The connectors of the server on screen. Without it, a connector card has no action. */
   connectors?: ConnectorRegistry | undefined;
+  /** The MCP servers of the host. A catalog app is connected when the host holds each of its servers. */
+  mcpServers?: readonly McpServerConfig[] | undefined;
   onOpenMarketplaceApp?: ((request: { appId: string; connect: boolean }) => void) | undefined;
 }
 
@@ -46,9 +50,20 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     const found = plugin();
     return found ? localizedPlugin(found, t).tagline : "";
   };
+  /**
+   * Connected when the host holds every app, and attention when it holds some, as Marketplace does
+   * for apps. Marketplace also counts the plugin's skills, which belong to an agent; no catalog
+   * plugin has one yet.
+   */
+  const pluginState = (): MarketplaceSuggestionState => {
+    const apps = plugin()?.apps ?? [];
+    const held = apps.map((app) => (props.mcpServers ?? []).some((config) => isPluginAppConfig(config, app)));
+    if (held.length > 0 && held.every(Boolean)) return "connected";
+    return held.some(Boolean) ? "attention" : "available";
+  };
   const state = (): MarketplaceSuggestionState => {
     const entry = connector();
-    if (!entry) return "available";
+    if (!entry) return pluginState();
     if (entry.access === "loading") return "busy";
     if (entry.access !== "available") return "unavailable";
     if (entry.controller.busy()) return "busy";

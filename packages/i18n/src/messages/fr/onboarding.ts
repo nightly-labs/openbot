@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot n’a pas pu lire votre configuration.",
+  "onboarding.readFailed.description":
+    "Vos données locales n’ont pas changé. Réessayez. Si le problème persiste, configurez OpenBot à nouveau.",
+  "onboarding.readFailed.setUpAgain": "Reconfigurer",
   "onboarding.setup.saveFailed": "OpenBot n’a pas pu enregistrer votre configuration locale.",
   "onboarding.setup.verifyFailed": "OpenBot n’a pas pu vérifier cette invitation.",
   "onboarding.setup.connectFailed": "OpenBot n’a pas pu se connecter à cet hôte.",
@@ -39,6 +43,9 @@ export const messages = {
   "onboarding.provider.googlePlan": "Forfait Google AI Pro ou Ultra",
   "onboarding.provider.cursorPlan": "Forfait Cursor ou clé API",
   "onboarding.provider.clineAccount": "Modèles gratuits avec un compte Cline",
+  "onboarding.provider.inceptionKey": "Modèles Mercury avec une clé d’API Inception",
+  "onboarding.provider.deepseekKey": "Modèles DeepSeek avec une clé d’API DeepSeek",
+  "onboarding.provider.openrouterKey": "De nombreux modèles avec une clé d’API OpenRouter",
   "onboarding.provider.tryFree": "Essayez gratuitement",
   "onboarding.provider.noSignIn": "Aucune connexion requise",
   "onboarding.provider.more": "Plus de fournisseurs",

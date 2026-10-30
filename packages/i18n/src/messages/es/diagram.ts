@@ -4,8 +4,37 @@ import type { messages as source } from "../en/diagram";
 export const messages = {
   "diagram.view.label": "Diagrama {name}",
   "diagram.board.label": "Lienzo de {name}",
-  "diagram.board.emptyTitle": "Empieza con una rutina",
-  "diagram.board.emptyBody": "Añade una rutina que inicie el trabajo y conecta agentes a ella.",
+  "diagram.board.emptyLead": "Dibújala una vez.",
+  "diagram.board.emptyTitle": "Y mira cómo {run}.",
+  "diagram.board.emptyRun": "funciona",
+  "diagram.board.emptyStart": "Una rutina inicia el trabajo.",
+  "diagram.board.emptyHandoff": "Cada agente pasa su respuesta al siguiente.",
+  "diagram.board.sample.routine": "Resumen matutino",
+  "diagram.board.sample.instruction":
+    "Reúne lo que cambió desde ayer en el mercado y en el embudo de ventas, y conviértelo en las prioridades de hoy.",
+  "diagram.board.sample.researchName": "Investigación",
+  "diagram.board.sample.researchTitle": "Socio de investigación",
+  "diagram.board.sample.researchTask":
+    "Reúne las noticias de mercado y de producto desde ayer, con una fuente para cada punto.",
+  "diagram.board.sample.researchOutput":
+    "1. Northwind bajó sus precios de API un 20 %.\n2. La guía de la UE para modelos de uso general es definitiva.\n3. Dos competidores lanzaron lienzos de agentes esta semana.",
+  "diagram.board.sample.salesName": "Ventas",
+  "diagram.board.sample.salesTitle": "Especialista en prospección",
+  "diagram.board.sample.salesTask":
+    "Enumera los acuerdos que cambiaron de etapa desde ayer y el siguiente paso de cada uno.",
+  "diagram.board.sample.salesOutput":
+    "- Contoso pasó a Negociación. Siguiente paso: enviar la revisión de seguridad.\n- Fabrikam lleva 9 días parado. Siguiente paso: llamar al contacto clave.",
+  "diagram.board.sample.writerName": "Redactor",
+  "diagram.board.sample.writerTitle": "Redactor de resúmenes",
+  "diagram.board.sample.writerTask":
+    "Escribe un resumen a partir de la investigación y del embudo. Menos de 200 palabras.",
+  "diagram.board.sample.writerOutput":
+    "Northwind bajó sus precios de API, la guía de la UE es definitiva y Contoso está cerca de cerrar. Fabrikam necesita una llamada hoy.",
+  "diagram.board.sample.chiefName": "Jefe",
+  "diagram.board.sample.chiefTitle": "Jefe de gabinete",
+  "diagram.board.sample.chiefTask": "Lee el resumen, decide las tres prioridades de hoy y publícalas para el equipo.",
+  "diagram.board.sample.chiefOutput":
+    "Prioridades de hoy:\n1. Enviar la revisión de seguridad a Contoso.\n2. Responder a la bajada de precios de Northwind.\n3. Llamar a Fabrikam.",
   "diagram.menu.label": "Lienzo",
   "diagram.menu.addAgent": "Añadir agente aquí",
   "diagram.menu.noAgents": "Todos los agentes están en el lienzo",

@@ -27,5 +27,6 @@ export * from "./sliding-tabs";
 export * from "./surface";
 export * from "./switch";
 export * from "./toast";
+export * from "./tooltip";
 export * from "./typography";
 export * from "./user-avatar";

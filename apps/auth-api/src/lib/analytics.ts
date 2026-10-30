@@ -9,9 +9,13 @@ import {
 } from "@openbot/contracts/first-touch";
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
+import { BRAND_ROUTE } from "./brand-page";
+import { COMMERCIAL_LICENSE_ROUTE } from "./commercial-license";
+import { CONTACT_TOPICS } from "./contact";
 import { CONTENT_COLLECTIONS } from "./content";
 import { type CollectionId, type ContentCollection, findArticle } from "./content-collection";
 import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platforms";
+import { DPA_ROUTE } from "./dpa";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_LINKS,
@@ -19,11 +23,15 @@ import {
   OPENBOT_LINKS,
 } from "./landing-links";
 import { MOBILE_APPS } from "./mobile-apps";
+import { PRICING_ROUTE } from "./pricing-page";
+import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
 import { TEAMS_ROUTE } from "./teams-page";
+import { TERMS_ROUTE } from "./terms";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
-const ANALYTICS_SCHEMA_VERSION = 9;
+/** Generation 10 adds `billing_return_viewed` and `contact_form_submitted`. */
+const ANALYTICS_SCHEMA_VERSION = 10;
 
 type LandingAcquisitionSource = FirstTouchAcquisitionSource;
 
@@ -36,6 +44,16 @@ export interface ArticleReference {
   slug: string;
 }
 
+/** The Stripe page that closed before the desktop return page opened. */
+export type BillingReturnKind = "plan" | "license" | "portal";
+export const BILLING_RETURN_KINDS = ["plan", "license", "portal"] as const satisfies readonly BillingReturnKind[];
+type BillingReturnOutcome = "completed" | "cancelled";
+
+type ContactTopicId = (typeof CONTACT_TOPICS)[number]["id"];
+/** `rate_limited` is the 429 answer; `failed` is each other failure, the network included. */
+type ContactFormResult = "succeeded" | "failed" | "rate_limited";
+const CONTACT_TOPIC_IDS = CONTACT_TOPICS.map((topic) => topic.id);
+
 interface LandingAnalyticsEvents {
   landing_viewed: Record<string, never>;
   landing_download_clicked: { platform: LandingDownloadPlatform; placement: LandingPlacement };
@@ -47,6 +65,8 @@ interface LandingAnalyticsEvents {
     | { action: "view"; valid_invite: boolean }
     | { action: "open_app" }
     | { action: "download"; platform: DownloadPlatform };
+  billing_return_viewed: { outcome: BillingReturnOutcome; kind?: BillingReturnKind };
+  contact_form_submitted: { topic?: ContactTopicId; result: ContactFormResult };
 }
 
 type LandingEventName = keyof LandingAnalyticsEvents;
@@ -56,6 +76,7 @@ type LandingPlacement =
   | "download_section"
   | "teams_section"
   | "teams_page"
+  | "pricing_page"
   | "download_page"
   | "footer"
   | "content_index"
@@ -69,6 +90,7 @@ const LANDING_PLACEMENTS = [
   "download_section",
   "teams_section",
   "teams_page",
+  "pricing_page",
   "download_page",
   "footer",
   "content_index",
@@ -85,6 +107,7 @@ type LandingDestination =
   | "guides"
   | "contact"
   | "teams"
+  | "pricing"
   | "x"
   | "discord"
   | "repository"
@@ -108,7 +131,14 @@ export type LandingScreenPath =
   | "/"
   | "/join"
   | "/contact"
+  | "/billing/return"
   | typeof TEAMS_ROUTE
+  | typeof PRICING_ROUTE
+  | typeof BRAND_ROUTE
+  | typeof PRIVACY_POLICY_ROUTE
+  | typeof TERMS_ROUTE
+  | typeof COMMERCIAL_LICENSE_ROUTE
+  | typeof DPA_ROUTE
   | DownloadPagePath
   | CollectionIndexRoute
   | `${CollectionIndexRoute}/${string}`;
@@ -118,6 +148,12 @@ const FIXED_SCREEN_PATHS = [
   "/join",
   "/contact",
   TEAMS_ROUTE,
+  PRICING_ROUTE,
+  BRAND_ROUTE,
+  PRIVACY_POLICY_ROUTE,
+  TERMS_ROUTE,
+  COMMERCIAL_LICENSE_ROUTE,
+  DPA_ROUTE,
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS),
   "/news",
   "/guides",
@@ -190,12 +226,12 @@ const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.download, "download_section"],
-  [OPENBOT_LINKS.downloadFromOtherPage, "download_section"],
   ...Object.values(OPENBOT_DOWNLOAD_PAGE_LINKS).map((path) => [path, "download_page"] as const),
   [OPENBOT_LINKS.news, "news"],
   [OPENBOT_LINKS.guides, "guides"],
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
+  [PRICING_ROUTE, "pricing"],
   [OPENBOT_LINKS.x, "x"],
   [OPENBOT_LINKS.discord, "discord"],
   [OPENBOT_LINKS.repository, "repository"],
@@ -204,6 +240,7 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.changelog, "releases"],
   [OPENBOT_LINKS.license, "license"],
   [OPENBOT_LINKS.privacy, "privacy"],
+  [PRIVACY_POLICY_ROUTE, "privacy"],
   [OPENBOT_LINKS.documentation, "documentation"],
   [OPENBOT_LINKS.troubleshooting, "troubleshooting"],
   [OPENBOT_LINKS.architecture, "architecture"],
@@ -220,6 +257,8 @@ const EVENT_PROPERTY_ALLOWLIST = {
   content_article_opened: ["collection", "slug", "placement"],
   content_article_read: ["collection", "slug", "depth"],
   join_page_action: ["action", "valid_invite", "platform"],
+  billing_return_viewed: ["outcome", "kind"],
+  contact_form_submitted: ["topic", "result"],
 } as const satisfies Record<LandingEventName, readonly string[]>;
 
 /**
@@ -308,6 +347,40 @@ class LandingAnalytics {
       if (platform) this.#track("join_page_action", { action: "download", platform });
     };
     return this.#replaceClickListener(document, handleClick, "/join");
+  }
+
+  /**
+   * The desktop page that Stripe opens after a Checkout or the Customer Portal. It reports one view
+   * with the result, and no `landing_viewed`, so it does not add to the landing page visits. It does not
+   * save a first visit: the visitor came from Stripe, not from a source. The reported path has no
+   * query, so the Checkout Session ID in the URL is not sent.
+   */
+  startBillingReturn(
+    document: Document,
+    hostname: string,
+    options: { cancelled: boolean; kind: BillingReturnKind | undefined },
+  ): () => void {
+    if (isLikelyAutomation(document.defaultView?.navigator)) return () => undefined;
+    if (!this.#ensureClient(hostname)) return () => undefined;
+    this.#campaignPath = "/billing/return";
+    this.#client?.setGlobalProperties(landingAttribution(document, hostname));
+    this.#pageStarted = true;
+    this.#flushPending();
+    this.#screenView("/billing/return");
+    this.#track("billing_return_viewed", {
+      outcome: options.cancelled ? "cancelled" : "completed",
+      ...(options.kind ? { kind: options.kind } : {}),
+    });
+    // The page has no tracked links. The listener only ends the page when the component unmounts.
+    return this.#replaceClickListener(document, () => undefined, "/billing/return");
+  }
+
+  /** The result of one send of the contact form. The form text and the email address are never sent. */
+  trackContactFormSubmitted(topic: string, result: ContactFormResult): void {
+    this.#track("contact_form_submitted", {
+      ...(isOneOf(CONTACT_TOPIC_IDS, topic) ? { topic } : {}),
+      result,
+    });
   }
 
   #replaceClickListener(
@@ -423,6 +496,11 @@ class LandingAnalytics {
 
 function isSafeLandingProperty(name: LandingEventName, key: string, value: unknown): boolean {
   if (key === "action") return isOneOf(["view", "open_app", "download"] as const, value);
+  if (key === "outcome") return name === "billing_return_viewed" && isOneOf(["completed", "cancelled"] as const, value);
+  if (key === "kind") return name === "billing_return_viewed" && isOneOf(BILLING_RETURN_KINDS, value);
+  if (key === "topic") return name === "contact_form_submitted" && isOneOf(CONTACT_TOPIC_IDS, value);
+  if (key === "result")
+    return name === "contact_form_submitted" && isOneOf(["succeeded", "failed", "rate_limited"] as const, value);
   if (key === "valid_invite") return name === "join_page_action" && isBoolean(value);
   if (key === "detected") return name === "landing_download_selected" && isBoolean(value);
   if (key === "collection") return CONTENT_COLLECTIONS.some((collection) => collection.id === value);
@@ -587,8 +665,9 @@ function landingPlacement(link: HTMLAnchorElement): LandingPlacement {
   // Checked before `.post-article`, which wraps it: a card in the related row is a different
   // question from a link inside the article body.
   if (link.closest(".post-more")) return "content_related";
-  // Checked before `.landing-hero`: the /teams hero uses the landing hero classes.
+  // Checked before `.landing-hero`: the /teams and /pricing heroes use the landing hero classes.
   if (link.closest(".teams-main")) return "teams_page";
+  if (link.closest(".pricing-page main")) return "pricing_page";
   if (link.closest(".landing-hero")) return "hero";
   if (link.closest(".landing-download")) return "download_section";
   if (link.closest(".landing-teams")) return "teams_section";

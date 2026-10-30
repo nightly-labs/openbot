@@ -43,6 +43,14 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "このサーバーはチャンネルの削除に対応していません。",
   "error.backend.browserNavigateUnsupported":
     "このリモートホストは、既存のタブでのアドレスバーによる移動に対応していません。",
+  "error.backend.browserUserControlBusy":
+    "このブラウザーのタブはシークレットを待っています。先にシークレットの要求に応答してください。",
+  "error.backend.browserUserControlUnsupported":
+    "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
+  "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
+  "error.backend.browserSignInOpenFailed": "OpenBot はサインインウィンドウを開けませんでした。",
+  "error.backend.browserSignInReadFailed": "OpenBot はウィンドウからサインインを読み取れませんでした。",
+  "error.backend.browserStopUnsupported": "このリモートホストはページの読み込みを停止できません。",
   "error.backend.sharedDataLocalOnly": "共有データは、これらのエージェントを実行しているコンピューターで管理されます。",
   "error.backend.browserUrlProtocol": "HTTP(S) のブラウザー URL のみ使用できます。",
   "error.backend.sunshineNotReady": "Sunshine の準備ができませんでした。",
@@ -56,8 +64,6 @@ export const messages = {
   "error.backend.channelMemberUnavailable": "チャンネルのメンバーを使用できません。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
-  "error.backend.channelsRetired":
-    "チャンネルはサポートされなくなりました。エージェントを同じサイドバーのセクションに入れると、一緒に作業できます。",
   "error.backend.channelReferenceUnavailable": "参照先のチャンネルメッセージを使用できません。",
   "error.backend.channelTaskNotFound": "チャンネルのタスクが見つかりません。",
   "error.backend.channelTaskComplete": "このタスクはすでに完了しています。",
@@ -67,10 +73,21 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "この依頼はルーティングのコンテキスト上限を超えています。メンバーを選択するか、短い依頼を送信してください。",
   "error.backend.channelTaskMemberRequired": "このタスクのメンバーを選択してください。",
+  "error.backend.channelTaskStopped": "停止しました。このタスクを続行するか、再割り当てしてください。",
+  "error.backend.channelRoutingUnreadable":
+    "リーダーがこのメッセージを振り分けられませんでした。メンバーに再割り当てしてください。",
+  "error.backend.channelRoutingFailed": "ルーティングに失敗しました。メンバーを選択するか、もう一度お試しください。",
+  "error.backend.channelLeadTimedOut":
+    "チャンネルリードが時間内に応答しませんでした。メンバーを選択するか、もう一度お試しください。",
+  "error.backend.channelLeadFailed":
+    "チャンネルリードがこのメッセージをルーティングできませんでした。メンバーを選択するか、もう一度お試しください。",
   "error.backend.channelRequestMemberRequired": "この依頼のメンバーを選択してください。",
   "error.backend.channelDeliveryNotCreated": "チャンネルへの配信を作成できませんでした。",
   "error.backend.channelAssignmentStopped": "このチャンネルの割り当ては停止されたか、置き換えられました。",
   "error.backend.channelAssigneeUnavailable": "割り当てられたエージェントを使用できません。",
+  "error.backend.channelAssigneeRemoved": "割り当てられたメンバーが削除されました。",
+  "error.backend.channelAssigneeReassign":
+    "割り当てられたメンバーを使用できません。このタスクを再割り当てしてください。",
   "error.backend.channelAssignmentChanged": "このチャンネルの割り当ては変更されました。",
   "error.backend.channelMemberRequired": "このチャンネルの使用可能なメンバーを選択してください。",
   "error.backend.memoryEssentialBudget":
@@ -183,11 +200,16 @@ export const messages = {
     "待機を再開できるのは自分のルーティンの実行だけですが、ルーティンがありません。openbot.create_routine でルーティンを作成してから、待機を開いてください。",
   "error.backend.agentWaitRemoteUnsupported":
     "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.markUnreadRemoteUnsupported":
+    "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
+  "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInClientRefused":
+    "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
@@ -205,8 +227,15 @@ export const messages = {
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
   "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
+  "error.backend.mcpSignInMetadataUnreadable":
+    "OpenBot はこのサーバーのサインイン情報を読み取れませんでした。サーバーアドレスを確認して再試行してください。",
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
+  "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpOAuthProxyUnavailable":
+    "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
+  "error.backend.mcpOAuthSignInNeeded":
+    "この MCP サーバーへのサインインは終了しました。ユーザーは OpenBot でもう一度サインインする必要があります。",
   "error.backend.mcpServerUnreachable":
     "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
   "error.backend.mcpLocalServerOff":
@@ -221,6 +250,11 @@ export const messages = {
   "error.backend.oauthTooManyRedirects": "OAuth エンドポイントのリダイレクトが多すぎます。",
   "error.backend.oauthRedirectOrigin":
     "OAuth エンドポイントが {origin} にリダイレクトしたため、認証情報を転送しませんでした。",
+  "error.backend.oauthTimedOut": "OAuth エンドポイント {origin} が時間内に応答しませんでした。",
+  "error.backend.oauthResponseTooLarge": "OAuth エンドポイント {origin} の応答が大きすぎます。",
+  "error.backend.oauthResponseUnreadable": "OAuth エンドポイント {origin} の応答を読み取れませんでした。",
+  "error.backend.mcpOAuthPrivateEndpoint":
+    "OAuth エンドポイント {origin} はプライベートネットワーク上にありますが、MCP サーバーは公開されているため、認証情報を送信しませんでした。",
   "error.backend.sidebarSectionLimit": "1 つのサーバーに置けるサイドバーのセクションは {limit} 個までです。",
   "error.backend.sectionNameRequired": "セクション名が必要です。",
   "error.backend.sectionNameTooLong": "セクション名が長すぎます。",
@@ -230,6 +264,7 @@ export const messages = {
   "error.backend.directMessageSelf": "自分自身にダイレクトメッセージを送信することはできません。",
   "error.backend.readBoundaryUnavailable": "既読の位置はもう使用できません。",
   "error.backend.sharedFileOutside": "共有ファイルは共有ディレクトリ内にある必要があります。",
+  "error.backend.sharedPathIsFolder": "共有パスはファイルではなくフォルダーです。",
   "error.backend.sharedPathNotFile": "共有パスがファイルではありません。",
   "error.backend.workspaceFileOutside":
     "ワークスペースのファイルはエージェントのワークスペース内にある必要があります。",
@@ -246,17 +281,27 @@ export const messages = {
   "error.backend.steerTurnChanged": "このメッセージで方向を変える前に、実行中のターンが変わりました。",
   "error.backend.steerUnsupported":
     "このプロバイダーは実行中のターンの方向を修正できません。メッセージはキューに残ります。",
+  "error.backend.steerRoutineRun": "ルーティンを実行中です。メッセージはキューに残り、ルーティンの後に開始します。",
   "error.backend.steerQueuedOnly": "ターンの方向を変えられるのはキュー内のメッセージだけです。",
   "error.backend.promptInactive": "この質問はもう有効ではありません。",
   "error.backend.promptAnswerMismatch": "回答が有効な質問と一致しません。",
   "error.backend.approvalInactive": "この承認はもう有効ではありません。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
+  "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
+  "error.backend.apiKeyNotAllowed": "API キーを入力できるのはサーバーの所有者か管理者だけです。",
+  "error.backend.apiKeySaving": "API キーはすでに保存中です。",
   "error.backend.authRequestInactive": "この安全な認証要求はもう有効ではありません。",
   "error.backend.secureAuthUnavailable": "安全な認証を使用できません。",
   "error.backend.browserUrlRequired": "ブラウザーの URL が必要です。",
   "error.backend.browserUrlTooLong": "ブラウザーの URL が長すぎます。",
   "error.backend.browserTabLimit": "ブラウザーで開けるタブは {limit} 個までです。",
+  "error.backend.browserProfileMissing":
+    "このエージェントのブラウザープロファイルはもうありません。エージェントの設定で別のプロファイルを選んでください。",
+  "error.backend.browserProfileNotFound": "このブラウザープロファイルはもうありません。",
+  "error.backend.browserProfileNameTaken": "この名前のブラウザープロファイルはすでにあります。",
+  "error.backend.browserSessionInUse": "このブラウザーセッションはまだタブで使われています。もう一度お試しください。",
+  "error.backend.browserProfileLimit": "ブラウザープロファイルは {limit} 個まで作成できます。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
@@ -293,6 +338,15 @@ export const messages = {
   "error.backend.taskNotFound": "このタスクは利用できません。",
   "error.backend.taskClosed": "このタスクは閉じています。メッセージを送信するには、もう一度開いてください。",
   "error.backend.taskStillRunning": "このタスクはまだ実行中です。停止するまで待ってから閉じてください。",
+  "error.backend.threadNotFound": "このスレッドは利用できません。",
+  "error.backend.threadStillRunning": "このスレッドはまだ実行中です。停止してから、もう一度お試しください。",
+  "error.backend.threadArchived": "このスレッドはアーカイブされています。メッセージを送信するには、復元してください。",
+  "error.backend.threadTitleRequired": "スレッドに短いタイトルを付けてください。",
+  "error.backend.threadOpenLimitReached":
+    "このエージェントには {count} 件の開いているスレッドがあります。スレッドをアーカイブしてから、別のスレッドを開始するか復元してください。",
+  "error.backend.threadRemoteUnsupported": "スレッドは、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.threadMoveRefused":
+    "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
   "error.backend.taskOwnChatOnly":

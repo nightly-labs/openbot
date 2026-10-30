@@ -52,10 +52,13 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
       return JSON.stringify(args[1] === "items" ? [item] : item);
     },
   });
-  const vault = passwordVaultRouter(
-    { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
-    connector,
-  );
+  const vault = passwordVaultRouter([
+    {
+      prefix: "",
+      vault: { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
+    },
+    { prefix: "bitwarden:", vault: connector },
+  ]);
   const checks: string[] = [];
   try {
     await runCauseEffect(connector.connect("fixture-session-key"));

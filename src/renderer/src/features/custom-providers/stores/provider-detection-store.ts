@@ -9,8 +9,6 @@ import {
   detectedModelServerKey,
   type ProviderDetectionDesktopApi,
   type ProviderDetectionSettings,
-  type SaveCustomProviderInput,
-  type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { checkResult } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import {
@@ -18,6 +16,7 @@ import {
   customAgentInput,
   formatAgentArgs,
 } from "@openbot/ui/features/custom-providers/custom-acp-agent-form";
+import { customProviderUpdate } from "@openbot/ui/features/custom-providers/custom-provider-form";
 import type {
   DetectedProvider,
   DetectedProviderApi,
@@ -77,8 +76,14 @@ function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | u
     name: saved.name,
     baseUrl: saved.baseUrl,
     added: true,
-    savedModels: saved.models.map((model) => ({ id: model.id, name: model.name })),
+    savedModels: saved.models.map((model) =>
+      model.contextWindow === undefined
+        ? { id: model.id, name: model.name }
+        : { id: model.id, name: model.name, contextWindow: model.contextWindow },
+    ),
     keyStored: saved.hasApiKey,
+    savedHeaderNames: saved.headerNames ?? [],
+    ...(saved.harness ? { harness: saved.harness } : {}),
   };
 }
 
@@ -93,21 +98,7 @@ function agentRow(found: DetectedAcpAgent, saved: CustomAgentSummary | undefined
     args: formatAgentArgs(saved.args),
     added: true,
     envNames: saved.envNames,
-  };
-}
-
-/**
- * An update sends only what the user changed: a blank key and no headers keep the stored ones.
- * There is no way to clear them here, which is the rule of `customProviders.update`.
- */
-function updateInput(value: SaveCustomProviderInput): UpdateCustomProviderInput {
-  return {
-    id: value.id,
-    name: value.name,
-    baseUrl: value.baseUrl,
-    models: value.models,
-    ...(value.apiKey === null ? {} : { apiKey: value.apiKey }),
-    ...(value.headers.length === 0 ? {} : { headers: value.headers }),
+    usagePrompt: saved.usagePrompt,
   };
 }
 
@@ -305,7 +296,7 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     value: Parameters<DetectedProviderApi["save"]>[1],
   ): Promise<CustomProviderRestart> {
     if (value.kind === "agent") return options.agents.saveCustomAgent(customAgentInput(value.value));
-    if (provider.added) return options.endpoints.updateCustomProvider(updateInput(value.value));
+    if (provider.added) return options.endpoints.updateCustomProvider(customProviderUpdate(value.value));
     return options.endpoints.saveCustomProvider(value.value);
   }
 

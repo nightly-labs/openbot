@@ -13,6 +13,9 @@
   "observability": {
     "enabled": true
   },
+  // The Cloudflare Vite plugin emits and uploads Worker source maps unless this is false. The Worker
+  // bundles the web app, and its maps pass the 60 MiB upload limit, so every deploy fails.
+  "upload_source_maps": false,
   // The outbox, the hosted-site cleanup and the hosted server checks are retry paths: the request path
   // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
   // stops 15 to 20 minutes after its last use.
@@ -58,6 +61,9 @@
     "HOSTED_SERVERS_ENABLED": "true",
     // Each account can buy a server in production. Put account IDs here to limit creates to them.
     "HOSTED_SERVERS_ALLOWED_USER_IDS": "*",
+    // A license bought before this time is free until then: Stripe charges its first payment at this time.
+    // Local development reads it too; set LICENSE_TRIAL_END= in the shell to sell licenses with no trial.
+    "LICENSE_TRIAL_END": "2026-12-01T00:00:00Z",
     // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
     // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",

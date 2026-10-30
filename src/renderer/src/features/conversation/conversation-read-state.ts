@@ -8,9 +8,12 @@ import type {
 import {
   AGENT_EXCHANGE_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
+  CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -33,7 +36,7 @@ export type AgentAutoReadEntry =
  * bookkeeping the agent writes about itself, so they never make a conversation
  * unread.
  */
-export function isRoutineEventItem(message: { itemType?: string }): boolean {
+export function isRoutineEventItem(message: { itemType?: string | undefined }): boolean {
   return (
     message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) === true ||
     message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) === true ||
@@ -55,7 +58,7 @@ export function isRoutineEventItem(message: { itemType?: string }): boolean {
  * its own entry point over this one rule rather than a predicate typed loosely
  * enough to accept both and silently take either spelling.
  */
-function isIncoming(message: { itemType?: string }, fromUser: boolean): boolean {
+function isIncoming(message: { itemType?: string | undefined }, fromUser: boolean): boolean {
   return (
     !fromUser &&
     message.itemType !== "commentary" &&
@@ -63,13 +66,19 @@ function isIncoming(message: { itemType?: string }, fromUser: boolean): boolean 
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== AGENT_EXCHANGE_ITEM_TYPE &&
     message.itemType !== "plan" &&
+    message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
+    message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
+    message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
     message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
     !isRoutineEventItem(message)
   );
 }
 
 /** The rule for a message as main sends it. */
-function isIncomingConversationMessage(message: { author: ConversationMessageAuthor; itemType?: string }): boolean {
+function isIncomingConversationMessage(message: {
+  author: ConversationMessageAuthor;
+  itemType?: string | undefined;
+}): boolean {
   return isIncoming(message, message.author === "user");
 }
 
@@ -78,7 +87,7 @@ function isIncomingConversationMessage(message: { author: ConversationMessageAut
  * kinds of row the renderer synthesizes itself: streamed thinking and UI notices.
  * Neither exists in main, so neither can be read.
  */
-function isIncomingAgentMessage(message: AgentMessage): boolean {
+export function isIncomingAgentMessage(message: AgentMessage): boolean {
   return (
     isIncoming(message, message.author === "you") &&
     !message.id.startsWith("thinking:") &&
@@ -88,7 +97,7 @@ function isIncomingAgentMessage(message: AgentMessage): boolean {
 
 /** The newest message that could move the read boundary, or `undefined`. */
 export function latestIncomingConversationMessage<
-  Message extends { author: ConversationMessageAuthor; itemType?: string },
+  Message extends { author: ConversationMessageAuthor; itemType?: string | undefined },
 >(messages: readonly Message[]): Message | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -110,7 +119,7 @@ export function latestVisibleAgentMessageId(messages: readonly AgentMessage[] | 
 /** Recounts a read state against the messages it applies to. */
 export function readStateForMessages(
   state: ConversationReadState,
-  messages: readonly { author: ConversationMessageAuthor; id: string; itemType?: string }[],
+  messages: readonly { author: ConversationMessageAuthor; id: string; itemType?: string | undefined }[],
 ): ConversationReadState {
   const throughIndex = state.throughMessageId
     ? messages.findIndex((message) => message.id === state.throughMessageId)

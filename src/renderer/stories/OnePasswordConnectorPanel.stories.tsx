@@ -6,11 +6,13 @@ import {
 import { OnePasswordConnectorPanel } from "@openbot/ui/features/settings/OnePasswordConnectorPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { SettledArgs } from "./settled-args";
 
 const meta = {
   title: "Settings/OnePasswordConnectorPanel",
   component: OnePasswordConnectorPanel,
   parameters: { layout: "padded", a11y: { test: "error" } },
+  render: (args) => <SettledArgs>{() => <OnePasswordConnectorPanel {...args} />}</SettledArgs>,
 } satisfies Meta<typeof OnePasswordConnectorPanel>;
 
 export default meta;

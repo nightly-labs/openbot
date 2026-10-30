@@ -1,6 +1,7 @@
 import { useNavigation, useRoute } from "expo-router/react-navigation";
 import { type ComponentProps, createContext, useContext, useEffect, useRef } from "react";
 import { type GestureResponderEvent, Pressable } from "react-native";
+import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
 import type { createChatNavigationGate } from "@/features/agents/model/chat-navigation-gate";
 import { haptics } from "@/shared/lib/haptics";
 
@@ -23,6 +24,7 @@ export function ChatLinkPressable({
   chatId?: string;
 }) {
   const gate = useContext(ChatNavigationGateContext);
+  const pane = useChatListPane();
   const route = useRoute();
   const navigation = useNavigation();
   const mounted = useRef(true);
@@ -51,7 +53,8 @@ export function ChatLinkPressable({
         const navigate = () => {
           if (mounted.current) onPress?.(event);
         };
-        if (gate && route.name === "connected") gate.request(navigate, navigation.isFocused);
+        if (pane) openChatFromPane(pane, chatId, navigate);
+        else if (gate && route.name === "connected") gate.request(navigate, navigation.isFocused);
         else navigate();
       }}
     />

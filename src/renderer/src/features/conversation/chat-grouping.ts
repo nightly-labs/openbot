@@ -18,7 +18,7 @@ export interface SenderRunRow {
 }
 
 /** Do two messages fall close enough together to stay one block? An unreadable time says no. */
-export function withinGroupingWindow(previousIso: string | undefined, currentIso: string | undefined): boolean {
+function withinGroupingWindow(previousIso: string | undefined, currentIso: string | undefined): boolean {
   if (previousIso === undefined || currentIso === undefined) return false;
   const previous = new Date(previousIso).getTime();
   const current = new Date(currentIso).getTime();

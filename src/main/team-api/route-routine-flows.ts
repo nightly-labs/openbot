@@ -23,7 +23,7 @@ import {
 import type { TeamApiAgents, TeamApiRoutineFlows } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
+import { readJson, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 
 const ROUTINE_FLOW_PATHS = new Set<string>(Object.values(ROUTINE_FLOWS_ROUTES));
 
@@ -158,13 +158,19 @@ export async function routeRoutineFlows(
   const requireVisible = (...agentIds: string[]) => {
     if (!agentIds.every(visible)) agentNotFound();
   };
+  // Each change to a flow changes the routines of the agents in it, so it needs `manage` for each.
+  const requireManage = (agentIds: readonly string[]) => {
+    for (const agentId of agentIds) requireAgentLevel(context, agentId, "manage");
+  };
   const requireVisibleFlow = async (ref: { routineId: string } | { linkId: string }) => {
     const touched = await run(routineFlows.agentsOf(ref));
     if (!touched?.every((agentId) => !hiddenAgentIds.has(agentId))) agentNotFound();
+    requireManage(touched);
   };
   /** A node is an agent or a routine, and either one must be visible to the caller. */
   const requireVisibleNode = async (agentId: string, nodeKey: string) => {
     requireVisible(agentId, ...nodeAgentIds(nodeKey));
+    requireManage([agentId, ...nodeAgentIds(nodeKey)]);
     const routineId = nodeRoutineId(nodeKey);
     if (routineId) await requireVisibleFlow({ routineId });
   };
@@ -190,6 +196,7 @@ export async function routeRoutineFlows(
     case ROUTINE_FLOWS_ROUTES.connect: {
       const input = parse(parseConnectRoutineFlow, body);
       requireVisible(input.fromAgentId, input.toAgentId);
+      requireManage([input.fromAgentId, input.toAgentId]);
       await requireVisibleFlow({ routineId: input.routineId });
       return json(200, await run(routineFlows.connect(input)));
     }

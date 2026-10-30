@@ -1,3 +1,4 @@
+import type { ServerNotificationLevel } from "@openbot/contracts/ipc";
 import {
   Button,
   Item,
@@ -15,10 +16,12 @@ import {
   type GeneralSettingsValue,
   TASK_SOUND_CHOICES,
 } from "@openbot/ui/features/settings/app-settings";
+import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
 import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { Show } from "solid-js";
 import { playSoundChoice } from "../../completion-sound";
 import { useI18n } from "../../i18n-context";
+import type { NotificationLevelsStore } from "./notification-levels-store";
 
 interface SettingsNotificationsTabProps {
   value: GeneralSettingsValue;
@@ -28,7 +31,15 @@ interface SettingsNotificationsTabProps {
   onTestNotification?: (() => void | Promise<void>) | undefined;
   /** Opens the operating system notification settings. Absent where the system has no such page. */
   onOpenNotificationSettings?: (() => void | Promise<void>) | undefined;
-  selectMount: HTMLElement | undefined;
+  /** The agents and levels of each server. */
+  levels: NotificationLevelsStore;
+  /** Writes the level of a server for all devices of the user, or for this computer on an older host. */
+  onSetServerLevel: (serverId: string, level: ServerNotificationLevel) => Promise<void>;
+  /** Mutes a server on this computer. No duration mutes until the user unmutes. */
+  onSetServerMuted: (serverId: string, muted: boolean, durationMs?: number) => Promise<void>;
+  /** Moves the tab to one server. Each nonce moves once. */
+  focusRequest?: { serverId: string; nonce: number } | null | undefined;
+  menuMount?: HTMLElement | undefined;
 }
 
 export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
@@ -45,15 +56,44 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
   };
   return (
     <>
-      <SettingsSection title={i18n.t("settings.alerts.title")}>
+      <SettingsSection
+        title={
+          <NotificationScopeTitle
+            title={i18n.t("settings.notifications.whatYouHear")}
+            scope="settings.notifications.allDevices"
+          />
+        }
+      >
+        <NotificationMatrix
+          data-settings-row="settings.notifications.whatYouHear"
+          servers={props.levels.matrixServers()}
+          device="computer"
+          onSetServerLevel={props.onSetServerLevel}
+          onSetAgentLevel={props.levels.setAgentLevel}
+          onTurnOnAgent={props.levels.turnOnAgent}
+          onMute={(serverId, durationMs) =>
+            durationMs === null
+              ? props.onSetServerMuted(serverId, true)
+              : props.onSetServerMuted(serverId, true, durationMs)
+          }
+          onUnmute={(serverId) => props.onSetServerMuted(serverId, false)}
+          onRetry={props.levels.retry}
+          focusRequest={props.focusRequest}
+          menuMount={props.menuMount}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={i18n.t("settings.notifications.thisComputer")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
+            data-settings-row="settings.desktopNotifications.title"
             checked={props.value.desktopNotifications}
             onChange={(checked) => props.onUpdateSetting("desktopNotifications", checked)}
             label={i18n.t("settings.desktopNotifications.title")}
             description={i18n.t("settings.desktopNotifications.description")}
           />
           <SwitchField
+            data-settings-row="settings.notificationPreview.title"
             checked={props.value.notificationPreview}
             disabled={!props.value.desktopNotifications}
             onChange={(checked) => props.onUpdateSetting("notificationPreview", checked)}
@@ -62,7 +102,7 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
           />
           <Show when={props.onTestNotification}>
             {(onTestNotification) => (
-              <Item>
+              <Item data-settings-row="settings.testNotification.title">
                 <ItemContent>
                   <ItemTitle>{i18n.t("settings.testNotification.title")}</ItemTitle>
                   <ItemDescription>{i18n.t("settings.testNotification.description")}</ItemDescription>
@@ -97,12 +137,7 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
               </Item>
             )}
           </Show>
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={i18n.t("settings.sounds.title")}>
-        <ItemGroup class="settings-modal-card">
-          <Item class="settings-modal-row">
+          <Item data-settings-row="settings.taskSound.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.taskSound.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.taskSound.description")}</ItemDescription>
@@ -114,11 +149,11 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
                 value={props.value.taskSound}
                 onChange={(value) => props.onUpdateSetting("taskSound", value)}
                 onPreview={playSoundChoice}
-                mount={props.selectMount}
+                mount={props.menuMount}
               />
             </ItemActions>
           </Item>
-          <Item class="settings-modal-row">
+          <Item data-settings-row="settings.soundFeedback.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.soundFeedback.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.soundFeedback.description")}</ItemDescription>
@@ -134,7 +169,7 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
                   )
                 }
                 onPreview={playSoundChoice}
-                mount={props.selectMount}
+                mount={props.menuMount}
               />
             </ItemActions>
           </Item>

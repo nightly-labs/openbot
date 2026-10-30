@@ -1,0 +1,98 @@
+/* The browser profiles section of the server settings: the list, then the new profile form. */
+.browser-profiles-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+}
+
+/* The name field row of the new profile form and of an inline rename. */
+.browser-profiles-row {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.browser-profiles-name {
+  min-width: 0;
+  flex: 1;
+}
+
+/* "New profile" closes the list of the agent settings select, under a line. */
+.ui-select-item.browser-profile-select-new {
+  margin-top: calc(var(--openbot-space-1) * 2 + 1px);
+}
+
+.ui-select-item.browser-profile-select-new::before {
+  position: absolute;
+  top: calc(-1 * var(--openbot-space-1) - 1px);
+  right: calc(-1 * var(--openbot-space-1));
+  left: calc(-1 * var(--openbot-space-1));
+  border-top: 1px solid var(--openbot-border);
+  content: "";
+}
+
+.ui-select-item.browser-profile-select-new[hidden] {
+  display: none;
+}
+
+.browser-profile-select-option .ui-select-item-label,
+.browser-profile-select-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* The column of the profile colors and the "New profile" plus. */
+.browser-profile-select-mark {
+  display: inline-flex;
+  width: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.browser-profile-select-mark svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* In the settings the dot is the button that opens the colors. */
+/* The shared profile has no color menu. Its dot takes the place of the menu button. */
+.browser-profile-shared-mark {
+  display: inline-flex;
+  width: var(--openbot-control-md);
+  height: var(--openbot-control-md);
+  align-items: center;
+  justify-content: center;
+}
+
+.browser-profile-color-trigger .browser-profile-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.browser-profile-color-option {
+  gap: var(--openbot-space-2);
+}
+
+.browser-profile-color-option > span:not(.browser-profile-dot) {
+  flex: 1 1 auto;
+}
+
+/* The name field takes the place of "New profile". Its text lines up with the option labels. */
+.browser-profile-select-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+.browser-profile-select-form .browser-profiles-name {
+  font-size: var(--openbot-text-sm);
+}
+
+.browser-profile-select-form .ui-text {
+  padding-inline: var(--openbot-space-2);
+}

@@ -14,7 +14,6 @@ export const messages = {
   "skill.emptyEnabled": "Ten agent nie ma włączonych umiejętności.",
   "skill.emptyAssigned": "Ten agent nie ma jeszcze przypisanych umiejętności.",
   "skill.folderSkill": "OpenBot nie zainstalował tej umiejętności. Edytuj ją lub usuń w {location}.",
-  "skill.localOnHost": "Ta lokalna umiejętność jest zapisana na hoście. Otwórz jej szczegóły na tamtym komputerze.",
   "skill.moreFor": "Więcej: {name}",
   "skill.update": "Zaktualizuj",
   "skill.updateName": "Zaktualizuj: {name}",
@@ -63,4 +62,22 @@ export const messages = {
   "skill.preview.examplePrompt": "Pomóż mi użyć tej umiejętności.",
   "skill.preview.try": "Wypróbuj",
   "skill.preview.linkFailed": "Nie udało się otworzyć linku.",
+
+  "skill.marketplace.changed": {
+    one: "Zmieniono {name} u {count} agenta.",
+    few: "Zmieniono {name} u {count} agentów.",
+    many: "Zmieniono {name} u {count} agentów.",
+    other: "Zmieniono {name} u {count} agenta.",
+  },
+  "skill.marketplace.updated": {
+    one: "Zaktualizowano {name} u {count} agenta.",
+    few: "Zaktualizowano {name} u {count} agentów.",
+    many: "Zaktualizowano {name} u {count} agentów.",
+    other: "Zaktualizowano {name} u {count} agenta.",
+  },
+  "skill.marketplace.undone": "Cofnięto zmianę {name}.",
+  "skill.marketplace.confirmAgents": "Agenci: {agents}.",
+  "skill.marketplace.limitReason": "Agent może mieć najwyżej {limit} umiejętności.",
+  "skill.marketplace.cannotRemove":
+    "OpenBot nie może usunąć wbudowanej umiejętności ani umiejętności, której nie zainstalował.",
 } as const satisfies PartialTranslation<typeof source>;

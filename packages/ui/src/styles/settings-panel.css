@@ -22,7 +22,7 @@
   right: 0;
   bottom: 0;
   display: flex;
-  width: var(--settings-panel-width, 296px);
+  width: var(--settings-panel-width, 360px);
   flex-direction: column;
   border-left: 1px solid var(--openbot-border);
   background: var(--openbot-bg-canvas);
@@ -111,6 +111,12 @@
   line-height: 18px;
 }
 
+/* The count and error under a field, after its control rather than above it like the label. */
+.settings-field > .ui-field-limit {
+  display: grid;
+  margin: var(--openbot-space-1-5) 0 0 var(--openbot-space-2);
+}
+
 .settings-field input,
 .settings-field textarea,
 .settings-field select {
@@ -163,12 +169,13 @@
   overflow-y: auto;
 }
 
-/* Instructions keep a fixed height and scroll inside, so the rows below do not move. */
+/* Instructions keep a fixed height while the user types, so the rows below do not move.
+   The grip in the corner sets a taller height. */
 .settings-field .settings-instructions-input {
   field-sizing: fixed;
   height: 120px;
   min-height: 120px;
-  max-height: 120px;
+  max-height: none;
   resize: none;
 }
 
@@ -182,6 +189,11 @@
 .settings-field select:focus {
   border-color: var(--openbot-text-muted);
   background: var(--openbot-shadow-popover-ambient);
+}
+
+.settings-field input[aria-invalid="true"],
+.settings-field textarea[aria-invalid="true"] {
+  border-color: var(--openbot-danger);
 }
 
 .settings-field input:focus-visible,

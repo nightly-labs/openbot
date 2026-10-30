@@ -69,6 +69,11 @@ export function createSidebarLayoutActions(deps: {
     void props.onMutateLayout({ type: "move", sectionId, direction, steps }).catch(announceError);
   }
 
+  /** The host reports a failed copy itself; the live region only needs to hear that it failed. */
+  function duplicateSection(sectionId: string): void {
+    void props.onDuplicateSection?.(sectionId).catch(announceError);
+  }
+
   /**
    * Moves one chat into a section, or out of every section when `sectionId` is null. The action
    * keeps its released `agentId` field name; a channel id travels in it the same way.
@@ -281,6 +286,7 @@ export function createSidebarLayoutActions(deps: {
   return {
     assignChatSection,
     commitSidebarDrop,
+    duplicateSection,
     moveDraggedChat,
     movePersonByKeyboard,
     movePinnedItem,

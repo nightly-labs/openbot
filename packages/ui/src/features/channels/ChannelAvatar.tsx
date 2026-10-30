@@ -22,10 +22,13 @@ export function ChannelAvatar(props: { members: ChannelMember[]; agents: AgentPr
   const agentFor = (member: ChannelMember) => props.agents.find((agent) => agent.id === member.agentId);
   const cluster = () => props.layout === "cluster";
   /* The last cell of a full cluster is the count, so a fifth member costs a face rather than
-   * hiding without a trace. Four members still get four faces. */
+   * hiding without a trace. Four members still get four faces. A count of two digits is wider than
+   * a cell, so it takes the whole bottom row, under two faces. */
   const shown = () => {
     if (!cluster()) return props.members.slice(0, ROW_LIMIT);
-    return props.members.slice(0, props.members.length > CLUSTER_CELLS ? CLUSTER_CELLS - 1 : CLUSTER_CELLS);
+    if (props.members.length <= CLUSTER_CELLS) return props.members;
+    const countWithThreeFaces = props.members.length - (CLUSTER_CELLS - 1);
+    return props.members.slice(0, countWithThreeFaces >= 10 ? CLUSTER_CELLS - 2 : CLUSTER_CELLS - 1);
   };
   const hidden = () => props.members.length - shown().length;
   return (

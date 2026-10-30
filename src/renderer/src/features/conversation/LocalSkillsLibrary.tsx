@@ -8,12 +8,12 @@ import { SkillPreview } from "../../components/SkillPreview";
 import { skillsPort } from "../../skills-port";
 
 export function LocalSkillsLibrary(props: {
-  initialSkillId?: string;
+  initialSkillId?: string | undefined;
   agentId: string;
   disabled?: boolean;
   installed: InstalledSkill[];
   onInstalled: () => Promise<void>;
-  onTry?: (skill: MarketplaceSkillDetail) => void;
+  onTry?: ((skill: MarketplaceSkillDetail) => void) | undefined;
 }) {
   const { t, errorMessage } = useText();
   const [reload, setReload] = createSignal(0);
@@ -231,7 +231,7 @@ export function LocalSkillsLibrary(props: {
                     <Switch
                       aria-label={t("skill.enableName", { name: skill.name })}
                       checked={props.installed.some((item) => item.skillId === skill.id && item.enabled !== false)}
-                      disabled={state.busy || props.disabled}
+                      disabled={state.busy || props.disabled === true}
                       onChange={(enabled) => void toggleSkill(skill, enabled)}
                     />
                   </div>

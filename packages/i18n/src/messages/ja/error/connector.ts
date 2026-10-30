@@ -27,4 +27,11 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "1Password の接続ファイルが大きすぎます。",
   "error.connector.bitwardenFailed":
     "Bitwarden を読み取れませんでした。bw CLI をインストールし、サインインしてロックを解除し、Shared with OpenBot という名前のフォルダーを 1 つ作成してください。新しいセッションキーで接続してください。",
+  "error.connector.bitwardenHostInput":
+    "HTTPS のサーバーのアドレス、API キーの client_id と client_secret、マスターパスワードを入力してください。",
+  "error.connector.bitwardenHostFailed":
+    "このサーバーで Bitwarden を開けませんでした。サーバーのアドレス、API キー、マスターパスワードを確認し、Shared with OpenBot という名前のフォルダーが 1 つあることを確認してから、もう一度接続してください。",
+  "error.connector.bitwardenCliInstallFailed":
+    "このサーバーに Bitwarden CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
+  "error.connector.bitwardenFileUnreadable": "Bitwarden の接続ファイルを読み取れません。",
 } as const satisfies PartialTranslation<typeof source>;

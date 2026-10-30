@@ -44,8 +44,16 @@ if (command === "list") {
   });
   if (!response.ok) throw new Error(await response.text());
   process.stdout.write(`${rest[0] === "on" ? "Featured" : "Unfeatured"} ${targetId}.\n`);
+} else if (command === "verify" && targetId && (rest[0] === "on" || rest[0] === "off")) {
+  const response = await fetch(new URL(`/v1/skills/admin/verified/${encodeURIComponent(targetId)}`, apiUrl), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ verified: rest[0] === "on" }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  process.stdout.write(`${rest[0] === "on" ? "Verified" : "Unverified"} ${targetId}.\n`);
 } else {
   throw new Error(
-    "Usage: bun run skills:review -- list | approve <version-id> | reject <version-id> --note <reason> | feature <skill-id> on|off",
+    "Usage: bun run skills:review -- list | approve <version-id> | reject <version-id> --note <reason> | feature <skill-id> on|off | verify <skill-id> on|off",
   );
 }

@@ -62,13 +62,23 @@ const NETWORK_CODES = [
  * "error": { "message": "Could not parse your authentication token…" } }`. The anchored status rules
  * below cannot see that, and without this set the whole exchange - URL, headers and body - was
  * printed to the user verbatim. Codex also reports an expired sign-in as `workspace routing
- * discovery unauthorized (401)`, with the code after the word.
+ * discovery unauthorized (401)`, with the code after the word, and a token it cannot refresh as
+ * `Your access token could not be refreshed… Please log out and sign in again.`
  *
  * Bare `401` is deliberately not a signal: it matches ports, byte counts and IDs. Every entry here
  * pairs the code with a word that only an authentication failure uses.
  */
 const AUTH_SIGNALS =
-  /\b401\s+unauthorized\b|\bunauthorized\s*\(\s*401\s*\)|\bhttp\s*401\b|"status"\s*:\s*401\b|\bunauthorized_unknown\b|could not parse your authentication token|please try signing in again|\binvalid_api_key\b|\bnot authenticated\b/iu;
+  /\b401\s+unauthorized\b|\bunauthorized\s*\(\s*401\s*\)|\bhttp\s*401\b|"status"\s*:\s*401\b|\bunauthorized_unknown\b|could not parse your authentication token|please try signing in again|please log out and sign in again|\binvalid_api_key\b|\bnot authenticated\b/iu;
+
+/**
+ * Rate-limit signals that appear inside a longer sentence rather than at its start.
+ *
+ * Codex retries a throttled request by itself and then reports `exceeded retry limit, last status:
+ * 429 Too Many Requests`. The anchored status rule below cannot see that, so the raw Codex text was
+ * shown above the composer (#2751). As with {@link AUTH_SIGNALS}, bare `429` is not a signal.
+ */
+const RATE_LIMIT_SIGNALS = /\b429\s+too many requests\b|\blast status:\s*429\b|"status"\s*:\s*429\b/iu;
 
 /** Runtime output, stack traces, paths and serialized objects: never shown, whatever the kind. */
 const TECHNICAL_OUTPUT =
@@ -99,6 +109,7 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (/^(?:HTTP )?403(?:\b|:)/u.test(message)) return "permission";
   if (/^(?:HTTP )?429(?:\b|:)/u.test(message)) return "rate-limit";
   if (/^(?:HTTP )?5\d\d(?:\b|:)/u.test(message)) return "service";
+  if (RATE_LIMIT_SIGNALS.test(message)) return "rate-limit";
   // Unanchored, and last: a 429 body that happens to mention a token is still a rate limit.
   if (AUTH_SIGNALS.test(message)) return "auth";
   return "unknown";

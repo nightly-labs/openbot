@@ -1,4 +1,5 @@
 import { Button, Heading } from "@openbot/ui";
+import type { VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, For, onCleanup, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -15,7 +16,6 @@ import {
 } from "../src/features/conversation/conversation-scope";
 import type { ConversationProps } from "../src/features/conversation/conversation-types";
 import { VOICE_LEVEL_COUNT } from "../src/features/conversation/stores/voice-store";
-import type { VoicePhase } from "../src/features/conversation/voice-status";
 import { CONVERSATION_STORY_ARGS, StoryAppProviders } from "./conversation-story-support";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
@@ -37,6 +37,8 @@ interface VoiceInputState {
   draft?: string;
   liveText?: string;
   error?: () => string;
+  /** The recording stopped at the time limit. */
+  limitReached?: boolean;
   props?: Partial<ConversationProps>;
 }
 
@@ -66,11 +68,25 @@ const STATES: VoiceInputState[] = [
     draft: "Quick question about the release.",
     liveText: DICTATION,
   },
+  {
+    title: "Recording, 13 seconds left",
+    phase: "recording",
+    elapsedSeconds: 107,
+    levels: SPEECH_LEVELS,
+    liveText: DICTATION,
+  },
+  {
+    title: "Recording, 7 seconds left",
+    phase: "recording",
+    elapsedSeconds: 113,
+    levels: SPEECH_LEVELS,
+    liveText: DICTATION,
+  },
   { title: "Transcribing", phase: "transcribing", elapsedSeconds: 7, liveText: DICTATION },
   { title: "Transcript in the draft", draft: DICTATION },
+  { title: "Stopped at the time limit", draft: DICTATION, limitReached: true },
   { title: "Microphone blocked", error: () => currentText().t("composer.voice.blocked") },
   { title: "No speech detected", error: () => currentText().t("composer.voice.noSpeechDetected") },
-  { title: "No microphone (Linux and remote web)", props: { platform: "linux" } },
 ];
 
 /** Only the message box, set to one voice state through the same controller signals the app uses. */
@@ -82,7 +98,7 @@ function VoiceInputComposer(props: { state: VoiceInputState }) {
   const controller = useConversationController();
   onSettled(() => {
     const target = { agentId: conversationProps.agent?.id ?? "", serverId: conversationProps.server?.id ?? "local" };
-    const { draft, phase, elapsedSeconds, levels, modelProgress, liveText, error } = props.state;
+    const { draft, phase, elapsedSeconds, levels, modelProgress, liveText, error, limitReached } = props.state;
     if (draft) controller.setDrafts({ [target.agentId]: { text: draft, attachments: [], replyToMessageId: null } });
     if (phase) controller.setVoicePhase(phase);
     if (elapsedSeconds !== undefined) controller.setVoiceElapsedSeconds(elapsedSeconds);
@@ -90,6 +106,7 @@ function VoiceInputComposer(props: { state: VoiceInputState }) {
     if (modelProgress !== undefined) controller.setVoiceModelProgress(modelProgress);
     if (liveText) controller.setVoiceLiveTranscript({ ...target, text: liveText });
     if (error) controller.setConversationErrors({ [composerDraftKey(target)]: error() });
+    if (limitReached) controller.setVoiceLimitReached(target);
   });
   return (
     <ConversationViewScopeContext value={scope}>

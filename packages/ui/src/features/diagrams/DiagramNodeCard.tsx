@@ -30,7 +30,10 @@ export interface DiagramRoutineChip {
 export interface DiagramNodeCardProps {
   node: DiagramNode;
   name: string;
-  agent?: AgentProfile | undefined;
+  /** Only the face and the kicker read it, so a sample agent needs no more than these. */
+  agent?:
+    | (Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl" | "title"> & Partial<Pick<AgentProfile, "model">>)
+    | undefined;
   /** The step an agent runs in when the focused routine fires; absent outside its path. */
   step?: number | undefined;
   /** True for an agent that no routine reaches, so it never runs. */

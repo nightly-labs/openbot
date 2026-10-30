@@ -45,7 +45,13 @@ continue without the user.
    `WithRouter` pattern from `AgentTemplatePage.stories.tsx`.
 4. Read `packages/ui/AGENTS.md` and `src/renderer/AGENTS.md`. For public web,
    also read `apps/auth-api/AGENTS.md`.
-5. Write down your assumptions in one short list. You show it to the user in
+5. Take a reference screenshot of the place where the feature lives in the
+   current app. For desktop, use the `App` story (`app--expanded-sidebar` and
+   the other `app--*` ids), the real container story (for example
+   `settings-serversettingsmodal--*`), or the dev app with
+   `bun run dev:automation screenshot`. For public web, use the page story.
+   Save it as `reference.png` beside the variant screenshots (Step 5).
+6. Write down your assumptions in one short list. You show it to the user in
    Step 6.
 
 ## Step 2 — List what to reuse
@@ -66,6 +72,11 @@ Before you write UI, list the parts that already exist:
   radii, or spacing values when a token exists.
 - Similar screens in the app. A new screen must look like it belongs next to
   them.
+
+References are the real app and real components only: `App`, `WebWorkspace`,
+the real containers, and stories of one component. Do not copy layout from a
+story that builds its own shell, header, sidebar, chat panel, or settings
+menu. Such a copy keeps a design that the app no longer has.
 
 ## Step 3 — Choose the directions
 
@@ -89,6 +100,31 @@ one sentence for its main cost. Example for a pricing page:
 Do not ask the user to approve the directions. Build them.
 
 ## Step 4 — Build the variants
+
+### Start from the real app
+
+Render the real app or the real container, and hand-build only the new part.
+Never copy an existing header, sidebar, menu, settings navigation, or composer.
+
+- A feature in the shell (page rail, sidebar, chat header, chat, composer):
+  render `PrototypeApp` from `src/renderer/stories/prototype-support.tsx`.
+  Put the new part into the real DOM with `createAppDom` and
+  `AppSlot` (`header`, `topbar`, `rail`, `sidebar`), open a chat with
+  `openChat`, and add data with the `setup` prop (for example
+  `mock.api.agent.channelCommand`).
+- A feature in a settings section: render the real dialog on that section.
+  Server settings: `ServerSettingsStory` from
+  `src/renderer/stories/server-settings-story.tsx`, with `initialSection`.
+  App settings: `SettingsModal`, as `SettingsModal.stories.tsx` does.
+- A feature in the chat timeline: `StoryConversation` from
+  `src/renderer/stories/conversation-story-support.tsx`.
+- A new dialog or panel that the app does not have yet: open it over
+  `PrototypeApp`, so the user sees it in the window.
+
+When the real app cannot show a state without product code, show the new
+component alone, and say so in Step 6.
+
+### Files
 
 Put each prototype in its own files. Do not change product code, shared
 components, contracts, or the i18n catalog for a prototype.
@@ -120,7 +156,23 @@ export const GuidedChoice: Story = { name: "C. Guided choice", render: () => <Gu
 ```
 
 Give each variant component a `Variant` suffix, so its name is not the same as
-the story export.
+the story export. A desktop variant in the shell renders the real app and adds
+only its part:
+
+```tsx
+/** A. Two arrows at the start of the chat header. */
+export function HeaderArrowsVariant() {
+  const app = createAppDom();
+  return (
+    <div class="chat-history-prototype" ref={app.attach}>
+      <PrototypeApp />
+      <AppSlot app={app} slot="header">
+        <HistoryArrows />
+      </AppSlot>
+    </div>
+  );
+}
+```
 
 Rules:
 
@@ -168,7 +220,11 @@ Run these checks one at a time:
    The desktop stylesheet sets `overflow: hidden` on `html` and `body`, so a
    full-page screenshot shows only the viewport. Before each screenshot,
    resize the viewport height to the `scrollHeight` of `#storybook-root`.
-6. Look at each screenshot. Fix broken layout, clipped text, overlap, and
+6. Compare each screenshot with the reference screenshot from Step 1.
+   Everything outside the new part must be the same. When the shell, a
+   header, or a menu looks different, the variant copies an old design:
+   render the real one.
+7. Look at each screenshot. Fix broken layout, clipped text, overlap, and
    console errors that the prototype causes before you show the variants.
    Report errors that also occur without the prototype; do not fix them.
 
@@ -203,3 +259,6 @@ Then stop. Do not commit, push, or open a PR unless the user asks.
   or change the chosen story into the feature's normal story under its
   domain title. Do not keep `Prototypes/` stories in a PR unless the user
   asks for them.
+- **Reject**: when the user rejects all directions, delete the prototype
+  files. Do not keep `Prototypes/` or `Concepts/` stories on `main`: a later
+  agent copies them as references.

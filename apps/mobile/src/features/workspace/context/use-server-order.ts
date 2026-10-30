@@ -20,7 +20,7 @@ function showOrderFailure(error: unknown): void {
   );
 }
 
-/** The default server and the order of the other servers, saved on this device for the account. */
+/** The order of the servers, saved on this device for the account, and a default server of an earlier version. */
 export function useServerOrder(
   apiUrl: string,
   userId: string,
@@ -61,36 +61,18 @@ export function useServerOrder(
     [],
   );
 
-  /** Saves the order of the other servers. Returns false and keeps the old order on failure. */
+  /**
+   * Saves the order of all servers; the first one opens when the app starts. A default server that an
+   * earlier version saved stays first until the user orders the list, and the saved order ends it.
+   * Returns false and keeps the old order on failure.
+   */
   const reorderServers = useCallback(
     (serverIds: string[]) => {
       try {
         LockedKeychain.setItem(orderKey, JSON.stringify(serverIds));
+        if (latest.current.defaultServerId !== null) LockedKeychain.setItem(defaultKey, JSON.stringify(null));
         setSavedServerOrder({ key: orderKey, ids: serverIds });
-        return true;
-      } catch (error) {
-        showOrderFailure(error);
-        return false;
-      }
-    },
-    [orderKey],
-  );
-
-  /** Makes a server the default in place of the current one, or removes it with `null`. */
-  const setDefaultServer = useCallback(
-    (serverId: string | null) => {
-      const { servers: current, defaultServerId: currentDefault, orderedServers: ordered } = latest.current;
-      const previous = current.some((server) => server.id === currentDefault) ? currentDefault : null;
-      const listed = ordered
-        .filter((server) => server.id !== currentDefault && server.id !== serverId)
-        .map((server) => server.id);
-      // The server that is no longer the default goes to the top of the list.
-      const order = previous && previous !== serverId ? [previous, ...listed] : listed;
-      try {
-        LockedKeychain.setItem(orderKey, JSON.stringify(order));
-        LockedKeychain.setItem(defaultKey, JSON.stringify(serverId));
-        setSavedServerOrder({ key: orderKey, ids: order });
-        setSavedDefaultServer({ key: defaultKey, id: serverId });
+        setSavedDefaultServer({ key: defaultKey, id: null });
         return true;
       } catch (error) {
         showOrderFailure(error);
@@ -100,5 +82,5 @@ export function useServerOrder(
     [orderKey, defaultKey],
   );
 
-  return { serverOrder, defaultServerId, orderedServers, sortByPreference, reorderServers, setDefaultServer };
+  return { serverOrder, defaultServerId, orderedServers, sortByPreference, reorderServers };
 }

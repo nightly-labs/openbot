@@ -1,0 +1,36 @@
+{
+  "slug": "neon",
+  "name": "Neon",
+  "tagline": "Postgres projects, branches and migrations",
+  "description": "Neon lets agents list projects and branches, run SQL, read table schemas, test schema changes on a temporary branch, find slow queries, and search the Neon docs. Each user signs in to their own Neon account through the browser and can choose read-only access when they authorize. With full access, agents can run SQL that changes or deletes data, and create, reset or delete branches, databases and projects. Neon recommends its MCP server for development and testing, not for production databases.",
+  "category": "coding",
+  "creatorName": "Neon",
+  "iconUrl": "https://neon.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-projects", "text": "Which projects and branches are in my Neon account?" },
+    { "id": "prompt-slow-queries", "text": "Which queries are the slowest on my Neon database, and why?" },
+    {
+      "id": "prompt-migration",
+      "text": "Add an index on the orders table in a temporary branch, and show me the result before you apply it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-neon-mcp",
+      "name": "Neon",
+      "description": "Postgres projects, branches, SQL, and migrations, over Neon's MCP server with browser sign-in.",
+      "iconUrl": "https://neon.com/apple-touch-icon.png",
+      "server": {
+        "name": "neon",
+        "transport": "http",
+        "url": "https://mcp.neon.tech/mcp",
+        "auth": [{ "id": "neon-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://neon.com",
+  "privacyPolicyUrl": "https://www.databricks.com/legal/privacynotice",
+  "termsUrl": "https://neon.com/platform-terms"
+}

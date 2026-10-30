@@ -10,12 +10,14 @@ import {
   type SignInRelayStatus,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
+import type { ProviderAccountRelayProvider } from "@openbot/contracts/team-protocol/provider-account-relays";
 import type { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Duration, Effect, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { McpHostSignIns } from "./mcp-host-sign-ins";
+import type { ProviderAccountsHost } from "./provider-accounts-host";
 import type { ProviderHostSignIns } from "./provider-host-sign-ins";
 import { HttpError } from "./team-api/http-error";
 
@@ -27,6 +29,11 @@ const SIGN_IN_RELAY_TTL_MS = 10 * 60_000;
 const FLOW_LIMIT = 16;
 /** How long the listener of a sign-in on this host can take to answer its callback. */
 const REPLAY_TIMEOUT = Duration.seconds(10);
+/**
+ * How long the success page that a callback redirects to can take. The client waits 15 s for
+ * `complete`, and cancels the sign-in after it: the callback and this page stay under that.
+ */
+const SUCCESS_PAGE_TIMEOUT = Duration.seconds(3);
 /** How long after its message an agent's sign-in link can start a flow. A CLI's own page ends sooner. */
 const PRINTED_LINK_AGE_MS = 60 * 60_000;
 /** What `status` and `complete` answer, as `sign-in-relay-v1` sends it. */
@@ -37,7 +44,8 @@ export interface RelaySignIn {
   /** One sign-in runs for each key; a new flow for the same key replaces the old one. */
   key: string;
   status: () => { pageUrl: string | null; result: McpTestResult | null };
-  cancel: () => void;
+  /** Ends when the sign-in has stopped, so a client that reads the host after `cancel` sees it gone. */
+  cancel: () => Effect.Effect<void>;
 }
 
 /** The part of a flow that differs by kind of sign-in. */
@@ -66,6 +74,7 @@ interface Flow {
 export interface SignInRelayHostDependencies {
   mcp: Pick<McpHostSignIns, "startRelay" | "relayStatus" | "cancel">;
   providers: Pick<ProviderHostSignIns, "startRelay" | "relayStatus" | "cancel">;
+  accounts: Pick<ProviderAccountsHost, "startRelay" | "relayStatus" | "cancelSignIn">;
   /** Gives an MCP grant to the sign-in on this host that waits for `state`, as the loopback listener does. */
   receiveMcpGrant: (state: string, code: string) => boolean;
   /** Answers whether an agent message of `agentId` holds this exact address. */
@@ -116,7 +125,7 @@ export class SignInRelayHost {
           registerSecretValue(code);
           return receiveMcpGrant(state, code);
         }),
-      cancel: () => mcp.cancel(url),
+      cancel: () => Effect.sync(() => mcp.cancel(url)),
     });
   });
 
@@ -138,7 +147,34 @@ export class SignInRelayHost {
         const { pageUrl, result } = providers.relayStatus(provider);
         return { pageUrl, result: result && { toolCount: 0, error: result.error } };
       },
-      cancel: () => Effect.runFork(providers.cancel(provider).pipe(Effect.ignore)),
+      cancel: () => providers.cancel(provider).pipe(Effect.ignore),
+    });
+  });
+
+  /**
+   * Starts the sign-in of a provider account after the first with no tab, and returns its flow at once
+   * (`provider-account-relay-v1` and `-v2`). A null `accountId` signs in a new account.
+   */
+  startProviderAccount(memberId: string, provider: ProviderAccountRelayProvider, accountId: string | null) {
+    return this.#startProviderAccount(memberId, provider, accountId);
+  }
+
+  readonly #startProviderAccount = Effect.fn("SignInRelayHost.startProviderAccount")(function* (
+    this: SignInRelayHost,
+    memberId: string,
+    provider: ProviderAccountRelayProvider,
+    accountId: string | null,
+  ) {
+    const { accounts } = this.#dependencies;
+    yield* accounts.startRelay(provider, accountId);
+    // One account sign-in runs for each provider, so a new flow replaces the one of any account.
+    return this.startReplay(memberId, {
+      key: `account\n${provider}`,
+      status: () => {
+        const { pageUrl, result } = accounts.relayStatus(provider);
+        return { pageUrl, result: result && { toolCount: 0, error: result.error } };
+      },
+      cancel: () => accounts.cancelSignIn(provider).pipe(Effect.ignore),
     });
   });
 
@@ -173,9 +209,10 @@ export class SignInRelayHost {
         ),
       refuse: replay,
       // The CLI keeps its own sign-in, so a refusal or a cancel only ends what this host relays.
-      cancel: () => {
-        result ??= { toolCount: 0, error: sourceText("error.mcp.relayEnded") };
-      },
+      cancel: () =>
+        Effect.sync(() => {
+          result ??= { toolCount: 0, error: sourceText("error.mcp.relayEnded") };
+        }),
     });
   }
 
@@ -208,18 +245,27 @@ export class SignInRelayHost {
     // waits for the callback gets the refusal too, so it stops now and not at its own deadline.
     if (params.has("error")) {
       if (flow.target.refuse) yield* flow.target.refuse(params, page);
-      flow.target.cancel();
+      yield* flow.target.cancel();
       return view(flow);
     }
     if (!(yield* flow.target.deliver(params, page))) return yield* refuse(400, "error.team.signInRelayMismatch");
     return view(flow);
   });
 
-  cancel(memberId: string, flowId: string): void {
-    const flow = this.#flow(memberId, flowId);
-    this.#flows.delete(flowId);
-    if (!flow.target.status().result) flow.target.cancel();
+  /** Ends when the sign-in on this host has stopped. */
+  cancel(memberId: string, flowId: string) {
+    return this.#cancel(memberId, flowId);
   }
+
+  readonly #cancel = Effect.fn("SignInRelayHost.cancel")(function* (
+    this: SignInRelayHost,
+    memberId: string,
+    flowId: string,
+  ) {
+    const flow = yield* refusable(() => this.#flow(memberId, flowId));
+    this.#flows.delete(flowId);
+    if (!flow.target.status().result) yield* flow.target.cancel();
+  });
 
   #open(memberId: string, target: RelayTarget): { flowId: string; expiresAt: number } {
     this.#expire();
@@ -228,7 +274,7 @@ export class SignInRelayHost {
     for (const [id, flow] of this.#flows) {
       if (this.#flows.size < FLOW_LIMIT) break;
       this.#flows.delete(id);
-      flow.target.cancel();
+      Effect.runFork(flow.target.cancel());
     }
     const flowId = randomBytes(16).toString("hex");
     const expiresAt = this.#now() + SIGN_IN_RELAY_TTL_MS;
@@ -248,7 +294,7 @@ export class SignInRelayHost {
     for (const [id, flow] of this.#flows) {
       if (flow.expiresAt > now) continue;
       this.#flows.delete(id);
-      if (!flow.target.status().result) flow.target.cancel();
+      if (!flow.target.status().result) Effect.runFork(flow.target.cancel());
     }
   }
 }
@@ -283,9 +329,8 @@ function view(flow: Flow): SignInRelayView {
 
 /**
  * Sends the callback to the loopback address that the page of this host's own sign-in names. The
- * address comes only from that page, so a client cannot choose it. The request follows no redirect,
- * and only its status is kept: the answer is a page for a browser. The query holds a grant, so
- * nothing here logs the address.
+ * address comes only from that page, so a client cannot choose it. Only the status of the callback is
+ * kept: the answer is a page for a browser. The query holds a grant, so nothing here logs the address.
  */
 const replay = Effect.fn("SignInRelayHost.replay")(function* (query: URLSearchParams, pageUrl: string) {
   if (!loopbackCallback(pageUrl)) return false;
@@ -294,12 +339,27 @@ const replay = Effect.fn("SignInRelayHost.replay")(function* (query: URLSearchPa
   const address = new URL(new URL(pageUrl).searchParams.get("redirect_uri") ?? "");
   address.search = query.toString();
   address.hash = "";
-  return yield* Effect.tryPromise(async (signal) => {
+  const answer = yield* load(address, REPLAY_TIMEOUT);
+  if (!answer?.delivered) return false;
+  // `codex login` answers its callback with a redirect to its own success page, and ends only when
+  // that page loads, as in a browser on this host. Only that one redirect, to the same address and
+  // port, is followed. The callback has its sign-in already, so this load does not change the result.
+  if (answer.next?.origin === address.origin) {
+    const token = answer.next.searchParams.get("id_token");
+    if (token) registerSecretValue(token);
+    yield* load(answer.next, SUCCESS_PAGE_TIMEOUT);
+  }
+  return true;
+});
+
+/** Loads `address` with no redirect. Null when it does not answer in time. */
+const load = (address: URL, timeout: Duration.Duration) =>
+  Effect.tryPromise(async (signal) => {
     const response = await fetch(address, { redirect: "manual", signal });
     await response.body?.cancel();
-    return response.status < 400;
+    const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+    return { delivered: response.status < 400, next: location ? URL.parse(location, address) : null };
   }).pipe(
-    Effect.timeout(REPLAY_TIMEOUT),
-    Effect.orElseSucceed(() => false),
+    Effect.timeout(timeout),
+    Effect.orElseSucceed(() => null),
   );
-});

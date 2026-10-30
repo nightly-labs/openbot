@@ -1,7 +1,7 @@
 import { APP_LOADING_FPS, APP_LOADING_LOOP_S, AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { ServerConnectionNotice } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { SplashPlayground } from "./splash-concept";
+import { SplashPlayground } from "./splash-story-support";
 
 interface LoadingStoryArgs {
   readyAfterMs: number;

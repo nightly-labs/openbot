@@ -1,3 +1,4 @@
+import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import type { CentralAuthUser, MobileConnectedDevice } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
@@ -18,6 +19,8 @@ export interface RemoteHostSummary {
   name: string;
   logoKey: string | null;
   devicePublicKey: string | null;
+  /** The host's signed key handovers. An account server from before handovers sends none. */
+  keyHandovers: HostKeyHandover[];
   authEpoch: number;
   membershipId: string;
   role: "owner" | "admin" | "member";
@@ -49,6 +52,7 @@ export interface RemoteInvitePreview {
   emailBound: boolean;
   permanent: boolean;
   devicePublicKey: string | null;
+  keyHandovers: HostKeyHandover[];
 }
 
 export interface RemoteMemberRecord {
@@ -160,6 +164,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
       devicePublicKey: host.devicePublicKey,
+      keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
@@ -230,6 +235,7 @@ export function decodeRemoteInvitePreview(value: unknown): RemoteInvitePreview {
     emailBound: record.emailBound,
     permanent: isPermanentInvite(record.permanent, record.expiresAt),
     devicePublicKey: record.devicePublicKey,
+    keyHandovers: optionalHostKeyHandovers(record.keyHandovers),
   };
 }
 

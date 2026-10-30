@@ -45,10 +45,8 @@ const claudeArtifactSchema = z.object({
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 const opencodeArtifactSchema = z.object({
-  package: z.string().regex(/^opencode-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)$/u),
-  asset: z
-    .string()
-    .regex(/^opencode-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  package: z.string().regex(/^@opencode\/cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)$/u),
+  asset: z.string().regex(/^cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
@@ -181,11 +179,15 @@ const agentRuntimeLockSchema = z.object({
    */
   opencode: z.object({
     registry: z.literal("https://registry.npmjs.org"),
-    /** Canonical name; `github.com/sst/opencode` now redirects here. The licence comes from the
-     *  `opencode-ai` npm tarball, not from this repository. */
+    /** Canonical name; `github.com/sst/opencode` now redirects here. */
     repository: z.literal("https://github.com/anomalyco/opencode"),
     version: z.string().regex(/^\d+\.\d+\.\d+$/u),
     license: z.literal("MIT"),
+    /**
+     * The `@opencode/cli` tarballs of OpenCode 2 carry no LICENSE. The `opencode-ai` tarball of
+     * OpenCode 1, from the same repository, carries the same MIT file, so it is the copy installed.
+     */
+    licensePackage: z.object({ name: z.literal("opencode-ai"), version: z.string().regex(/^\d+\.\d+\.\d+$/u) }),
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": opencodeArtifactSchema,

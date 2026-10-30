@@ -11,11 +11,12 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
+  decodeTeamProtocolV2Json,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV7CurrentEvent,
-  decodeTeamProtocolV7WebRtcHttpResponse,
+  decodeTeamProtocolV8CurrentEvent,
+  decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV7WebRtcHttpRequest,
+  encodeTeamProtocolV8WebRtcHttpRequest,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
   type TeamProtocolV2Json,
@@ -28,7 +29,7 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -73,6 +74,13 @@ import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
 export type { RemoteFileUpload } from "./file-upload";
 export { MOBILE_ATTACHMENT_BYTES } from "./file-upload";
 
+import {
+  judgePath,
+  PATH_CHECK_INTERVAL_MS,
+  type ProbeArm,
+  type ProbeSample,
+  unmeasuredProbeMs,
+} from "./remote-path-check";
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 export type RemoteTeamCommand =
@@ -84,8 +92,8 @@ export type RemoteTeamCommand =
       method: string;
       path: string;
       body: TeamProtocolV2Json;
-      upload?: RemoteFileUpload;
-      timeoutMs?: number;
+      upload?: RemoteFileUpload | undefined;
+      timeoutMs?: number | undefined;
     };
 
 export interface RemoteTeamBootstrapPayload {
@@ -104,8 +112,12 @@ export interface RemoteTeamCommandResult {
   reference?: string;
 }
 
-/** Carries every outstanding command across the native/DOM bridge, keyed by request ID. */
-export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand[]) => void) {
+/**
+ * Keeps every outstanding command of the native/DOM bridge, keyed by request ID. `deliver` sends one
+ * new command to the page. A page that loads again does not have the commands of the page before it,
+ * so the consumer sends it `outstanding()` once it is ready, and the page skips an ID that it has.
+ */
+export function createRemoteCommandMailbox(deliver: (command: RemoteTeamCommand) => void) {
   const pending = new Map<string, { command: RemoteTeamCommand; resolve: (result: RemoteTeamCommandResult) => void }>();
   let target: { hostId: string; hostPublicKey: string } | null = null;
   const cancel = () => {
@@ -127,7 +139,7 @@ export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand
       }
       return new Promise((resolve) => {
         pending.set(command.id, { command, resolve });
-        publish([...pending.values()].map((entry) => entry.command));
+        deliver(command);
       });
     },
     receive(result: RemoteTeamCommandResult) {
@@ -135,9 +147,64 @@ export function createRemoteCommandMailbox(publish: (commands: RemoteTeamCommand
       if (!entry) return;
       pending.delete(result.commandId);
       entry.resolve(result);
-      publish([...pending.values()].map((item) => item.command));
     },
+    /** The commands that have no result yet, in the order they were sent. */
+    outstanding: (): RemoteTeamCommand[] => [...pending.values()].map((entry) => entry.command),
     dispose: cancel,
+  };
+}
+
+function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
+  if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
+    return null;
+  const maxBytes = value.maxBytes;
+  if (!(maxBytes === undefined || isNumber(maxBytes))) return null;
+  return {
+    name: value.name,
+    mimeType: value.mimeType,
+    base64: value.base64,
+    ...(maxBytes === undefined ? {} : { maxBytes }),
+  };
+}
+
+/**
+ * Reads a command that crossed the native/DOM bridge as JSON. `command` is null when the value is not
+ * a command; `commandId` is then its ID when it has one, so the page can still answer it.
+ */
+export function decodeRemoteTeamCommand(value: unknown): {
+  command: RemoteTeamCommand | null;
+  commandId: string | null;
+} {
+  if (!isDynamicRecord(value) || !isString(value.id)) return { command: null, commandId: null };
+  const id = value.id;
+  const invalid = { command: null, commandId: id };
+  if (value.type === "disconnect") return { command: { id, type: "disconnect" }, commandId: id };
+  if (value.type === "connect")
+    return isString(value.hostId) && isString(value.hostPublicKey)
+      ? { command: { id, type: "connect", hostId: value.hostId, hostPublicKey: value.hostPublicKey }, commandId: id }
+      : invalid;
+  if (value.type !== "request" || !isString(value.method) || !isString(value.path)) return invalid;
+  const timeoutMs = value.timeoutMs;
+  if (!(timeoutMs === undefined || isNumber(timeoutMs))) return invalid;
+  const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
+  if (upload === null) return invalid;
+  let body: TeamProtocolV2Json;
+  try {
+    body = decodeTeamProtocolV2Json(value.body);
+  } catch {
+    return invalid;
+  }
+  return {
+    command: {
+      id,
+      type: "request",
+      method: value.method,
+      path: value.path,
+      body,
+      ...(upload ? { upload } : {}),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    },
+    commandId: id,
   };
 }
 
@@ -173,7 +240,9 @@ export interface RemoteTeamDiagnostic {
     | "signal-ready"
     | "signal-retry"
     | "host-waiting"
-    | "host-busy"
+    | "path-check"
+    | "event-reset"
+    | "event-gap"
     | "peer-state"
     | "route"
     | "ice-recovery"
@@ -238,7 +307,6 @@ interface PeerState {
   connection: RTCPeerConnection | null;
   channels: Partial<Record<ChannelKind, RTCDataChannel>>;
   decoders: Partial<Record<ChannelKind, TeamWebRtcPayloadDecoder>>;
-  channelLocks: Partial<Record<ChannelKind, Semaphore.Semaphore>>;
   identity: Ed25519Identity;
   clientPublicKey: string;
   clientNonce: string;
@@ -273,7 +341,9 @@ interface PeerState {
   answeredRequest: boolean;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
-  hostProtocol?: number;
+  hostProtocol: number | undefined;
+  /** The compatibility read in flight. A request waits for it when the host protocol is not known. */
+  hostProtocolRead?: Deferred.Deferred<void>;
 }
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
@@ -285,16 +355,15 @@ const ICE_RESTART_DELAY_MS = 2_000;
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 /** A socket that waits for the host is renewed with its resume token, so a dead socket does not wait forever. */
 const HOST_WAIT_RENEW_MS = 60_000;
-const COMPATIBILITY_REQUEST_TIMEOUT_MS = 3_000;
-/** The first read on a new peer also waits for a slow relay path, such as TURN over TLS on mobile data. */
-const FIRST_COMPATIBILITY_REQUEST_TIMEOUT_MS = 10_000;
-/**
- * A host whose main process is busy answers the check late, but its WebRTC process still receives
- * and acknowledges the request. While the path receives data, the check waits this long in total
- * before it replaces the peer, so a busy host does not cause a reconnect loop.
- */
-const BUSY_HOST_COMPATIBILITY_TIMEOUT_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
+/**
+ * A Signal restart disconnects all peers at the same time, and each resume asks the account service.
+ * The first retry is spread over 0.5–4 s (before: 0.25–0.5 s). Later retries double up to 30 s.
+ */
+function signalRetryDelay(attempt: number): number {
+  if (attempt === 0) return 500 + Math.random() * 3_500;
+  return Math.min(30_000, 500 * 2 ** attempt) * (0.5 + Math.random() / 2);
+}
 /**
  * The host gets no answer to its ICE consent checks while the phone is suspended, and stops using a
  * path that did not answer for 30 s (RFC 7675). A longer absence needs an ICE restart.
@@ -385,6 +454,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
   // A failed attempt keeps its session for the next attempt on the same host. Ending it each time
   // made every recovery attempt a create, a ticket and an end on the account Worker.
   let retainedSession: { hostId: string; sessionId: string } | null = null;
+  // A new peer of a known host sends the capabilities of its last protocol. With the bootstrap
+  // capabilities, the host would hide the agents of the providers that protocol 7 does not know.
+  const hostProtocols = new Map<string, number>();
 
   return {
     async sendHostStreamData(data: string | ArrayBuffer) {
@@ -517,15 +589,18 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     return pair ? { local: stats.get(pair.localCandidateId), remote: stats.get(pair.remoteCandidateId) } : null;
   }
 
-  /**
-   * A count that grows while the host's WebRTC process answers on the selected path: received bytes
-   * and ICE consent answers. Null when there is no pair or no stats.
-   */
-  function receivedOnPath(connection: RTCPeerConnection) {
+  /** The data bytes of the selected pair and its round-trip time. Null when there is no pair or no stats. */
+  function sentOnPath(connection: RTCPeerConnection) {
     return peerCall(() => connection.getStats()).pipe(
       Effect.map((stats) => {
         const pair = selectedPair(stats);
-        return pair ? (Number(pair.bytesReceived) || 0) + (Number(pair.responsesReceived) || 0) : null;
+        if (!pair) return null;
+        const rtt = Number(pair.currentRoundTripTime);
+        return {
+          bytesSent: Number(pair.bytesSent) || 0,
+          bytesReceived: Number(pair.bytesReceived) || 0,
+          rttMs: Number.isFinite(rtt) ? rtt * 1000 : null,
+        };
       }),
       Effect.catch(() => Effect.succeed(null)),
     );
@@ -739,7 +814,6 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         connection: null,
         channels: {},
         decoders: {},
-        channelLocks: {},
         identity,
         clientPublicKey,
         clientNonce: randomBase64Url(32),
@@ -765,6 +839,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         signalReady: false,
         answeredRequest: false,
         lastSignalClose: null,
+        hostProtocol: hostProtocols.get(hostId),
       };
       peer = state;
       const connected = Deferred.makeUnsafe<void, RemotePeerError>();
@@ -846,6 +921,23 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       if (event?.code === 1008 && (refusal === null || refusal === "rate_limited"))
         signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
       diagnose(state, "signal-closed", `code ${event?.code ?? "unknown"}`);
+      // An attempt that is not authenticated has nothing to keep, and a new socket would wait 60 s. Its
+      // refusal, such as `host_unavailable`, is handled after the close and is lost. Fail the attempt now
+      // with that refusal, so the recovery owner retries it, and not the connect deadline 30 s later.
+      // A rate limit and a revoked session have no text here: they keep their own steps.
+      const refused = refusal === null ? sourceText("error.remote.signalClosed") : SIGNAL_ERROR_TEXT.get(refusal);
+      if (
+        refused !== undefined &&
+        !state.authenticated &&
+        state.connected &&
+        !state.waitingForHost &&
+        Date.now() >= signalRetryAt
+      ) {
+        const reference =
+          refusal === null ? referenceFrom("signal", "close", event?.code) : referenceFrom("signal", refusal);
+        failPeer(state, referenced(refused, reference), actions);
+        return;
+      }
       scheduleReconnect(state, actions);
     };
   }
@@ -1069,8 +1161,10 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     channel.bufferedAmountLowThreshold = 1024 * 1024;
     state.channels[kind] = channel;
     state.decoders[kind] = new TeamWebRtcPayloadDecoder();
-    const lock = Semaphore.makeUnsafe(1);
-    state.channelLocks[kind] = lock;
+    // Frames run one at a time, in the order they arrive. A semaphore does not keep that order: a
+    // frame that arrives while the permit is free between two holders runs first, and the event
+    // stream then has a gap that disconnects the peer.
+    let handled = Promise.resolve();
     channel.onopen = () => {
       if (CHANNELS.every((name) => state.channels[name]?.readyState === "open") && !state.binding) {
         diagnose(state, "channels-open");
@@ -1079,22 +1173,24 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     };
     channel.onmessage = (event) => {
       const data = event.data;
-      void runPeerEffect(
-        lock.withPermit(
-          Effect.gen(function* () {
-            const decoded = yield* Effect.try({
-              try: () => {
-                if (!isString(data) && !(data instanceof ArrayBuffer)) {
-                  throw new Error("The host sent unsupported binary data.");
-                }
-                return state.decoders[kind]?.push(data);
-              },
-              catch: peerError,
-            });
-            if (decoded !== undefined) yield* handleChannelData(state, kind, decoded, actions);
-          }),
-        ),
-      ).catch((error) => failPeer(state, error, actions));
+      handled = handled
+        .then(() =>
+          runPeerEffect(
+            Effect.gen(function* () {
+              const decoded = yield* Effect.try({
+                try: () => {
+                  if (!isString(data) && !(data instanceof ArrayBuffer)) {
+                    throw new Error("The host sent unsupported binary data.");
+                  }
+                  return state.decoders[kind]?.push(data);
+                },
+                catch: peerError,
+              });
+              if (decoded !== undefined) yield* handleChannelData(state, kind, decoded, actions);
+            }),
+          ),
+        )
+        .catch((error) => failPeer(state, error, actions));
     };
     channel.onerror = () =>
       failPeer(
@@ -1191,14 +1287,21 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
           const status = frame.result.status;
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
-            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV7Base(body))).protocol.maximum;
+            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol.maximum;
+            hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({
             status: frame.result.status,
             body: sideRoute
-              ? yield* peerDecode(() => sideRoute.response(pending.path, status, body, { historyExtent: true }))
+              ? yield* peerDecode(() =>
+                  sideRoute.response(pending.path, status, body, {
+                    historyExtent: true,
+                    channelAttention: true,
+                    agentTaskUiBlocks: true,
+                  }),
+                )
               : yield* peerDecode(() =>
-                  decodeTeamProtocolV7WebRtcHttpResponse(pending.method, pending.path, status, body),
+                  decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
                 ),
           });
         }
@@ -1211,6 +1314,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       if (kind !== "events") return;
       const frame = yield* peerDecode(() => decodeTeamProtocolV2EventFrame(data));
       if (frame.type === "event-reset") {
+        diagnose(state, "event-reset", `after ${state.lastEventSequence}, next ${frame.nextSequence}`);
         state.lastEventSequence = frame.nextSequence - 1;
         yield* RemotePeerIO.use((io) =>
           io.connectionUpdate({
@@ -1229,12 +1333,14 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         yield* sendEventAckEffect(state);
         return;
       }
-      if (frame.sequence !== state.lastEventSequence + 1)
+      if (frame.sequence !== state.lastEventSequence + 1) {
+        diagnose(state, "event-gap", `expected ${state.lastEventSequence + 1}, got ${frame.sequence}`);
         return yield* new RemotePeerError({ message: sourceText("error.remote.eventStreamGap") });
-      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload));
+      }
+      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }));
       const decoded = channel
         ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
-        : yield* peerDecode(() => decodeTeamProtocolV7CurrentEvent(frame));
+        : yield* peerDecode(() => decodeTeamProtocolV8CurrentEvent(frame));
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
@@ -1313,6 +1419,12 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         if (state && (method === "GET" || method === "HEAD")) state.needsResync = true;
         return yield* new RemotePeerError({ message: sourceText("error.remote.selectedServerOffline") });
       }
+      const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
+      const protocolRead = checksConnection ? Deferred.makeUnsafe<void>() : null;
+      if (protocolRead) state.hostProtocolRead = protocolRead;
+      // A read sent with the compatibility read must not go out with the bootstrap capabilities.
+      else if (state.hostProtocol === undefined && state.hostProtocolRead)
+        yield* Deferred.await(state.hostProtocolRead);
       const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
@@ -1328,16 +1440,12 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
             : // A caller names a provider and model on agent creation only when the host advertises
               // `agent-create-model`, so the pair is kept whenever it is present.
               yield* peerDecode(() =>
-                encodeTeamProtocolV7WebRtcHttpRequest(method, path, body, {
+                encodeTeamProtocolV8WebRtcHttpRequest(method, path, body, {
                   preserveSemanticTags: true,
                   agentCreateModel: true,
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
-        const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
-        const compatibilityTimeout = state.answeredRequest
-          ? COMPATIBILITY_REQUEST_TIMEOUT_MS
-          : FIRST_COMPATIBILITY_REQUEST_TIMEOUT_MS;
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -1348,14 +1456,24 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               method,
               path,
               body: payloadBody,
-              ...(bodyTransferId ? { bodyTransferId, contentType: upload?.mimeType } : {}),
+              ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
               capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
             },
           }),
         );
-        // Read before the send, so the acknowledgement of this request counts as an answer of the path.
+        // Read before the send, so the bytes of this probe and of the frames ahead of it count as its progress.
         const connection = state.connection;
-        let pathReceived = checksConnection && connection ? yield* receivedOnPath(connection) : null;
+        const sent = checksConnection && connection ? yield* sentOnPath(connection) : null;
+        const arm: ProbeArm | null = sent && {
+          at: Date.now(),
+          rttMs: sent.rttMs,
+          bytesSent: sent.bytesSent,
+          bytesReceived: sent.bytesReceived,
+          rpcBuffered: state.channels.rpc?.bufferedAmount ?? 0,
+          probeBytes: new TextEncoder().encode(payload).byteLength,
+          fresh: !state.answeredRequest,
+          limitMs: timeoutMs,
+        };
         const answer = Deferred.makeUnsafe<{ status: number; body: TeamProtocolV2Json }, RemotePeerError>();
         const response = yield* Effect.acquireUseRelease(
           // Registered before the send, so a fast response finds its request.
@@ -1368,18 +1486,21 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               reject(error);
               if (checksConnection) failPeer(state, error, actions);
             };
-            const busyHostDeadline = Date.now() + Math.min(BUSY_HOST_COMPATIBILITY_TIMEOUT_MS, timeoutMs);
-            // A path that still receives data reaches a host that is only slow. A path that receives
-            // nothing, as after a network change, is replaced at once.
+            const samples: ProbeSample[] = [];
             const checkPath = () => {
-              if (!connection || pathReceived === null || Date.now() >= busyHostDeadline) return expire();
-              const before = pathReceived;
-              void runPeerEffect(receivedOnPath(connection)).then((received) => {
+              if (!connection || !arm) return expire();
+              void runPeerEffect(sentOnPath(connection)).then((now) => {
                 if (pendingRequests.get(requestId) !== pending) return;
-                if (received === null || received <= before) return expire();
-                pathReceived = received;
-                diagnose(state, "host-busy", "compatibility check waits");
-                pending.timer = setTimeout(checkPath, Math.min(compatibilityTimeout, busyHostDeadline - Date.now()));
+                if (!now) return expire();
+                const sample = { at: Date.now(), bytesSent: now.bytesSent, bytesReceived: now.bytesReceived };
+                const verdict = judgePath(arm, samples, sample);
+                samples.push(sample);
+                if (verdict.kind === "pending") {
+                  pending.timer = setTimeout(checkPath, verdict.recheckAt - sample.at);
+                  return;
+                }
+                diagnose(state, "path-check", verdict.reason);
+                expire();
               }, expire);
             };
             const resolve = (value: { status: number; body: TeamProtocolV2Json }) =>
@@ -1391,7 +1512,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               reject,
               timer: setTimeout(
                 checksConnection ? checkPath : expire,
-                checksConnection ? Math.min(compatibilityTimeout, timeoutMs) : timeoutMs,
+                checksConnection
+                  ? Math.min(arm ? PATH_CHECK_INTERVAL_MS : unmeasuredProbeMs(!state.answeredRequest), timeoutMs)
+                  : timeoutMs,
               ),
             };
             pendingRequests.set(requestId, pending);
@@ -1420,7 +1543,14 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
         return response;
-      }).pipe(Effect.ensuring(Effect.sync(() => delivery?.stop())));
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            delivery?.stop();
+            if (protocolRead) Deferred.doneUnsafe(protocolRead, Effect.void);
+          }),
+        ),
+      );
     })();
   }
 
@@ -1583,7 +1713,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     const delay = Math.max(
       signalRetryAt - Date.now(),
       isPeerOnline(state) || canRecoverPeer(state) || state.waitingForHost
-        ? Math.min(30_000, 500 * 2 ** state.reconnectAttempt++)
+        ? signalRetryDelay(state.reconnectAttempt++)
         : 60_000,
     );
     diagnose(state, "signal-retry", `in ${delay} ms`);
@@ -1747,7 +1877,6 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       state.socket?.close();
       state.connection?.close();
       for (const decoder of Object.values(state.decoders)) decoder?.reset();
-      state.channelLocks = {};
       rejectRequests(new Error(sourceText("error.remote.serverDisconnected")));
       rejectConnection(state, new Error(sourceText("error.remote.serverDisconnected")));
       if (retainSession) {

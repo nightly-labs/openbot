@@ -20,7 +20,9 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const TRUSTED_BOTS = new Set(["infeld-ai[bot]", "dependabot[bot]"]);
+// `openbotgit[bot]` is the OpenBot GitHub App. The account Worker gives its installation token only for
+// repositories where the signed-in user can push (`apps/auth-api/src/server/github-installation-tokens.ts`).
+const TRUSTED_BOTS = new Set(["infeld-ai[bot]", "dependabot[bot]", "openbotgit[bot]"]);
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const TRUSTED_PERMISSIONS = new Set(["admin", "maintain", "write"]);
 const LABEL_EXTERNAL = "external";

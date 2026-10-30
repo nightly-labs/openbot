@@ -61,6 +61,32 @@ client at your own origin is not included in this image. The
 [self-hosted account service](self-hosting.md#what-changes) is a separate deployment with its own
 client limits.
 
+## Network
+
+The container uses the Docker bridge network. In the container, OpenBot sees only its bridge
+address. Devices connect to it through the public address of the host or through TURN. On a public
+server, this is sufficient: a test on a VPS gave the same connection time with the bridge network
+and with host networking.
+
+When the devices are on the same local network or Tailscale tailnet as the host, the bridge network
+can make the connection slow: the container does not see the local or `tailscale0` addresses of the
+host, so devices often use TURN. With host networking, OpenBot sees all addresses of the host, and
+devices can connect directly. Add `network_mode: host` to the service in `compose.yaml`, or
+`--network host` to `docker run`. Host networking is available on Linux with Docker Engine.
+
+Host networking removes the network isolation of the container:
+
+- Other programs on the host can connect to the listeners of OpenBot on `127.0.0.1`. These
+  listeners take tokens and team requests.
+- Agents can connect to the services of the host that listen only on `127.0.0.1`.
+- The virtual displays `:0` and `:1` of the container use abstract X sockets, which are in the
+  network namespace. When the host has its own display `:0` or `:1`, the container does not start.
+  Other programs on the host can connect to the displays, see the agent display and send input to it.
+
+Use it only on a host where you trust the other programs and users. Do not use it with
+[several instances on one host](#several-instances-on-one-host): their firewall works only on the
+`openbot` bridge network.
+
 ## Tags
 
 | Tag | Image |
@@ -137,6 +163,31 @@ disk of the host, where Docker on ext4 cannot limit its size. Outside `/data`, t
 only to `tmpfs` folders that count toward the memory limit: `/tmp` (8 GiB), `/var/tmp` (1 GiB),
 `/run/lock` and `/run/openbot`, and to the small tmpfs of its update requests. Before the image is mounted, root owns the folder, so the container cannot write to
 `/data` and stops. It never starts with an empty home folder.
+
+### CPU and memory of the instances
+
+`--cpus` is a CPU time limit. The container still sees every CPU of the host in `/proc/cpuinfo` and
+`/proc/stat`, so a program that sizes itself from the CPU count starts too many workers: `next build`
+started 63 on a 64-CPU host that gives the instance 8, and two builds filled 32 GiB. `setup`
+installs LXCFS with `--enable-cfs` (`lxcfs-openbot.conf`) as its last step; when that fails, it
+prints a warning and the rest of the setup stays done. When LXCFS runs, `openbot-instance` adds
+`lxcfs.yaml`: the container then reads its own CPU limit in `/proc/cpuinfo`, and its memory limit in
+`/proc/meminfo` and `/proc/swaps`. On cgroup v2, LXCFS 5.0 does not limit the CPU lines of
+`/proc/stat`, which Node's `os.cpus()` counts, so OpenBot limits the Node programs of agents itself
+(see [agent processes](hosted-servers.md#memory)). `nproc`, Python's `os.cpu_count()` and other
+programs that read the CPU affinity or `/sys/devices/system/cpu/online` still see the CPUs of the
+host. That file is not mounted: LXCFS lists CPUs 0 to limit-1 in it, but a process still runs on any
+CPU of the host, and the Gemini CLI then exits with SIGILL. Without LXCFS, an instance still starts
+(an update from the app must not fail), and `ready` prints a warning.
+
+An instance gets the LXCFS files when its container is made again: run `openbot-instance up <name>`
+after `setup`. A restart of LXCFS breaks its files in the containers that run, so `setup` does not
+restart it while a container uses it; each `setup` prints a warning until LXCFS runs with
+`--enable-cfs`. Docker starts after LXCFS (`docker-openbot.conf`).
+
+`start` also checks that the container cannot swap (`memory.swap.max` is 0), and prints a warning if
+it can, or if it cannot read the value. A container that swaps stops for seconds at a time when its memory is full, and its clients
+lose the connection.
 
 ### Logs
 
@@ -372,7 +423,7 @@ message from a person starts first. The browser opens no new tab and unloads idl
 
 The memory ceiling is the smaller of the memory of the host and the memory limit of the container
 (`--memory`, or `mem_limit` in Compose). Without a limit, the ceiling is the memory of the host. A
-fixed number of turns run at the same time: 4 up to 5 GiB of ceiling, 8 up to 10 GiB, and 16 above.
+fixed number of turns run at the same time: 2 up to 5 GiB of ceiling, 8 up to 10 GiB, and 16 above.
 `/dev/shm` and the `tmpfs` folders count toward the limit too. `docker exec openbot openbot status`
 shows the ceiling, the free memory, the level (`ok`, `low` or `critical`) and the turn limit.
 
@@ -381,7 +432,9 @@ sees only the memory of the host, so the guard uses it, and the log has one warn
 
 Main has an OOM score adjustment of 0 in the container, and each process that it starts gets 500.
 So when the container is out of memory, the kernel is more likely to stop a provider CLI, an MCP
-server or an agent tool than OpenBot.
+server or an agent tool than OpenBot. Agent processes also run at nice 10, and at the `critical` level
+main stops leftover agent processes, such as the workers of a build whose parent was stopped. See
+[agent processes](hosted-servers.md#memory).
 
 ## Environment
 
@@ -391,7 +444,7 @@ environment of OpenBot, so they can read these values.
 | Variable | Use |
 | --- | --- |
 | `XAI_API_KEY`, `CURSOR_API_KEY`, `CLINE_API_KEY` | A provider API key. |
-| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_ANTIGRAVITY_PATH` | Another provider executable. Mount it read-only in the container. |
+| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH` | Another provider executable. Mount it read-only in the container. |
 | `OPENBOT_AUTH_API_URL` | Another account server, for example a [self-hosted account service](self-hosting.md). |
 | `OPENBOT_DISPLAY_SIZE` | The size of the virtual display that computer use reads, as `WIDTHxHEIGHT` from 640x480 to 2576x2576. The default is 1280x800. A value that is not valid writes a warning in `docker logs`, and the container starts with 1280x800. See [Display size](self-hosted-server.md#display-size) for when to use 1920x1080. `docker/instances/compose.yaml` does not pass it, so an instance uses 1280x800. |
 
@@ -435,10 +488,13 @@ does not use systemd.
 
 - Remote desktop and Computer Use need a display. The container has a virtual display for the
   agents, but remote desktop and Computer Use were not tested in it. The arm64 release has no remote desktop runtime.
-- Voice prompts are not available on Linux.
+- Voice prompts are not available: the container has no microphone, and the web app has no voice prompts.
 - Gemini signs in on a Google page in the browser of the container. An owner or admin opens it
   with Connect in the app, and signs in through the live view of that page. This needs a release
   with `provider-host-sign-in-v1` on both sides. It was not tested in a container.
+- Bitwarden and Vaultwarden connect with an API key and the master password (`bitwarden-connector-v1`).
+  The container must reach the vault server over HTTPS. On a host with several instances, the
+  firewall blocks private addresses, so a Vaultwarden server on the local network cannot be used.
 
 ## Not confirmed
 
@@ -450,6 +506,9 @@ does not use systemd.
   Podman, Kubernetes, rootless Docker, and hosts that restrict user namespaces with AppArmor, such as
   Ubuntu 23.10 or newer. On such a host, the container can need an AppArmor profile that permits
   `userns`.
+- Host networking: users report that it makes the connection fast on a local network and on a
+  Tailscale tailnet. This was not tested here. On a public Ubuntu 24.04 VPS with Docker 29, the
+  bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.
 - The two displays of the entrypoint were tested with a stand-in for OpenBot: `:0` is 1280x800 and
   `:1` has the display size. Computer Use and remote desktop on `:1` were not tested.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in

@@ -15,7 +15,7 @@
 // The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
 // and one page each, which is expensive, so it runs once per connection rather than per event.
 
-import type { AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, BrowserTab } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
@@ -56,6 +56,12 @@ export class RemoteEventRefresh {
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
   readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
+  // The frozen `browser-changed` event has no field for a person's control or the history state, so
+  // `browser-user-control-v1` and `browser-page-state-v1` send them on their own. Each server keeps its
+  // last lists and tabs to merge them here.
+  readonly #browserHolds = new Map<string, ReadonlySet<string>>();
+  readonly #browserPageStates = new Map<string, ReadonlyMap<string, { canGoBack: boolean; canGoForward: boolean }>>();
+  readonly #browserStates = new Map<string, { tabs: BrowserTab[]; activeTabId: string | null }>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
@@ -80,12 +86,41 @@ export class RemoteEventRefresh {
       yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
       yield* this.#refreshQueue(serverId, event.agentId);
+    } else if (event.type === "browser-user-control-changed" || event.type === "browser-page-state-changed") {
+      if (event.type === "browser-user-control-changed") this.#browserHolds.set(serverId, new Set(event.tabIds));
+      else this.#browserPageStates.set(serverId, new Map(event.tabs.map(({ tabId, ...state }) => [tabId, state])));
+      this.#emit(serverId, event);
+      const state = this.#browserStates.get(serverId);
+      if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
     } else {
-      const remoteEvent = addRemotePreviewUrls(event, serverId);
+      if (event.type === "browser-changed")
+        this.#browserStates.set(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
+      const remoteEvent = addRemotePreviewUrls(
+        event.type === "browser-changed" ? this.#withBrowserHolds(serverId, event) : event,
+        serverId,
+      );
       if (bufferedLive) this.#emit(serverId, remoteEvent, true);
       else this.#emit(serverId, remoteEvent);
     }
   }).bind(this);
+
+  #withBrowserHolds(
+    serverId: string,
+    state: { tabs: BrowserTab[]; activeTabId: string | null },
+  ): Extract<AgentEvent, { type: "browser-changed" }> {
+    const held = this.#browserHolds.get(serverId);
+    const pageStates = this.#browserPageStates.get(serverId);
+    const tabs = state.tabs.map((tab) => {
+      const { userControl: _, canGoBack: _back, canGoForward: _forward, ...rest } = tab;
+      const pageState = pageStates?.get(tab.id);
+      return {
+        ...rest,
+        ...(held?.has(tab.id) ? { userControl: true as const } : {}),
+        ...(pageState ? { canGoBack: pageState.canGoBack, canGoForward: pageState.canGoForward } : {}),
+      };
+    });
+    return { type: "browser-changed", tabs, activeTabId: state.activeTabId };
+  }
 
   /**
    * Builds the current state from scratch, for a host that cannot replay what was missed. One agent
@@ -146,6 +181,9 @@ export class RemoteEventRefresh {
 
   forget(serverId: string): void {
     this.#rosterLoads.delete(serverId);
+    this.#browserHolds.delete(serverId);
+    this.#browserPageStates.delete(serverId);
+    this.#browserStates.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);
@@ -157,6 +195,9 @@ export class RemoteEventRefresh {
 
   clear(): void {
     this.#rosterLoads.clear();
+    this.#browserHolds.clear();
+    this.#browserPageStates.clear();
+    this.#browserStates.clear();
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();

@@ -33,7 +33,12 @@ export function renderBloubAvatar(seed: string, hue: AvatarHue | null, mood: Ava
   for (const eye of frame.eyes) {
     const path = Skia.Path.MakeFromSVGString(eye.d);
     const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = eye.matrix.slice(7, -1).split(",").map(Number);
-    if (path) canvas.drawPath(path.transform([a, c, e, b, d, f, 0, 0, 1]), fill(AVATAR_PAPER, eye.alpha));
+    if (!path) continue;
+    // Skia 2.14 paths are immutable, so the canvas applies the eye transform.
+    canvas.save();
+    canvas.concat(Skia.Matrix([a, c, e, b, d, f, 0, 0, 1]));
+    canvas.drawPath(path, fill(AVATAR_PAPER, eye.alpha));
+    canvas.restore();
   }
   for (const dot of frame.dots) canvas.drawCircle(dot.x, dot.y, dot.r, fill(color, dot.opacity));
   surface.flush();

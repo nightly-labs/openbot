@@ -140,7 +140,7 @@
 }
 
 .onboarding-computer-desktop {
-  stroke: var(--openbot-border-on-light);
+  stroke: var(--openbot-paper-border);
   stroke-width: 1;
   filter: drop-shadow(0 16px 22px var(--openbot-shadow-popover-ambient));
 }
@@ -168,33 +168,33 @@
 
 .onboarding-computer-window-body {
   fill: var(--openbot-onboarding-window);
-  stroke: var(--openbot-border-on-light);
+  stroke: var(--openbot-paper-border);
   stroke-width: 1;
 }
 
 .onboarding-computer-window-bar,
 .onboarding-computer-window-bar-fill {
-  fill: var(--openbot-text-muted-on-light);
+  fill: var(--openbot-paper-text-muted);
   opacity: 0.24;
 }
 
 .onboarding-computer-window-bar {
-  stroke: var(--openbot-border-on-light);
+  stroke: var(--openbot-paper-border);
   stroke-width: 1;
 }
 
 .onboarding-computer-window-pane {
-  fill: var(--openbot-text-dim-on-light);
+  fill: var(--openbot-paper-text-dim);
   opacity: 0.18;
 }
 
 .onboarding-computer-window-card {
-  fill: var(--openbot-text-dim-on-light);
+  fill: var(--openbot-paper-text-dim);
   opacity: 0.24;
 }
 
 .onboarding-computer-window-line {
-  fill: var(--openbot-text-dim-on-light);
+  fill: var(--openbot-paper-text-dim);
   opacity: 0.54;
 }
 
@@ -221,7 +221,7 @@
 }
 
 .onboarding-computer-cursor path {
-  fill: var(--openbot-text-on-light);
+  fill: var(--openbot-paper-text);
   stroke: var(--openbot-onboarding-window);
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1100,4 +1100,10 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   to {
     stroke-dashoffset: -1.2;
   }
+}
+
+/* The read error reuses the sign-in screen; its one secondary action sits under the primary button. */
+.setup-read-error-actions {
+  justify-content: center;
+  margin-top: var(--openbot-space-3);
 }

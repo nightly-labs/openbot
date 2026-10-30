@@ -6,7 +6,7 @@ import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
 const FOOTER_DESCRIPTION =
-  "Persistent AI teammates on your own computer. Run Codex, Claude, Gemini, Grok or your own model with the plans you already pay for.";
+  "Persistent AI teammates on your own computer. Run Codex, Claude, Gemini, Grok, Muse Code, Pi or your own model with the plans you already pay for.";
 
 const SOCIALS = [
   {
@@ -45,7 +45,7 @@ export function LandingFooter() {
 
             <p class="landing-footer-description">{FOOTER_DESCRIPTION}</p>
 
-            <Link class="landing-footer-cta" to="/" hash="download">
+            <Link class="landing-footer-cta" to="/download">
               <span>Download OpenBot</span>
               <LandingIcon name="download" />
             </Link>
@@ -93,7 +93,7 @@ export function LandingFooter() {
         <div class="landing-footer-bottom" data-revealed={revealState()}>
           <p>&copy; {currentYear} Synthetify Labs, All rights reserved.</p>
           <div class="landing-footer-meta">
-            <Link to="/" hash="download">
+            <Link to="/download">
               <span class="landing-footer-availability" aria-hidden="true" />
               Available for macOS, Windows, Linux, iOS and Android
             </Link>
@@ -127,9 +127,13 @@ function FooterNavLink(props: { link: FooterLink }) {
       </Show>
       <Show when={page()}>
         {(link) => (
-          <Link to={link().to} hash={link().hash}>
-            {link().label}
-          </Link>
+          <Show when={link().hash} fallback={<Link to={link().to}>{link().label}</Link>}>
+            {(hash) => (
+              <Link to={link().to} hash={hash()}>
+                {link().label}
+              </Link>
+            )}
+          </Show>
         )}
       </Show>
       <Show when={article()}>

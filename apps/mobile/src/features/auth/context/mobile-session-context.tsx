@@ -22,6 +22,7 @@ import {
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
+import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
 import { queryClient } from "@/shared/lib/query-client";
 import { untilForeground } from "@/shared/lib/until-foreground";
@@ -136,6 +137,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     const current = sessionRef.current;
     if (!current) return;
     await mobileAnalytics.operation("account_sign_out", {}, () => logoutMobileSession(current));
+    deleteAgentAvatars();
     if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
       setCurrentSession(null);
     }

@@ -17,6 +17,7 @@ export const messages = {
     "Usługa aktualizacji nie odpowiedziała. OpenBot sam spróbuje ponownie za kilka minut.",
   "error.update.checkNoRelease":
     "Nie znaleziono opublikowanej aktualizacji dla tej platformy. OpenBot sam spróbuje ponownie za kilka minut.",
+  "error.update.managedByNix": "Aktualizacje tej kopii OpenBot instaluje Nix. Zaktualizuj ją przez Nix.",
   "error.update.managedByHost":
     "Aktualizacje na tym Macu instaluje host. Aktualizacja pozostaje gotowa do czasu konserwacji hosta.",
   "error.update.siblingSession":

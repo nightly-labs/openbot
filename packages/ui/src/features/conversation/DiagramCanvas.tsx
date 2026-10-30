@@ -1,21 +1,8 @@
-import { Button, Minus, Plus } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createSignal, onSettled } from "solid-js";
 import { useText } from "../../text";
+import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
 
-interface Camera {
-  x: number;
-  y: number;
-  scale: number;
-}
-
-const MAX_SCALE = 8;
-/** One button press or key press zooms by this factor. */
-const ZOOM_STEP = 1.25;
-/** A double-click zooms the fitted diagram in by this factor. */
-const DOUBLE_CLICK_ZOOM = 2.5;
-/** How fast a pinch or Ctrl and the wheel zooms, per pixel of wheel movement. */
-const WHEEL_ZOOM_RATE = 0.01;
 /** An arrow key moves the diagram by this distance. */
 const KEY_STEP = 48;
 /** The edge of the canvas that stays clear of a fitted diagram. */
@@ -29,7 +16,7 @@ const FIT_MARGIN = 24;
  * and the image is sized with `width`, not scaled, so the SVG stays sharp at every zoom.
  */
 export function DiagramCanvas(props: { url: string; title: string }) {
-  const { t, format } = useText();
+  const { t } = useText();
   const [zoom, setZoom] = createSignal(1);
   let viewport: HTMLDivElement | undefined;
   let image: HTMLImageElement | undefined;
@@ -176,39 +163,14 @@ export function DiagramCanvas(props: { url: string; title: string }) {
           draggable={false}
         />
       </div>
-      <div class="message-preview-zoom" role="toolbar" aria-label={t("chat.preview.zoomLabel")}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t("chat.preview.zoomOut")}
-          title={t("chat.preview.zoomOut")}
-          onClick={() => zoomBy(1 / ZOOM_STEP)}
-        >
-          <Minus aria-hidden="true" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="message-preview-zoom-level"
-          aria-label={t("chat.preview.zoomFit", { zoom: format.percent(zoom(), { maximumFractionDigits: 0 }) })}
-          title={t("chat.preview.zoomFit", { zoom: format.percent(zoom(), { maximumFractionDigits: 0 }) })}
-          onClick={() => move(fitted(), true)}
-        >
-          {format.percent(zoom(), { maximumFractionDigits: 0 })}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t("chat.preview.zoomIn")}
-          title={t("chat.preview.zoomIn")}
-          onClick={() => zoomBy(ZOOM_STEP)}
-        >
-          <Plus aria-hidden="true" />
-        </Button>
-      </div>
+      <ZoomControls
+        class="message-preview-zoom"
+        levelClass="message-preview-zoom-level"
+        zoom={zoom()}
+        onZoomOut={() => zoomBy(1 / ZOOM_STEP)}
+        onFit={() => move(fitted(), true)}
+        onZoomIn={() => zoomBy(ZOOM_STEP)}
+      />
     </div>
   );
 }

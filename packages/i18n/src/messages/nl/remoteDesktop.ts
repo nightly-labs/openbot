@@ -1,0 +1,77 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/remoteDesktop";
+
+export const messages = {
+  "remoteDesktop.controlFailed": "Bediening op afstand mislukt. Maak opnieuw verbinding en probeer het opnieuw.",
+  "remoteDesktop.startFailed": "Kan bediening op afstand niet starten.",
+  "remoteDesktop.disconnectFailed": "Kan bediening op afstand niet verbreken.",
+  "remoteDesktop.switchDisplayFailed": "Kan niet wisselen van gedeeld scherm.",
+  "remoteDesktop.workspaceLabel": "Bediening op afstand",
+  "remoteDesktop.displayLabel": "Extern scherm",
+  "remoteDesktop.selectDisplay": "Scherm kiezen",
+  "remoteDesktop.backToOpenBot": "Terug naar OpenBot",
+  "remoteDesktop.disconnect": "Verbreken",
+  "remoteDesktop.viewerTitle": "Extern Sunshine-bureaublad",
+  "remoteDesktop.viewerLoadFailed": "Kan de Moonlight-viewer niet laden.",
+  "remoteDesktop.streamNotReady":
+    "De server heeft de stream niet gestart. Sunshine is misschien gestopt op de server. Probeer het opnieuw.",
+  "remoteDesktop.hostOfflineTitle": "Server is offline",
+  "remoteDesktop.hostOfflineMessage": "Maak opnieuw verbinding met de server voordat je het bureaublad opent.",
+  "remoteDesktop.openFailed": "Kan het bureaublad niet openen",
+  "remoteDesktop.notSharingTitle": "{name} deelt zijn scherm niet",
+  "remoteDesktop.notSharingDescription":
+    "De server staat niet toe dat OpenBot het scherm opneemt. Open op die server Systeeminstellingen → Privacy en beveiliging → Schermopname, zet OpenBot aan en probeer het hier opnieuw.",
+  "remoteDesktop.setup.check.screenRecording": "Schermopname",
+  "remoteDesktop.setup.check.accessibility": "Toegankelijkheid",
+  "remoteDesktop.setup.check.service": "Sunshine-dienst",
+  "remoteDesktop.setup.check.displays": "Beschikbaarheid van schermen",
+  "remoteDesktop.setup.check.guiSession": "macOS-gebruikerssessie",
+  "remoteDesktop.setup.state.notChecked": "Niet gecontroleerd",
+  "remoteDesktop.setup.state.checking": "Controleren…",
+  "remoteDesktop.setup.state.allowed": "Toegestaan",
+  "remoteDesktop.setup.state.blocked": "Geblokkeerd",
+  "remoteDesktop.setup.state.unavailable": "Niet beschikbaar",
+  "remoteDesktop.setup.state.failed": "Controle mislukt",
+  "remoteDesktop.setup.state.available": "Beschikbaar",
+  "remoteDesktop.setup.checkFailed": "Kan de configuratie van het externe bureaublad niet controleren.",
+  "remoteDesktop.setup.openFailed": "Kan de macOS-configuratie niet openen.",
+  "remoteDesktop.setup.cleanupUnconfirmed": "De testverbinding is beëindigd voordat het opruimen was bevestigd.",
+  "remoteDesktop.setup.endSessionFirst":
+    "Beëindig de sessie voor extern bureaublad van deze computer voordat je een test start.",
+  "remoteDesktop.setup.startFailed": "Kan de test voor extern bureaublad niet starten.",
+  "remoteDesktop.setup.connectionLost": "De testverbinding is verbroken.",
+  "remoteDesktop.setup.hostUpdateRequired":
+    "Werk OpenBot op de server bij om machtigingen te controleren en extern bureaublad te testen.",
+  "remoteDesktop.setup.permissions": "Machtigingen",
+  "remoteDesktop.setup.checked": "Gecontroleerd",
+  "remoteDesktop.setup.checkAgain": "Opnieuw controleren",
+  "remoteDesktop.setup.grantAccess": "Toegang verlenen aan {name}",
+  "remoteDesktop.setup.grant": "Verlenen",
+  "remoteDesktop.setup.grantHelp":
+    "Houd het Sunshine-account ingelogd op de Mac. Verleen in dat account toegang via Systeeminstellingen → Privacy en beveiliging. Verlenen opent een hulpvenster. Sleep Sunshine.app naar de lijst met machtigingen.",
+  "remoteDesktop.setup.restartRequired":
+    "Sunshine moet herstarten. Beëindig actieve sessies voor extern bureaublad en controleer daarna opnieuw. Actieve sessies worden niet herstart.",
+  "remoteDesktop.setup.showInFinder": "Toon Sunshine in Finder",
+  "remoteDesktop.setup.liveTest": "Live verbindingstest",
+  "remoteDesktop.setup.liveTestLocal": "Test het beeld, de muis en het toetsenbord op deze Mac.",
+  "remoteDesktop.setup.liveTestRemote":
+    "De test opent een tijdelijk paneel op de server. Andere externe sessies moeten eerst stoppen. Invoer blijft binnen het paneel.",
+  "remoteDesktop.setup.testSummary": "Video: {video} · Beeld: {picture} · Muis: {mouse} · Toetsenbord: {keyboard}",
+  "remoteDesktop.setup.received": "ontvangen",
+  "remoteDesktop.setup.notReceived": "niet ontvangen",
+  "remoteDesktop.setup.confirmed": "bevestigd",
+  "remoteDesktop.setup.notConfirmed": "niet bevestigd",
+  "remoteDesktop.setup.notTested": "niet getest",
+  "remoteDesktop.setup.waiting": "wachten",
+  "remoteDesktop.setup.testLocal": "Testen op deze Mac",
+  "remoteDesktop.setup.testRemote": "Extern bureaublad testen",
+  "remoteDesktop.setup.videoFailed": "De videoverbinding van de test is mislukt.",
+  "remoteDesktop.setup.inputInstructions":
+    "Klik op het doel in het testpaneel en typ daarna {code}. Muis: {mouse}. Toetsenbord: {keyboard}.",
+  "remoteDesktop.setup.videoOnly":
+    "Alleen videotest. Voor het testen van muis en toetsenbord is de bijgewerkte Sunshine-runtime nodig.",
+  "remoteDesktop.setup.pictureConfirmed": "Beeld bevestigd",
+  "remoteDesktop.setup.seeDesktop": "Ik zie mijn bureaublad",
+  "remoteDesktop.setup.seeTestPanel": "Ik zie het testpaneel",
+  "remoteDesktop.setup.finishTest": "Test afronden",
+} as const satisfies PartialTranslation<typeof source>;

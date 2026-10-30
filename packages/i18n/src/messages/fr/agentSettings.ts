@@ -16,6 +16,54 @@ export const messages = {
   "agentSettings.closeDetails": "Fermer les détails",
   "agentSettings.backToSettings": "Retour aux réglages",
   "agentSettings.permissions.title": "Accès",
+  "agentSettings.folders.title": "Dossiers",
+  "agentSettings.folders.valueNone": "Aucun ajouté",
+  "agentSettings.folders.valueCount": { one: "{count} ajouté", other: "{count} ajoutés" },
+  "agentSettings.folders.valueMissing": { one: "{count} introuvable", other: "{count} introuvables" },
+  "agentSettings.folders.valueAll": "Tous les fichiers",
+  "agentSettings.folders.valueDrop": "Déposez pour ajouter",
+  "agentSettings.folders.add": "Ajouter un dossier…",
+  "agentSettings.folders.addLabel": "Ajouter un dossier",
+  "agentSettings.folders.drop": "Déposez pour ajouter le dossier",
+  "agentSettings.folders.always": "Toujours inclus",
+  "agentSettings.folders.added": "Ajouté",
+  "agentSettings.folders.workspace": "Espace de travail",
+  "agentSettings.folders.shared": "Dossier partagé",
+  "agentSettings.folders.notFound": "Introuvable dans {path}",
+  "agentSettings.folders.locate": "Localiser…",
+  "agentSettings.folders.remove": "Retirer {folder}",
+  "agentSettings.folders.wideAccess":
+    "Avec {access}, {agent} peut modifier tous les fichiers. Ces dossiers s’appliquent en mode {workspace}.",
+  "agentSettings.folders.changeAccess": "Modifier",
+  "agentSettings.folders.toastAdded": "{agent} peut maintenant modifier les fichiers de {folder}",
+  "agentSettings.folders.toastRemoved": "{agent} ne peut plus modifier les fichiers de {folder}",
+  "agentSettings.folders.undo": "Annuler",
+  "agentSettings.folders.alreadyAdded": "{folder} est déjà ajouté",
+  "agentSettings.folders.inWorkspace": "{folder} est dans l’espace de travail, donc {agent} peut déjà le modifier",
+  "agentSettings.folders.inShared": "{folder} est dans le dossier partagé, donc {agent} peut déjà le modifier",
+  "agentSettings.folders.inFolder": "{folder} est dans {parent}, qui est déjà ajouté",
+  "agentSettings.folders.protected":
+    "Vous ne pouvez pas ajouter {folder}, car il contient des données OpenBot ou les fichiers d’autres agents",
+  "agentSettings.folders.missing": "{folder} n’est pas un dossier de cet ordinateur",
+  "agentSettings.folders.limit": {
+    one: "Vous pouvez ajouter {count} dossier au maximum",
+    other: "Vous pouvez ajouter {count} dossiers au maximum",
+  },
+  "agentSettings.folders.failed": "Impossible de modifier les dossiers",
+  "agentSettings.folders.excluded": "Exclus",
+  "agentSettings.folders.exclude": "Exclure un dossier…",
+  "agentSettings.folders.excludedIn": "Dans {folder}",
+  "agentSettings.folders.include": "Ne plus exclure {folder}",
+  "agentSettings.folders.toastExcluded": "{agent} ne peut plus modifier les fichiers de {folder}",
+  "agentSettings.folders.toastIncluded": "{agent} peut de nouveau modifier les fichiers de {folder}",
+  "agentSettings.folders.alreadyExcluded": "{folder} est déjà exclu",
+  "agentSettings.folders.inExcluded": "{folder} est dans {parent}, qui est déjà exclu",
+  "agentSettings.folders.excludeOutside": "{folder} n’est dans aucun dossier que {agent} peut modifier",
+  "agentSettings.folders.excludeRoot": "Vous ne pouvez pas exclure {folder}. Excluez un dossier qu’il contient",
+  "agentSettings.folders.excludeLimit": {
+    one: "Vous pouvez exclure au plus {count} dossier",
+    other: "Vous pouvez exclure au plus {count} dossiers",
+  },
   "agentSettings.advanced.title": "Avancé",
   "agentSettings.backupModels.title": "Modèles de secours",
   "agentSettings.backupModels.valueAsk": "Demander d’abord",
@@ -24,7 +72,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Quand {model} atteint sa limite d’utilisation avant que {name} commence à écrire, {name} vous demande quel modèle utiliser.",
   "agentSettings.backupModels.introAutomatic":
-    "Quand {model} atteint sa limite d’utilisation avant que {name} commence à écrire, {name} passe au premier modèle disponible dans l’ordre.",
+    "Quand {model} atteint sa limite d’utilisation ou échoue sur une erreur du fournisseur avant que {name} commence à écrire, {name} passe au premier modèle disponible dans l’ordre.",
   "agentSettings.backupModels.ask": "Demander avant de changer",
   "agentSettings.backupModels.order": "Ordre",
   "agentSettings.backupModels.listLabel": "Modèles de secours, dans l’ordre",
@@ -37,7 +85,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin.",
+    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "agentSettings.groups.brain": "Cerveau",
   "agentSettings.groups.knows": "Connaissances",
   "agentSettings.groups.does": "Actions",
@@ -51,6 +99,7 @@ export const messages = {
   "agentSettings.agentTitlePlaceholder": "Décrivez ce que fait votre agent",
   "agentSettings.instructions": "Instructions",
   "agentSettings.instructionsLabel": "Instructions de l’agent",
+  "agentSettings.instructionsResize": "Redimensionner les instructions",
   "agentSettings.instructionsPlaceholder": "À quoi sert cet agent",
 
   "agentSettings.avatar.edit": "Modifier l’avatar de l’agent",
@@ -59,7 +108,7 @@ export const messages = {
   "agentSettings.avatar.image": "Image",
   "agentSettings.avatar.replaceImage": "Remplacer l’image",
   "agentSettings.avatar.uploadImage": "Importer une image",
-  "agentSettings.avatar.imageHint": "PNG, JPEG ou WebP · recadrage carré",
+  "agentSettings.avatar.imageHint": "PNG, JPEG, GIF ou WebP · recadrage carré",
   "agentSettings.avatar.generatedFace": "Visage généré",
   "agentSettings.avatar.resetToId": "Réinitialiser selon l’ID",
   "agentSettings.avatar.newSet": "Nouvelle série",
@@ -75,7 +124,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Impossible de traiter l’avatar de l’agent.",
 
   "agentSettings.runtime.model": "Modèle de l’agent",
-  "agentSettings.runtime.modelBusy": "Attendez la fin du travail en cours avant de changer de modèle.",
   "agentSettings.runtime.modelUnavailable": "Les modèles sont disponibles après la connexion d’une CLI d’agent.",
   "agentSettings.runtime.reasoning": "Raisonnement",
   "agentSettings.runtime.reasoningLabel": "Niveau de raisonnement de l’agent",
@@ -85,8 +133,9 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Accès de l’agent",
   "agentSettings.runtime.busyMessage": "Pendant le travail",
   "agentSettings.runtime.busyMessageLabel": "Messages pendant le travail de l’agent",
-  "agentSettings.runtime.taskLimit": "Tâches simultanées",
-  "agentSettings.runtime.taskLimitLabel": "Tâches exécutées en même temps",
+
+  "agentSettings.runtime.taskLimit": "Fils en parallèle",
+  "agentSettings.runtime.taskLimitLabel": "Fils exécutés en même temps",
   "agentSettings.runtime.workingDirectory": "Répertoire de travail",
   "agentSettings.runtime.notAvailable": "Pas encore disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -100,15 +149,20 @@ export const messages = {
   "agentSettings.access.full": "Accès complet",
   "agentSettings.busyMessage.appDefaultQueue": "Par défaut de l’app (File d’attente)",
   "agentSettings.busyMessage.appDefaultSteer": "Par défaut de l’app (Orienter)",
+  "agentSettings.busyMessage.hostDefaultQueue": "Par défaut de l’hôte (File d’attente)",
+  "agentSettings.busyMessage.hostDefaultSteer": "Par défaut de l’hôte (Orienter)",
   "agentSettings.busyMessage.queue": "File d’attente",
   "agentSettings.busyMessage.steer": "Orienter",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
-
   "agentSettings.taskLimit.default": "Par défaut ({count})",
   "agentSettings.taskLimit.oneTurn":
-    "{provider} exécute un tour à la fois. Les tâches et la discussion de cet agent s’attendent mutuellement.",
-  "agentSettings.notifications.title": "Notifications",
+    "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
+  "agentSettings.notificationLevel.title": "Me notifier",
+  "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
+  "agentSettings.notificationLevel.note":
+    "Ce choix ne concerne que vous, sur tous vos appareils. Si le serveur est en sourdine ou réglé sur « Rien », cet agent reste aussi silencieux.",
+  "agentSettings.notificationLevel.sharedOff": "Les notifications de cet agent sont désactivées pour tous les membres.",
 
   "agentSettings.newChat.title": "Nouvelle discussion",
   "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",
@@ -150,6 +204,21 @@ export const messages = {
   "agentSettings.automation.title": "Scripts locaux",
   "agentSettings.automation.description":
     "Autoriser les scripts de l’hôte à envoyer des messages, exécuter des routines, répondre aux questions et accepter ou refuser les approbations",
+  "agentSettings.agentNewChat.title": "L’agent démarre de nouvelles discussions",
+  "agentSettings.agentNewChat.description":
+    "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
+  "agentSettings.quickAcknowledgement.title": "Montrer le plan avant les longues tâches",
+  "agentSettings.quickAcknowledgement.description":
+    "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "agentSettings.browserProfile.label": "Profil de navigateur",
+  "agentSettings.browserProfile.shared": "Partagé",
+  "agentSettings.browserProfile.agent": "Cet agent uniquement",
+  "agentSettings.browserProfile.missing": "Profil supprimé",
+  "agentSettings.browserProfile.new": "Nouveau profil",
+  "agentSettings.browserProfile.manageTitle": "Profils de navigateur",
+  "agentSettings.browserProfile.manageDescription":
+    "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "agentSettings.browserProfile.manage": "Gérer",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
 } as const satisfies PartialTranslation<typeof source>;

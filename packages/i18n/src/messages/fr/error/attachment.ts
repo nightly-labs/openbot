@@ -12,5 +12,9 @@ export const messages = {
     "Ce serveur ne prend pas en charge les pièces jointes MP3 ou MOV. Mettez à jour OpenBot sur l’hôte, puis réessayez.",
   "error.attachment.emlUnsupported":
     "Ce serveur ne prend pas en charge les pièces jointes EML. Mettez à jour OpenBot sur l’hôte, puis réessayez.",
+  "error.attachment.zipUnsupported":
+    "Ce serveur ne prend pas en charge les pièces jointes ZIP. Mettez à jour OpenBot sur l’hôte, puis réessayez.",
+  "error.attachment.mp4Unsupported":
+    "Ce serveur ne prend pas en charge les pièces jointes MP4. Mettez à jour OpenBot sur l’hôte, puis réessayez.",
   "error.attachment.previewTooLarge": "Le fichier dépasse la limite de 100 Mo.",
 } as const satisfies PartialTranslation<typeof source>;
