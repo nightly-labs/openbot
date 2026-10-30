@@ -169,6 +169,12 @@ export interface AgentProviderDescriptor {
    * to ask.
    */
   readonly approvalsInFullAccess: boolean;
+  /**
+   * Whether the CLI's own file tools reach only the workspace, the shared folder and the added
+   * folders also outside Workspace only. Antigravity 1.4.5 limits them to `cwd` and
+   * `additionalDirectories` for every session that is not a Google admin session (#3843).
+   */
+  readonly foldersInFullAccess: boolean;
 }
 
 /**
@@ -196,6 +202,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   claude: {
     id: "claude",
@@ -217,6 +224,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: false,
+    foldersInFullAccess: false,
   },
   grok: {
     id: "grok",
@@ -238,6 +246,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   opencode: {
     id: "opencode",
@@ -261,6 +270,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
   // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
@@ -284,6 +294,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: true,
   },
   // The Cursor CLI (`cursor-agent acp`) with the user's Cursor plan. Sign-in is the ACP
   // `cursor_login` method, which opens a browser. `CURSOR_API_KEY` in the environment also signs in.
@@ -307,6 +318,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // The Cline CLI (`cline --acp`). Sign-in is the ACP `cline` method, which opens a browser. A Cline
   // account runs the free models; `CLINE_API_KEY` in the environment also signs in.
@@ -330,6 +342,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   pi: {
     id: "pi",
@@ -351,6 +364,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   muse: {
     id: "muse",
@@ -372,6 +386,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // Inception's Mercury models run in the Pi CLI that OpenBot downloads for Pi, with a key the user
   // saves here. Pi's own sign-in and models stay on the Pi row.
@@ -395,6 +410,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // DeepSeek's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in DeepSeek
   // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
@@ -418,6 +434,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // OpenRouter's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in OpenRouter
   // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
@@ -441,6 +458,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
@@ -465,6 +483,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 
