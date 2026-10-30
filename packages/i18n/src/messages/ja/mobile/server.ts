@@ -719,7 +719,7 @@ export const messages = {
   "mobile.server.mcp.stdioDescription": "サーバーは、サーバーのコンピューターでこのコマンドを起動します。",
   "mobile.server.mcp.httpDescription": "すべてのプロバイダーが HTTP MCP サーバーを使えます。",
   "mobile.server.mcp.providerLimit":
-    "Claude のみ: 作業ディレクトリがあるサーバーは、ほかのプロバイダーには渡されません。",
+    "Claude と Codex のみ: 作業ディレクトリがあるサーバーは、ほかのプロバイダーには渡されません。",
   "mobile.server.mcp.command": "コマンド",
   "mobile.server.mcp.commandHint": "プログラムだけを入力します。続く語は引数に入力してください。",
   "mobile.server.mcp.arguments": "引数",

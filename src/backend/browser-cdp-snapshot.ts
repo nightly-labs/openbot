@@ -104,7 +104,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
-    if (remainingElements <= 0) break;
+    if (remainingElements <= 0) continue;
     const candidates =
       capture.sessionId && deadline === undefined
         ? yield* collectActionableNodesEffect(send, capture, remainingElements).pipe(

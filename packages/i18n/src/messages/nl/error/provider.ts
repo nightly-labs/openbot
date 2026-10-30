@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot kon Computerbesturing niet registreren in de configuratie van Codex. Controleer of je Codex-config.toml geldig en beschrijfbaar is en start OpenBot opnieuw. Je kunt Computerbesturing uitzetten in de instellingen van de teamgenoot om zonder door te gaan.",
   "error.provider.codexUnresponsive": "Codex reageerde niet meer, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
   "error.provider.endpointsReadOnly":
     "De opgeslagen endpoints zijn geschreven door een nieuwere versie van OpenBot, of het bestand kan niet worden gelezen. Werk OpenBot bij om ze te wijzigen.",
   "error.provider.endpointNoSecureStorage":

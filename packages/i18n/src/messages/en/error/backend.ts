@@ -70,6 +70,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelRoutingTooLong":
     "This request exceeds the routing context limit. Select a member or send a shorter request.",
   "error.backend.channelTaskMemberRequired": "Choose a member for this task.",
+  "error.backend.channelTaskStopped": "Stopped. Continue or reassign this task.",
+  "error.backend.channelRoutingUnreadable": "The lead could not route this message. Reassign it to a member.",
   "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
   "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",
   "error.backend.channelLeadFailed": "The channel lead could not route this message. Choose a member or try again.",
@@ -305,6 +307,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserTypingFocusMoved":
+    "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
+  "error.backend.browserTypingSubmitSkipped":
+    "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",

@@ -26,6 +26,8 @@ const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
 const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";
 const MOBILE_DEVICE_ID_KEY = "openbot.mobile.device-id.v1";
 const MOBILE_AUTH_REQUEST_TIMEOUT_MS = 10_000;
+// The account server can try to send a code for up to 25 s. Desktop waits 35 s too.
+const MOBILE_EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 
 let mobileSessionStorageTail = Promise.resolve();
 let mobileProfileTail = Promise.resolve();
@@ -148,6 +150,7 @@ export async function startMobileEmailSignIn(email: string, requestId: string): 
     "/v1/auth/email/start",
     { email: address },
     { "Idempotency-Key": requestId },
+    MOBILE_EMAIL_CODE_REQUEST_TIMEOUT_MS,
   );
   if (!response.ok) throw mobileEmailError(response, body, "mobile.auth.email.error.sendFailed");
   if (!isDynamicRecord(body) || !isString(body.challengeId) || typeof body.resendAt !== "number") {
@@ -198,17 +201,22 @@ async function mobileEmailRequest(
   path: string,
   payload: Record<string, string>,
   headers: Record<string, string> = {},
+  timeoutMs?: number,
 ): Promise<{ response: Response; body: DynamicRecord | null }> {
   try {
-    return await withMobileAuthRequestTimeout(async (signal) => {
-      const request = await fetch(new URL(path, mobileAccountApiUrl()).toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify(payload),
-        signal,
-      });
-      return { response: request, body: await readResponseBody(request, signal) };
-    });
+    return await withMobileAuthRequestTimeout(
+      async (signal) => {
+        const request = await fetch(new URL(path, mobileAccountApiUrl()).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify(payload),
+          signal,
+        });
+        return { response: request, body: await readResponseBody(request, signal) };
+      },
+      undefined,
+      timeoutMs,
+    );
   } catch {
     throw new MobileEmailSignInError(
       currentText().t("mobile.auth.error.accountServiceUnreachable"),

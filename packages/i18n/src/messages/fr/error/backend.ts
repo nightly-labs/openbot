@@ -74,6 +74,9 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "Cette demande dépasse la limite de contexte de routage. Sélectionnez un membre ou envoyez une demande plus courte.",
   "error.backend.channelTaskMemberRequired": "Choisissez un membre pour cette tâche.",
+  "error.backend.channelTaskStopped": "Arrêtée. Continuez ou réassignez cette tâche.",
+  "error.backend.channelRoutingUnreadable":
+    "Le responsable n'a pas pu acheminer ce message. Réassignez-le à un membre.",
   "error.backend.channelRoutingFailed": "Le routage a échoué. Choisissez un membre ou réessayez.",
   "error.backend.channelLeadTimedOut":
     "Le responsable du canal n'a pas répondu à temps. Choisissez un membre ou réessayez.",
