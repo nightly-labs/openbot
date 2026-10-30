@@ -361,8 +361,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     (source) => agentFolders.load(source),
   );
 
-  /** The access label when the agent can change all files: the folders then do not apply. */
+  /**
+   * The access label when the agent can change all files: the folders then do not apply. They still
+   * apply to a provider whose own file tools reach only its folders.
+   */
   function wideAccess(): string | null {
+    const provider = knownProvider();
+    if (provider !== undefined && agentProviderDescriptor(provider).foldersInFullAccess) return null;
     return draft.permission === "workspace" ? null : t(ACCESS_LABEL[draft.permission]);
   }
 
@@ -1435,6 +1440,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 agentName={props.agent.name}
                 wideAccess={wideAccess()}
                 workspaceAccess={t(ACCESS_LABEL.workspace)}
+                showExclusions={draft.permission === "workspace" || wideAccess() !== null}
                 onChangeAccess={() => openPage("permissions")}
               />
             </Show>

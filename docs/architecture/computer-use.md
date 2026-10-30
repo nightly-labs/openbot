@@ -37,8 +37,8 @@ One MCP entry reaches every provider. `CuaDriverRuntime.mcpServerConfig()` retur
 while the daemon runs, and `AgentService.enabledMcpServers()` appends it, which is the one function
 Codex, Claude, and ACP all read. Two properties keep it there: the name is not in
 `RESERVED_MCP_SERVER_NAMES`, which is a drop filter rather than a marker, and `workingDirectory`
-stays empty, because ACP has no field for one and Codex accepts none, so an entry with one would
-vanish for two providers with no error. Codex staleness needs no separate signal, because
+stays empty, because ACP has no field for one, so an entry with one would vanish for ACP providers
+with no error. Codex staleness needs no separate signal, because
 `toolFingerprint` already folds the MCP entries and a changed fingerprint forces a replacement
 session. `onMcpServerChanged` is what refreshes the agent runtimes, which deactivates every
 stored provider session: the next turn starts a new one, which keeps the public thread and loses

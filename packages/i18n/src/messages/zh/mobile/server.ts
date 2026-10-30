@@ -700,7 +700,7 @@ export const messages = {
   "mobile.server.mcp.http": "URL（HTTP）",
   "mobile.server.mcp.stdioDescription": "服务器会在其所在的电脑上启动该命令。",
   "mobile.server.mcp.httpDescription": "所有服务商都可以使用 HTTP MCP 服务器。",
-  "mobile.server.mcp.providerLimit": "仅限 Claude：带工作目录的服务器不会提供给其他服务商。",
+  "mobile.server.mcp.providerLimit": "仅限 Claude 和 Codex：带工作目录的服务器不会提供给其他服务商。",
   "mobile.server.mcp.command": "命令",
   "mobile.server.mcp.commandHint": "只填写程序。其后的每个词请放在“参数”中。",
   "mobile.server.mcp.arguments": "参数",

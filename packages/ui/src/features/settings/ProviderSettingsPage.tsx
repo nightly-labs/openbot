@@ -1164,7 +1164,11 @@ function ApiKeySection(props: SectionProps) {
                   ? t("provider.settings.geminiKeyInUse")
                   : props.option.id === "claude" && saved()
                     ? t("provider.settings.claudeKeyInUse")
-                    : t("provider.settings.keyAlternative", { name: props.option.name })}
+                    : props.option.id === "codex"
+                      ? saved()
+                        ? t("provider.settings.codexKeyInUse")
+                        : t("provider.settings.codexKeyAlternative")
+                      : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>

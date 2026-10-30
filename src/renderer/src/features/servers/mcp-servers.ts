@@ -194,8 +194,8 @@ export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
  *
  * Not a health claim, and so not the stored state the note above rules out: it is read from the
  * saved row alone, it needs no connection, and it is the same answer every time until the user
- * edits the field. A server that names a working directory reaches Claude and the test and no
- * other provider, which the user should be able to see without starting an agent to find out.
+ * edits the field. A server that names a working directory reaches Claude, Codex and the test and
+ * no other provider, which the user should be able to see without starting an agent to find out.
  */
 export function mcpProviderLimitNote(config: McpServerConfig, t: AppTranslate): string | null {
   if (config.transport !== "stdio" || !config.workingDirectory.trim()) return null;

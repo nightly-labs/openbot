@@ -8,9 +8,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+  type ProviderAccountRelay,
+  providerAccountRelay,
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -398,12 +398,13 @@ const Providers = createSimpleContext({
     }
 
     /**
-     * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`).
-     * The other relay requests run it by its provider, and the accounts are read again when it ends.
+     * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`
+     * or `-v2`). The other relay requests run it by its provider, and the accounts are read again when
+     * it ends.
      */
-    function accountRelay(serverId: string) {
+    function accountRelay(serverId: string, relayed: ProviderAccountRelay) {
       return {
-        providers: PROVIDER_ACCOUNT_RELAY_PROVIDERS,
+        providers: relayed.providers,
         hostName: activeServer()?.name ?? "",
         start: (provider: AgentProviderId, accountId: string | null) =>
           providerAdmin().startAccountRelaySignIn({ provider, accountId }, serverId),
@@ -432,6 +433,10 @@ const Providers = createSimpleContext({
       applyStatus: applyAgentStatus,
       target: () => {
         const serverId = providerAdminServerId();
+        const relayed =
+          serverId && accountsAdminServerId() === serverId
+            ? providerAccountRelay((capability) => serverSupportsCapability(activeServer(), capability))
+            : null;
         return serverId
           ? {
               start: (provider) => providerAdmin().startCodeLogin(provider, serverId),
@@ -446,10 +451,7 @@ const Providers = createSimpleContext({
                 cancel: (provider) => providerAdmin().cancelHostSignIn(provider, serverId),
               },
               ...(accountsAdminServerId() === serverId ? { accountSignIn: accountSignIn(serverId) } : {}),
-              ...(accountsAdminServerId() === serverId &&
-              serverSupportsCapability(activeServer(), PROVIDER_ACCOUNT_RELAY_CAPABILITY)
-                ? { accountRelay: accountRelay(serverId) }
-                : {}),
+              ...(relayed ? { accountRelay: accountRelay(serverId, relayed) } : {}),
               relay: {
                 hostName: activeServer()?.name ?? "",
                 start: (provider) => providerAdmin().startRelaySignIn(provider, serverId),

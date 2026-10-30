@@ -297,7 +297,7 @@
     }
   },
   "remoteDesktop": {
-    "recipeVersion": 17,
+    "recipeVersion": 18,
     "sunshine": {
       "sourceMode": "upstream-with-patch",
       "repository": "https://github.com/LizardByte/Sunshine.git",
@@ -313,7 +313,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "79185b9ce0374f99b80ca661954af8d1de17f7cc82e2eae39e1e59e438966ee2"
+        "sha256": "9528d0c45829e33c509ec150da98d3165bba157ea44c3fb7765b275694a8c212"
       },
       "overrides": [],
       "submodules": {
@@ -369,27 +369,27 @@
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "6cb684f6cf5327c5ca92034a85f38205e6d30a4232ff0d0cdd6c59b8f5c209f0"
+        "sha256": "6bb12e809946b14242f3554826ceb29906de4e4dc5df2f860f5440f566d09466"
       },
       "darwin-x64": {
         "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "19e9aee76e59d69c36a9541cba64babdbdd2e20b99b199952c6d3aa8ac3f194d"
+        "sha256": "d68b12a10f230ffcade41a235a9e04650f906d3a06b4fc905dd77f1ac261ca32"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "2e2b6f79eca5a703f810b592e53bc3c3b19ea051874b3486b7007a57669c0f25"
+        "sha256": "8009b33abdb7f97cc7f9f05ae1f943e131f567666d74bc1e34b639dbe648dbd6"
       },
       "linux-x64": {
         "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "a5f2d9d6223c2de8a990d27d02085582b14129b337e09790017d2a664c5a4106"
+        "sha256": "ea2f9a5f1c8bea1a5917989dfdf23260ba461a94c648d029e25043a0ae0e7010"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-0f10ee1a5ffb9cf64cc3459c3fe07c2b9786b9adfc7ecce4b59b635d60855848",
-      "inputDigest": "0f10ee1a5ffb9cf64cc3459c3fe07c2b9786b9adfc7ecce4b59b635d60855848",
+      "tag": "remote-desktop-runtime-ec62decaa9803abc6e1bd5fd9fddebae0aa5cac4540348d0d62229d1a37b3bb0",
+      "inputDigest": "ec62decaa9803abc6e1bd5fd9fddebae0aa5cac4540348d0d62229d1a37b3bb0",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "978d9bd5878e5a04e04cab836330166541917901aa0f38504d2ca9c7298ab38a"
+      "manifestSha256": "c6225c056cc3956e5ef192361bf866eb7d558ee9229db95cd0a473c19e9d5b4f"
     }
   },
   "bun": {

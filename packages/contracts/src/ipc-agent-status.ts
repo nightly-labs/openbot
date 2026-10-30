@@ -64,8 +64,8 @@ export interface AgentProviderStatus {
   restartPending?: boolean;
   /**
    * A saved API key serves the provider's turns in place of the plan sign-in, so the plan's usage
-   * does not apply. Gemini only: its saved key comes before the Google account. Local only:
-   * released Team API adapters omit it.
+   * does not apply. Gemini: its saved key comes before the Google account. Codex: its own login is
+   * an OpenAI API key. Local only: released Team API adapters omit it.
    */
   apiKeyInUse?: boolean;
   /**

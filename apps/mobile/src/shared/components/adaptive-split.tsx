@@ -1,3 +1,4 @@
+import { isRunningInExpoGo } from "expo";
 import { createContext, type ReactNode, use, useEffect, useMemo, useRef } from "react";
 import { type AccessibilityActionEvent, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -110,24 +111,26 @@ function modeAt(paneWidth: number, railWidth: number): SplitPaneMode {
   return paneWidth < (railWidth + PANE_MIN_WIDTH) / 2 ? "rail" : "list";
 }
 
-function SplitColumns({
-  enabled,
-  pane,
-  resizeLabel,
-  children,
-}: {
+interface SplitColumnsProps {
   enabled: boolean;
   pane: ReactNode;
   resizeLabel: string;
   children: ReactNode;
-}) {
-  const { width } = useWindowDimensions();
-  const windowInsets = useSafeAreaInsets();
-  const preference = useSplitPanePreference();
+}
+
+/** The columns beside the vertical fold that `ReservedRegionsProvider` reports. */
+function FoldSplitColumns(props: SplitColumnsProps) {
   const division = useReservedRegions().find(
     (region) => region.kind === "division" && region.frame.height > region.frame.width,
   );
   const fold = division ? { x: division.frame.x, width: division.frame.width } : null;
+  return <SplitColumns {...props} fold={fold} />;
+}
+
+function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColumnsProps & { fold: Fold | null }) {
+  const { width } = useWindowDimensions();
+  const windowInsets = useSafeAreaInsets();
+  const preference = useSplitPanePreference();
   const railWidth = PANE_RAIL_WIDTH + windowInsets.left;
   const split = enabled ? splitFor(width, fold, preference.mode, preference.width, windowInsets.left) : null;
   const splitShown = split !== null;
@@ -330,11 +333,21 @@ export function AdaptiveSplit({
   resizeLabel: string;
   children: ReactNode;
 }) {
+  // Expo Go does not include the native `ReservedRegionsView`, so there the window has no fold.
+  if (isRunningInExpoGo()) {
+    return (
+      <View style={styles.row}>
+        <SplitColumns enabled={enabled} pane={pane} resizeLabel={resizeLabel} fold={null}>
+          {children}
+        </SplitColumns>
+      </View>
+    );
+  }
   return (
     <ReservedRegionsProvider style={styles.row}>
-      <SplitColumns enabled={enabled} pane={pane} resizeLabel={resizeLabel}>
+      <FoldSplitColumns enabled={enabled} pane={pane} resizeLabel={resizeLabel}>
         {children}
-      </SplitColumns>
+      </FoldSplitColumns>
     </ReservedRegionsProvider>
   );
 }

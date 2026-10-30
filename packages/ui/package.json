@@ -246,6 +246,7 @@
     "./features/settings/ProfileShareDialog": "./src/features/settings/ProfileShareDialog.tsx",
     "./features/settings/ProviderSettingsPage": "./src/features/settings/ProviderSettingsPage.tsx",
     "./features/settings/profile-stats": "./src/features/settings/profile-stats.ts",
+    "./features/settings/BackgroundProcessesSection": "./src/features/settings/BackgroundProcessesSection.tsx",
     "./features/settings/SettingsAgentsTab": "./src/features/settings/SettingsAgentsTab.tsx",
     "./features/settings/SettingsDialogShell": "./src/features/settings/SettingsDialogShell.tsx",
     "./features/billing/BillingServerLifecycle": "./src/features/billing/BillingServerLifecycle.tsx",

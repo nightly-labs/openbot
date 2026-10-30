@@ -834,7 +834,7 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "Сервер запускает эту команду на своём компьютере.",
   "mobile.server.mcp.httpDescription": "Любой провайдер может использовать HTTP-сервер MCP.",
-  "mobile.server.mcp.providerLimit": "Только Claude: другие провайдеры не получают сервер с рабочей папкой.",
+  "mobile.server.mcp.providerLimit": "Только Claude и Codex: другие провайдеры не получают сервер с рабочей папкой.",
   "mobile.server.mcp.command": "Команда",
   "mobile.server.mcp.commandHint": "Только программа. Каждое следующее слово укажите в аргументах.",
   "mobile.server.mcp.arguments": "Аргументы",

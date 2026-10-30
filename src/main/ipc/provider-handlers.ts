@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { registerSecretValue } from "@openbot/logging";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -80,6 +81,7 @@ export function providerIpcHandlers({
       // advertises is decided at spawn time: the service writes the key only when it can restart
       // the provider on it, and reports success only once the new process is up.
       setProviderApiKey: payloadHandler(parseProviderApiKeyInput, async ({ provider, key }) => {
+        if (provider === "codex") return signInCodexWithApiKey(service, key);
         await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
         return runCauseEffect(
           service.changeProviderCredential(provider, () =>
@@ -151,6 +153,15 @@ export function providerIpcHandlers({
       checkForUpdates: handler(() => runCauseEffect(providerRuntimes.checkForUpdates())),
     },
   };
+}
+
+/**
+ * Codex keeps its key in its own login, not in OpenBot's store, so the store does not register it for
+ * redaction. It is registered here, before Codex can echo it in a log line.
+ */
+export function signInCodexWithApiKey(service: Pick<AgentService, "signInCodexWithApiKey">, key: string) {
+  registerSecretValue(key);
+  return runCauseEffect(service.signInCodexWithApiKey(key));
 }
 
 /**

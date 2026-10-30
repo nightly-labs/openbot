@@ -68,6 +68,17 @@ export const messages = {
   "settings.busyMessage.title": "Orientar a los agentes mientras trabajan",
   "settings.busyMessage.description":
     "Los mensajes nuevos se incorporan al trabajo actual del agente, no a la cola. Funciona con ChatGPT y Claude.",
+  "settings.backgroundProcesses.title": "Procesos en segundo plano",
+  "settings.backgroundProcesses.description":
+    "Programas que los agentes iniciaron y dejaron en marcha, como servidores de desarrollo. Siguen en marcha cuando termina el chat y cuando sales de OpenBot.",
+  "settings.backgroundProcesses.empty": "No hay programas de agentes en marcha.",
+  "settings.backgroundProcesses.loadFailed": "No se pudieron leer los procesos en segundo plano.",
+  "settings.backgroundProcesses.noAgent": "Ningún agente",
+  "settings.backgroundProcesses.started": "Iniciado {time}",
+  "settings.backgroundProcesses.ports": { one: "Puerto {ports}", other: "Puertos {ports}" },
+  "settings.backgroundProcesses.stop": "Detener",
+  "settings.backgroundProcesses.stopLabel": "Detener el proceso {pid}",
+  "settings.backgroundProcesses.stopFailed": "No se pudo detener el proceso.",
   "settings.keepRemoteSessions.title": "Conexión rápida a servidores",
   "settings.keepRemoteSessions.description":
     "Mantener la conexión con los servidores entre inicios. OpenBot se abre aproximadamente un segundo más rápido. Al cerrar OpenBot, el servicio de OpenBot no cierra la conexión.",

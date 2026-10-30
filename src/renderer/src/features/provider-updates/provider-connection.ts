@@ -74,8 +74,8 @@ interface ProviderAccountSignInTarget extends Omit<ProviderHostSignInTarget, "st
 }
 
 /**
- * How a joined server relays the sign-in of one account of a provider (`provider-account-relay-v1`),
- * for the `providers` it names. The page opens as for `ProviderRelayTarget`.
+ * How a joined server relays the sign-in of one account of a provider (`provider-account-relay-v1`
+ * or `-v2`), for the `providers` it names. The page opens as for `ProviderRelayTarget`.
  */
 interface ProviderAccountRelayTarget extends Omit<ProviderRelayTarget, "start"> {
   providers: readonly AgentProviderId[];

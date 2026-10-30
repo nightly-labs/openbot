@@ -653,6 +653,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(source ? { cliSource: source } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
+          ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -961,6 +962,8 @@ export class ProviderRuntime implements ProviderPort {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
             if (!agentProviderDescriptor(provider).reportsUsage) return null;
+            // A Codex API-key login has no plan usage: Codex refuses the read.
+            if (provider === "codex" && this.#accounts.get(provider)?.type === "apiKey") return null;
             const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
             if (kept && !usageWindowHasReset(kept)) return kept;
             if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return null;
@@ -1751,6 +1754,18 @@ export class ProviderRuntime implements ProviderPort {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
     return yield* this.#runProviderConnectionCommand(provider, () => this.#startProviderCode(provider, codeSignIn));
+  }).bind(this);
+
+  /**
+   * Saves an OpenAI API key as Codex's login, for `changeProviderCredential` to restart Codex on. A
+   * pending ChatGPT sign-in ends first, so that it cannot replace the key when it finishes.
+   */
+  readonly saveCodexApiKey = Effect.fn("ProviderRuntime.saveCodexApiKey")(function* (
+    this: ProviderRuntime,
+    apiKey: string,
+  ) {
+    yield* this.#codexLogin.cancel(null);
+    yield* this.#codexLogin.saveApiKey(apiKey).pipe(toProviderOperationFailed);
   }).bind(this);
 
   readonly #startProviderCode = Effect.fn("ProviderRuntime.startCodeLogin")(function* (
