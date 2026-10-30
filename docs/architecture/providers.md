@@ -202,7 +202,7 @@ in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
 automatically discovered system CLI. When the managed copy wins, `resolveInstalledFirst` in
-`src/backend/cli.ts` resolves again with no managed copy, and a system CLI of the same or a newer
+`src/backend/cli.ts` also resolves with no managed copy, at the same time, and a system CLI of the same or a newer
 version runs instead: the user's CLI on `PATH` replaces a copy that is not newer. A version that
 cannot be compared, such as two Cursor builds of one date, keeps the managed copy. Antigravity has
 no `PATH` discovery, so it always runs the managed copy. Updates never run the system CLI's updater. An explicit path
@@ -337,7 +337,8 @@ the one Update button, and one entry point in the runtime store, `startProviderU
 runs behind it, whoever owns the CLI: the download installs the managed copy and
 `updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
 Later resolutions keep that copy while it is newer than the system install, which is left where it
-is; when the user's CLI catches up, the user's CLI runs again. OpenBot never runs the CLI's own updater, so no version it offers depends
+is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+`providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
 the binary, not from the client that runs it, so a provider that is signed out still reports its own

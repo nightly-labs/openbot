@@ -343,23 +343,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * The bytes of the old versions that `removeOldVersions` would remove now. The update check
-   * removes the same versions on its own.
+   * Collects the old versions now, with the window the update check would use. The update check
+   * collects the same versions on its own.
    */
-  oldVersions(): Effect.Effect<number> {
-    return Effect.gen({ self: this }, function* () {
-      if (!this.#target) return 0;
-      const paths = yield* this.#oldVersionPathsEffect(this.#target, Date.now() - this.#removalRetentionMs(), false);
-      return yield* measurePaths(paths);
-    });
-  }
-
-  /** Collects now, with the window the update check would use, and answers what is left. */
-  removeOldVersions(): Effect.Effect<number> {
-    return Effect.gen({ self: this }, function* () {
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, this.#removalRetentionMs());
-      return yield* this.oldVersions();
-    });
+  removeOldVersions(): Effect.Effect<void> {
+    return this.#target ? this.#collectVersionsEffect(this.#target, this.#removalRetentionMs()) : Effect.void;
   }
 
   /**
@@ -385,7 +373,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<RemovableRuntimes, ProviderRuntimeFailure> {
       const target = this.#target;
       if (!target) return yield* this.removableRuntimes();
-      yield* this.#collectVersionsEffect(target, this.#removalRetentionMs());
+      yield* this.removeOldVersions();
       const downloads = yield* this.#removableDownloadsEffect(target);
       const failed = yield* Effect.forEach(
         downloads,
@@ -613,14 +601,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * current, though, so the comparison belongs here with the managed one rather than in the
    * renderer, which must not compare versions at all. Pass `null` when the provider went back to the
    * managed copy or resolved nothing. While a version is set, the copy in the store runs nothing here,
-   * so `removeDownload` and the Storage page can remove it.
+   * so `removeDownload` and the Storage page can remove it, and this instance does not stamp it.
+   *
+   * True when the provider runs its copy in the store again. The caller then runs
+   * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): void {
-    if ((this.#systemVersions.get(provider) ?? null) === version) return;
+  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+    const previous = this.#systemVersions.get(provider) ?? null;
+    if (previous === version) return false;
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
     this.emit("status", this.getStatus());
+    return previous !== null && version === null;
   }
 
   /** Sends the update offers again after the user turns a provider on or off. */

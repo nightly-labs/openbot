@@ -318,7 +318,7 @@ try {
   assert.ok(report.installedMeasured >= 4096, "the copy of a provider that runs the user's CLI counts");
   report.installedListed = (await runCauseEffect(manager.removableRuntimes())).providers;
   assert.deepEqual(report.installedListed, [ON], "the Storage page names it");
-  manager.setSystemVersion(ON, null);
+  assert.equal(manager.setSystemVersion(ON, null), true, "main is told that the copy runs again");
   report.installedGoneMeasured = await measure(ON);
   assert.equal(report.installedGoneMeasured, 0, "the copy stays once the user's CLI is gone");
   manager.setSystemVersion(ON, "9.9.9");

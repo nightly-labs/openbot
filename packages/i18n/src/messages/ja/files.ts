@@ -113,7 +113,7 @@ export const messages = {
   "files.cleanup.description.runtimes":
     "どのエージェントも使っていない、古いプロバイダー CLI のバージョンです。OpenBot は使用中のバージョンを残します。",
   "files.cleanup.description.runtimeDownloads":
-    "古いプロバイダー CLI のバージョンと、{providers} の CLI のダウンロードです。どのエージェントも使っていません。これらのプロバイダーはオフか、インストール済みの CLI を使っています。プロバイダーが必要とするとき、OpenBot は CLI をもう一度ダウンロードします。",
+    "{providers} の CLI のダウンロードと、ある場合は古い CLI のバージョンです。どのエージェントも使っていません。これらのプロバイダーはオフか、インストール済みの CLI を使っています。プロバイダーが必要とするとき、OpenBot は CLI をもう一度ダウンロードします。",
   "files.cleanup.clear": "消去",
   "files.cleanup.clearCategory": "{category}を消去",
   "files.cleanup.confirm.caches": "キャッシュされたサーバーのファイルを消去しますか？",

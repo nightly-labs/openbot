@@ -124,7 +124,7 @@ export const messages = {
   "files.cleanup.description.runtimes":
     "Ältere Anbieter-CLI-Versionen, die kein Agent verwendet. OpenBot behält die verwendete Version.",
   "files.cleanup.description.runtimeDownloads":
-    "Ältere Anbieter-CLI-Versionen und die CLI-Downloads von {providers}. Kein Agent verwendet sie: Diese Anbieter sind deaktiviert oder verwenden die CLI, die du installiert hast. OpenBot lädt eine CLI erneut herunter, wenn ein Anbieter sie braucht.",
+    "Die CLI-Downloads von {providers} und eventuelle ältere CLI-Versionen. Kein Agent verwendet sie: Diese Anbieter sind deaktiviert oder verwenden die CLI, die du installiert hast. OpenBot lädt eine CLI erneut herunter, wenn ein Anbieter sie braucht.",
   "files.cleanup.clear": "Leeren",
   "files.cleanup.clearCategory": "{category} leeren",
   "files.cleanup.confirm.caches": "Zwischengespeicherte Serverdateien löschen?",

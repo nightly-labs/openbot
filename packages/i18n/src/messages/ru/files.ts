@@ -129,7 +129,7 @@ export const messages = {
   "files.cleanup.description.runtimes":
     "Старые версии CLI провайдеров, которые не использует ни один агент. OpenBot оставляет используемую версию.",
   "files.cleanup.description.runtimeDownloads":
-    "Старые версии CLI провайдеров и загруженные CLI: {providers}. Ни один агент их не использует: эти провайдеры выключены или используют CLI, который вы установили. OpenBot снова загрузит CLI, когда он понадобится провайдеру.",
+    "Загруженные CLI: {providers}, а также старые версии CLI, если они есть. Ни один агент их не использует: эти провайдеры выключены или используют CLI, который вы установили. OpenBot снова загрузит CLI, когда он понадобится провайдеру.",
   "files.cleanup.clear": "Очистить",
   "files.cleanup.clearCategory": "Очистить: {category}",
   "files.cleanup.confirm.caches": "Очистить кэш файлов сервера?",

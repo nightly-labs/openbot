@@ -112,7 +112,7 @@ export const messages = {
   "files.cleanup.description.runtimes":
     "어떤 에이전트도 쓰지 않는 이전 버전의 제공자 CLI예요. OpenBot은 사용 중인 버전을 유지해요.",
   "files.cleanup.description.runtimeDownloads":
-    "이전 버전의 제공자 CLI와 {providers}의 CLI 다운로드예요. 어떤 에이전트도 쓰지 않아요. 이 제공자는 꺼져 있거나 설치한 CLI를 사용해요. 제공자에게 필요하면 OpenBot이 CLI를 다시 다운로드해요.",
+    "{providers}의 CLI 다운로드와, 있다면 이전 버전의 CLI예요. 어떤 에이전트도 쓰지 않아요. 이 제공자는 꺼져 있거나 설치한 CLI를 사용해요. 제공자에게 필요하면 OpenBot이 CLI를 다시 다운로드해요.",
   "files.cleanup.clear": "지우기",
   "files.cleanup.clearCategory": "{category} 지우기",
   "files.cleanup.confirm.caches": "캐시된 서버 파일을 지울까요?",

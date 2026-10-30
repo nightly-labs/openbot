@@ -3,7 +3,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
 import type { AgentClient } from "./../agent-client";
-import { type CodexCliInfo, resolveCodexCli } from "./../cli";
+import { type CodexCliInfo, resolveCodexCli, resolveInstalledFirst } from "./../cli";
 import { causeHelpers } from "../effect-boundary";
 import {
   type AccountLoginCompletedResult,
@@ -140,9 +140,7 @@ export class CodexLoginFlow {
    */
   readonly saveApiKey = Effect.fn("CodexLogin.saveApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
     const bundledExecutable = this.#host.bundledExecutable();
-    const cli = yield* resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable }).pipe(
-      toCodexLoginFailed,
-    );
+    const cli = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
     yield* Effect.acquireUseRelease(
       loginStep(() => this.#host.createClient(cli)),
       (client) =>
@@ -284,9 +282,8 @@ export class CodexLoginFlow {
     this.#host.setConnecting();
     return yield* Effect.gen({ self: this }, function* () {
       const bundledExecutable = this.#host.bundledExecutable();
-      const resolved = yield* resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable }).pipe(
-        toCodexLoginFailed,
-      );
+      // The CLI that the provider runs: the user's when it is as new as OpenBot's copy.
+      const resolved = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
       cli = resolved;
       return yield* Effect.acquireUseRelease(
         loginStep(() => this.#host.createClient(resolved)),

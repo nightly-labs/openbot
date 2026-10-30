@@ -695,14 +695,23 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
 ): Effect.Effect<Cli, E> {
-  return Effect.gen(function* () {
-    const resolved = yield* resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-    if (!preferInstalled || resolved.source !== "managed") return resolved;
-    const installed = yield* resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-    return installed?.source === "system" &&
-      (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
+  const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
+  if (!preferInstalled) return copy;
+  const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
+  const choose = (resolved: Cli, installed: Cli | null): Cli =>
+    resolved.source === "managed" &&
+    installed?.source === "system" &&
+    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
       ? installed
       : resolved;
+  return Effect.gen(function* () {
+    // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    if (bundledExecutable) {
+      const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
+      return choose(resolved, installed);
+    }
+    const resolved = yield* copy;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
   });
 }
 
