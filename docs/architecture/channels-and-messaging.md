@@ -160,7 +160,7 @@ different view, and a request to the whole group goes to all of them. Each selec
 gets the request's attachments; its packet names the other members that answer, but does not carry
 their replies to that request, so each member gives its own view. This stays true after a typed
 "continue" makes the follow-up the request of a task: the replies count from the first request. After
-the member wrote its own reply, a follow-up gets the other replies, so it can ask about them. The packet cursor stops before the
+the member wrote its own complete reply or result (not commentary), a follow-up gets the other replies, so it can ask about them. The packet cursor stops before the
 first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
 request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.

@@ -214,9 +214,15 @@ export class ChannelHistory {
       // Members that answer one request each give their own view. The reply of a member that
       // finished first made the next one copy its first sentence, so the rows that the other tasks
       // of this request wrote after the request stay out until this assignment ends. After the
-      // member gave its own view, a follow-up can ask about the others, so they show again.
+      // member gave its own view, a follow-up can ask about the others, so they show again. A note
+      // between tool calls or a reply that a stop cut off is not that view.
       const answered = messages.some(
-        (message) => message.author.kind === "agent" && message.taskId === task.id && message.message.text.trim(),
+        (message) =>
+          message.author.kind === "agent" &&
+          message.taskId === task.id &&
+          message.message.text.trim() &&
+          (message.id.startsWith("channel-result-") ||
+            (message.message.status === "completed" && message.message.itemType !== "commentary")),
       );
       const siblings = new Set(
         task.parentTaskId === null && !answered
