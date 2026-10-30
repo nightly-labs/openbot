@@ -2039,7 +2039,7 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
  * A page that redirects while it loads made `loadURL` reject inside Electron's `did-start-navigation`
  * event, and the tab then called `webContents.stop()` before that event returned. Chromium stops the
  * process when a navigation is cancelled while it starts. The process must survive and end on the
- * redirected page.
+ * redirected page, and each navigation must succeed.
  */
 async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
   const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
@@ -2079,6 +2079,8 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
     ".openbot-build/browser-redirect-navigation-report.json",
     JSON.stringify({ processAlive: true, attempts: outcomes.length, outcomes }, null, 2),
   );
+  const failed = outcomes.filter((outcome) => !outcome.success);
+  if (failed.length > 0) throw new Error(`${failed.length} redirecting navigations failed: ${failed[0]?.error}`);
   process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
 }
 

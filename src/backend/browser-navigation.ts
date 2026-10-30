@@ -5,6 +5,7 @@ import { type BrowserOperationError, browserFailure, browserSync } from "./brows
 
 const NAVIGATION_TIMED_OUT = "Navigation timed out.";
 const TAB_CLOSED = "Browser tab was closed during navigation.";
+const ERR_ABORTED = -3;
 
 /**
  * Starts a navigation and settles when the main frame finishes it. `initiate` returns `false` when
@@ -86,6 +87,9 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const complete = () => {
         finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
       };
+      // A page that starts its next page while it loads, as a sign-in redirect does, aborts its own
+      // load with `ERR_ABORTED`. The main frame still loads the next page, so wait for that load.
+      const supersededBy = (code: unknown) => code === ERR_ABORTED && !timedOut && contents.isLoading();
       const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
         if (!isMainFrame) return;
         // A page that calls `pushState` while it loads must not end the wait for that load.
@@ -99,7 +103,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         if (started && inPlace && isMainFrame) complete();
       };
       const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-        if (!started || !isMainFrame) return;
+        if (!started || !isMainFrame || supersededBy(code)) return;
         finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
       };
       const destroyed = () => {
@@ -142,6 +146,8 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
             (error) =>
               setImmediate(() => {
                 initiationPending = false;
+                if (settled || supersededBy(error instanceof Error && "errno" in error ? error.errno : undefined))
+                  return;
                 finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
               }),
           );
