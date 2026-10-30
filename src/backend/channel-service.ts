@@ -2119,7 +2119,13 @@ export class ChannelService {
           ...task,
           state: nextState,
           revision: nextState === "queued" ? task.revision + 1 : task.revision,
-          error: state === "failed" ? "The agent could not complete this task." : null,
+          // The turn stored the provider's redacted reason on its delivery before it reported the end.
+          // Without it, the channel showed only this sentence and the reason was in the agent's chat.
+          error:
+            state === "failed"
+              ? ((assignment.deliveryId ? this.mailbox.getDelivery(assignment.deliveryId)?.delivery.error : null) ??
+                "The agent could not complete this task.")
+              : null,
         });
       }
       if (task.parentTaskId) {
