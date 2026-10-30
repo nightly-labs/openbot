@@ -206,7 +206,7 @@ import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/o
 import type {
   ProviderAccountRelay,
   ProviderAccountRelayProvider,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";

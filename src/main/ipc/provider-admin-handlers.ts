@@ -28,7 +28,7 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
-import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,

@@ -1,14 +1,4 @@
-import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
-import {
-  PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_V2_ROUTES,
-  type ProviderAccountRelayProvider,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+import { PROVIDER_ACCOUNT_RELAYS } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_PROVIDERS,
@@ -23,18 +13,6 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, requireAdmin, stringField } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(SIGN_IN_RELAY_ROUTES));
-/** The `start` route of each account relay, with its capability and the providers its codec admits. */
-const ACCOUNT_STARTS: ReadonlyMap<string, { capability: string; providers: readonly ProviderAccountRelayProvider[] }> =
-  new Map([
-    [
-      PROVIDER_ACCOUNT_RELAY_ROUTES.start,
-      { capability: PROVIDER_ACCOUNT_RELAY_CAPABILITY, providers: PROVIDER_ACCOUNT_RELAY_PROVIDERS },
-    ],
-    [
-      PROVIDER_ACCOUNT_RELAY_V2_ROUTES.start,
-      { capability: PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY, providers: PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS },
-    ],
-  ]);
 
 /**
  * Sign-ins of this host that an administrator finishes in the browser of their own computer. Frozen
@@ -49,7 +27,8 @@ export async function routeSignInRelay(
   relay: TeamApiSignInRelay | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
-  const accountStart = method === "POST" ? ACCOUNT_STARTS.get(url.pathname) : undefined;
+  const accountStart =
+    method === "POST" ? PROVIDER_ACCOUNT_RELAYS.find((candidate) => candidate.start === url.pathname) : undefined;
   if (accountStart) {
     // The host advertises the capability only with `sign-in-relay-v1` and `provider-accounts-v1`.
     if (!relay || !capabilities.has(accountStart.capability))

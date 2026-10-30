@@ -10,7 +10,7 @@ import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/clau
 import {
   type ProviderAccountRelay,
   providerAccountRelay,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";

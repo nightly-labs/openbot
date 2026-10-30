@@ -12,7 +12,7 @@ import {
   type ProviderAdminDesktopApi,
   relayCallbackQuery,
 } from "@openbot/contracts/ipc";
-import type { ProviderAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+import type { ProviderAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";

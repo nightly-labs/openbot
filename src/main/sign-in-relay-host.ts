@@ -10,7 +10,7 @@ import {
   type SignInRelayStatus,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
-import type { ProviderAccountRelayProvider } from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+import type { ProviderAccountRelayProvider } from "@openbot/contracts/team-protocol/provider-account-relays";
 import type { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
