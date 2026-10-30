@@ -20,6 +20,13 @@ interface BrowserPictureInPictureOptions {
   onEvent: (event: BrowserPictureInPictureEvent) => void;
 }
 
+/** A host's tab, which the window draws from the live view because it has no native view here. */
+export interface BrowserPictureInPictureLiveView {
+  clipboard: boolean;
+  /** Stops the host's screencast when the window closes, as nobody looks at it after that. */
+  stop: () => void;
+}
+
 const HOVER_POLL_INTERVAL_MS = 150;
 /** The dark background of the floating browser, under its own page. */
 const PICTURE_IN_PICTURE_DARK_BACKGROUND = "#111415";
@@ -36,9 +43,15 @@ export class BrowserPictureInPicture {
     this.#options = options;
   }
 
+  /** The open window, which receives the frames of a live view. */
+  get window(): BrowserWindow | null {
+    return this.#window && !this.#window.isDestroyed() ? this.#window : null;
+  }
+
   readonly open = Effect.fn("BrowserPictureInPicture.open")(function* (
     this: BrowserPictureInPicture,
     savedBounds?: BrowserBounds,
+    liveView?: BrowserPictureInPictureLiveView,
   ): Effect.fn.Return<BrowserBounds, PictureInPictureFailed> {
     const existing = this.#window;
     if (existing && !existing.isDestroyed()) {
@@ -123,6 +136,7 @@ export class BrowserPictureInPicture {
     window.on("closed", () => {
       // A child view's contents outlive its window. A window that the system closes skips `#close`.
       if (!controlsView.webContents.isDestroyed()) controlsView.webContents.close();
+      liveView?.stop();
       if (this.#window !== window) return;
       this.#stopHoverTracking();
       this.#window = null;
@@ -134,11 +148,14 @@ export class BrowserPictureInPicture {
     });
 
     const developmentUrl = this.#options.developmentUrl;
-    yield* pipCall(() =>
-      developmentUrl
-        ? window.loadURL(new URL("browser-pip.html", `${developmentUrl}/`).toString())
-        : window.loadURL("openbot-app://app/browser-pip.html"),
-    );
+    const pageUrl = developmentUrl
+      ? new URL("browser-pip.html", `${developmentUrl}/`)
+      : new URL("openbot-app://app/browser-pip.html");
+    if (liveView) {
+      pageUrl.searchParams.set("view", "live");
+      if (liveView.clipboard) pageUrl.searchParams.set("clipboard", "1");
+    }
+    yield* pipCall(() => window.loadURL(pageUrl.toString()));
     // The system can close the window during the load, and the `closed` handler closes the controls.
     if (controlsView.webContents.isDestroyed()) return bounds;
     yield* pipCall(() =>

@@ -17,7 +17,11 @@ import {
   BROWSER_USER_CONTROL_ROUTES,
   decodeBrowserUserControlSnapshot,
 } from "@openbot/contracts/team-protocol/browser-user-control-v1";
-import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  decodeBrowserViewInputValue,
+  TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import type { BrowserHost } from "../../backend/browser-host";
@@ -350,9 +354,23 @@ export function browserIpcHandlers({
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
       startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => runCauseEffect(browserView.start(tabId))),
       stopLiveView: handler(() => runCauseEffect(browserView.stop())),
-      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        runCauseEffect(browserPictureInPicture.open(bounds)),
-      ),
+      // A host's tab is not a native view on this screen, so the window draws it from the live view.
+      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) => {
+        const serverId = remoteServers.activeServerId;
+        const live =
+          serverId !== LOCAL_SERVER_ID && remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY);
+        return runCauseEffect(
+          browserPictureInPicture.open(
+            bounds,
+            live
+              ? {
+                  clipboard: remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+                  stop: () => void runCauseEffect(browserView.stop()).catch(() => undefined),
+                }
+              : undefined,
+          ),
+        );
+      }),
       closePictureInPicture: handler(() => browserPictureInPicture.close()),
       dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
       hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
