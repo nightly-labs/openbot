@@ -3,7 +3,6 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
-  ServerNotificationLevel,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -93,9 +92,6 @@ export interface ServerSettingsModalProps {
    * section appears only when a caller supplies this.
    */
   onRotateHostKey?: (() => Promise<void>) | undefined;
-  /** The Notifications section appears only when a caller supplies both: they are desktop notifications. */
-  onSetMuted?: (muted: boolean) => Promise<void>;
-  onSetNotificationLevel?: (level: ServerNotificationLevel) => Promise<void>;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   /**
    * The license of the signed-in account. When the owner invites a person to a full license, the

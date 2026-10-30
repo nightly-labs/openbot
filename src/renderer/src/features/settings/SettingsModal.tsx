@@ -12,6 +12,7 @@ import type {
   MobileConnectTicket,
   RemoteNetworkRoute,
   RemoteNetworkRouteState,
+  ServerNotificationLevel,
   ServerSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
@@ -43,6 +44,7 @@ import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
+import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
 import { createSettingsAgentsSection } from "./SettingsAgentsSection";
@@ -66,8 +68,14 @@ export interface SettingsModalProps {
   chatWindow?: boolean;
   /** The built-in display's notch, null when it has none, or undefined before main answers. */
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
-  /** The servers that the Dynamic Island tab lists. */
+  /** The servers that the Notifications and Dynamic Island tabs list. */
   servers?: readonly ServerSummary[];
+  /** Writes the notification level of a server. Resolves after `servers` shows it. */
+  onSetServerNotificationLevel?: ((serverId: string, level: ServerNotificationLevel) => Promise<void>) | undefined;
+  /** Mutes a server on this computer. No duration mutes until the user unmutes. */
+  onSetServerMuted?: ((serverId: string, muted: boolean, durationMs?: number) => Promise<void>) | undefined;
+  /** The server that the Notifications tab moves to. Each nonce moves once. */
+  notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
   onOpenWhatsNew?: (() => void) | undefined;
@@ -144,6 +152,10 @@ export function SettingsModal(props: SettingsModalProps) {
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "billing");
   const voice = createSettingsVoiceStore(() => props.open && activeTab() === "voice");
+  const notificationLevels = createNotificationLevelsStore({
+    visible: () => props.open && activeTab() === "notifications",
+    servers: () => props.servers ?? [],
+  });
   const agents = createSettingsAgentsSection({
     visible: () => props.open && activeTab() === "agents",
     value: () => props.value,
@@ -301,6 +313,15 @@ export function SettingsModal(props: SettingsModalProps) {
                 ? props.onOpenNotificationSettings
                 : undefined
             }
+            levels={notificationLevels}
+            onSetServerLevel={(serverId, level) =>
+              props.onSetServerNotificationLevel?.(serverId, level) ?? Promise.resolve()
+            }
+            onSetServerMuted={(serverId, muted, durationMs) =>
+              props.onSetServerMuted?.(serverId, muted, durationMs) ?? Promise.resolve()
+            }
+            focusRequest={props.notificationFocusRequest}
+            menuMount={modalElement}
           />
         </Tabs.Content>
 

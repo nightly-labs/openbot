@@ -88,7 +88,9 @@ import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
+import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
@@ -1062,6 +1064,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applyHostHidden(serverId, event.agents);
         return;
       }
+      // The user changed their levels on another device. A read that started before it is older.
+      if (event.type === "agent-notification-levels-changed") {
+        setSyncedNotificationLevels(serverId, { server: event.server, agents: event.agents });
+        return;
+      }
       syncEventQueries(queryClient, queryScope, serverId, event);
       if (event.type === "channels-changed") void channelStore.refresh(serverId, event.channelId);
       if (
@@ -1259,6 +1266,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }),
     [request, teamApi, queryClient, queryScope],
   );
+  useSyncedNotificationLevelsLoader({
+    servers,
+    foreground,
+    supports: hostRequests.checks.canSetAgentNotificationLevel,
+    load: hostRequests.actions.loadAgentNotificationLevels,
+  });
   const workflows = useMemo(
     () => createWorkflowActions({ request, capabilities: serverCapabilities.current }),
     [request],

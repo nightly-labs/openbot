@@ -336,8 +336,9 @@ export const messages = {
   "mobile.agent.notifications.failedBody": "L'host non ha potuto salvare questa modifica.",
   "mobile.agent.notificationLevel.title": "Avvisami per",
   "mobile.agent.notificationLevel.server": "Impostazione del server",
+  "mobile.agent.notificationLevel.serverValue": "Impostazione del server ({level})",
   "mobile.agent.notificationLevel.footer":
-    "L'interruttore vale per ogni membro di questo server. Se è disattivato, nessun membro riceve notifiche. «Avvisami per» vale solo per te, su tutti i tuoi dispositivi. «Niente» o il silenzio nelle impostazioni di notifica di questo server le ferma comunque.",
+    "L'interruttore vale per ogni membro di questo server. Se è disattivato, nessun membro riceve notifiche. «Avvisami per» vale solo per te, su tutti i tuoi dispositivi. Cambialo in Impostazioni > Notifiche.",
   "mobile.agent.notificationLevel.unsupported":
     "Questo server non può salvare il tuo livello di notifiche per un agente. Aggiorna OpenBot sul computer che lo esegue.",
   "mobile.agent.newChat.title": "Nuova chat",

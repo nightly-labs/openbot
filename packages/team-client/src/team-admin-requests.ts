@@ -18,6 +18,7 @@ import {
   type SetAgentHiddenInput,
   type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
+  type SetOwnServerNotificationLevelInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
@@ -1207,6 +1208,16 @@ export function setAgentNotificationLevel(
       agentId: input.agentId,
       level: input.level,
     }),
+  );
+}
+
+/** The member's own level of the whole server, for all of their devices. `null` gives each device its own level. */
+export function setOwnServerNotificationLevel(
+  request: TeamApiRequest,
+  level: SetOwnServerNotificationLevelInput["level"],
+): Effect.Effect<AgentNotificationLevelsSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, decodeAgentNotificationLevels, { level }),
   );
 }
 

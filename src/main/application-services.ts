@@ -2649,6 +2649,16 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       connectTrace,
+      // The owner's levels on this computer's server, which the host also reads for the owner's phones.
+      localNotificationLevels: {
+        snapshot: () => agentNotificationLevels.snapshot(OWNER_NOTIFICATION_KEY),
+        setServer: (level) => agentNotificationLevels.setServer(OWNER_NOTIFICATION_KEY, level),
+        setAgent: (input) => agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, input),
+        subscribe: (listener) =>
+          agentNotificationLevels.subscribe((key) => {
+            if (key === OWNER_NOTIFICATION_KEY) listener();
+          }),
+      },
       accountReady: centralAuthInitialization,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {

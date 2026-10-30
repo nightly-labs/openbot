@@ -43,6 +43,7 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveSetupInput,
+  ServerNotificationLevel,
   SetAgentNotificationLevelInput,
   SetRoutineResultDestinationInput,
   SidebarLayoutSnapshot,
@@ -239,12 +240,16 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
 /**
- * `agent-notification-levels-v1`: the level that each member chose for each agent. The host keeps
- * the levels of the owner under one key, so its desktop app and its phones read the same levels.
+ * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
+ * The host keeps the levels of the owner under one key, so its desktop app and its phones read the
+ * same levels.
  */
 export interface TeamApiAgentNotificationLevels {
   snapshot(memberId: string, hidden: ReadonlySet<string>): AgentNotificationLevelsSnapshot;
   set(memberId: string, input: SetAgentNotificationLevelInput): Effect.Effect<unknown, PreferenceFileFailure>;
+  setServer(memberId: string, level: ServerNotificationLevel | null): Effect.Effect<unknown, PreferenceFileFailure>;
+  /** Calls `listener` with the member after each change of their levels, from any of their devices. */
+  subscribe(listener: (memberId: string) => void): () => void;
 }
 
 /**

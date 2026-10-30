@@ -339,8 +339,9 @@ export const messages = {
   "mobile.agent.notifications.failedBody": "ホストはこの変更を保存できませんでした。",
   "mobile.agent.notificationLevel.title": "通知する内容",
   "mobile.agent.notificationLevel.server": "サーバーの設定",
+  "mobile.agent.notificationLevel.serverValue": "サーバーの設定（{level}）",
   "mobile.agent.notificationLevel.footer":
-    "スイッチはこのサーバーのすべてのメンバーに適用されます。オフのときは、どのメンバーにも通知は届きません。「通知する内容」はあなただけの設定で、あなたのすべてのデバイスに適用されます。このサーバーの通知設定で「なし」またはミュートにすると、通知は止まります。",
+    "スイッチはこのサーバーのすべてのメンバーに適用されます。オフのときは、どのメンバーにも通知は届きません。「通知する内容」はあなただけの設定で、あなたのすべてのデバイスに適用されます。変更は 設定 > 通知 で行います。",
   "mobile.agent.notificationLevel.unsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
   "mobile.agent.newChat.title": "新しいチャット",

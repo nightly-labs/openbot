@@ -1,5 +1,6 @@
 import { type AgentAccessEvent, agentAccessEvent } from "./agent-access-v1";
 import { type AgentHiddenEvent, agentHiddenEvent } from "./agent-hidden-v1";
+import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from "./agent-notification-levels-v1";
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
@@ -19,6 +20,7 @@ import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 export type OptionalTeamEvent =
   | AgentAccessEvent
   | AgentHiddenEvent
+  | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | BrowserPageStateEvent
   | BrowserUserControlEvent
@@ -45,6 +47,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
   const event =
     agentAccessEvent(value) ??
     agentHiddenEvent(value) ??
+    agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     browserPageStateEvent(value) ??
     browserUserControlEvent(value) ??

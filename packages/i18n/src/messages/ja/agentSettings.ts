@@ -156,7 +156,6 @@ export const messages = {
 
   "agentSettings.notifications.title": "通知",
   "agentSettings.notificationLevel.title": "自分への通知",
-  "agentSettings.notificationLevel.label": "このエージェントの自分への通知",
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
   "agentSettings.notificationLevel.note":
     "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",

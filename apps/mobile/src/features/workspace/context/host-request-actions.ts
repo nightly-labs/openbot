@@ -151,6 +151,7 @@ import {
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
+  setOwnServerNotificationLevel,
   setRoutineResultDestination,
   signInRelayStatus,
   signOutMcpServer,
@@ -275,6 +276,7 @@ type HostRequestActions = Pick<
   | "setServerRoles"
   | "loadAgentNotificationLevels"
   | "setAgentNotificationLevel"
+  | "setOwnServerNotificationLevel"
   | "githubConnector"
   | "loadGitHubRepositories"
   | "loadOnePasswordConnector"
@@ -497,6 +499,8 @@ export function createHostRequestActions({
       runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
     setAgentNotificationLevel: async (input, serverId) =>
       runTeamRequest(setAgentNotificationLevel(notificationLevelsApi(serverId), input)),
+    setOwnServerNotificationLevel: async (level, serverId) =>
+      runTeamRequest(setOwnServerNotificationLevel(notificationLevelsApi(serverId), level)),
     githubConnector: async (route, serverId) =>
       runTeamRequest(githubConnectorRequest(connectorsAdmin(serverId), route)),
     loadGitHubRepositories: async (serverId) => runTeamRequest(githubConnectorRepositories(connectorsAdmin(serverId))),

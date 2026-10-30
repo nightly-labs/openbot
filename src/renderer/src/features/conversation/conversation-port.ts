@@ -9,7 +9,6 @@ export interface ConversationPort {
     OpenBotDesktopApi["agent"],
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"
-    | "setAgentNotificationLevel"
     | "askSideQuestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"

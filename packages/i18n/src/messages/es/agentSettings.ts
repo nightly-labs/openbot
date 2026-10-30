@@ -153,7 +153,6 @@ export const messages = {
     "{provider} ejecuta un turno a la vez. Los hilos de este agente se esperan entre sí.",
   "agentSettings.notifications.title": "Notificaciones",
   "agentSettings.notificationLevel.title": "Avisarme",
-  "agentSettings.notificationLevel.label": "Tus notificaciones de este agente",
   "agentSettings.notificationLevel.server": "Predeterminado del servidor ({level})",
   "agentSettings.notificationLevel.note":
     "Esta opción es solo para ti y se aplica en todos tus dispositivos. Si el servidor está silenciado o en «Nada», este agente también queda en silencio.",

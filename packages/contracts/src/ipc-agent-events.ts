@@ -4,6 +4,7 @@
 
 import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentNotificationLevelEntry, isAgentNotificationLevelsSnapshot } from "./ipc-agent-notification-levels";
 import { type AgentRuntimeSnapshot, isAgentRuntimeSnapshot } from "./ipc-agent-runtime";
 import type { AccountUsage, AgentStatus } from "./ipc-agent-status";
 import { type AgentTasksSnapshot, isAgentTasksSnapshot } from "./ipc-agent-tasks";
@@ -27,6 +28,7 @@ import {
 import { type HiddenAgent, isHiddenAgentsSnapshot } from "./ipc-hidden-agents";
 import { isQueueSnapshot, type QueueSnapshot } from "./ipc-queue";
 import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
+import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
@@ -55,6 +57,15 @@ export type AgentEvent =
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
   /** The whole hidden list, in the `agent-hidden-v1` wire shape, so the Team API sends it as it is. */
   | { type: "hidden-agents-changed"; agents: HiddenAgent[] }
+  /**
+   * The user's own notification levels on this server changed on one of their devices. Only the
+   * connections of that member get it (`agent-notification-levels-v1`), with all of their levels.
+   */
+  | {
+      type: "agent-notification-levels-changed";
+      server: ServerNotificationLevel | null;
+      agents: AgentNotificationLevelEntry[];
+    }
   /** The roles changed. A client reads `/v1/agent-access` again for its own levels. */
   | { type: "agent-access-changed"; revision: number }
   | { type: "conversation"; snapshot: ConversationSnapshot }
@@ -194,6 +205,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isSidebarLayoutSnapshot(value.layout);
     case "hidden-agents-changed":
       return isHiddenAgentsSnapshot({ agents: value.agents });
+    case "agent-notification-levels-changed":
+      return isAgentNotificationLevelsSnapshot({ server: value.server, agents: value.agents });
     case "agent-access-changed":
       return isNumber(value.revision) && Number.isSafeInteger(value.revision) && value.revision >= 0;
     case "conversation":

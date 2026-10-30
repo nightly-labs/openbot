@@ -33,7 +33,8 @@ import {
 /**
  * The browser notifications and sounds of host events. As on desktop, mute and the notification level
  * decide what a host's event says; the sound follows them too. The level that the user chose for an
- * agent replaces the server level for the events of that agent.
+ * agent replaces the server level for the events of that agent. The server level is the level that
+ * the host keeps for all devices of the user, else the level of this browser.
  */
 export function createWebNotificationRouting(options: {
   workspace: Pick<WebWorkspace, "state" | "onHostEvent" | "onHostNotice">;
@@ -58,12 +59,18 @@ export function createWebNotificationRouting(options: {
     const read = options.readAgentLevels;
     if (!read) return null;
     try {
-      const levels = agentNotificationLevelMap(await read(hostId));
+      const snapshot = await read(hostId);
+      const levels = agentNotificationLevelMap(snapshot);
       agentLevels.set(hostId, levels);
+      notifications.setSyncedLevel(hostId, snapshot.server);
       return levels;
     } catch {
       return agentLevels.get(hostId) ?? null;
     }
+  }
+  /** Reads the levels of a host again, such as after it comes online. Another device can have changed them. */
+  function refreshLevels(hostId: string): void {
+    void levelsOf(hostId);
   }
   function notify(hostId: string, event: AgentEvent, agents: ClientAgentSummary[]): void {
     withdrawWebAgentNotification(hostId, event);
@@ -73,7 +80,7 @@ export function createWebNotificationRouting(options: {
       return;
     }
     const { muted, level } = untrack(() => notifications.state(hostId));
-    if (muted || level === "nothing") return;
+    if (muted) return;
     const agentId = agentEventAgentId(event);
     if (agentId === null) {
       show(hostId, event, agents, level);
@@ -82,7 +89,8 @@ export function createWebNotificationRouting(options: {
     if (requestKey) waitingRequests.add(requestKey);
     void levelsOf(hostId).then((levels) => {
       if (requestKey && !waitingRequests.delete(requestKey)) return;
-      // The user can mute the server or change its level while the read runs.
+      // The user can mute the server or change its level while the read runs. The read also gives
+      // the server level that the host keeps for the user.
       const current = untrack(() => notifications.state(hostId));
       if (current.muted) return;
       show(hostId, event, agents, agentNotificationLevel(current.level, levels, agentId));
@@ -120,6 +128,7 @@ export function createWebNotificationRouting(options: {
     if (!muted) requestWebNotificationPermission(true);
     notifications.setMuted(hostId, muted, durationMs);
   }
+  /** Sets the level of this browser. The notification settings also write it to a host that keeps it. */
   function setNotificationLevel(hostId: string, level: ServerNotificationLevel) {
     if (level !== "nothing") requestWebNotificationPermission(true);
     notifications.setLevel(hostId, level);
@@ -152,5 +161,5 @@ export function createWebNotificationRouting(options: {
       playAgentEventSound(event);
     }),
   );
-  return { setMuted, setNotificationLevel, notifyChannelReplies };
+  return { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels };
 }

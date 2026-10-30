@@ -159,7 +159,6 @@ export const messages = {
     "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
   "agentSettings.notifications.title": "Notifications",
   "agentSettings.notificationLevel.title": "Me notifier",
-  "agentSettings.notificationLevel.label": "Vos notifications pour cet agent",
   "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
   "agentSettings.notificationLevel.note":
     "Ce choix ne concerne que vous, sur tous vos appareils. Si le serveur est en sourdine ou réglé sur « Rien », cet agent reste aussi silencieux.",

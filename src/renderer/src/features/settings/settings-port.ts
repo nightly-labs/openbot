@@ -2,7 +2,8 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 /**
  * What the settings context reaches in main: the app-wide preferences, the switches for updates,
- * notifications and the Dynamic Island, and the local agents of the Agents tab.
+ * notifications and the Dynamic Island, the local agents of the Agents tab, and the agents and the
+ * user's own notification levels of each server for the Notifications tab.
  */
 export interface SettingsPort {
   getAgentDefaults: OpenBotDesktopApi["getAgentDefaults"];
@@ -28,7 +29,10 @@ export interface SettingsPort {
   setExternalLinkPreference: OpenBotDesktopApi["setExternalLinkPreference"];
   setRemoteNetworkRoute: OpenBotDesktopApi["setRemoteNetworkRoute"];
   setRemoteSessionReusePreference: OpenBotDesktopApi["setRemoteSessionReusePreference"];
-  agent: Pick<OpenBotDesktopApi["agent"], "listAgents" | "updateAgent">;
+  agent: Pick<
+    OpenBotDesktopApi["agent"],
+    "listAgents" | "updateAgent" | "listAgentNotificationLevels" | "setAgentNotificationLevel" | "onScopedEvent"
+  >;
   dynamicIsland: Pick<
     OpenBotDesktopApi["dynamicIsland"],
     "getBuiltInDisplayGeometry" | "getPreference" | "setPreference"

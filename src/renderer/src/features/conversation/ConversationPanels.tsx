@@ -162,13 +162,21 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     const remote = props.runtime;
     if (remote) {
       const calls = remote.agentNotificationLevels;
-      return calls ? { list: () => calls.list(), set: (input) => calls.set(input) } : undefined;
+      return calls ? { list: () => calls.list() } : undefined;
     }
     return {
       list: () => conversationPort().agent.listAgentNotificationLevels(serverId),
-      set: (input) => conversationPort().agent.setAgentNotificationLevel(input, serverId),
+      subscribe: (listener) =>
+        conversationPort().agent.onScopedEvent((scoped) => {
+          if (scoped.serverId === serverId && scoped.event.type === "agent-notification-levels-changed")
+            listener({ server: scoped.event.server, agents: scoped.event.agents });
+        }),
     };
   });
+  const openNotificationSettings = (trigger: HTMLElement) => {
+    const serverId = props.server?.id;
+    if (serverId) props.onOpenNotificationSettings?.(serverId, trigger);
+  };
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   /** The panes this chat can open. The web client has no Files pane, and a chat without a thread has no files. */
   const sidePanelPanes = createMemo((): SidePanelPane[] => [
@@ -512,6 +520,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               onManageBrowserProfiles={props.onManageBrowserProfiles}
               notificationLevelCalls={notificationLevelCalls()}
               serverNotificationLevel={props.server?.notificationLevel}
+              onOpenNotificationSettings={
+                props.onOpenNotificationSettings && props.server ? openNotificationSettings : undefined
+              }
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
               maxWidth={settingsMaxWidth}

@@ -27,8 +27,11 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import {
+  effectiveServerNotificationSetting,
+  useSyncedNotificationLevels,
+} from "@/features/settings/model/notification-levels";
+import {
   mutedUntil,
-  serverNotificationSetting,
   showsInLiveActivity,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
@@ -457,7 +460,8 @@ export function useLiveActivity({
     [publish],
   );
 
-  // The notification settings of each server also decide whether the Live Activity shows it. A change
+  // The notification settings of each server also decide whether the Live Activity shows it: the level
+  // that the user chose for all of their devices, or this phone's level, and this phone's mute. A change
   // shows at once, and the activity ends when no server that it can show has anything to show.
   // A subscription, not a hook: a change that shows no other server must not re-render the workspace.
   useEffect(() => {
@@ -466,11 +470,12 @@ export function useLiveActivity({
       if (muteEnd) clearTimeout(muteEnd);
       muteEnd = null;
       const preference = usePushNotificationPreference.getState();
+      const synced = useSyncedNotificationLevels.getState().servers;
       let next: ReadonlySet<string> | null = null;
       if (preference.ready) {
         const now = Date.now();
         const settings = serverIds.map(
-          (serverId) => [serverId, serverNotificationSetting(preference, serverId)] as const,
+          (serverId) => [serverId, effectiveServerNotificationSetting(preference, synced[serverId], serverId)] as const,
         );
         next = new Set(
           settings.filter(([, setting]) => !showsInLiveActivity(setting, now)).map(([serverId]) => serverId),
@@ -493,8 +498,12 @@ export function useLiveActivity({
     const unsubscribe = usePushNotificationPreference.subscribe((state, previous) => {
       if (state.ready !== previous.ready || state.servers !== previous.servers) apply();
     });
+    const unsubscribeSynced = useSyncedNotificationLevels.subscribe((state, previous) => {
+      if (state.servers !== previous.servers) apply();
+    });
     return () => {
       unsubscribe();
+      unsubscribeSynced();
       if (muteEnd) clearTimeout(muteEnd);
     };
   }, [serverIds, publish]);

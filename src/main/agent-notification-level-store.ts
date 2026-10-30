@@ -16,20 +16,29 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  */
 export const OWNER_NOTIFICATION_KEY = "owner";
 
-type Levels = Readonly<Record<string, ServerNotificationLevel>>;
+interface MemberLevels {
+  /** The level of the whole server, or `null` when each device uses its own level. */
+  server: ServerNotificationLevel | null;
+  agents: Readonly<Record<string, ServerNotificationLevel>>;
+}
+
+const NO_LEVELS: MemberLevels = { server: null, agents: {} };
 
 /**
- * The notification level that each person chose for each agent: the owner of this computer, and each
- * member of its server by member ID. A level replaces the server level for that agent on each device
- * of that person, and the host applies it to the notifications that it sends to their phones.
+ * The notification levels that each person chose on this server: the owner of this computer, and each
+ * member by member ID. The level of the server replaces the level that each device keeps for it, and
+ * the level of an agent replaces the level of the server for that agent, on each device of that
+ * person. The host applies them to the notifications that it sends to their phones.
  *
  * A file that is missing or unreadable as JSON reads as no levels, and an entry that is not a level
- * is left out. Writes are chained for the reason `update-preference-store.ts` chains its own.
+ * is left out. A file of the first version has agent levels only. Writes are chained for the reason
+ * `update-preference-store.ts` chains its own.
  */
 export class AgentNotificationLevelStore {
   readonly #path: string;
-  #members: Readonly<Record<string, Levels>> = {};
+  #members: Readonly<Record<string, MemberLevels>> = {};
   #writes = Semaphore.makeUnsafe(1);
+  readonly #listeners = new Set<(key: string) => void>();
 
   constructor(path: string) {
     this.#path = path;
@@ -45,14 +54,26 @@ export class AgentNotificationLevelStore {
     });
   }
 
-  /** The levels of one person, by agent. */
+  /** Calls `listener` with the key of a person after each saved change of their levels. */
+  subscribe(listener: (key: string) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  /** The agent levels of one person, by agent. */
   levels(key: string): ReadonlyMap<string, ServerNotificationLevel> {
-    return new Map(Object.entries(this.#members[key] ?? {}));
+    return new Map(Object.entries(this.#members[key]?.agents ?? {}));
+  }
+
+  /** The server level of one person, or `null` when each device uses its own level. */
+  serverLevel(key: string): ServerNotificationLevel | null {
+    return this.#members[key]?.server ?? null;
   }
 
   /** The levels of one person, without the agents in `hidden`, which that person cannot see. */
   snapshot(key: string, hidden: ReadonlySet<string> = new Set()): AgentNotificationLevelsSnapshot {
     return {
+      server: this.serverLevel(key),
       agents: [...this.levels(key)]
         .filter(([agentId]) => !hidden.has(agentId))
         .map(([agentId, level]) => ({ agentId, level })),
@@ -64,12 +85,25 @@ export class AgentNotificationLevelStore {
     key: string,
     { agentId, level }: SetAgentNotificationLevelInput,
   ) {
-    const current = { ...this.#members[key] };
-    if (level === null) delete current[agentId];
-    else current[agentId] = level;
+    const current = this.#members[key] ?? NO_LEVELS;
+    const agents = { ...current.agents };
+    if (level === null) delete agents[agentId];
+    else agents[agentId] = level;
     // The oldest choices go first. A person cannot see this many agents at once.
-    const entries = Object.entries(current).slice(-AGENT_NOTIFICATION_LEVEL_LIMIT);
-    yield* this.#write({ ...this.#members, [key]: Object.fromEntries(entries) });
+    const kept = Object.fromEntries(Object.entries(agents).slice(-AGENT_NOTIFICATION_LEVEL_LIMIT));
+    yield* this.#write({ ...this.#members, [key]: { server: current.server, agents: kept } });
+    this.#changed(key);
+    return this.snapshot(key);
+  });
+
+  readonly setServer = Effect.fn("AgentNotificationLevels.setServer")(function* (
+    this: AgentNotificationLevelStore,
+    key: string,
+    level: ServerNotificationLevel | null,
+  ) {
+    const current = this.#members[key] ?? NO_LEVELS;
+    yield* this.#write({ ...this.#members, [key]: { server: level, agents: current.agents } });
+    this.#changed(key);
     return this.snapshot(key);
   });
 
@@ -83,12 +117,18 @@ export class AgentNotificationLevelStore {
     yield* this.#write(rest);
   });
 
-  #write(members: Readonly<Record<string, Levels>>): Effect.Effect<void, PreferenceFileFailure> {
+  #changed(key: string): void {
+    for (const listener of this.#listeners) listener(key);
+  }
+
+  #write(members: Readonly<Record<string, MemberLevels>>): Effect.Effect<void, PreferenceFileFailure> {
     // A person with no levels left has no entry.
-    const kept = Object.fromEntries(Object.entries(members).filter(([, levels]) => Object.keys(levels).length > 0));
+    const kept = Object.fromEntries(
+      Object.entries(members).filter(([, levels]) => levels.server !== null || Object.keys(levels.agents).length > 0),
+    );
     return this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, members: kept }).pipe(
+        writePreferenceFile(this.#path, { version: 2, members: kept }).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
               this.#members = kept;
@@ -100,22 +140,34 @@ export class AgentNotificationLevelStore {
   }
 }
 
-function decodeFile(parsed: unknown): Record<string, Levels> | null {
-  if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isDynamicRecord(parsed.members)) return null;
+function decodeLevels(value: unknown): Record<string, ServerNotificationLevel> {
+  return isDynamicRecord(value)
+    ? Object.fromEntries(
+        Object.entries(value).filter((entry): entry is [string, ServerNotificationLevel] =>
+          isServerNotificationLevel(entry[1]),
+        ),
+      )
+    : {};
+}
+
+function decodeFile(parsed: unknown): Record<string, MemberLevels> | null {
+  if (!isDynamicRecord(parsed) || !isDynamicRecord(parsed.members)) return null;
+  const version = parsed.version;
+  if (version !== 1 && version !== 2) return null;
   return Object.fromEntries(
-    Object.entries(parsed.members).flatMap(([key, levels]) =>
-      isDynamicRecord(levels)
-        ? [
-            [
-              key,
-              Object.fromEntries(
-                Object.entries(levels).filter((entry): entry is [string, ServerNotificationLevel] =>
-                  isServerNotificationLevel(entry[1]),
-                ),
-              ),
-            ],
-          ]
-        : [],
-    ),
+    Object.entries(parsed.members).flatMap(([key, value]): [string, MemberLevels][] => {
+      if (!isDynamicRecord(value)) return [];
+      // Version 1 kept the agent levels of a person as the whole entry.
+      if (version === 1) return [[key, { server: null, agents: decodeLevels(value) }]];
+      return [
+        [
+          key,
+          {
+            server: isServerNotificationLevel(value.server) ? value.server : null,
+            agents: decodeLevels(value.agents),
+          },
+        ],
+      ];
+    }),
   );
 }

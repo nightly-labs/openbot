@@ -154,7 +154,6 @@ export const messages = {
     "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "agentSettings.notifications.title": "Meldingen",
   "agentSettings.notificationLevel.title": "Meld mij",
-  "agentSettings.notificationLevel.label": "Jouw meldingen voor deze agent",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":
     "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",

@@ -268,7 +268,7 @@ export function ServerRail(props: ServerRailProps) {
               onRemove={props.onRemove}
               canRemove={props.canRemove}
               onSetMuted={props.onSetMuted}
-              onSetNotificationLevel={props.onSetNotificationLevel}
+              onOpenNotificationSettings={props.onOpenNotificationSettings}
             />
           )}
         </For>
@@ -320,7 +320,7 @@ export function ServerRail(props: ServerRailProps) {
                     onRemove={props.onRemove}
                     canRemove={props.canRemove}
                     onSetMuted={props.onSetMuted}
-                    onSetNotificationLevel={props.onSetNotificationLevel}
+                    onOpenNotificationSettings={props.onOpenNotificationSettings}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -454,7 +454,7 @@ function ServerRailButton(
                 server={props.server}
                 trigger={() => trigger}
                 onSetMuted={props.onSetMuted}
-                onSetNotificationLevel={props.onSetNotificationLevel}
+                onOpenNotificationSettings={props.onOpenNotificationSettings}
                 onOpenSettings={props.onOpenSettings}
                 onLeave={props.onLeave}
                 onDelete={props.onDelete}

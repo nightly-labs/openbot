@@ -795,6 +795,8 @@ try {
     agentNotificationLevels: {
       snapshot: (memberId, hiddenIds) => agentLevels.snapshot(memberId, hiddenIds),
       set: (memberId, input) => agentLevels.set(memberId, input),
+      setServer: (memberId, level) => agentLevels.setServer(memberId, level),
+      subscribe: (listener) => agentLevels.subscribe(listener),
     },
     hiddenAgents: {
       listHiddenAgents: () => hidden,
@@ -1740,10 +1742,10 @@ try {
     check(
       "a member sets a level for an agent; it is the member's own, and another member does not see it",
       memberSet.status === 200 &&
-        isDeepStrictEqual(memberSet.body, { agents: [{ agentId: "agent-ada", level: "nothing" }] }) &&
+        isDeepStrictEqual(memberSet.body, { server: null, agents: [{ agentId: "agent-ada", level: "nothing" }] }) &&
         isDeepStrictEqual(memberRead.body, memberSet.body) &&
         adminRead.status === 200 &&
-        isDeepStrictEqual(adminRead.body, { agents: [] }),
+        isDeepStrictEqual(adminRead.body, { server: null, agents: [] }),
       [summary(memberSet), summary(memberRead), summary(adminRead)],
     );
     const missing = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
@@ -1783,10 +1785,143 @@ try {
     check(
       "the host keeps the level after a restart, and a null level removes it",
       memberKeys.length === 1 &&
-        isDeepStrictEqual(reloadedLevels, [{ agents: [{ agentId: "agent-ada", level: "nothing" }] }]) &&
+        isDeepStrictEqual(reloadedLevels, [{ server: null, agents: [{ agentId: "agent-ada", level: "nothing" }] }]) &&
         cleared.status === 200 &&
-        isDeepStrictEqual(cleared.body, { agents: [] }),
+        isDeepStrictEqual(cleared.body, { server: null, agents: [] }),
       [summary(cleared), reloadedLevels],
+    );
+    // The member's level of the whole server: their own, kept after a restart, and removed with null.
+    const serverSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: "needs-me" },
+      capabilities,
+    });
+    const adminServerRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const serverInvalid = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: "loud" },
+      capabilities,
+    });
+    const serverReloaded = new AgentNotificationLevelStore(agentLevelsFile);
+    await runCauseEffect(serverReloaded.load());
+    const keptServerLevels = memberKeys.map((key) => serverReloaded.serverLevel(key));
+    const serverCleared = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+    check(
+      "a member sets their own server level, another member does not see it, a restart keeps it, and null removes it",
+      serverSet.status === 200 &&
+        isDeepStrictEqual(serverSet.body, { server: "needs-me", agents: [] }) &&
+        isDeepStrictEqual(adminServerRead.body, { server: null, agents: [] }) &&
+        serverInvalid.status === 400 &&
+        isDeepStrictEqual(keptServerLevels, ["needs-me"]) &&
+        isDeepStrictEqual(serverCleared.body, { server: null, agents: [] }),
+      [summary(serverSet), summary(adminServerRead), summary(serverInvalid), keptServerLevels, summary(serverCleared)],
+    );
+
+    // A change on one device reaches the other devices of the same member at once, and no other member.
+    const openLevelsSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: unknown[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "agent-notification-levels-changed") {
+          events.push(value);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [AGENT_NOTIFICATION_LEVELS_CAPABILITY],
+        }),
+      );
+      /** Whether a levels event came before the deadline. */
+      const arrived = (deadlineMs: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (events.length > 0) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, deadlineMs);
+          const wake = () => {
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, events, arrived };
+    };
+    /**
+     * Makes a change until the socket gets its event. The host reads the capabilities of the socket from
+     * its first message, and no answer says that it did, so a change can come before it.
+     */
+    const changeUntilEvent = async (
+      device: Awaited<ReturnType<typeof openLevelsSocket>>,
+      change: () => Promise<unknown>,
+    ) => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await change();
+        if (await device.arrived(5_000)) return true;
+      }
+      return false;
+    };
+    const bobOther = await openLevelsSocket(bobToken);
+    const adaDevice = await openLevelsSocket(adaToken);
+    const bobGot = await changeUntilEvent(bobOther, () =>
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, { token: bobToken, json: { level: "all" }, capabilities }),
+    );
+    // Ada's own change is her first event: an event of bob would have come before it on her socket.
+    const adaGot = await changeUntilEvent(adaDevice, () =>
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: adaToken,
+        json: { agentId: "agent-ada", level: "needs-me" },
+        capabilities,
+      }),
+    );
+    const bobEvents = [...bobOther.events].slice(0, 1);
+    const adaEvents = [...adaDevice.events].slice(0, 1);
+    bobOther.socket.close();
+    adaDevice.socket.close();
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", level: null },
+      capabilities,
+    });
+    check(
+      "a change of a member's levels reaches the other devices of that member at once, and no other member",
+      bobGot &&
+        adaGot &&
+        isDeepStrictEqual(bobEvents, [{ type: "agent-notification-levels-changed", server: "all", agents: [] }]) &&
+        isDeepStrictEqual(adaEvents, [
+          {
+            type: "agent-notification-levels-changed",
+            server: null,
+            agents: [{ agentId: "agent-ada", level: "needs-me" }],
+          },
+        ]),
+      [bobEvents, adaEvents],
     );
   }
 

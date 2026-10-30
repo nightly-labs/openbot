@@ -544,7 +544,7 @@ function AgentForm({
                 </SettingsRow>
               ) : null}
               {showNotifications ? <AgentNotificationsRow agent={agent} available={available} /> : null}
-              {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} available={available} /> : null}
+              {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} /> : null}
               {showAdvanced ? (
                 <SettingsRow
                   onPress={() =>

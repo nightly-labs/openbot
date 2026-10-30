@@ -185,7 +185,6 @@ export function createWebConversationRuntime(
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
   const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest) : undefined;
   const listLevels = remote.listAgentNotificationLevels;
-  const setLevel = remote.setAgentNotificationLevel;
   return {
     agent: {
       ...messageLinks,
@@ -285,8 +284,7 @@ export function createWebConversationRuntime(
         });
     },
     // Any member keeps an own level for each agent. The panel asks only a host with the capability.
-    agentNotificationLevels:
-      listLevels && setLevel ? { list: () => listLevels(hostId()), set: (input) => setLevel(input) } : undefined,
+    agentNotificationLevels: listLevels ? { list: () => listLevels(hostId()) } : undefined,
     // Any member reads the tab labels; the panels offer the other calls to an owner or admin only.
     get browserProfiles() {
       return browserProfilesEnabled?.() === true ? browserProfiles : undefined;

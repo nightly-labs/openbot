@@ -332,8 +332,9 @@ export const messages = {
   "mobile.agent.notifications.failedBody": "호스트가 이 변경 사항을 저장하지 못했어요.",
   "mobile.agent.notificationLevel.title": "알림 받을 항목",
   "mobile.agent.notificationLevel.server": "서버 설정",
+  "mobile.agent.notificationLevel.serverValue": "서버 설정({level})",
   "mobile.agent.notificationLevel.footer":
-    "스위치는 이 서버의 모든 멤버에게 적용돼요. 꺼져 있으면 어떤 멤버도 알림을 받지 않아요. “알림 받을 항목”은 나에게만 적용되고 내 모든 기기에 적용돼요. 이 서버의 알림 설정에서 “없음”이나 음소거를 선택하면 알림이 계속 중지돼요.",
+    "스위치는 이 서버의 모든 멤버에게 적용돼요. 꺼져 있으면 어떤 멤버도 알림을 받지 않아요. “알림 받을 항목”은 나에게만 적용되고 내 모든 기기에 적용돼요. 설정 > 알림에서 변경할 수 있어요.",
   "mobile.agent.notificationLevel.unsupported":
     "이 서버는 에이전트별 내 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "mobile.agent.newChat.title": "새 채팅",

@@ -86,10 +86,14 @@ interface PushNotificationOptions {
   /** The last send, answer or typing of the member in a session other than this phone, or `null`. */
   lastUseElsewhere(memberId: string, sessionId: string): number | null;
   /**
-   * The level that the member chose for each agent (`agent-notification-levels-v1`). It replaces the
-   * level of the phone's registration for the events of that agent.
+   * The levels that the member chose on this server for all of their devices
+   * (`agent-notification-levels-v1`). The server level replaces the level of the phone's registration,
+   * and the level of an agent replaces the server level for the events of that agent.
    */
-  agentLevels?(memberId: string): ReadonlyMap<string, ServerNotificationLevel>;
+  memberLevels?(memberId: string): {
+    server: ServerNotificationLevel | null;
+    agents: ReadonlyMap<string, ServerNotificationLevel>;
+  };
   /** Whether the member is at the computer of this host, where the desktop app shows the event. */
   atHostComputer(memberId: string, event: AgentEvent): boolean;
   /**
@@ -297,7 +301,8 @@ export class PushNotificationService {
       const { stored } = registration;
       const { value, memberId, sessionId } = stored;
       const translate = translateFor(resolveLocale("system", value.locale));
-      const level = agentNotificationLevel(value.level, this.#options.agentLevels?.(memberId) ?? null, subject.agentId);
+      const chosen = this.#options.memberLevels?.(memberId);
+      const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);
       // A phone from before channel-attention-v1 has no channel view, so its title names the agent only.
       const eventChannel = registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY) ? channel : null;
       // The fixed text, as the desktop shows it without a preview.

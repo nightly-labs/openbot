@@ -321,8 +321,9 @@ export const messages = {
   "mobile.agent.notifications.failedBody": "主机无法保存该更改。",
   "mobile.agent.notificationLevel.title": "通知我",
   "mobile.agent.notificationLevel.server": "跟随服务器",
+  "mobile.agent.notificationLevel.serverValue": "跟随服务器（{level}）",
   "mobile.agent.notificationLevel.footer":
-    "该开关对此服务器的所有成员生效。关闭时，任何成员都不会收到通知。“通知我”只对你生效，并应用到你的所有设备。此服务器通知设置中的“不通知”或静音仍会停止通知。",
+    "该开关对此服务器的所有成员生效。关闭时，任何成员都不会收到通知。“通知我”只对你生效，并应用到你的所有设备。可在“设置 > 通知”中更改。",
   "mobile.agent.notificationLevel.unsupported":
     "此服务器无法为助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "mobile.agent.newChat.title": "新对话",

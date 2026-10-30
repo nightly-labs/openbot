@@ -374,8 +374,13 @@ export class HostService extends EventEmitter<HostEvents> {
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),
-            agentLevels: (memberId) =>
-              options.agentNotificationLevels?.levels(this.#notificationKey(memberId)) ?? new Map(),
+            memberLevels: (memberId) => {
+              const key = this.#notificationKey(memberId);
+              return {
+                server: options.agentNotificationLevels?.serverLevel(key) ?? null,
+                agents: options.agentNotificationLevels?.levels(key) ?? new Map(),
+              };
+            },
             liveActivityShows: (sessionId, subject, alert, startedAt) =>
               this.#liveActivityPush?.showsEvent(sessionId, subject, alert, startedAt) ?? false,
             channelForThread: (threadId) => this.channelForThread(threadId),
@@ -1319,6 +1324,13 @@ export class HostService extends EventEmitter<HostEvents> {
     return {
       snapshot: (memberId, hidden) => store.snapshot(this.#notificationKey(memberId), hidden),
       set: (memberId, input) => store.set(this.#notificationKey(memberId), input),
+      setServer: (memberId, level) => store.setServer(this.#notificationKey(memberId), level),
+      subscribe: (listener) =>
+        store.subscribe((key) => {
+          // The owner's levels have one key for the desktop app of this computer and the owner's phones.
+          const memberId = key === OWNER_NOTIFICATION_KEY ? this.#options.store.getOwnerMemberId() : key;
+          if (memberId) listener(memberId);
+        }),
     };
   }
 

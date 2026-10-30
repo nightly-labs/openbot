@@ -171,7 +171,6 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn": "{provider} wykonuje jedną turę naraz. Wątki tego agenta czekają na siebie.",
   "agentSettings.notifications.title": "Powiadomienia",
   "agentSettings.notificationLevel.title": "Powiadamiaj mnie",
-  "agentSettings.notificationLevel.label": "Twoje powiadomienia dla tego agenta",
   "agentSettings.notificationLevel.server": "Domyślne serwera ({level})",
   "agentSettings.notificationLevel.note":
     "Ten wybór dotyczy tylko ciebie, na wszystkich twoich urządzeniach. Gdy serwer jest wyciszony lub ustawiony na „Nic”, ten agent też milczy.",

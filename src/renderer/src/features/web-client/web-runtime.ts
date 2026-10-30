@@ -35,6 +35,7 @@ import type {
   RespondToPromptInput,
   Routine,
   RoutineRun,
+  ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
   SetMessageReactionInput,
@@ -120,6 +121,7 @@ import {
   setAgentHidden,
   setAgentNotificationLevel,
   setAgentProviderAccount,
+  setOwnServerNotificationLevel,
 } from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
@@ -148,6 +150,7 @@ import {
   createWebHostConnections,
   type WebHostConnections,
   type WebHostNotice,
+  type WebHostNotificationSettings,
   WebHostRequestError,
 } from "./web-host-connections";
 import {
@@ -263,6 +266,21 @@ export interface WebWorkspaceRuntime {
   listAgentNotificationLevels?: (hostId: string) => Promise<AgentNotificationLevelsSnapshot>;
   /** Sets the user's own level for one agent of the open host. Needs `agent-notification-levels-v1`. */
   setAgentNotificationLevel?: (input: SetAgentNotificationLevelInput) => Promise<AgentNotificationLevelsSnapshot>;
+  /**
+   * The agents and the user's own levels of a host, for the notification settings: the open host, or
+   * a host with a status connection. `levels` is null on a host without `agent-notification-levels-v1`.
+   */
+  notificationSettings?: (hostId: string) => Promise<WebHostNotificationSettings>;
+  /** Sets the user's own level for one agent of a host. Needs `agent-notification-levels-v1`. */
+  setHostAgentNotificationLevel?: (
+    hostId: string,
+    input: SetAgentNotificationLevelInput,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
+  /** Sets the user's own level of a host, for all of their devices. Needs `agent-notification-levels-v1`. */
+  setOwnServerNotificationLevel?: (
+    hostId: string,
+    level: ServerNotificationLevel | null,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   /** The agent image as a data URL. The browser cannot open the host's `openbot-avatar:` URL. */
@@ -1073,13 +1091,44 @@ export function createWebWorkspaceRuntime(
         if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
         return hosts.agentNotificationLevels(hostId);
       }
-      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { agents: [] };
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { server: null, agents: [] };
       return runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)));
     },
     async setAgentNotificationLevel(input) {
       if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
       return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async notificationSettings(hostId) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.notificationSettings(hostId);
+      }
+      const [agents, levels] = await Promise.all([
+        guardedListDecoder(isClientAgentSummary, "agents")(await request("GET", TEAM_API_ROUTES.agents.all)),
+        capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+          ? runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)))
+          : null,
+      ]);
+      return { agents, levels };
+    },
+    async setHostAgentNotificationLevel(hostId, input) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.setAgentNotificationLevel(hostId, input);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async setOwnServerNotificationLevel(hostId, level) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.setOwnServerNotificationLevel(hostId, level);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setOwnServerNotificationLevel(teamApi, level).pipe(Effect.mapError((error) => error.cause)));
     },
     async models() {
       return guardedListDecoder(

@@ -32,7 +32,6 @@ import {
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_BUSY_MESSAGE_MODE,
   type ProviderRuntimeStatus,
-  SERVER_NOTIFICATION_LEVELS,
   type ServerNotificationLevel,
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
@@ -203,8 +202,8 @@ export interface AgentNotificationLevelOptions {
   current: ServerNotificationLevel | null;
   /** The level of the server. It applies while `current` is null. */
   serverLevel: ServerNotificationLevel;
-  /** Saves the choice for this user only. The host keeps it, so it applies on each device of the user. */
-  onUpdate: (agentId: string, level: ServerNotificationLevel | null) => Promise<void>;
+  /** Opens the notification settings, the one place where the user changes the level. */
+  onOpen: (trigger: HTMLElement) => void;
 }
 
 function browserProfileChoice(profile: AgentBrowserProfile): BrowserProfileChoice {
@@ -256,8 +255,6 @@ interface AgentSettingsDraft {
   dirty: Record<keyof AgentTextFields, boolean>;
   fields: AgentTextFields;
   notifications: boolean;
-  /** `default` follows the server level. */
-  notificationLevel: NotificationLevelChoice;
   permission: AgentPermissionLevel;
   computerUse: boolean;
   allowAutomation: boolean;
@@ -301,7 +298,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     dirty: { description: false, name: false, title: false },
     fields: { description: "", name: "", title: "" },
     notifications: true,
-    notificationLevel: "default",
     permission: untrack(() => currentPermission()),
     computerUse: true,
     allowAutomation: false,
@@ -525,17 +521,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           }
         });
       }),
-  );
-
-  // The host keeps the user's own level apart from the agent, so it syncs on its own. The agent id
-  // is read too: a level saved for the agent before keeps the draft until the next agent shows.
-  createEffect(
-    () => ({ agentId: props.agent.id, current: props.notificationLevel?.current ?? null }),
-    ({ current }) => {
-      setDraft((state) => {
-        state.notificationLevel = current ?? "default";
-      });
-    },
   );
 
   onSettled(() => {
@@ -828,34 +813,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  async function saveNotificationLevel(next: NotificationLevelChoice): Promise<void> {
-    const agentId = props.agent.id;
-    const update = props.notificationLevel?.onUpdate;
-    if (!update) return;
-    const previous = draft.notificationLevel;
-    setSaveError(null);
-    setDraft((state) => {
-      state.notificationLevel = next;
-    });
-    try {
-      await update(agentId, next === "default" ? null : next);
-    } catch (error) {
-      if (disposed || props.agent.id !== agentId) return;
-      setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
-      if (draft.notificationLevel === next) {
-        setDraft((state) => {
-          state.notificationLevel = previous;
-        });
-      }
-    }
-  }
-
-  const notificationLevelLabel = (choice: NotificationLevelChoice) =>
-    choice === "default"
-      ? t("agentSettings.notificationLevel.server", {
-          level: t(SERVER_NOTIFICATION_LEVEL_LABELS[props.notificationLevel?.serverLevel ?? "all"]),
-        })
-      : t(SERVER_NOTIFICATION_LEVEL_LABELS[choice]);
+  /** "Server default (All activity)" while the agent follows the server, else the level of the agent. */
+  const notificationLevelLabel = (options: AgentNotificationLevelOptions) =>
+    options.current === null
+      ? t("agentSettings.notificationLevel.server", { level: t(SERVER_NOTIFICATION_LEVEL_LABELS[options.serverLevel]) })
+      : t(SERVER_NOTIFICATION_LEVEL_LABELS[options.current]);
 
   async function saveBusyMessage(next: BusyMessageChoice): Promise<void> {
     const agentId = props.agent.id;
@@ -1406,37 +1368,23 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 />
               </SettingsLinkGroup>
               <Show when={props.notificationLevel}>
-                <SettingsLinkGroup inset class="agent-settings-runtime-rows">
-                  <Select<NotificationLevelChoice>
-                    class="agent-settings-runtime-select"
-                    options={[...NOTIFICATION_LEVEL_CHOICES]}
-                    value={draft.notificationLevel}
-                    disabled={!draft.notifications}
-                    onChange={(next) => {
-                      if (!next || next === draft.notificationLevel) return;
-                      void saveNotificationLevel(next);
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>{notificationLevelLabel(item.item.rawValue)}</SelectItem>
-                    )}
-                  >
-                    <SelectTrigger
-                      class="agent-settings-runtime-row"
-                      aria-label={t("agentSettings.notificationLevel.label")}
-                    >
-                      <span class="agent-settings-runtime-label">{t("agentSettings.notificationLevel.title")}</span>
-                      <SelectValue<NotificationLevelChoice>>
-                        {(state) => notificationLevelLabel(state.selectedOption() ?? draft.notificationLevel)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent />
-                  </Select>
-                </SettingsLinkGroup>
-                <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
-                  {draft.notifications
-                    ? t("agentSettings.notificationLevel.note")
-                    : t("agentSettings.notificationLevel.sharedOff")}
-                </Text>
+                {(options) => (
+                  <>
+                    <SettingsLinkGroup inset class="agent-settings-runtime-rows">
+                      <SettingsLinkRow
+                        icon={<Bell aria-hidden="true" />}
+                        label={t("agentSettings.notificationLevel.title")}
+                        value={notificationLevelLabel(options())}
+                        onClick={(trigger) => options().onOpen(trigger)}
+                      />
+                    </SettingsLinkGroup>
+                    <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+                      {draft.notifications
+                        ? t("agentSettings.notificationLevel.note")
+                        : t("agentSettings.notificationLevel.sharedOff")}
+                    </Text>
+                  </>
+                )}
               </Show>
             </Show>
             <Show when={page() === "permissions"}>
@@ -1778,10 +1726,6 @@ const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
 function taskLimitChoice(limit: number | undefined): TaskLimitChoice {
   return limit === undefined ? "default" : `${limit}`;
 }
-
-/** `default` follows the server level, then the levels as the server menu lists them. */
-type NotificationLevelChoice = "default" | ServerNotificationLevel;
-const NOTIFICATION_LEVEL_CHOICES: readonly NotificationLevelChoice[] = ["default", ...SERVER_NOTIFICATION_LEVELS];
 
 const BUSY_MESSAGE_CHOICES = ["default", "queue", "steer"] as const;
 type BusyMessageChoice = (typeof BUSY_MESSAGE_CHOICES)[number];

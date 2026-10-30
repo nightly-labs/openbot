@@ -157,7 +157,6 @@ export const messages = {
 
   "agentSettings.notifications.title": "Notifiche",
   "agentSettings.notificationLevel.title": "Avvisami",
-  "agentSettings.notificationLevel.label": "Le tue notifiche per questo agente",
   "agentSettings.notificationLevel.server": "Predefinita del server ({level})",
   "agentSettings.notificationLevel.note":
     "Questa scelta vale solo per te, su tutti i tuoi dispositivi. Se il server è silenziato o impostato su «Niente», anche questo agente resta in silenzio.",

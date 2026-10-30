@@ -352,6 +352,7 @@ export class TeamApiServer {
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
+  #stopNotificationLevelsListener: (() => void) | null = null;
   #localTypingAgentId: string | null = null;
   readonly #reportedUnrepresentableAgents = new Set<string>();
   #nextRateLimitSweepAt = 0;
@@ -451,6 +452,9 @@ export class TeamApiServer {
       this.#options.machine?.subscribe((memberId, event) => {
         if (memberId) this.#sendMachineAlert(memberId, event);
       }) ?? null;
+    // A change on one device of a member shows at once on their other devices.
+    this.#stopNotificationLevelsListener =
+      this.#options.agentNotificationLevels?.subscribe((memberId) => this.#sendNotificationLevels(memberId)) ?? null;
     this.#heartbeat = setInterval(() => {
       for (const [client, connection] of this.#eventClients) {
         if (!this.#options.store.authenticate(connection.token)) {
@@ -474,6 +478,8 @@ export class TeamApiServer {
     this.#stopAgentAccessListener = null;
     this.#stopMachineAlertListener?.();
     this.#stopMachineAlertListener = null;
+    this.#stopNotificationLevelsListener?.();
+    this.#stopNotificationLevelsListener = null;
     yield* Scope.close(this.#legacyConversationScope, Exit.void);
     this.#legacyConversationScope = Scope.makeUnsafe();
     for (const [client, connection] of this.#eventClients) {
@@ -638,6 +644,26 @@ export class TeamApiServer {
         client.readyState === webSockets.WebSocket.OPEN
       )
         client.send(JSON.stringify(event));
+    }
+  }
+
+  /**
+   * Sends a member's own notification levels to each connection of that member, and to no other member.
+   * The list leaves out the agents that the connection cannot see, as `/v1/agent-notification-levels` does.
+   */
+  #sendNotificationLevels(memberId: string): void {
+    const levels = this.#options.agentNotificationLevels;
+    if (!levels) return;
+    for (const [client, connection] of this.#eventClients) {
+      if (
+        connection.memberId !== memberId ||
+        !connection.capabilities.has(AGENT_NOTIFICATION_LEVELS_CAPABILITY) ||
+        client.readyState !== webSockets.WebSocket.OPEN
+      )
+        continue;
+      const member = this.#connectionMember(connection);
+      const hidden = this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member);
+      client.send(JSON.stringify({ type: "agent-notification-levels-changed", ...levels.snapshot(memberId, hidden) }));
     }
   }
 

@@ -6,7 +6,6 @@ import type {
   FilePreview,
   OpenBotDesktopApi,
   ResetAgentSessionSettingInput,
-  SetAgentNotificationLevelInput,
   SetAgentSessionSettingInput,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -110,10 +109,11 @@ export interface ConversationRuntime {
     | undefined;
 }
 
-/** Reads and saves the user's own notification level of each agent on one server. */
+/** Reads the user's own level of each agent. The notification settings are the one place that changes them. */
 export interface AgentNotificationLevelCalls {
   list(): Promise<AgentNotificationLevelsSnapshot>;
-  set(input: SetAgentNotificationLevelInput): Promise<AgentNotificationLevelsSnapshot>;
+  /** Calls `listener` with all levels after a change on any device of the user. Returns the unsubscribe. */
+  subscribe?(listener: (levels: AgentNotificationLevelsSnapshot) => void): () => void;
 }
 
 export function conversationRuntime(props: Pick<ConversationProps, "runtime">): ConversationRuntime {

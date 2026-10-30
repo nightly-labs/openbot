@@ -19,13 +19,14 @@ import {
 } from "@openbot/ui";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
+import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
 import { SendShortcutSelect } from "@openbot/ui/features/settings/SendShortcutSelect";
 import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { useText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, replayActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
@@ -33,6 +34,7 @@ import { webReportsEnabled } from "../../error-reports";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import type { WebAccountCalls } from "./web-account";
 import { setWebAnalyticsEnabled } from "./web-analytics";
+import type { WebNotificationSettings } from "./web-notification-settings";
 
 const TABS = ["profile", "preferences"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
@@ -67,6 +69,10 @@ export interface WebAccountSettingsProps {
   /** Closes these settings and opens the plans and servers of the account. */
   onOpenBilling: () => void;
   onSignOut: () => Promise<void>;
+  /** The levels of each host and its agents, which apply on all devices of the user. */
+  notifications: WebNotificationSettings;
+  /** Opens Preferences at the notification row of one host. Each nonce opens once. */
+  notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
 }
 
 /**
@@ -107,6 +113,13 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
     () => activeTab() === "profile",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
+  // A server menu or a settings link opens the notification levels, which are in Preferences.
+  createEffect(
+    () => (props.open ? props.notificationFocusRequest : null),
+    (request) => {
+      if (request) setActiveTab("preferences");
+    },
+  );
 
   return (
     <Tabs.Root
@@ -235,7 +248,27 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
               />
             </ItemGroup>
           </SettingsSection>
-          <SettingsSection title={t("settings.notifications.title")}>
+          <SettingsSection
+            title={
+              <NotificationScopeTitle
+                title={t("settings.notifications.whatYouHear")}
+                scope="settings.notifications.allDevices"
+              />
+            }
+          >
+            <NotificationMatrix
+              servers={props.notifications.matrixServers()}
+              device="browser"
+              onSetServerLevel={props.notifications.setServerLevel}
+              onSetAgentLevel={props.notifications.setAgentLevel}
+              onMute={props.notifications.mute}
+              onUnmute={props.notifications.unmute}
+              onRetry={props.notifications.retry}
+              focusRequest={props.open ? props.notificationFocusRequest : null}
+              menuMount={modalElement}
+            />
+          </SettingsSection>
+          <SettingsSection title={t("settings.notifications.thisBrowser")}>
             <ItemGroup class="settings-modal-card">
               <SwitchField
                 checked={completionSound()}

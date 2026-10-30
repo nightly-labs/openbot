@@ -347,8 +347,9 @@ export const messages = {
   "mobile.agent.notifications.failedBody": "L’hôte n’a pas pu enregistrer cette modification.",
   "mobile.agent.notificationLevel.title": "Me notifier pour",
   "mobile.agent.notificationLevel.server": "Réglage du serveur",
+  "mobile.agent.notificationLevel.serverValue": "Réglage du serveur ({level})",
   "mobile.agent.notificationLevel.footer":
-    "L’interrupteur s’applique à chaque membre de ce serveur. S’il est désactivé, aucun membre ne reçoit de notifications. « Me notifier pour » ne concerne que vous et s’applique sur tous vos appareils. « Rien » ou le silence dans les réglages de notifications de ce serveur les arrête quand même.",
+    "L’interrupteur s’applique à chaque membre de ce serveur. S’il est désactivé, aucun membre ne reçoit de notifications. « Me notifier pour » ne concerne que vous, sur tous vos appareils. Modifiez-le dans Réglages > Notifications.",
   "mobile.agent.notificationLevel.unsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour un agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.agent.newChat.title": "Nouvelle discussion",

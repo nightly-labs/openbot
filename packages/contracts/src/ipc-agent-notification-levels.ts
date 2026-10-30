@@ -15,9 +15,22 @@ export interface AgentNotificationLevelEntry {
 /** The most agents with a level of their own, as `agent-notification-levels-v1` permits. */
 export const AGENT_NOTIFICATION_LEVEL_LIMIT = 1000;
 
-/** The agents that have a level of their own. An agent that is not in the list uses the server level. */
+/**
+ * The levels that the signed-in user chose on one server, for all of their devices. An agent that is
+ * not in the list uses the server level.
+ */
 export interface AgentNotificationLevelsSnapshot {
+  /** The level of the whole server, or `null` when each device uses its own level. */
+  server: ServerNotificationLevel | null;
   agents: AgentNotificationLevelEntry[];
+}
+
+/** The snapshot of a server without levels: each device uses its own server level. */
+export const EMPTY_AGENT_NOTIFICATION_LEVELS: AgentNotificationLevelsSnapshot = { server: null, agents: [] };
+
+export interface SetOwnServerNotificationLevelInput {
+  /** `null` gives each device its own server level again. */
+  level: ServerNotificationLevel | null;
 }
 
 export interface SetAgentNotificationLevelInput {
@@ -42,6 +55,7 @@ function isAgentNotificationLevelEntry(value: unknown): value is AgentNotificati
 export function isAgentNotificationLevelsSnapshot(value: unknown): value is AgentNotificationLevelsSnapshot {
   return (
     isDynamicRecord(value) &&
+    (value.server === null || isServerNotificationLevel(value.server)) &&
     Array.isArray(value.agents) &&
     value.agents.length <= AGENT_NOTIFICATION_LEVEL_LIMIT &&
     value.agents.every(isAgentNotificationLevelEntry) &&
@@ -58,6 +72,16 @@ export function parseSetAgentNotificationLevelInput(value: unknown): SetAgentNot
   )
     throw new Error("Invalid agent notification level request.");
   return { agentId: value.agentId, level: value.level };
+}
+
+export function parseSetOwnServerNotificationLevelInput(value: unknown): SetOwnServerNotificationLevelInput {
+  if (
+    !isDynamicRecord(value) ||
+    Object.keys(value).some((key) => key !== "level") ||
+    (value.level !== null && !isServerNotificationLevel(value.level))
+  )
+    throw new Error("Invalid server notification level request.");
+  return { level: value.level };
 }
 
 /** The levels of a snapshot by agent. */

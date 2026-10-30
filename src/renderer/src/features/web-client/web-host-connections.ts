@@ -3,6 +3,8 @@ import {
   type AgentNotificationLevelsSnapshot,
   type ClientAgentSummary,
   isClientAgentSummary,
+  type ServerNotificationLevel,
+  type SetAgentNotificationLevelInput,
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
@@ -16,7 +18,11 @@ import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { createRemoteTeamPeer, RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
 import { createRemoteConnectionRecovery } from "@openbot/team-client/remote-recovery";
-import { listAgentNotificationLevels } from "@openbot/team-client/team-admin-requests";
+import {
+  listAgentNotificationLevels,
+  setAgentNotificationLevel,
+  setOwnServerNotificationLevel,
+} from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { referenceFrom } from "@openbot/user-errors";
@@ -99,7 +105,28 @@ export interface WebHostConnections {
    * `agent-notification-levels-v1` has none. Rejects while the host has no connection.
    */
   agentNotificationLevels(hostId: string): Promise<AgentNotificationLevelsSnapshot>;
+  /**
+   * The agents and the user's own levels of a host that this tab has not opened, for the notification
+   * settings. `levels` is null on a host without `agent-notification-levels-v1`.
+   */
+  notificationSettings(hostId: string): Promise<WebHostNotificationSettings>;
+  /** Sets the user's own level for one agent of a host that this tab has not opened. */
+  setAgentNotificationLevel(
+    hostId: string,
+    input: SetAgentNotificationLevelInput,
+  ): Promise<AgentNotificationLevelsSnapshot>;
+  /** Sets the user's own level of a host that this tab has not opened, for all of their devices. */
+  setOwnServerNotificationLevel(
+    hostId: string,
+    level: ServerNotificationLevel | null,
+  ): Promise<AgentNotificationLevelsSnapshot>;
   dispose(): Promise<void>;
+}
+
+/** What the notification settings show for one host. `levels` is null when the host keeps none. */
+export interface WebHostNotificationSettings {
+  agents: ClientAgentSummary[];
+  levels: AgentNotificationLevelsSnapshot | null;
 }
 
 /**
@@ -276,6 +303,24 @@ export function createWebHostConnections(options: {
     recovery.setActive(true);
   }
 
+  /** A Team API request on the status connection of a host. Throws while the host has no connection. */
+  function hostRequest(hostId: string): { entry: HostEntry; request: TeamApiRequest } {
+    const entry = entries.get(hostId);
+    const peer = entry?.peer;
+    if (!entry?.capabilities || !peer)
+      throw new WebHostRequestError(currentText().t("webClient.error.connectionUnavailable"), null);
+    const request: TeamApiRequest = async (method, path, decode, body = {}) => {
+      const response = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body });
+      if (!response.ok || (response.status ?? 500) >= 400)
+        throw new WebHostRequestError(
+          response.error ?? currentText().t("webClient.error.requestIncomplete"),
+          response.status === undefined ? (response.reference ?? null) : referenceFrom("http", response.status),
+        );
+      return decode(response.body);
+    };
+    return { entry, request };
+  }
+
   /** The status stays online without the list. Notifications then wait for the next `agents-changed`. */
   async function readAgents(entry: HostEntry): Promise<void> {
     const revision = entry.agentsRevision;
@@ -391,21 +436,30 @@ export function createWebHostConnections(options: {
       for (const entry of entries.values()) entry.recovery?.refresh();
     },
     async agentNotificationLevels(hostId) {
-      const entry = entries.get(hostId);
-      const peer = entry?.peer;
-      if (!entry?.capabilities || !peer)
-        throw new WebHostRequestError(currentText().t("webClient.error.connectionUnavailable"), null);
-      if (!entry.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { agents: [] };
-      const request: TeamApiRequest = async (method, path, decode, body = {}) => {
-        const response = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body });
-        if (!response.ok || (response.status ?? 500) >= 400)
-          throw new WebHostRequestError(
-            response.error ?? currentText().t("webClient.error.requestIncomplete"),
-            response.status === undefined ? (response.reference ?? null) : referenceFrom("http", response.status),
-          );
-        return decode(response.body);
-      };
+      const { entry, request } = hostRequest(hostId);
+      if (!entry.capabilities?.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { server: null, agents: [] };
       return runTeamEffect(listAgentNotificationLevels(request).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async notificationSettings(hostId) {
+      const { entry, request } = hostRequest(hostId);
+      // The status connection reads the list once; a read that failed then is made again here.
+      if (entry.agents.length === 0) await readAgents(entry);
+      const levels = entry.capabilities?.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+        ? await runTeamEffect(listAgentNotificationLevels(request).pipe(Effect.mapError((error) => error.cause)))
+        : null;
+      return { agents: entry.agents, levels };
+    },
+    async setAgentNotificationLevel(hostId, input) {
+      const { entry, request } = hostRequest(hostId);
+      if (!entry.capabilities?.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setAgentNotificationLevel(request, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async setOwnServerNotificationLevel(hostId, level) {
+      const { entry, request } = hostRequest(hostId);
+      if (!entry.capabilities?.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setOwnServerNotificationLevel(request, level).pipe(Effect.mapError((error) => error.cause)));
     },
     async dispose() {
       disposed = true;

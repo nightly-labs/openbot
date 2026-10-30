@@ -101,6 +101,7 @@ import {
   isMemoryReviewInterval,
   isPromptCacheTtl,
   isReleasedRoutineSchedule,
+  LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type MacPermissionId,
   type MemoryReviewPreference,
@@ -468,7 +469,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agentStatus;
   };
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
-  const agentNotificationLevels = new Map<string, ServerNotificationLevel>();
+  /** The levels of the preview user on each server, kept for the session as each host keeps them. */
+  const agentNotificationLevels = new Map<string, Map<string, ServerNotificationLevel>>();
+  const notificationLevelsOf = (serverId: string | undefined) => {
+    const key = serverId ?? LOCAL_SERVER_ID;
+    const levels = agentNotificationLevels.get(key) ?? new Map<string, ServerNotificationLevel>();
+    agentNotificationLevels.set(key, levels);
+    return levels;
+  };
+  const notificationLevelsSnapshot = (levels: ReadonlyMap<string, ServerNotificationLevel>) => ({
+    server: null,
+    agents: [...levels].map(([agentId, level]) => ({ agentId, level })),
+  });
   // Two profiles, so the agent select and the manage dialog show a list. "Client B" has no agents.
   let browserProfiles: { id: string; name: string; hue: AvatarHue }[] = [
     { id: "0a1b2c3d4e5f60718293a4b5c6d7e8f9", name: "Client A", hue: 215 },
@@ -1802,16 +1814,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         return snapshot;
       },
-      // The levels of the preview user, kept for the session as a host keeps them for each member.
-      listAgentNotificationLevels: async () => ({
-        agents: [...agentNotificationLevels].map(([agentId, level]) => ({ agentId, level })),
-      }),
-      setAgentNotificationLevel: async ({ agentId, level }) => {
-        if (!agents.some((agent) => agent.id === agentId))
+      listAgentNotificationLevels: async (serverId) => notificationLevelsSnapshot(notificationLevelsOf(serverId)),
+      setAgentNotificationLevel: async ({ agentId, level }, serverId) => {
+        const known = serverId === storyForeignServerId ? [...agents, STORY_FOREIGN_AGENT] : agents;
+        if (!known.some((agent) => agent.id === agentId))
           throw new Error(sourceText("error.agent.unknown", { id: agentId }));
-        if (level === null) agentNotificationLevels.delete(agentId);
-        else agentNotificationLevels.set(agentId, level);
-        return { agents: [...agentNotificationLevels].map(([id, value]) => ({ agentId: id, level: value })) };
+        const levels = notificationLevelsOf(serverId);
+        if (level === null) levels.delete(agentId);
+        else levels.set(agentId, level);
+        return notificationLevelsSnapshot(levels);
       },
       readAgentSessionSettings: async (agentId) => clone(previewSessionSettings(agentId)),
       setAgentSessionSetting: async ({ agentId, settingId, value }) => {

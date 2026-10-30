@@ -87,6 +87,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     setPendingPluginConnect,
     agentAutoApproves,
     generalSettings,
+    openNotificationLevels,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -518,6 +519,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSignInWithCodeProvider={composerCodeSignIn() ? signInWithCode : undefined}
         onManageProviders={manageProviders() ? openProviderSettings : undefined}
         onManageBrowserProfiles={manageBrowserProfiles() ? openBrowserProfileSettings : undefined}
+        onOpenNotificationSettings={openNotificationLevels}
         agent={conversationAgent()}
         agents={agentList()}
         mentionAgents={agentList().filter((agent) => !userHiddenAgentIds().has(agent.id))}

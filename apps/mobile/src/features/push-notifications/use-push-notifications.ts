@@ -15,10 +15,13 @@ import { useLiveActivityHost } from "@/features/live-activity/model/live-activit
 import { liveActivityHostKeys, loadLiveActivitySecret } from "@/features/live-activity/model/live-activity-keys";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import {
+  effectiveServerNotificationSetting,
+  useSyncedNotificationLevels,
+} from "@/features/settings/model/notification-levels";
+import {
   loadPushNotificationPreference,
   mutedUntil,
   registeredSound,
-  serverNotificationSetting,
   setNotificationPermission,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
@@ -48,7 +51,8 @@ const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATION
 
 /**
  * Gives each connected server that supports the notifications of this platform the push token of the
- * app, the events that the user chose, and whether the app is on screen. With notifications off, an
+ * app, the events that the user chose, and whether the app is on screen. The server level is the
+ * level that the user chose for all of their devices, or this phone's level when they chose none. With notifications off, an
  * iPhone still registers without a token when the Live Activity plays the sound, because the host
  * decides when it does. A host keeps the registration also when it restarts, so the phone tells each
  * host again after each connection, and removes it when the user turns both off for that host or
@@ -62,6 +66,10 @@ export function usePushNotifications({
   supportsPush,
 }: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
+  // The level that the user chose for all of their devices replaces the level of this phone. The host
+  // applies it too, and the levels of the agents, so a change registers again only when it turns the
+  // server on or off here, or changes the level of the registration.
+  const synced = useSyncedNotificationLevels((state) => state.servers);
   const liveActivities = useLiveActivitiesPreference();
   const activityHost = useLiveActivityHost();
   // An iPhone registers only when it knows which Apple environment its token is for.
@@ -177,7 +185,7 @@ export function usePushNotifications({
         continue;
       }
       if (!supportsPush(server.id)) continue;
-      const setting = serverNotificationSetting(preference, server.id);
+      const setting = effectiveServerNotificationSetting(preference, synced[server.id], server.id);
       const muted = mutedUntil(setting, now);
       let registration: PushNotificationRegistration | AndroidPushNotificationRegistration | null = null;
       if ((deliverable || activitySound) && setting.level !== "nothing" && muted !== Number.POSITIVE_INFINITY) {
@@ -233,6 +241,7 @@ export function usePushNotifications({
     secret,
     environment,
     preference,
+    synced,
     liveActivities,
     activityHost,
     supportsPush,

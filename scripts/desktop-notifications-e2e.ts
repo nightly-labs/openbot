@@ -196,6 +196,8 @@ const hostEvents = new EventEmitter<{ event: [AgentEvent] }>();
 const sent: NotificationRelayRequest[] = [];
 /** The levels that the owner chose for each agent, which the desktop and the owner's phone read. */
 const ownLevels = new Map<string, ServerNotificationLevel>();
+/** The owner's level of the whole server, for all of their devices, or `null` for the level of each device. */
+let ownServerLevel: ServerNotificationLevel | null = null;
 const sentWaiters: (() => void)[] = [];
 const phone = new PushNotificationService({
   agents: {
@@ -225,7 +227,8 @@ const phone = new PushNotificationService({
   atHostComputer: (memberId, event) =>
     memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
   // The host reads the owner's levels from the same store as the desktop app of its computer.
-  agentLevels: (memberId) => (memberId === OWNER_ID ? ownLevels : new Map()),
+  memberLevels: (memberId) =>
+    memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
   liveActivityShows: () => false,
   randomBytes: (size) => crypto.getRandomValues(new Uint8Array(size)),
 });
@@ -443,6 +446,27 @@ try {
     };
     assert.equal(await count("nothing", [browserStep(13), finished]), 0, "Nothing for the agent reached the phone.");
     assert.equal(await count("needs-me", [finished, prompt(14)]), 1, "Only when it needs me sent a finished turn.");
+    return { sent: sent.length };
+  });
+
+  await step("The owner's phone follows the server level that the owner chose for all devices", async () => {
+    // The phone registered "All activity". The level for all devices replaces it.
+    await setLevel("all", true);
+    const count = async (level: ServerNotificationLevel, events: AgentEvent[]): Promise<number> => {
+      const from = sent.length;
+      ownServerLevel = level;
+      for (const event of events) hostEvents.emit("event", event);
+      ownServerLevel = null;
+      await phoneSends(browserStep(97));
+      return sent.length - from - 1;
+    };
+    assert.equal(await count("needs-me", [finished, prompt(15)]), 1, "The server level of all devices was not used.");
+    assert.equal(await count("nothing", [prompt(16), browserStep(17)]), 0, "The server level Nothing sent a request.");
+    // The level of an agent still replaces the server level, but not a server level of Nothing.
+    ownLevels.set(agentId, "all");
+    assert.equal(await count("needs-me", [finished]), 1, "The agent level did not replace the server level.");
+    assert.equal(await count("nothing", [finished]), 0, "The agent level opened a server set to Nothing.");
+    ownLevels.clear();
     return { sent: sent.length };
   });
 

@@ -708,8 +708,8 @@ server can change it.
   export. See [iPhone notifications](#iphone-notifications) and
   [Android notifications](#android-notifications).
 - `~/Library/Application Support/OpenBot/openbot-agent-notification-levels-v1.json` holds the
-  notification level that the owner and each member of this host chose for each agent ("All
-  activity", "Only when it needs me" or "Nothing"), by member ID and agent ID. Each member reads and
+  notification level that the owner and each member of this host chose for the whole server and for
+  each agent ("All activity", "Only when it needs me" or "Nothing"), by member ID and agent ID. Each member reads and
   sets only their own levels, and the host applies them to the desktop notifications of this computer
   and to the notifications that it sends to that member's phones. A removed member's levels are
   deleted. It is never sent to the OpenBot account service.

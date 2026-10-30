@@ -155,7 +155,6 @@ export const messages = defineMessages("agentSettings", {
 
   "agentSettings.notifications.title": "Notifications",
   "agentSettings.notificationLevel.title": "Notify me",
-  "agentSettings.notificationLevel.label": "Your notifications for this agent",
   "agentSettings.notificationLevel.server": "Server default ({level})",
   "agentSettings.notificationLevel.note":
     "This choice is only for you and applies on all your devices. When the server is muted or set to Nothing, this agent stays silent too.",

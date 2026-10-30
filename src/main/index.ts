@@ -571,7 +571,6 @@ function registerIpcHandlers({
   agentDefaults,
   agentMemoryLimit,
   memoryReview,
-  agentNotificationLevels,
   agentAccess,
   teamStore,
   serverTimezone,
@@ -815,7 +814,6 @@ function registerIpcHandlers({
     }),
     ...agentIpcHandlers({
       service,
-      agentNotificationLevels,
       sidebarLayout,
       host,
       remoteServers,

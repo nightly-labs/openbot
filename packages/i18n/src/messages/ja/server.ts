@@ -279,13 +279,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "別のコンピューターからこの Mac を表示して操作します。",
   "server.settings.later": "後で",
   "server.settings.setUp": "設定",
-  "server.settings.notifications": "通知",
-  "server.settings.muteNotifications": "通知をミュート",
-  "server.settings.muteDescription":
-    "このサーバーからのデスクトップ通知、サウンド、MacBook のノッチの更新を停止します。",
-  "server.settings.mutedUntilDescription": "{until}。今すぐミュートを解除するにはオフにしてください。",
-  "server.settings.notifyAbout": "通知する内容",
-  "server.settings.notifyAboutDescription": "デスクトップ通知を表示するエージェントのイベントです。",
   "server.settings.agents": "エージェント",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":

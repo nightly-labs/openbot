@@ -32,10 +32,6 @@ import {
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import {
-  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
-  AGENT_NOTIFICATION_LEVELS_ROUTES,
-} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -69,7 +65,7 @@ import {
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentNotificationLevelsFromHost, decodeAgentSummaries } from "./remote-agent-decoding";
+import { decodeAgentSummaries } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -82,7 +78,7 @@ export interface RendererForwarderDependencies {
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<
     RemoteServerManager,
-    "list" | "request" | "readAgentConversationPage" | "supportsCapability"
+    "list" | "request" | "readAgentConversationPage" | "notificationLevels" | "cachedNotificationLevels"
   > | null;
   /** The level that the user chose for each agent of this computer's server. */
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
@@ -294,31 +290,19 @@ export function createRendererForwarders({
     );
   }
 
-  /** The last levels that each remote server gave, for a request that fails as the agent list can. */
-  const remoteAgentLevels = new Map<string, ReadonlyMap<string, ServerNotificationLevel>>();
-
   /**
    * The level that the user chose for each agent of a server. The local levels come at once. A remote
-   * server gives the levels of this member, and a server without `agent-notification-levels-v1` has none.
+   * server gives the levels of this member, and the manager keeps them for a read that fails.
    */
   function agentNotificationLevels(
     serverId: string,
   ): ReadonlyMap<string, ServerNotificationLevel> | Promise<ReadonlyMap<string, ServerNotificationLevel>> {
     if (serverId === LOCAL_SERVER_ID) return ownAgentNotificationLevels();
     const remoteManager = getRemoteServerManager();
-    if (!remoteManager?.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return new Map();
-    return runCauseEffect(
-      remoteManager.request(serverId, AGENT_NOTIFICATION_LEVELS_ROUTES.read, decodeAgentNotificationLevelsFromHost, {
-        method: "POST",
-        body: {},
-      }),
-    ).then(
-      (snapshot) => {
-        const levels = agentNotificationLevelMap(snapshot);
-        remoteAgentLevels.set(serverId, levels);
-        return levels;
-      },
-      () => remoteAgentLevels.get(serverId) ?? new Map(),
+    if (!remoteManager) return new Map();
+    // The read also refreshes the server level in the server list, which `notifyLevel` reads after it.
+    return runCauseEffect(remoteManager.notificationLevels(serverId)).then(agentNotificationLevelMap, () =>
+      agentNotificationLevelMap(remoteManager.cachedNotificationLevels(serverId)),
     );
   }
 

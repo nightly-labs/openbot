@@ -1,4 +1,4 @@
-import { parseSetAgentNotificationLevelInput } from "@openbot/contracts/ipc";
+import { parseSetAgentNotificationLevelInput, parseSetOwnServerNotificationLevelInput } from "@openbot/contracts/ipc";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
@@ -11,8 +11,8 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireVisibleBodyAgent } from "./request-helpers";
 
 /**
- * Each member reads and sets the notification level of each agent for themselves only. The levels of
- * an agent that this peer cannot see are not in the list and cannot be set.
+ * Each member reads and sets, for themselves only, the notification level of this server and of each
+ * agent. The levels of an agent that this peer cannot see are not in the list and cannot be set.
  */
 export async function routeAgentNotificationLevels(
   context: TeamApiRequestContext,
@@ -28,6 +28,10 @@ export async function routeAgentNotificationLevels(
   const body = await readJson(request);
   if (url.pathname === AGENT_NOTIFICATION_LEVELS_ROUTES.read)
     return json(200, levels.snapshot(member.id, hiddenAgentIds));
+  if (url.pathname === AGENT_NOTIFICATION_LEVELS_ROUTES.server) {
+    await runCauseEffect(levels.setServer(member.id, parseSetOwnServerNotificationLevelInput(body).level));
+    return json(200, levels.snapshot(member.id, hiddenAgentIds));
+  }
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const input = parseSetAgentNotificationLevelInput(body);
   if (!agents.listAgents().some((agent) => agent.id === input.agentId))

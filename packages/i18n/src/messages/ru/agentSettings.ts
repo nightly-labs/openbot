@@ -177,7 +177,6 @@ export const messages = {
 
   "agentSettings.notifications.title": "Уведомления",
   "agentSettings.notificationLevel.title": "Уведомлять меня",
-  "agentSettings.notificationLevel.label": "Ваши уведомления от этого агента",
   "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",
   "agentSettings.notificationLevel.note":
     "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",

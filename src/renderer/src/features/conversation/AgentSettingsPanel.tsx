@@ -88,6 +88,8 @@ interface AgentSettingsPanelProps
   notificationLevelCalls?: AgentNotificationLevelCalls | undefined;
   /** The level of the server that runs the agent. */
   serverNotificationLevel?: ServerNotificationLevel | undefined;
+  /** Opens the notification settings of the server that runs the agent. Absent hides the row. */
+  onOpenNotificationSettings?: ((trigger: HTMLElement) => void) | undefined;
 }
 
 export type { AgentSkillsMode };
@@ -230,19 +232,27 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       );
     },
   );
+  // A change on another device of the user shows at once.
+  createEffect(
+    () => props.notificationLevelCalls,
+    (calls) => {
+      if (!calls?.subscribe) return;
+      return calls.subscribe((snapshot) => {
+        if (calls === levelsCalls) {
+          ++levelsRequest;
+          setOwnLevels(agentNotificationLevelMap(snapshot));
+        }
+      });
+    },
+  );
   const notificationLevelOptions = (): AgentNotificationLevelOptions | undefined => {
-    const calls = props.notificationLevelCalls;
+    const open = props.onOpenNotificationSettings;
     const levels = ownLevels();
-    if (!calls || !levels) return undefined;
+    if (!open || !levels) return undefined;
     return {
       current: levels.get(props.agent.id) ?? null,
       serverLevel: props.serverNotificationLevel ?? "all",
-      onUpdate: async (agentId, level) => {
-        // A read that started before the save is older than the save.
-        ++levelsRequest;
-        const snapshot = await calls.set({ agentId, level });
-        if (calls === levelsCalls) setOwnLevels(agentNotificationLevelMap(snapshot));
-      },
+      onOpen: open,
     };
   };
   createEffect(

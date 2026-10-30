@@ -7,7 +7,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createSignal, onSettled } from "solid-js";
+import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
 import { actionToast } from "../../action-toast";
 import { readShowAgentSteps, setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
@@ -92,6 +92,16 @@ const Settings = createSimpleContext({
     const [appSettingsOpenRequest, setAppSettingsOpenRequest] = createSignal(0);
     /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
+    /** The server that the Notifications tab shows first. Each nonce moves to it once. */
+    const [notificationFocusRequest, setNotificationFocusRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+    } | null>(null);
+    let notificationFocusNonce = 0;
+    // A request moves the tab once. A later opening of the settings shows the tab from the top.
+    createEffect(appSettingsOpen, (open) => {
+      if (!open) setNotificationFocusRequest(null);
+    });
     /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
@@ -403,6 +413,18 @@ const Settings = createSimpleContext({
       setAppSettingsOpenRequest((count) => count + 1);
     }
 
+    /**
+     * Opens the Notifications tab, the one place where the user changes the level of a server and its
+     * agents. With a server, the tab moves to the row of that server.
+     */
+    function openNotificationLevels(serverId?: string, trigger?: HTMLElement | null): void {
+      if (serverId) setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
+      // The modal applies a tab when the requested tab changes, so a repeated request clears it first.
+      setAppSettingsTab(undefined);
+      flush();
+      openAppSettings(trigger, "notifications");
+    }
+
     /** Opens the Hosted servers tab with the delete confirmation of one server. */
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
@@ -606,6 +628,8 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       appSettingsTab,
       openAppSettings,
+      notificationFocusRequest,
+      openNotificationLevels,
       hostedServerDeleteRequest,
       openHostedServerDelete,
       skillsMarketplaceOpen,
