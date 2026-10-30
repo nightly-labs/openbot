@@ -387,6 +387,27 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
+  /** Saves the latest product analytics answer of the account, so each device of the user follows it. */
+  readonly updateAnalytics = Effect.fn("AuthService.updateAnalytics")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+      enabled: boolean,
+    ): Effect.fn.Return<AuthUser, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const user = yield* this.authenticate(sessionToken);
+      if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
+      const updated = yield* dependencies.repository.updateUserAnalytics(user.id, enabled, now);
+      if (user.analyticsEnabled !== updated.analyticsEnabled) {
+        yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      }
+      return updated;
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly updateAvatar = Effect.fn("AuthService.updateAvatar")(
     function* (
       this: AuthService,

@@ -8,6 +8,8 @@ import { currentText } from "@openbot/ui/text";
  */
 export interface WebAccountCalls {
   updateName: (name: string) => Promise<void>;
+  /** Saves the user's analytics answer on the account, so their other devices follow it. */
+  updateAnalytics: (enabled: boolean) => Promise<void>;
   updateAvatar: (image: AvatarImageInput | null) => Promise<void>;
   listSessions: () => Promise<AccountSession[]>;
   revokeSession: (sessionId: string) => Promise<void>;
@@ -47,6 +49,10 @@ export function createWebAccountCalls(
   return {
     async updateName(name) {
       await request("v1/me/profile", { method: "PATCH", body: JSON.stringify({ name }) });
+      await onAccountChanged();
+    },
+    async updateAnalytics(enabled) {
+      await request("v1/me/analytics", { method: "PUT", body: JSON.stringify({ enabled }) });
       await onAccountChanged();
     },
     async updateAvatar(image) {

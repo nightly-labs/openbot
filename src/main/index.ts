@@ -570,7 +570,7 @@ function registerIpcHandlers({
   browserView,
   updater,
   setupFile,
-  analyticsPreferenceFile,
+  analyticsPreferences,
   updatePreferenceFile,
   requestedUpdate,
   idleRestart,
@@ -632,7 +632,6 @@ function registerIpcHandlers({
   dynamicIsland,
   cuaDriver,
   computerUsePermissionHelp,
-  analytics,
   storageUsage,
   machineAlerts,
   trace,
@@ -657,7 +656,7 @@ function registerIpcHandlers({
       browser,
       updater,
       setupFile,
-      analyticsPreferenceFile,
+      analyticsPreferences,
       approvalAutomation,
       busyMessageMode,
       agentDefaults,
@@ -680,7 +679,6 @@ function registerIpcHandlers({
       getMainWindow: getDialogParent,
       openChatWindow: windows.openChatWindow,
       chatWindowTargets: windows.chatWindowTargets,
-      setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
       trace,
       resources: resourceMonitor,
     }),
@@ -902,6 +900,8 @@ function forwardCentralAuth(state: CentralAuthState): void {
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
+    // Started before the renderer is told, so its next read of the answer waits for this one.
+    services?.analyticsPreferences.followAccount(state.user);
   } else if (state.status === "signed_out") {
     if (activeAnalyticsPrincipalId) services?.analytics.clear();
     activeAnalyticsPrincipalId = null;
@@ -1192,6 +1192,8 @@ if (!hasSingleInstanceLock) {
         centralAuthPrincipalId(currentAccount) !== centralAuthPrincipalId(appliedAccount)
       ) {
         forwardCentralAuth(currentAccount);
+      } else if (currentAccount.status === "signed_in") {
+        built.analyticsPreferences.followAccount(currentAccount.user);
       }
       const {
         service,

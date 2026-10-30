@@ -3,7 +3,8 @@
 OpenBot is local-first, but it is not offline-only. Agent workspaces, conversations, attachments,
 browser data, and team data stay on the computer that runs OpenBot. The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
-configuration, memberships, invitations, and logical sessions.
+configuration, memberships, invitations, logical sessions, and the account's product analytics
+answer.
 
 The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
 and attachment data travel through the existing encrypted host connection, not through the
@@ -216,13 +217,24 @@ browser, clear the site data of openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
 request. The analytics service runs on OpenBot's self-hosted infrastructure and receives events
 through `analytics.openbot.run`.
-Analytics is enabled in production by default. Desktop users can disable it under **Settings →
+Desktop and web installs from before the first-run analytics box keep analytics on. On a new desktop
+install, and at web sign-in with no saved choice, the **Help make OpenBot better** box starts ticked
+only when both the region (of the system on desktop, of the browser language on web) and the time
+zone are in the United States and its territories, Mexico, Australia, New Zealand or Japan. The
+check runs on the device and sends nothing. Everywhere else, and when the region is unknown, the box starts
+clear and nothing is sent until the user ticks it. Desktop users can disable it under **Settings →
 General → Permissions → Share product analytics**. The preference is stored locally and disables both UI
 analytics and lifecycle analytics emitted by the local host. Website analytics does not use the
 desktop preference. Mobile has its own phone-wide **Settings → Privacy → Share product analytics**
 preference, independent of desktop and host collection. It defaults to enabled in a
 configured production build, is read before collection starts, and remains disabled if the stored
-preference cannot be read. Disabling it drops pending mobile events; it does not remove previously
+preference cannot be read.
+When the user signs in, the account service keeps their latest analytics answer: on, off, or no
+answer yet. A box that the user ticks or clears, and a Settings switch that the user changes on
+desktop, web or mobile, sends the answer (one true or false value) to the account. A default that
+the user did not change is not sent. After sign-in on another device, that device follows the
+account's answer. A choice made while the device was offline or signed out goes to the account at
+the next sign-in or profile refresh. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
 When a user turns product analytics off on desktop, web or mobile, the app first sends one event
 that says analytics was turned off, then stops. Turning it on again sends nothing.

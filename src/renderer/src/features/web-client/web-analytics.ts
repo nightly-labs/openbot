@@ -1,7 +1,7 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { version } from "../../../../../package.json";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
-import { setWebReportsEnabled, WEB_PREFERENCE, webReportsEnabled } from "../../error-reports";
+import { setWebAccountPending, setWebReportsEnabled, WEB_PREFERENCE, webReportsEnabled } from "../../error-reports";
 
 /**
  * Starts product analytics for the signed-in account of this browser. The sign-in screen loads this
@@ -16,17 +16,29 @@ export function trackBillingReturn(event: DesktopAnalyticsProperties<"billing_re
   desktopAnalytics.track("billing_return_viewed", event);
 }
 
-/** Sets the one web preference for failure reports and product analytics. Returns the stored value. */
+/**
+ * Sets the one web preference for failure reports and product analytics, and marks it for the
+ * account. Returns the stored value.
+ */
 export function setWebAnalyticsEnabled(value: boolean): boolean {
   // Product analytics stops first, so its opt-out event goes before the reports stop too.
   if (!value) desktopAnalytics.setTrackingEnabled(false, { recordOptOut: true });
   const enabled = setWebReportsEnabled(value);
   desktopAnalytics.setTrackingEnabled(enabled);
+  setWebAccountPending(value);
   return enabled;
+}
+
+/**
+ * Follows the saved answer of the sign-in screen. The user has not used the app yet, so an answer of
+ * off records no opt-out event.
+ */
+export function followWebReportsPreference(): void {
+  desktopAnalytics.setTrackingEnabled(webReportsEnabled());
 }
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key === WEB_PREFERENCE) desktopAnalytics.setTrackingEnabled(webReportsEnabled());
+    if (event.key === WEB_PREFERENCE) followWebReportsPreference();
   });
 }

@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { loadAnalyticsPreference } from "@/features/analytics/preference";
+import { followAccountAnalytics, loadAnalyticsPreference } from "@/features/analytics/preference";
 import {
   logoutMobileSession,
   type MobileProfileChange,
@@ -159,6 +159,17 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     },
     [handleSessionError, setCurrentSession],
   );
+
+  // The account keeps the user's latest analytics answer. This phone sends its unsent choice, or
+  // follows the account. A failed send stays marked for the next profile refresh.
+  const accountAnalytics = sessionState?.user.analyticsEnabled;
+  const signedIn = Boolean(sessionState);
+  useEffect(() => {
+    if (!signedIn) return;
+    void followAccountAnalytics(accountAnalytics, (enabled) => updateProfile({ analyticsEnabled: enabled })).catch(
+      () => undefined,
+    );
+  }, [signedIn, accountAnalytics, updateProfile]);
 
   const value = useMemo<MobileSessionContextValue>(
     () => ({

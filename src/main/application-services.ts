@@ -143,6 +143,7 @@ import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
 import { catalogPluginSlug, isReportedMcpServerName, loadCatalogPluginServers } from "./analytics-plugin-catalog";
+import { AnalyticsPreferenceService } from "./analytics-preference-service";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { providerAuthKind } from "./analytics-provider-auth";
 import { AppBehaviorService } from "./app-behavior-service";
@@ -553,7 +554,8 @@ export interface ApplicationServices {
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
   setupFile: string;
-  analyticsPreferenceFile: string;
+  /** The analytics answer of this computer, kept the same as the account's latest answer. */
+  analyticsPreferences: AnalyticsPreferenceService;
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
@@ -1149,7 +1151,9 @@ export async function createApplicationServices({
   const updatePreferenceFile = join(app.getPath("userData"), UPDATE_PREFERENCE_FILE);
   const routineHoldFile = join(app.getPath("userData"), ROUTINE_HOLD_FILE);
   const setupState = await runCauseEffect(readSetupState(setupFile));
-  const analyticsPreference = await Effect.runPromise(readAnalyticsPreference(analyticsPreferenceFile));
+  const analyticsPreference = await Effect.runPromise(
+    readAnalyticsPreference(analyticsPreferenceFile, setupState.completed),
+  );
   // Loaded before the first window and before the application menu is built, so every native
   // surface draws in the saved language on the first frame rather than switching after startup.
   const language = new LanguageService({
@@ -2656,6 +2660,11 @@ export async function createApplicationServices({
     resources: resourceMonitor,
   });
   teardown.push(TEARDOWN_ORDER.analytics, "host analytics", () => Effect.runPromise(analytics.close()));
+  const analyticsPreferences = new AnalyticsPreferenceService({
+    path: analyticsPreferenceFile,
+    account: centralAuth,
+    setTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+  });
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
@@ -3178,7 +3187,7 @@ export async function createApplicationServices({
     browserView,
     updater,
     setupFile,
-    analyticsPreferenceFile,
+    analyticsPreferences,
     updatePreferenceFile,
     approvalAutomation,
     agentAdminSettings,

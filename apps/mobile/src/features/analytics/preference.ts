@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { mobileAnalytics } from "./mobile-analytics";
 
 const key = "openbot.mobile.analytics.v1";
+/** A choice of this phone that the account has not saved yet, "true" or "false". */
+const accountPendingKey = "openbot.mobile.analytics.account-pending.v1";
 // The longest wait for the opt-out event before tracking stops. The opt-out must not wait for a slow network.
 const OPT_OUT_EVENT_LIMIT_MS = 2_000;
 export const useAnalyticsPreference = create<{ enabled: boolean; ready: boolean; saving: boolean }>(() => ({
@@ -43,7 +45,32 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
     await SecureStore.setItemAsync(key, String(enabled));
     mobileAnalytics.setEnabled(enabled);
     useAnalyticsPreference.setState({ enabled });
+    await SecureStore.setItemAsync(accountPendingKey, String(enabled));
   } finally {
     useAnalyticsPreference.setState({ saving: false });
   }
+}
+
+/**
+ * Keeps this phone and the account on the user's latest analytics answer. A choice that the account
+ * does not have yet goes to it with `send`; otherwise this phone follows the account's answer.
+ */
+export async function followAccountAnalytics(
+  answer: boolean | null | undefined,
+  send: (enabled: boolean) => Promise<void>,
+): Promise<void> {
+  await loadAnalyticsPreference();
+  const stored = await SecureStore.getItemAsync(accountPendingKey);
+  if (stored !== null) {
+    const pending = stored === "true";
+    // The save updates the session, and the next call clears the mark.
+    if (pending !== answer) await send(pending);
+    else await SecureStore.deleteItemAsync(accountPendingKey);
+    return;
+  }
+  const state = useAnalyticsPreference.getState();
+  if (answer === null || answer === undefined || state.saving || answer === state.enabled) return;
+  await SecureStore.setItemAsync(key, String(answer));
+  mobileAnalytics.setEnabled(answer);
+  useAnalyticsPreference.setState({ enabled: answer });
 }

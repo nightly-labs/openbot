@@ -242,6 +242,8 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 checked={reportsEnabled()}
                 onChange={(value) => {
                   setReportsEnabled(setWebAnalyticsEnabled(value));
+                  // A failed save stays marked, and the next session check sends it again.
+                  props.calls.updateAnalytics(value).catch(() => undefined);
                 }}
                 label={t("settings.analytics.title")}
                 description={t("settings.analytics.webDescription")}

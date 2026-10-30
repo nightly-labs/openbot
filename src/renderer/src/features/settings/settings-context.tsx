@@ -192,9 +192,28 @@ const Settings = createSimpleContext({
       },
     );
 
+    // Main follows the account's analytics answer when it changes. Read the preferences again, so
+    // the settings row and the tracker in this window show it.
+    let accountAnalytics: boolean | null | undefined;
+    createEffect(
+      () => {
+        const auth = centralAuth();
+        return auth.status === "signed_in" ? (auth.user.analyticsEnabled ?? null) : null;
+      },
+      (answer) => {
+        const changed = accountAnalytics !== undefined && answer !== accountAnalytics;
+        accountAnalytics = answer;
+        if (changed && answer !== null && !landingPreview) loadPreferences();
+      },
+    );
+
     let dynamicIslandSaveCount = 0;
 
-    function updateGeneralSettings(value: GeneralSettingsValue): void {
+    /**
+     * `analyticsChosen` is false for a default that the user did not change, such as the first-run
+     * box left as it was. Only a choice goes to the account.
+     */
+    function updateGeneralSettings(value: GeneralSettingsValue, options: { analyticsChosen?: boolean } = {}): void {
       const previous = generalSettings();
       function persistField<Key extends keyof GeneralSettingsValue, Response>(
         key: Key,
@@ -226,7 +245,10 @@ const Settings = createSimpleContext({
         desktopAnalytics.setTrackingEnabled(value.productAnalytics, { recordOptOut: true });
         setAnalyticsPreferenceLoaded(value.productAnalytics);
         void settingsPort()
-          .setAnalyticsPreference({ enabled: value.productAnalytics })
+          .setAnalyticsPreference({
+            enabled: value.productAnalytics,
+            ...(options.analyticsChosen === false ? {} : { chosen: true }),
+          })
           .then((preference) => {
             desktopAnalytics.setTrackingEnabled(preference.enabled);
             setAnalyticsPreferenceLoaded(preference.enabled);

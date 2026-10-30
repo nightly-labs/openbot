@@ -37,6 +37,7 @@ export interface BrowserApiServices {
     | "verifyEmailCode"
     | "authenticate"
     | "enforceTeamInviteRateLimit"
+    | "updateAnalytics"
     | "updateName"
     | "updateAvatar"
     | "listAccountSessions"
@@ -300,6 +301,12 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     if (!isString(body.name))
       return yield* new AuthServiceError(400, "invalid_profile_name", "Enter a valid display name.");
     return json(yield* services.auth.updateName(token, body.name));
+  }
+  if (path === "v1/me/analytics" && request.method === "PUT") {
+    const body = yield* readJsonObject(request);
+    if (!isBoolean(body.enabled))
+      return yield* new AuthServiceError(400, "invalid_analytics_preference", "The analytics setting is not valid.");
+    return json(yield* services.auth.updateAnalytics(token, body.enabled));
   }
   if (path === AVATAR_PATH && request.method === "PUT") {
     return yield* Effect.gen(function* () {

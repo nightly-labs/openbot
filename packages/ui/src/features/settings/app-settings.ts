@@ -96,5 +96,6 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   autoDownloadUpdates: true,
   allowRemoteUpdates: true,
   autoInstallUpdates: false,
-  productAnalytics: true,
+  // Opt-in: main reads the saved choice, and an older install with no choice reads as on.
+  productAnalytics: false,
 };
