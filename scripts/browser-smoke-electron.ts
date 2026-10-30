@@ -2012,6 +2012,18 @@ async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindo
         ? contents.mainFrame.framesInSubtree.find((candidate) => candidate.url === frameUrl)
         : contents.mainFrame;
       assert(frame, `Typing focus frame is missing: ${surface}`);
+      if (surface === "cross-origin frame") {
+        // Typing checks only the target. That needs a frame in another process to clear its active
+        // element when the page focuses an element outside the frame.
+        assert(frame.processId !== contents.mainFrame.processId, "The cross-origin frame shares the page process.");
+        await frame.executeJavaScript("document.body.innerHTML = '<input id=\"probe\">'; probe.focus(); true");
+        await contents.executeJavaScript(
+          "const probe = document.createElement('input'); probe.id = 'probe'; document.body.prepend(probe); probe.focus(); true",
+        );
+        const frameActive = await frame.executeJavaScript("document.activeElement?.id ?? ''");
+        await contents.executeJavaScript("document.querySelector('#probe').remove(); true");
+        assert(frameActive !== "probe", "The cross-origin frame kept its active element after the page took focus.");
+      }
       const names = [
         "normal append",
         "normal replace submit",
@@ -2156,8 +2168,11 @@ async function runTypingFocusScenario(browser: BrowserHost, window: BrowserWindo
                   : "alphaX";
         const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
         const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
+        // The error tells the agent whether the text is already in the field.
+        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
         const safe =
           result.success === expectedSuccess &&
+          (result.success || toolError(result).includes(expectedError)) &&
           observed.other === "beta" &&
           observed.intended === expectedValue &&
           observed.events.length === expectedInputs &&

@@ -777,7 +777,15 @@ export class BrowserCdpEngine {
           key: "error.backend.browserTypingFocusMoved" | "error.backend.browserTypingSubmitSkipped",
         ) =>
           Effect.gen({ self: this }, function* () {
-            const focused = yield* this.#callOnNode(send, backendNodeId, HOLDS_FOCUS_FUNCTION, [], resolved.sessionId);
+            // A target that a handler removed may no longer resolve. The error must still say what
+            // was already typed.
+            const focused = yield* this.#callOnNode(
+              send,
+              backendNodeId,
+              HOLDS_FOCUS_FUNCTION,
+              [],
+              resolved.sessionId,
+            ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (focused !== true) return yield* browserFailure(new Error(sourceText(key)));
           });
         yield* browserSync(() => assertBeforeDeadline(deadline));
