@@ -49,7 +49,8 @@ const KEY_EXTENSIONS = {
   // DeepSeek refuses the whole request when a tool `pattern` has an unescaped `[` in a character class,
   // such as `^[^[\]]*$` from an MCP server (#4037). JSON Schema reads it as ECMA-262, where it is valid;
   // DeepSeek reads a nested class. Pi sends patterns as they are, so this removes those patterns only.
-  // The tool still checks its input.
+  // Values in `const`, `default`, `enum` and `examples` are data, and the keys of `properties` are names,
+  // so they stay as they are.
   deepseek: {
     variable: "OPENBOT_PI_DEEPSEEK_API_KEY",
     source: String.raw`export default function (pi) {${readKey("deepseek", "OPENBOT_PI_DEEPSEEK_API_KEY")}
@@ -65,13 +66,17 @@ const KEY_EXTENSIONS = {
     }
     return false;
   };
-  const portable = (value) => {
-    if (Array.isArray(value)) return value.map(portable);
+  const DATA = new Set(["const", "default", "enum", "examples"]);
+  const NAMES = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
+  const portable = (value, names = false) => {
+    if (Array.isArray(value)) return value.map((item) => portable(item));
     if (value === null || typeof value !== "object") return value;
     return Object.fromEntries(
-      Object.entries(value).flatMap(([key, item]) =>
-        key === "pattern" && typeof item === "string" && nestsClass(item) ? [] : [[key, portable(item)]],
-      ),
+      Object.entries(value).flatMap(([key, item]) => {
+        if (names) return [[key, portable(item)]];
+        if (key === "pattern" && typeof item === "string" && nestsClass(item)) return [];
+        return [[key, DATA.has(key) ? item : portable(item, NAMES.has(key))]];
+      }),
     );
   };
   pi.on("before_provider_request", (event) =>
