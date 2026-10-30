@@ -1849,8 +1849,15 @@ export function createConversationViewScope(props: ConversationProps) {
     updateVirtualScrollMargin();
     scrollResizeObserver?.observe(element);
   };
+  // The NEW line animates in once for each place it marks, as after Mark unread. The virtualizer
+  // draws a row again when it scrolls back into view, and that draw shows the line at once.
+  let animatedUnreadBoundary: string | undefined;
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
+    const boundary = `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${untrack(unreadBoundaryMessageId) ?? ""}`;
+    if (boundary === animatedUnreadBoundary) return;
+    animatedUnreadBoundary = boundary;
+    element.dataset.arrive = "";
   };
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
