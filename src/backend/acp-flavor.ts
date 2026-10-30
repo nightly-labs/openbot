@@ -1,5 +1,6 @@
 import { win32 } from "node:path";
 import type { RequestError } from "@agentclientprotocol/sdk";
+import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
 /**
@@ -92,6 +93,14 @@ export interface AcpFlavor {
    * replaces the server that the others in it use. Their OpenBot servers then share one token.
    */
   mcpServersPerDirectory?: true;
+  /**
+   * The agent connects to each MCP server of a session before it answers `session/new` or
+   * `session/load`, and leaves out a server that did not load with no error. A session that OpenBot's
+   * servers did not reach then fails, as the agent cannot use OpenBot's tools.
+   */
+  mcpServersLoadWithSession?: true;
+  /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
+  enableMcpServers?(cwd: string, names: readonly string[]): void;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
@@ -114,6 +123,10 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
+  // Cursor 2026.10.22-27dcf5f leaves out a disabled or blocked server, and the agent turn then
+  // finds no OpenBot tools (#3058).
+  mcpServersLoadWithSession: true,
+  enableMcpServers: enableCursorMcpServers,
 };
 
 /**

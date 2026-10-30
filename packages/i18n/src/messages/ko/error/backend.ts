@@ -70,6 +70,8 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "이 요청이 라우팅 컨텍스트 한도를 넘었어요. 멤버를 선택하거나 더 짧은 요청을 보내세요.",
   "error.backend.channelTaskMemberRequired": "이 작업을 맡을 멤버를 선택하세요.",
+  "error.backend.channelTaskStopped": "중지됨. 이 작업을 계속하거나 다시 배정하세요.",
+  "error.backend.channelRoutingUnreadable": "리더가 이 메시지를 배정하지 못했어요. 멤버에게 다시 배정하세요.",
   "error.backend.channelRoutingFailed": "라우팅에 실패했어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadTimedOut": "채널 리더가 제시간에 답하지 않았어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadFailed": "채널 리더가 이 메시지를 전달하지 못했어요. 멤버를 선택하거나 다시 시도해 주세요.",

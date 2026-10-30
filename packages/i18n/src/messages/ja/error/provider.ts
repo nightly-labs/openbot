@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot は Codex の設定に Computer Use を登録できませんでした。Codex の config.toml が有効で書き込み可能であることを確認してから、OpenBot を再起動してください。Computer Use なしで続行するには、エージェントの設定で Computer Use をオフにできます。",
   "error.provider.codexUnresponsive": "Codex が応答しなくなったため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpUnresponsive": "{provider} が時間内に応答しなかったため、OpenBot がそのプロセスを終了しました。",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
   "error.provider.endpointsReadOnly":
     "保存されたエンドポイントは新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
   "error.provider.endpointNoSecureStorage":

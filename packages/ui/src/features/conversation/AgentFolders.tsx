@@ -535,6 +535,11 @@ export function AgentFoldersPage(props: {
   wideAccess: string | null;
   /** The label of the level the folders apply in. */
   workspaceAccess: string;
+  /**
+   * Whether to show the excluded folders. Only Workspace only blocks them, so they show there or
+   * under the wide-access note that says so.
+   */
+  showExclusions: boolean;
   onChangeAccess: () => void;
 }) {
   const { t } = useText();
@@ -621,39 +626,41 @@ export function AgentFoldersPage(props: {
                 </Button>
               </SettingsLinkGroup>
             </div>
-            <SettingsLinkGroup inset title={t("agentSettings.folders.excluded")}>
-              <For each={list().excluded} keyed={(path) => path}>
-                {(path) => {
-                  const fresh = opened;
-                  return (
-                    <ExclusionRow
-                      path={path()}
-                      place={exclusionPlace(path(), list(), {
-                        workspace: t("agentSettings.folders.workspace"),
-                        shared: t("agentSettings.folders.shared"),
-                      })}
-                      fresh={fresh}
-                      flash={flash() === path()}
-                      onFlashEnd={clearFlash}
-                      onInclude={() => void props.folders.include(path())}
-                    />
-                  );
-                }}
-              </For>
-              <Button
-                variant="ghost"
-                type="button"
-                class="settings-link agent-folders-add"
-                onClick={() => void props.folders.exclude()}
-              >
-                <span class="settings-link-label">
-                  <span class="settings-link-icon">
-                    <Plus aria-hidden="true" />
+            <Show when={props.showExclusions}>
+              <SettingsLinkGroup inset title={t("agentSettings.folders.excluded")}>
+                <For each={list().excluded} keyed={(path) => path}>
+                  {(path) => {
+                    const fresh = opened;
+                    return (
+                      <ExclusionRow
+                        path={path()}
+                        place={exclusionPlace(path(), list(), {
+                          workspace: t("agentSettings.folders.workspace"),
+                          shared: t("agentSettings.folders.shared"),
+                        })}
+                        fresh={fresh}
+                        flash={flash() === path()}
+                        onFlashEnd={clearFlash}
+                        onInclude={() => void props.folders.include(path())}
+                      />
+                    );
+                  }}
+                </For>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  class="settings-link agent-folders-add"
+                  onClick={() => void props.folders.exclude()}
+                >
+                  <span class="settings-link-label">
+                    <span class="settings-link-icon">
+                      <Plus aria-hidden="true" />
+                    </span>
+                    {t("agentSettings.folders.exclude")}
                   </span>
-                  {t("agentSettings.folders.exclude")}
-                </span>
-              </Button>
-            </SettingsLinkGroup>
+                </Button>
+              </SettingsLinkGroup>
+            </Show>
           </>
         )}
       </Show>

@@ -72,6 +72,8 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "Esta solicitud supera el límite de contexto de asignación. Selecciona un miembro o envía una solicitud más corta.",
   "error.backend.channelTaskMemberRequired": "Elige un miembro para esta tarea.",
+  "error.backend.channelTaskStopped": "Detenida. Continúa o reasigna esta tarea.",
+  "error.backend.channelRoutingUnreadable": "El líder no pudo dirigir este mensaje. Reasígnalo a un miembro.",
   "error.backend.channelRoutingFailed": "La asignación falló. Elige un miembro o inténtalo de nuevo.",
   "error.backend.channelLeadTimedOut":
     "El coordinador del canal no respondió a tiempo. Elige un miembro o inténtalo de nuevo.",

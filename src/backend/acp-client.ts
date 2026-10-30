@@ -1371,6 +1371,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
   }
 
+  /**
+   * Whether the session got other `additionalDirectories` than these params send. A history read
+   * sends no roots and keeps the session as it is.
+   */
+  #workspaceRootsChanged(thread: AcpThread, params: unknown): boolean {
+    if (!this.#acceptsAdditionalDirectories || !isRecord(params) || !Array.isArray(params.runtimeWorkspaceRoots))
+      return false;
+    const roots = params.runtimeWorkspaceRoots.filter(isString);
+    return roots.join("\n") !== thread.workspaceRoots.join("\n");
+  }
+
   readonly #startThread = Effect.fn("AcpAgentClient.startThread")(function* (
     this: AcpAgentClient,
     params: unknown,
@@ -1382,9 +1393,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!resume || !requestedThreadId) return yield* this.#openThread(params, false);
     const held = this.#threads.get(requestedThreadId);
     const recovering = held && !held.activeTurn && held.needsResume;
-    // The MCP servers are fixed when a session opens, so a changed Computer Use switch loads the
-    // session again. A session with a turn keeps its servers until a later resume.
-    if (held && !recovering && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
+    // The MCP servers and the workspace roots are fixed when a session opens, so a changed Computer
+    // Use switch or a changed folder list loads the session again: Antigravity's file tools reach only
+    // the roots of the session (#3843). A session with a turn keeps them until a later resume.
+    if (
+      held &&
+      !recovering &&
+      !held.activeTurn &&
+      (held.computerUse !== computerUseParam(params) || this.#workspaceRootsChanged(held, params))
+    ) {
       yield* this.#threads.close(held).pipe(toProviderClientOperationError);
     }
     // A thread this client already holds takes the caller's settings even though no session is
@@ -1480,6 +1497,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
             const mcpServers = [...handoff.servers, ...mcp.servers];
+            const enableMcpServers = this.#flavor.enableMcpServers;
+            if (enableMcpServers) {
+              const names = mcp.servers.map((server) => server.name);
+              // A failed change only goes to the log: the check after the session request reports its effect.
+              yield* Effect.try({ try: () => enableMcpServers(cwd, names), catch: String }).pipe(
+                Effect.catch((error) =>
+                  Effect.sync(() =>
+                    this.emit(
+                      "diagnostic",
+                      this.#redact(`OpenBot could not turn on its ${this.#label} MCP servers: ${error}`),
+                    ),
+                  ),
+                ),
+              );
+            }
             if (resume && requestedThreadId) {
               const response = providerResult(
                 yield* Effect.result(
@@ -1501,6 +1533,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             }
+            // The turn would run with no OpenBot tools, and the model would make up their errors (#3058).
+            if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
+              throw new Error(sourceText("error.provider.acpMcpNotLoaded", { provider: this.#label }));
             mcp.setThreadId(id);
             const thread: AcpThread = {
               id,
