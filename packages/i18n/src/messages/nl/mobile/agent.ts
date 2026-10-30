@@ -332,15 +332,12 @@ export const messages = {
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
-  "mobile.agent.notifications.title": "Meldingen",
-  "mobile.agent.notifications.footer": "Meldingen zijn hetzelfde voor elk lid van deze server.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",
   "mobile.agent.notifications.failedBody": "De host kan deze wijziging niet opslaan.",
   "mobile.agent.notificationLevel.title": "Meld mij over",
   "mobile.agent.notificationLevel.server": "Serverinstelling",
   "mobile.agent.notificationLevel.serverValue": "Serverinstelling ({level})",
-  "mobile.agent.notificationLevel.footer":
-    "De schakelaar geldt voor elk lid van deze server. Staat hij uit, dan krijgt geen enkel lid meldingen. “Meld mij over” geldt alleen voor jou, op al je apparaten. Wijzig het in Instellingen > Meldingen.",
+  "mobile.agent.notificationLevel.footer": "“Meld mij over” geldt alleen voor jou, op al je apparaten.",
   "mobile.agent.notificationLevel.unsupported":
     "Deze server kan geen eigen meldingsniveau voor een agent bewaren. Werk OpenBot bij op de computer waarop hij draait.",
   "mobile.agent.newChat.title": "Nieuwe chat",

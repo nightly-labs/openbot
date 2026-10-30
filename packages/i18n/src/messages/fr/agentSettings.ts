@@ -157,7 +157,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "Par défaut ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
-  "agentSettings.notifications.title": "Notifications",
   "agentSettings.notificationLevel.title": "Me notifier",
   "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
   "agentSettings.notificationLevel.note":

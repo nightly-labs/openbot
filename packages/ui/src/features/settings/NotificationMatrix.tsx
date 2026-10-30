@@ -3,7 +3,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
 import { Badge, Bell, BellOff, Button, buttonVariants, DropdownMenu, Input, ItemGroup, Text, toast } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import {
   SERVER_MUTE_CHOICES,
@@ -44,6 +44,8 @@ export interface NotificationMatrixServer {
   /** The server cannot keep the level of the user, so a change applies to this device only. */
   deviceOnly: boolean;
   agents: NotificationMatrixAgents;
+  /** Whether this device can turn on an agent that is off for every member. Absent means it can. */
+  canTurnOnAgents?: boolean | undefined;
 }
 
 export interface NotificationMatrixProps {
@@ -57,6 +59,12 @@ export interface NotificationMatrixProps {
   /** `durationMs` null mutes until the user unmutes. */
   onMute: (serverId: string, durationMs: number | null) => Promise<void>;
   onUnmute: (serverId: string) => Promise<void>;
+  /**
+   * Turns on an agent that a member turned off for every member with the agent switch of earlier
+   * versions. The host keeps that switch, so this table is the one place that turns it on again.
+   * Without it, such an agent shows disabled choices.
+   */
+  onTurnOnAgent?: ((serverId: string, agentId: string) => Promise<void>) | undefined;
   /** Reads the agents of a server again after a failed read. */
   onRetry?: ((serverId: string) => void) | undefined;
   /** Scrolls to a server row and moves the focus to it. Each nonce moves once. */
@@ -149,6 +157,20 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
       setPending((state) => {
         if (state.agents[key] === shown) delete state.agents[key];
       });
+    }
+  }
+
+  /** The agent whose switch for every member turns on now. */
+  const [turningOn, setTurningOn] = createSignal<string | null>(null);
+
+  async function runTurnOn(action: () => Promise<void>, agentId: string): Promise<void> {
+    setTurningOn(agentId);
+    try {
+      await action();
+    } catch (error) {
+      showFailure(error);
+    } finally {
+      setTurningOn(null);
     }
   }
 
@@ -294,14 +316,36 @@ export function NotificationMatrix(props: NotificationMatrixProps) {
                                     </span>
                                   </Show>
                                 </th>
-                                <ChoiceCells
-                                  name={agent().name}
-                                  group={`${groupId}-${server().id}-${agent().id}`}
-                                  selected={agentLevel(server(), agent())}
-                                  inherited={serverLevel(server())}
-                                  disabled={agent().sharedOff || silent()}
-                                  onSelect={(level) => void setAgentLevel(server(), agent(), level)}
-                                />
+                                <Show
+                                  when={agent().sharedOff && server().canTurnOnAgents !== false && props.onTurnOnAgent}
+                                  fallback={
+                                    <ChoiceCells
+                                      name={agent().name}
+                                      group={`${groupId}-${server().id}-${agent().id}`}
+                                      selected={agentLevel(server(), agent())}
+                                      inherited={serverLevel(server())}
+                                      disabled={agent().sharedOff || silent()}
+                                      onSelect={(level) => void setAgentLevel(server(), agent(), level)}
+                                    />
+                                  }
+                                >
+                                  {(turnOn) => (
+                                    <td colspan={SERVER_NOTIFICATION_LEVELS.length} class="notification-matrix-cell">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={t("settings.notificationMatrix.turnOnFor", { name: agent().name })}
+                                        disabled={turningOn() !== null}
+                                        onClick={() =>
+                                          void runTurnOn(() => turnOn()(server().id, agent().id), agent().id)
+                                        }
+                                      >
+                                        {t("settings.notificationMatrix.turnOn")}
+                                      </Button>
+                                    </td>
+                                  )}
+                                </Show>
                                 <td />
                               </tr>
                             );

@@ -146,6 +146,8 @@ export const messages = {
   "mobile.settings.notifications.levelShort.nothing": "オフ",
   "mobile.settings.notifications.thisPhoneOnly": "このスマートフォンのみ",
   "mobile.settings.notifications.offForEveryone": "このサーバーの全員に対してオフ",
+  "mobile.settings.notifications.turnOn": "オンにする",
+  "mobile.settings.notifications.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
   "mobile.settings.notifications.levelsFooter":
     "エージェントのレベルをもう一度タップすると、サーバーの設定に従います。",
   "mobile.settings.notifications.agentsUnsupported":

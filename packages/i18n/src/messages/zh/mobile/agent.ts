@@ -315,15 +315,12 @@ export const messages = {
     "{provider} 无法引导运行中的对话。它工作期间发送的消息会留在队列中等待。",
   "mobile.agent.workspace.title": "工作区文件夹",
   "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
-  "mobile.agent.notifications.title": "通知",
-  "mobile.agent.notifications.footer": "该服务器的所有成员共用同一套通知设置。",
   "mobile.agent.notifications.failed": "无法更改通知设置",
   "mobile.agent.notifications.failedBody": "主机无法保存该更改。",
   "mobile.agent.notificationLevel.title": "通知我",
   "mobile.agent.notificationLevel.server": "跟随服务器",
   "mobile.agent.notificationLevel.serverValue": "跟随服务器（{level}）",
-  "mobile.agent.notificationLevel.footer":
-    "该开关对此服务器的所有成员生效。关闭时，任何成员都不会收到通知。“通知我”只对你生效，并应用到你的所有设备。可在“设置 > 通知”中更改。",
+  "mobile.agent.notificationLevel.footer": "“通知我”只对你生效，并应用到你的所有设备。",
   "mobile.agent.notificationLevel.unsupported":
     "此服务器无法为助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "mobile.agent.newChat.title": "新对话",

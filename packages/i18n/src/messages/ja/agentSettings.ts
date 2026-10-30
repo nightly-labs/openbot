@@ -154,7 +154,6 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn":
     "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
-  "agentSettings.notifications.title": "通知",
   "agentSettings.notificationLevel.title": "自分への通知",
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
   "agentSettings.notificationLevel.note":

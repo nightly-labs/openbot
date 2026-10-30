@@ -128,6 +128,7 @@ function MatrixStory(props: {
             onMute={(serverId, durationMs) => setMuted(serverId, true, durationMs)}
             onUnmute={(serverId) => setMuted(serverId, false, null)}
             onRetry={fn()}
+            onTurnOnAgent={fn(async () => undefined)}
           />
         </SettingsSection>
       </div>

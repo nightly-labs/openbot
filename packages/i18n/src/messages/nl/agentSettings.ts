@@ -152,7 +152,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "Standaard ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
-  "agentSettings.notifications.title": "Meldingen",
   "agentSettings.notificationLevel.title": "Meld mij",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":

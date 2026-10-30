@@ -85,6 +85,8 @@ export const messages = {
   "settings.notificationMatrix.thisComputerOnly": "Yalnızca bu bilgisayar",
   "settings.notificationMatrix.thisBrowserOnly": "Yalnızca bu tarayıcı",
   "settings.notificationMatrix.sharedOff": "Bu sunucudaki herkes için kapalı",
+  "settings.notificationMatrix.turnOn": "Aç",
+  "settings.notificationMatrix.turnOnFor": "Bu sunucudaki herkes için {name} bildirimlerini aç",
   "settings.notificationMatrix.serverNothing": "Sunucu Hiçbir şey olarak ayarlıyken sessiz",
   "settings.notificationMatrix.updateServer": "Ajan seçmek için bu sunucudaki OpenBot'u güncelle",
   "settings.notificationMatrix.loading": "Ajanlar yükleniyor…",

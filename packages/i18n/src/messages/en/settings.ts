@@ -106,6 +106,8 @@ export const messages = defineMessages("settings", {
   "settings.notificationMatrix.thisComputerOnly": "This computer only",
   "settings.notificationMatrix.thisBrowserOnly": "This browser only",
   "settings.notificationMatrix.sharedOff": "Off for everyone on this server",
+  "settings.notificationMatrix.turnOn": "Turn on",
+  "settings.notificationMatrix.turnOnFor": "Turn on notifications of {name} for everyone on this server",
   "settings.notificationMatrix.serverNothing": "Silent while the server is set to Nothing",
   "settings.notificationMatrix.updateServer": "Update OpenBot on this server to choose agents",
   "settings.notificationMatrix.loading": "Loading agents…",

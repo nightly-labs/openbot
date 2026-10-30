@@ -153,7 +153,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.taskLimit.oneTurn":
     "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
-  "agentSettings.notifications.title": "Notifications",
   "agentSettings.notificationLevel.title": "Notify me",
   "agentSettings.notificationLevel.server": "Server default ({level})",
   "agentSettings.notificationLevel.note":

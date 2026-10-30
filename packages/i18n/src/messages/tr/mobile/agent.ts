@@ -342,15 +342,13 @@ export const messages = {
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
-  "mobile.agent.notifications.title": "Bildirimler",
-  "mobile.agent.notifications.footer": "Bildirimler bu sunucunun her üyesi için aynıdır.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",
   "mobile.agent.notifications.failedBody": "Ana makine bu değişikliği kaydedemedi.",
   "mobile.agent.notificationLevel.title": "Şunun hakkında bildir",
   "mobile.agent.notificationLevel.server": "Sunucu ayarı",
   "mobile.agent.notificationLevel.serverValue": "Sunucu ayarı ({level})",
   "mobile.agent.notificationLevel.footer":
-    "Anahtar bu sunucunun her üyesi için geçerlidir. Kapalıyken hiçbir üye bildirim almaz. “Şunun hakkında bildir” yalnızca senin içindir ve tüm cihazlarında geçerlidir. Bunu Ayarlar > Bildirimler bölümünden değiştir.",
+    "“Şunun hakkında bildir” yalnızca senin içindir ve tüm cihazlarında geçerlidir.",
   "mobile.agent.notificationLevel.unsupported":
     "Bu sunucu bir ajan için kendi bildirim düzeyini saklayamıyor. OpenBot’u onu çalıştıran bilgisayarda güncelle.",
   "mobile.agent.newChat.title": "Yeni sohbet",

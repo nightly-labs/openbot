@@ -152,7 +152,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "Standard ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} führt immer nur einen Durchlauf aus. Die Threads dieses Agenten warten aufeinander.",
-  "agentSettings.notifications.title": "Benachrichtigungen",
   "agentSettings.notificationLevel.title": "Mich benachrichtigen",
   "agentSettings.notificationLevel.server": "Server-Standard ({level})",
   "agentSettings.notificationLevel.note":

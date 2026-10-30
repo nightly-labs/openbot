@@ -530,7 +530,7 @@ a server connects; the desktop reads them for each notification too. The server 
 server before (the effective level is `server ?? the device level`); the agent level replaces the
 server level for that agent (`agentNotificationLevel` in `@openbot/team-client`), in both directions.
 A server set to Nothing, or muted on a device, stays quiet for all agents. A mute stays on each device.
-The shared switch of the agent (`notifications`) still turns notifications off for every member. The
+The shared switch of the agent (`notifications`) still turns notifications off for every member, because the released Team API carries it. Current clients do not show it in the agent settings any more: the matrix shows such an agent with a "Turn on" button, which sets the switch back on. The
 host applies the levels to phone notifications itself (`PushNotificationService`), so phones of every
 version follow them. On the desktop, `RemoteServerManager` reports the effective level in each
 `ServerSummary`, so the rail, the menus and the island follow it.

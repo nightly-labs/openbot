@@ -148,7 +148,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "기본값({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider}은(는) 한 번에 한 턴씩 실행해요. 이 에이전트의 스레드는 서로를 기다려요.",
-  "agentSettings.notifications.title": "알림",
   "agentSettings.notificationLevel.title": "내 알림",
   "agentSettings.notificationLevel.server": "서버 기본값 ({level})",
   "agentSettings.notificationLevel.note":

@@ -9,6 +9,9 @@ import { NOTIFICATION_LEVEL_KEYS } from "./server-notification-settings";
 
 const LEVELS = ["all", "needs-me", "nothing"] as const satisfies readonly ServerNotificationLevel[];
 
+/** The corner radius of a selected or inherited level and of a server chip, in points. */
+export const SELECTION_RADIUS = 12;
+
 const SHORT_KEYS = {
   all: "mobile.settings.notifications.levelShort.all",
   "needs-me": "mobile.settings.notifications.levelShort.needsMe",
@@ -62,8 +65,11 @@ export function NotificationLevelSegments({
               void haptics.selection();
               onSelect(level);
             }}
-            className={`min-h-8 justify-center rounded-lg px-2 ${selected ? "bg-control-active" : ""}`}
+            className={`min-h-8 justify-center px-2.5 ${selected ? "bg-control-active" : ""}`}
             style={({ pressed }) => ({
+              // Between the 8 pt of a small control and the 16 pt of the card, whose radius on a box
+              // this low would make a pill. The selection then reads as part of the card.
+              borderRadius: SELECTION_RADIUS,
               borderWidth: 1,
               borderStyle: fromServer ? "dashed" : "solid",
               borderColor: fromServer ? accent : "transparent",

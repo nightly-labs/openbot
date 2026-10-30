@@ -93,6 +93,8 @@ export const messages = {
   "settings.notificationMatrix.thisComputerOnly": "Cet ordinateur uniquement",
   "settings.notificationMatrix.thisBrowserOnly": "Ce navigateur uniquement",
   "settings.notificationMatrix.sharedOff": "Désactivé pour tous sur ce serveur",
+  "settings.notificationMatrix.turnOn": "Activer",
+  "settings.notificationMatrix.turnOnFor": "Activer les notifications de {name} pour tous sur ce serveur",
   "settings.notificationMatrix.serverNothing": "Silencieux tant que le serveur est sur Rien",
   "settings.notificationMatrix.updateServer": "Mettez à jour OpenBot sur ce serveur pour choisir des agents",
   "settings.notificationMatrix.loading": "Chargement des agents…",

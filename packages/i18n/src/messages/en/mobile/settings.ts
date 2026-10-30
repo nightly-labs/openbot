@@ -143,6 +143,8 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.notifications.levelShort.nothing": "Off",
   "mobile.settings.notifications.thisPhoneOnly": "This phone only",
   "mobile.settings.notifications.offForEveryone": "Off for everyone on this server",
+  "mobile.settings.notifications.turnOn": "Turn on",
+  "mobile.settings.notifications.turnOnFor": "Turn on notifications of {name} for everyone on this server",
   "mobile.settings.notifications.levelsFooter": "Tap an agent’s level again to follow the server.",
   "mobile.settings.notifications.agentsUnsupported": "Update OpenBot on this server to choose agents.",
   "mobile.settings.notifications.agentsOffline": "Agents show when this server is online.",

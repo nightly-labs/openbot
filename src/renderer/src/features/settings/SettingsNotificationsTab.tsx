@@ -66,6 +66,7 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
           device="computer"
           onSetServerLevel={props.onSetServerLevel}
           onSetAgentLevel={props.levels.setAgentLevel}
+          onTurnOnAgent={props.levels.turnOnAgent}
           onMute={(serverId, durationMs) =>
             durationMs === null
               ? props.onSetServerMuted(serverId, true)

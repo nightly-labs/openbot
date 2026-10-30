@@ -31,8 +31,10 @@ export function createWebNotificationSettings(options: {
   servers: () => readonly ServerSummary[];
   runtime: Pick<
     WebWorkspaceRuntime,
-    "notificationSettings" | "setHostAgentNotificationLevel" | "setOwnServerNotificationLevel"
+    "notificationSettings" | "setHostAgentNotificationLevel" | "setOwnServerNotificationLevel" | "updateAgent"
   >;
+  /** The host that this tab has open. Only it takes a change of an agent. */
+  openHostId: () => string | null;
   notifications: ReturnType<typeof createWebServerNotifications>;
   /** Sets the level of this browser, and asks for the notification permission. */
   setLocalLevel: (hostId: string, level: ServerNotificationLevel) => void;
@@ -132,6 +134,7 @@ export function createWebNotificationSettings(options: {
       offline: server.state !== "online",
       deviceOnly: keepsLevels(server.id) === false,
       agents: matrixAgents(server.id),
+      canTurnOnAgents: server.id === options.openHostId(),
     })),
   );
 
@@ -152,6 +155,16 @@ export function createWebNotificationSettings(options: {
     rememberLevels(hostId, await write(hostId, { agentId, level }));
   }
 
+  /** Turns on an agent of the open host that a member turned off for every member. */
+  async function turnOnAgent(hostId: string, agentId: string): Promise<void> {
+    if (hostId !== options.openHostId()) return;
+    await options.runtime.updateAgent({ agentId, notifications: true });
+    setEntries((draft) => {
+      const agent = draft[hostId]?.agents.find((candidate) => candidate.id === agentId);
+      if (agent) agent.notifications = true;
+    });
+  }
+
   async function mute(hostId: string, durationMs: number | null): Promise<void> {
     if (durationMs === null) options.setMuted(hostId, true);
     else options.setMuted(hostId, true, durationMs);
@@ -165,6 +178,7 @@ export function createWebNotificationSettings(options: {
     matrixServers,
     setServerLevel,
     setAgentLevel,
+    turnOnAgent,
     mute,
     unmute,
     retry: (hostId: string) => void load(hostId),

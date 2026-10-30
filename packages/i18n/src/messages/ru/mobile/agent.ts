@@ -355,15 +355,12 @@ export const messages = {
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
-  "mobile.agent.notifications.title": "Уведомления",
-  "mobile.agent.notifications.footer": "Уведомления одинаковы для всех участников этого сервера.",
   "mobile.agent.notifications.failed": "Не удалось изменить уведомления",
   "mobile.agent.notifications.failedBody": "Хосту не удалось сохранить это изменение.",
   "mobile.agent.notificationLevel.title": "Уведомлять о",
   "mobile.agent.notificationLevel.server": "Настройка сервера",
   "mobile.agent.notificationLevel.serverValue": "Настройка сервера ({level})",
-  "mobile.agent.notificationLevel.footer":
-    "Переключатель действует для всех участников этого сервера. Когда он выключен, никто из участников не получает уведомления. «Уведомлять о» действует только для вас, на всех ваших устройствах. Изменить это можно в разделе Настройки > Уведомления.",
+  "mobile.agent.notificationLevel.footer": "«Уведомлять о» действует только для вас, на всех ваших устройствах.",
   "mobile.agent.notificationLevel.unsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для агента. Обновите OpenBot на компьютере, где он работает.",
   "mobile.agent.newChat.title": "Новый чат",

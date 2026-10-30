@@ -155,7 +155,6 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn":
     "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
 
-  "agentSettings.notifications.title": "Notifiche",
   "agentSettings.notificationLevel.title": "Avvisami",
   "agentSettings.notificationLevel.server": "Predefinita del server ({level})",
   "agentSettings.notificationLevel.note":

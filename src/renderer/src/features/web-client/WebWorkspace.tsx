@@ -616,6 +616,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     notifications,
     setLocalLevel: setNotificationLevel,
     setMuted,
+    openHostId: () => server()?.id ?? null,
   });
   /** The host whose notification row the account settings show. Each nonce moves there once. */
   const [notificationFocusRequest, setNotificationFocusRequest] = createSignal<{

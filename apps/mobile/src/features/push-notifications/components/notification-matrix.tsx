@@ -27,7 +27,7 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
-import { NotificationLevelSegments } from "./notification-level-segments";
+import { NotificationLevelSegments, SELECTION_RADIUS } from "./notification-level-segments";
 import { ServerMuteRow } from "./server-notification-settings";
 
 /** The row of the whole server. An agent ID cannot be empty, so it cannot be the same. */
@@ -80,8 +80,9 @@ export function NotificationMatrix({
                   void haptics.selection();
                   setChosenId(candidate.id);
                 }}
-                className={`min-h-9 justify-center rounded-full px-3.5 ${selected ? "bg-control-active" : "bg-grouped"}`}
+                className={`min-h-9 justify-center px-3.5 ${selected ? "bg-control-active" : "bg-grouped"}`}
                 style={({ pressed }) => ({
+                  borderRadius: SELECTION_RADIUS,
                   borderWidth: 1,
                   borderColor: selected ? accent : "transparent",
                   opacity: pressed ? 0.6 : 1,
@@ -120,8 +121,10 @@ function ServerLevels({
 }) {
   const { t } = useText();
   const { agents, canSendNotifications, canSetAgentNotificationLevel } = useMobileWorkspace();
-  const { loadAgentNotificationLevels, setAgentNotificationLevel, setOwnServerNotificationLevel } =
+  const { loadAgentNotificationLevels, setAgentNotificationLevel, setOwnServerNotificationLevel, updateAgent } =
     useMobileWorkspaceActions();
+  /** The agent whose switch for every member turns on now. */
+  const [turningOn, setTurningOn] = useState<string | null>(null);
   const preference = usePushNotificationPreference();
   const liveActivities = useLiveActivitiesPreference();
   const synced = useSyncedNotificationLevels((state) => state.servers[server.id]);
@@ -132,7 +135,7 @@ function ServerLevels({
   const online = showsOnline(server);
   const keepsLevels = canSetAgentNotificationLevel(server.id);
 
-  // Another device of the user can change the levels, and no host event says so.
+  // The screen reads the levels again when it opens; the host also sends each change of another device.
   useEffect(() => {
     if (!keepsLevels || !online) return;
     void loadSyncedNotificationLevels(server.id, () => loadAgentNotificationLevels(server.id)).catch(() => undefined);
@@ -167,6 +170,29 @@ function ServerLevels({
       );
     } finally {
       setPending(null);
+    }
+  }
+
+  /**
+   * Turns on an agent that a member turned off for every member, with the agent switch of earlier
+   * versions. The host keeps that switch, so this screen is the one place that turns it on again.
+   */
+  async function turnOn(agentId: string): Promise<void> {
+    setTurningOn(agentId);
+    try {
+      await updateAgent({ agentId, notifications: true }, server.id);
+      void haptics.notification("success");
+    } catch (cause) {
+      void haptics.notification("error");
+      const text = currentText();
+      showFailureAlert(
+        cause,
+        "settings",
+        text.t("mobile.agent.notifications.failed"),
+        text.errorMessage(cause, text.t("mobile.agent.notifications.failedBody")),
+      );
+    } finally {
+      setTurningOn(null);
     }
   }
 
@@ -229,20 +255,38 @@ function ServerLevels({
                       // Only the short title: a note that comes and goes would change the height of the row.
                       supportingText={agent.title || undefined}
                       trailing={
-                        <NotificationLevelSegments
-                          label={agent.name}
-                          value={own}
-                          inherited={serverLevel}
-                          // "Nothing" for the server silences each agent, whatever its own level.
-                          disabled={!hostEnabled || sharedOff || serverLevel === "nothing"}
-                          onSelect={(level) => {
-                            // A tap on the agent's own level gives the agent back to the server level.
-                            const next = own === level ? null : level;
-                            void saveOnHost(agent.id, next, () =>
-                              setAgentNotificationLevel({ agentId: agent.id, level: next }, server.id),
-                            );
-                          }}
-                        />
+                        sharedOff ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={t("mobile.settings.notifications.turnOnFor", { name: agent.name })}
+                            accessibilityHint={t("mobile.settings.notifications.offForEveryone")}
+                            disabled={!online || turningOn !== null}
+                            hitSlop={8}
+                            onPress={() => void turnOn(agent.id)}
+                            style={({ pressed }) => ({
+                              opacity: !online || turningOn !== null ? 0.45 : pressed ? 0.6 : 1,
+                            })}
+                          >
+                            <Typography.Paragraph type="body-sm" className="text-accent">
+                              {t("mobile.settings.notifications.turnOn")}
+                            </Typography.Paragraph>
+                          </Pressable>
+                        ) : (
+                          <NotificationLevelSegments
+                            label={agent.name}
+                            value={own}
+                            inherited={serverLevel}
+                            // "Nothing" for the server silences each agent, whatever its own level.
+                            disabled={!hostEnabled || serverLevel === "nothing"}
+                            onSelect={(level) => {
+                              // A tap on the agent's own level gives the agent back to the server level.
+                              const next = own === level ? null : level;
+                              void saveOnHost(agent.id, next, () =>
+                                setAgentNotificationLevel({ agentId: agent.id, level: next }, server.id),
+                              );
+                            }}
+                          />
+                        )
                       }
                     >
                       <Typography.Paragraph numberOfLines={1}>{agent.name}</Typography.Paragraph>

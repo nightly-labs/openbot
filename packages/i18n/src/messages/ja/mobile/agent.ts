@@ -333,15 +333,13 @@ export const messages = {
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
-  "mobile.agent.notifications.title": "通知",
-  "mobile.agent.notifications.footer": "通知はこのサーバーのすべてのメンバーで共通です。",
   "mobile.agent.notifications.failed": "通知を変更できませんでした",
   "mobile.agent.notifications.failedBody": "ホストはこの変更を保存できませんでした。",
   "mobile.agent.notificationLevel.title": "通知する内容",
   "mobile.agent.notificationLevel.server": "サーバーの設定",
   "mobile.agent.notificationLevel.serverValue": "サーバーの設定（{level}）",
   "mobile.agent.notificationLevel.footer":
-    "スイッチはこのサーバーのすべてのメンバーに適用されます。オフのときは、どのメンバーにも通知は届きません。「通知する内容」はあなただけの設定で、あなたのすべてのデバイスに適用されます。変更は 設定 > 通知 で行います。",
+    "「通知する内容」はあなただけの設定で、あなたのすべてのデバイスに適用されます。",
   "mobile.agent.notificationLevel.unsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
   "mobile.agent.newChat.title": "新しいチャット",

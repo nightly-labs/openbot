@@ -1341,25 +1341,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     onOpen={() => openPage("folders")}
                   />
                 </Show>
-                <div class="agent-settings-switch-row">
-                  <span class="settings-link-label">
-                    <span class="settings-link-icon">
-                      <Bell aria-hidden="true" />
-                    </span>
-                    {t("agentSettings.notifications.title")}
-                  </span>
-                  <Switch
-                    size="sm"
-                    aria-label={t("agentSettings.notifications.title")}
-                    checked={draft.notifications}
-                    onChange={(next) => {
-                      setDraft((state) => {
-                        state.notifications = next;
-                      });
-                      void saveAgentPatch({ notifications: next });
-                    }}
-                  />
-                </div>
                 <SettingsLinkRow
                   ref={pageRowRef("advanced")}
                   icon={<SlidersHorizontal aria-hidden="true" />}

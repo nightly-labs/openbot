@@ -150,12 +150,21 @@ export function createNotificationLevelsStore(options: {
     });
   }
 
+  /** Turns on an agent that a member turned off for every member. The host keeps that switch. */
+  async function turnOnAgent(serverId: string, agentId: string): Promise<void> {
+    await settingsPort().agent.updateAgent({ agentId, notifications: true }, serverId);
+    setEntries((draft) => {
+      const agent = draft[serverId]?.agents.find((candidate) => candidate.id === agentId);
+      if (agent) agent.notifications = true;
+    });
+  }
+
   function retry(serverId: string): void {
     const server = options.servers().find((candidate) => candidate.id === serverId);
     if (server) void load(server);
   }
 
-  return { matrixServers, setAgentLevel, retry };
+  return { matrixServers, setAgentLevel, turnOnAgent, retry };
 }
 
 export type NotificationLevelsStore = ReturnType<typeof createNotificationLevelsStore>;

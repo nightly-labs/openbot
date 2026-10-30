@@ -100,6 +100,8 @@ export const messages = {
   "settings.notificationMatrix.thisComputerOnly": "이 컴퓨터만",
   "settings.notificationMatrix.thisBrowserOnly": "이 브라우저만",
   "settings.notificationMatrix.sharedOff": "이 서버의 모든 사람에게 꺼짐",
+  "settings.notificationMatrix.turnOn": "켜기",
+  "settings.notificationMatrix.turnOnFor": "이 서버의 모든 사람에게 {name}의 알림 켜기",
   "settings.notificationMatrix.serverNothing": "서버가 없음으로 설정된 동안 조용해요",
   "settings.notificationMatrix.updateServer": "에이전트를 선택하려면 이 서버의 OpenBot을 업데이트하세요",
   "settings.notificationMatrix.loading": "에이전트 불러오는 중…",

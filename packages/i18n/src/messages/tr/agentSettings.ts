@@ -152,7 +152,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "Varsayılan ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
-  "agentSettings.notifications.title": "Bildirimler",
   "agentSettings.notificationLevel.title": "Bana bildir",
   "agentSettings.notificationLevel.server": "Sunucu varsayılanı ({level})",
   "agentSettings.notificationLevel.note":

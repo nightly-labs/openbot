@@ -175,7 +175,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "По умолчанию ({count})",
   "agentSettings.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
 
-  "agentSettings.notifications.title": "Уведомления",
   "agentSettings.notificationLevel.title": "Уведомлять меня",
   "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",
   "agentSettings.notificationLevel.note":

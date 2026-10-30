@@ -169,7 +169,6 @@ export const messages = {
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
   "agentSettings.taskLimit.default": "Domyślnie ({count})",
   "agentSettings.taskLimit.oneTurn": "{provider} wykonuje jedną turę naraz. Wątki tego agenta czekają na siebie.",
-  "agentSettings.notifications.title": "Powiadomienia",
   "agentSettings.notificationLevel.title": "Powiadamiaj mnie",
   "agentSettings.notificationLevel.server": "Domyślne serwera ({level})",
   "agentSettings.notificationLevel.note":

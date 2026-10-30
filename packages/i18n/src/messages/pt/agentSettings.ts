@@ -151,7 +151,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "Padrão ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
-  "agentSettings.notifications.title": "Notificações",
   "agentSettings.notificationLevel.title": "Me notificar",
   "agentSettings.notificationLevel.server": "Padrão do servidor ({level})",
   "agentSettings.notificationLevel.note":

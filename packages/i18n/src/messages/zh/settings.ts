@@ -101,6 +101,8 @@ export const messages = {
   "settings.notificationMatrix.thisComputerOnly": "仅这台电脑",
   "settings.notificationMatrix.thisBrowserOnly": "仅此浏览器",
   "settings.notificationMatrix.sharedOff": "已为该服务器上的所有人关闭",
+  "settings.notificationMatrix.turnOn": "开启",
+  "settings.notificationMatrix.turnOnFor": "为此服务器上的所有人开启 {name} 的通知",
   "settings.notificationMatrix.serverNothing": "服务器设为“不提醒”时保持静默",
   "settings.notificationMatrix.updateServer": "请在该服务器上更新 OpenBot 以选择助手",
   "settings.notificationMatrix.loading": "正在加载助手…",

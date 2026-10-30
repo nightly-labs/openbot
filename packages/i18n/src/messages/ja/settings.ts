@@ -84,6 +84,8 @@ export const messages = {
   "settings.notificationMatrix.thisComputerOnly": "このコンピューターのみ",
   "settings.notificationMatrix.thisBrowserOnly": "このブラウザのみ",
   "settings.notificationMatrix.sharedOff": "このサーバーの全員に対してオフ",
+  "settings.notificationMatrix.turnOn": "オンにする",
+  "settings.notificationMatrix.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
   "settings.notificationMatrix.serverNothing": "サーバーが「なし」の間は通知しません",
   "settings.notificationMatrix.updateServer": "エージェントを選ぶには、このサーバーの OpenBot を更新してください",
   "settings.notificationMatrix.loading": "エージェントを読み込み中…",

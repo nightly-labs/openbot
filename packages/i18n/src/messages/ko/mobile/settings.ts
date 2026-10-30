@@ -144,6 +144,8 @@ export const messages = {
   "mobile.settings.notifications.levelShort.nothing": "끔",
   "mobile.settings.notifications.thisPhoneOnly": "이 휴대전화만",
   "mobile.settings.notifications.offForEveryone": "이 서버의 모든 사람에게 꺼짐",
+  "mobile.settings.notifications.turnOn": "켜기",
+  "mobile.settings.notifications.turnOnFor": "이 서버의 모든 사람에게 {name}의 알림 켜기",
   "mobile.settings.notifications.levelsFooter": "에이전트의 수준을 다시 탭하면 서버 설정을 따라요.",
   "mobile.settings.notifications.agentsUnsupported": "에이전트별로 선택하려면 이 서버의 OpenBot을 업데이트하세요.",
   "mobile.settings.notifications.agentsOffline": "이 서버가 온라인이면 에이전트가 표시돼요.",

@@ -323,15 +323,12 @@ export const messages = defineMessages("mobile.agent", {
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
   "mobile.agent.workspace.title": "Workspace folder",
   "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
-  "mobile.agent.notifications.title": "Notifications",
-  "mobile.agent.notifications.footer": "Notifications are the same for every member of this server.",
   "mobile.agent.notifications.failed": "Could not change notifications",
   "mobile.agent.notifications.failedBody": "The host could not save this change.",
   "mobile.agent.notificationLevel.title": "Notify me about",
   "mobile.agent.notificationLevel.server": "Server setting",
   "mobile.agent.notificationLevel.serverValue": "Server setting ({level})",
-  "mobile.agent.notificationLevel.footer":
-    "The switch applies to every member of this server. When it is off, no member gets notifications. “Notify me about” is only for you, on all your devices. Change it in Settings > Notifications.",
+  "mobile.agent.notificationLevel.footer": "“Notify me about” is only for you and applies on all your devices.",
   "mobile.agent.notificationLevel.unsupported":
     "This server cannot keep your own notification level for an agent. Update OpenBot on the computer that runs it.",
   "mobile.agent.newChat.title": "New chat",

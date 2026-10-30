@@ -147,7 +147,6 @@ export const messages = {
   "agentSettings.taskLimit.default": "默认（{count}）",
   "agentSettings.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
 
-  "agentSettings.notifications.title": "通知",
   "agentSettings.notificationLevel.title": "通知我",
   "agentSettings.notificationLevel.server": "服务器默认（{level}）",
   "agentSettings.notificationLevel.note":

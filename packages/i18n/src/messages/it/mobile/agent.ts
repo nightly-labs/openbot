@@ -330,15 +330,12 @@ export const messages = {
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
-  "mobile.agent.notifications.title": "Notifiche",
-  "mobile.agent.notifications.footer": "Le notifiche sono le stesse per ogni membro di questo server.",
   "mobile.agent.notifications.failed": "Impossibile modificare le notifiche",
   "mobile.agent.notifications.failedBody": "L'host non ha potuto salvare questa modifica.",
   "mobile.agent.notificationLevel.title": "Avvisami per",
   "mobile.agent.notificationLevel.server": "Impostazione del server",
   "mobile.agent.notificationLevel.serverValue": "Impostazione del server ({level})",
-  "mobile.agent.notificationLevel.footer":
-    "L'interruttore vale per ogni membro di questo server. Se è disattivato, nessun membro riceve notifiche. «Avvisami per» vale solo per te, su tutti i tuoi dispositivi. Cambialo in Impostazioni > Notifiche.",
+  "mobile.agent.notificationLevel.footer": "«Avvisami per» vale solo per te, su tutti i tuoi dispositivi.",
   "mobile.agent.notificationLevel.unsupported":
     "Questo server non può salvare il tuo livello di notifiche per un agente. Aggiorna OpenBot sul computer che lo esegue.",
   "mobile.agent.newChat.title": "Nuova chat",
