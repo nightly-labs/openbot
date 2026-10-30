@@ -16,6 +16,8 @@ export function remoteServerSummaries(
   statusFor: (serverId: string) => RemoteServerConnectionStatus,
   /** The member limit of this computer's own host, when the account server lists it. */
   localMemberLimit: number | null = null,
+  /** The local servers that this app runs as its child processes. */
+  isThisComputer: (serverId: string) => boolean = () => false,
 ): ServerSummary[] {
   return [
     // Always present and always reachable: it is this computer. It has no host to be incompatible
@@ -57,6 +59,7 @@ export function remoteServerSummaries(
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
+        ...(isThisComputer(server.id) ? { thisComputer: true as const } : {}),
         compatibility: status.compatibility,
         issue: status.issue,
         connectionSequence: status.connectionSequence,

@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Fechar aba",
   "conversation.threads.closeOthers": "Fechar outras abas",
   "conversation.threads.closeRight": "Fechar abas à direita",
+  "conversation.threads.toSide": "Abrir ao lado do chat",
   "conversation.threads.archive": "Arquivar",
   "conversation.threads.archived": "Arquivados",
   "conversation.threads.restore": "Restaurar",

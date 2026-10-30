@@ -242,6 +242,7 @@
     "test:opencode-azure-responses": "bun scripts/opencode-azure-responses-e2e.ts",
     "test:claude-api-key": "bun scripts/claude-api-key-e2e.ts",
     "test:cursor-usage": "bun scripts/cursor-usage-e2e.ts",
+    "test:opencode-go-usage": "bun scripts/opencode-go-usage-e2e.ts",
     "test:cursor-stream-closed": "bun scripts/cursor-stream-closed-e2e.ts",
     "test:cursor-model-set": "bun scripts/cursor-model-set-e2e.ts",
     "test:provider-update-busy": "bun scripts/provider-update-busy-e2e.ts",
@@ -449,7 +450,8 @@
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
-    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch"
+    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
+    "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

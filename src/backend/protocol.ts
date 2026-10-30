@@ -75,6 +75,14 @@ export interface AppServerRequest {
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ */
+export function isCodexLoginType(type: string | undefined): boolean {
+  return type === "chatgpt" || type === "apiKey";
+}
+
 export interface AccountReadResult {
   account: null | {
     type: string;

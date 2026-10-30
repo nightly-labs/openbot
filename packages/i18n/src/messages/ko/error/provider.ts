@@ -180,6 +180,8 @@ export const messages = {
   "error.provider.signInExpired": "{provider} 로그인이 만료되었어요. 계속하려면 다시 로그인하세요.",
   "error.provider.cliActivateFailed": "OpenBot이 관리형 CLI를 활성화할 수 없었어요.",
   "error.provider.cliBusyReconnect": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 연결하세요.",
+  "error.provider.cliBusySignOut":
+    "{provider} CLI가 턴을 처리하고 있습니다. 끝날 때까지 기다린 다음 연결을 해제하세요.",
   "error.provider.opencodeCredentialsRejected":
     "모델 제공자가 API 키를 거부했어요. 설정에서 OpenCode 키를 수정하거나 `opencode auth login`으로 제공자 키를 수정하세요. 그런 다음 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -313,6 +315,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider}은(는) 계정을 하나만 둘 수 있어요.",
   "error.provider.accountNeedsConnection": "다른 계정을 추가하기 전에 {provider}을(를) 연결하세요.",
   "error.provider.usageResetUnsupported": "{provider}은(는) 사용 한도를 초기화할 수 없어요.",
+  "error.provider.signOutUnsupported": "OpenBot은 {provider} 로그인의 연결을 해제할 수 없습니다.",
   "error.provider.usageResetNotConnected": "사용량을 초기화하기 전에 이 {provider} 계정에 다시 로그인하세요.",
   "error.provider.accountLimit": "{provider}은(는) 계정을 최대 {limit}개까지 둘 수 있어요.",
   "error.provider.accountNotFound": "이 {provider} 계정이 이 컴퓨터에 없어요. 새로 고친 후 다시 시도해 주세요.",

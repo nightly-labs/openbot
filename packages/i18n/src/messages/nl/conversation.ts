@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Tabblad sluiten",
   "conversation.threads.closeOthers": "Andere tabbladen sluiten",
   "conversation.threads.closeRight": "Tabbladen rechts sluiten",
+  "conversation.threads.toSide": "Naast de chat openen",
   "conversation.threads.archive": "Archiveren",
   "conversation.threads.archived": "Gearchiveerd",
   "conversation.threads.restore": "Herstellen",

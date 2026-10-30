@@ -115,8 +115,22 @@ export const messages = defineMessages("server", {
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
-  "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
+  "server.add.otherOptions": "Other options",
+  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
+  "server.local.createTitle": "New server on this computer",
+  "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
+  "server.local.nameLabel": "Server name",
+  "server.local.create": "Create server",
+  "server.local.creating": "Creating server…",
+  "server.local.createFailed": "Could not create the server.",
+  "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "server.local.deleteConfirmTitle": "Delete {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stops the server and moves its agents, chats and files to the trash.",
+  "server.local.deleting": "Deleting server…",
+  "server.local.deletedTitle": "Deleted {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -208,6 +222,8 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
+  // Added to the tooltip of a server that runs on this computer, after its name.
+  "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
   "server.rail.unmute": "Unmute server",

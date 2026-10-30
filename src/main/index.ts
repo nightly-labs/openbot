@@ -58,6 +58,7 @@ import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
 import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
+import { backgroundProcessIpcHandlers } from "./ipc/background-process-handlers";
 import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
@@ -76,6 +77,7 @@ import { hostedServerIpcHandlers } from "./ipc/hosted-server-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { instanceTransferIpcHandlers } from "./ipc/instance-transfer-handlers";
 import { licenseIpcHandlers } from "./ipc/license-handlers";
+import { localServerIpcHandlers } from "./ipc/local-server-handlers";
 import { macAutomationIpcHandlers } from "./ipc/mac-automation-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
@@ -104,6 +106,7 @@ import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
+import { takeLocalServerChildEnvironment } from "./local-server-child";
 import { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
   configureApplicationMenu,
@@ -197,7 +200,12 @@ removeClaudeCodeSessionEnvironment(process.env);
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
 const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, process.platform);
-if (serverMode || hostedServer) hideExceptionErrorBox();
+// Always taken, so the owner password leaves the environment also when the flag is refused.
+const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
+const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
+if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
+// A local server has no window, so it has no Dock tile either.
+if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
   selfHostedApiOrigin: selfHostedApiOrigin(process.env.OPENBOT_AUTH_API_URL),
@@ -345,7 +353,7 @@ const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 // A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
 // services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
 // (`scripts/hosting/openbot-boat-pre-stop`).
-if (!app.isPackaged || hostedServer || serverMode) {
+if (!app.isPackaged || hostedServer || serverMode || localServerChild) {
   const quitAfterSignal = () => {
     recordExit("signal");
     // Before `app.quit()`: the same signal can stop the Computer Use driver first.
@@ -355,6 +363,12 @@ if (!app.isPackaged || hostedServer || serverMode) {
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
   process.once("SIGHUP", quitAfterSignal);
+  // The desktop app holds the other end of stdin. Its end means that the app stopped, also by a crash.
+  if (localServerChild) {
+    process.stdin.once("end", quitAfterSignal);
+    process.stdin.once("error", quitAfterSignal);
+    process.stdin.resume();
+  }
 }
 
 /**
@@ -404,7 +418,9 @@ const {
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
   getFormat: () => createFormat(services?.language.locale ?? "en"),
-  desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
+  // The desktop app shows the notifications of a local server, as it does for every joined server.
+  desktopNotificationsEnabled: () =>
+    !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
   notificationPreviewEnabled: () => services?.notificationPreference.get().messagePreview ?? true,
   ownAgentNotificationLevels: () => services?.agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY) ?? new Map(),
 });
@@ -597,6 +613,7 @@ function registerIpcHandlers({
   billing,
   license,
   hostedServers,
+  localServers,
   routineFeed,
   events,
   customProviderChanges,
@@ -675,6 +692,7 @@ function registerIpcHandlers({
       permissionHelp: computerUsePermissionHelp,
     }),
     ...macAutomationIpcHandlers({ platform: process.platform }),
+    ...backgroundProcessIpcHandlers({ platform: process.platform, agents: () => service.listAgents() }),
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials, openLink }),
     ...voiceIpcHandlers({ voice, speech, server: voiceServer, service }),
     ...accountIpcHandlers({ centralAuth, host }),
@@ -700,6 +718,7 @@ function registerIpcHandlers({
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
+    ...localServerIpcHandlers({ localServers }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...customAgentIpcHandlers(customAgentChanges),
     ...acpRegistryIpcHandlers(acpRegistry, remoteServers),
@@ -846,11 +865,40 @@ function requestDesktopNotificationPermission(
 }
 
 /** `null` for every state but a signed-in one, matching what the two principal trackers store. */
+/** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
+async function presentApplication(): Promise<void> {
+  await ensureMacApplicationPresence(
+    process.platform,
+    (policy) => app.setActivationPolicy(policy),
+    () => app.dock?.show() ?? Promise.resolve(),
+  );
+  // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
+  // exists, so an AppImage writes its own first. On Windows the NSIS installer writes the scheme
+  // (`build/installer.nsh`), and each start writes it again for installs from before that script.
+  // A Windows development build does not register: the handler would be bare `electron.exe`.
+  // A macOS development build does not register either: macOS ignores the path and arguments and
+  // names the `com.github.Electron` bundle, so the link took `openbot://` from an installed
+  // OpenBot and opened some worktree's bare Electron.app. `bun run dev:slack` has a loopback return.
+  await Effect.runPromise(
+    installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
+  );
+  if (
+    process.platform === "linux" ||
+    ((process.platform === "darwin" || process.platform === "win32") && app.isPackaged)
+  ) {
+    if (!app.setAsDefaultProtocolClient("openbot")) {
+      logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
+    }
+  }
+}
+
 function centralAuthPrincipalId(state: CentralAuthState): string | null {
   return state.status === "signed_in" ? state.user.id : null;
 }
 
 function forwardCentralAuth(state: CentralAuthState): void {
+  // A local server has no account: its owner is a password member that a sign-out must not unbind.
+  if (localServerChild) return;
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
@@ -1090,37 +1138,16 @@ if (!hasSingleInstanceLock) {
       performance.mark("openbot:when-ready");
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin") app.dock?.setIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild) app.dock?.setIcon(appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
-      await ensureMacApplicationPresence(
-        process.platform,
-        (policy) => app.setActivationPolicy(policy),
-        () => app.dock?.show() ?? Promise.resolve(),
-      );
-      // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
-      // exists, so an AppImage writes its own first. On Windows the NSIS installer writes the scheme
-      // (`build/installer.nsh`), and each start writes it again for installs from before that script.
-      // A Windows development build does not register: the handler would be bare `electron.exe`.
-      // A macOS development build does not register either: macOS ignores the path and arguments and
-      // names the `com.github.Electron` bundle, so the link took `openbot://` from an installed
-      // OpenBot and opened some worktree's bare Electron.app. `bun run dev:slack` has a loopback return.
-      await Effect.runPromise(
-        installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
-      );
-      if (
-        process.platform === "linux" ||
-        ((process.platform === "darwin" || process.platform === "win32") && app.isPackaged)
-      ) {
-        if (!app.setAsDefaultProtocolClient("openbot")) {
-          logger.warn("Unable to register the openbot:// scheme. Invitation links will not open OpenBot.");
-        }
-      }
+      if (!localServerChild) await presentApplication();
       configureContentSecurityPolicy();
       configureRendererPermissions();
-      await Effect.runPromise(windows.restoreMainWindowBounds());
+      // A local server keeps a window that never loads: the agent browser and the services attach to it.
+      if (!localServerChild) await Effect.runPromise(windows.restoreMainWindowBounds());
       const mainWindow = windows.openMainWindow();
 
       const built = await createApplicationServices({
@@ -1134,6 +1161,7 @@ if (!hasSingleInstanceLock) {
         hostedServer,
         serverMode,
         hostingDeveloperKey,
+        localServerChild,
         macHapticFeedback,
         teardown,
         forwardCentralAuth,
@@ -1293,6 +1321,18 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      if (localServerChild) {
+        // No window, menu, tray, Dynamic Island or renderer: the desktop app is the interface.
+        const childRoutineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
+        powerMonitor.on("suspend", () => childRoutineWake.suspend());
+        powerMonitor.on("resume", () => childRoutineWake.resume());
+        powerMonitor.on("resume", () => built.messaging.resume());
+        teardown.push(0, "routine wake", () => childRoutineWake.dispose());
+        void runCauseEffect(built.agentInitialization.start()).catch((error) => {
+          logger.error("Unable to initialize the local agent backend:", toLogValue(error));
+        });
+        return;
+      }
       void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
         logger.warn("Unable to ask for notification permission:", toLogValue(error)),
       );
@@ -1475,8 +1515,9 @@ if (!hasSingleInstanceLock) {
       // The Windows error box ends the text at a NUL character, so control characters are replaced.
       const message = (error instanceof Error ? error.message : String(error)).replace(/[^\P{Cc}\n\t]/gu, "�");
       logger.error("OpenBot failed to start:", toLogValue(error));
-      // A server has nobody at its virtual display to close the box, and the box blocks the quit.
-      if (!serverMode && !hostedServer) {
+      // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
+      // server on this computer has no window: the app that started it reports the failed start.
+      if (!serverMode && !hostedServer && !localServerChild) {
         // The services, and with them the saved language, may not exist yet. Then the system language applies.
         const locale = services?.language.locale ?? resolveLocale("system", app.getLocale());
         const translate = services?.language.translate ?? translateFor(locale);

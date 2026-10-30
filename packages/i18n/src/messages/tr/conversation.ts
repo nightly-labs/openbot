@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Sekmeyi kapat",
   "conversation.threads.closeOthers": "Diğer sekmeleri kapat",
   "conversation.threads.closeRight": "Sağdaki sekmeleri kapat",
+  "conversation.threads.toSide": "Sohbetin yanında aç",
   "conversation.threads.archive": "Arşivle",
   "conversation.threads.archived": "Arşivlenenler",
   "conversation.threads.restore": "Geri yükle",

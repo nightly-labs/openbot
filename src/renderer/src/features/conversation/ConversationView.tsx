@@ -83,6 +83,7 @@ export function ConversationView(props: ConversationProps) {
               activeRightPanel() === "question" ||
               activeRightPanel() === "voice" ||
               activeRightPanel() === "subagent" ||
+              activeRightPanel() === "thread" ||
               activeRightPanel() === "side-panel",
             "side-panel-docked": sidePanelOpen(),
             "side-panel-maximized": sidePanelOpen() && sidePanel().maximized,

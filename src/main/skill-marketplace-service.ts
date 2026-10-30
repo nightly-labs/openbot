@@ -912,6 +912,15 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
     return value;
   });
 });
+/** The folder of each installed pack and the folders of its skills. */
+export const readPackFolders = Effect.fn("SkillMarketplace.readPackFolders")(function* (workspace: string) {
+  const lock = yield* readLock(workspace);
+  return new Map(
+    Object.values(lock.skills).flatMap(
+      (entry): Array<[string, string[]]> => (entry.folders ? [[entry.slug, entry.folders]] : []),
+    ),
+  );
+});
 const writeLock = Effect.fn("SkillMarketplace.writeLock")((workspace: string, lock: SkillsLock) =>
   writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true }).pipe(
     toSkillMarketplaceFailure,

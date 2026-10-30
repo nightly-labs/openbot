@@ -440,6 +440,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
+| `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
@@ -810,6 +811,51 @@ the tiers used the same lookup key. The license terms allow 3 devices for each u
   us" and creates no invite. Admins get no step; the join tells the person that the license is full.
 - Desktop calls the `license` IPC group; the web client calls the browser routes. Both render
   `@openbot/ui/features/billing/LicenseSection` in the license slot of `BillingPanel`.
+
+## Servers on this computer
+
+The desktop can run more servers on the same computer. Each one is a separate workspace: its own
+`openbot.db`, agents, chats, workspace folders, server settings, MCP servers and browser data. App
+preferences and the account sign-in stay with the desktop. The first server, "Local", does not
+change.
+
+Each extra server is a headless child process of the same binary (`src/main/local-server-child.ts`).
+`LocalServers` (`src/main/local-servers/local-servers.ts`) starts it with its own `--user-data-dir`
+(`<userData>/local-servers/<id>`) and its own agent root (`~/OpenBot/Servers/<id>`). The child
+sets up a password host whose one member is the owner, starts the Team API on loopback only, and
+writes one ready line to stdout with the API address and its identity. The line has no secret. The
+desktop pins the identity at the first start, signs in as the owner with the password, and attaches
+the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`.
+
+- **Registry.** `openbot-local-servers-v1.json` in the desktop userData. The owner password is 32
+  random bytes, sealed with the secret storage cipher. A file that this build cannot read is
+  read-only: no server starts and no write replaces it. Folder names come from a UUID, so a
+  changed file cannot name another path.
+- **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
+  directory sync keeps it. While the child is stopped, the entry has the address
+  `http://127.0.0.1:0` and no token, so a client never reaches an old port.
+- **Lifetime.** The child ends when its stdin closes. Teardown step 57 stops all children before
+  the joined-server connections close (step 60). The sibling scan before an update leaves out the
+  child PIDs. After an unexpected exit, the desktop starts the child again after 5 seconds, at most
+  3 times in 10 minutes. The owner password is registered for redaction and is never logged.
+- **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
+  with `shell.trashItem`. It never deletes them.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+
+Limits:
+
+- A user can create at most `LOCAL_SERVER_LIMIT` (5) servers on this computer, in addition to
+  "Local", because each one is a full OpenBot process that runs all the time. `LocalServers.create`
+  refuses one more with `error.remote.localServerLimit`. The create dialog tells the user before
+  they type a name.
+- A child server is reached as a joined server. Features behind `kind === "local"`, such as
+  Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
+- Only this computer can connect. The child does not publish to the account service and has no
+  WebRTC, so phones, the web client and other members cannot join it.
+- The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
+  shared with the other servers.
+- Not confirmed: the memory of each child, the agent browser in a child with no window, and which
+  process gets an `openbot://` link on macOS.
 
 ## macOS Host Manager
 

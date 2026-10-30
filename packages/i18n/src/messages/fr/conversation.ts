@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Fermer l’onglet",
   "conversation.threads.closeOthers": "Fermer les autres onglets",
   "conversation.threads.closeRight": "Fermer les onglets à droite",
+  "conversation.threads.toSide": "Ouvrir à côté du chat",
   "conversation.threads.archive": "Archiver",
   "conversation.threads.archived": "Archivés",
   "conversation.threads.restore": "Restaurer",

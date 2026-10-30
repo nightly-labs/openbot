@@ -72,11 +72,28 @@ const slackRequestSchema = z.object({
     .catch(undefined),
 });
 
-// The only parts of a Telegram update that Signal reads: the chat, the callback query, and the text
-// of a message, only to find a link code.
-const telegramChatSchema = z.object({ id: z.int() });
+// The only parts of a Telegram update that Signal reads: the chat, the callback query, the text of a
+// message, only to find a link code, and, to know whether a message can address OpenBot, the chat
+// type, the entity types, and whether it replies, is in a thread, or renames or leaves the chat.
+const telegramChatSchema = z.object({ id: z.int(), type: z.string().optional().catch(undefined) });
+const telegramEntitiesSchema = z
+  .array(z.object({ type: z.string() }))
+  .optional()
+  .catch(undefined);
 const telegramUpdateSchema = z.object({
-  message: z.object({ chat: telegramChatSchema, text: z.string().optional() }).optional(),
+  message: z
+    .object({
+      chat: telegramChatSchema,
+      text: z.string().optional(),
+      entities: telegramEntitiesSchema,
+      caption_entities: telegramEntitiesSchema,
+      reply_to_message: z.unknown().optional(),
+      message_thread_id: z.unknown().optional(),
+      new_chat_title: z.unknown().optional(),
+      left_chat_member: z.unknown().optional(),
+      migrate_to_chat_id: z.unknown().optional(),
+    })
+    .optional(),
   edited_message: z.object({ chat: telegramChatSchema }).optional(),
   callback_query: z.object({ id: z.string(), message: z.object({ chat: telegramChatSchema }).optional() }).optional(),
   my_chat_member: z.object({ chat: telegramChatSchema }).optional(),
@@ -588,9 +605,34 @@ function telegramUpdate(
     chatId,
     callbackQueryId: callbackQueryId.length > 0 && callbackQueryId.length <= 128 ? callbackQueryId : null,
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
-    // A message or a button press can start a hosted server that sleeps; a member change cannot.
-    wakes: update.message !== undefined || update.callback_query !== undefined,
+    wakes:
+      update.callback_query !== undefined || (update.message !== undefined && telegramMessageWakes(update.message)),
   };
+}
+
+// Entity types that can name OpenBot: `@username`, a mention of a user without a username, and a
+// command such as `/stop@bot`. Signal reads only the type, not the text, so a mention of another
+// person also counts.
+const TELEGRAM_ADDRESSING_ENTITIES = new Set(["mention", "text_mention", "bot_command"]);
+
+/**
+ * True when a message can address OpenBot, so it can start a hosted server that sleeps: a direct
+ * message, a reply, a message in a thread, a message with a mention or a command, or a rename or a
+ * removal that the host must see. The bot gets every group message, and the host answers none of the
+ * others.
+ */
+function telegramMessageWakes(message: NonNullable<z.output<typeof telegramUpdateSchema>["message"]>): boolean {
+  return (
+    message.chat.type === "private" ||
+    message.reply_to_message !== undefined ||
+    message.message_thread_id !== undefined ||
+    message.new_chat_title !== undefined ||
+    message.left_chat_member !== undefined ||
+    message.migrate_to_chat_id !== undefined ||
+    [...(message.entities ?? []), ...(message.caption_entities ?? [])].some((entity) =>
+      TELEGRAM_ADDRESSING_ENTITIES.has(entity.type),
+    )
+  );
 }
 
 function decodeAuthEvent(body: string): RemoteAuthEvent | null {

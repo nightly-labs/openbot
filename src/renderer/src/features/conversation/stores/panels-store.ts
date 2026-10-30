@@ -42,10 +42,11 @@ export interface SidePanelState {
   maximized: boolean;
 }
 
-/** The side panel of each agent, and the subagent in its Subagent pane. */
+/** The side panel of each agent, the subagent in its Subagent pane, and the side thread that it shows. */
 export interface SidePanelsState {
   side: Record<string, SidePanelState>;
   subagents: Record<string, string>;
+  threads: Record<string, string>;
 }
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
@@ -117,7 +118,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return (agentId && panels.side[agentId]) || SIDE_PANEL_EMPTY;
   };
-  const sidePanelOpen = () => activeRightPanel() === "side-panel" || paneOfMode(activeRightPanel()) !== null;
+  const sidePanelOpen = () =>
+    activeRightPanel() === "side-panel" || activeRightPanel() === "thread" || paneOfMode(activeRightPanel()) !== null;
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -145,6 +147,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return agentId ? (panels.subagents[agentId] ?? null) : null;
   };
+  /** The side thread of the side panel, while it shows or when it showed last. It can be gone. */
+  const panelThreadId = (): string | null => {
+    const agentId = conversationOwnerId(deps.props);
+    return agentId ? (panels.threads[agentId] ?? null) : null;
+  };
   const filePreviewOpen = () =>
     activeRightPanel() === "file-preview" &&
     deps.sidebarFilePreview()?.ownerAgentId === conversationOwnerId(deps.props);
@@ -163,7 +170,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
         selected: pane,
       }));
-    else if (mode === "side-panel") updateSidePanel(agentId, (state) => ({ ...state, selected: null }));
+    else if (mode === "side-panel" || mode === "thread")
+      updateSidePanel(agentId, (state) => ({ ...state, selected: null }));
     else if (mode === "none" && panels.side[agentId]?.maximized) {
       updateSidePanel(agentId, (state) => ({ ...state, maximized: false }));
     }
@@ -177,6 +185,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       draft.subagents[agentId] = subagentId;
     });
     setActiveRightPanel("subagent", agentId);
+  }
+
+  /** Shows a side thread in the side panel. */
+  function openPanelThread(threadId: string): void {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return;
+    setPanels((draft) => {
+      draft.threads[agentId] = threadId;
+    });
+    setActiveRightPanel("thread", agentId);
   }
 
   function openRoutineSettings(routine: { routineId: string; name: string } | "new"): void {
@@ -467,6 +485,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     filesOpen,
     panelSubagentId,
     openSubagentPanel,
+    panelThreadId,
+    openPanelThread,
     sidePanel,
     sidePanelOpen,
     setSidePanelMaximized,

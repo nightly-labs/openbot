@@ -775,7 +775,10 @@ Network traffic can also occur when:
   removes it, OpenBot sends the tokens it deleted to that same service once, to revoke them.
   Agents reach a server that OpenBot signed in to through a local server on `127.0.0.1`, which adds
   the token to each call, so the token does not go to the agent's process.
-  Nothing about the user's agents, conversations or files is sent in those requests. The
+  That local server tells the MCP server that the client is OpenBot: it sends
+  `User-Agent: OpenBot/<version>` and, when a session starts, the client name `openbot`, the
+  OpenBot version and the title `<agent name> (OpenBot)`, so the server can show which agent made a
+  change. Nothing else about the user's agents, conversations or files is sent in those requests. The
   registration names OpenBot's logo at `openbot.run`; an authorization service that shows it on its
   sign-in page can make the browser load it from `openbot.run`;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
@@ -1024,9 +1027,11 @@ Signal then asks the account service to link the chat to the computer. The accou
 the Telegram chat ID, the bot ID, the computer, the OpenBot account and the time of the link, and a
 hash of each code until it is used or expires. It keeps no chat name and no message.
 
-Telegram sends each update of a linked chat, which contains the messages that mention the bot or reply
-to it, the messages of a direct chat, and button presses, to Signal. Signal checks Telegram's secret
-header and reads only the chat ID, a link code and the ID of a button press, to find the computer. It
+Telegram sends each update of a linked chat, which contains every message of a group or a direct chat
+and button presses, to Signal. Signal checks Telegram's secret
+header and reads only the chat ID, a link code and the ID of a button press, to find the computer, and
+the chat type, the entity types and whether a message replies or is in a thread, to know whether it
+can address OpenBot. It
 passes each update to that computer over its Signal connection, in transit only: it does not store or
 log it. The computer's answers, status posts, reactions and files go to Telegram through Signal,
 because only Signal has the token. Signal accepts only a fixed list of Bot API calls, only for the
@@ -1042,11 +1047,13 @@ short-lived signed addresses, in transit only.
   for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
   Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
   memories; deleting an agent removes its conversations.
-- **Read from Telegram.** The messages that mention the bot, replies to it and the other messages of a
-  reply chain that Telegram sends, the messages of a direct chat, the message that a request
-  answers, the files in them, the names of their authors and the name of the chat. With privacy
-  mode on, which is Telegram's default for a bot, Telegram sends a bot only messages that mention it,
-  replies to it and commands.
+- **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
+  authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
+  Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
+  from a message that mentions the bot, a reply to it, another message of a reply chain that an
+  agent answers, or a message of a direct chat. The other messages of a group stay in the
+  computer's memory until OpenBot quits, and an agent can read the last of them with its history
+  tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
@@ -1167,8 +1174,16 @@ to the local OpenCode process. To show the remaining Go quota in Usage, OpenBot 
 to `opencode.ai/zen/go/v1/usage`; that request contains no conversation, file, or model data, and
 the response contains only the used percentage and reset time of each Go limit. OpenBot does not
 send that usage to its maintainer. No screen, log, data export, or diagnostics report contains the
-key; the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
-upload its session files. OpenCode manages its own login and resume state.
+key; the data export lists it under `scope.excludes`.
+
+When you saved no key in OpenBot, OpenBot reads the Go quota with the key that the OpenCode CLI
+uses: an OpenCode Console connection in OpenCode's database (`opencode.db`), else the Go key. The Go
+key is the `opencode-go` key in OpenCode's `auth.json` (or `OPENCODE_AUTH_CONTENT`), or
+`OPENCODE_API_KEY` from the environment that started OpenBot when `auth.json` has none. OpenBot reads
+these from OpenCode's data folder (`$XDG_DATA_HOME/opencode`, or `~/.local/share/opencode`) and sends
+the key only to `opencode.ai/zen/go/v1/usage`. When OpenCode rejects the Console key, OpenBot tries
+the Go key. OpenBot does not store, log, or show these keys. OpenBot does not copy OpenCode credentials or upload its session
+files. OpenCode manages its own login and resume state.
 
 ### Gemini
 

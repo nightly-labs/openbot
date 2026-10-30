@@ -18,6 +18,7 @@ import type {
   ProviderUsageResets,
 } from "@openbot/contracts/ipc";
 import {
+  AGENT_PROVIDERS,
   accountUsageCoversModel,
   agentProviderDescriptor,
   CUSTOM_AGENT_DEFAULT_MODEL,
@@ -316,16 +317,7 @@ const INITIAL_STATUS: AgentStatus = {
   phase: "idle",
   cliVersion: null,
   auth: { kind: "unknown" },
-  providers: [
-    { id: "codex", state: "not-started", version: null, message: null },
-    { id: "claude", state: "not-started", version: null, message: null },
-    { id: "grok", state: "not-started", version: null, message: null },
-    { id: "opencode", state: "not-started", version: null, message: null },
-    { id: "antigravity", state: "not-started", version: null, message: null },
-    { id: "cursor", state: "not-started", version: null, message: null },
-    { id: "cline", state: "not-started", version: null, message: null },
-    { id: "acp", state: "not-started", version: null, message: null },
-  ],
+  providers: AGENT_PROVIDERS.map((id) => ({ id, state: "not-started", version: null, message: null })),
   capabilities: {
     chat: "unavailable",
     browser: "ready",
@@ -661,6 +653,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(source ? { cliSource: source } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
+          ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -955,7 +948,7 @@ export class ProviderRuntime implements ProviderPort {
         Effect.gen({ self: this }, function* () {
           let usage: AccountUsage;
           if (provider === "opencode") {
-            // The Go quota is one HTTPS request with the saved key, so do not start OpenCode for it.
+            // The Go quota is one HTTPS request with the CLI's key, so do not start OpenCode for it.
             usage = normalizeAccountUsage(
               yield* readOpenCodeGoUsage(this.#credentials.apiKey("opencode")).pipe(
                 toProviderOperationFailed,
@@ -969,6 +962,8 @@ export class ProviderRuntime implements ProviderPort {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
             if (!agentProviderDescriptor(provider).reportsUsage) return null;
+            // A Codex API-key login has no plan usage: Codex refuses the read.
+            if (provider === "codex" && this.#accounts.get(provider)?.type === "apiKey") return null;
             const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
             if (kept && !usageWindowHasReset(kept)) return kept;
             if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return null;
@@ -1372,8 +1367,14 @@ export class ProviderRuntime implements ProviderPort {
     if (!options.automatic) this.#startFailures.clear();
     // A refresh cancels a sign-in that has not finished. The sign-in process of an expired account
     // writes a 401 for the old token, and the renderer refreshes after each auth error, so the
-    // sign-in would end before the user enters the code. The sign-in is what fixes that error.
-    if (options.automatic && (this.#codexLogin.pending || this.#cliLogin.size > 0)) return this.status();
+    // sign-in would end before the user enters the code. The sign-in is what fixes that error. A
+    // sign-in that is starting runs as a connection command, and the refresh would wait for it and
+    // then cancel it.
+    if (
+      options.automatic &&
+      (this.#codexLogin.pending || this.#cliLogin.size > 0 || this.#providerConnectionCommands.size > 0)
+    )
+      return this.status();
     if (this.#providerRefresh) return yield* Deferred.await(this.#providerRefresh);
     if (this.#status.phase === "starting" || this.#status.phase === "restarting") return this.status();
     const completion = Deferred.makeUnsafe<AgentStatus, ProviderOperationFailed>();
@@ -1639,6 +1640,35 @@ export class ProviderRuntime implements ProviderPort {
     return this.status();
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * Signs the provider's own sign-in out and reports it signed out. Its agents wait for a sign-in;
+   * the provider's other accounts wait until it connects again.
+   */
+  readonly signOutProvider = Effect.fn("ProviderRuntime.signOutProvider")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const accounts = yield* this.#requireAccounts(provider);
+    // Codex signs in, by browser or by code, through its own login client.
+    const codex = requireProviderDriver(provider).signIn.kind === "browser";
+    return yield* this.#runProviderConnectionCommand(provider, () =>
+      Effect.gen({ self: this }, function* () {
+        // The sign-out removes the credential that a running turn uses.
+        if (this.#hooks.isProviderBusy(provider)) {
+          return yield* new ProviderOperationFailed({
+            cause: new Error(sourceText("error.provider.cliBusySignOut", { provider: providerLabel(provider) })),
+          });
+        }
+        // A sign-in that finished after the sign-out would sign the provider in again.
+        yield* codex ? this.#codexLogin.cancel(null) : this.#cancelCliLogin(provider);
+        const disposals = this.#disposals;
+        yield* accounts.signOutDefault(provider).pipe(toProviderOperationFailed);
+        yield* this.#endSignedOutClient(provider, disposals);
+        return this.status();
+      }),
+    );
+  }, Effect.uninterruptible).bind(this);
+
   /** Whether the provider has a saved API key. */
   hasProviderKey(provider: AgentProvider): boolean {
     return this.#credentials.apiKey(provider) !== null;
@@ -1724,6 +1754,18 @@ export class ProviderRuntime implements ProviderPort {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
     return yield* this.#runProviderConnectionCommand(provider, () => this.#startProviderCode(provider, codeSignIn));
+  }).bind(this);
+
+  /**
+   * Saves an OpenAI API key as Codex's login, for `changeProviderCredential` to restart Codex on. A
+   * pending ChatGPT sign-in ends first, so that it cannot replace the key when it finishes.
+   */
+  readonly saveCodexApiKey = Effect.fn("ProviderRuntime.saveCodexApiKey")(function* (
+    this: ProviderRuntime,
+    apiKey: string,
+  ) {
+    yield* this.#codexLogin.cancel(null);
+    yield* this.#codexLogin.saveApiKey(apiKey).pipe(toProviderOperationFailed);
   }).bind(this);
 
   readonly #startProviderCode = Effect.fn("ProviderRuntime.startCodeLogin")(function* (

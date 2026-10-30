@@ -188,6 +188,9 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
     const read = props.optionTextValue ?? props.label;
     return props.options.filter((option) => searchText(read(option)).includes(text));
   });
+  // Kobalte keys a string or number row by its text and skips `optionValue`, but it finds the chosen
+  // option with `optionValue`. So each row is an object, and Kobalte reads its key from `optionValue`.
+  const rows = createMemo(() => matches().map((option) => ({ option })));
   const choose = (option: Option) => {
     setOpen(false);
     props.onChange(option);
@@ -237,12 +240,12 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
           aria-label={props["aria-label"]}
           aria-labelledby={props["aria-labelledby"]}
         >
-          <Combobox.Root<Option>
+          <Combobox.Root<{ option: Option }>
             class="ui-search-select-root"
-            options={matches()}
-            optionValue={key}
-            optionTextValue={props.label}
-            optionLabel={props.label}
+            options={rows()}
+            optionValue={(row) => key(row.option)}
+            optionTextValue={(row) => props.label(row.option)}
+            optionLabel={(row) => props.label(row.option)}
             open={true}
             modal={false}
             triggerMode="manual"
@@ -253,8 +256,8 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
             onOpenChange={(next) => {
               if (!next) setOpen(false);
             }}
-            onChange={(option) => {
-              if (option !== null) choose(option);
+            onChange={(row) => {
+              if (row !== null) choose(row.option);
             }}
             itemComponent={(item) => (
               <Combobox.Item
@@ -262,14 +265,14 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
                 class="ui-select-item"
                 data-slot="select-item"
                 data-cuelume-select=""
-                data-checked={isCurrent(item.item.rawValue) ? "" : undefined}
+                data-checked={isCurrent(item.item.rawValue.option) ? "" : undefined}
                 // The combobox has no selection, so the search field starts empty. The row says it is the value.
-                aria-selected={isCurrent(item.item.rawValue) ? "true" : "false"}
+                aria-selected={isCurrent(item.item.rawValue.option) ? "true" : "false"}
               >
                 <Combobox.ItemLabel class="ui-select-item-label">
-                  {(props.itemContent ?? props.label)(item.item.rawValue)}
+                  {(props.itemContent ?? props.label)(item.item.rawValue.option)}
                 </Combobox.ItemLabel>
-                <Show when={isCurrent(item.item.rawValue)}>
+                <Show when={isCurrent(item.item.rawValue.option)}>
                   <span class="ui-select-item-indicator">
                     <Check aria-hidden="true" />
                   </span>

@@ -187,6 +187,7 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot non è riuscito ad attivare la CLI gestita.",
   "error.provider.cliBusyReconnect":
     "La CLI di {provider} sta lavorando a un turno. Attendi che finisca, poi riconnetti.",
+  "error.provider.cliBusySignOut": "La CLI {provider} sta elaborando un turno. Attendi che finisca, poi disconnetti.",
   "error.provider.opencodeCredentialsRejected":
     "Il provider del modello ha rifiutato la chiave API. Correggi la chiave di OpenCode in Impostazioni, oppure la chiave del provider con `opencode auth login`. Poi riprova o scegli un altro modello.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -323,6 +324,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} può avere un solo account.",
   "error.provider.accountNeedsConnection": "Connetti {provider} prima di aggiungere un altro account.",
   "error.provider.usageResetUnsupported": "{provider} non può azzerare i limiti di utilizzo.",
+  "error.provider.signOutUnsupported": "OpenBot non può disconnettere l'accesso a {provider}.",
   "error.provider.usageResetNotConnected": "Accedi di nuovo a questo account {provider} prima di azzerarne l'utilizzo.",
   "error.provider.accountLimit": "{provider} può avere al massimo {limit} account.",
   "error.provider.accountNotFound": "Questo account {provider} non è su questo computer. Aggiorna e riprova.",

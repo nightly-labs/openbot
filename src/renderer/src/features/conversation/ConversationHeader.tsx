@@ -48,6 +48,7 @@ export function ConversationHeader() {
     sidePanelOpen,
     sideThreadOpen,
     toggleSidePanel,
+    moveThreadToPanel,
   } = useConversationViewScope();
   const runningThreads = () => props.threads?.running ?? 0;
   /** While a side thread is open, the agent's name goes back to the agent's own chat. */
@@ -55,6 +56,8 @@ export function ConversationHeader() {
     const header = props.threads?.header;
     return header && sideThreadOpen() ? () => header.onOpen(MAIN_THREAD_ID) : undefined;
   };
+  /** With thread tabs, the agent's name is the tab of the agent's own chat. */
+  const titleSelected = () => (props.threads ? !sideThreadOpen() : undefined);
   const working = () => agentActivity() === "Working";
   const providerName = (provider: AgentProviderRef) =>
     isKnownAgentProvider(provider) ? providerDisplayName(provider) : String(provider);
@@ -103,6 +106,7 @@ export function ConversationHeader() {
       onSettingsIntent={() => void loadAgentSettingsPanel()}
       onOpenSettings={() => setActiveRightPanel("settings")}
       onOpenChat={openMainChat()}
+      titleSelected={titleSelected()}
       pendingModel={pendingModel()}
       modelPicker={{
         provider: settingsProvider(),
@@ -144,7 +148,11 @@ export function ConversationHeader() {
             }
           : undefined
       }
-      threads={<Show when={props.threads}>{(threads) => <ThreadHeader {...threads().header} />}</Show>}
+      threads={
+        <Show when={props.threads}>
+          {(threads) => <ThreadHeader {...threads().header} onMoveToSide={moveThreadToPanel} />}
+        </Show>
+      }
       sidePanel={
         channel?.readOnly()
           ? undefined

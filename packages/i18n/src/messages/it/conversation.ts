@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Chiudi scheda",
   "conversation.threads.closeOthers": "Chiudi altre schede",
   "conversation.threads.closeRight": "Chiudi schede a destra",
+  "conversation.threads.toSide": "Apri accanto alla chat",
   "conversation.threads.archive": "Archivia",
   "conversation.threads.archived": "Archiviati",
   "conversation.threads.restore": "Ripristina",

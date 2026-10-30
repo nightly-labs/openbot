@@ -60,6 +60,12 @@
   letter-spacing: var(--openbot-tracking-tight);
 }
 
+/* The "Other options" button is wider than the close button. The same padding on the two sides keeps
+ * the title in the centre, with space for the longest translation of the button. */
+.add-server-dialog:has(.add-server-other) .add-server-intro .ui-heading {
+  padding-inline: 160px;
+}
+
 .add-server-intro .ui-text {
   max-width: 560px;
   font-size: var(--openbot-text-lg);
@@ -553,9 +559,21 @@
   flex: 0 0 auto;
 }
 
-.add-server-join {
-  margin: 0;
-  text-align: center;
+/* The ways to add a server without a plan, across from the close button of the shell. */
+.add-server-other {
+  position: absolute;
+  top: var(--openbot-space-6);
+  left: var(--openbot-space-6);
+  z-index: 2;
+}
+
+.add-server-other .ui-button {
+  color: var(--openbot-text-muted);
+}
+
+/* The menu opens over the dialog, which is on a higher layer than menus. */
+.ui-action-menu.add-server-other-menu {
+  z-index: calc(var(--openbot-layer-dialog) + 1);
 }
 
 /* Progress */
@@ -929,6 +947,20 @@
   .add-server-intro .ui-heading {
     font-size: var(--openbot-text-2xl);
     line-height: var(--openbot-leading-2xl);
+  }
+
+  /* The title goes under the row of the "Other options" button and the close button. */
+  .add-server-dialog:has(.add-server-other) .add-server-intro {
+    padding-top: calc(var(--openbot-control-md) + var(--openbot-space-1));
+  }
+
+  .add-server-dialog:has(.add-server-other) .add-server-intro .ui-heading {
+    padding-inline: 0;
+  }
+
+  .add-server-other {
+    top: var(--openbot-space-3);
+    left: var(--openbot-space-3);
   }
 
   .add-server-intro .ui-text {

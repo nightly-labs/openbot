@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Закрыть вкладку",
   "conversation.threads.closeOthers": "Закрыть другие вкладки",
   "conversation.threads.closeRight": "Закрыть вкладки справа",
+  "conversation.threads.toSide": "Открыть рядом с чатом",
   "conversation.threads.archive": "Архивировать",
   "conversation.threads.archived": "В архиве",
   "conversation.threads.restore": "Восстановить",

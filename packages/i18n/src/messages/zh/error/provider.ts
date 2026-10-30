@@ -161,6 +161,7 @@ export const messages = {
   "error.provider.signInExpired": "你的 {provider} 登录已过期，请重新登录以继续。",
   "error.provider.cliActivateFailed": "OpenBot 无法激活托管的 CLI。",
   "error.provider.cliBusyReconnect": "{provider} CLI 正在处理对话，请等它结束后再重新连接。",
+  "error.provider.cliBusySignOut": "{provider} CLI 正在处理一轮对话。请等待其完成，然后断开连接。",
   "error.provider.opencodeCredentialsRejected":
     "模型服务商拒绝了该 API 密钥。请在设置中修正 OpenCode 密钥，或用 `opencode auth login` 修正服务商密钥，然后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -279,6 +280,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} 只能保存一个账号。",
   "error.provider.accountNeedsConnection": "请先连接 {provider}，再添加其他账号。",
   "error.provider.usageResetUnsupported": "{provider} 无法重置用量上限。",
+  "error.provider.signOutUnsupported": "OpenBot 无法断开 {provider} 的登录。",
   "error.provider.usageResetNotConnected": "重置用量前，请先重新登录该 {provider} 账号。",
   "error.provider.accountLimit": "{provider} 最多只能保存 {limit} 个账号。",
   "error.provider.accountNotFound": "该 {provider} 账号不在本电脑上。请刷新后重试。",

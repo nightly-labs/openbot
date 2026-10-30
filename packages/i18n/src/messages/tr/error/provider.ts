@@ -185,6 +185,8 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot yönetilen CLI'yi etkinleştiremedi.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından tekrar bağlanın.",
+  "error.provider.cliBusySignOut":
+    "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, sonra bağlantıyı kesin.",
   "error.provider.opencodeCredentialsRejected":
     "Model sağlayıcısı API anahtarını reddetti. Ayarlar'da OpenCode anahtarını veya `opencode auth login` ile sağlayıcının anahtarını düzeltin. Ardından tekrar deneyin ya da başka bir model seçin.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -320,6 +322,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} yalnızca bir hesap destekler.",
   "error.provider.accountNeedsConnection": "Başka bir hesap eklemeden önce {provider} sağlayıcısına bağlanın.",
   "error.provider.usageResetUnsupported": "{provider} kullanım sınırlarını sıfırlayamaz.",
+  "error.provider.signOutUnsupported": "OpenBot {provider} oturumunun bağlantısını kesemiyor.",
   "error.provider.usageResetNotConnected": "Kullanımını sıfırlamadan önce bu {provider} hesabında yeniden oturum açın.",
   "error.provider.accountLimit": "{provider} en fazla {limit} hesap destekler.",
   "error.provider.accountNotFound": "Bu {provider} hesabı bu bilgisayarda yok. Yenileyip tekrar deneyin.",

@@ -66,6 +66,17 @@ export const messages = {
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
     "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. ChatGPT ve Claude ile çalışır.",
+  "settings.backgroundProcesses.title": "Arka plan işlemleri",
+  "settings.backgroundProcesses.description":
+    "Ajanların başlatıp çalışır bıraktığı programlar, örneğin geliştirme sunucuları. Sohbet bittiğinde ve OpenBot'tan çıktığınızda da çalışmaya devam ederler.",
+  "settings.backgroundProcesses.empty": "Çalışan ajan programı yok.",
+  "settings.backgroundProcesses.loadFailed": "Arka plan işlemleri okunamadı.",
+  "settings.backgroundProcesses.noAgent": "Ajan yok",
+  "settings.backgroundProcesses.started": "Başlatıldı: {time}",
+  "settings.backgroundProcesses.ports": { one: "Bağlantı noktası {ports}", other: "Bağlantı noktaları {ports}" },
+  "settings.backgroundProcesses.stop": "Durdur",
+  "settings.backgroundProcesses.stopLabel": "{pid} işlemini durdur",
+  "settings.backgroundProcesses.stopFailed": "İşlem durdurulamadı.",
   "settings.keepRemoteSessions.title": "Sunuculara hızlı bağlantı",
   "settings.keepRemoteSessions.description":
     "Katıldığınız sunuculara olan bağlantıyı açılışlar arasında koruyun. OpenBot yaklaşık bir saniye daha hızlı başlar. OpenBot'tan çıktığınızda OpenBot hizmeti bağlantıyı kapatmaz.",

@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "탭 닫기",
   "conversation.threads.closeOthers": "다른 탭 닫기",
   "conversation.threads.closeRight": "오른쪽 탭 닫기",
+  "conversation.threads.toSide": "채팅 옆에 열기",
   "conversation.threads.archive": "보관",
   "conversation.threads.archived": "보관됨",
   "conversation.threads.restore": "복원",

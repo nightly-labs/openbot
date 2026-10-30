@@ -61,6 +61,8 @@ interface AddServerOverlayProps {
   onOpenServer: (serverId: string) => void;
   onContactUs?: (() => void) | undefined;
   onJoinWithInvite?: (() => void) | undefined;
+  /** Opens the dialog that creates a server on this computer. The web client has no such server. */
+  onCreateLocal?: (() => void) | undefined;
   /** Opens the list of the account's hosted servers, so that the user can delete one at the limit. */
   onManageServers?: (() => void) | undefined;
 }
@@ -407,6 +409,7 @@ function AddServerSession(
                 props.onJoinWithInvite?.();
               })
             }
+            onCreateLocal={props.onCreateLocal}
             onCurrencyChange={(next) => trackPlans("currency_changed", { currency: HOSTED_BILLING_CURRENCY[next] })}
             onBillingChange={(next) =>
               trackPlans("interval_changed", { interval: next === "yearly" ? "year" : "month" })

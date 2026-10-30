@@ -68,8 +68,10 @@ export interface McpEndpointRefusal {
   error: string;
 }
 
+/** `agentId` is the agent whose session connects, or `null` for a session that has none. */
 export type McpEndpointSource = (
   config: McpServerConfig,
+  agentId: string | null,
 ) => Effect.Effect<McpEndpoint | McpEndpointRefusal, McpOperationError>;
 
 /**
@@ -180,13 +182,23 @@ export function computerUseParam(params: unknown): boolean {
   return !isDynamicRecord(params) || params.computerUse !== false;
 }
 
+/**
+ * The agent of a `thread/start` or `thread/resume`. `ThreadLifecycle` sends `openbotAgentId` to
+ * Claude and the ACP clients, which read the MCP servers themselves, so that the proxy can name the
+ * agent to a server it signed in to.
+ */
+export function mcpAgentParam(params: unknown): string | null {
+  return isDynamicRecord(params) && typeof params.openbotAgentId === "string" ? params.openbotAgentId : null;
+}
+
 export const usableMcpServers = Effect.fnUntraced(function* (
   configs: readonly McpServerConfig[],
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ) {
   const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
-  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, endpoint), {
+  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, endpoint, agentId), {
     concurrency: "unbounded",
   });
 });
@@ -195,12 +207,13 @@ export const usableMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
   endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ): Effect.fn.Return<UsableMcpServer, McpShapeFailed> {
   // An http server starts no process, so it needs neither a command nor a `PATH`. It is the only
   // kind that can carry a sign-in, because a token travels in a header.
   if (config.transport !== "stdio") {
     const resolved = endpoint
-      ? yield* endpoint(config).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
+      ? yield* endpoint(config, agentId).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
       : { url: config.url, authorization: null, proxied: false };
     // Never the raw token instead: a proxy that cannot start is a server this hand-off leaves out.
     if ("error" in resolved) return { config, error: resolved.error, reason: "unusable" };

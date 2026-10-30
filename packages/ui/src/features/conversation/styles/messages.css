@@ -15,10 +15,17 @@
   padding-inline: var(--openbot-space-1);
 }
 
-/* Keep the face beside the bubble, independent of the author name and footer height. */
+/* Keep the face beside the bubble, independent of the author name and footer height. The face is a
+   little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
+.message-entry-with-author,
+.message-author-gutter {
+  --message-author-face-size: var(--openbot-space-8);
+  --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
+}
+
 .message-entry-with-author {
   display: grid;
-  grid-template-columns: calc(var(--openbot-space-6) + var(--openbot-space-1)) minmax(0, 1fr);
+  grid-template-columns: var(--message-author-column) minmax(0, 1fr);
   column-gap: var(--openbot-space-2);
   row-gap: var(--openbot-space-1);
 }
@@ -38,6 +45,8 @@
 }
 
 .message-author-avatar {
+  width: var(--message-author-column);
+  height: var(--message-author-column);
   grid-column: 1;
   grid-row: 2;
   align-self: end;
@@ -47,10 +56,10 @@
 }
 
 .message-author-avatar .agent-avatar {
-  --agent-avatar-optical-offset: -3px;
+  --agent-avatar-optical-offset: -4px;
 
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
+  width: var(--message-author-face-size);
+  height: var(--message-author-face-size);
 }
 
 .message-author-avatar-button {
@@ -69,8 +78,8 @@
  * with one agent draws no faces at all, so it never asks for the column.
  */
 .message-author-gutter {
-  width: 28px;
-  flex: 0 0 28px;
+  width: var(--message-author-column);
+  flex: 0 0 var(--message-author-column);
 }
 
 .message-author-name {

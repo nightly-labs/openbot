@@ -98,8 +98,21 @@ export const messages = {
   "server.add.custom.description":
     "Krijg een eigen infrastructuur, extra opslag of functies die passen bij je manier van werken.",
   "server.add.custom.action": "Neem contact op",
-  "server.add.join.title": "Heb je een uitnodiging?",
   "server.add.join.action": "Word lid van een server",
+  "server.add.otherOptions": "Andere opties",
+  "server.local.createTitle": "Nieuwe server op deze computer",
+  "server.local.createDescription": "De server heeft eigen agents, chats en bestanden. Hij draait op deze computer.",
+  "server.local.nameLabel": "Servernaam",
+  "server.local.create": "Server maken",
+  "server.local.creating": "Server maken…",
+  "server.local.createFailed": "Kan de server niet maken.",
+  "server.local.limitReached":
+    "Je kunt maximaal {limit} servers op deze computer hebben. Wis er een om een nieuwe te maken.",
+  "server.local.deleteConfirmTitle": "{name} wissen?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stopt de server en verplaatst de agents, chats en bestanden ervan naar de prullenbak.",
+  "server.local.deleting": "Server wissen…",
+  "server.local.deletedTitle": "{name} gewist",
   "server.add.limit.title": "Dit account heeft het maximale aantal servers",
   "server.add.limit.description": {
     one: "Een account kan {count} betaalde server hebben. Verwijder eerst een server om er een toe te voegen.",
@@ -184,6 +197,7 @@ export const messages = {
   "server.rail.addRemote": "Externe server toevoegen",
   "server.rail.add": "Server toevoegen",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "op deze computer",
   "server.rail.notificationsMuted": "meldingen gedempt",
   "server.rail.actions": "Serveracties",
   "server.rail.unmute": "Server niet meer dempen",

@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Zamknij kartę",
   "conversation.threads.closeOthers": "Zamknij inne karty",
   "conversation.threads.closeRight": "Zamknij karty po prawej",
+  "conversation.threads.toSide": "Otwórz obok czatu",
   "conversation.threads.archive": "Archiwizuj",
   "conversation.threads.archived": "Zarchiwizowane",
   "conversation.threads.restore": "Przywróć",

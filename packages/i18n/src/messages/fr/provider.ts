@@ -194,6 +194,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Annuler la connexion",
   "provider.account.finishSignIn": "Terminez la connexion dans le navigateur.",
   "provider.account.remove": "Supprimer le compte",
+  "provider.account.disconnect": "Déconnecter",
   "provider.account.actionFailed": "Impossible de modifier le compte {name}.",
   "provider.account.resetUsage": "Réinitialiser l’usage",
   "provider.account.resetUsageTitle": "Réinitialiser l’usage de {name} ?",
@@ -208,6 +209,11 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} n’a plus de crédits de réinitialisation d’usage.",
   "provider.account.resetUsageAlreadyRedeemed": "Ce crédit de réinitialisation de {name} a déjà été utilisé.",
   "provider.account.resetUsageFailed": "Impossible de réinitialiser l’usage de {name}.",
+  "provider.settings.disconnectTitle": "Déconnecter {name} ?",
+  "provider.settings.disconnectOthers": "Les autres comptes {provider} attendent que vous reconnectiez {provider}.",
+  "provider.settings.disconnectLocal":
+    "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
+  "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":

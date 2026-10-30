@@ -65,6 +65,17 @@ export const messages = {
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。ChatGPT と Claude で使えます。",
+  "settings.backgroundProcesses.title": "バックグラウンドプロセス",
+  "settings.backgroundProcesses.description":
+    "エージェントが起動して実行したままにしたプログラム（開発サーバーなど）です。チャットが終わっても、OpenBot を終了しても動き続けます。",
+  "settings.backgroundProcesses.empty": "実行中のエージェントのプログラムはありません。",
+  "settings.backgroundProcesses.loadFailed": "バックグラウンドプロセスを読み込めませんでした。",
+  "settings.backgroundProcesses.noAgent": "エージェントなし",
+  "settings.backgroundProcesses.started": "開始 {time}",
+  "settings.backgroundProcesses.ports": { other: "ポート {ports}" },
+  "settings.backgroundProcesses.stop": "停止",
+  "settings.backgroundProcesses.stopLabel": "プロセス {pid} を停止",
+  "settings.backgroundProcesses.stopFailed": "プロセスを停止できませんでした。",
   "settings.keepRemoteSessions.title": "サーバーへの高速接続",
   "settings.keepRemoteSessions.description":
     "参加しているサーバーへの接続を起動の間も維持します。OpenBot の起動が約 1 秒速くなります。OpenBot を終了しても、OpenBot サービスは接続を閉じません。",

@@ -775,7 +775,6 @@
 
 .message-code-scroll > code {
   min-width: 100%;
-  width: max-content;
   display: block;
   font: inherit;
 }
@@ -798,7 +797,8 @@
 .message-code-line-source {
   min-width: 0;
   padding-right: 12px;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .message-code-caret {

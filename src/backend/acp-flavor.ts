@@ -40,6 +40,16 @@ export interface AcpFlavor {
    * to it. A set of the model the process already runs on is not sent again.
    */
   processWideModel?: true;
+  /**
+   * The agent frees what a session holds only when its process ends, not at `session/close`. Model
+   * discovery then resumes one probe session for each process rather than opening another.
+   */
+  closeKeepsSession?: true;
+  /**
+   * Each session gets a process of its own, and an idle session is closed by ending that process.
+   * For an agent with `closeKeepsSession`.
+   */
+  sessionProcesses?: true;
   /** An agent that sends a failed prompt as answer text and ends the turn as a success. */
   sdkHarness?: {
     /** The session whose prompt failed, from a stderr line. */

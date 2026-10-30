@@ -1,12 +1,17 @@
 import type { AgentApproval, AgentContextState, AgentEvent } from "@openbot/contracts/ipc";
 import { isAgentTaskActive, taskApproval } from "@openbot/team-client/agent-tasks";
-import { activeThreadId, threadLists } from "@openbot/ui/features/conversation/threads/thread-items";
+import {
+  activeThreadId,
+  type ThreadListsInput,
+  threadLists,
+} from "@openbot/ui/features/conversation/threads/thread-items";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type {
   BrowserTakeoverRequest,
   ConversationThreads,
   PromptAnswerOptions,
+  SideThread,
 } from "../conversation/conversation-types";
 import type { AgentThreadTabsState } from "./agent-thread-tabs";
 
@@ -43,11 +48,9 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
   const agentId = agent.id;
   const snapshot = tasks.snapshot(agentId);
   const list = snapshot?.tasks ?? [];
-  const lists = threadLists({
+  const listInput: Omit<ThreadListsInput, "open" | "draft"> = {
     mainUpdatedAt: agent.updatedAt,
     tasks: list,
-    open: tabs.openIds(agentId),
-    draft: tabs.hasDraft(agentId),
     draftTitle: input.newThreadTitle,
     hidden: tabs.hidden(),
     waitsFor: (task) =>
@@ -58,7 +61,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
-  });
+  };
+  const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
   const open =
     activeId === MAIN_THREAD_ID
@@ -68,6 +72,26 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         : list.find((task) => task.id === activeId);
   const approval = open ? taskApproval(open, approvals) : undefined;
   const editable = tasks.editable();
+  /** A thread in the side panel, with the actions of its own message box. */
+  const sideThread = (id: string): SideThread | undefined => {
+    const task = list.find((entry) => entry.id === id);
+    if (!task) return undefined;
+    const sideApproval = taskApproval(task, approvals);
+    return {
+      task,
+      conversation: tasks.conversation(task.id),
+      approval: sideApproval,
+      onSend: (text, attachmentDraftIds) => tabs.send(agentId, task.id, text, attachmentDraftIds),
+      onStop: () => tasks.stopTask(agentId, task.id),
+      onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
+      onRespondApproval: (decision, options) =>
+        sideApproval ? input.onRespondApproval(sideApproval, decision, options) : Promise.resolve(false),
+      get contextState() {
+        return input.contextStates?.()[task.threadId];
+      },
+      onCompactContext: onCompactContext ? () => onCompactContext(task.id) : undefined,
+    };
+  };
   return {
     header: {
       ...lists,
@@ -83,6 +107,14 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onRestore: (id) => void tabs.restore(agentId, id),
       onRename: editable ? (id, title) => void tabs.rename(agentId, id, title) : undefined,
       onDelete: editable ? (id) => void tabs.remove(agentId, id) : undefined,
+    },
+    side: {
+      tabs: threadLists({ ...listInput, open: tabs.sideIds(agentId), draft: false }).tabs,
+      thread: sideThread,
+      onToSide: (id) => tabs.toSide(agentId, id),
+      onToChat: (id) => tabs.toChat(agentId, id),
+      onClose: (id) => tabs.closeSide(agentId, id),
+      onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
     limit: snapshot?.limit ?? 1,

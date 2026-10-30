@@ -75,7 +75,7 @@ import {
   piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
-import type { AccountReadResult, ModelListResponse } from "./protocol";
+import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -336,6 +336,11 @@ export interface ProviderClientContext {
    */
   readonly mcpOAuthProxySettings?: McpOAuthProxySettingsStore;
   /**
+   * The OpenBot version that the OAuth proxy names to a server it signed in to. Optional: without it
+   * the proxy passes on the provider's own `clientInfo`.
+   */
+  readonly appVersion?: string;
+  /**
    * Whether this model may still be used. A removed endpoint stays in the running process, with the
    * credentials it started with, until that process restarts, and the restart waits for the work in
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
@@ -361,11 +366,12 @@ export interface ProviderClientContext {
    */
   readonly agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
   /**
-   * Variables that every provider process gets on a server, and so every program an agent starts: the
-   * marker that the server memory guard finds leftover processes by, and the CPU limit module for Node
-   * (`agentProcessEnvironment` in `src/main/server-memory.ts`). Fixed while the app runs. They are not
-   * part of `agentEnvironment`: Codex gets that in each thread configuration and replaces a session
-   * whose variables change, so Codex gets these in the spawn environment of its app-server instead.
+   * Variables that every provider process gets, and so every program an agent starts: the marker that
+   * the server memory guard and `src/main/background-processes.ts` find leftover processes by, and on
+   * a server the CPU limit module for Node (`agentProcessEnvironment` in `src/main/server-memory.ts`).
+   * Fixed while the app runs. They are not part of `agentEnvironment`: Codex gets that in each thread
+   * configuration and replaces a session whose variables change, so Codex gets these in the spawn
+   * environment of its app-server instead.
    */
   readonly serverEnvironment?: Readonly<Record<string, string>>;
   /**
@@ -651,8 +657,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...context.accountEnvironment,
       }),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
+    // An API-key login has no plan usage to read.
     validateAccount: (account) => {
-      if (account.type !== "chatgpt") {
+      if (!isCodexLoginType(account.type)) {
         throw new Error(sourceText("error.provider.codexLoginRequired"));
       }
     },

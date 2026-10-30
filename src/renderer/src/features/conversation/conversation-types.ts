@@ -37,7 +37,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
-import type { ThreadHeaderProps } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
@@ -398,7 +398,9 @@ export type RightPanelMode =
   | "files"
   | "question"
   | "voice"
-  | "subagent";
+  | "subagent"
+  /** A side thread in the side panel, beside the agent's own chat. */
+  | "thread";
 
 export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 
@@ -408,6 +410,8 @@ export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel"
  */
 export interface ConversationThreads {
   header: ThreadHeaderProps;
+  /** The side threads with a tab in the side panel. */
+  side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
   /** How many side threads of the agent can run at the same time. */
@@ -432,4 +436,31 @@ export interface ConversationThreads {
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+}
+
+/** The side threads in the side panel. Each shows beside the agent's own chat. */
+interface SideThreads {
+  /** In tab order. */
+  tabs: readonly ThreadItem[];
+  /** A thread of a tab, with the actions of its own message box. Undefined when the thread is gone. */
+  thread: (id: string) => SideThread | undefined;
+  /** Moves a chat tab to the side panel. */
+  onToSide: (id: string) => void;
+  /** Moves a side panel tab back to the chat tabs, and opens it there. */
+  onToChat: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+}
+
+/** A side thread in the side panel. Each action applies to this thread. */
+export interface SideThread {
+  task: AgentTask;
+  conversation: ConversationSnapshot | undefined;
+  approval: AgentApproval | undefined;
+  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  onStop: () => void;
+  onRead: (messageId: string) => void;
+  onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;
+  contextState: AgentContextState | undefined;
+  onCompactContext?: (() => Promise<void>) | undefined;
 }

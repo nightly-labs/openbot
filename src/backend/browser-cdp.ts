@@ -2601,9 +2601,14 @@ export class BrowserCdpEngine {
     ]);
     let blockerId = 0;
     for (const point of points) {
+      // The hit test takes document coordinates; input events keep viewport coordinates.
       const hit = yield* send(
         "DOM.getNodeForLocation",
-        { x: Math.round(point.x), y: Math.round(point.y), includeUserAgentShadowDOM: true },
+        {
+          x: Math.round(point.x + numberValue(viewport?.pageX)),
+          y: Math.round(point.y + numberValue(viewport?.pageY)),
+          includeUserAgentShadowDOM: true,
+        },
         sessionId,
       );
       const hitId = numberValue(hit.backendNodeId);

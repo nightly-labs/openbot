@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "Cerrar pestaña",
   "conversation.threads.closeOthers": "Cerrar otras pestañas",
   "conversation.threads.closeRight": "Cerrar pestañas a la derecha",
+  "conversation.threads.toSide": "Abrir junto al chat",
   "conversation.threads.archive": "Archivar",
   "conversation.threads.archived": "Archivados",
   "conversation.threads.restore": "Restaurar",

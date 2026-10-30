@@ -184,6 +184,7 @@ export const messages = {
   "error.provider.signInExpired": "Logowanie do {provider} wygasło. Zaloguj się ponownie, aby kontynuować.",
   "error.provider.cliActivateFailed": "Nie udało się aktywować zarządzanego CLI.",
   "error.provider.cliBusyReconnect": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, a potem połącz ponownie.",
+  "error.provider.cliBusySignOut": "CLI {provider} przetwarza turę. Poczekaj, aż skończy, a potem odłącz.",
   "error.provider.opencodeCredentialsRejected":
     "Dostawca modelu odrzucił klucz API. Popraw klucz OpenCode w Ustawieniach albo klucz dostawcy poleceniem `opencode auth login`. Potem spróbuj ponownie lub wybierz inny model.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -320,6 +321,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} obsługuje tylko jedno konto.",
   "error.provider.accountNeedsConnection": "Połącz {provider}, zanim dodasz kolejne konto.",
   "error.provider.usageResetUnsupported": "{provider} nie może resetować limitów użycia.",
+  "error.provider.signOutUnsupported": "OpenBot nie może odłączyć logowania {provider}.",
   "error.provider.usageResetNotConnected":
     "Zaloguj się ponownie do tego konta {provider}, zanim zresetujesz jego użycie.",
   "error.provider.accountLimit": "Maksymalna liczba kont dla {provider} to {limit}.",

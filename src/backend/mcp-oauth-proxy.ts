@@ -23,6 +23,10 @@ const OTHER_HEADER_TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 3;
 /** The JSON-RPC code that MCP servers use for a request they refuse without a sign-in. */
 const SIGN_IN_NEEDED_CODE = -32001;
+/** An `initialize` request is small. A larger body goes through as it is. */
+const MAX_INITIALIZE_BYTES = 64 * 1024;
+/** The longest agent name in the client title, so that a server does not cut "(OpenBot)" off. */
+const MAX_AGENT_NAME_LENGTH = 80;
 
 /** The headers of the Streamable HTTP transport. Every other header of the provider stays here. */
 const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "mcp-session-id", "mcp-protocol-version", "last-event-id"];
@@ -58,6 +62,15 @@ export interface McpOAuthProxyOptions {
   target: (route: string) => Effect.Effect<McpOAuthProxyTarget | null, McpOperationError>;
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  /** What the proxy tells a server about the client. Without it, the provider's own `clientInfo` goes through. */
+  client?: McpOAuthProxyClient;
+}
+
+/** The client that a server sees: OpenBot, and the agent of the route when it has one. */
+interface McpOAuthProxyClient {
+  version: string;
+  /** The current name of the agent whose key is `agentKey`, or `null` when no agent has it now. */
+  agentName: (agentKey: string) => string | null;
 }
 
 /** The address and the bearer that one provider process is given for one route. */
@@ -70,8 +83,11 @@ export interface McpOAuthProxyRoute {
  * A loopback pass-through for the Streamable HTTP transport.
  *
  * Bytes go through unchanged, event streams included, because the provider and the server speak
- * MCP to each other; this class only changes the credential. Each route has its own bearer, made
- * from the secret, so a bearer that one row's provider holds opens no other route.
+ * MCP to each other. This class changes the credential, and it names OpenBot and the agent as the
+ * client: the `clientInfo` of `initialize` and the `User-Agent`. Each route has its own bearer, made
+ * from the secret, so a bearer that one row's provider holds opens no other route. An agent route
+ * adds the agent key to the path and to the bearer; the route without one stays valid for the
+ * sessions that hold it.
  *
  * **Never a 401.** A provider that gets a 401 starts its own OAuth sign-in against this address,
  * which has no metadata, and reports a broken server. A sign-in that is gone gets a JSON-RPC error
@@ -89,17 +105,20 @@ export class McpOAuthProxy {
   }
 
   /**
-   * The address and the bearer of `route`, after the listener is up. Every caller shares one
-   * start, so two hand-offs at once do not bind two ports.
+   * The address and the bearer of `route` for the agent with `agentKey` (`mcpOAuthProxyAgentKey`),
+   * after the listener is up. Every caller shares one start, so two hand-offs at once do not bind
+   * two ports.
    */
   readonly route = Effect.fn("McpOAuthProxy.route")(function* (
     this: McpOAuthProxy,
     route: string,
+    agentKey: string | null = null,
   ): Effect.fn.Return<McpOAuthProxyRoute, McpOperationError> {
     const { port, secret } = yield* this.#start();
-    const bearer = routeBearer(secret, route);
+    const path = agentKey ? `${route}/${agentKey}` : route;
+    const bearer = routeBearer(secret, path);
     registerSecretValue(bearer);
-    return { url: `http://127.0.0.1:${port}/mcp/${route}`, bearer };
+    return { url: `http://127.0.0.1:${port}/mcp/${path}`, bearer };
   });
 
   /**
@@ -207,18 +226,21 @@ export class McpOAuthProxy {
     // The provider closed the connection: the upstream request and its event stream end too. This is
     // set before the first wait, so a close during a token refresh is not missed.
     response.once("close", () => controller.abort());
-    const route = /^\/mcp\/([0-9a-f]{32})$/u.exec(request.url ?? "")?.[1];
-    if (!route || !authorized(request, routeBearer(secret, route))) return refuse(response, 403);
+    const [, route, agentKey] = /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?$/u.exec(request.url ?? "") ?? [];
+    if (!route || !authorized(request, routeBearer(secret, agentKey ? `${route}/${agentKey}` : route)))
+      return refuse(response, 403);
     const method = request.method ?? "";
     if (method !== "POST" && method !== "GET" && method !== "DELETE") {
       response.writeHead(405, { allow: "POST, GET, DELETE" });
       response.end();
       return;
     }
-    const body = method === "POST" ? yield* readBody(request) : null;
-    if (body === "too-large") return refuse(response, 413);
+    const read = method === "POST" ? yield* readBody(request) : null;
+    if (read === "too-large") return refuse(response, 413);
     const target = yield* this.#options.target(route);
-    if (!target) return signInNeeded(response, method, body);
+    if (!target) return signInNeeded(response, method, read);
+    const client = this.#options.client;
+    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
     if (!upstream) return signInNeeded(response, method, body);
     const headers: Record<string, string> = {};
@@ -245,12 +267,13 @@ export class McpOAuthProxy {
     body: Buffer | null,
     controller: AbortController,
   ): Effect.fn.Return<Response | null, McpOperationError> {
-    const first = yield* send(target, target.token, request, method, body, controller);
+    const userAgent = this.#options.client ? `OpenBot/${this.#options.client.version}` : null;
+    const first = yield* send(target, target.token, request, method, body, controller, userAgent);
     if (first.status !== 401) return first;
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
     if (!renewed) return null;
-    const second = yield* send(target, renewed, request, method, body, controller);
+    const second = yield* send(target, renewed, request, method, body, controller, userAgent);
     if (second.status !== 401) return second;
     yield* discard(second);
     return null;
@@ -265,6 +288,67 @@ function routeBearer(secret: string, route: string): string {
 /** The route of one row. A new URL is a new route, so a session that holds the old one is refused. */
 export function mcpOAuthProxyRoute(mcpServerId: string, url: string): string {
   return createHash("sha256").update(`${mcpServerId}\u0000${url}`).digest("hex").slice(0, 32);
+}
+
+/** The path segment of one agent. Agent ids are not all hex, and the path does not show them. */
+export function mcpOAuthProxyAgentKey(agentId: string): string {
+  return createHash("sha256").update(`agent\u0000${agentId}`).digest("hex").slice(0, 32);
+}
+
+interface ClientInfo {
+  name: string;
+  title: string;
+  version: string;
+  websiteUrl: string;
+}
+
+/**
+ * OpenBot as the MCP client. The name is fixed, so a server can know OpenBot; the title names the
+ * agent, read at each `initialize`, so a rename shows in the next session.
+ */
+function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): ClientInfo {
+  // Control characters and line breaks would break a label that a server shows on one line, and
+  // direction marks could make it read as the name of another agent.
+  const agentName = agentKey ? client.agentName(agentKey) : null;
+  const name = agentName
+    ? Array.from(agentName.replace(/[\p{Cc}\p{Zl}\p{Zp}\u200E\u200F\u202A-\u202E\u2066-\u2069]+/gu, " ").trim())
+        .slice(0, MAX_AGENT_NAME_LENGTH)
+        .join("")
+        .trim()
+    : null;
+  return {
+    name: "openbot",
+    title: name ? `${name} (OpenBot)` : "OpenBot",
+    version: client.version,
+    websiteUrl: "https://openbot.run",
+  };
+}
+
+/**
+ * The body with OpenBot as the `clientInfo` when it is an `initialize` request. Any other body is
+ * returned as it is. MCP does not let `initialize` be part of a batch, so a batch is not read.
+ */
+function withClientInfo(
+  body: Buffer,
+  request: IncomingMessage,
+  client: McpOAuthProxyClient,
+  agentKey: string | null,
+): Buffer {
+  if (
+    body.length > MAX_INITIALIZE_BYTES ||
+    !request.headers["content-type"]?.toLowerCase().includes("json") ||
+    !body.includes('"initialize"')
+  )
+    return body;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8"));
+  } catch {
+    return body;
+  }
+  if (!isDynamicRecord(parsed) || parsed.method !== "initialize" || !isDynamicRecord(parsed.params)) return body;
+  const params = { ...parsed.params, clientInfo: clientInfo(client, agentKey) };
+  return Buffer.from(JSON.stringify({ ...parsed, params }));
 }
 
 function allowedHost(host: string | undefined, port: number): boolean {
@@ -313,8 +397,9 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   method: string,
   body: Buffer | null,
   controller: AbortController,
+  userAgent: string | null,
 ): Effect.fn.Return<Response, McpOperationError> {
-  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request));
+  const headers = yield* mcpSync(() => upstreamHeaders(target, token, request, userAgent));
   const origin = new URL(target.url).origin;
   let url = new URL(target.url);
   for (let hop = 0; ; hop += 1) {
@@ -337,11 +422,18 @@ const send = Effect.fn("McpOAuthProxy.send")(function* (
   }
 });
 
-function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: IncomingMessage): Headers {
+function upstreamHeaders(
+  target: McpOAuthProxyTarget,
+  token: string,
+  request: IncomingMessage,
+  userAgent: string | null,
+): Headers {
   const headers = new Headers();
   for (const { key, value } of target.headers) {
     if (key.trim().toLowerCase() !== "authorization") headers.set(key.trim(), value);
   }
+  // A `User-Agent` that the user wrote on the row is kept. The provider's own does not go upstream.
+  if (userAgent && !headers.has("user-agent")) headers.set("user-agent", userAgent);
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = request.headers[name];
     if (isString(value)) headers.set(name, value);

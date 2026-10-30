@@ -17,6 +17,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
@@ -121,6 +122,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     askSideQuestion,
     voiceConversationAvailable,
     panelSubagentId,
+    shownPanelThreadId,
+    openPanelThread,
+    closePanelThread,
+    movePanelThreadToChat,
     channel,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
@@ -252,6 +257,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
    * it first in an effect callback when the last tab closes, which halts the reactive system.
    */
   const selectedPane = () => (activeRightPanel() === "side-panel" ? null : sidePanel().selected);
+  /** The side thread that shows, and whose tab is selected. */
+  const shownThread = () => (activeRightPanel() === "thread" ? shownPanelThreadId() : null);
+  /** With no side thread to show, the side panel lists the panes. */
+  const launcherShown = () =>
+    activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
+  const sideThreadTabs = () => props.threads?.side.tabs ?? [];
+  const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
     <>
       <Show when={sidePanelOpen()}>
@@ -263,12 +275,20 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           settingsLabel={channel ? t("channel.settings.title") : undefined}
           onSelect={openSidePanelPane}
           onClose={closeSidePanelPane}
+          threads={{
+            items: sideThreadTabs(),
+            selectedId: shownThread(),
+            onSelect: openPanelThread,
+            onClose: closePanelThread,
+            onMove: moveSideThread,
+            onToChat: movePanelThreadToChat,
+          }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
         />
       </Show>
 
-      <Show when={activeRightPanel() === "side-panel"}>
+      <Show when={launcherShown()}>
         <aside class="browser-panel side-panel-empty" aria-label={t("conversation.sidePanel.label")}>
           <SidePanelLauncher
             available={sidePanelPanes()}
@@ -374,6 +394,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         keyed
       >
         <VoiceConversationPane />
+      </Show>
+
+      {/* Keyed, so each side thread gets its own messages and read state. */}
+      <Show when={shownThread()} keyed>
+        {(threadId) => <ConversationSideThread threadId={threadId} />}
       </Show>
 
       <Show when={activeRightPanel() === "subagent"}>

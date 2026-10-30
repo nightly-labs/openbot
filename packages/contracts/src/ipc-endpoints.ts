@@ -138,6 +138,7 @@ import type {
   AnalyticsPreference,
   AppInfo,
   AppSetupState,
+  BackgroundProcess,
   CentralAuthState,
   ChatWindowTarget,
   ComputerUseHighlightPlacement,
@@ -776,6 +777,8 @@ export const IPC_ENDPOINTS = {
     ),
     renameProviderAccount: request<RenameProviderAccountInput, AgentStatus>()("app:rename-provider-account"),
     removeProviderAccount: request<RemoveProviderAccountInput, AgentStatus>()("app:remove-provider-account"),
+    /** Signs the provider's own sign-in out, in the home folder that a terminal CLI shares. */
+    signOutProvider: request<AgentProviderId, AgentStatus>()("app:sign-out-provider"),
     /** The usage reset credits of each connected account of a provider. It reads the usage of each. */
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     /** Spends one usage reset credit of an account. A reset ends the usage limit that holds its agents. */
@@ -900,6 +903,12 @@ export const IPC_ENDPOINTS = {
     /** Sends one harmless Apple Event to each app, so macOS shows its Automation prompts now. */
     request: request<readonly MacAutomationTarget[], MacAutomationResult[]>()("mac-automation:request"),
   },
+  // The programs that agents left running on this computer. `list` answers null where OpenBot cannot
+  // find them (Windows). `stop` takes the id of one, and ends it with its children.
+  backgroundProcesses: {
+    list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
+    stop: request<string, void>()("background-processes:stop"),
+  },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),
     localGet: request<LocalSkillRevisionInput, MarketplaceSkillDetail>()("skills:local-get"),
@@ -994,13 +1003,15 @@ export const IPC_ENDPOINTS = {
     resetUsage: scopedRequest<ResetProviderUsageInput, ProviderUsageResetOutcome, "required">()(
       "provider-admin:reset-usage",
     ),
+    // Signs a joined server's host's own sign-in of a provider out (`provider-sign-out-v1`).
+    signOut: scopedRequest<AgentProviderId, void, "required">()("provider-admin:sign-out"),
     // A sign-in that a joined server's host starts and that opens in this computer's browser
     // (`sign-in-relay-v1`). This computer takes the callback and sends its query to the host.
     // `openRelaySignIn` opens the page when the user asks, and `pasteRelaySignIn` takes the address
     // the browser shows when the callback cannot reach this computer.
     startRelaySignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:start-relay-sign-in"),
-    // The relayed sign-in of an account after the first (`provider-account-relay-v1`). The other relay
-    // requests run it, by its provider, as they run `startRelaySignIn`'s.
+    // The relayed sign-in of an account after the first (`provider-account-relay-v1` or `-v2`). The
+    // other relay requests run it, by its provider, as they run `startRelaySignIn`'s.
     startAccountRelaySignIn: scopedRequest<ConnectProviderAccountInput, void, "required">()(
       "provider-admin:start-account-relay-sign-in",
     ),
@@ -1246,6 +1257,14 @@ export const IPC_ENDPOINTS = {
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
     // Owner only. Stops a running server and starts it again; a server that does not run starts.
     restart: request<string, HostedServerSummary>()("hosted-servers:restart"),
+  },
+  // Servers that the desktop app starts on this computer, each with its own data. Each one is in the
+  // server list as a joined server with `thisComputer`. `create` takes the name; the others take the
+  // server id. A server, in server mode or hosted, has none and refuses these.
+  localServers: {
+    create: request<string, ServerSummary>()("local-servers:create"),
+    restart: request<string, void>()("local-servers:restart"),
+    delete: request<string, void>()("local-servers:delete"),
   },
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
@@ -1833,6 +1852,7 @@ export const IPC_GROUP_PATHS = {
   browserDock: "browserDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
+  backgroundProcesses: "backgroundProcesses",
   skills: "skills",
   customProviders: "customProviders",
   providerDetection: "providerDetection",
@@ -1853,6 +1873,7 @@ export const IPC_GROUP_PATHS = {
   billing: "billing",
   license: "license",
   hostedServers: "hostedServers",
+  localServers: "localServers",
   marketplaceAgents: "marketplaceAgents",
   agentTemplates: "agentTemplates",
   auth: "auth",

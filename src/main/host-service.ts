@@ -98,6 +98,7 @@ interface HostServiceOptions {
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
   providerUsageResets?: ForwardedApiOptions["providerUsageResets"];
+  providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
   machine?: ForwardedApiOptions["machine"];
@@ -403,6 +404,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
       ...(options.providerUsageResets === undefined ? {} : { providerUsageResets: options.providerUsageResets }),
+      ...(options.providerSignOut === undefined ? {} : { providerSignOut: options.providerSignOut }),
       ...(options.mcpToolRuntimePreparation === undefined
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
@@ -953,7 +955,8 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.getStatus();
   });
 
-  readonly startDevelopmentLocal = Effect.fn("HostService.startDevelopmentLocal")(
+  /** Starts the Team API on loopback only, with no Signal: the development host and a local server. */
+  readonly startLoopbackOnly = Effect.fn("HostService.startLoopbackOnly")(
     function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError, HostApiRuntime> {
       if (!this.#options.store.configured)
         return yield* new RemoteWorkflowError({

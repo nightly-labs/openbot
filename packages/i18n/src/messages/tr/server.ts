@@ -111,8 +111,22 @@ export const messages = {
   "server.add.custom.description":
     "Özel altyapı, ek depolama alanı veya iş akışınıza göre uyarlanmış özellikler edinin.",
   "server.add.custom.action": "Bize ulaşın",
-  "server.add.join.title": "Davetiniz var mı?",
   "server.add.join.action": "Sunucuya katıl",
+  "server.add.otherOptions": "Diğer seçenekler",
+  "server.local.createTitle": "Bu bilgisayarda yeni sunucu",
+  "server.local.createDescription":
+    "Sunucunun kendi ajanları, sohbetleri ve dosyaları vardır. Bu bilgisayarda çalışır.",
+  "server.local.nameLabel": "Sunucu adı",
+  "server.local.create": "Sunucu oluştur",
+  "server.local.creating": "Sunucu oluşturuluyor…",
+  "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.limitReached":
+    "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
+  "server.local.deleteConfirmTitle": "{name} silinsin mi?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot sunucuyu durdurur ve ajanlarını, sohbetlerini ve dosyalarını çöp kutusuna taşır.",
+  "server.local.deleting": "Sunucu siliniyor…",
+  "server.local.deletedTitle": "{name} silindi",
   // Hesap maksimum sayıda barındırılan sunucuya sahip olduğunda gösterilir. Planlar devre dışıdır.
   "server.add.limit.title": "Bu hesap maksimum sunucu sayısına ulaştı",
   "server.add.limit.description": {
@@ -182,6 +196,7 @@ export const messages = {
   "server.rail.addRemote": "Uzak sunucu ekle",
   "server.rail.add": "Bir sunucu ekle",
   "server.rail.buttonLabel": "{name} sunucusu",
+  "server.rail.thisComputer": "bu bilgisayarda",
   "server.rail.notificationsMuted": "bildirimler sessize alındı",
   "server.rail.actions": "Sunucu eylemleri",
   "server.rail.unmute": "Sunucunun sesini aç",

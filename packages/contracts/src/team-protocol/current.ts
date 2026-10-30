@@ -64,9 +64,11 @@ import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
+import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { PROVIDERS_RUNTIMES_V2_CAPABILITY } from "./providers-v2";
@@ -181,9 +183,11 @@ export {
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
+  PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
+  PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -321,6 +325,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_TASK_LIMIT_CAPABILITY,
   BROWSER_PROFILES_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
+  PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   STORAGE_DISK_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
@@ -338,6 +343,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_CONTEXT_USAGE_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  PROVIDER_SIGN_OUT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -451,6 +457,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_TASK_LIMIT_CAPABILITY &&
     capability !== BROWSER_PROFILES_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_RELAY_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY &&
     capability !== STORAGE_DISK_CAPABILITY &&
     capability !== MACHINE_RESOURCES_CAPABILITY &&
     capability !== PROMPT_CACHE_TTL_CAPABILITY &&
@@ -468,7 +475,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
     capability !== MEMORY_REVIEW_CAPABILITY &&
-    capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+    capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
+    capability !== PROVIDER_SIGN_OUT_CAPABILITY,
 );
 // A v7 host does not know the v8 markers, so a client sends them only after it negotiates protocol 8.
 const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
@@ -528,6 +536,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_TASK_LIMIT_CAPABILITY &&
       capability !== BROWSER_PROFILES_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_RELAY_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY &&
       capability !== STORAGE_DISK_CAPABILITY &&
       capability !== MACHINE_RESOURCES_CAPABILITY &&
       capability !== PROMPT_CACHE_TTL_CAPABILITY &&
@@ -545,6 +554,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
       capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
       capability !== MEMORY_REVIEW_CAPABILITY &&
-      capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+      capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
+      capability !== PROVIDER_SIGN_OUT_CAPABILITY,
   );
 }

@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "关闭标签页",
   "conversation.threads.closeOthers": "关闭其他标签页",
   "conversation.threads.closeRight": "关闭右侧标签页",
+  "conversation.threads.toSide": "在聊天旁打开",
   "conversation.threads.archive": "归档",
   "conversation.threads.archived": "已归档",
   "conversation.threads.restore": "恢复",

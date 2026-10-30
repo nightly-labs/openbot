@@ -108,8 +108,21 @@ export const messages = {
   "server.add.custom.description":
     "Erhalte eigene Infrastruktur, zusätzlichen Speicher oder Funktionen, die auf deine Arbeitsweise zugeschnitten sind.",
   "server.add.custom.action": "Kontaktiere uns",
-  "server.add.join.title": "Hast du eine Einladung?",
   "server.add.join.action": "Server beitreten",
+  "server.add.otherOptions": "Weitere Optionen",
+  "server.local.createTitle": "Neuer Server auf diesem Computer",
+  "server.local.createDescription": "Der Server hat eigene Agenten, Chats und Dateien. Er läuft auf diesem Computer.",
+  "server.local.nameLabel": "Servername",
+  "server.local.create": "Server erstellen",
+  "server.local.creating": "Server wird erstellt…",
+  "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
+  "server.local.limitReached":
+    "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
+  "server.local.deleteConfirmTitle": "{name} löschen?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stoppt den Server und verschiebt seine Agenten, Chats und Dateien in den Papierkorb.",
+  "server.local.deleting": "Server wird gelöscht…",
+  "server.local.deletedTitle": "{name} gelöscht",
   "server.add.limit.title": "Dieses Konto hat die maximale Anzahl von Servern",
   "server.add.limit.description": {
     one: "Ein Konto kann {count} kostenpflichtigen Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",
@@ -178,6 +191,7 @@ export const messages = {
   "server.rail.addRemote": "Remote-Server hinzufügen",
   "server.rail.add": "Server hinzufügen",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "auf diesem Computer",
   "server.rail.notificationsMuted": "Benachrichtigungen stummgeschaltet",
   "server.rail.actions": "Serveraktionen",
   "server.rail.unmute": "Stummschaltung aufheben",

@@ -103,8 +103,22 @@ export const messages = {
   "server.add.custom.title": "より高い性能やカスタムソリューションが必要ですか？",
   "server.add.custom.description": "専用インフラ、追加ストレージ、ワークフローに合わせた機能をご用意できます。",
   "server.add.custom.action": "お問い合わせ",
-  "server.add.join.title": "招待をお持ちですか？",
   "server.add.join.action": "サーバーに参加",
+  "server.add.otherOptions": "その他のオプション",
+  "server.local.createTitle": "このコンピューター上の新しいサーバー",
+  "server.local.createDescription":
+    "このサーバーには専用のエージェント、チャット、ファイルがあります。このコンピューター上で動作します。",
+  "server.local.nameLabel": "サーバー名",
+  "server.local.create": "サーバーを作成",
+  "server.local.creating": "サーバーを作成中…",
+  "server.local.createFailed": "サーバーを作成できませんでした。",
+  "server.local.limitReached":
+    "このコンピューターに作成できるサーバーは最大 {limit} 台です。新しく作成するには、1 台を削除してください。",
+  "server.local.deleteConfirmTitle": "{name} を削除しますか？",
+  "server.local.deleteConfirmDescription":
+    "OpenBot はサーバーを停止し、エージェント、チャット、ファイルをゴミ箱に移動します。",
+  "server.local.deleting": "サーバーを削除中…",
+  "server.local.deletedTitle": "{name} を削除しました",
   "server.add.limit.title": "このアカウントのサーバー数が上限に達しています",
   "server.add.limit.description": {
     other:
@@ -169,6 +183,7 @@ export const messages = {
   "server.rail.addRemote": "リモートサーバーを追加",
   "server.rail.add": "サーバーを追加",
   "server.rail.buttonLabel": "{name} サーバー",
+  "server.rail.thisComputer": "このコンピューター上",
   "server.rail.notificationsMuted": "通知はミュート中",
   "server.rail.actions": "サーバーの操作",
   "server.rail.unmute": "サーバーのミュートを解除",

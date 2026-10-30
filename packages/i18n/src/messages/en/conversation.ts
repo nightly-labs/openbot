@@ -70,6 +70,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.closeTab": "Close tab",
   "conversation.threads.closeOthers": "Close other tabs",
   "conversation.threads.closeRight": "Close tabs to the right",
+  "conversation.threads.toSide": "Open beside the chat",
   "conversation.threads.archive": "Archive",
   "conversation.threads.archived": "Archived",
   "conversation.threads.restore": "Restore",

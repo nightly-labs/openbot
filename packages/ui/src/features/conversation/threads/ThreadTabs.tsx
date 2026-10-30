@@ -5,6 +5,7 @@ import {
   CircleX,
   ContextMenu,
   Input,
+  PanelRight,
   PencilLine,
   SlidingTabs,
   Trash2,
@@ -12,7 +13,9 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, flush, onSettled, Show } from "solid-js";
-import { ThreadStatusMark, threadAttention } from "./ThreadStatusMark";
+import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
+import { ThreadTabGhost } from "./ThreadTabGhost";
+import { setCarriedThreadTab, sidePanelTabRow, swallowNextClick } from "./thread-tab-drag";
 import { MAIN_THREAD_ID, type ThreadHeaderProps, type ThreadItem, threadBusy } from "./thread-types";
 
 /** The width of the soft edge where more tabs are out of view, as in the CSS. */
@@ -24,12 +27,12 @@ const DRAG_EDGE = 40;
 const DRAG_SCROLL_MAX = 12;
 /** The actions with which Kobalte selects a tab. */
 const CHOICE_EVENTS = ["pointerdown", "click", "keydown"];
-/** A short title gets a field wide enough to type a longer one. */
-const RENAME_MIN_WIDTH = 160;
 /** For this time after the field opens, focus that leaves it comes back. */
 const RENAME_FOCUS_GUARD = 400;
+/** The steps of the model picker, from the full picker to its icon. Each step gives the tabs more room. */
+const MODEL_FIT = ["full", "short", "icon"] as const;
 
-/** A tab whose title the user edits, and where its field shows over the tabs. */
+/** A tab whose title the user edits, and where its field shows over the title of the tab. */
 interface Rename {
   id: string;
   title: string;
@@ -42,11 +45,14 @@ interface TabDrag {
   id: string;
   pointerId: number;
   startX: number;
+  startY: number;
   startScroll: number;
   /** The pointer now. */
   x: number;
   /** False until the pointer moves past `DRAG_START`. */
   moving: boolean;
+  /** The pointer is over the side panel, so a drop opens the thread there. */
+  away: boolean;
   /** The place of the tab when the pointer lets it go. */
   target: number;
   frame: number;
@@ -64,6 +70,8 @@ function ThreadTab(props: {
   onClose: () => void;
   onMove: (step: -1 | 1) => void;
   onRename: () => void;
+  /** The user edits the title of this tab. */
+  renaming: boolean;
 }) {
   const { t } = useText();
   // The close control and dragging are for the pointer. A keyboard user closes the focused tab with
@@ -74,6 +82,10 @@ function ThreadTab(props: {
     event.stopPropagation();
   };
   const menuMark = () => (props.menuOpen ? "" : undefined);
+  const renameMark = () => (props.renaming ? "" : undefined);
+  // The slot closes the tab only for a press that started on it outside a rename. A press that ends a
+  // rename can end on the slot, because the slot takes the pointer again when the rename ends.
+  let closePressed = false;
   const closeLabel = () => t("conversation.threads.closeTab");
   return (
     <SlidingTabs.Trigger
@@ -82,6 +94,7 @@ function ThreadTab(props: {
       data-thread-id={props.thread.id}
       data-attention={threadAttention(props.thread.status)}
       data-menu-open={menuMark()}
+      data-renaming={renameMark()}
       title={props.thread.title}
       onDblClick={(event: MouseEvent) => {
         if (event.target instanceof Element && event.target.closest(".agent-threads-tab-close")) return;
@@ -104,21 +117,29 @@ function ThreadTab(props: {
         }
       }}
     >
-      <span class="agent-threads-tab-title">{props.thread.title}</span>
-      <ThreadStatusMark status={props.thread.status} />
+      {/* As in a side panel tab, the icon slot shows the thread's state and is also the close control. */}
       <span
         class="agent-threads-tab-close"
         aria-hidden="true"
         title={closeLabel()}
-        onPointerDown={stop}
+        onPointerDown={(event) => {
+          stop(event);
+          closePressed = !props.renaming;
+        }}
         onMouseDown={stop}
         onClick={(event) => {
           stop(event);
-          props.onClose();
+          if (closePressed) props.onClose();
+          closePressed = false;
         }}
       >
-        <X />
+        <span class="agent-threads-tab-icon">
+          <ThreadTabIcon status={props.thread.status} />
+        </span>
+        <X class="agent-threads-tab-x" />
       </span>
+      <span class="agent-threads-tab-title">{props.thread.title}</span>
+      <ThreadStatusText status={props.thread.status} />
     </SlidingTabs.Trigger>
   );
 }
@@ -165,7 +186,61 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       element.toggleAttribute("data-more-before", element.scrollLeft > 1);
       element.toggleAttribute("data-more-after", element.scrollLeft < max - 1);
     };
+    const header = element.closest<HTMLElement>(".conversation-header");
+    // When the tabs do not fit, the model picker in the header gets smaller first: without the effort,
+    // then as its icon. It gets larger again when the tabs still fit after the change. Each step is
+    // measured at its end size with the transitions off. Then the picker slides to the new step.
+    let step = 0;
+    let sliding = false;
+    let disposed = false;
+    // Tabs that are narrower than their full width also need room, so the picker gets smaller before them.
+    const overflows = () => {
+      if (element.scrollWidth - element.clientWidth > 1) return true;
+      const tab = element.querySelector<HTMLElement>(".agent-threads-tab");
+      return (
+        tab !== null && tab.getBoundingClientRect().width < Number.parseFloat(getComputedStyle(tab).maxWidth) - 0.5
+      );
+    };
+    const show = (next: number) => {
+      step = next;
+      if (!header) return;
+      if (next === 0) delete header.dataset.modelFit;
+      else header.dataset.modelFit = MODEL_FIT[next];
+    };
+    const fitting = () => {
+      while (step < MODEL_FIT.length - 1 && overflows()) show(step + 1);
+      if (overflows()) return step;
+      while (step > 0) {
+        const current = step;
+        show(current - 1);
+        if (!overflows()) continue;
+        show(current);
+        break;
+      }
+      return step;
+    };
+    const fitPicker = () => {
+      // While the picker slides, its width is not final. The tabs measure again after the slide.
+      if (!header || sliding) return;
+      const from = step;
+      header.toggleAttribute("data-model-measure", true);
+      const to = fitting();
+      show(from);
+      header.getBoundingClientRect();
+      header.removeAttribute("data-model-measure");
+      if (to === from) return;
+      header.getBoundingClientRect();
+      show(to);
+      header.getBoundingClientRect();
+      sliding = true;
+      const slides = header.querySelector(".provider-model-trigger")?.getAnimations({ subtree: true }) ?? [];
+      void Promise.allSettled(slides.map((slide) => slide.finished)).then(() => {
+        sliding = false;
+        if (!disposed) measure();
+      });
+    };
     const measure = () => {
+      fitPicker();
       const tab = element.querySelector<HTMLElement>('.agent-threads-tab[aria-selected="true"]');
       // The agent's own chat has no tab: while it is open, no tab is selected and the fill hides.
       if (!tab) {
@@ -187,6 +262,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
     const focusSelected = () => element.querySelector<HTMLElement>('.agent-threads-tab[aria-selected="true"]')?.focus();
     const resize = new ResizeObserver(measure);
     resize.observe(element);
+    if (header) resize.observe(header);
     const observeTabs = () => {
       for (const tab of element.querySelectorAll(".agent-threads-tab")) resize.observe(tab);
     };
@@ -260,7 +336,12 @@ export function ThreadTabs(props: ThreadHeaderProps) {
         last.left + last.width - self.left - self.width,
       );
       const center = self.left + self.width / 2 + offset;
-      current.target = items.filter((item, i) => i !== index && item.left + item.width / 2 < center).length;
+      // At the end of the row the center of the dragged tab can only reach the center of the last tab,
+      // so a tab after it is passed at the same center too.
+      current.target = items.filter((item, i) => {
+        const itemCenter = item.left + item.width / 2;
+        return i < index ? itemCenter < center : i > index && itemCenter <= center;
+      }).length;
       const room = self.width + Number.parseFloat(getComputedStyle(element).columnGap || "0");
       items.forEach((item, i) => {
         if (i === index) {
@@ -272,9 +353,34 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       });
       setDragged({ id: current.id, x: offset });
     };
+    /** Over the side panel, the tab leaves the tabs. A copy of it follows the pointer there. */
+    const carryAway = (current: TabDrag, y: number) => {
+      const thread = props.tabs.find((item) => item.id === current.id);
+      const row = sidePanelTabRow(element);
+      const away =
+        thread?.kind === "side" &&
+        props.onMoveToSide !== undefined &&
+        row !== null &&
+        current.x >= row.getBoundingClientRect().left;
+      if (away !== current.away) {
+        current.away = away;
+        const tab = element.querySelector<HTMLElement>(`[data-thread-id="${CSS.escape(current.id)}"]`);
+        tab?.setAttribute("data-dragged", away ? "away" : "");
+        if (away) {
+          for (const item of tabElements()) item.style.transform = "";
+          setDragged(null);
+        }
+      }
+      setCarriedThreadTab(away && thread ? { thread, from: "chat", x: current.x, y } : null);
+      return away;
+    };
     const autoScroll = () => {
       const current = drag;
       if (!current?.moving) return;
+      if (current.away) {
+        current.frame = requestAnimationFrame(autoScroll);
+        return;
+      }
       const box = element.getBoundingClientRect();
       const speed =
         current.x < box.left + DRAG_EDGE
@@ -293,13 +399,13 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       if (!current || event.pointerId !== current.pointerId) return;
       current.x = event.clientX;
       if (!current.moving) {
-        if (Math.abs(current.x - current.startX) < DRAG_START) return;
+        if (Math.hypot(current.x - current.startX, event.clientY - current.startY) < DRAG_START) return;
         current.moving = true;
         element.setAttribute("data-dragging", "");
         element.querySelector(`[data-thread-id="${CSS.escape(current.id)}"]`)?.setAttribute("data-dragged", "");
         current.frame = requestAnimationFrame(autoScroll);
       }
-      follow(current);
+      if (!carryAway(current, event.clientY)) follow(current);
     };
     const onDragEnd = (event: PointerEvent) => {
       const current = drag;
@@ -312,6 +418,13 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       cancelAnimationFrame(current.frame);
       element.removeAttribute("data-dragging");
       element.querySelector("[data-dragged]")?.removeAttribute("data-dragged");
+      setCarriedThreadTab(null);
+      swallowNextClick();
+      if (current.away && event.type !== "pointercancel") {
+        setDragged(null);
+        props.onMoveToSide?.(current.id);
+        return;
+      }
       reorder(
         current.id,
         event.type === "pointercancel"
@@ -323,14 +436,17 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       if (event.button !== 0 || !event.isPrimary || drag) return;
       if (!(event.target instanceof Element) || event.target.closest(".agent-threads-tab-close")) return;
       const id = event.target.closest<HTMLElement>(".agent-threads-tab")?.dataset.threadId;
-      if (!id || tabElements().length < 2) return;
+      // One tab can still move to the side panel.
+      if (!id || (tabElements().length < 2 && !props.onMoveToSide)) return;
       drag = {
         id,
         pointerId: event.pointerId,
         startX: event.clientX,
+        startY: event.clientY,
         startScroll: element.scrollLeft,
         x: event.clientX,
         moving: false,
+        away: false,
         target: 0,
         frame: 0,
       };
@@ -381,6 +497,9 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       window.removeEventListener("pointerup", onDragEnd);
       window.removeEventListener("pointercancel", onDragEnd);
       if (drag) cancelAnimationFrame(drag.frame);
+      if (drag?.away) setCarriedThreadTab(null);
+      disposed = true;
+      show(0);
       document.removeEventListener("focusin", keepFocus);
       document.removeEventListener("pointerdown", onPointer, true);
     };
@@ -390,16 +509,22 @@ export function ThreadTabs(props: ThreadHeaderProps) {
     list?.querySelector<HTMLElement>(`.agent-threads-tab[data-thread-id="${CSS.escape(id)}"]`);
   const threadOf = (id: string | null) => props.tabs.find((thread) => thread.id === id);
 
-  /** Opens a text field over the tab, with the tab's title. */
+  /**
+   * Edits the title in the tab: a text field without a frame takes the place of the title, from its
+   * start to the end of the tab, so the icon stays and the tab keeps its size. A tab that is partly out
+   * of view scrolls into view first.
+   */
   const startRename = (id: string) => {
     const tab = tabOf(id);
     const thread = threadOf(id);
-    if (!tab || !area || !thread || !renamable(props, thread)) return;
+    const title = tab?.querySelector(".agent-threads-tab-title");
+    if (!tab || !title || !area || !thread || !renamable(props, thread)) return;
+    tab.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
     const box = tab.getBoundingClientRect();
-    const base = area.getBoundingClientRect();
-    const width = Math.max(box.width, RENAME_MIN_WIDTH);
+    const start = title.getBoundingClientRect().left;
+    const end = box.right - (Number.parseFloat(getComputedStyle(tab).paddingRight) || 0);
     renameAt = performance.now();
-    setRenaming({ id, title: thread.title, width, left: Math.max(0, box.left - base.left) });
+    setRenaming({ id, title: thread.title, width: end - start, left: start - area.getBoundingClientRect().left });
   };
   /** Keeps a title that is not empty. Enter and Escape put focus back on the tab. */
   const finishRename = (value: string | null, refocus: boolean) => {
@@ -410,6 +535,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
     if (title && title !== edit.title) props.onRename?.(edit.id, title);
     if (refocus) requestAnimationFrame(() => tabOf(edit.id)?.focus());
   };
+  const isRenaming = (id: string) => renaming()?.id === id;
   const renameStyle = (edit: Rename) => `left: ${edit.left}px; width: ${edit.width}px;`;
 
   /** A right-click outside a tab opens no menu. */
@@ -442,6 +568,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
   };
   const canRename = () => renamable(props, target());
   const canDelete = () => isSide() && props.onDelete !== undefined;
+  const canMoveToSide = () => isSide() && props.onMoveToSide !== undefined;
   const isMenuTarget = (id: string) => menuOpen() && menuTarget() === id;
   const openChosen = (id: string) => {
     if (choosing) props.onOpen(id);
@@ -492,6 +619,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
                     onClose={() => closeTab(thread().id)}
                     onMove={(step) => move(thread().id, step)}
                     onRename={() => startRename(thread().id)}
+                    renaming={isRenaming(thread().id)}
                   />
                 )}
               </For>
@@ -504,6 +632,13 @@ export function ThreadTabs(props: ThreadHeaderProps) {
               <ContextMenu.Item onSelectAfterClose={() => startRename(targetId())}>
                 <PencilLine class="agent-context-icon size-4" aria-hidden="true" />
                 <span>{t("common.rename")}</span>
+              </ContextMenu.Item>
+              <ContextMenu.Separator />
+            </Show>
+            <Show when={canMoveToSide()}>
+              <ContextMenu.Item onSelect={() => props.onMoveToSide?.(targetId())}>
+                <PanelRight class="agent-context-icon size-4" aria-hidden="true" />
+                <span>{t("conversation.threads.toSide")}</span>
               </ContextMenu.Item>
               <ContextMenu.Separator />
             </Show>
@@ -544,6 +679,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+      <ThreadTabGhost from="chat" />
       <Show when={renaming()}>
         {(edit) => (
           <Input

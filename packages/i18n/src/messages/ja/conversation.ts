@@ -71,6 +71,7 @@ export const messages = {
   "conversation.threads.closeTab": "タブを閉じる",
   "conversation.threads.closeOthers": "他のタブを閉じる",
   "conversation.threads.closeRight": "右のタブを閉じる",
+  "conversation.threads.toSide": "チャットの横に開く",
   "conversation.threads.archive": "アーカイブ",
   "conversation.threads.archived": "アーカイブ済み",
   "conversation.threads.restore": "復元",

@@ -177,6 +177,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.signInExpired": "Your {provider} sign-in expired. Sign in again to continue.",
   "error.provider.cliActivateFailed": "OpenBot could not activate the managed CLI.",
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
+  "error.provider.cliBusySignOut": "The {provider} CLI is working on a turn. Wait for it to finish, then disconnect.",
   "error.provider.opencodeCredentialsRejected":
     "The model provider rejected the API key. Fix the OpenCode key in Settings, or the provider's key with `opencode auth login`. Then try again or choose another model.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -309,6 +310,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.accountsUnsupported": "{provider} can hold one account only.",
   "error.provider.accountNeedsConnection": "Connect {provider} before you add another account.",
   "error.provider.usageResetUnsupported": "{provider} cannot reset usage limits.",
+  "error.provider.signOutUnsupported": "OpenBot cannot disconnect the {provider} sign-in.",
   "error.provider.usageResetNotConnected": "Sign in to this {provider} account again before you reset its usage.",
   "error.provider.accountLimit": "{provider} can hold at most {limit} accounts.",
   "error.provider.accountNotFound": "This {provider} account is not on this computer. Refresh and try again.",
