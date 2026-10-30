@@ -10,12 +10,12 @@ const ERR_ABORTED = -3;
 /**
  * Starts a navigation and settles when the main frame finishes it. `initiate` returns `false` when
  * there is nowhere to go, `true` when the navigation started synchronously, or the promise of an
- * API such as `loadURL`.
+ * API such as `loadURL`. With a `null` timeout, the wait has no deadline.
  */
 export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
-  timeoutMs = 10_000,
+  timeoutMs: number | null = 10_000,
 ): Effect.Effect<void, BrowserOperationError> {
   return watchNavigation(contents, initiate, timeoutMs);
 }
@@ -61,14 +61,14 @@ export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((conte
 
 /** Without `initiate`, the load in progress counts as a started cross-document navigation. */
 const watchNavigation = Effect.fn("Browser.watchNavigation")(
-  (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number) => {
+  (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number | null) => {
     return Effect.callback<void, BrowserOperationError>((resume) => {
       let started = initiate === undefined;
       let inPlace = false;
       let settled = false;
       let timedOut = false;
       let initiationPending = false;
-      let timer: NodeJS.Timeout;
+      let timer: NodeJS.Timeout | undefined;
       const cleanup = () => {
         clearTimeout(timer);
         contents.off("did-start-navigation", didStartNavigation);
@@ -114,17 +114,19 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       contents.on("did-navigate-in-page", didNavigateInPage);
       contents.on("did-fail-load", didFailLoad);
       contents.once("destroyed", destroyed);
-      timer = setTimeout(() => {
-        timedOut = true;
-        try {
-          const navigationWasActive = started || contents.isLoading();
-          contents.stop();
-          if (!navigationWasActive && !initiationPending) complete();
-        } catch (error) {
-          finish(error);
-        }
-      }, timeoutMs);
-      timer.unref();
+      if (timeoutMs !== null) {
+        timer = setTimeout(() => {
+          timedOut = true;
+          try {
+            const navigationWasActive = started || contents.isLoading();
+            contents.stop();
+            if (!navigationWasActive && !initiationPending) complete();
+          } catch (error) {
+            finish(error);
+          }
+        }, timeoutMs);
+        timer.unref();
+      }
       if (!initiate) return Effect.sync(cleanup);
       try {
         const initiation = initiate();

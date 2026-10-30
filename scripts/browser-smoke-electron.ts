@@ -2061,6 +2061,14 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
           success: exit._tag === "Success",
           ...(exit._tag === "Success" ? {} : { error: String(exit.cause) }),
         });
+        const opened = await Effect.runPromiseExit(browser.open(url, "smoke-thread", "smoke-bot"));
+        outcomes.push({
+          via: "open",
+          url,
+          success: opened._tag === "Success",
+          ...(opened._tag === "Success" ? {} : { error: String(opened.cause) }),
+        });
+        if (opened._tag === "Success") await runCauseEffect(browser.close(opened.value.id));
       }
     }
     await waitFor(

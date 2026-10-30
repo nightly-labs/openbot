@@ -739,7 +739,8 @@ export class BrowserHost {
 
       const loadGeneration = tab.loadGeneration;
       yield* Effect.gen({ self: this }, function* () {
-        yield* browserCall(() => tab.contents.loadURL(normalizedUrl, browserLoadOptions()));
+        // The first load of a new tab has no deadline, as with `loadURL` alone.
+        yield* navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()), null);
         if (focus) {
           this.#focusTab(tab);
           setImmediate(() => this.#focusTab(tab));
