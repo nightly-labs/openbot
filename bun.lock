@@ -386,9 +386,10 @@
     "expo@58.0.17": "patches/expo@58.0.17.patch",
     "expo-router@58.0.25": "patches/expo-router@58.0.25.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
+    "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
-    "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
+    "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
   },
   "catalog": {

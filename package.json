@@ -448,7 +448,8 @@
     "expo-splash-screen@58.0.11": "patches/expo-splash-screen@58.0.11.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-uitextview@2.7.1": "patches/react-native-uitextview@2.7.1.patch",
-    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch"
+    "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
+    "cuelume@0.2.8": "patches/cuelume@0.2.8.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",
