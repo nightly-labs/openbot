@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
 import { isMissingFileError } from "./file-errors";
+import { cursorDataHome } from "./process-confinement";
 
 /**
  * Cursor 2026.10.22-27dcf5f does not load a server whose name is in the project's
@@ -9,18 +9,8 @@ import { isMissingFileError } from "./file-errors";
  * The list has names only, so an `openbot` entry from the user's own Cursor CLI takes OpenBot's
  * tools from each agent in that project. This removes OpenBot's names and keeps the other entries.
  */
-export function enableCursorMcpServers(
-  cwd: string,
-  names: readonly string[],
-  env: NodeJS.ProcessEnv = process.env,
-  home = homedir(),
-): void {
-  const file = join(
-    env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor"),
-    "projects",
-    cursorProjectSlug(cursorProjectRoot(cwd)),
-    "mcp-disabled.json",
-  );
+export function enableCursorMcpServers(cwd: string, names: readonly string[]): void {
+  const file = join(cursorDataHome(), "projects", cursorProjectSlug(cursorProjectRoot(cwd)), "mcp-disabled.json");
   let text: string;
   try {
     text = readFileSync(file, "utf8");

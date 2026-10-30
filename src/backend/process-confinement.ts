@@ -142,7 +142,7 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
 export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
   const xdgConfig = env.XDG_CONFIG_HOME?.trim();
   const userConfig = env.CURSOR_CONFIG_DIR?.trim() || (xdgConfig ? join(xdgConfig, "cursor") : join(home, ".cursor"));
-  const dataHome = env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
+  const dataHome = cursorDataHome(env, home);
   // `auth.json` and the `sandbox.json` and `hooks.json` files are always in `~/.cursor` on macOS.
   const fixedHome = join(home, ".cursor");
   const settings = [
@@ -170,6 +170,11 @@ export function cursorStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
       names: [".workspace-trusted", "mcp-approvals.json"],
     },
   };
+}
+
+/** The Cursor CLI's data folder, which holds its sessions and the project data in `projects`. */
+export function cursorDataHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.CURSOR_DATA_DIR?.trim() || join(home, ".cursor");
 }
 
 const CURSOR_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cursor-cache");
