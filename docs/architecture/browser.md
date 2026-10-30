@@ -207,7 +207,9 @@ The single `evaluate` tool still refuses that value. If the step failed after th
 would click again. In a script, `waitFor` also takes a page function: the page polls it every
 100 ms until it returns a truthy value, in one `evaluate` step (at most 25 seconds). A script that
 fails without a final snapshot returns the tab's `url`, because the steps before the failure stay
-done and the agent must not start again from the wrong page.
+done and the agent must not start again from the wrong page. When the final snapshot fails after
+the last step, the result keeps the script's value and log. It has `snapshotError`, or the
+`user_control` status when a person took the tab.
 
 The script runs in a QuickJS WebAssembly sandbox (`src/backend/browser-script.ts`), not in
 `node:vm`, because the backend process holds the vault. The sandbox has no modules, network, files,

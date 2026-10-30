@@ -182,6 +182,30 @@ async function main(): Promise<void> {
     host.releaseUserControl(held.tab.id);
     recordCases("script-stops-at-user-control");
 
+    // The person takes the tab during the last step: the script is done, but the final snapshot is
+    // refused. The result keeps the value, so that the agent does not run the steps again.
+    await held.contents.executeJavaScript("delete window.fixtureFinish");
+    const late = runScript({
+      tabId: held.tab.id,
+      script: `
+        const value = await evaluate("new Promise((resolve) => { window.fixtureFinish = resolve; })");
+        return { value };
+      `,
+    });
+    await held.contents.executeJavaScript(
+      "new Promise((resolve) => { const ready = () => (window.fixtureFinish ? resolve() : requestAnimationFrame(ready)); ready(); })",
+    );
+    const lateTake = Effect.runFork(host.takeUserControl(held.tab.id, { kind: "local" }));
+    await held.contents.executeJavaScript("window.fixtureFinish('late')");
+    const lateOutcome = await late;
+    await runCauseEffect(Fiber.join(lateTake));
+    assert.equal(lateOutcome.outcome.status, "user_control");
+    assert.deepEqual(lateOutcome.outcome.value, { value: "late" }, "The script result was lost.");
+    assert.equal(lateOutcome.outcome.steps, 1);
+    assert.equal(lateOutcome.outcome.snapshot, undefined, "A held tab returned a snapshot.");
+    host.releaseUserControl(held.tab.id);
+    recordCases("script-keeps-result-when-snapshot-refused");
+
     phase("secret-protection");
     const seed = await open("/form");
     await seed.contents.session.protocol.handle(

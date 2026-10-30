@@ -28,6 +28,9 @@ export type BrowserStepOutcome =
   | { status: "user_control" }
   | { status: "tab_closed" };
 
+export const BROWSER_SCRIPT_USER_CONTROL_ERROR =
+  "A person took control of the tab. Wait for the release, then take a fresh snapshot.";
+
 export interface BrowserScriptResult {
   status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed";
   value?: BrowserJsonValue;
@@ -294,7 +297,7 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
               break;
             case "user_control":
               return result("user_control", {
-                error: "A person took control of the tab. Wait for the release, then take a fresh snapshot.",
+                error: BROWSER_SCRIPT_USER_CONTROL_ERROR,
               });
             case "tab_closed":
               return result("tab_closed", { error: "A step closed the tab." });

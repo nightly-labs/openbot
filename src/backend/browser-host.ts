@@ -32,7 +32,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
   app,
   type BrowserWindow,
@@ -83,7 +83,12 @@ import {
   preferredBrowserLanguageCodes,
 } from "./browser-policy";
 import { BrowserRecorder } from "./browser-recorder";
-import { type BrowserScriptResult, type BrowserStepOutcome, runBrowserScript } from "./browser-script";
+import {
+  BROWSER_SCRIPT_USER_CONTROL_ERROR,
+  type BrowserScriptResult,
+  type BrowserStepOutcome,
+  runBrowserScript,
+} from "./browser-script";
 import {
   type BrowserContextMenuItem,
   browserContextMenuItems,
@@ -1843,22 +1848,34 @@ export class BrowserHost {
           maxSteps: BROWSER_SCRIPT_MAX_STEPS,
           runStep: (step) => this.#runStep(params, tabId, step, hooks),
         });
-        const snapshot =
-          args.finalSnapshot === false || run.status === "user_control" || run.status === "tab_closed"
-            ? undefined
-            : yield* this.#finalStepsSnapshot(params, tabId);
+        let result: BrowserScriptResult = run;
+        let snapshot: BrowserSnapshot | undefined;
+        let snapshotError: string | undefined;
+        if (args.finalSnapshot !== false && run.status !== "user_control" && run.status !== "tab_closed") {
+          // The steps are done when the final snapshot fails, so the result keeps their value and log.
+          // Otherwise the agent sees only an error and can run the same clicks or submits again.
+          const read = yield* Effect.result(this.#finalStepsSnapshot(params, tabId));
+          if (Result.isSuccess(read)) snapshot = read.success;
+          else {
+            const error = read.failure.cause;
+            if (error instanceof BrowserUserControlHeld)
+              result = { ...run, status: "user_control", error: BROWSER_SCRIPT_USER_CONTROL_ERROR };
+            else snapshotError = redactText(error instanceof Error ? error.message : String(error));
+          }
+        }
         // The steps before a failure stay done. Without a snapshot, the URL shows the agent where the
         // script left the tab, so that it does not start again from the wrong page.
-        const tab = run.status === "completed" || snapshot ? undefined : this.#tabs.get(tabId);
+        const tab = snapshot || (result.status === "completed" && !snapshotError) ? undefined : this.#tabs.get(tabId);
         return {
           ...textResult({
             tabId,
-            ...run,
-            ...(run.error === undefined ? {} : { error: redactText(run.error) }),
+            ...result,
+            ...(result.error === undefined ? {} : { error: redactText(result.error) }),
+            ...(snapshotError === undefined ? {} : { snapshotError }),
             ...(tab ? { url: currentTabUrl(tab) } : {}),
             ...(snapshot ? { snapshot } : {}),
           }),
-          success: run.status === "completed",
+          success: result.status === "completed",
         };
       }),
     close_tab: ({ args }, params) =>
