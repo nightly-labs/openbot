@@ -7,7 +7,8 @@
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
-// - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent.
+// - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent, and a secure
+//   authentication answer reaches the agent service (#3949).
 // - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
 //   client gets the released runtime snapshot (#3584).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
@@ -18,7 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentContextState } from "@openbot/contracts/ipc";
+import { type AgentContextState, BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import {
   createTeamProtocolV2Request,
   createTeamProtocolV8Event,
@@ -51,6 +52,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -1012,6 +1014,40 @@ try {
       `The host failed the DELETE: ${JSON.stringify(frame)}.`,
     );
     return { status };
+  });
+
+  await step("v8 RPC: a secure authentication answer over WebRTC reaches the agent (#3949)", async () => {
+    // The answer names its agent as `agentId` on every protocol. With `botId`, the Team API refused
+    // the body with 400 before the agent service read it.
+    const path = BROWSER_SECRET_RESPONSE_PATH;
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "POST",
+          path,
+          body: encodeTeamProtocolV8WebRtcHttpRequest("POST", path, {
+            requestId: "no-such-request",
+            agentId: source.id,
+            decision: "cancel",
+          }),
+          capabilities: [...teamCapabilitiesForProtocol(8)],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    // No secure card is open, so the agent service answers that the request is no longer active.
+    const error = "error" in frame ? frame.error : undefined;
+    assert.equal(
+      error?.message,
+      sourceText("error.backend.authRequestInactive"),
+      `The answer did not reach the agent service: ${JSON.stringify(frame)}.`,
+    );
+    return { status: error?.status };
   });
 
   await step("v2 path: a failed ICE path marks the session away and keeps it open (#3583)", async () => {
