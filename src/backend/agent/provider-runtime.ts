@@ -40,6 +40,7 @@ import {
   CodexCliError,
   cliPathEnvironment,
   cliSpawnTarget,
+  resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
@@ -745,10 +746,14 @@ export class ProviderRuntime implements ProviderPort {
     return this.status();
   }, Effect.uninterruptible).bind(this);
 
-  /** Resolve a provider's binary and keep who owns it, whether or not the provider is signed in. */
+  /**
+   * Resolve a provider's binary and keep who owns it, whether or not the provider is signed in. The
+   * CLI the user installed wins when it is as new (`resolveInstalledFirst`).
+   */
   readonly #resolveProviderCli = Effect.fn("ProviderRuntime.resolveCli")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    { preferInstalled = true }: { preferInstalled?: boolean } = {},
   ) {
     return yield* Effect.gen({ self: this }, function* () {
       yield* providerStep(() => this.requireProviderOn(provider));
@@ -759,9 +764,11 @@ export class ProviderRuntime implements ProviderPort {
       }
       const driver = requireProviderDriver(provider);
       const bundledExecutable = this.#bundledExecutables[driver.cliProvider ?? provider];
-      const cli = yield* driver
-        .resolveCli(bundledExecutable === undefined ? {} : { bundledExecutable })
-        .pipe(toProviderOperationFailed);
+      const cli = yield* resolveInstalledFirst(
+        (input) => driver.resolveCli(input),
+        bundledExecutable,
+        preferInstalled,
+      ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli.source);
       return cli;
     }).pipe(
@@ -2144,7 +2151,7 @@ export class ProviderRuntime implements ProviderPort {
           const executable = yield* install();
           installed = true;
           this.#bundledExecutables[provider] = executable;
-          const cli = yield* this.#resolveProviderCli(provider);
+          const cli = yield* this.#resolveProviderCli(provider, { preferInstalled: false });
           if (cli.source !== "managed" || cli.executable !== executable)
             return yield* new ProviderOperationFailed({
               cause: new Error(sourceText("error.provider.cliSelectFailed")),

@@ -58,6 +58,7 @@ export const messages = {
   "error.provider.removeWhileOn": "请先关闭服务商，再移除其下载。",
   "error.provider.removeWhileDownloading": "请等待下载完成，然后再移除。",
   "error.provider.removeIncomplete": "有程序正在使用此 CLI 的文件。请关闭该程序，然后重试。",
+  "error.provider.removeDownloadsFailed": "无法移除 {providers} 的 CLI 下载。",
   "error.provider.cliOverride": "请在 OpenBot 中更新之前，先移除显式指定的 CLI 路径。",
   "error.provider.runtimeUpdateIncomplete": "运行时更新未完成。",
   "error.provider.downloadHttp": "运行时下载失败，HTTP {status}。",

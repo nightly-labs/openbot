@@ -63,6 +63,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Desactiva el proveedor antes de quitar su descarga.",
   "error.provider.removeWhileDownloading": "Espera a que termine la descarga y luego quítala.",
   "error.provider.removeIncomplete": "Un programa usa archivos de esta CLI. Ciérralo y vuelve a intentarlo.",
+  "error.provider.removeDownloadsFailed": "No se pudieron quitar las descargas de la CLI de {providers}.",
   "error.provider.cliOverride": "Elimina la ruta de CLI definida explícitamente antes de actualizar en OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "La actualización del entorno de ejecución no se completó.",
   "error.provider.downloadHttp": "La descarga del entorno de ejecución falló con HTTP {status}.",

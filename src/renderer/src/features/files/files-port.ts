@@ -12,7 +12,7 @@ export interface FilesPort {
    */
   storage: Pick<OpenBotDesktopApi["storage"], "clear" | "deleteFile" | "getUsage" | "openFile"> &
     Partial<
-      Pick<OpenBotDesktopApi["storage"], "getOldRuntimeVersions" | "removeOldRuntimeVersions" | "getMachineMetrics">
+      Pick<OpenBotDesktopApi["storage"], "getRemovableRuntimes" | "removeRemovableRuntimes" | "getMachineMetrics">
     >;
   /** The machine alert settings, beside `storage.getMachineMetrics`. */
   hostAdmin?: Pick<OpenBotDesktopApi["hostAdmin"], "getMachineAlerts" | "setMachineAlerts">;

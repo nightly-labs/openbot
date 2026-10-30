@@ -61,6 +61,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Disattiva il provider prima di rimuoverne il download.",
   "error.provider.removeWhileDownloading": "Attendi la fine del download, poi rimuovilo.",
   "error.provider.removeIncomplete": "Un programma usa alcuni file di questa CLI. Chiudilo e riprova.",
+  "error.provider.removeDownloadsFailed": "Impossibile rimuovere i download della CLI di {providers}.",
   "error.provider.cliOverride": "Rimuovi l'override esplicito del percorso della CLI prima di aggiornare da OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "L'aggiornamento del runtime non è stato completato.",
   "error.provider.downloadHttp": "Download del runtime non riuscito con HTTP {status}.",

@@ -63,6 +63,7 @@ export const messages = {
   "error.provider.removeWhileDownloading": "ダウンロードが終わってから削除してください。",
   "error.provider.removeIncomplete":
     "この CLI のファイルを別のプログラムが使用しています。閉じてから、もう一度お試しください。",
+  "error.provider.removeDownloadsFailed": "{providers} の CLI のダウンロードを削除できませんでした。",
   "error.provider.cliOverride": "OpenBot で更新する前に、明示的な CLI パスの指定を削除してください。",
   "error.provider.runtimeUpdateIncomplete": "ランタイムの更新が完了しませんでした。",
   "error.provider.downloadHttp": "ランタイムのダウンロードが HTTP {status} で失敗しました。",

@@ -64,6 +64,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Desative o provedor antes de remover o download dele.",
   "error.provider.removeWhileDownloading": "Aguarde o fim do download e depois remova.",
   "error.provider.removeIncomplete": "Um programa usa arquivos desta CLI. Feche-o e tente de novo.",
+  "error.provider.removeDownloadsFailed": "Não foi possível remover os downloads da CLI de {providers}.",
   "error.provider.cliOverride": "Remova a substituição explícita do caminho da CLI antes de atualizar pelo OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "A atualização do ambiente de execução não foi concluída.",
   "error.provider.downloadHttp": "O download do ambiente de execução falhou com HTTP {status}.",

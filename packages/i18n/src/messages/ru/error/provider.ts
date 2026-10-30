@@ -61,6 +61,7 @@ export const messages = {
   "error.provider.removeWhileOn": "Выключите провайдера, прежде чем удалять его загрузку.",
   "error.provider.removeWhileDownloading": "Дождитесь окончания загрузки, затем удалите её.",
   "error.provider.removeIncomplete": "Программа использует файлы этого CLI. Закройте её и повторите попытку.",
+  "error.provider.removeDownloadsFailed": "Не удалось удалить загруженные CLI: {providers}.",
   "error.provider.cliOverride": "Удалите явно заданный путь к CLI, прежде чем обновлять в OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "Обновление среды выполнения не завершено.",
   "error.provider.downloadHttp": "Загрузка среды выполнения не удалась: HTTP {status}.",

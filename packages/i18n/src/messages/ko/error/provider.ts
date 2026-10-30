@@ -61,6 +61,7 @@ export const messages = {
   "error.provider.removeWhileOn": "다운로드를 삭제하기 전에 제공자를 끄세요.",
   "error.provider.removeWhileDownloading": "다운로드가 끝난 뒤 삭제하세요.",
   "error.provider.removeIncomplete": "다른 프로그램이 이 CLI의 파일을 사용하고 있어요. 닫은 뒤 다시 시도하세요.",
+  "error.provider.removeDownloadsFailed": "{providers}의 CLI 다운로드를 제거할 수 없었어요.",
   "error.provider.cliOverride": "OpenBot에서 업데이트하기 전에 명시적인 CLI 경로 재정의를 제거하세요.",
   "error.provider.runtimeUpdateIncomplete": "런타임 업데이트가 완료되지 않았어요.",
   "error.provider.downloadHttp": "런타임 다운로드가 HTTP {status}(으)로 실패했어요.",

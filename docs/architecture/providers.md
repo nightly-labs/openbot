@@ -201,7 +201,11 @@ artifact and preserves the old runtime, so a release that does not start leaves 
 in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
-automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+automatically discovered system CLI. When the managed copy wins, `resolveInstalledFirst` in
+`src/backend/cli.ts` resolves again with no managed copy, and a system CLI of the same or a newer
+version runs instead: the user's CLI on `PATH` replaces a copy that is not newer. A version that
+cannot be compared, such as two Cursor builds of one date, keeps the managed copy. Antigravity has
+no `PATH` discovery, so it always runs the managed copy. Updates never run the system CLI's updater. An explicit path
 suppresses managed update offers. Startup uses the same selection and reads the executable's version.
 On macOS and Linux, discovery looks in the folders of the login-shell `PATH` (`loginSearchPath` in
 `src/backend/cli.ts`, shared with ACP and custom agents and cached for 60 s), then in fixed user
@@ -264,7 +268,10 @@ agent service has to be given the executable either way. Staging directories car
 random suffix and are swept by age, never by name, so a sibling's install is not collected while it
 runs. The manager stamps each version it takes into use -- the pinned one it verified, and the older
 one it falls back to until the pinned one arrives -- and collection keeps anything stamped within two
-days. When the computer has been awake for one check interval (one hour), the update check keeps
+days. Once the version it runs is `ready`, the manager keeps no older version to fall back on and stops
+stamping the one it replaced, so that version goes when its last stamp leaves the window. Before
+this, the store kept the last working older version of each CLI for good, and every update left two
+copies on disk. When the computer has been awake for one check interval (one hour), the update check keeps
 only what was stamped within three hours. So a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
@@ -284,6 +291,15 @@ stamps the version it activates, so an install it made in the same session is it
 provider that is off is not stamped, a sibling can collect its version; turning the provider on
 reads the store again when that version is gone. Turning the provider on later downloads the CLI as
 on first use.
+
+Server settings > Storage shows the same downloads in its "Provider runtimes" cleanup row, for this
+computer only. `removableRuntimes` answers the old versions and the download of each provider that is
+off, counts a directory that is both once, and names those providers; a provider whose download runs
+is left out. A provider that is on keeps its copy unless main reported a system version for it
+(`setSystemVersion`): it then runs the user's CLI, so its copy runs nothing and counts as removable.
+The row never moves a running provider to another CLI. `removeRemovableRuntimes` collects the old versions, then calls `removeDownload`
+for each named provider at once, so each follows the rules above. A failure does not stop the
+others; the error names the providers that failed, and the page measures again.
 
 ### Managed provider updates
 
@@ -319,8 +335,9 @@ Each provider status row reports `cliSource`, and main passes the version of a `
 it compares a managed installation. The row and the notification therefore use the one update offer,
 the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
 runs behind it, whoever owns the CLI: the download installs the managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+`updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
+Later resolutions keep that copy while it is newer than the system install, which is left where it
+is; when the user's CLI catches up, the user's CLI runs again. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
 the binary, not from the client that runs it, so a provider that is signed out still reports its own
