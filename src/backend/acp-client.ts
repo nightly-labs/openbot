@@ -3079,5 +3079,5 @@ const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be inco
  * busy network, is not one: Cursor stayed signed in and OpenBot asked for a sign-in (#3796).
  */
 function isAuthenticationError(error: unknown): boolean {
-  return (error instanceof RequestError && error.code === -32000) || classifyUserError(error) === "auth";
+  return (error instanceof RequestError && error.code === -32000) || classifyUserError(failureText(error)) === "auth";
 }
