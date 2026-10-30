@@ -505,19 +505,21 @@ export class CustomEndpoints {
   /**
    * Drops the moves that wait for `harness` when it did not start. Those agents are on a model that
    * their harness no longer lists, so they move to a model that it lists, as after a restart of OpenBot.
+   * It runs in the chain, so an edit that moves the endpoint back drops the moves first.
    */
-
-  readonly abandonMovesTo = Effect.fn("CustomEndpoints.abandonMovesTo")(function* (
-    this: CustomEndpoints,
-    harness: CustomProviderHarness,
-  ) {
-    const from = new Set<AgentProvider>();
-    for (const agent of this.#waitingFor(harness)) {
-      this.#pendingMoves.delete(agent.id);
-      from.add(providerForAgent(agent));
-    }
-    for (const provider of from) yield* this.moveAgentsOffUnlistedModels(provider);
-  }, Effect.uninterruptible).bind(this);
+  abandonMovesTo(harness: CustomProviderHarness): Effect.Effect<void> {
+    return this.runExclusive(() =>
+      Effect.gen({ self: this }, function* () {
+        const dropped = new Map<AgentProvider, Set<string>>();
+        for (const agent of this.#waitingFor(harness)) {
+          this.#pendingMoves.delete(agent.id);
+          const provider = providerForAgent(agent);
+          dropped.set(provider, (dropped.get(provider) ?? new Set()).add(agent.id));
+        }
+        for (const [provider, agentIds] of dropped) yield* this.moveAgentsOffUnlistedModels(provider, agentIds);
+      }),
+    );
+  }
 
   /** Whether agents wait for `harness` to start, to move there with `moveAgentsToHarness`. */
   waitsForHarness(harness: CustomProviderHarness): boolean {
@@ -606,6 +608,8 @@ export class CustomEndpoints {
   readonly moveAgentsOffUnlistedModels = Effect.fn("CustomEndpoints.moveAgentsOffUnlistedModels")(function* (
     this: CustomEndpoints,
     provider: AgentProvider,
+    /** Only these agents, when given. */
+    agentIds?: ReadonlySet<string>,
   ) {
     const models = this.available().filter((model) => model.provider === provider);
     const providerFallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
@@ -613,6 +617,7 @@ export class CustomEndpoints {
     const affected = this.#store.list().filter(
       (agent) =>
         providerForAgent(agent) === provider &&
+        (agentIds === undefined || agentIds.has(agent.id)) &&
         !models.some((model) => model.id === agent.model) &&
         // An agent whose endpoint moved waits for `moveAgentsToHarness`, which keeps its model.
         this.#pendingMove(agent) === null,
