@@ -310,8 +310,10 @@ can never name a tab that took its place.
 
 A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
 Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
-input action runs (`BrowserDialogTurn` names the thread and turn). The engine then sends
-`Page.enable` on its own debugger, and `Page.javascriptDialogOpening` ends the action with the dialog:
+input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
+runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
+queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
 an opaque id, the type, and the message, scrubbed and redacted like snapshot text. A `run_script` step
 stops with status `dialog`. The agent answers with `handle_dialog`, which sends
 `Page.handleJavaScriptDialog` and returns the next dialog or the page status. Until then, every other

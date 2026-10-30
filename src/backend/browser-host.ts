@@ -33,7 +33,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   app,
   type BrowserWindow,
@@ -1957,9 +1957,8 @@ export class BrowserHost {
         });
         const answered = args.accept ? "accepted" : "dismissed";
         // The action that opened the dialog goes on, and can open the next one.
-        const next = yield* Effect.raceFirst(
-          tab.engine.nextDialog(),
-          Effect.sleep(DIALOG_ACTION_WAIT_MS).pipe(Effect.as(undefined)),
+        const next = Option.getOrUndefined(
+          yield* tab.engine.nextDialog().pipe(Effect.timeoutOption(DIALOG_ACTION_WAIT_MS)),
         );
         if (next) return textResult({ answered, ...dialogTabResult(args.tabId, next) });
         // Waits in the tab queue for the action, then for the page to settle. A dialog can open meanwhile.

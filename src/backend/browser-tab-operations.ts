@@ -293,13 +293,20 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
             return yield* browserFailure(
               new Error("Browser inspection is protected during authentication. Use takeover."),
             );
-          // A dialog can open from the input or while the page settles, so the watch ends after both.
+          const openDialog = tab.engine.dialog;
+          // The dialog opened after the tool checked the tab. The input would wait for its answer.
+          if (dialogTurn && openDialog)
+            return dialogTabResult(tab.id, { ...openDialog, agent: tab.engine.dialogOwnedBy(dialogTurn) });
+          // A dialog can open from the input or while the page settles. Drains run after both.
           const watch = dialogTurn ? tab.engine.watchDialogs(dialogTurn) : undefined;
-          let watchUsers = 2;
-          const releaseWatch = Effect.sync(() => {
-            watchUsers -= 1;
-            if (watchUsers === 0) watch?.end();
-          });
+          let watchedInput: Fiber.Fiber<void, BrowserOperationError> | undefined;
+          // Registered before the fork, so an interruption cannot leave the watch on.
+          if (watch)
+            keepQueueBlocked(
+              Effect.suspend(() => (watchedInput ? Fiber.await(watchedInput) : Effect.void)).pipe(
+                Effect.ensuring(Effect.sync(watch.end)),
+              ),
+            );
           let dialogReturned = false;
           const deadline = Date.now() + timeoutMs;
           const timeoutMessage = `Browser ${action} timed out.`;
@@ -310,6 +317,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           const completion = yield* Effect.forkIn(
             Effect.gen(function* () {
               let highlighted = false;
+              // The input itself reports a failure to attach.
+              if (watch) yield* tab.engine.observeDialogs().pipe(Effect.ignore);
               yield* Effect.gen(function* () {
                 // CDP emulates page focus. Native focus would interrupt typing in another chat.
                 if (target && target.kind !== "point")
@@ -330,10 +339,11 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                   ),
                 ),
               );
-            }).pipe(Effect.ensuring(releaseWatch)),
+            }),
             tab.scope,
             { startImmediately: true },
           );
+          watchedInput = completion;
           onOperationStarted?.(completion);
           // Register before waiting, so even an interrupted caller leaves the queue protected.
           keepQueueBlocked(
@@ -425,7 +435,6 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                 return yield* error;
               }),
             ),
-            Effect.ensuring(releaseWatch),
           );
           if (!watch) return yield* result;
           return yield* Effect.raceFirst(

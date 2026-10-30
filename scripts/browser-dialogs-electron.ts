@@ -38,12 +38,16 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>start</title>
 <button id="alert" onclick="alert('Saved'); document.title = 'alert:done'">Alert</button>
 <button id="chain" onclick="if (confirm('First?')) alert('Second'); document.title = 'chain:done'">Chain</button>
 <button id="secret" onclick="document.title = 'secret:' + confirm('Use password=hunter2 here?')">Secret</button>
+<button id="later" onclick="setTimeout(() => { document.title = 'later:' + confirm('Later?') })">Later</button>
 <button id="prompt" onclick="document.title = 'prompt:' + prompt('Name?')">Prompt</button>
 <form action="/done" onsubmit="return confirm('Send the form?')"><button id="submit">Send</button></form>`;
 
 const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(request.url === "/done" ? '<!doctype html><meta charset="utf-8"><title>done</title>' : PAGE);
+  if (request.url === "/done") response.end('<!doctype html><meta charset="utf-8"><title>done</title>');
+  else if (request.url === "/greet")
+    response.end("<!doctype html><title>start</title><script>alert('Welcome'); document.title = 'greeted'</script>");
+  else response.end(PAGE);
 });
 
 /**
@@ -212,6 +216,13 @@ async function main(): Promise<void> {
       assert.equal(await title(contents), "chain:done");
       recordCases("chained-dialog-returned");
 
+      // The click ends before the dialog opens, and the page settles meanwhile.
+      const later = agentDialog(await click(tabId, "#later"));
+      assert.equal(later.message, "Later?");
+      assert.equal((await answer(tabId, later.id, true)).success, true);
+      assert.equal(await title(contents), "later:true");
+      recordCases("dialog-after-input-returned");
+
       const secret = agentDialog(await click(tabId, "#secret"));
       assert(!secret.message.includes("hunter2"), "The dialog text kept a secret.");
       assert.match(secret.message, /\[redacted\]/);
@@ -230,6 +241,14 @@ async function main(): Promise<void> {
       assert.equal(submitted.success, true, text(submitted));
       assert.match(JSON.parse(text(submitted)).url, /\/done\??$/);
       recordCases("form-navigation-kept-after-accept");
+
+      // The page loads with no debugger command in flight.
+      const greeting = agentDialog(await call("navigate", { tabId, url: `${origin}/greet` }));
+      assert.equal(greeting.message, "Welcome");
+      const greeted = await answer(tabId, greeting.id, true);
+      assert.equal(greeted.success, true, text(greeted));
+      assert.equal(await title(contents), "greeted");
+      recordCases("dialog-during-navigation-returned");
     }
 
     {

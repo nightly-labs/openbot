@@ -679,6 +679,8 @@ export class BrowserCdpEngine {
   /** CDP reported a dialog, and Electron did not show its box yet. */
   #dialogBoxPending = false;
   #cancelDialogBox = false;
+  /** The tab closes. A dialog that opens now closes with the page. */
+  #dialogsReleased = false;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -1834,10 +1836,20 @@ export class BrowserCdpEngine {
     return {
       opened: Deferred.await(watch.opened),
       end: () => {
-        if (this.#dialogWatches.delete(watch)) this.#signalDialogChange();
+        if (!this.#dialogWatches.delete(watch)) return;
+        this.#signalDialogChange();
+        this.#releaseIdleDebugger();
       },
     };
   }
+
+  /**
+   * Attaches the debugger for the watches, with `Page` on. It stays attached while a watch runs, so the
+   * engine also sees a dialog that opens with no command in flight, as during a page load.
+   */
+  readonly observeDialogs = Effect.fn("BrowserCdp.observeDialogs")(function* (this: BrowserCdpEngine) {
+    yield* this.#leaseEffect(() => Effect.void, false);
+  });
 
   /** The dialog that is open now, if this engine saw it open. */
   get dialog(): BrowserDialog | undefined {
@@ -1898,10 +1910,16 @@ export class BrowserCdpEngine {
   handOffDialogs(threadId?: string, turnId?: string): void {
     const matches = (owner: BrowserDialogOwner) =>
       (threadId === undefined || owner.threadId === threadId) && (turnId === undefined || owner.turnId === turnId);
-    for (const watch of this.#dialogWatches) if (matches(watch.owner)) this.#dialogWatches.delete(watch);
-    if (this.#dialog?.owner && matches(this.#dialog.owner))
+    let changed = false;
+    for (const watch of this.#dialogWatches)
+      if (matches(watch.owner)) changed = this.#dialogWatches.delete(watch) || changed;
+    if (this.#dialog?.owner && matches(this.#dialog.owner)) {
       this.#dialog = { ...this.#dialog, agent: false, owner: undefined };
+      changed = true;
+    }
+    if (!changed) return;
     this.#signalDialogChange();
+    this.#releaseIdleDebugger();
   }
 
   /**
@@ -1909,7 +1927,9 @@ export class BrowserCdpEngine {
    * drains. `destroy` then closes Electron's box, and the dialog closes with the page.
    */
   releaseDialogs(): void {
+    this.#dialogsReleased = true;
     this.#dialogWatches.clear();
+    this.#signalDialogChange();
     if (this.#dialog) this.#detachOwnedDebugger();
   }
 
@@ -1917,6 +1937,12 @@ export class BrowserCdpEngine {
     const type = stringValue(params.type);
     // Electron answers `prompt` and `beforeunload` itself, with no box.
     if (type !== "alert" && type !== "confirm") return;
+    if (this.#dialogsReleased) {
+      // As in `releaseDialogs`: a command that waits for this dialog must not hold the closing tab.
+      this.#dialogBoxPending = true;
+      this.#detachOwnedDebugger();
+      return;
+    }
     const watch = [...this.#dialogWatches].at(-1);
     const agent = watch !== undefined && this.#ownsDebugger && this.#contents.listenerCount(CANCEL_DIALOGS_EVENT) > 0;
     const dialog: BrowserDialog = {
@@ -1936,7 +1962,13 @@ export class BrowserCdpEngine {
     if (!this.#dialog) return;
     this.#dialog = undefined;
     this.#signalDialogChange();
-    if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
+    this.#releaseIdleDebugger();
+  }
+
+  /** The engine sees a dialog only while it stays attached: for each lease, watch, and open dialog. */
+  #releaseIdleDebugger(): void {
+    if (this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0)
+      this.#detachOwnedDebugger();
   }
 
   #signalDialogChange(): void {
@@ -1986,7 +2018,7 @@ export class BrowserCdpEngine {
         Effect.gen({ self: this }, function* () {
           const error = operationFailure.cause;
           this.#retainDebugger = previousRetainDebugger;
-          if (!this.#retainDebugger) this.#detachOwnedDebugger();
+          this.#releaseIdleDebugger();
           return yield* browserFailure(error);
         }),
       ),
@@ -3197,8 +3229,7 @@ export class BrowserCdpEngine {
       Effect.ensuring(
         Effect.sync(() => {
           this.#activeLeases -= 1;
-          // The engine sees an open dialog close only while it stays attached.
-          if (this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog) this.#detachOwnedDebugger();
+          this.#releaseIdleDebugger();
         }),
       ),
     );
