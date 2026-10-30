@@ -41,4 +41,14 @@ export const messages = {
     "OpenBot はこのチャットに接続されています。エージェントに依頼するには、{bot} をメンションするか、OpenBot のメッセージに返信してください。",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram で回答し、チームに依頼します",
+  "status.messaging.whatsappNoAgent":
+    "ここで回答できるエージェントはまだいません。OpenBot で WhatsApp Orchestrator を追加してください。",
+  "status.messaging.whatsappApprovalMenu": "承認する場合は 1、拒否する場合は 2 と返信してください。",
+  "status.messaging.whatsappStopMenu": "停止するには「stop」と返信してください。",
+  "status.messaging.whatsappPairingCode":
+    "この番号は、所有者が許可した人にだけ回答します。所有者にこのコードを伝えてください: {code}",
+  "status.messaging.whatsappPairingApproved": "この番号にリクエストを送れるようになりました。",
+  "status.messaging.whatsappOwnChat": "自分にメッセージ",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "WhatsApp で回答し、チームに依頼します",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,7 +1,7 @@
 # Messaging connections
 
-The agents of this computer can answer in an external chat platform. Slack, Discord and Telegram
-are supported today. The design notes are in
+The agents of this computer can answer in an external chat platform. Slack, Discord, Telegram and
+WhatsApp are supported today. The design notes are in
 [architecture/channels-and-messaging.md](architecture/channels-and-messaging.md#messaging-connections),
 the Slack launch steps in [apps/slack-app/LAUNCH.md](../apps/slack-app/LAUNCH.md), and the Discord app
 settings in [apps/discord-app/README.md](../apps/discord-app/README.md).
@@ -156,6 +156,44 @@ agents.
 - `@<bot> stop` or a reply `stop` to the bot, or the **Stop** button, stops the request.
 - Files up to 20 MB go both ways.
 
+## Connect WhatsApp
+
+A WhatsApp number links to this computer as a device, as WhatsApp Web does. The messages go directly
+between this computer and WhatsApp: no OpenBot service and no OpenBot account takes part. OpenBot uses
+an unofficial client, and WhatsApp can restrict or block a number that it sees as automated. A number
+used only by OpenBot is safer than your personal one.
+
+1. Open **Marketplace → Apps → WhatsApp** and select **Link WhatsApp**.
+2. Select whose number it is:
+   - **My personal number**: only your own "Message yourself" chat, and the contacts and groups you
+     allow, reach the agents. OpenBot never writes to anyone else first.
+   - **A number only for OpenBot**: a person you did not allow gets one message with a 6-character
+     code, and the request shows in OpenBot. Select **Approve** to allow the person.
+3. Select **QR code** and scan it in WhatsApp → **Linked devices** → **Link a device**, or select
+   **Pairing code**, type the number of the phone, and type the code that OpenBot shows on the phone.
+4. Pick the model of the WhatsApp Orchestrator and select **Add agent**. One orchestrator answers every
+   linked number. It goes in the **Integrations** section of the sidebar.
+5. Under **Who can write**, add contacts by phone number, and groups from the list of the number's
+   groups.
+
+**Disconnect** logs the device out, deletes its keys on this computer, and keeps the conversations,
+the workspace memories and the allowed senders, so the same number linked again gets them back. When
+OpenBot was off, also remove the device in WhatsApp → **Linked devices**. When it is the last number,
+the WhatsApp Orchestrator is deleted with its conversations, as for Slack.
+
+## What happens in WhatsApp
+
+- A direct chat is one conversation. In a group, a mention of the number starts a conversation, and
+  a reply to a message of it continues it without a mention. Other messages of the group start nothing.
+- 👀 means the message arrived. "Working on it…" is replaced by the answer within 15 minutes; later,
+  the answer is a new message. 👌, 💔 or 🫡 shows the end.
+- Personal WhatsApp has no buttons. An approval ends with "Reply 1 to approve or 2 to deny." Only the
+  person who wrote the request can answer it. `stop` stops the request.
+- Short messages that one person sends within 1.5 seconds become one request.
+- Files up to 64 MB go both ways. A voice message arrives as an audio file.
+- A message that arrives while OpenBot is off waits on WhatsApp's servers and arrives when the number
+  connects again. OpenBot answers messages up to one day old.
+
 ## Test Telegram locally
 
 Telegram must reach Signal over public HTTPS.
@@ -212,7 +250,8 @@ The workspace row says what is wrong.
 
 ## Workspace memories
 
-Each connection (a Slack workspace, a Discord server or a Telegram chat) has its own list of facts.
+Each connection (a Slack workspace, a Discord server, a Telegram chat or a WhatsApp number) has its own
+list of facts.
 The agent that answers saves a fact with `openbot.messaging_remember` and deletes one with
 `openbot.messaging_forget_memory`. Every prompt of every conversation of that connection shows the
 whole list, with the ID of each fact. The prompt marks the facts as data, not instructions.
@@ -294,6 +333,17 @@ while this computer has no Signal connection is lost, except for a hosted server
   disconnect it, and add the bot again.
 - Telegram has no history API. The agent sees as context only the messages that this computer saw
   since it started, and the message that a request answers.
+- WhatsApp is an unofficial client. WhatsApp can restrict or block a number that it sees as automated,
+  and a protocol change of WhatsApp can stop the connection until OpenBot updates. Use a number only
+  for OpenBot when you can.
+- WhatsApp removes a linked device after about 14 days without a connection. Link the number again.
+- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw since
+  it started. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
+  server connects. A message older than one day gets no answer.
+- WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
+  stops with "locked"; link it as its own device.
+- A WhatsApp number is managed only on the computer that runs the agents. A joined server and the
+  phone app show no WhatsApp page.
 
 ## Adding a platform
 
@@ -313,6 +363,7 @@ core changes:
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
 | Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
 | Telegram | The webhook of the one OpenBot bot through Signal, which holds the token | `message_thread_id`, the topic in a forum, `dm` in a direct chat | Implemented. No history API: the host keeps what the bot sees, in memory. |
+| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host keeps what it saw, in memory. Sender rules in `whatsapp-senders.ts`. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Marketplace → Apps, and its i18n
 keys. The database needs no migration: `platform` has no `CHECK`.

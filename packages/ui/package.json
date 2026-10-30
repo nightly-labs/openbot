@@ -222,6 +222,7 @@
     "./features/settings/OnePasswordConnectorPanel": "./src/features/settings/OnePasswordConnectorPanel.tsx",
     "./features/settings/SlackIntegrationPanel": "./src/features/settings/SlackIntegrationPanel.tsx",
     "./features/settings/TelegramIntegrationPanel": "./src/features/settings/TelegramIntegrationPanel.tsx",
+    "./features/settings/WhatsAppIntegrationPanel": "./src/features/settings/WhatsAppIntegrationPanel.tsx",
     "./features/settings/AppearanceSelect": "./src/features/settings/AppearanceSelect.tsx",
     "./features/settings/LanguageSelect": "./src/features/settings/LanguageSelect.tsx",
     "./features/marketplace/Marketplace": "./src/features/marketplace/Marketplace.tsx",

@@ -22,12 +22,17 @@ import type {
   SetDiscordAccessInput,
   SidebarLayoutSnapshot,
   SidebarSection,
+  StartWhatsAppLinkInput,
+  WhatsAppLinkState,
+  WhatsAppOverview,
+  WhatsAppSender,
 } from "@openbot/contracts/ipc";
 import { MESSAGING_CONNECTION_STATES, MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { TELEGRAM_LINK_CODE_TTL_SECONDS } from "@openbot/contracts/signal-protocol/telegram-route";
 import { SLACK_ORCHESTRATOR_AVATAR } from "@openbot/contracts/slack-app";
 import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
+import { WHATSAPP_ORCHESTRATOR_AVATAR } from "@openbot/contracts/whatsapp-app";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Result, Schema, Scope } from "effect";
@@ -70,6 +75,9 @@ import { SlackApiError, SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
 import { parseTelegramUpdate, telegramLink, telegramRemoval } from "./telegram/telegram-updates";
+import { WhatsAppConnect } from "./whatsapp/whatsapp-connect";
+import { whatsAppOrchestratorMemories, whatsAppOrchestratorProfile } from "./whatsapp/whatsapp-orchestrator";
+import type { WhatsAppRuntime } from "./whatsapp/whatsapp-runtime";
 
 const logger = createOpenBotLogger("messaging");
 
@@ -124,7 +132,9 @@ export interface MessagingServiceOptions {
   slackOrigin?: string;
   /** The account service half of the OpenBot Telegram bot. Without it and `ingress`, no chat can connect. */
   telegramApp?: TelegramAppPort;
-  /** Where the Slack, Discord and Telegram Orchestrators go in the sidebar: an Integrations section. */
+  /** The linked WhatsApp numbers of this computer. Without it, no number can link. */
+  whatsapp?: WhatsAppRuntime;
+  /** Where the Slack, Discord, Telegram and WhatsApp Orchestrators go in the sidebar: an Integrations section. */
   sidebar?: Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "removeAgent">;
   /** The file that keeps status posts across a restart. Without it, they are kept in memory only. */
   statusPath?: string;
@@ -226,6 +236,8 @@ export class MessagingService {
   readonly #discordConnect: DiscordConnect | null;
   readonly #slackOrigin: string | undefined;
   readonly #telegramApp: TelegramAppPort | null;
+  readonly #whatsapp: WhatsAppConnect | null;
+  readonly #whatsappRuntime: WhatsAppRuntime | null;
   readonly #sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "removeAgent"> | null;
   #started = false;
   /** `start` asked every enabled connection to start. One with no live entry then does not start by itself. */
@@ -245,6 +257,19 @@ export class MessagingService {
     this.#discordConnect = options.ingress && options.discordApp ? new DiscordConnect(options.discordApp) : null;
     this.#slackOrigin = options.slackOrigin;
     this.#telegramApp = options.ingress && options.telegramApp ? options.telegramApp : null;
+    this.#whatsappRuntime = options.whatsapp ?? null;
+    this.#whatsapp = options.whatsapp
+      ? new WhatsAppConnect({
+          runtime: options.whatsapp,
+          store: options.threads.store,
+          credentials: options.credentials,
+          hooks: {
+            prepare: (workspaceId, workspaceName) => this.#prepareWhatsApp(workspaceId, workspaceName),
+            finish: (connectionId, values) => this.#finishWhatsApp(connectionId, values),
+            dispatch: (operation) => this.#dispatch(operation),
+          },
+        })
+      : null;
     this.#sidebar = options.sidebar ?? null;
     this.#status = new MessagingStatusPosts(options.statusPath ?? null);
     this.#posts = this.#status.posts;
@@ -308,6 +333,8 @@ export class MessagingService {
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
     this.#endTelegramLinkLease();
+    // A WhatsApp link that did not finish leaves no store behind.
+    if (this.#whatsapp) yield* this.#whatsapp.cancelLink();
     for (const timer of this.#settleTimers.values()) clearTimeout(timer);
     this.#settleTimers.clear();
     yield* Effect.forEach(
@@ -319,6 +346,7 @@ export class MessagingService {
       { concurrency: "unbounded", discard: true },
     );
     this.#live.clear();
+    this.#whatsappRuntime?.closeAll();
     yield* Scope.close(this.#scope, Exit.void);
   }, Effect.uninterruptible).bind(this);
 
@@ -345,6 +373,132 @@ export class MessagingService {
   /** The Telegram chats linked to this computer. A disconnected one is left out. */
   telegramOverview(): MessagingOverview {
     return this.#overview("telegram");
+  }
+
+  /** The WhatsApp numbers linked to this computer, with who may give work through each. */
+  whatsappOverview(): WhatsAppOverview {
+    return { ...this.#overview("whatsapp"), accounts: this.#whatsapp?.accounts() ?? [] };
+  }
+
+  whatsappLinkState(): WhatsAppLinkState {
+    return this.#whatsapp?.linkState() ?? { status: "idle", qr: null, code: null, workspaceId: null, error: null };
+  }
+
+  readonly startWhatsAppLink = Effect.fn("MessagingService.startWhatsAppLink")(function* (
+    this: MessagingService,
+    input: StartWhatsAppLinkInput,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    return yield* whatsapp.startLink(input);
+  }).bind(this);
+
+  readonly cancelWhatsAppLink = Effect.fn("MessagingService.cancelWhatsAppLink")(function* (this: MessagingService) {
+    if (this.#whatsapp) yield* this.#whatsapp.cancelLink();
+  }).bind(this);
+
+  readonly listWhatsAppGroups = Effect.fn("MessagingService.listWhatsAppGroups")(function* (
+    this: MessagingService,
+    workspaceId: string,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    return yield* whatsapp.groups(workspaceId).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  readonly addWhatsAppSender = Effect.fn("MessagingService.addWhatsAppSender")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    sender: WhatsAppSender,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.addSender(workspaceId, sender).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  readonly removeWhatsAppSender = Effect.fn("MessagingService.removeWhatsAppSender")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    senderId: string,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.removeSender(workspaceId, senderId).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  readonly answerWhatsAppRequest = Effect.fn("MessagingService.answerWhatsAppRequest")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    code: string,
+    approve: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.answerRequest(workspaceId, code, approve).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  readonly setWhatsAppOwnNumber = Effect.fn("MessagingService.setWhatsAppOwnNumber")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    ownNumber: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  /**
+   * Unlinks the device from the WhatsApp account (when its socket is open), deletes its keys and stops
+   * the connection. As for Telegram, the last number takes the WhatsApp Orchestrator with it. The
+   * allowed senders and the conversations stay, so the same number linked again gets them back.
+   */
+  readonly disconnectWhatsAppNumber = Effect.fn("MessagingService.disconnectWhatsAppNumber")(function* (
+    this: MessagingService,
+    workspaceId: string,
+  ) {
+    const runtime = yield* messagingStep(() => this.#requireWhatsApp() && this.#whatsappRuntime);
+    const record = yield* messagingStep(() => this.#requireConnection("whatsapp", workspaceId));
+    const orphan = yield* this.#orphanedOrchestrator(record);
+    const storeId = this.#credentials.get(record.connectionId)?.storeId;
+    const handle = storeId ? runtime?.get(storeId) : null;
+    if (handle) yield* handle.session.logout();
+    yield* this.#stopConnection(record.connectionId);
+    if (storeId) runtime?.delete(storeId);
+    yield* this.#credentials.clear(record.connectionId);
+    yield* messagingStep(() =>
+      this.#threads.store.updateConnection(record.connectionId, { enabled: false, lastErrorCode: null }),
+    );
+    this.#whatsapp?.forget(workspaceId);
+    if (orphan) yield* this.#deleteOrchestrator(orphan);
+  }, Effect.uninterruptible).bind(this);
+
+  /** The connection of a number whose link just finished, new or the one it had, stopped for its new store. */
+  readonly #prepareWhatsApp = Effect.fn("MessagingService.prepareWhatsApp")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    workspaceName: string,
+  ) {
+    const record = yield* messagingStep(() =>
+      this.#threads.store.ensureConnection("whatsapp", workspaceId, workspaceName),
+    );
+    yield* this.#stopConnection(record.connectionId);
+    return record.connectionId;
+  });
+
+  readonly #finishWhatsApp = Effect.fn("MessagingService.finishWhatsApp")(function* (
+    this: MessagingService,
+    connectionId: string,
+    values: Record<string, string>,
+  ) {
+    yield* this.#credentials.set(connectionId, values);
+    const record = this.#threads.store.connection(connectionId);
+    if (!record) return;
+    this.#threads.store.updateConnection(connectionId, {
+      enabled: true,
+      lastErrorCode: null,
+      orchestratorAgentId: this.#orchestrator(record) ?? this.#platformOrchestrator("whatsapp"),
+    });
+    const updated = this.#threads.store.connection(connectionId);
+    if (updated) yield* this.#startConnection(updated);
+  }, Effect.uninterruptible);
+
+  #requireWhatsApp(): WhatsAppConnect {
+    if (!this.#whatsapp) throw new Error(sourceText("error.messaging.whatsappUnsupported"));
+    return this.#whatsapp;
   }
 
   #overview(platform: MessagingPlatform): MessagingOverview {
@@ -393,6 +547,8 @@ export class MessagingService {
     platform: MessagingPlatform,
     input: AddMessagingOrchestratorInput,
   ) {
+    // The WhatsApp Orchestrator has its own profile; the code below makes a Slack or Discord one.
+    if (platform === "whatsapp") return yield* this.#addSharedOrchestrator(platform, input);
     const record = yield* messagingStep(() => this.#requireConnection(platform, input.workspaceId));
     // One orchestrator answers every workspace of the platform, as for Telegram.
     const current = this.#orchestrator(record) ?? this.#platformOrchestrator(platform);
@@ -709,27 +865,50 @@ export class MessagingService {
     this: MessagingService,
     input: AddTelegramOrchestratorInput,
   ) {
-    const records = this.#threads.store.connections().filter((record) => record.platform === "telegram");
+    return yield* this.#addSharedOrchestrator("telegram", input);
+  }, Effect.uninterruptible).bind(this);
+
+  /** Creates the WhatsApp Orchestrator, or gives the one that exists to every linked number. */
+  readonly addWhatsAppOrchestrator = Effect.fn("MessagingService.addWhatsAppOrchestrator")(function* (
+    this: MessagingService,
+    input: AddTelegramOrchestratorInput,
+  ) {
+    return yield* this.#addSharedOrchestrator("whatsapp", input);
+  }, Effect.uninterruptible).bind(this);
+
+  /** One orchestrator for every place of a platform whose places are many small ones: Telegram chats, WhatsApp numbers. */
+  readonly #addSharedOrchestrator = Effect.fn("MessagingService.addSharedOrchestrator")(function* (
+    this: MessagingService,
+    platform: "telegram" | "whatsapp",
+    input: AddTelegramOrchestratorInput,
+  ) {
+    const records = this.#threads.store.connections().filter((record) => record.platform === platform);
     if (!records.length)
       return yield* new MessagingOperationFailed({
-        cause: new Error(sourceText("error.messaging.telegramNotConnected")),
+        cause: new Error(
+          sourceText(
+            platform === "telegram" ? "error.messaging.telegramNotConnected" : "error.messaging.whatsappNotConnected",
+          ),
+        ),
       });
-    const current = this.#platformOrchestrator("telegram");
+    const current = this.#platformOrchestrator(platform);
     if (current) {
-      this.#assignTelegramOrchestrator(current);
+      this.#assignSharedOrchestrator(platform, current);
       return { agentId: current, sectionId: null };
     }
+    const telegram = platform === "telegram";
     const agent = yield* this.#agents
       .createAgentProfile({
-        ...telegramOrchestratorProfile(),
-        ...TELEGRAM_ORCHESTRATOR_AVATAR,
+        ...(telegram ? telegramOrchestratorProfile() : whatsAppOrchestratorProfile()),
+        ...(telegram ? TELEGRAM_ORCHESTRATOR_AVATAR : WHATSAPP_ORCHESTRATOR_AVATAR),
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
       })
       .pipe(toMessagingOperationFailed);
-    for (const text of telegramOrchestratorMemories()) this.#agents.createMemory({ agentId: agent.id, text });
-    this.#assignTelegramOrchestrator(agent.id);
+    const memories = telegram ? telegramOrchestratorMemories() : whatsAppOrchestratorMemories();
+    for (const text of memories) this.#agents.createMemory({ agentId: agent.id, text });
+    this.#assignSharedOrchestrator(platform, agent.id);
     const sectionId = yield* this.#placeInIntegrations(agent.id).pipe(
       Effect.catch((failure) => {
         this.#warn(failure.cause);
@@ -737,7 +916,7 @@ export class MessagingService {
       }),
     );
     return { agentId: agent.id, sectionId };
-  }, Effect.uninterruptible).bind(this);
+  });
 
   /**
    * Opens a `t.me` link with a one-use code in the browser. Telegram sends the code in the chat that
@@ -959,9 +1138,9 @@ export class MessagingService {
         this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agentId });
   }
 
-  #assignTelegramOrchestrator(agentId: string): void {
+  #assignSharedOrchestrator(platform: "telegram" | "whatsapp", agentId: string): void {
     for (const record of this.#threads.store.connections())
-      if (record.platform === "telegram" && record.orchestratorAgentId !== agentId)
+      if (record.platform === platform && record.orchestratorAgentId !== agentId)
         this.#threads.store.updateConnection(record.connectionId, { orchestratorAgentId: agentId });
   }
 
@@ -1103,14 +1282,17 @@ export class MessagingService {
       logger.warn("A messaging connection stopped.", { platform: live.record.platform, state });
       // The workspace uninstalled OpenBot or revoked its token, or the bot left the Telegram chat:
       // Signal stops routing it here.
+      // A WhatsApp number has no route: only this computer knows it.
       const unlink:
         | Effect.Effect<void, DiscordConnectFailed | SlackConnectFailed | MessagingOperationFailed>
         | undefined =
-        live.record.platform === "telegram"
-          ? this.#telegramApp?.unlink(live.record.workspaceId)
-          : live.record.platform === "discord"
-            ? this.#discordConnect?.unlink(live.record.workspaceId)
-            : this.#connect?.unlink(live.record.workspaceId);
+        live.record.platform === "whatsapp"
+          ? undefined
+          : live.record.platform === "telegram"
+            ? this.#telegramApp?.unlink(live.record.workspaceId)
+            : live.record.platform === "discord"
+              ? this.#discordConnect?.unlink(live.record.workspaceId)
+              : this.#connect?.unlink(live.record.workspaceId);
       if (unlink) yield* unlink.pipe(Effect.catch((error) => Effect.sync(() => this.#warn(error.cause))));
       // The summary then shows the stored state, which a reconnect of the socket cannot change.
       if (state === "removed" && this.#live.get(live.record.connectionId) === live)
@@ -1228,7 +1410,9 @@ export class MessagingService {
           ? "status.messaging.discordNoAgent"
           : live.record.platform === "telegram"
             ? "status.messaging.telegramNoAgent"
-            : "status.messaging.noAgent";
+            : live.record.platform === "whatsapp"
+              ? "status.messaging.whatsappNoAgent"
+              : "status.messaging.noAgent";
       yield* adapter.post(message.target, { text: sourceText(noAgent) }).pipe(toMessagingOperationFailed);
       return;
     }
@@ -1868,7 +2052,9 @@ export class MessagingService {
             ? "error.messaging.discordNotConnected"
             : platform === "telegram"
               ? "error.messaging.telegramNotConnected"
-              : "error.messaging.notConnected",
+              : platform === "whatsapp"
+                ? "error.messaging.whatsappNotConnected"
+                : "error.messaging.notConnected",
         ),
       );
     return record;

@@ -94,6 +94,7 @@ export const messages = {
   "marketplace.app.slackTagline": "Mentions et messages directs dans Slack",
   "marketplace.app.discordTagline": "Mentions et messages directs dans Discord",
   "marketplace.app.telegramTagline": "Groupes et discussions privées dans Telegram",
+  "marketplace.app.whatsappTagline": "Votre propre discussion et les personnes que vous autorisez dans WhatsApp",
   "marketplace.app.bitwardenTagline": "Connectez-vous aux sites avec les identifiants d’un dossier partagé",
   "marketplace.app.onePasswordCategory": "Gestion des identifiants et des connexions",
   "marketplace.app.yourApps": "Vos apps",

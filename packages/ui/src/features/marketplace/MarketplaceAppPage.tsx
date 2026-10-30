@@ -432,6 +432,7 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
   slack: [{ label: "plugin.link.website", url: "https://slack.com" }],
   discord: [{ label: "plugin.link.website", url: "https://discord.com" }],
   telegram: [{ label: "plugin.link.website", url: "https://telegram.org" }],
+  whatsapp: [{ label: "plugin.link.website", url: "https://www.whatsapp.com" }],
   github: [{ label: "plugin.link.website", url: "https://github.com" }],
   onepassword: [
     { label: "plugin.link.website", url: "https://1password.com" },
@@ -446,6 +447,7 @@ const CONNECTOR_DEVELOPER = {
   slack: "connector.slack.title",
   discord: "connector.discord.title",
   telegram: "connector.telegram.title",
+  whatsapp: "connector.whatsapp.title",
   github: "connector.github.title",
   onepassword: "connector.onePassword.title",
   bitwarden: "connector.bitwarden.title",

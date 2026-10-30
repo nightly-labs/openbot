@@ -1,16 +1,16 @@
-// The Slack workspaces, Discord guilds and Telegram chats where this computer's agents answer. Tokens
+// The Slack workspaces, Discord guilds, Telegram chats and WhatsApp numbers where this computer's agents answer. Tokens
 // only travel towards the host; no result carries one. The `host*` endpoints do the same for a
 // joined server (`connectors-v1`).
 
 import {
   type AddMessagingOrchestratorResult,
+  type ConnectorMessagingPlatform,
   type DiscordAccess,
   type DiscordRoleList,
   decodeHostMessagingOverview,
   isAddMessagingOrchestratorResult,
   isDiscordAccess,
   isDiscordRoleList,
-  type MessagingPlatform,
   messagingPage,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, nullableString } from "@openbot/contracts/ipc-decoding";
@@ -30,6 +30,7 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 import {
   parseAddMessagingOrchestratorInput,
   parseAddTelegramOrchestratorInput,
+  parseAnswerWhatsAppRequestInput,
   parseConnectTelegramChatInput,
   parseHostAddMessagingOrchestratorInput,
   parseHostMessagingConnectInput,
@@ -37,8 +38,12 @@ import {
   parseHostMessagingWorkspaceInput,
   parseHostSetMessagingEnabledInput,
   parseMessagingWorkspaceInput,
+  parseRemoveWhatsAppSenderInput,
   parseSetDiscordAccessInput,
   parseSetMessagingEnabledInput,
+  parseSetWhatsAppOwnNumberInput,
+  parseStartWhatsAppLinkInput,
+  parseWhatsAppSenderInput,
 } from "./messaging-inputs";
 import { scopedHandler } from "./scoped-handler";
 
@@ -61,6 +66,17 @@ interface MessagingIpcDependencies {
     | "discordAccess"
     | "listDiscordRoles"
     | "setDiscordAccess"
+    | "whatsappOverview"
+    | "whatsappLinkState"
+    | "startWhatsAppLink"
+    | "cancelWhatsAppLink"
+    | "disconnectWhatsAppNumber"
+    | "addWhatsAppOrchestrator"
+    | "listWhatsAppGroups"
+    | "addWhatsAppSender"
+    | "removeWhatsAppSender"
+    | "answerWhatsAppRequest"
+    | "setWhatsAppOwnNumber"
   >;
   remoteServers: {
     supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -122,7 +138,7 @@ export function messagingIpcHandlers({
    */
   async function open(
     serverId: string,
-    platform: MessagingPlatform,
+    platform: ConnectorMessagingPlatform,
     page: { url: string | null; nonce: string | null },
   ) {
     if (page.url === null) return;
@@ -131,7 +147,7 @@ export function messagingIpcHandlers({
     if (platform !== "telegram" && page.nonce !== null) relayedInstalls.remember(platform, page.nonce, serverId);
     await openExternal(address);
   }
-  const overview = (platform: MessagingPlatform) =>
+  const overview = (platform: ConnectorMessagingPlatform) =>
     platform === "slack"
       ? messaging.slackOverview()
       : platform === "discord"
@@ -192,6 +208,39 @@ export function messagingIpcHandlers({
       ),
       addTelegramOrchestrator: payloadHandler(parseAddTelegramOrchestratorInput, (input) =>
         runCauseEffect(messaging.addTelegramOrchestrator(input)),
+      ),
+      getWhatsAppOverview: handler(() => messaging.whatsappOverview()),
+      startWhatsAppLink: payloadHandler(parseStartWhatsAppLinkInput, (input) =>
+        runCauseEffect(messaging.startWhatsAppLink(input)),
+      ),
+      getWhatsAppLinkState: handler(() => messaging.whatsappLinkState()),
+      cancelWhatsAppLink: handler(() => runCauseEffect(messaging.cancelWhatsAppLink())),
+      disconnectWhatsAppNumber: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.disconnectWhatsAppNumber(workspaceId)),
+      ),
+      reconnectWhatsAppNumber: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(Effect.asVoid(messaging.reconnect("whatsapp", workspaceId, true))),
+      ),
+      setWhatsAppEnabled: payloadHandler(parseSetMessagingEnabledInput, ({ workspaceId, enabled }) =>
+        runCauseEffect(messaging.setEnabled("whatsapp", workspaceId, enabled)),
+      ),
+      addWhatsAppOrchestrator: payloadHandler(parseAddTelegramOrchestratorInput, (input) =>
+        runCauseEffect(messaging.addWhatsAppOrchestrator(input)),
+      ),
+      listWhatsAppGroups: payloadHandler(parseMessagingWorkspaceInput, ({ workspaceId }) =>
+        runCauseEffect(messaging.listWhatsAppGroups(workspaceId)),
+      ),
+      addWhatsAppSender: payloadHandler(parseWhatsAppSenderInput, ({ workspaceId, sender }) =>
+        runCauseEffect(messaging.addWhatsAppSender(workspaceId, sender)),
+      ),
+      removeWhatsAppSender: payloadHandler(parseRemoveWhatsAppSenderInput, ({ workspaceId, senderId }) =>
+        runCauseEffect(messaging.removeWhatsAppSender(workspaceId, senderId)),
+      ),
+      answerWhatsAppRequest: payloadHandler(parseAnswerWhatsAppRequestInput, ({ workspaceId, code, approve }) =>
+        runCauseEffect(messaging.answerWhatsAppRequest(workspaceId, code, approve)),
+      ),
+      setWhatsAppOwnNumber: payloadHandler(parseSetWhatsAppOwnNumberInput, ({ workspaceId, ownNumber }) =>
+        runCauseEffect(messaging.setWhatsAppOwnNumber(workspaceId, ownNumber)),
       ),
       hostOverview: scopedHandler(parseHostMessagingPlatformInput, {
         local: ({ platform }) => overview(platform),

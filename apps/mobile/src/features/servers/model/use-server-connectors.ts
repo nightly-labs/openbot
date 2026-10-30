@@ -1,4 +1,4 @@
-import type { MessagingPlatform } from "@openbot/contracts/ipc";
+import type { ConnectorMessagingPlatform } from "@openbot/contracts/ipc";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useRef } from "react";
@@ -33,7 +33,7 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
   /** Only the connector that the page on screen shows is read again. */
   const refetchInterval = (id: MobileConnectorId): number | false =>
     focused && (poll === "all" || poll === id) ? POLL_MS : false;
-  const messaging = (platform: MessagingPlatform) => ({
+  const messaging = (platform: ConnectorMessagingPlatform) => ({
     queryKey: queryKeys.serverConnector(queryScope, serverId, platform),
     enabled: connectors,
     retry: false,

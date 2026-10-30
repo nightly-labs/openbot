@@ -1,4 +1,4 @@
-import { MESSAGING_PLATFORMS, type MessagingConnectPage } from "@openbot/contracts/ipc";
+import { CONNECTOR_MESSAGING_PLATFORMS, type MessagingConnectPage } from "@openbot/contracts/ipc";
 import { CONNECTORS_CAPABILITY, CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -33,7 +33,8 @@ export async function routeConnectors(
   const { github, messaging } = connectors;
   const status = (current: ReturnType<typeof github.status>) => ({ ...current, ...github.pages() });
   // The codec allows only these values; a GitHub route has no platform.
-  const platform = MESSAGING_PLATFORMS.find((id) => id === body.platform) ?? "telegram";
+  // WhatsApp is not one of them: a number is managed only on its host.
+  const platform = CONNECTOR_MESSAGING_PLATFORMS.find((id) => id === body.platform) ?? "telegram";
   const workspaceId = () => stringField(body, "workspaceId", false, 128);
   switch (url.pathname) {
     case CONNECTORS_ROUTES.githubStatus:

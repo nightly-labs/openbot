@@ -321,7 +321,7 @@ No account API, Signal, IPC contract, or database migration changes are required
 ## Messaging connections
 
 The agents of a computer can answer in an external chat platform: Slack, Discord (see **Discord**
-below) and Telegram. [messaging.md](../messaging.md) has the setup, the limits and how to add a
+below), Telegram and WhatsApp (see **WhatsApp** below). [messaging.md](../messaging.md) has the setup, the limits and how to add a
 platform. Every workspace
 installs the one OpenBot Slack app (`apps/slack-app`), and the workspace is linked to the host that
 connected it. People mention @OpenBot or send it a direct message. The workspace's Slack Orchestrator,
@@ -494,6 +494,51 @@ the token and does the platform work for the hosts:
 - **Conversations.** A conversation is a reply chain, keyed by its first message. Every OpenBot post
   replies to that message, so a reply to an OpenBot post names the conversation through the replied
   post's own reference. A direct message has no guild, so Signal answers it once with a fixed line.
+
+**WhatsApp.** A WhatsApp number links as a device of the host, so the host holds its own session and
+no OpenBot service takes part: no Signal route, no account service row, no route ticket. A connection
+is one linked number (`workspace_id` is the number in digits).
+
+- **Client.** `packages/whatsapp` vendors Baileys v7.0.0-rc14 (MIT) without its copyleft parts
+  (`libsignal`, `whatsapp-rust-bridge`); `src/signal/` is OpenBot's clean-room Signal code, and
+  `signal-repository.ts` gives it to Baileys as its `SignalRepository`. See
+  [packages/whatsapp/README.md](../../packages/whatsapp/README.md). The main bundle includes the
+  vendor; type checks read it only through its generated declarations.
+- **Store.** `WhatsAppAuthStore` keeps one SQLite file per number in `<userData>/whatsapp/`: the
+  device's creds and Signal keys, the posts of the last day (for WhatsApp's retry receipts), a journal
+  of received messages (30 minutes), the reply chains (7 days) and the WhatsApp Web version. Each value
+  is AES-256-GCM sealed under a random key that `MessagingCredentialStore` keeps
+  (`whatsappStoreKey`), with its table and row as additional data. The file is held in SQLite's
+  exclusive locking mode while it is open, so a second process cannot take the same session.
+  `openbot.db` stays the source of truth for the connection, its conversations and its memories.
+- **Runtime.** `WhatsAppRuntime` keeps the open store, the `WhatsAppSession` and the in-memory chat
+  state of each number. The driver's adapter and transport share them. A store stays open across a
+  restart of its connection and closes when the messaging service stops.
+- **Session.** `WhatsAppSession` owns the Baileys socket: no history sync, not online on connect,
+  own posts not read back. A closed socket follows `closeDecision`: 401, 403 and 411 stop with
+  `invalid_token` (the user links again); 440 stops with `error` (another client has the session;
+  Reconnect takes it back); 515 restarts at once; others retry with backoff from 2 to 30 seconds with
+  jitter. A watchdog reconnects a socket that is silent for 90 seconds. Posts wait up to 5 minutes
+  for the socket, keep at least a second between posts to one chat, and get their message id before
+  the send, so an echo in the owner's own chat is never read as a request.
+- **Link.** `WhatsAppConnect` pairs a new device in a new store (QR code, or a pairing code for a
+  phone number); the page reads the link state about every second. When the device opens, the store
+  becomes the connection's store, the store of an earlier device of the number is deleted, and the
+  connection starts.
+- **Senders.** `whatsapp-senders.ts` applies the rules before anything shows that a message was seen.
+  The owner's own chat always counts. On the owner's personal number (the default) nobody else counts
+  unless the owner allowed them, and OpenBot never writes to anyone first. On a number used only by
+  OpenBot, an unknown direct sender gets one pairing code; at most three requests wait, for an hour,
+  in memory. Groups count only when allowed (migration 48, `projection_messaging_allowed_senders`).
+- **Messages.** `whatsapp-events.ts` turns a message into an `InboundMessage`: a direct chat is
+  keyed by the phone number (LID forms are mapped through `remoteJidAlt`, `participantAlt` and the
+  LID mapping), is one conversation (`dm`), and in a group a mention starts a conversation keyed by
+  its message id and a reply continues it. The transport reads messages one at a time, journals each
+  before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
+  the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
+  the quoted menu or the newest one of the conversation.
+- **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
+  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 
 ## Mobile chat queue
 

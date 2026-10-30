@@ -1,4 +1,4 @@
-/* Marketplace > Apps > Slack, Discord and Telegram: the channel pages (ChannelParts.tsx). */
+/* Marketplace > Apps > Slack, Discord, Telegram and WhatsApp: the channel pages (ChannelParts.tsx). */
 
 .channel-stack {
   display: grid;
@@ -90,6 +90,175 @@
 }
 
 .discord-role-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ WhatsApp link dialog */
+
+/* What the number is and how the phone links: cards with a radio dot, as in the mobile route choice. */
+.whatsapp-choice {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.whatsapp-choice[data-layout="row"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.whatsapp-choice-option {
+  display: flex;
+  min-width: 0;
+}
+
+.whatsapp-choice-card {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--openbot-space-3);
+  min-width: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  cursor: pointer;
+  transition-property: background-color, box-shadow;
+  transition-duration: var(--openbot-duration-hover), var(--openbot-duration-normal);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.whatsapp-choice-card:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.whatsapp-choice-card[data-disabled] {
+  cursor: default;
+}
+
+.whatsapp-choice-card[data-checked] {
+  box-shadow: inset 0 0 0 1.5px var(--openbot-accent);
+}
+
+.whatsapp-choice-option:has(:focus-visible) .whatsapp-choice-card {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+/* A ring, filled when the option is selected. */
+.whatsapp-choice-dot {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-top: 1px;
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--openbot-text-muted);
+  transition: box-shadow var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.whatsapp-choice-dot::after {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+  content: "";
+  transform: scale(0);
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.whatsapp-choice-card[data-checked] .whatsapp-choice-dot {
+  box-shadow: inset 0 0 0 1.5px var(--openbot-accent);
+}
+
+.whatsapp-choice-card[data-checked] .whatsapp-choice-dot::after {
+  transform: scale(1);
+}
+
+.whatsapp-choice-text {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+}
+
+.whatsapp-choice-name {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.whatsapp-choice-hint {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The QR code above the steps on the phone. */
+.whatsapp-link-qr {
+  display: grid;
+  gap: var(--openbot-space-3);
+  justify-items: center;
+}
+
+.whatsapp-link-qr > .channel-checklist {
+  justify-self: stretch;
+}
+
+.whatsapp-link-step-index {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The pairing code, large enough to type on the phone from this screen. */
+.whatsapp-pairing-code {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: center;
+  justify-content: center;
+  padding: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.whatsapp-pairing-digits {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-2xl);
+  line-height: var(--openbot-leading-2xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
+}
+
+/* ------------------------------------------------ WhatsApp group dialog */
+
+.whatsapp-groups {
+  display: grid;
+  max-height: 40vh;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  overflow-y: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  list-style: none;
+}
+
+.whatsapp-group-row {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-sm);
+}
+
+.whatsapp-group-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

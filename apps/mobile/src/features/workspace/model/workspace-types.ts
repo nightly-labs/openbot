@@ -26,6 +26,7 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   ClearableStorageCategory,
+  ConnectorMessagingPlatform,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -59,7 +60,6 @@ import type {
   McpSignInState,
   McpTestResult,
   MessagingOverview,
-  MessagingPlatform,
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
@@ -365,7 +365,7 @@ export interface MobileWorkspaceContextValue {
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
   /** The text of a CSV password export. The host adds its logins and answers only the counts. */
   importVaultCsv: (csv: string, serverId: string) => Promise<VaultHostImportResult>;
-  loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
+  loadMessagingConnections: (platform: ConnectorMessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
   /** Sends the sealed grant of a Slack or Discord install to the host that started it. */

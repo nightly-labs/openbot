@@ -87,6 +87,7 @@ export const messages = {
   "marketplace.app.slackTagline": "Vermeldingen en privéberichten in Slack",
   "marketplace.app.discordTagline": "Vermeldingen en privéberichten in Discord",
   "marketplace.app.telegramTagline": "Groepen en privéchats in Telegram",
+  "marketplace.app.whatsappTagline": "Je eigen chat en de mensen die je toestaat in WhatsApp",
   "marketplace.app.bitwardenTagline": "Log in op sites met logins uit een gedeelde map",
   "marketplace.app.onePasswordCategory": "Beheer van logins en inloggegevens",
   "marketplace.app.yourApps": "Jouw apps",

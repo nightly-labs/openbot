@@ -99,6 +99,7 @@ export const messages = {
   "marketplace.app.slackTagline": "Erwähnungen und Direktnachrichten in Slack",
   "marketplace.app.discordTagline": "Erwähnungen und Direktnachrichten in Discord",
   "marketplace.app.telegramTagline": "Gruppen und Direktchats in Telegram",
+  "marketplace.app.whatsappTagline": "Dein eigener Chat und zugelassene Personen in WhatsApp",
   "marketplace.app.bitwardenTagline": "Bei Websites mit Zugangsdaten aus einem geteilten Ordner anmelden",
   "marketplace.app.onePasswordCategory": "Verwaltung von Anmeldungen und Zugangsdaten",
   "marketplace.app.yourApps": "Deine Apps",

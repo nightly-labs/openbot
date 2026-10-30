@@ -40,4 +40,14 @@ export const messages = {
     "OpenBot ist mit diesem Chat verbunden. Erwähne {bot} oder antworte auf eine Nachricht von OpenBot, um die Agenten zu fragen.",
   "status.messaging.telegramOrchestratorName": "Telegram-Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Antwortet in Telegram und fragt das Team",
+  "status.messaging.whatsappNoAgent":
+    "Hier kann noch kein Agent antworten. Füge den WhatsApp-Orchestrator in OpenBot hinzu.",
+  "status.messaging.whatsappApprovalMenu": "Antworte 1 zum Genehmigen oder 2 zum Ablehnen.",
+  "status.messaging.whatsappStopMenu": "Antworte „stop“, um zu stoppen.",
+  "status.messaging.whatsappPairingCode":
+    "Diese Nummer antwortet nur Personen, die ihr Besitzer zugelassen hat. Gib dem Besitzer diesen Code: {code}",
+  "status.messaging.whatsappPairingApproved": "Du kannst jetzt Anfragen an diese Nummer senden.",
+  "status.messaging.whatsappOwnChat": "Nachricht an dich selbst",
+  "status.messaging.whatsappOrchestratorName": "WhatsApp-Orchestrator",
+  "status.messaging.whatsappOrchestratorTitle": "Antwortet in WhatsApp und fragt das Team",
 } as const satisfies PartialTranslation<typeof source>;

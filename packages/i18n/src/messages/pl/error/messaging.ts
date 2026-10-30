@@ -16,6 +16,10 @@ export const messages = {
   "error.messaging.telegramRelayUnavailable":
     "OpenBot nie może połączyć się z Telegramem na tym komputerze. Zaloguj się, nadaj temu komputerowi nazwę i spróbuj ponownie.",
   "error.messaging.telegramServiceUnavailable": "OpenBot nie może teraz połączyć Telegrama. Spróbuj ponownie później.",
+  "error.messaging.whatsappNotConnected": "Ten numer WhatsApp nie jest połączony.",
+  "error.messaging.whatsappUnsupported": "Ten komputer nie może połączyć się z WhatsApp.",
+  "error.messaging.whatsappTooManySenders": "Numer WhatsApp może dopuścić maksymalnie 200 kontaktów i grup.",
+  "error.messaging.whatsappRequestEnded": "Ta prośba wygasła. Poproś tę osobę, aby napisała ponownie po nowy kod.",
   "error.messaging.memoryLimit":
     "Połączony obszar roboczy może mieć maksymalnie {limit} wspomnień. Najpierw usuń jedno.",
 } as const satisfies PartialTranslation<typeof source>;
