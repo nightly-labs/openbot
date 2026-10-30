@@ -324,6 +324,11 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "antigravity", state: "not-started", version: null, message: null },
     { id: "cursor", state: "not-started", version: null, message: null },
     { id: "cline", state: "not-started", version: null, message: null },
+    { id: "pi", state: "not-started", version: null, message: null },
+    { id: "muse", state: "not-started", version: null, message: null },
+    { id: "inception", state: "not-started", version: null, message: null },
+    { id: "deepseek", state: "not-started", version: null, message: null },
+    { id: "openrouter", state: "not-started", version: null, message: null },
     { id: "acp", state: "not-started", version: null, message: null },
   ],
   capabilities: {
