@@ -9,6 +9,10 @@ import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOpera
 import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_PROVIDERS,
 } from "@openbot/contracts/team-protocol/provider-account-relay-v1";
@@ -28,6 +32,7 @@ import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { runTeamEffect } from "@openbot/team-client";
 import {
+  type CustomProviderRoutes,
   cancelProviderAccountSignIn,
   cancelProviderCodeLogin,
   cancelProviderHostSignIn,
@@ -109,6 +114,7 @@ function webProviderAdmin(
   runtimeRoutes: () => ProviderRuntimeRoutes,
   signInRoutes: () => ProviderCodeLoginRoutes,
   keyRoutes: () => typeof PROVIDERS_ADMIN_ROUTES | typeof PROVIDERS_V5_ROUTES | typeof PROVIDERS_V8_ROUTES,
+  customRoutes: () => CustomProviderRoutes,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -176,11 +182,17 @@ function webProviderAdmin(
         checkProviderRuntimeUpdates(request(serverId), runtimeRoutes()).pipe(Effect.mapError((error) => error.cause)),
       ),
     listCustomProviders: async (serverId) =>
-      runTeamEffect(listCustomProviders(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        listCustomProviders(request(serverId), customRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     saveCustomProvider: async (input, serverId) =>
-      runTeamEffect(saveCustomProvider(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        saveCustomProvider(request(serverId), input, customRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     deleteCustomProvider: async (input, serverId) =>
-      runTeamEffect(deleteCustomProvider(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      runTeamEffect(
+        deleteCustomProvider(request(serverId), input, customRoutes()).pipe(Effect.mapError((error) => error.cause)),
+      ),
     accounts: async (serverId) =>
       runTeamEffect(listProviderAccounts(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
     accountUsage: async (serverId) =>
@@ -253,6 +265,10 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         : serverSupportsCapability(options.server(), PROVIDERS_V5_CAPABILITY)
           ? PROVIDERS_V5_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
+    () =>
+      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+        ? CUSTOM_PROVIDER_HARNESS_ROUTES
+        : PROVIDERS_ADMIN_ROUTES,
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
