@@ -653,6 +653,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(source ? { cliSource: source } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
+          ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -1751,6 +1752,23 @@ export class ProviderRuntime implements ProviderPort {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
     return yield* this.#runProviderConnectionCommand(provider, () => this.#startProviderCode(provider, codeSignIn));
+  }).bind(this);
+
+  /** Signs Codex in with an OpenAI API key in place of its current login, as another sign-in does. */
+  readonly signInCodexWithApiKey = Effect.fn("ProviderRuntime.signInCodexWithApiKey")(function* (
+    this: ProviderRuntime,
+    apiKey: string,
+  ) {
+    this.#startFailures.delete("codex");
+    const start = this.#providerStarts.get("codex");
+    if (start) yield* Deferred.await(start);
+    return yield* this.#runProviderConnectionCommand("codex", () =>
+      Effect.gen({ self: this }, function* () {
+        yield* this.#codexLogin.cancel(null);
+        yield* this.#codexLogin.startApiKey(apiKey).pipe(toProviderOperationFailed);
+        return this.status();
+      }),
+    );
   }).bind(this);
 
   readonly #startProviderCode = Effect.fn("ProviderRuntime.startCodeLogin")(function* (

@@ -157,6 +157,10 @@ export const messages = defineMessages("provider", {
   "provider.claudeKey.description":
     "Save an Anthropic API key on the host. Anthropic bills each request to the key. To use it for an agent, select the API key account in the agent's model menu. When Claude is not signed in, all agents use the key.",
   "provider.claudeKey.label": "Anthropic API key",
+  "provider.codexKey.title": "Log in with an OpenAI API key",
+  "provider.codexKey.description":
+    "Codex saves the key on this computer, as `codex login --with-api-key` does. OpenAI bills each request to the key, not to your ChatGPT plan. To use the plan again, disconnect the account and connect ChatGPT.",
+  "provider.codexKey.label": "OpenAI API key",
   "provider.inceptionKey.title": "Inception API key",
   "provider.inceptionKey.description":
     "Save an Inception API key on this computer to use the Mercury models. OpenBot runs them in the Pi CLI that it downloads.",
@@ -256,6 +260,9 @@ export const messages = defineMessages("provider", {
   "provider.settings.geminiKeyInUse": "Gemini uses this key, not your Google AI plan. The plan's usage is not shown.",
   "provider.settings.claudeKeyInUse":
     "Select the API key account in an agent's model menu. When Claude is not signed in, all agents use the key.",
+  "provider.settings.codexKeyInUse":
+    "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
+  "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",

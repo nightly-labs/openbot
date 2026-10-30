@@ -12,6 +12,7 @@ import {
   decodeAccountLoginStartResult,
   decodeAccountReadResult,
   decodeRecordResponse,
+  isCodexLoginType,
 } from "./../protocol";
 import { recordRestartActivity } from "../restart-activity";
 
@@ -131,6 +132,32 @@ export class CodexLoginFlow {
     return started ?? { kind: "connected" };
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * Signs Codex in with an OpenAI API key. Codex keeps the key in its own home, as
+   * `codex login --with-api-key` does, so OpenBot stores no copy and Disconnect removes it. Codex
+   * checks the key on the first request, not here.
+   */
+  readonly startApiKey = Effect.fn("CodexLogin.startApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
+    yield* this.#withLoginClientEffect(
+      (client, cli) =>
+        Effect.gen({ self: this }, function* () {
+          yield* client
+            .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
+            .pipe(toCodexLoginFailed);
+          const { account } = yield* client
+            .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+            .pipe(toCodexLoginFailed);
+          if (account?.type !== "apiKey") {
+            return yield* new CodexLoginFailed({
+              cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
+            });
+          }
+          yield* this.#host.activate(client, cli, account);
+        }),
+      { reuseSaved: false },
+    );
+  }, Effect.uninterruptible).bind(this);
+
   readonly complete = Effect.fn("CodexLogin.complete")(function* (
     this: CodexLoginFlow,
     completion: AccountLoginCompletedResult,
@@ -241,11 +268,13 @@ export class CodexLoginFlow {
    * Returns null when the client turned out to be signed in already: the account was activated and
    * there is no login to start. Both sign-in shapes share this because everything before the
    * `account/login/start` call - the CLI, the handshake, the account already on this computer - and
-   * everything the failure path has to undo is the same for a browser hand-off and for a code.
+   * everything the failure path has to undo is the same for a browser hand-off and for a code. A
+   * key login replaces the saved one, so it passes `reuseSaved: false`.
    */
   readonly #withLoginClientEffect = Effect.fn("CodexLogin.withClient")(function* <T>(
     this: CodexLoginFlow,
     run: (client: AgentClient, cli: CodexCliInfo) => Effect.Effect<T, CodexLoginFailed>,
+    { reuseSaved = true }: { reuseSaved?: boolean } = {},
   ) {
     let cli: CodexCliInfo | null = null;
     this.#host.setConnecting();
@@ -271,7 +300,7 @@ export class CodexLoginFlow {
               )
               .pipe(toCodexLoginFailed);
             yield* loginStep(() => client.notify("initialized"));
-            if (!this.#host.hasActiveClient()) {
+            if (reuseSaved && !this.#host.hasActiveClient()) {
               const existing = yield* client
                 .request("account/read", { refreshToken: false }, decodeAccountReadResult)
                 .pipe(
@@ -284,7 +313,7 @@ export class CodexLoginFlow {
                   ),
                 );
               const account = existing.account;
-              if (account?.type === "chatgpt") {
+              if (account && isCodexLoginType(account.type)) {
                 yield* this.#host.activate(client, resolved, account).pipe(toCodexLoginFailed);
                 return null;
               }

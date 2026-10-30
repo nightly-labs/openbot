@@ -113,6 +113,7 @@ interface ProviderAdminIpcDependencies {
     | "cancelProviderCodeLogin"
     | "changeProviderCredential"
     | "clearProviderCredential"
+    | "signInCodexWithApiKey"
   >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<
@@ -410,6 +411,8 @@ export function providerAdminIpcHandlers({
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
         local: async ({ provider, key }) => {
+          // Codex keeps its key in its own login, not in OpenBot's store.
+          if (provider === "codex") return runCauseEffect(service.signInCodexWithApiKey(key));
           await runCauseEffect(runtimes.ensureKeyProviderCli(provider));
           return runCauseEffect(
             service.changeProviderCredential(provider, () =>

@@ -75,7 +75,7 @@ import {
   piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
-import type { AccountReadResult, ModelListResponse } from "./protocol";
+import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -656,10 +656,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...context.accountEnvironment,
       }),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
-    // `codex login --with-api-key` signs in with an OpenAI API key; its turns use API credits and it
-    // has no plan usage to read.
+    // An API-key login has no plan usage to read.
     validateAccount: (account) => {
-      if (account.type !== "chatgpt" && account.type !== "apiKey") {
+      if (!isCodexLoginType(account.type)) {
         throw new Error(sourceText("error.provider.codexLoginRequired"));
       }
     },

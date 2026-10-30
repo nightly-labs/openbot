@@ -3733,6 +3733,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  signInCodexWithApiKey(apiKey: string): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .signInCodexWithApiKey(apiKey)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "signInCodexWithApiKey", cause: failure.cause }),
+        ),
+      );
+  }
+
   submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {
     return this.#providers.submitProviderCodeLogin(provider, code);
   }
