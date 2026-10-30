@@ -947,7 +947,7 @@ export class ProviderRuntime implements ProviderPort {
         Effect.gen({ self: this }, function* () {
           let usage: AccountUsage;
           if (provider === "opencode") {
-            // The Go quota is one HTTPS request with the saved key, so do not start OpenCode for it.
+            // The Go quota is one HTTPS request with the CLI's key, so do not start OpenCode for it.
             usage = normalizeAccountUsage(
               yield* readOpenCodeGoUsage(this.#credentials.apiKey("opencode")).pipe(
                 toProviderOperationFailed,

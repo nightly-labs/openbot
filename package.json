@@ -242,6 +242,7 @@
     "test:opencode-azure-responses": "bun scripts/opencode-azure-responses-e2e.ts",
     "test:claude-api-key": "bun scripts/claude-api-key-e2e.ts",
     "test:cursor-usage": "bun scripts/cursor-usage-e2e.ts",
+    "test:opencode-go-usage": "bun scripts/opencode-go-usage-e2e.ts",
     "test:cursor-stream-closed": "bun scripts/cursor-stream-closed-e2e.ts",
     "test:cursor-model-set": "bun scripts/cursor-model-set-e2e.ts",
     "test:provider-update-busy": "bun scripts/provider-update-busy-e2e.ts",
