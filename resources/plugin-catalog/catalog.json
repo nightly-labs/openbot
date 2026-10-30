@@ -51,6 +51,42 @@
       "detailSha256": "f85666d6f360a29f8cb29be4c7fd992e1c0d018b5b1a0f5c59cadddefa6883b8"
     },
     {
+      "slug": "gmail",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "2125ea3dbf6bf23fb3dacbb13046deb355e5c8d1123afaa484b04dceb08a1053"
+    },
+    {
+      "slug": "google-calendar",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "e1602fbbf8c9f1feaf06452bfeb2efb120b5ee9885628ebb6fa771c3e21b8cac"
+    },
+    {
+      "slug": "google-drive",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "7fdd7236bcdb340d97da54a57e7c9e4bf097fb36fa2fbb4ff1731d4ae0ba2400"
+    },
+    {
+      "slug": "google-docs",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "1cf45d70d42e9f352a74241ca4001b4afde12260708f6f3c8af93dda073c8bf5"
+    },
+    {
+      "slug": "google-sheets",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "e582aa7f6344b7324ec2b5faa34fe25fab0c6899cdd140a2177c9b423179a2df"
+    },
+    {
+      "slug": "google-slides",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "4dbd57291452779ac4f8bbd5fad49ac257c217ea882720fd7bea656edf9fc328"
+    },
+    {
       "slug": "cobrain",
       "version": "1.0.0",
       "featured": false,

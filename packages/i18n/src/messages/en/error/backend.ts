@@ -193,6 +193,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
   "error.backend.mcpSignInClientRefused":
     "The sign-in server did not accept OpenBot when it completed the sign-in. Sign in again: OpenBot registers with the server again.",
+  "error.backend.googleSignInNeedsAccount":
+    "Sign in to your OpenBot account first. OpenBot needs it to complete a Google sign-in.",
+  "error.backend.googleSignInUnavailable": "OpenBot could not complete the Google sign-in. Try again later.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",

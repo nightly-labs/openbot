@@ -33,11 +33,17 @@ socket of the guild's host; `src/discord-api.ts` makes the typed Discord calls o
 `discord-session` token, an interaction token, a message's content or Discord's error text. Never
 let a host call Discord in a guild or channel that is not routed to its socket.
 
+Signal also holds the client secret of the OpenBot Google sign-in app (`src/google-oauth.ts`). A host
+sends only its two Google token requests (`POST /v1/google/oauth/token`, with its remote host ticket):
+the code exchange and the refresh. Signal adds the secret and returns Google's answer. Never log the
+request, the code, a token, the secret or Google's answer, never store them, and never accept another
+grant type, another client ID or a redirect that is not the host's loopback `/mcp-auth` address.
+
 - The message shapes come from `@openbot/contracts/signal-protocol`. `src/protocol.ts` only
   re-exports them for the server. Change them there, and keep released messages compatible.
 - `src/tokens.ts` holds the secrets. Compare secrets in constant time (`timingSafeEqual`), and keep
   the TTL limits. Never log a ticket, a token, a Slack, Discord or Telegram route ticket, a request
-  or update body, a bot token, a file or upload token, a TURN credential, or a secret from
+  or update body, a bot token, a Google code or token, a file or upload token, a TURN credential, or a secret from
   `src/config.ts`. Log only the error
   message, as `src/app.ts` does.
 - This project uses Bun types. Keep them inside `remote/api`; root `scripts/**` and Electron main

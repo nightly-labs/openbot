@@ -1,0 +1,33 @@
+{
+  "slug": "google-sheets",
+  "name": "Google Sheets",
+  "tagline": "Read and update spreadsheets",
+  "description": "Google Sheets lets agents read spreadsheets and cell values, write values and formulas, add rows and columns, and change spreadsheets. Agents can read all the spreadsheets that the user can open, and change the spreadsheets that the user can edit. This is Google's official Sheets MCP server, which is in Developer Preview. Each user signs in to their own Google account through the browser and approves access on Google's consent page. OpenBot has its own Google sign-in app, so the user does not set up Google Cloud. A spreadsheet from another person can contain instructions for the agent, so check what the agent does after it reads an untrusted spreadsheet.",
+  "category": "documents",
+  "creatorName": "Google",
+  "iconUrl": "https://ssl.gstatic.com/images/branding/product/2x/sheets_2020q4_48dp.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-summarize", "text": "Summarize the totals in my budget spreadsheet." },
+    { "id": "prompt-add-rows", "text": "Add these expenses as new rows to my expenses spreadsheet." },
+    { "id": "prompt-formula", "text": "Add a column with the total of each row to my sales spreadsheet." }
+  ],
+  "apps": [
+    {
+      "id": "app-google-sheets-mcp",
+      "name": "Google Sheets",
+      "description": "Spreadsheet values, formulas, and updates, over Google's Sheets MCP server with browser sign-in.",
+      "iconUrl": "https://ssl.gstatic.com/images/branding/product/2x/sheets_2020q4_48dp.png",
+      "server": {
+        "name": "google-sheets",
+        "transport": "http",
+        "url": "https://sheetsmcp.googleapis.com/mcp/v1",
+        "auth": [{ "id": "google-sheets-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://workspace.google.com/products/sheets/",
+  "privacyPolicyUrl": "https://policies.google.com/privacy",
+  "termsUrl": "https://policies.google.com/terms"
+}

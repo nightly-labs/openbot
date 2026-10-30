@@ -337,6 +337,18 @@ A `link` server with no `registration_endpoint` fails: each user would have to r
 first. Use a `key` flow for it, or leave it out. The smoke reads metadata only. It never registers a
 client and never sends a credential.
 
+The one exception is Google's MCP servers (Gmail, Drive, Docs, Sheets, Slides, Calendar). OpenBot brings its
+own Google sign-in app for them ([`google-mcp-sign-in.ts`](../../src/backend/google-mcp-sign-in.ts)):
+`GOOGLE_MCP_SCOPES` names each server URL and its scopes, and the smoke skips the registration check
+for these URLs. A Google server with no sign-in app that the user saved gets the OpenBot app. The
+client ID is public ([`google-token-broker.ts`](../../src/main/google-token-broker.ts)); the client
+secret is only in Signal. So the code exchange and the refresh go to Signal
+(`POST /v1/google/oauth/token`, with the host's remote ticket), which adds the secret and returns
+Google's answer. The tokens stay on the host, and the MCP traffic goes to Google directly. A host
+with no OpenBot account cannot use the OpenBot app; it can still save its own sign-in app. To add a
+Google server, add its URL and scopes to `GOOGLE_MCP_SCOPES` and its scopes to the OAuth consent
+screen of the OpenBot Google Cloud project. `bun run test:mcp-google-broker` checks the sign-in.
+
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the
 MCP server ([`McpSignInAppSection.tsx`](../../src/renderer/src/features/servers/McpSignInAppSection.tsx)).

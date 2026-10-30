@@ -409,6 +409,66 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Welche Trello-Karten sind mir zugewiesen?",
   "marketplace.plugin.trello.prompt.board": "Fasse zusammen, was auf meinem Trello-Board gerade in Arbeit ist.",
   "marketplace.plugin.trello.prompt.newCards": "Füge diese To-dos als Karten zu meinem Trello-Board hinzu.",
+  "marketplace.plugin.gmail.tagline": "E-Mail-Suche, Entwürfe und Labels",
+  "marketplace.plugin.gmail.description":
+    "Mit Gmail durchsuchen und lesen Agenten E-Mail-Threads und Nachrichten, schreiben Entwürfe, fügen Labels hinzu und entfernen sie, erstellen Labels, verschieben E-Mails in den Papierkorb und zurück und markieren E-Mails als Spam. Agenten können keine E-Mails senden: Sie schreiben einen Entwurf, und der Nutzer prüft und sendet ihn in Gmail. Agenten können E-Mails nicht endgültig löschen. Das ist Googles offizieller MCP-Server für Gmail, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Eine E-Mail von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er eine nicht vertrauenswürdige E-Mail gelesen hat.",
+  "marketplace.plugin.gmail.app":
+    "E-Mail-Suche, Entwürfe, Labels und Papierkorb über den Gmail-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.gmail.prompt.unread": "Fasse meine ungelesenen E-Mails von heute zusammen.",
+  "marketplace.plugin.gmail.prompt.thread":
+    "Versieh die ungelesenen Newsletter dieser Woche mit dem Label Newsletter und verschiebe sie in den Papierkorb.",
+  "marketplace.plugin.gmail.prompt.draft":
+    "Schreibe einen Antwortentwurf auf die neueste E-Mail von meiner Führungskraft.",
+  "marketplace.plugin.googleDrive.tagline": "Dateien suchen, lesen und hinzufügen",
+  "marketplace.plugin.googleDrive.description":
+    "Mit Google Drive durchsuchen Agenten Dateien, listen zuletzt verwendete Dateien auf, lesen Dateiinhalte und Details, sehen, wer Zugriff auf eine Datei hat, und erstellen und kopieren Dateien. Agenten können alle Dateien lesen, die der Nutzer öffnen kann. Sie können Dateien erstellen und jede Datei kopieren, die sie lesen können. Der Drive-Server von Google hat kein Tool, das eine Datei ändert, verschiebt oder löscht. Das ist Googles offizieller MCP-Server für Google Drive, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Eine Datei von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er eine nicht vertrauenswürdige Datei gelesen hat.",
+  "marketplace.plugin.googleDrive.app":
+    "Dateisuche, Lesen und Erstellen von Dateien über den Drive-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.googleDrive.prompt.find":
+    "Finde den Marketingplan in meinem Google Drive und fasse ihn zusammen.",
+  "marketplace.plugin.googleDrive.prompt.recent":
+    "Liste die Dateien auf, die ich zuletzt in Google Drive verwendet habe.",
+  "marketplace.plugin.googleDrive.prompt.access":
+    "Erstelle eine Kopie der Budgetdatei in meinem Google Drive für nächstes Jahr.",
+  "marketplace.plugin.googleDocs.tagline": "Dokumente lesen und bearbeiten",
+  "marketplace.plugin.googleDocs.description":
+    "Mit Google Docs lesen Agenten Dokumente und ändern deren Inhalt. Agenten können alle Dokumente lesen, die der Nutzer öffnen kann, und die Dokumente bearbeiten, die der Nutzer bearbeiten kann. Das ist Googles offizieller MCP-Server für Google Docs, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Ein Dokument von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er ein nicht vertrauenswürdiges Dokument gelesen hat.",
+  "marketplace.plugin.googleDocs.app":
+    "Dokumente lesen und bearbeiten über den Docs-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.googleDocs.prompt.summarize":
+    "Fasse die offenen Fragen in meinem Dokument zum Launch-Plan zusammen.",
+  "marketplace.plugin.googleDocs.prompt.edit":
+    "Füge oben in meinem Dokument mit den Besprechungsnotizen eine kurze Zusammenfassung ein.",
+  "marketplace.plugin.googleDocs.prompt.review": "Finde unklare Sätze in meinem Dokument zum Projektvorschlag.",
+  "marketplace.plugin.googleSheets.tagline": "Tabellen lesen und aktualisieren",
+  "marketplace.plugin.googleSheets.description":
+    "Mit Google Sheets lesen Agenten Tabellen und Zellwerte, schreiben Werte und Formeln, fügen Zeilen und Spalten ein und ändern Tabellen. Agenten können alle Tabellen lesen, die der Nutzer öffnen kann, und die Tabellen ändern, die der Nutzer bearbeiten kann. Das ist Googles offizieller MCP-Server für Google Sheets, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Eine Tabelle von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er eine nicht vertrauenswürdige Tabelle gelesen hat.",
+  "marketplace.plugin.googleSheets.app":
+    "Tabellenwerte, Formeln und Änderungen über den Sheets-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.googleSheets.prompt.summarize": "Fasse die Summen in meiner Budgettabelle zusammen.",
+  "marketplace.plugin.googleSheets.prompt.addRows": "Füge diese Ausgaben als neue Zeilen in meine Ausgabentabelle ein.",
+  "marketplace.plugin.googleSheets.prompt.formula":
+    "Füge meiner Umsatztabelle eine Spalte mit der Summe jeder Zeile hinzu.",
+  "marketplace.plugin.googleSlides.tagline": "Präsentationen lesen und bearbeiten",
+  "marketplace.plugin.googleSlides.description":
+    "Mit Google Slides lesen Agenten Präsentationen, Folien und Folienvorschauen und ändern den Inhalt einer Präsentation: Sie fügen Folien, Text, Formen und Bilder hinzu, ändern und löschen sie. Agenten können alle Präsentationen lesen, die der Nutzer öffnen kann, und die Präsentationen bearbeiten, die der Nutzer bearbeiten kann. Der Slides-Server von Google hat kein Tool, das eine Präsentation erstellt oder löscht. Das ist Googles offizieller MCP-Server für Google Slides, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Eine Präsentation von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er eine nicht vertrauenswürdige Präsentation gelesen hat.",
+  "marketplace.plugin.googleSlides.app":
+    "Präsentationen lesen und bearbeiten über den Slides-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.googleSlides.prompt.summary":
+    "Fasse meine Präsentation zum Quartalsrückblick Folie für Folie zusammen.",
+  "marketplace.plugin.googleSlides.prompt.agenda":
+    "Füge in meiner Präsentation für das Teammeeting nach der Titelfolie eine Folie mit der Tagesordnung ein.",
+  "marketplace.plugin.googleSlides.prompt.typos":
+    "Finde und korrigiere die Rechtschreibfehler in meiner Präsentation zum Produktlaunch.",
+  "marketplace.plugin.googleCalendar.tagline": "Termine, Kalender und freie Zeiten",
+  "marketplace.plugin.googleCalendar.description":
+    "Mit Google Calendar listen Agenten Kalender auf, lesen und durchsuchen Termine, finden Zeiten, zu denen Personen frei sind, erstellen, ändern und löschen Termine und antworten auf Einladungen. Das ist Googles offizieller MCP-Server für Google Calendar, der sich in der Developer Preview befindet. Jeder Nutzer meldet sich im Browser bei seinem eigenen Google-Konto an und erlaubt den Zugriff auf der Zustimmungsseite von Google. OpenBot hat eine eigene Google-Anmelde-App, daher muss der Nutzer nichts in Google Cloud einrichten. Ein Termin von einer anderen Person kann Anweisungen für den Agenten enthalten. Prüfe daher, was der Agent tut, nachdem er einen nicht vertrauenswürdigen Termin gelesen hat.",
+  "marketplace.plugin.googleCalendar.app":
+    "Kalender, Termine und freie Zeiten über den Calendar-MCP-Server von Google mit Anmeldung im Browser.",
+  "marketplace.plugin.googleCalendar.prompt.today": "Was steht heute in meinem Google Calendar?",
+  "marketplace.plugin.googleCalendar.prompt.week": "Fasse meine Besprechungen für diese Woche zusammen.",
+  "marketplace.plugin.googleCalendar.prompt.freeTime":
+    "Finde nächste Woche eine freie Stunde und trage ein Meeting mit Alex in meinen Kalender ein.",
   "marketplace.plugin.huggingface.tagline": "Modelle, Datensätze und Paper auf dem Hub",
   "marketplace.plugin.huggingface.description":
     "Mit Hugging Face durchsuchen Agenten Modelle, Datensätze, Spaces, Collections und Paper auf dem Hugging Face Hub, lesen Model Cards und Repository-Dateien, zeigen eine Vorschau von Datensätzen und durchsuchen die Hugging-Face-Dokumentation. Es verwendet öffentliche Hub-Daten und braucht kein Konto und keinen Schlüssel. Die Tools lesen nur: Agenten können keine Repositorys anlegen und keine Jobs ausführen.",
