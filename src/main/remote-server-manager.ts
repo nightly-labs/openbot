@@ -251,7 +251,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #localLevels: LocalNotificationLevels | null;
   /**
    * The notification levels that the user chose on each joined server, as each server last gave them.
-   * No event changes them, so each read and each connection reads them again.
+   * Each connection reads them, and `agent-notification-levels-changed` and each change from this
+   * computer keep them current.
    */
   readonly #syncedLevels = new Map<string, AgentNotificationLevelsSnapshot>();
   readonly #team: RemoteTeamDirectory;
@@ -618,6 +619,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   cachedNotificationLevels(serverId: string): AgentNotificationLevelsSnapshot {
     if (serverId === LOCAL_SERVER_ID) return this.#localLevels?.snapshot() ?? EMPTY_AGENT_NOTIFICATION_LEVELS;
     return this.#syncedLevels.get(serverId) ?? EMPTY_AGENT_NOTIFICATION_LEVELS;
+  }
+
+  /**
+   * The levels of a joined server that this computer has read, or `null` before the first read
+   * succeeds. A server without `agent-notification-levels-v1` has none to read.
+   */
+  knownNotificationLevels(serverId: string): AgentNotificationLevelsSnapshot | null {
+    if (serverId === LOCAL_SERVER_ID) return this.cachedNotificationLevels(serverId);
+    return this.#syncedLevels.get(serverId) ?? null;
   }
 
   /**

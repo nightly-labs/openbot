@@ -346,7 +346,9 @@ export class PushNotificationService {
         title: notice.title,
         body: notice.body,
       };
-      yield* this.#send(registration, content, fixed.body);
+      // A failed send waits before it goes again, so each send has its own fiber: the other phones
+      // do not wait for it.
+      yield* this.#send(registration, content, fixed.body).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
     }
   });
 

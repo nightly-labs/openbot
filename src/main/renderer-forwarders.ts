@@ -78,7 +78,12 @@ export interface RendererForwarderDependencies {
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<
     RemoteServerManager,
-    "list" | "request" | "readAgentConversationPage" | "notificationLevels" | "cachedNotificationLevels"
+    | "list"
+    | "request"
+    | "readAgentConversationPage"
+    | "notificationLevels"
+    | "cachedNotificationLevels"
+    | "knownNotificationLevels"
   > | null;
   /** The level that the user chose for each agent of this computer's server. */
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
@@ -291,8 +296,10 @@ export function createRendererForwarders({
   }
 
   /**
-   * The level that the user chose for each agent of a server. The local levels come at once. A remote
-   * server gives the levels of this member, and the manager keeps them for a read that fails.
+   * The level that the user chose for each agent of a server. The local levels come at once. The
+   * manager keeps the levels of a remote server current from its connection and its events, so only
+   * a server whose levels this computer could not read yet gets a request, as when the read at
+   * connection failed.
    */
   function agentNotificationLevels(
     serverId: string,
@@ -300,6 +307,8 @@ export function createRendererForwarders({
     if (serverId === LOCAL_SERVER_ID) return ownAgentNotificationLevels();
     const remoteManager = getRemoteServerManager();
     if (!remoteManager) return new Map();
+    const known = remoteManager.knownNotificationLevels(serverId);
+    if (known) return agentNotificationLevelMap(known);
     // The read also refreshes the server level in the server list, which `notifyLevel` reads after it.
     return runCauseEffect(remoteManager.notificationLevels(serverId)).then(agentNotificationLevelMap, () =>
       agentNotificationLevelMap(remoteManager.cachedNotificationLevels(serverId)),
