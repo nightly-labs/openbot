@@ -8,6 +8,7 @@ import type {
   BrowserTarget,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
@@ -181,6 +182,20 @@ const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
 
 /** Frames inside frames. Past this the focus is treated as in the last frame reached. */
 const MAX_FOCUSED_FRAME_DEPTH = 8;
+
+/**
+ * True when this node holds focus in its own document: every shadow root on the way up names it or
+ * its host as active. It starts inside the node, so a closed shadow root does not hide it.
+ */
+const HOLDS_FOCUS_FUNCTION = `function() {
+  if (!this.isConnected) return false;
+  for (let node = this;;) {
+    const root = node.getRootNode();
+    if (root.activeElement !== node) return false;
+    if (root.nodeType === Node.DOCUMENT_NODE) return true;
+    node = root.host;
+  }
+}`;
 
 /**
  * The page's selection, read in the automation world so the page's own scripts cannot answer for it.
@@ -754,6 +769,17 @@ export class BrowserCdpEngine {
       Effect.gen({ self: this }, function* () {
         const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
         if (!resolved.backendNodeId) return yield* browserFailure(new Error("Typing requires an element target."));
+        const backendNodeId = resolved.backendNodeId;
+        // Native input goes to whatever holds focus, and a page focus or input handler can move it.
+        // Focus that leaves a frame also clears the frame's own active element, so the target alone
+        // tells whether it still holds focus.
+        const checkFocus = (
+          key: "error.backend.browserTypingFocusMoved" | "error.backend.browserTypingSubmitSkipped",
+        ) =>
+          Effect.gen({ self: this }, function* () {
+            const focused = yield* this.#callOnNode(send, backendNodeId, HOLDS_FOCUS_FUNCTION, [], resolved.sessionId);
+            if (focused !== true) return yield* browserFailure(new Error(sourceText(key)));
+          });
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
@@ -783,7 +809,11 @@ export class BrowserCdpEngine {
           [mode],
           resolved.sessionId,
         );
-        if (useEndKey === true) yield* dispatchShortcut(send, "End", resolved.sessionId);
+        if (useEndKey === true) {
+          yield* checkFocus("error.backend.browserTypingFocusMoved");
+          yield* dispatchShortcut(send, "End", resolved.sessionId);
+        }
+        yield* checkFocus("error.backend.browserTypingFocusMoved");
         yield* browserSync(() => assertBeforeDeadline(deadline));
         yield* send("Input.insertText", { text }, resolved.sessionId);
         // Submitting is part of typing rather than a second action, because it has to reach the node
@@ -791,6 +821,7 @@ export class BrowserCdpEngine {
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
         // the snapshot" and `submit: true` would insert the text without ever submitting it.
         if (options.submit === true) {
+          yield* checkFocus("error.backend.browserTypingSubmitSkipped");
           yield* browserSync(() => assertBeforeDeadline(deadline));
           yield* dispatchShortcut(send, "Enter", resolved.sessionId);
         }
