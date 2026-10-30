@@ -31,9 +31,30 @@ function timeOf(value: Date, options: DayMarkerOptions): string {
   return options.format ? options.format.date(value, time) : value.toLocaleTimeString(options.locale, time);
 }
 
-function dateOf(value: Date, options: DayMarkerOptions): string {
-  const date = { weekday: "short", month: "short", day: "numeric" } as const;
+function dateOf(value: Date, now: Date, options: DayMarkerOptions): string {
+  // The year shows only when it is not this year.
+  const date: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+  if (value.getFullYear() !== now.getFullYear()) date.year = "numeric";
   return options.format ? options.format.date(value, date) : value.toLocaleDateString(options.locale, date);
+}
+
+/**
+ * The day and time of a moment, in the form of a day separator: "Today 12:55", "Yesterday 11:55" or
+ * "Mon 26 Oct 12:55". Other times in a transcript use it too, so a reader sees one date form.
+ */
+export function dayAndTimeLabel(value: Date, options: DayMarkerOptions = {}): string {
+  const now = options.now ?? new Date();
+  const age = dayDifference(value, now);
+  const t = options.t ?? currentText().t;
+  const time = timeOf(value, options);
+  if (age === 0) return t("chat.day.today", { time });
+  if (age === 1) return t("chat.day.yesterday", { time });
+  return t("chat.day.date", { date: dateOf(value, now, options), time });
+}
+
+/** The time of a moment alone, in the form of the day separators. */
+export function timeLabel(value: Date, options: DayMarkerOptions = {}): string {
+  return timeOf(value, options);
 }
 
 /**
@@ -54,11 +75,5 @@ export function dayMarkerLabel(
     const previous = new Date(previousIso);
     if (!Number.isNaN(previous.getTime()) && dayDifference(previous, current) === 0) return null;
   }
-  const now = options.now ?? new Date();
-  const age = dayDifference(current, now);
-  const t = options.t ?? currentText().t;
-  const time = timeOf(current, options);
-  if (age === 0) return t("chat.day.today", { time });
-  if (age === 1) return t("chat.day.yesterday", { time });
-  return t("chat.day.date", { date: dateOf(current, options), time });
+  return dayAndTimeLabel(current, options);
 }

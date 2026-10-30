@@ -24,7 +24,7 @@
 
 .ui-popover-menu-surface {
   border: 0;
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--ui-menu-radius);
   outline: 0;
   background: var(--openbot-bg-control);
   box-shadow:

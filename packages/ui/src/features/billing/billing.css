@@ -70,7 +70,7 @@
   flex-direction: column;
   overflow: hidden;
   outline: 0;
-  border-radius: var(--openbot-radius-modal);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }
@@ -140,8 +140,8 @@
 }
 
 .billing-license-icon svg {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
 }
 
 .billing-license-row .ui-item-actions {

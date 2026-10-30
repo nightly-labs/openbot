@@ -33,6 +33,7 @@ import type {
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { timeLabel } from "./chat-day-markers";
 import { formatChatTimestamp } from "./chat-timestamp";
 
 interface ChatActionMarkerProps {
@@ -1070,7 +1071,7 @@ function formatRangeEnd(start: string, end: string, t: AppTranslate, format: App
     return formatMarkerTime(end, t, format);
   // A time today already shows without a date, in the same form as the start.
   if (sameDay(endDate, new Date())) return formatChatTimestamp(endDate, format);
-  return format.date(endDate, { timeStyle: "short" });
+  return timeLabel(endDate, { format });
 }
 
 function sameDay(first: Date, second: Date): boolean {

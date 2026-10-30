@@ -521,7 +521,7 @@ export function AccountLogin(props: AccountLoginProps) {
                   </Button>
                   {/* The account is for sign-in only. A new user asks what leaves the computer. */}
                   <p class="account-login-local-data">
-                    <Lock size={13} aria-hidden="true" />
+                    <Lock size={14} aria-hidden="true" />
                     {t("account.login.localData")}
                   </p>
                 </form>

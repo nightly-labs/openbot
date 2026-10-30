@@ -185,7 +185,7 @@
 }
 
 .otp-input-message {
-  min-height: 17px;
+  min-height: var(--openbot-leading-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -193,7 +193,7 @@
   margin: 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
   text-align: center;
 }
 

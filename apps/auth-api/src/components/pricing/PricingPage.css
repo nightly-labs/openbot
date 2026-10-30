@@ -2,14 +2,12 @@
    scoped under `.pricing-page`. */
 
 .pricing-page .pricing-hero {
-  /* The accent colour as channels. The page sets it from the size of the order. */
-  --pricing-accent: 236, 72, 153;
   padding-bottom: clamp(72px, 8vw, 120px);
 }
 
 /* The order form takes the colour of the order. */
 .pricing-page .order-form {
-  --order-accent: rgb(var(--pricing-accent));
+  --order-accent: var(--pricing-accent);
 }
 
 .pricing-page .pricing-heading {
@@ -22,19 +20,23 @@
   z-index: -1;
   inset: 0 auto 0 50%;
   width: 100vw;
-  background: radial-gradient(36% 26% at 50% 34%, rgba(var(--pricing-accent), 0.14), var(--openbot-transparent) 70%);
+  background: radial-gradient(
+    36% 26% at 50% 34%,
+    color-mix(in srgb, var(--pricing-accent) 14%, var(--openbot-transparent)),
+    var(--openbot-transparent) 70%
+  );
   content: "";
   pointer-events: none;
   transform: translateX(-50%);
-  transition: background 600ms ease;
+  transition: background calc(var(--openbot-duration-slow) * 3) ease;
 }
 
 .pricing-page .pricing-enterprise h2 {
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .pricing-page .pricing-cta {
@@ -88,7 +90,7 @@
   margin-top: 20px;
   padding: 22px 24px;
   border: 1px solid var(--openbot-price-rim-under);
-  border-radius: 18px;
+  border-radius: var(--openbot-radius-grouped);
   background:
     linear-gradient(
       90deg,
@@ -161,7 +163,7 @@
 .pricing-page .pricing-enterprise-body {
   margin: 4px 0 0;
   color: var(--openbot-text-muted);
-  font-size: 14px;
+  font-size: var(--openbot-text-lg);
   line-height: 1.45;
 }
 

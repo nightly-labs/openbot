@@ -729,11 +729,20 @@ export function ConversationTimeline() {
                   const previous = previousMessage();
                   return previous !== undefined && markerRowEndsWithMarker(previous);
                 });
+                // In a group, a marker in the same minute as the one above repeats its time, so the time
+                // shows once.
+                const repeatsMarkerTime = createMemo(() => {
+                  if (!groupedWithMarker()) return false;
+                  const current = Date.parse(message()?.actionMarker?.timestamp ?? "");
+                  const previous = Date.parse(previousMessage()?.actionMarker?.timestamp ?? "");
+                  return Number.isFinite(current) && Math.floor(current / 60_000) === Math.floor(previous / 60_000);
+                });
                 if (markerOnly) {
                   return (
                     <div
                       data-index={virtualRow.index}
                       data-grouped={groupedWithMarker() ? "marker" : undefined}
+                      data-repeated-time={repeatsMarkerTime() ? "" : undefined}
                       ref={messageVirtualizer.measureElement}
                       class="virtual-chat-row"
                       style={{

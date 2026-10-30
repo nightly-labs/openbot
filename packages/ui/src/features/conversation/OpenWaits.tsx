@@ -1,6 +1,7 @@
 import { buttonVariants, DropdownMenu, Ellipsis, MessageCircle, X } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { dayAndTimeLabel, timeLabel } from "./chat-day-markers";
 import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
 /**
@@ -69,8 +70,8 @@ function OpenWaitList(props: OpenWaitsProps) {
   const openedAt = (value: string) => {
     const date = new Date(value);
     return date.toDateString() === now().toDateString()
-      ? format.date(date, { timeStyle: "short" })
-      : format.date(date, { dateStyle: "medium", timeStyle: "short" });
+      ? timeLabel(date, { now: now(), format })
+      : dayAndTimeLabel(date, { now: now(), t, format });
   };
   return (
     <section

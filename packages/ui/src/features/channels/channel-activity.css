@@ -15,7 +15,7 @@
 }
 
 /* Who works, before what the work is. The working rings reach about 10px past a face, so the names
-   start after them rather than under them. Each name takes its agent's message colour. */
+   start after them rather than under them. The face carries the agent's colour; the name is text. */
 .channel-activity-names {
   flex: 0 1 auto;
   min-width: 0;
@@ -23,12 +23,12 @@
   overflow: hidden;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .channel-activity-name {
-  color: var(--channel-activity-name-color, var(--openbot-text-muted));
+  color: var(--openbot-text-readable);
 }
 /* In a narrow pane, long names end in an ellipsis before the short label wraps. */
 .channel-activity-content .agent-activity-label {
@@ -36,20 +36,21 @@
 }
 
 /* Reserve space outside the transcript. Only the panel's padded lower edge sits behind the composer.
-   The top edge is pulled over the transcript's own bottom padding, so messages pass behind the glass
-   as the reader scrolls while that padding still clears the last one at rest. */
+   The top edge is pulled over half of the transcript's bottom padding, so messages pass behind the
+   glass as the reader scrolls, and the last one keeps a gap above the panel at rest. The panel is the queue's
+   neutral tray: only the icon carries the failure colour, so the reason stays readable. */
 .channel-paused-tasks {
   position: relative;
   max-height: 35dvh;
   overflow-y: auto;
-  margin: calc(-1 * var(--openbot-space-6)) var(--openbot-space-3) calc(-1 * var(--openbot-radius-lg));
+  margin: calc(-1 * var(--openbot-space-3)) var(--openbot-space-3) calc(-1 * var(--openbot-radius-lg));
+  border: 1px solid var(--openbot-queue-border);
   border-radius: var(--openbot-radius-lg) var(--openbot-radius-lg) var(--openbot-radius-md) var(--openbot-radius-md);
-  background: var(--openbot-accent-strong);
-  box-shadow: 0 0 0 1px var(--openbot-accent-soft);
+  background: var(--openbot-queue-surface);
   -webkit-backdrop-filter: blur(var(--openbot-space-3));
   backdrop-filter: blur(var(--openbot-space-3));
   padding-bottom: var(--openbot-radius-lg);
-  color: var(--openbot-accent-text);
+  color: var(--openbot-queue-text);
 }
 
 /* Under the waiting block, the panel covers that block's lower edge, as the queue does, instead of
@@ -68,26 +69,28 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
 }
 .channel-paused-task + .channel-paused-task {
-  border-top: 1px solid var(--openbot-accent-soft);
+  border-top: 1px solid var(--openbot-border);
 }
 .channel-paused-task-reason {
+  display: flex;
   min-width: 0;
   flex: 1 1 24ch;
+  gap: var(--openbot-space-2);
+  align-items: center;
   margin: 0;
   overflow-wrap: anywhere;
-  font-size: var(--openbot-text-sm);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+.channel-paused-task-icon {
+  flex: 0 0 auto;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-danger-text);
 }
 .channel-paused-task-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--openbot-space-2);
   align-items: center;
-}
-.channel-paused-task-actions .ui-button {
-  background: var(--openbot-surface-light);
-  color: var(--openbot-text-on-light);
-}
-.channel-paused-task-actions .ui-button:hover {
-  background: var(--openbot-surface-light);
-  box-shadow: 0 0 0 1px var(--openbot-text-dim-on-light);
 }

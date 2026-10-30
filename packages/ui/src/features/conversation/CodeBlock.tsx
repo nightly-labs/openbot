@@ -132,7 +132,7 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
 export function CodeBlock(props: {
   block: MessageCodeBlock;
   streaming?: boolean | undefined;
-  /** Buttons before Copy, such as the switch between a preview and its code. */
+  /** Controls after the language label, such as the switch between a preview and its code. */
   actions?: JSX.Element;
   /** Buttons after Copy, such as the button that opens a larger view. */
   trailingActions?: JSX.Element;
@@ -221,8 +221,8 @@ export function CodeBlock(props: {
           </Show>
           <span class="message-code-language">{languageLabel()}</span>
         </div>
+        {props.actions}
         <div class="message-code-actions">
-          {props.actions}
           <Button
             type="button"
             variant="ghost"

@@ -341,8 +341,13 @@ Every GritQL rule has rejected examples marked `// flag` beside accepted example
 because a rule that matches nothing passes without enforcing anything. One rule failed to detect
 `querySelector<HTMLElement>` until its fixture covered that spelling.
 
+Renderer and shared UI stylesheets have a budget of zero for literal colours, font sizes, weights,
+pixel line-heights, letter-spacing, icon sizes, radii and durations. The public site stylesheets
+(`apps/auth-api/src`, `apps/status/src`) have their own budgets in `SITE_DEBT_BUDGETS`, which can
+only go down. A site can declare its own `--site-` scale beside the brand tokens.
+
 The UI fixtures have two trees. `renderer` breaks every check beside valid examples.
-`renderer-clean` breaks none. Both are needed: a check that reports once per file can falsely reject
+`renderer-clean` breaks none. `site` holds the public site budget fixtures. Both are needed: a check that reports once per file can falsely reject
 a valid example without changing the failure count in the first tree.
 
 The shared UI Biome override also runs `tools/ui-foundation/no-desktop-preload.grit`.

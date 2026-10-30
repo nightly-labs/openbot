@@ -103,11 +103,67 @@ function declaredClasses(source: string): Set<string> {
   return names;
 }
 
+/** The stylesheets of the public site, and the most of each style debt that they may hold. */
+export interface SiteStyles {
+  readonly sheets: readonly string[];
+  readonly budgets: Readonly<Partial<Record<StyleDebt, number>>>;
+}
+
+const STYLE_DEBTS = [
+  "colour literals outside the palette",
+  "untokenized font-size",
+  "untokenized font-weight",
+  "pixel line-height",
+  "untokenized letter-spacing",
+  "icon size outside the icon scale",
+  "untokenized border-radius",
+  "untokenized transition durations",
+] as const;
+
+export type StyleDebt = (typeof STYLE_DEBTS)[number];
+
+/** The literals that a stylesheet holds where a design token belongs, by kind. */
+function styleDebts(styles: string): Record<StyleDebt, number> {
+  // An icon takes its size from the icon scale. A drawing above 24px keeps its own size.
+  let iconSizeLiteralCount = 0;
+  for (const [, selector = "", body = ""] of styles
+    .replace(/\/\*[\s\S]*?\*\//gu, "")
+    .matchAll(/([^{}]*)\{([^{}]*)\}/gu)) {
+    if (!/(?:^|[\s>+~,(])svg\b|\.lucide\b/u.test(selector)) continue;
+    for (const [, size = ""] of body.matchAll(
+      /(?<![-\w])(?:width|height|inline-size|block-size):\s*(\d+(?:\.\d+)?)px/gu,
+    )) {
+      if (Number(size) <= 24) iconSizeLiteralCount += 1;
+    }
+  }
+  return {
+    "colour literals outside the palette":
+      matches(styles, /#[\da-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)/giu) +
+      matches(styles, /(?<![-\w])(?:white|black|red|blue|green|yellow|purple|orange|gray|grey|pink)(?![-\w])/giu),
+    "untokenized font-size": matches(styles, /font-size:(?!\s*(?:var\(|inherit\b))\s*[^;]+/gu),
+    "untokenized font-weight": matches(styles, /font-weight:(?!\s*(?:var\(|inherit\b))\s*[^;]+/gu),
+    // A unitless line-height scales with its font and stays allowed; a pixel one is a leading token.
+    "pixel line-height": matches(styles, /line-height:\s*[\d.]+px\b/gu),
+    "untokenized letter-spacing": matches(
+      styles,
+      /letter-spacing:(?!\s*(?:var\(|0(?:\s|;)|inherit\b|normal\b))\s*[^;]+/gu,
+    ),
+    "icon size outside the icon scale": iconSizeLiteralCount,
+    "untokenized border-radius": matches(styles, /border-radius:(?!\s*(?:var\(|0(?:\s|;)|inherit\b))\s*[^;]+/gu),
+    "untokenized transition durations": matches(
+      styles,
+      /transition(?:-duration)?:(?![^;]*var\()(?!\s*(?:none|0\.01ms))[^;]*\b\d+m?s\b[^;]*/gu,
+    ),
+  };
+}
+
 export function checkUiFoundation(
   rendererRoot: string,
   labelRoot: string,
   reachableRoots: readonly string[] = [rendererRoot],
   uiRoot = resolve(rendererRoot, "components/ui"),
+  tokenSheets: readonly string[] = [],
+  site: SiteStyles = { sheets: [], budgets: {} },
 ): UiFoundationReport {
   const sourceFiles = [...new Set([...filesUnder(rendererRoot), ...filesUnder(uiRoot)])];
   // Compared with a separator appended, or components/ui-kit and components/uiLegacy read
@@ -216,28 +272,40 @@ export function checkUiFoundation(
       failures.push(`${relative(labelRoot, path)}: .${name} is not reachable from any markup; delete the rule`);
     }
   }
-  const colorLiteralCount =
-    matches(legacyStyles, /#[\da-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)/giu) +
-    matches(legacyStyles, /(?<![-\w])(?:white|black|red|blue|green|yellow|purple|orange|gray|grey|pink)(?![-\w])/giu);
-  const debtBudgets = [
+  // A token that no stylesheet declares resolves to nothing, and the property silently falls
+  // back to its initial value: `--openbot-text-xs` sized three rules that way. A reference with a
+  // fallback, `var(--name, value)`, is optional by intent and is not reported.
+  const declaredTokens = new Set(
+    [...styleSheets, ...tokenSheets, ...site.sheets].flatMap((path) =>
+      [...readFileSync(path, "utf8").matchAll(/(--openbot-[\w-]+)\s*:/gu)].map(([, name]) => name),
+    ),
+  );
+  for (const path of [...styleSheets, ...site.sheets]) {
+    const referenced = new Set(
+      [...readFileSync(path, "utf8").matchAll(/var\(\s*(--openbot-[\w-]+)\s*\)/gu)].map(([, name]) => name),
+    );
+    for (const name of [...referenced].sort()) {
+      if (name !== undefined && !declaredTokens.has(name)) {
+        failures.push(`${relative(labelRoot, path)}: var(${name}) is not declared by any stylesheet`);
+      }
+    }
+  }
+  const debtBudgets: [string, number, number][] = [
     ["hand-rolled composite ARIA roles", manualCompositeCount, 0],
     // Biome rejects the *ByTestId queries, but a GritQL rule cannot see a JSX attribute in
     // the product tree, so this count is the only guard against a hook in markup. Reach an
     // element by its accessible name instead.
     ["data-testid hooks in renderer markup", matches(testHookSource, /data-testid\s*=/gu), 0],
-    ["colour literals outside the palette", colorLiteralCount, 0],
-    ["untokenized font-size", matches(legacyStyles, /font-size:(?!\s*(?:var\(|inherit\b))\s*[^;]+/gu), 0],
-    [
-      "untokenized border-radius",
-      matches(legacyStyles, /border-radius:(?!\s*(?:var\(|0(?:\s|;)|inherit\b))\s*[^;]+/gu),
-      0,
-    ],
-    [
-      "untokenized transition durations",
-      matches(legacyStyles, /transition(?:-duration)?:(?![^;]*var\()(?!\s*(?:none|0\.01ms))[^;]*\b\d+m?s\b[^;]*/gu),
-      0,
-    ],
-  ] as const;
+  ];
+  const rendererDebts = styleDebts(legacyStyles);
+  for (const label of STYLE_DEBTS) debtBudgets.push([label, rendererDebts[label], 0]);
+  // The public site has its own budgets. They start at the counts of the day the check came in
+  // and may only go down, as the renderer's did.
+  if (site.sheets.length > 0) {
+    const siteDebts = styleDebts(site.sheets.map((path) => readFileSync(path, "utf8")).join("\n"));
+    for (const label of STYLE_DEBTS)
+      debtBudgets.push([`public web ${label}`, siteDebts[label], site.budgets[label] ?? 0]);
+  }
 
   for (const [label, actual, maximum] of debtBudgets) {
     if (actual > maximum)
@@ -247,6 +315,18 @@ export function checkUiFoundation(
   return { failures, manualCompositeCount };
 }
 
+/** The style debt of the public site, which may only go down. */
+const SITE_DEBT_BUDGETS: SiteStyles["budgets"] = {
+  "colour literals outside the palette": 107,
+  "untokenized font-size": 280,
+  "untokenized font-weight": 159,
+  "pixel line-height": 4,
+  "untokenized letter-spacing": 79,
+  "icon size outside the icon scale": 38,
+  "untokenized border-radius": 88,
+  "untokenized transition durations": 33,
+};
+
 if (import.meta.main) {
   const logger = createOpenBotLogger("ui-foundation-check");
   const projectRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -255,6 +335,13 @@ if (import.meta.main) {
     projectRoot,
     [resolve(projectRoot, "src"), resolve(projectRoot, "apps"), resolve(projectRoot, "packages/ui/src")],
     resolve(projectRoot, "packages/ui/src"),
+    filesUnder(resolve(projectRoot, "packages/brand/src")).filter((path) => path.endsWith(".css")),
+    {
+      sheets: ["apps/auth-api/src", "apps/status/src"]
+        .flatMap((directory) => filesUnder(resolve(projectRoot, directory)))
+        .filter((path) => path.endsWith(".css")),
+      budgets: SITE_DEBT_BUDGETS,
+    },
   );
 
   if (failures.length > 0) {

@@ -17,7 +17,7 @@
   padding: var(--openbot-space-1) var(--openbot-space-1-5) var(--openbot-space-1) var(--openbot-space-1);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   line-height: var(--openbot-space-4);
   vertical-align: middle;
   white-space: nowrap;
@@ -35,7 +35,7 @@
 /* A quote is a passage, not a name: it stops at a short width, and its title shows all of it. */
 .reference-chip[data-kind="quote"] {
   max-width: min(240px, 100%);
-  font-weight: 450;
+  font-weight: var(--openbot-weight-regular);
 }
 
 .reference-chip[data-kind="agent"]:hover,

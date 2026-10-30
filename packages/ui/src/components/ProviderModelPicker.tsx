@@ -25,6 +25,7 @@ import {
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
+  ChevronsUpDown,
   Input,
   Listbox,
   Plus,
@@ -516,7 +517,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
               )}
             </Show>
           </span>
-          <ChevronDownIcon />
+          {/* A field stands beside selects, so it takes their icon. */}
+          <Show when={field()} fallback={<ChevronDownIcon />}>
+            <span class="ui-select-trigger-icon">
+              <ChevronsUpDown aria-hidden="true" />
+            </span>
+          </Show>
         </Popover.Trigger>
 
         <Popover.Content

@@ -434,8 +434,8 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 }
 
 .skills-marketplace-icon svg {
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
 }
 
 .marketplace-skill-mark[data-kind="icon"] > img {
@@ -1347,8 +1347,8 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
 /* Last, because it is the most specific icon rule: every button icon in the window is 16px. */
 .skills-marketplace .ui-button > svg,
 .marketplace-search > svg {
-  width: 16px;
-  height: 16px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
 }
 
 /* After the icon size rule, so that the warning color wins. */

@@ -125,7 +125,7 @@
 .agent-routine-row strong {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .agent-routine-row small,
@@ -135,8 +135,8 @@
 }
 
 .agent-routine-action-buttons svg {
-  width: 15px;
-  height: 15px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
 }
 
 .agent-routine-status-icon-active,
@@ -155,8 +155,8 @@
 
 .agent-routine-status-icon-active > svg,
 .agent-routine-status-icon-paused > svg {
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -507,16 +507,16 @@
 
 .agent-routine-run-icon {
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 18px;
   place-items: center;
   color: var(--openbot-text-muted);
 }
 
 .agent-routine-run-icon > svg {
-  width: 16px;
-  height: 16px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -956,7 +956,7 @@
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1.2;
 }
 
@@ -1141,8 +1141,8 @@
 }
 
 .agent-skill-icon svg {
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
 }
 
 .agent-skill-copy {
@@ -1377,7 +1377,7 @@
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
   text-align: left;
 }
 
@@ -1388,7 +1388,8 @@
   font-weight: var(--openbot-weight-regular);
 }
 
-.agent-settings-runtime-row .ui-select-trigger-icon {
+.agent-settings-runtime-row .ui-select-trigger-icon,
+.agent-settings-runtime-rows .provider-model-trigger-field .ui-select-trigger-icon {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
 }
@@ -1414,7 +1415,7 @@
 .agent-settings-runtime-path > span:last-child {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
   user-select: text;
 }
@@ -1429,7 +1430,7 @@
   margin: 0 var(--openbot-space-1);
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .agent-settings-notifications {
@@ -1456,8 +1457,8 @@
 .agent-settings-notifications strong {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 500;
-  line-height: 18px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
 }
 
 .agent-settings-notifications div > span {
@@ -1465,5 +1466,5 @@
   margin-top: 2px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
 }

@@ -13,7 +13,8 @@ export function App(props: AppProps = {}) {
       >
         <AppAccessGate />
       </AppProviders>
-      <Toaster onToastShown={reportNotification} />
+      {/* The stack starts under the 38px window header, so a toast never covers the header controls. */}
+      <Toaster onToastShown={reportNotification} offset={{ top: 46 }} />
     </NotificationObserver>
   );
 }

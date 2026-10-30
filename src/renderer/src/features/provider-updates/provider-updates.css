@@ -28,6 +28,23 @@
   margin-right: var(--openbot-space-6);
 }
 
+/* The notification stays until the user acts on it or closes it, so the close control shows at rest:
+   a hidden one left an empty space beside the action button. With a button, it stands centred
+   beside that button, so the two make one row. */
+.ui-toaster .provider-update-toast[data-sonner-toast][data-styled="true"] [data-close-button] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.ui-toaster
+  .provider-update-toast[data-sonner-toast][data-styled="true"]:has(
+    .provider-update-toast-action:not([data-idle="true"])
+  )
+  [data-close-button] {
+  top: 50%;
+  translate: 0 -50%;
+}
+
 /* A state with nothing to offer marks its label instead of losing it, and the button goes out of the
    layout. Sonner renders its action button for as long as an action exists on the toast, and taking
    the action away means replacing the notification, which is the one thing this flow will not do.

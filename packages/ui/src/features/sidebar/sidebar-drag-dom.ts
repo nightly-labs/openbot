@@ -137,7 +137,7 @@ export function createSidebarChatDragCard(source: HTMLElement): HTMLElement {
       ?.textContent?.trim() ?? "Chat";
   copy.append(name);
 
-  const titleText = source.querySelector(".sidebar-pinned-title, .agent-role-badge")?.textContent?.trim();
+  const titleText = source.querySelector(".sidebar-pinned-title")?.textContent?.trim();
   if (titleText) {
     const title = document.createElement("span");
     title.className = "z-badge z-badge-variant-secondary sidebar-pinned-title";

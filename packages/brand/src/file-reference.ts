@@ -33,6 +33,7 @@ const ARCHIVE_BADGES = new Set(["7z", "gz", "rar", "tar", "zip"]);
 const DATA_BADGES = new Set(["csv", "ods", "xls", "xlsx"]);
 const PRESENTATION_BADGES = new Set(["odp", "ppt", "pptx"]);
 const MEDIA_BADGES = new Set(["avi", "flac", "m4a", "mkv", "mov", "mp3", "mp4", "ogg", "wav", "webm"]);
+const TEXT_BADGES = new Set(["log", "txt"]);
 const BADGED_EXTENSIONS = new Set([
   ...CODE_BADGES,
   ...DOCUMENT_BADGES,
@@ -41,6 +42,7 @@ const BADGED_EXTENSIONS = new Set([
   ...DATA_BADGES,
   ...PRESENTATION_BADGES,
   ...MEDIA_BADGES,
+  ...TEXT_BADGES,
 ]);
 
 export type FileReferenceTone = "source" | "script" | "markup" | "style" | "data" | "document" | "media" | "default";

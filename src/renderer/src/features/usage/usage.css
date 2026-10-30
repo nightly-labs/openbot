@@ -90,7 +90,7 @@
 }
 .agent-usage h3 {
   font-size: var(--openbot-text-xl);
-  font-weight: 550;
+  font-weight: var(--openbot-weight-medium);
 }
 .agent-usage-notice {
   color: var(--openbot-text-secondary);

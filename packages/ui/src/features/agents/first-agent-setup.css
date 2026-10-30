@@ -131,7 +131,7 @@
   display: block;
   width: 18px;
   height: 18px;
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-swatch-edge);
   border-radius: var(--openbot-radius-pill);
 }
 

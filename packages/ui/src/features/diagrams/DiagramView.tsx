@@ -192,8 +192,8 @@ export function DiagramView(props: DiagramViewProps) {
                 })
               }
             >
-              <Show when={panels.inspector} fallback={<PanelRight aria-hidden="true" class="size-[14px]" />}>
-                <ChevronRight aria-hidden="true" class="size-[14px]" />
+              <Show when={panels.inspector} fallback={<PanelRight aria-hidden="true" class="size-3.5" />}>
+                <ChevronRight aria-hidden="true" class="size-3.5" />
               </Show>
             </Button>
           </Show>

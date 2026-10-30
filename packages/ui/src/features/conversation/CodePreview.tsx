@@ -91,7 +91,17 @@ export function CodePreview(props: {
           fill ? (
             <DiagramCanvas url={url()} title={title()} />
           ) : (
-            <img class="message-preview-diagram" src={url()} alt={title()} />
+            <img
+              class="message-preview-diagram"
+              src={url()}
+              alt={title()}
+              onLoad={(event) =>
+                event.currentTarget.style.setProperty(
+                  "--message-preview-diagram-width",
+                  `${event.currentTarget.naturalWidth}px`,
+                )
+              }
+            />
           )
         }
       </Match>

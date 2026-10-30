@@ -328,7 +328,7 @@
   overflow: auto;
   padding: var(--openbot-space-6);
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   border: 1px solid var(--openbot-dialog-ring);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);

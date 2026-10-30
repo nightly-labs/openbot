@@ -1,6 +1,5 @@
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { createMemo, For } from "solid-js";
-import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -41,7 +40,7 @@ const NAME_MARKER = /(\u{E000}\d+\u{E001})/u;
 
 /**
  * The names of the workers as one list in the interface language ("Chief and Research"), cut into
- * parts so that each name can take its agent's colour. The list is written with a marker for each
+ * parts so that each name can stand out from the words between them. The list is written with a marker for each
  * name, so the words and their order stay those of the locale.
  */
 function channelWorkerNameParts(workers: ChannelWorker[], list: AppFormat["list"]): ChannelWorkerNamePart[] {
@@ -54,11 +53,6 @@ function channelWorkerNameParts(workers: ChannelWorker[], list: AppFormat["list"
       if (worker) return [{ worker }];
       return part ? [{ text: part }] : [];
     });
-}
-
-/** The colour of the worker's name on its messages, so the name here matches its face and its replies. */
-function workerNameStyle(worker: ChannelWorker) {
-  return `--channel-activity-name-color: ${avatarHeadColor(worker.agent?.avatarSeed ?? worker.id, worker.agent?.avatarHue ?? null)}`;
 }
 
 /**
@@ -126,15 +120,7 @@ export function ChannelActivityIndicator(props: {
         </div>
         <span class="channel-activity-names">
           <For each={channelWorkerNameParts(props.workers, format.list)}>
-            {(part) =>
-              "worker" in part ? (
-                <span class="channel-activity-name" style={workerNameStyle(part.worker)}>
-                  {part.worker.name}
-                </span>
-              ) : (
-                part.text
-              )
-            }
+            {(part) => ("worker" in part ? <span class="channel-activity-name">{part.worker.name}</span> : part.text)}
           </For>
         </span>
         <span class="agent-activity-label">{t(agentActivityLabelKey(label()))}</span>

@@ -692,8 +692,8 @@
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 740;
-  letter-spacing: -0.02em;
+  font-weight: var(--openbot-weight-bold);
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .server-rail-logo {
@@ -736,12 +736,12 @@
   background: transparent;
   color: var(--openbot-accent-text);
   font-size: var(--openbot-text-2xl);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 
 .server-rail-action svg {
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   fill: none;
   stroke: currentColor;
   stroke-width: var(--openbot-icon-stroke);
@@ -1137,8 +1137,8 @@ textarea {
 .server-menu-mark {
   position: relative;
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
   overflow: hidden;
   place-items: center;
@@ -1166,6 +1166,11 @@ textarea {
   white-space: nowrap;
 }
 
+.server-menu-current {
+  flex: 0 0 auto;
+  color: var(--openbot-text-primary);
+}
+
 .server-menu-muted {
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
@@ -1188,7 +1193,13 @@ textarea {
   margin-left: 0;
 }
 
-/* The add item: a dashed circle that fills in on the highlighted row, with the plus cut out of it. */
+/* A trailing value, such as the current-server check or the layout name, keeps a clear gap before the
+   submenu chevron, and both rows end at one edge. */
+.server-menu :is(.server-menu-current, .ui-menu-trailing) {
+  margin-inline-end: var(--openbot-space-1);
+}
+
+/* The add item: a plain plus in the icon column, as the other menu items have, in the secondary text colour. */
 .ui-action-menu .server-menu-add {
   color: var(--openbot-text-secondary);
 }
@@ -1203,23 +1214,11 @@ textarea {
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
   place-items: center;
-  border: 1px dashed color-mix(in srgb, var(--openbot-text-primary) 30%, transparent);
-  border-radius: var(--openbot-radius-pill);
 }
 
 .ui-action-menu .server-menu-add-circle > svg {
-  width: var(--ui-menu-inset);
-  height: var(--ui-menu-inset);
-  stroke-width: 2.5;
-}
-
-.ui-action-menu .server-menu-add:is(:hover, [data-highlighted]) .server-menu-add-circle {
-  border-color: transparent;
-  background: var(--openbot-text-primary);
-}
-
-.ui-action-menu .server-menu-add:is(:hover, [data-highlighted]) .server-menu-add-circle > svg {
-  color: var(--ui-menu-bg);
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
 }
 
 .sidebar-topbar-actions {
@@ -1305,8 +1304,8 @@ textarea {
 }
 
 .sidebar-toggle-icon {
-  width: 17px;
-  height: 17px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   fill: none;
   stroke: currentcolor;
   stroke-linecap: round;
@@ -1314,8 +1313,8 @@ textarea {
 }
 
 .sidebar-marketplace-button > svg {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -1340,8 +1339,8 @@ textarea {
 }
 
 .sidebar-update-button > svg {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -1356,7 +1355,7 @@ textarea {
   justify-content: flex-start;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
   cursor: pointer;
 }
 
@@ -1406,7 +1405,7 @@ textarea {
   align-items: center;
   gap: 8px;
   border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-sm);
+  border-radius: var(--openbot-radius-md);
   background: var(--openbot-hover);
   padding: 0 9px;
   color: var(--openbot-text-dim);
@@ -1438,7 +1437,7 @@ textarea {
   box-shadow: none;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
 }
 
 .search-field input::placeholder {
@@ -1645,8 +1644,8 @@ textarea {
   min-width: 0;
   overflow: hidden;
   font-size: var(--openbot-text-sm);
-  font-weight: 400;
-  line-height: 16px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1708,8 +1707,8 @@ textarea {
   padding: 0 7px;
   color: var(--openbot-text-readable);
   font-size: var(--openbot-text-sm);
-  font-weight: 400;
-  line-height: 16px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -1723,7 +1722,7 @@ textarea {
   padding: 0 4px;
   color: var(--openbot-bg-sidebar);
   font-size: var(--openbot-text-sm);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .sidebar-hidden-group-count {
@@ -1818,7 +1817,7 @@ textarea {
 }
 
 .sidebar-agent-item + .sidebar-agent-item {
-  margin-top: 4px;
+  margin-top: var(--openbot-space-0-5);
 }
 
 .sidebar-agent-item-dragging {
@@ -1909,7 +1908,7 @@ textarea {
   background: transparent;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
   list-style: none;
   transition:
     border-color var(--openbot-duration-fast) ease-out,
@@ -2000,8 +1999,8 @@ textarea {
   overflow: hidden;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: 450;
-  line-height: 16px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
   text-align: center;
   text-overflow: ellipsis;
   text-wrap: pretty;
@@ -2019,7 +2018,7 @@ textarea {
   background: var(--openbot-hover);
   padding: 0 var(--openbot-space-1);
   color: var(--openbot-text-readable);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 
 .sidebar-pinned-title > span {
@@ -2065,8 +2064,8 @@ textarea {
   border-radius: var(--openbot-radius-md);
   color: var(--openbot-success);
   font-size: var(--openbot-text-sm);
-  font-weight: 680;
-  letter-spacing: 0.02em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
 }
 
 .person-avatar > img,
@@ -2104,11 +2103,12 @@ textarea {
   place-items: center;
   border: 2px solid var(--openbot-bg-sidebar);
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
+  /* One step below the name, so a count does not draw the eye before the agent it belongs to. */
+  background: var(--openbot-text-secondary);
   padding: 0 3px;
   color: var(--openbot-bg-sidebar);
   font-size: var(--openbot-text-sm);
-  font-weight: 680;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .agent-row {
@@ -2222,8 +2222,8 @@ textarea {
 }
 
 .agent-row-agent-status-responded svg {
-  width: 10px;
-  height: 10px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
   fill: none;
   stroke: currentColor;
   stroke-width: var(--openbot-icon-stroke);
@@ -2235,12 +2235,12 @@ textarea {
   min-width: 16px;
   height: 16px;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-secondary);
   padding: 0 3px;
   color: var(--openbot-bg-sidebar);
   font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  line-height: 12px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 1;
 }
 
 .agent-row-agent-status-routine,
@@ -2254,8 +2254,8 @@ textarea {
 
 .agent-row-agent-status-routine svg,
 .agent-row-agent-status-limited svg {
-  width: 10px;
-  height: 10px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 .agent-row-agent-status-routine-failed {
@@ -2273,8 +2273,8 @@ textarea {
 }
 
 .agent-row-agent-status-waiting svg {
-  width: 11px;
-  height: 11px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 /* The action chip takes the time slot: the time does not matter while the agent waits. */
@@ -2289,13 +2289,13 @@ textarea {
   color: var(--openbot-warning-text);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
 .agent-row-wait-chip svg {
-  width: 11px;
-  height: 11px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 /* The tooltip anchors to this wrapper, so it needs a box of its own. */
@@ -2328,8 +2328,8 @@ textarea {
 }
 
 .sidebar-wait-tooltip-title svg {
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
 
 .sidebar-wait-tooltip-detail {
@@ -2561,8 +2561,8 @@ textarea {
   padding: 7px 10px 3px 13px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 590;
-  letter-spacing: 0.02em;
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -2584,7 +2584,7 @@ textarea {
   padding: 0 9px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 540;
+  font-weight: var(--openbot-weight-medium);
   transition-property: scale, background-color, color;
   transition-duration: var(--openbot-duration-normal), var(--openbot-duration-hover), var(--openbot-duration-hover);
   transition-timing-function: ease-out;
@@ -2652,8 +2652,8 @@ textarea {
 }
 
 .avatar-image-upload-preview > svg {
-  width: 19px;
-  height: 19px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -2675,13 +2675,13 @@ textarea {
 .avatar-image-upload strong {
   margin-bottom: 3px;
   font-size: var(--openbot-text-sm);
-  font-weight: 580;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .avatar-image-upload small {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 14px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .avatar-editor-actions button:active,
@@ -2725,9 +2725,7 @@ textarea {
 
 .avatar-choice-selected {
   background: var(--openbot-border);
-  box-shadow:
-    inset 0 0 0 1px var(--openbot-text-muted),
-    0 1px 3px var(--openbot-shadow-popover-ambient);
+  box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
 }
 
 .avatar-face-choice .agent-avatar {
@@ -2766,7 +2764,7 @@ textarea {
   box-shadow: none;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .conversation-title .agent-avatar {
@@ -2802,15 +2800,6 @@ textarea {
   overflow: hidden;
 }
 
-.agent-row-title:has(.agent-role-badge) {
-  --agent-role-badge-collapsed-width: calc(2ch + 9px);
-
-  display: grid;
-  grid-template-columns:
-    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - 5px))
-    minmax(var(--agent-role-badge-collapsed-width), 1fr);
-}
-
 .agent-row-name {
   display: flex;
   min-width: 0;
@@ -2826,8 +2815,8 @@ textarea {
 }
 
 .agent-row-access svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 .agent-row-title strong,
@@ -2837,34 +2826,8 @@ textarea {
   overflow: hidden;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
-  line-height: 20px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-role-badge {
-  min-width: 0;
-  max-width: 100%;
-  height: 18px;
-  min-height: 18px;
-  overflow: hidden;
-  flex: 0 1 auto;
-  justify-self: start;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-xs);
-  background: var(--openbot-hover);
-  padding: 2px 4px;
-  color: var(--openbot-text-readable);
-  font-size: var(--openbot-text-sm);
-  font-weight: 400;
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.agent-role-badge > span {
-  min-width: 0;
-  overflow: hidden;
+  line-height: var(--openbot-leading-lg);
+  font-weight: var(--openbot-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2874,9 +2837,10 @@ textarea {
 .channel-row .agent-row-time {
   min-width: 0;
   flex: 0 0 auto;
-  color: var(--openbot-text-readable);
+  color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -2908,8 +2872,9 @@ textarea {
   margin-top: 0;
   overflow: hidden;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

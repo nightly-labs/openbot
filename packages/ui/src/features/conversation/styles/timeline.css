@@ -24,6 +24,11 @@
   padding-top: var(--openbot-chat-marker-gap);
 }
 
+/* The time of the marker above already covers this one, so the centred row holds only its label. */
+.virtual-chat-row[data-repeated-time] .chat-action-marker-time:not(.chat-action-run-group-time) {
+  display: none;
+}
+
 .virtual-chat-row > .chat-action-marker + .message-entry {
   margin-top: var(--openbot-chat-marker-gap);
 }
@@ -150,7 +155,7 @@
 
 .scroll-to-latest-count {
   font-size: var(--openbot-text-sm);
-  font-weight: 620;
+  font-weight: var(--openbot-weight-semibold);
   white-space: nowrap;
 }
 
@@ -171,8 +176,8 @@
 }
 
 .scroll-to-latest-button svg {
-  width: 22px;
-  height: 22px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -183,8 +188,8 @@
 /* The mark is as tall as the arrow, so one padding can hold both away from every edge. */
 .scroll-to-latest-dismiss svg {
   box-sizing: content-box;
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   border-radius: var(--openbot-radius-pill);
   padding: var(--openbot-space-1);
   transition: background-color var(--openbot-duration-hover) ease;
@@ -215,8 +220,8 @@
 
 /* The way back to a reply has a smaller arrow, so the label reads first. */
 .scroll-to-latest-button .scroll-to-latest-reply-icon {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
 }
 
 .scroll-to-latest-button:active,
@@ -280,8 +285,8 @@
   padding: 0 12px;
   color: var(--openbot-unread-text);
   font-size: var(--openbot-text-sm);
-  font-weight: 620;
-  line-height: 16px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
   transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
@@ -298,8 +303,8 @@
   width: 100%;
   padding: 0 12px;
   font-size: var(--openbot-text-sm);
-  font-weight: 620;
-  line-height: 16px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
   text-align: left;
 }
 
@@ -309,8 +314,8 @@
   margin-left: auto;
   padding: 0;
   font-size: var(--openbot-text-sm);
-  font-weight: 680;
-  line-height: 14px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
@@ -362,9 +367,9 @@
   margin: var(--openbot-space-1) 0 var(--openbot-space-2);
   color: var(--openbot-unread-surface);
   font-size: var(--openbot-text-sm);
-  font-weight: 720;
-  letter-spacing: 0.08em;
-  line-height: 12px;
+  font-weight: var(--openbot-weight-bold);
+  letter-spacing: var(--openbot-tracking-caps);
+  line-height: 1;
 }
 
 .unread-messages-divider hr {
@@ -389,6 +394,6 @@
   padding: 4px 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   text-align: center;
 }

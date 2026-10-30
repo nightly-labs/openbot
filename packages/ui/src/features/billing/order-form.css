@@ -110,7 +110,7 @@
   /* Primary text: the glow behind the glass can be bright. */
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--openbot-duration-slow) ease;
@@ -154,8 +154,8 @@
   color: color-mix(in srgb, var(--order-accent) 65%, var(--openbot-text-primary));
   font-family: var(--openbot-font-mono);
   font-size: var(--order-text-badge);
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
   white-space: nowrap;
   transition:
@@ -174,8 +174,8 @@
 .order-form-price-amount {
   color: var(--openbot-text-primary);
   font-size: var(--order-text-price);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-glyph);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -276,8 +276,8 @@
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--order-text-title);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
 }
 
 .order-form-half-summary {
@@ -297,7 +297,7 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-success) 30%, var(--openbot-transparent));
   color: var(--openbot-success-text);
   font-size: var(--openbot-text-sm);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   white-space: nowrap;
   transition: background-color var(--openbot-duration-slow) ease;
 }
@@ -456,8 +456,8 @@
   align-items: center;
   color: var(--openbot-text-primary);
   font-size: var(--order-text-choice-price);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-glyph);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -491,8 +491,8 @@
   margin-right: 8px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-xl);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-tight);
   white-space: nowrap;
 }
 
@@ -635,8 +635,8 @@
 .order-form-summary-line > div > div > span:last-child {
   color: var(--openbot-text-primary);
   font-size: var(--order-text-line);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -650,7 +650,7 @@
 .order-form-summary-line[data-minus] > div > div > span:last-child {
   color: var(--openbot-success);
   font-size: var(--openbot-text-lg);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
   letter-spacing: 0;
 }
 
@@ -674,7 +674,7 @@
 .order-form-total-label {
   color: var(--openbot-text-secondary);
   font-size: var(--order-text-label);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .order-form-total .order-form-price {

@@ -82,7 +82,7 @@
 .composer-notice-copy strong {
   color: var(--notice-accent);
   font-size: var(--openbot-text-sm);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   /* The two lines are tight against each other so the stack costs as little height as one row. */
   line-height: 1.35;
 }

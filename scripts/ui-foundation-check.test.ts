@@ -14,10 +14,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkUiFoundation } from "./ui-foundation-check";
+import { checkUiFoundation, type StyleDebt } from "./ui-foundation-check";
 
 const fixtureRenderer = resolve(import.meta.dirname, "../tools/ui-foundation/fixtures/renderer");
 const cleanRenderer = resolve(import.meta.dirname, "../tools/ui-foundation/fixtures/renderer-clean");
+const fixtureSite = resolve(import.meta.dirname, "../tools/ui-foundation/fixtures/site");
+const brandTokens = resolve(import.meta.dirname, "../packages/brand/src/tokens.css");
 
 function budget(label: string, actual: number, maximum = 0): string {
   return `${label}: ${actual} (migration budget: ${maximum}; the count may only go down)`;
@@ -65,6 +67,10 @@ describe("ui foundation check", () => {
         // neither - the template
         // literal that would cover it is an id, so a prefix taken outside a class-building
         // region would silently spare every identifier-* rule in the tree.
+        // One line per undeclared name. tokens.css reads four tokens it declares itself and one
+        // with a fallback; count a fallback reference, or stop reading declarations, and lines
+        // appear for that file too.
+        "styles/legacy.css: var(--openbot-brand-only) is not declared by any stylesheet",
         "styles/unreachable.css: .identifier-panel is not reachable from any markup; delete the rule",
         "styles/unreachable.css: .unreachable-panel is not reachable from any markup; delete the rule",
         budget("hand-rolled composite ARIA roles", 9),
@@ -77,6 +83,10 @@ describe("ui foundation check", () => {
         // reads 7 and the word boundaries have gone.
         budget("colour literals outside the palette", 6),
         budget("untokenized font-size", 1),
+        budget("untokenized font-weight", 1),
+        budget("pixel line-height", 1),
+        budget("untokenized letter-spacing", 1),
+        budget("icon size outside the icon scale", 2),
         budget("untokenized border-radius", 1),
         budget("untokenized transition durations", 2),
         // Six: five in branches/TestHooks.tsx and the sixth in components/ui/Button.tsx. That
@@ -110,6 +120,15 @@ describe("ui foundation check", () => {
 
     expect(failures).toEqual([]);
     expect(manualCompositeCount).toBe(0);
+  });
+
+  it("reads token declarations from the sheets outside the walked tree", () => {
+    // The CLI passes packages/brand/src, where almost every token is declared. Ignore the
+    // sheets it is given and the repository reports every token it reads.
+    const brandSheet = resolve(import.meta.dirname, "../tools/ui-foundation/fixtures/brand/tokens.css");
+    const { failures } = checkUiFoundation(fixtureRenderer, fixtureRenderer, undefined, undefined, [brandSheet]);
+
+    expect(failures).not.toContain("styles/legacy.css: var(--openbot-brand-only) is not declared by any stylesheet");
   });
 
   it("reads markup outside the walked tree for reachability", () => {
@@ -239,4 +258,52 @@ it("flags hardcoded interface text on each line its fixture marks, and not on tr
   expect(
     pluginDiagnostics("no-hardcoded-ui-text.grit", resolve(cleanRenderer, "components/TranslatedText.tsx"), "tsx"),
   ).toEqual([]);
+});
+
+describe("public web budgets", () => {
+  const debts: readonly StyleDebt[] = [
+    "colour literals outside the palette",
+    "untokenized font-size",
+    "untokenized font-weight",
+    "pixel line-height",
+    "untokenized letter-spacing",
+    "icon size outside the icon scale",
+    "untokenized border-radius",
+    "untokenized transition durations",
+  ];
+  const site = (sheet: string, budget: number) => ({
+    sheets: [resolve(fixtureSite, sheet)],
+    budgets: Object.fromEntries(debts.map((debt) => [debt, budget])),
+  });
+
+  it("reports each kind of literal above its budget, and an undeclared token", () => {
+    // site.css holds one literal of each kind, so a budget of 0 reports each once.
+    const { failures } = checkUiFoundation(cleanRenderer, fixtureSite, undefined, undefined, [], site("site.css", 0));
+
+    expect([...failures].sort()).toEqual(
+      [
+        ...debts.map((debt) => budget(`public web ${debt}`, 1)),
+        "site.css: var(--openbot-site-missing) is not declared by any stylesheet",
+      ].sort(),
+    );
+  });
+
+  it("allows the literals that the budget holds", () => {
+    const { failures } = checkUiFoundation(cleanRenderer, fixtureSite, undefined, undefined, [], site("site.css", 1));
+
+    expect(failures).toEqual(["site.css: var(--openbot-site-missing) is not declared by any stylesheet"]);
+  });
+
+  it("reports nothing for site rules on tokens and on a site scale", () => {
+    const { failures } = checkUiFoundation(
+      cleanRenderer,
+      fixtureSite,
+      undefined,
+      undefined,
+      [brandTokens],
+      site("site-clean.css", 0),
+    );
+
+    expect(failures).toEqual([]);
+  });
 });

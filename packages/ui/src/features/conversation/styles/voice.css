@@ -64,7 +64,7 @@
 .voice-panel-name {
   margin: 0;
   font-size: var(--openbot-text-md);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .voice-panel-phase {
@@ -211,8 +211,8 @@
 }
 
 .voice-player-toggle svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
   fill: currentColor;
 }
 

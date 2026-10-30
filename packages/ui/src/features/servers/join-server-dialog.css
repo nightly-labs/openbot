@@ -13,7 +13,7 @@
   max-height: calc(100dvh - 48px);
   overflow: hidden;
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
   box-shadow: 0 0 0 1px var(--openbot-border-strong);
@@ -142,7 +142,7 @@
   height: 88px;
   flex: 0 0 auto;
   margin-bottom: var(--openbot-space-6);
-  border-radius: var(--openbot-radius-modal);
+  border-radius: var(--openbot-radius-logo);
   box-shadow:
     0 16px 36px var(--openbot-shadow-dialog),
     inset 0 1px 0 var(--openbot-border-strong);

@@ -102,5 +102,5 @@
   line-height: 1;
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--openbot-tracking-glyph);
 }

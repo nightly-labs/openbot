@@ -346,7 +346,7 @@
   font-size: var(--openbot-text-display);
   font-weight: var(--openbot-weight-regular);
   line-height: var(--openbot-leading-display);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--openbot-tracking-display);
   font-variant-numeric: tabular-nums;
 }
 

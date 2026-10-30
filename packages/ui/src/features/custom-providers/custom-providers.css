@@ -12,7 +12,7 @@
   /* The same radius the settings modal uses, so the two surfaces read as one family. It also nests
    * the close button: an 8px glyph target held 8px in from the corner asks for about 16px around it,
    * which 20px overshot. */
-  border-radius: var(--openbot-radius-card);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }

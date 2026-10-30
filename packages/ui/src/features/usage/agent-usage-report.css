@@ -14,9 +14,9 @@
 }
 .agent-usage-hero {
   font-size: var(--openbot-text-usage-total);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   line-height: 1.1;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--openbot-tracking-display);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
   margin-bottom: var(--openbot-space-3);
@@ -47,7 +47,7 @@
   flex-shrink: 0;
 }
 .agent-usage-provider-heading strong {
-  font-weight: 550;
+  font-weight: var(--openbot-weight-medium);
   font-variant-numeric: tabular-nums;
 }
 .agent-usage-provider p {
@@ -109,7 +109,7 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border-strong);
   white-space: nowrap;
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 .agent-usage-table th:first-child {
   text-align: left;

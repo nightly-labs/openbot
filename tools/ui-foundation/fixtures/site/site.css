@@ -1,0 +1,18 @@
+/* One literal of each kind that a token belongs to, as a public page could hold it. */
+.hero {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 22px;
+  letter-spacing: -0.04em;
+  border-radius: 14px;
+  transition: opacity 200ms ease;
+}
+
+.hero svg {
+  width: 18px;
+}
+
+.hero-lede {
+  color: var(--openbot-site-missing);
+}

@@ -159,7 +159,7 @@
   background: color-mix(in srgb, var(--background) 38%, transparent);
   color: var(--text-primary);
   font-size: var(--openbot-text-lg);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
   backdrop-filter: blur(3px);
   pointer-events: none;
 }

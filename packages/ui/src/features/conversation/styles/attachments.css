@@ -85,8 +85,8 @@
   overflow: hidden;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 560;
-  line-height: 17px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -94,7 +94,7 @@
 .message-attachment small {
   color: var(--openbot-text-readable);
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .attachment-open-button {
@@ -195,7 +195,7 @@
   padding: var(--queue-row-gutter) var(--queue-row-inset-end) 0 var(--queue-row-inset-start);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

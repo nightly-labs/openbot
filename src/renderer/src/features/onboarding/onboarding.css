@@ -66,7 +66,7 @@
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-display);
   font-weight: var(--openbot-weight-medium);
-  letter-spacing: -0.045em;
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.12;
 }
 
@@ -494,14 +494,14 @@
 
 .provider-picker-callout-title {
   font-size: var(--openbot-text-md);
-  font-weight: 620;
-  line-height: 18px;
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
 }
 
 .provider-picker-callout-detail {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .provider-picker-callout-arrow {
@@ -769,7 +769,7 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-hero);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: -0.055em;
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1;
   text-wrap: balance;
 }

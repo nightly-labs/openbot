@@ -433,7 +433,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               disabled={props.disabled}
               onClick={() => void props.onRefreshProviders?.()}
             >
-              <RefreshCw size={13} aria-hidden="true" />
+              <RefreshCw size={14} aria-hidden="true" />
               {t("provider.refresh")}
             </Button>
           </Show>

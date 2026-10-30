@@ -18,12 +18,12 @@ import "./PricingPage.css";
  * sky, blue, violet, pink and orange.
  */
 const RARITY = [
-  { rgb: "154, 163, 184" },
-  { rgb: "56, 168, 255" },
-  { rgb: "56, 71, 255" },
-  { rgb: "164, 108, 245" },
-  { rgb: "236, 72, 153" },
-  { rgb: "255, 106, 43" },
+  { colour: "rgb(154 163 184)" },
+  { colour: "rgb(56 168 255)" },
+  { colour: "rgb(56 71 255)" },
+  { colour: "rgb(164 108 245)" },
+  { colour: "rgb(236 72 153)" },
+  { colour: "rgb(255 106 43)" },
 ] as const;
 
 /** A license moves the colour: Standard with the Team license is pink, and Pro with it is orange. */
@@ -111,7 +111,7 @@ export function PricingPage(props: {
         <section
           class="landing-hero pricing-hero"
           aria-labelledby="pricing-title"
-          style={{ "--pricing-accent": rarity().rgb }}
+          style={{ "--pricing-accent": rarity().colour }}
         >
           <TextProvider locale={props.locale}>
             <OrderForm

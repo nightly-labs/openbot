@@ -112,7 +112,7 @@
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: -0.03em;
+  letter-spacing: var(--openbot-tracking-title);
   line-height: 1;
   cursor: inherit;
 }

@@ -793,7 +793,7 @@ function textTokenEndsWithTagMarker(token: Token | undefined): boolean {
 
 function semanticChatTag(token: Token | undefined): string | null {
   if (!token || !tokenIs(token, "link")) return null;
-  const target = /^(agent|skill|quote)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
+  const target = /^(agent|skill|quote|attachment)(?:\+uri)?:([^\r\n]+)$/u.exec(token.href);
   return target?.[2] ? `@${token.raw}` : null;
 }
 

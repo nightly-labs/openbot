@@ -17,7 +17,7 @@ export function SettingsSection(props: SettingsSectionProps): JSX.Element {
     <section class={cx("ui-settings-section", props.class)} aria-labelledby={headingId} {...others}>
       <div class="ui-settings-section-header">
         <div class="ui-settings-section-copy">
-          <Heading id={headingId} class="ui-settings-section-heading" as="h3" size="sm" tone="secondary">
+          <Heading id={headingId} as="h3" size="md">
             {props.title}
           </Heading>
           <Show when={props.description}>

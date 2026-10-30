@@ -10,7 +10,7 @@
   overflow: hidden;
   outline: 0;
   border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-card);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }

@@ -1821,6 +1821,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         }
                         onMounts={setSettingsMounts}
                         onEscape={showAgents}
+                        onClose={showAgents}
                       />
                     )}
                   </Show>

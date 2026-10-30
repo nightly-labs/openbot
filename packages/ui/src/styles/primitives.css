@@ -129,16 +129,22 @@
   font-weight: var(--openbot-weight-medium);
 }
 
+/* A class, not `:where()`: the base `button { font: inherit }` reset outranks `:where()`, so the small
+   sizes took the 14px above. They use the body size, so their labels stay as readable as the text
+   beside them. */
+.ui-button-size-xs,
+.ui-button-size-sm {
+  font-size: var(--openbot-text-md);
+}
+
 :where(.ui-button-size-xs) {
   height: var(--openbot-control-xs);
   padding-inline: var(--openbot-space-2);
-  font-size: var(--openbot-text-sm);
 }
 
 :where(.ui-button-size-sm) {
   height: var(--openbot-control-md);
   padding-inline: var(--openbot-space-3);
-  font-size: var(--openbot-text-sm);
 }
 
 :where(.ui-button-size-default) {
@@ -175,8 +181,9 @@
   color: var(--openbot-text-secondary);
 }
 
+/* Translucent, not a solid neutral: a solid fill one step above the canvas disappears on a card. */
 :where(.ui-button-variant-secondary) {
-  background: var(--openbot-bg-control-hover);
+  background: var(--openbot-hover);
   color: var(--openbot-text-primary);
 }
 
@@ -216,7 +223,7 @@
   }
 
   :where(.ui-button-variant-secondary):hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-bg-control-active);
+    background: var(--openbot-hover-strong);
   }
 
   :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
@@ -237,6 +244,10 @@
 :where(.ui-button-variant-outline, .ui-button-variant-secondary, .ui-button-variant-ghost)[aria-expanded="true"] {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
+}
+
+:where(.ui-button-variant-secondary)[aria-expanded="true"] {
+  background: var(--openbot-hover-strong);
 }
 
 :where(.ui-button):focus-visible {
@@ -369,8 +380,8 @@
 }
 
 :where(.z-badge) > svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
   flex: 0 0 auto;
   pointer-events: none;
 }
@@ -440,7 +451,7 @@
   background: var(--openbot-badge-new-soft);
   color: var(--openbot-badge-new);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--openbot-tracking-wide);
 }
 
 :where(.z-badge-variant-info-light) {
@@ -478,10 +489,16 @@
   color: var(--openbot-accent-text);
 }
 
+/* Every lucide icon draws the token stroke, not lucide's default 2. The selector has no
+ * specificity, so a rule that sets a stroke for one icon still wins. */
+:where(svg.lucide[stroke-width="2"]) {
+  stroke-width: var(--openbot-icon-stroke);
+}
+
 /* The hand-drawn SVGs, which are on a 20-unit viewBox where lucide's is 24. Feeding them
  * --openbot-icon-stroke raw would paint them 20% heavier than every lucide icon beside
  * them, so it is scaled to the smaller grid instead. These carried 1.35 to 1.6 by hand
- * before, i.e. 1.08 to 1.43 device px against lucide's 1.0. */
+ * before, i.e. 1.08 to 1.43 device px, against the token weight of every lucide icon. */
 :where(.ui-glyph-20) {
   stroke-width: calc(var(--openbot-icon-stroke) * 20 / 24);
 }
@@ -542,7 +559,7 @@
 :where(.ui-input, .ui-textarea, .ui-native-select) {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-border-control);
   border-radius: var(--openbot-radius-md);
   outline: 0;
   background: var(--openbot-bg-control);
@@ -623,7 +640,7 @@
   justify-content: space-between;
   gap: var(--openbot-space-1-5);
   cursor: pointer;
-  border: 1px solid var(--openbot-border-strong);
+  border: 1px solid var(--openbot-border-control);
   border-radius: var(--openbot-radius-md);
   outline: 0;
   background: transparent;
@@ -650,7 +667,7 @@
 }
 
 .ui-select-trigger[data-expanded] {
-  border-color: var(--openbot-border-strong);
+  border-color: var(--openbot-border-control);
   background: var(--openbot-hover);
 }
 
@@ -914,9 +931,11 @@
   border: 0;
   border-radius: var(--openbot-radius-pill);
   outline: none;
-  background: var(--openbot-bg-control);
+  /* A tint, not the control fill: the control fill is close to a card, so an off track was lost on one. */
+  background: var(--openbot-hover-strong);
+  /* The edge of a field, so an off track on a card is as clear as the inputs beside it. */
   box-shadow:
-    inset 0 0 0 1px var(--openbot-border-strong),
+    inset 0 0 0 1px var(--openbot-border-control),
     0 1px 2px var(--openbot-shadow-ring);
   transition:
     background-color var(--openbot-duration-hover) ease,
@@ -1008,7 +1027,8 @@
   height: var(--ui-switch-thumb-size);
   display: block;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-text-primary);
+  /* The off thumb has its own token for each theme: see `--openbot-switch-thumb-off`. */
+  background: var(--openbot-switch-thumb-off);
   box-shadow: 0 1px 2px var(--openbot-shadow-ring);
   transform: translate3d(
       calc(var(--ui-switch-inset) + (var(--ui-switch-position, 0) * var(--ui-switch-travel))),
@@ -1432,10 +1452,6 @@
   gap: var(--openbot-space-1);
 }
 
-.ui-settings-section-heading {
-  font-weight: var(--openbot-weight-regular);
-}
-
 .ui-settings-section-description {
   display: block;
 }
@@ -1752,7 +1768,7 @@
 
 .ui-error-reference-code {
   font-family: var(--openbot-font-mono);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   user-select: text;
   overflow-wrap: anywhere;
@@ -2099,7 +2115,7 @@
 
 .ui-dialog-content {
   border: 0;
-  border-radius: var(--openbot-radius-card);
+  border-radius: var(--openbot-radius-dialog);
   box-shadow: 0 0 0 1px var(--openbot-dialog-ring);
 }
 
@@ -2139,7 +2155,7 @@
   flex-direction: column;
   overflow: hidden;
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
   border: 1px solid var(--openbot-dialog-ring);
@@ -2557,7 +2573,7 @@ button.ui-bubble-content {
   padding: 0 var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .ui-message[data-align="end"] .ui-message-footer {

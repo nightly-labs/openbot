@@ -8,7 +8,7 @@ export function Reachable(props: { index: number; state: string }) {
   return (
     <section
       id={`identifier-${props.index}`}
-      class="reachable-from-markup legacy legacy-badge legacy-fade legacy-scrim tokenised preview"
+      class="reachable-from-markup legacy legacy-badge legacy-fade legacy-scrim legacy-icon legacy-drawing tokenised preview"
     >
       <div
         class={[

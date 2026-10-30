@@ -568,8 +568,8 @@
 }
 
 .agent-threads-state-icon svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 .agent-threads-tab-mark[data-kind="waiting"] .agent-threads-state-icon {

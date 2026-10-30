@@ -235,8 +235,8 @@
 
 .agent-folders-chat-zone svg {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   color: var(--openbot-text-secondary);
   transition: color var(--openbot-duration-fast) var(--openbot-ease-out);
 }

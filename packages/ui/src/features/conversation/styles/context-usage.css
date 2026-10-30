@@ -304,7 +304,7 @@
 
 .context-compaction-notice-copy strong {
   color: var(--notice-accent);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 /*

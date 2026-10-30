@@ -72,5 +72,5 @@
   padding: var(--openbot-space-2) var(--ui-menu-inset) var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }

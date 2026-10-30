@@ -96,11 +96,12 @@
   padding: var(--openbot-space-6) var(--openbot-space-6) var(--openbot-space-4);
 }
 
+/* The page title is two steps above the 16px section headings, so the two do not read as one level. */
 .settings-modal-title {
   margin: 0;
-  font-size: var(--openbot-text-2xl);
+  font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-2xl);
+  line-height: var(--openbot-leading-3xl);
   letter-spacing: var(--openbot-tracking-tight);
 }
 
@@ -252,10 +253,11 @@
   line-height: var(--openbot-leading-lg);
 }
 
+/* Descriptions are one step below the 14px row title, so a row reads as title, then detail. */
 .settings-modal :where(.ui-item-description, .ui-switch-description),
 .settings-modal :where(.ui-text)[data-variant="caption"] {
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 .settings-modal .ui-item-description {
@@ -310,7 +312,7 @@
   width: min(920px, calc(100vw - 48px));
   height: min(640px, calc(100dvh - 48px));
   grid-template-columns: 196px minmax(0, 1fr);
-  border-radius: var(--openbot-radius-card);
+  border-radius: var(--openbot-radius-dialog);
   box-shadow:
     var(--openbot-shadow-raised),
     0 0 0 1px var(--openbot-dialog-ring);
@@ -364,11 +366,6 @@
 
 :is(.app-settings-modal-shell, .server-settings-modal-shell) .ui-settings-section-header {
   padding-inline: 0;
-}
-
-:is(.app-settings-modal-shell, .server-settings-modal-shell) .ui-settings-section-heading {
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
 }
 
 .provider-picker-embedded {
@@ -482,13 +479,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* One width for every select on a settings page, so the controls make one column. It fits
+   "Default browser (Firefox)"; a longer browser name ends in an ellipsis. */
 .app-settings-modal-shell .settings-modal-select {
-  width: 168px;
-}
-
-/* "Open external links in": browser names are longer than the other choices. */
-.app-settings-modal-shell .settings-modal-link-select {
-  width: 220px;
+  width: 208px;
 }
 
 /* A line between the two fixed places and the browsers. */

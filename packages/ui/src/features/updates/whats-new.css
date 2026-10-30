@@ -10,7 +10,7 @@
   flex-direction: column;
   overflow: hidden;
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-primary);
 }
@@ -108,8 +108,8 @@
 }
 
 .whats-new-notice-title svg {
-  width: 16px;
-  height: 16px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
 }
 
@@ -141,7 +141,7 @@
   color: var(--whats-new-tone);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
 }
 

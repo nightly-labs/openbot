@@ -120,8 +120,8 @@
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 560;
-  line-height: 17px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -132,7 +132,7 @@
   gap: 4px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 11px;
+  line-height: 1;
 }
 
 .direct-conversation-person div > span i {
@@ -159,8 +159,8 @@
 }
 
 .direct-private-label svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -189,14 +189,14 @@
   margin: 14px 0 4px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-xl);
-  font-weight: 560;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .direct-conversation-empty p {
   max-width: 290px;
   margin: 0;
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .direct-message-list .ui-message-group {
@@ -212,8 +212,8 @@
 }
 
 .direct-message .ui-bubble-content {
-  font-size: var(--openbot-text-md);
-  line-height: 19px;
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
   white-space: pre-wrap;
 }
 
@@ -276,7 +276,7 @@
   color: var(--openbot-text-primary);
   font: inherit;
   font-size: var(--openbot-text-md);
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
 }
 
 .direct-composer textarea::placeholder {
@@ -294,7 +294,7 @@
   background: var(--openbot-success);
   color: var(--openbot-success);
   font-size: var(--openbot-text-xl);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .direct-composer > button:disabled {

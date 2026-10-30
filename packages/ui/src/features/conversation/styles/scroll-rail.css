@@ -76,7 +76,7 @@
   color: var(--openbot-text-dim);
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
   opacity: 0;
   transition: opacity var(--openbot-duration-slow) ease;
@@ -155,7 +155,7 @@
   overflow: hidden;
   margin-top: -3px;
   font-size: var(--openbot-text-sm);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;

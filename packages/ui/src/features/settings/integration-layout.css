@@ -86,7 +86,7 @@
   display: grid;
   gap: var(--openbot-space-4);
   padding: var(--openbot-space-6);
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-sheet);
   box-shadow: var(--openbot-shadow-dialog);
 }

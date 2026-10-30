@@ -1,10 +1,12 @@
 import { useText } from "@openbot/ui/text";
-import { Loading, Match, Show, Switch } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { Loading, Match, onSettled, Show, Switch } from "solid-js";
 import { AgentUsagePanel, WorkflowsPage } from "../../lazy-views";
 import { SkillsMarketplace } from "../../WorkspaceOverlays";
 import { SchedulePanel } from "../schedule/SchedulePanel";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
+import { listenForPageEscape } from "./page-escape";
 import { SettingsPage } from "./SettingsPage";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
@@ -36,18 +38,22 @@ export function WindowPageView() {
       {(serverId) => (
         <Switch
           fallback={
-            <Loading>
-              <AgentUsagePanel
-                serverId={serverId()}
-                hostName={hostName(serverId())}
-                agentId={usage.state.agentId}
-                onBack={usage.closeUsage}
-              />
-            </Loading>
+            <PageEscape onEscape={usage.closeUsage}>
+              <Loading>
+                <AgentUsagePanel
+                  serverId={serverId()}
+                  hostName={hostName(serverId())}
+                  agentId={usage.state.agentId}
+                  onBack={usage.closeUsage}
+                />
+              </Loading>
+            </PageEscape>
           }
         >
           <Match when={usage.state.view === "schedule"}>
-            <SchedulePanel serverId={serverId()} hostName={hostName(serverId())} onBack={usage.closeUsage} />
+            <PageEscape onEscape={usage.closeUsage}>
+              <SchedulePanel serverId={serverId()} hostName={hostName(serverId())} onBack={usage.closeUsage} />
+            </PageEscape>
           </Match>
           <Match when={usage.state.view === "workflows"}>
             <Loading>
@@ -57,5 +63,19 @@ export function WindowPageView() {
         </Switch>
       )}
     </Show>
+  );
+}
+
+/**
+ * Escape closes the usage or the schedule page, as it closes a settings page. Not the workflows page:
+ * its editor handles Escape.
+ */
+function PageEscape(props: { onEscape: () => void; children: JSX.Element }) {
+  let root!: HTMLDivElement;
+  onSettled(() => listenForPageEscape(root, () => props.onEscape()));
+  return (
+    <div class="window-page-escape" ref={root}>
+      {props.children}
+    </div>
   );
 }

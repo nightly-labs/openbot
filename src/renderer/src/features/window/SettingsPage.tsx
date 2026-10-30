@@ -121,6 +121,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
         if (query()) setQuery("");
         else windowPage.showAgents();
       }}
+      onClose={() => windowPage.showAgents()}
     >
       <Show when={props.kind === "personal"}>
         <label class="search-field settings-page-search">

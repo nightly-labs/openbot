@@ -1,4 +1,6 @@
-@import "@fontsource-variable/inter";
+/* The optical-size axis: Inter draws small text with open spacing and large text tighter, as
+   font-optical-sizing: auto follows the font size. */
+@import "@fontsource-variable/inter/opsz.css";
 @import "@fontsource-variable/inter/wght-italic.css";
 @import "tailwindcss";
 @import "@openbot/brand/tokens.css";

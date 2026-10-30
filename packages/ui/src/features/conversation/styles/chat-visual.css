@@ -33,7 +33,8 @@
   justify-content: center;
   min-width: 0;
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 /*

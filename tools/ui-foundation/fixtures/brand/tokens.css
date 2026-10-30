@@ -1,0 +1,5 @@
+/* Stands in for packages/brand/src: a token sheet outside the walked tree. Only a token read
+   by ../renderer is declared here, so the report names it until this sheet is passed in. */
+:root {
+  --openbot-brand-only: 4px;
+}

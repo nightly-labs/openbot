@@ -22,7 +22,7 @@
 .side-question-empty > strong {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .side-question-empty > p {

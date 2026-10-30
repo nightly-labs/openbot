@@ -1,8 +1,11 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { ArrowLeft, IconButton } from "@openbot/ui";
 import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { onSettled } from "solid-js";
+import { listenForPageEscape } from "./page-escape";
 
 /**
  * The frame of a settings page, on desktop and on the web: the heading and the section list at the
@@ -17,7 +20,10 @@ export function SettingsPageFrame(props: {
   onMounts: (mounts: SettingsPagePlacement | undefined) => void;
   /** Escape outside a popup or a text field of the window. */
   onEscape: () => void;
+  /** The Back button before the heading, as on the usage and schedule pages. */
+  onClose: () => void;
 }) {
+  const { t } = useText();
   let nav!: HTMLDivElement;
   let content!: HTMLDivElement;
   let root!: HTMLDivElement;
@@ -27,21 +33,9 @@ export function SettingsPageFrame(props: {
     // As on the usage and schedule pages, the heading takes the focus, so a screen reader reads the
     // page that opened. The settings shell puts the focus back on the opener when the page closes.
     root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
-    // Escape closes the page, as it closed the settings dialog. On the document and after the
-    // delegated handlers, so a control that handles Escape keeps it. A click can put the focus back on
-    // the rail or the server menu, so a target outside the page also counts, except an open popup or a
-    // text field.
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
-      if (target && !root.contains(target) && target.closest("input, textarea, select, [contenteditable]")) return;
-      event.preventDefault();
-      props.onEscape();
-    };
-    document.addEventListener("keydown", closeOnEscape);
+    const stopListening = listenForPageEscape(root, () => props.onEscape());
     return () => {
-      document.removeEventListener("keydown", closeOnEscape);
+      stopListening();
       props.onMounts(undefined);
     };
   });
@@ -49,7 +43,12 @@ export function SettingsPageFrame(props: {
   return (
     <div class="settings-page" ref={root}>
       <div class="settings-page-nav">
-        {props.heading}
+        <div class="settings-page-heading">
+          <IconButton variant="ghost" label={t("common.back")} onClick={() => props.onClose()}>
+            <ArrowLeft />
+          </IconButton>
+          {props.heading}
+        </div>
         {props.children}
         <div class="settings-page-sections" ref={nav} hidden={props.sectionsHidden} />
       </div>

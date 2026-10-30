@@ -331,8 +331,8 @@ body:has(.browser-dock-surface),
 }
 
 .agent-queue-panel[data-variant="floating"] :is(.agent-queue-steer, .agent-queue-icon-button) svg {
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
 
 .agent-queue-panel[data-variant="floating"]

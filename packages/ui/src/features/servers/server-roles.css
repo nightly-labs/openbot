@@ -32,6 +32,6 @@
 /* A Lucide icon in a text button renders at 24px; there is no shared size rule for it. */
 :is(.server-roles-create, .server-roles-member-trigger) > svg {
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }

@@ -1,11 +1,27 @@
-/* One unit of each migration budget. The last declaration is matched by a second,
-   separate pattern - the list of named colours - which the hex above does not exercise. */
+/* One unit of each migration budget. The named colour is matched by a second, separate
+   pattern - the list of named colours - which the hex above does not exercise. The gap
+   names a token that only ../../brand/tokens.css declares, so it is reported unless that
+   sheet is passed in. */
 .legacy {
   color: #ff0000;
   font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.01em;
   border-radius: 6px;
   transition: opacity 200ms ease;
   border-color: red;
+  gap: var(--openbot-brand-only);
+}
+
+/* A small icon counts once per axis; a 32px drawing is outside the icon range. */
+.legacy-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.legacy-drawing > svg {
+  width: 32px;
 }
 
 .legacy-badge {

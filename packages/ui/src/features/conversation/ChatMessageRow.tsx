@@ -103,9 +103,9 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // A memo, because `Bubble` reads the variant more than once and it splits the whole body.
   const variant = createMemo(() => conversationBubbleVariant(props.message));
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
-  // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
-  // own head colour, read through the same helper the action markers use, so a name matches the
-  // face beside it.
+  // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the author's
+  // own head colour, read through the same helper the action markers use, so the tint of another
+  // person's bubble matches the face beside it.
   const authorStyle = () => {
     const currentSeed = seed();
     if (own() || currentSeed === undefined) return undefined;

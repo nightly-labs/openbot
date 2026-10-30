@@ -70,7 +70,7 @@
 .browser-preview-list > .browser-empty-state > strong {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .browser-preview-list > .browser-empty-state > .ui-button {
@@ -90,7 +90,7 @@
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-1);
   color: var(--openbot-text-secondary);
-  font-weight: 400;
+  font-weight: var(--openbot-weight-regular);
 }
 
 .browser-preview-image {

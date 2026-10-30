@@ -135,7 +135,7 @@
   font-size: var(--openbot-text-display);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.1;
 }
 
@@ -162,8 +162,8 @@
 }
 
 .storage-message-icon {
-  width: 18px;
-  height: 18px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   flex: 0 0 auto;
   margin-top: 1px;
   color: var(--openbot-text-muted);
@@ -558,7 +558,7 @@
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--openbot-tracking-wide);
 }
 
 /* The shared danger colour is too dark for 12px text on its soft fill. */
@@ -687,7 +687,7 @@
   font-size: var(--openbot-text-3xl);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--openbot-tracking-title);
 }
 
 .agent-files-total-skeleton {

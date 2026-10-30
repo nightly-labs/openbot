@@ -15,7 +15,7 @@ export function SearchIcon() {
 
 export function PlusIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[18px] fill-none stroke-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-4 fill-none stroke-current">
       <path d="M10 4v12M4 10h12" stroke-linecap="round" />
     </svg>
   );

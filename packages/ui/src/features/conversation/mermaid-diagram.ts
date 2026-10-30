@@ -22,18 +22,43 @@ function loadMermaid(): Promise<Mermaid> {
 
 /** `strict` escapes the HTML in labels and turns off click handlers; a diagram cannot change it. */
 function initializeMermaid(api: Mermaid, scheme: DocumentColorScheme): void {
+  const edge = tokenColor("--openbot-text-muted");
   api.initialize({
     startOnLoad: false,
     securityLevel: "strict",
     // `neutral` is gray, as the light palette is; `default` draws lavender boxes.
     theme: scheme === "light" ? "neutral" : "dark",
-    // The app has no drop shadows; on the light palette Mermaid's shows under each box.
-    themeVariables: { dropShadow: "none" },
+    // The app has no drop shadows; on the light palette Mermaid's shows under each box. An edge
+    // label takes the preview's own background, so it covers the line without a grey box. A box is
+    // a raised surface with a muted edge: a diagram is drawn smaller than its source, and a
+    // dimmer 1px line fades on the light palette.
+    themeVariables: {
+      dropShadow: "none",
+      edgeLabelBackground: tokenColor("--openbot-bg-sidebar"),
+      mainBkg: tokenColor("--openbot-bg-surface-raised"),
+      nodeBorder: edge,
+      lineColor: edge,
+    },
+    // Boxes take the card corner radius of the app; a diamond or a circle keeps its shape. Mermaid's
+    // own box edge is a gradient that fades on the light palette, so every shape takes the line colour;
+    // `[data-look]` matches the weight of Mermaid's gradient rule. The diagram is drawn smaller than its
+    // source, so a 1.25px edge still shows as a full 1px line.
+    themeCSS: `.node rect { rx: 8px; ry: 8px; } :is(.node, [data-look].node) :is(rect, polygon, circle, ellipse) { stroke: ${edge}; stroke-width: 1.25px; }`,
     fontFamily: CHAT_MERMAID_FONT_FAMILY,
     // HTML labels write a line break as an unclosed `<br>`, and an image of that SVG does not load.
     htmlLabels: false,
     suppressErrorRendering: true,
   });
+}
+
+/** A colour token as an `rgb()` colour, which Mermaid can parse; it cannot read a token. */
+function tokenColor(token: string): string {
+  const probe = document.createElement("span");
+  probe.style.background = `var(${token})`;
+  document.body.append(probe);
+  const color = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  return color;
 }
 
 /** A drawn diagram, or why Mermaid could not draw it. */

@@ -78,8 +78,9 @@
   grid-row: 1;
   padding-inline: var(--openbot-space-3);
   min-width: 0;
-  color: var(--message-author-color, var(--openbot-text-muted));
-  font-weight: var(--openbot-weight-regular);
+  /* The face beside the name carries the agent's colour; the name is metadata, one quiet step. */
+  color: var(--openbot-text-muted);
+  font-weight: var(--openbot-weight-medium);
   /* A long name with no space wraps instead of widening the row. */
   overflow-wrap: anywhere;
 }
@@ -190,11 +191,11 @@
   order: -1;
 }
 
-/* Their bubble takes a tint of their name colour, so it does not read as the reader's own. */
+/* Their bubble takes a light tint of their face colour, so it does not read as the reader's own. */
 .ui-bubble.message-bubble-member > .ui-bubble-content {
   background: color-mix(
     in srgb,
-    var(--message-author-color, var(--openbot-accent)) 22%,
+    var(--message-author-color, var(--openbot-accent)) 12%,
     var(--openbot-bg-surface-raised)
   );
 }
@@ -223,8 +224,8 @@
 }
 
 .message-action-button svg {
-  width: 17px;
-  height: 17px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -312,8 +313,8 @@
 }
 
 .reaction-more-button svg {
-  width: 15px;
-  height: 15px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
 }
 
 .message-reaction-pill {
@@ -477,7 +478,7 @@
   background-clip: text;
   color: transparent;
   font-size: var(--openbot-text-sm);
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -499,7 +500,7 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
 }
 
 .chat-action-marker {
@@ -1001,7 +1002,7 @@ button.chat-action-target:active,
 }
 
 .message-entry .ui-bubble {
-  letter-spacing: -0.15px;
+  letter-spacing: var(--openbot-tracking-tight);
 }
 
 .message-entry-agent .ui-bubble {
@@ -1187,7 +1188,7 @@ button.chat-action-target:active,
   background-clip: text;
   color: transparent;
   font-size: var(--openbot-text-lg);
-  font-weight: 550;
+  font-weight: var(--openbot-weight-medium);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1205,7 +1206,7 @@ button.chat-action-target:active,
   overflow: hidden;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-md);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1214,7 +1215,7 @@ button.chat-action-target:active,
   max-width: 100%;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .image-generation-preview {
@@ -1261,7 +1262,7 @@ button.chat-action-target:active,
   backdrop-filter: blur(12px) saturate(1.15);
   -webkit-backdrop-filter: blur(12px) saturate(1.15);
   font-size: var(--openbot-text-sm);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
   opacity: 0;
   pointer-events: none;
   transform: translateY(4px);

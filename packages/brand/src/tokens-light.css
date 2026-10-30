@@ -53,16 +53,23 @@
 
   --openbot-border: rgba(20, 20, 20, 0.07);
   --openbot-border-strong: rgba(20, 20, 20, 0.1);
+  /* The edge of a field, a select or a colour swatch marks the control itself, so it is stronger than a divider. */
+  --openbot-border-control: rgba(20, 20, 20, 0.18);
+  --openbot-swatch-edge: rgba(20, 20, 20, 0.3);
   --openbot-image-outline: rgba(20, 20, 20, 0.1);
   --openbot-hover: rgba(20, 20, 20, 0.05);
+  --openbot-hover-strong: rgba(20, 20, 20, 0.08);
 
   /* Contrast on the canvas: primary 17:1, secondary 10:1, muted 4.9:1. Dim is for
      marks and disabled text, as in the dark palette. */
   --openbot-text-primary: #141414;
   --openbot-text-secondary: #3a3a3c;
   --openbot-text-muted: #6b6b70;
+  /* Off is a white thumb on the grey track; on is the same thumb on the dark track. Only the track
+     changes, so a grey thumb is not read as on. */
+  --openbot-switch-thumb-off: var(--openbot-bg-surface);
   --openbot-text-dim: #8e8e93;
-  --openbot-text-placeholder: #5c5c61;
+  --openbot-text-placeholder: var(--openbot-text-muted);
   --openbot-text-readable: rgba(20, 20, 20, 0.6);
   --openbot-settings-text-muted: rgba(20, 20, 20, 0.6);
 

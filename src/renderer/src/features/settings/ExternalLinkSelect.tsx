@@ -116,7 +116,7 @@ export function ExternalLinkSelect(props: ExternalLinkSelectProps) {
 
   return (
     <Select<string>
-      class="settings-modal-select settings-modal-link-select"
+      class="settings-modal-select"
       open={form.open}
       onOpenChange={(open) => {
         if (!open && keepOpen) {

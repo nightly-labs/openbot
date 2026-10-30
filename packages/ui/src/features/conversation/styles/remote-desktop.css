@@ -129,7 +129,7 @@
   max-width: 330px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .remote-desktop-connecting-avatar {
@@ -156,7 +156,7 @@
   max-width: 330px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .remote-desktop-empty-mark {
@@ -172,8 +172,8 @@
 }
 
 .remote-desktop-empty-mark svg {
-  width: 19px;
-  height: 19px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -188,7 +188,7 @@
   background: var(--openbot-border);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .remote-desktop-overlay > button:hover {

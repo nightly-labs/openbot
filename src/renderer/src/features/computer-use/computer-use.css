@@ -18,8 +18,8 @@
 }
 
 .computer-use-permission-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   color: var(--openbot-accent-text);
 }
 

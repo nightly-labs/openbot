@@ -13,7 +13,10 @@
 }
 
 /* The Preview and Code switch, sized to the header's buttons. */
+/* The switch stands beside the language label. Copy and Expand show on hover at the far end, so at
+   rest the switch does not float in the middle of the header. */
 .ui-sliding-tabs.message-preview-switch {
+  margin-inline-end: auto;
   gap: var(--openbot-space-0-5);
   padding: var(--openbot-space-0-5);
 }
@@ -22,7 +25,7 @@
   height: 22px;
   padding: 0 var(--openbot-space-2);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .message-preview-switch .ui-sliding-tabs-pill {
@@ -53,10 +56,15 @@
 }
 
 .message-preview-body[data-preview-kind="mermaid"] {
+  /* `safe`: a diagram wider than the column starts at its left edge, so all of it scrolls into view. */
+  place-items: safe center;
   max-height: 420px;
   overflow: auto;
   padding: var(--openbot-space-3);
   overscroll-behavior-x: contain;
+  /* A thin bar in the edge tone, so the frame does not get a second, heavier edge. */
+  scrollbar-color: var(--openbot-border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 /* The frame takes the page height that the app measures, up to the height of a code block. The
@@ -69,7 +77,10 @@
   background: var(--openbot-bg-sidebar);
 }
 
+/* A diagram fits its column, but not below 80% of its drawn size: beyond that its labels are too
+   small to read, so a wide diagram scrolls sideways instead. */
 .message-preview-diagram {
+  min-width: calc(var(--message-preview-diagram-width, 0px) * 0.8);
   max-width: 100%;
   height: auto;
   display: block;
@@ -91,7 +102,8 @@
   padding: var(--openbot-space-2) var(--openbot-space-3);
   border-bottom: 1px solid var(--openbot-border);
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-xs);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 /* Mermaid points at the error with a caret line, which lines up only in a monospace font. */
@@ -115,7 +127,7 @@
   flex-direction: column;
   overflow: hidden;
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
   /* The dialog grows from the block that opened it: the block's corner is the fixed point. */

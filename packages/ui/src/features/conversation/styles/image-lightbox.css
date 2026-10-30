@@ -123,7 +123,7 @@
 
 .image-lightbox-name {
   overflow: hidden;
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

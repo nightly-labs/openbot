@@ -10,7 +10,7 @@
 .message-copy {
   margin: 0;
   font-size: var(--openbot-text-lg);
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
   overflow-wrap: anywhere;
   white-space: pre-line;
   user-select: text;
@@ -319,8 +319,8 @@
   padding: 0 10px 0 11px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: 400;
-  line-height: 28px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-control-sm);
   outline: 0;
 }
 
@@ -416,7 +416,7 @@
   padding: 0 9px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 430;
+  font-weight: var(--openbot-weight-regular);
   white-space: nowrap;
 }
 
@@ -510,7 +510,7 @@
   padding: 6px 8px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -673,11 +673,17 @@
   color: var(--openbot-text-readable);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
+/* Alone, the language is the block's title, not a tag: plain text in the interface face, so the
+   heading has one face beside the Preview and Code switch. */
 .message-code-language:only-child {
-  font-family: var(--openbot-font-mono);
+  background: transparent;
+  padding-inline: var(--openbot-space-0-5);
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-sans);
+  font-weight: var(--openbot-weight-regular);
 }
 
 :where(.ui-button).message-code-copy {
@@ -689,7 +695,7 @@
   padding-inline: 7px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -709,6 +715,15 @@
   width: 40px;
   height: 40px;
   content: "";
+}
+
+/* Copy and Expand wait for the pointer or the keyboard, so a reply with several blocks reads as
+   text. The Preview and Code switch stays: it shows which view is open. A touch screen has no
+   hover, so it keeps them. */
+@media (hover: hover) and (pointer: fine) {
+  .message-code-block:not(:hover, :focus-within) .message-code-copy {
+    opacity: 0;
+  }
 }
 
 .message-code-copy-icons {
@@ -761,7 +776,7 @@
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: 19px;
+  line-height: var(--openbot-leading-sm);
   /* Only the inline axis: Chromium stops a vertical wheel at a contained block even when the block
      cannot scroll, so the chat would not scroll under the pointer. */
   overscroll-behavior-x: contain;
@@ -893,7 +908,7 @@
 
 .message-data-table thead {
   color: var(--openbot-data-table-header-text);
-  font-weight: 500;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .message-data-table tbody {
@@ -952,7 +967,7 @@
 .message-link {
   border-radius: var(--openbot-radius-xs);
   color: inherit;
-  font-weight: 560;
+  font-weight: var(--openbot-weight-medium);
   text-decoration-color: var(--openbot-text-muted);
   text-decoration-line: underline;
   text-decoration-thickness: 1px;
@@ -1019,7 +1034,7 @@
   padding: 0;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
   line-height: 1;
   text-decoration: none;
   vertical-align: 4px;
@@ -1051,8 +1066,8 @@
   padding: 6px 8px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  font-weight: 500;
-  line-height: 15px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
   pointer-events: none;
   text-align: left;
@@ -1102,8 +1117,8 @@
   gap: 6px;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  font-weight: 425;
-  line-height: 18px;
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-md);
   text-decoration: none;
 }
 
@@ -1115,7 +1130,7 @@
 .message-citation-ref-label {
   overflow: hidden;
   color: var(--openbot-text-primary);
-  font-weight: 550;
+  font-weight: var(--openbot-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1144,8 +1159,8 @@
 }
 
 .message-citation-arrow svg {
-  width: 14px;
-  height: 14px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -1209,8 +1224,8 @@
   display: block;
   margin-bottom: 1px;
   font-size: var(--openbot-text-sm);
-  font-weight: 550;
-  line-height: 14px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
 }
 
 /*
@@ -1218,10 +1233,10 @@
  * the cut, so an open code fence or a long heading cannot spill into the message under it.
  */
 .message-reply-quote {
-  max-height: 60px;
+  max-height: calc(var(--openbot-leading-sm) * 4);
   overflow: hidden;
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
   overflow-wrap: anywhere;
 }
 
@@ -1230,7 +1245,11 @@
  * translucent, so the mask uses an opaque token.
  */
 .message-reply-quote[data-clipped] {
-  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 45px, transparent 60px);
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(var(--openbot-leading-sm) * 3),
+    transparent calc(var(--openbot-leading-sm) * 4)
+  );
 }
 
 .message-reply-quote blockquote > :not(:first-child) {
@@ -1316,12 +1335,12 @@
   gap: var(--openbot-space-1);
   margin: -1px 0 7px;
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .message-reply-unavailable-icon {
-  width: 13px;
-  height: 13px;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   flex: none;
 }
 
@@ -1353,7 +1372,7 @@
   padding: 0 6px;
   color: var(--openbot-text-muted);
   font: inherit;
-  line-height: 20px;
+  line-height: var(--openbot-leading-lg);
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -1365,6 +1384,8 @@
   height: 16px;
 }
 
+/* A file name has the one link colour, so a line with several files does not show several colours.
+   The badge before it shows the type colour. */
 .message-file-reference,
 .composer-file-reference {
   --file-reference-color: var(--openbot-file-default);
@@ -1375,15 +1396,17 @@
   max-width: min(240px, calc(100% - 8px));
   align-items: center;
   gap: 4px;
-  margin: 0 1px;
+  /* The negative end margin cancels the end padding, so punctuation after the name sits as it does
+     after a word. The hover fill still clears the last letter. */
+  margin: 0 calc(-1 * var(--openbot-space-0-5)) 0 0;
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: transparent;
-  padding: 1px 6px 1px 3px;
-  color: var(--file-reference-color);
+  padding: 1px var(--openbot-space-0-5);
+  color: var(--openbot-file-default);
   font: inherit;
-  font-weight: 550;
-  line-height: 20px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-lg);
   vertical-align: middle;
   white-space: nowrap;
   transition:
@@ -1401,6 +1424,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   user-select: text;
+}
+
+/* In the text, a chip fills the height of the line, so a line with a chip is as high as the lines around
+   it. `middle` sets it by the x-height and pushed the line 1px lower. */
+.reference-chip.message-reference-chip {
+  height: auto;
+  padding-block: var(--openbot-space-0-5);
+  vertical-align: top;
 }
 
 /* A table measures its columns before it knows their widths, so the percentage cap above does not
@@ -1500,7 +1531,7 @@
 
 .ui-button.message-file-reference:focus-visible,
 .composer-file-reference:focus-visible {
-  outline: 2px solid var(--file-reference-color);
+  outline: 1px solid var(--openbot-border-focus);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -1516,30 +1547,35 @@
   color: var(--file-reference-color);
 }
 
+/* Each badge leaves at least 2px each side of its extension. */
+.attachment-reference-visual[data-badge-length="2"] {
+  width: 18px;
+}
+
 .attachment-reference-visual[data-badge-length="3"] {
-  width: 20px;
+  width: 22px;
 }
 
 .attachment-reference-visual[data-badge-length="4"] {
-  width: 24px;
+  width: 26px;
 }
 
 .attachment-reference-visual > span {
   font-size: var(--openbot-glyph-sm);
-  font-weight: 750;
-  letter-spacing: -0.2px;
+  font-weight: var(--openbot-weight-bold);
+  letter-spacing: var(--openbot-tracking-glyph);
   line-height: 1;
 }
 
 .attachment-reference-visual[data-badge-length="4"] > span {
   font-size: var(--openbot-glyph-xs);
-  letter-spacing: -0.4px;
+  letter-spacing: var(--openbot-tracking-glyph);
 }
 
 /* The page icon is on a 20-unit grid, so its stroke is scaled to match lucide's 24, as `.ui-glyph-20` does. */
 .attachment-reference-visual > svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -1548,14 +1584,14 @@
 }
 
 [data-slot="bubble"][data-author="user"] .message-file-reference {
-  color: var(--file-reference-color);
+  color: var(--openbot-file-default);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .ui-button.message-file-reference:hover:not(:disabled),
   .composer-file-reference:hover {
-    background-color: var(--file-reference-soft);
-    color: var(--file-reference-color);
+    background-color: var(--openbot-hover);
+    color: var(--openbot-file-default);
   }
 }
 
@@ -1590,8 +1626,8 @@
 }
 
 .attachment-file-visual svg {
-  width: 22px;
-  height: 22px;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;

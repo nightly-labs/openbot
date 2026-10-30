@@ -89,8 +89,12 @@
   --openbot-queue-border: var(--openbot-border-strong);
   --openbot-queue-text: var(--openbot-text-primary);
   --openbot-queue-action: var(--openbot-text-muted);
-  --openbot-border: rgba(255, 255, 255, 0.035);
-  --openbot-border-strong: rgba(255, 255, 255, 0.045);
+  /* Lines must be visible on the canvas: the same alpha steps as the light palette. */
+  --openbot-border: rgba(255, 255, 255, 0.07);
+  --openbot-border-strong: rgba(255, 255, 255, 0.1);
+  /* The edge of a field, a select or a colour swatch marks the control itself, so it is stronger than a divider. */
+  --openbot-border-control: rgba(255, 255, 255, 0.12);
+  --openbot-swatch-edge: rgba(255, 255, 255, 0.2);
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
   /* Focus is neutral: a grey border or a thin grey ring, never blue and never a halo. */
   --openbot-border-focus: var(--openbot-text-muted);
@@ -128,7 +132,8 @@
   --openbot-onboarding-window: #f3f5f8;
   --openbot-text-secondary: #dcdcdc;
   --openbot-text-muted: #979797;
-  --openbot-text-dim: #6a6a6a;
+  /* Contrast on the canvas: muted 6:1, dim 4.6:1. Dim is the quietest text that stays readable. */
+  --openbot-text-dim: #838383;
   --openbot-text-readable: rgba(255, 255, 255, 0.52);
   --openbot-text-muted-on-light: rgba(20, 20, 20, 0.52);
   --openbot-text-dim-on-light: rgba(20, 20, 20, 0.36);
@@ -136,7 +141,8 @@
   --openbot-download-card-chip: rgba(20, 20, 20, 0.1);
   --openbot-download-card-border: rgba(20, 20, 20, 0.16);
   --openbot-download-card-focus: rgba(242, 242, 242, 0.86);
-  --openbot-text-placeholder: #bfbfbf;
+  /* A placeholder is a hint, not a value: it uses the muted step, as the composer does. */
+  --openbot-text-placeholder: var(--openbot-text-muted);
   --openbot-text-on-accent: #ffffff;
   --openbot-text-on-status: #07130c;
   /* Hue 210, sampled from the reference UIs rather than picked: their status dot is
@@ -263,6 +269,8 @@
   --openbot-shadow-ring: rgba(228, 228, 228, 0.04);
   --openbot-border-on-light: rgba(20, 20, 20, 0.14);
   --openbot-hover: rgba(255, 255, 255, 0.06);
+  /* A filled secondary control: translucent, so it is one step above any surface it sits on. */
+  --openbot-hover-strong: rgba(255, 255, 255, 0.1);
   --openbot-font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openbot-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
   /* Six steps, one line-height each, named for the step it pairs with. The scale had
@@ -294,8 +302,8 @@
   /* Glyphs, not copy: a file-extension string inside a fixed 16-24px chip. Below the
    * scale's floor because the container is fixed, not because the text is small. Outside
    * the text-* namespace so text-* means exactly the six steps above. */
-  --openbot-glyph-xs: 7px;
-  --openbot-glyph-sm: 8px;
+  --openbot-glyph-xs: 8px;
+  --openbot-glyph-sm: 9px;
 
   --openbot-weight-regular: 400;
   --openbot-weight-medium: 500;
@@ -304,6 +312,12 @@
   --openbot-tracking-tight: -0.1px;
   --openbot-tracking-normal: 0;
   --openbot-tracking-wide: 0.02em;
+  /* Inter tightens as it grows: about -0.015em for 16-24px headings and -0.022em at display
+     size. Small capitals open up instead. A file-extension glyph is set tight to fit its chip. */
+  --openbot-tracking-title: -0.015em;
+  --openbot-tracking-display: -0.022em;
+  --openbot-tracking-caps: 0.08em;
+  --openbot-tracking-glyph: -0.05em;
   --openbot-space-0-5: 2px;
   --openbot-space-1: 4px;
   --openbot-space-1-5: 6px;
@@ -317,10 +331,14 @@
   --openbot-radius-sm: 6px;
   --openbot-radius-md: 8px;
   --openbot-radius-lg: 12px;
-  --openbot-radius-card: 14px;
+  /* One radius scale: 4, 6, 8, 12, 16, 20. Card is a name for a step on it. A dialog is 16px, which
+     nests an 8px close target held 8px in from its corner. */
+  --openbot-radius-card: var(--openbot-radius-lg);
+  --openbot-radius-dialog: 16px;
   --openbot-radius-xl: 20px;
-  --openbot-radius-bubble: 22px;
+  --openbot-radius-bubble: var(--openbot-radius-xl);
   --openbot-radius-bubble-inset: calc(var(--openbot-radius-bubble) - var(--openbot-space-3) - 1px);
+  /* Large stage surfaces on the website. Desktop dialogs use the dialog radius. */
   --openbot-radius-modal: 30px;
   --openbot-radius-media-preview: calc(var(--openbot-radius-lg) - 1px);
   --openbot-radius-pill: 999px;
@@ -337,25 +355,28 @@
   --openbot-switch-height: 20px;
   --openbot-switch-thumb: 16px;
   --openbot-switch-inset: 2px;
+  /* An off thumb: bright on the dark track, so the switch reads as a control, not as disabled. */
+  --openbot-switch-thumb-off: var(--openbot-text-secondary);
   --openbot-switch-sm-width: 24px;
   --openbot-switch-sm-height: 14px;
   --openbot-switch-sm-thumb: 12px;
   --openbot-switch-sm-inset: 1px;
   /* Unitless on purpose. Lucide icons carry viewBox="0 0 24 24", so CSS stroke-width
    * resolves in user units, not px: a literal 1px paints 1 * (16/24) = 0.67 device px at
-   * the 16px default size and reads blurry. 1.5 user units is the 1px the design asks for.
+   * the 16px default size and reads blurry. 1.75 user units paints about 1.2 device px at
+   * 16px: the line reads as clearly as the 13-14px text beside it, also on a 1x display.
    *
    * Which is also why three kinds of SVG keep a weight of their own rather than reading
    * this: the hand-written icons under src/renderer/src/features draw on a 16- or 20-unit
    * viewBox, so the same number paints a different device weight there; the onboarding
    * computer is a drawing, not an icon; and the checkbox tick would come out at 0.75
    * device px inside its 12px box. Every lucide icon in the renderer reads this token. */
-  --openbot-icon-stroke: 1.5;
+  --openbot-icon-stroke: 1.75;
   --openbot-icon-xs: 12px;
   --openbot-icon-sm: 14px;
   --openbot-icon-md: 16px;
   --openbot-icon-lg: 20px;
-  --openbot-chat-entry-gap: var(--openbot-space-3);
+  --openbot-chat-entry-gap: var(--openbot-space-2);
   --openbot-chat-marker-gap: var(--openbot-space-1);
   --openbot-chat-marker-height: var(--openbot-control-xs);
   --openbot-chat-marker-avatar: var(--openbot-icon-md);

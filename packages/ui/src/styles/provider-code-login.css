@@ -19,7 +19,7 @@
   max-height: calc(100dvh - var(--openbot-space-6) * 2);
   overflow-y: auto;
   outline: 0;
-  border-radius: var(--openbot-radius-xl);
+  border-radius: var(--openbot-radius-dialog);
   background: var(--openbot-bg-control);
   padding: var(--openbot-space-6);
   color: var(--openbot-text-primary);

@@ -1,11 +1,23 @@
 /* The neighbour each budget must leave alone: a token is not a literal, and the two
    values the ratchet exempts by hand are a zero radius and a disabled transition. The
    token naming a colour is the boundary case - the named-colour pattern must not see a
-   word that a hyphen joins to its neighbours, or every token in the palette counts. */
+   word that a hyphen joins to its neighbours, or every token in the palette counts.
+   A unitless line-height scales with its font, so it is not a pixel one; a reference with
+   a fallback is optional by intent, so it is not an undeclared token. */
+:root {
+  --openbot-text: inherit;
+  --openbot-red-500: inherit;
+  --openbot-text-sm: 12px;
+  --openbot-font-medium: 500;
+}
+
 .tokenised {
   color: var(--openbot-text);
   border-color: var(--openbot-red-500);
   font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-font-medium);
+  line-height: 1.25;
+  padding: var(--openbot-space-optional, 0);
   border-radius: 0;
   transition: none;
 }

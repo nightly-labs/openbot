@@ -594,9 +594,23 @@
   padding-bottom: var(--openbot-space-3);
 }
 
+/* The Back button and the title. The button hangs its padding back into the inset, as on the
+   usage page, so the arrow lines up with the section list. */
+.settings-page-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  margin-bottom: var(--openbot-space-3);
+}
+
+.settings-page-heading > .ui-icon-button {
+  flex: none;
+}
+
 .settings-page-title {
-  margin: 0 0 var(--openbot-space-3);
-  padding: 0 var(--openbot-space-2);
+  min-width: 0;
+  margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
   font-weight: var(--openbot-weight-semibold);
@@ -608,10 +622,10 @@
   outline: none;
 }
 
-/* A capsule search field */
+/* The search field has the corners of every other field, as the sidebar search has. */
 .settings-page-search {
   flex: none;
-  border-radius: var(--openbot-radius-pill);
+  border-radius: var(--openbot-radius-md);
   padding: 0 var(--openbot-space-3);
 }
 
@@ -644,11 +658,6 @@
   min-width: 0;
   align-items: center;
   gap: var(--openbot-space-2);
-}
-
-.settings-page-server .server-menu-mark {
-  width: var(--openbot-icon-md);
-  height: var(--openbot-icon-md);
 }
 
 .settings-page-nav-group .settings-modal-nav-item {
@@ -755,6 +764,11 @@
   background: var(--openbot-bg-control-active);
 }
 
+/* Only takes the Escape listener of the usage and schedule pages. */
+.window-page-escape {
+  display: contents;
+}
+
 /* A narrow window stacks the page: the heading and the sections above the panel. */
 @media (max-width: 720px) {
   .settings-page {
@@ -768,7 +782,7 @@
     padding: var(--openbot-space-3) var(--openbot-space-3) 0;
   }
 
-  .settings-page-title {
+  .settings-page-heading {
     margin-bottom: var(--openbot-space-2);
   }
 

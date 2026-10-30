@@ -74,14 +74,16 @@
 
 @media (hover: hover) and (pointer: fine) {
   .window-rail-button:hover {
-    background: var(--openbot-bg-control-hover);
+    background: var(--openbot-hover);
     color: var(--openbot-text-primary);
   }
 }
 
+/* Tints of the rail colour: the opaque control colours of the light theme are the rail colour, so the
+   current page showed no tile there. */
 .window-rail-button[aria-current="page"],
 .window-rail-button[aria-current="page"]:hover:not(:disabled):not([data-disabled]) {
-  background: var(--openbot-bg-control-active);
+  background: var(--openbot-hover-strong);
   color: var(--openbot-text-primary);
 }
 
@@ -118,8 +120,8 @@
   transform-origin: var(--kb-tooltip-content-transform-origin);
 }
 
-/* Usage rings: the provider logo inside one ring per limit window. The hover fill is a circle around
- * the rings. */
+/* Usage rings: the provider logo inside one ring, for the window that stops work first. The hover fill
+ * is a circle around the ring. */
 .window-rail-button.window-rail-usage {
   border-radius: var(--openbot-radius-pill);
 }
@@ -133,8 +135,8 @@
 }
 
 .window-rail-button .window-rail-usage-logo {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   overflow: visible;
   fill: var(--openbot-provider-current);
 }
@@ -144,8 +146,9 @@
   opacity: 0.15;
 }
 
+/* A ring is neutral while there is room. Colour appears only when a limit is near, so it means something. */
 .window-rail-usage-arc {
-  stroke: var(--openbot-success);
+  stroke: var(--openbot-text-readable);
 }
 
 .window-rail-usage-arc[data-usage-tone="warning"] {

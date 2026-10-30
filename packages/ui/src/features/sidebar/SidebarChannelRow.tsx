@@ -89,13 +89,6 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
           <span class="agent-row-heading">
             <span class="agent-row-title">
               <strong>{rowProps.channel.name}</strong>
-              <Show when={title()}>
-                {(label) => (
-                  <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
-                  </Badge>
-                )}
-              </Show>
             </span>
             <Show
               when={wait()}

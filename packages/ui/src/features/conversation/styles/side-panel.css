@@ -65,13 +65,15 @@
   color: var(--openbot-text-secondary);
 }
 
+/* Tints of the header colour: the opaque control colours of the light theme are the header colour, so
+   the selected tab showed no fill there. */
 .side-panel-tab:hover {
-  background: var(--openbot-bg-control-hover);
+  background: var(--openbot-hover);
   color: var(--openbot-text-primary);
 }
 
 .side-panel-tab[data-selected] {
-  background: var(--openbot-bg-control-active);
+  background: var(--openbot-hover-strong);
   color: var(--openbot-text-primary);
 }
 
@@ -300,8 +302,8 @@
 }
 
 .side-panel-tab-icon .agent-threads-state-icon svg {
-  width: 12px;
-  height: 12px;
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
 /* A thread tab has the widths of a tab in the chat header, so a thread keeps its size when it moves

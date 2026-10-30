@@ -23,9 +23,17 @@ reached only by a `prefix-${value}` family inside a multi-line class array. Thei
 else in this tree on purpose — the scan reads words, so naming a class in a comment would make it
 reachable and quietly retire the branch.
 
+`../brand/tokens.css` stands in for `packages/brand/src`, the token sheets the CLI passes in addition
+to the walked tree. It declares the one token that `styles/legacy.css` reads and nothing else
+declares.
+
 Adding a check to the script means adding the file that trips it here, beside the neighbour it must
 ignore. If the check reports once per file rather than once per occurrence, that neighbour cannot live
 here — the violation would account for the failure either way — so it goes in `../renderer-clean`.
 
 `stories/Play.stories.tsx` is input for `no-story-play.grit`, not for `ui-foundation-check.ts`. Each
 line that the rule must reject ends in `// flag`.
+
+`../site` stands in for the public site stylesheets (`apps/auth-api/src`, `apps/status/src`), which
+have their own budgets. `site.css` holds one literal of each budgeted kind and one undeclared token;
+`site-clean.css` holds the same rules on tokens and on a `--site-` scale, and must report nothing.

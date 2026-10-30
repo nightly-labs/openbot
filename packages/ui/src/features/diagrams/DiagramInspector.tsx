@@ -100,7 +100,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
                 title={t("diagram.inspector.back")}
                 onClick={() => props.onSelectNode(null)}
               >
-                <ChevronLeft aria-hidden="true" class="size-[14px]" />
+                <ChevronLeft aria-hidden="true" class="size-3.5" />
               </Button>
               <Show when={selectedAgent()}>
                 {(agent) => <AgentAvatar agent={agent()} class="diagram-inspector-avatar" motion="idle" />}

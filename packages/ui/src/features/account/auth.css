@@ -44,8 +44,8 @@
 .account-login-wordmark {
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-display);
-  font-weight: 620;
-  letter-spacing: -0.015em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: var(--openbot-leading-display);
 }
 
@@ -61,28 +61,28 @@
   margin: 0;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-3xl);
-  font-weight: 580;
-  letter-spacing: -0.035em;
-  line-height: 30px;
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-title);
+  line-height: var(--openbot-leading-3xl);
 }
 
 .account-login-description {
   margin: 8px 0 0;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-lg);
-  line-height: 21px;
+  line-height: var(--openbot-leading-lg);
 }
 
 .account-login-description strong {
   color: var(--openbot-text-primary);
-  font-weight: 560;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .account-login-error {
   margin: 0;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
   text-align: left;
 }
 
@@ -129,7 +129,7 @@
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
   font-size: var(--openbot-text-md);
-  font-weight: 650;
+  font-weight: var(--openbot-weight-semibold);
   transition:
     background-color var(--openbot-duration-hover) ease,
     border-color var(--openbot-duration-hover) ease,
@@ -157,7 +157,7 @@
   margin: 4px 0 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
   text-align: center;
   text-wrap: balance;
 }
@@ -209,7 +209,7 @@
   margin: -2px 0 0;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -253,7 +253,7 @@
   color: var(--openbot-warning);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   text-align: left;
 }
 
@@ -347,7 +347,7 @@
 }
 
 .initial-setup-back svg {
-  width: 18px;
+  width: var(--openbot-icon-md);
   fill: none;
   stroke: currentcolor;
   stroke-linecap: round;
@@ -359,8 +359,8 @@
   margin: 0 0 9px;
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-caps);
   text-transform: uppercase;
 }
 
@@ -368,8 +368,8 @@
   margin: 0;
   color: var(--text-primary);
   font-size: var(--openbot-text-display);
-  font-weight: 560;
-  letter-spacing: -0.035em;
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: var(--openbot-tracking-display);
   line-height: 1.1;
 }
 
@@ -432,7 +432,7 @@
 }
 
 .setup-route-icon svg {
-  width: 23px;
+  width: var(--openbot-icon-lg);
   fill: none;
   stroke: currentcolor;
   stroke-linecap: round;
@@ -462,13 +462,13 @@
 
 .setup-route-copy strong {
   font-size: var(--openbot-text-lg);
-  font-weight: 600;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .setup-route-copy small {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .setup-route-arrow {
@@ -499,7 +499,7 @@
   gap: 7px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 560;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .setup-remote-form input,
@@ -512,7 +512,7 @@
   padding: 11px 12px;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-md);
-  line-height: 18px;
+  line-height: var(--openbot-leading-md);
   resize: none;
 }
 
@@ -535,7 +535,7 @@
   margin: -2px 1px 0;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .setup-remote-change {
@@ -571,7 +571,7 @@
   padding: 0;
   color: var(--text-secondary);
   font-size: var(--openbot-text-sm);
-  font-weight: 560;
+  font-weight: var(--openbot-weight-medium);
 }
 
 .provider-picker-heading {
@@ -734,21 +734,21 @@
 
 .provider-picker-name {
   font-size: var(--openbot-text-md);
-  font-weight: 530;
-  line-height: 18px;
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
 }
 
 .provider-picker-email {
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
 }
 
 .provider-picker-check-error {
   overflow: hidden;
   color: var(--openbot-warning);
   font-size: var(--openbot-text-sm);
-  line-height: 15px;
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -842,7 +842,7 @@
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -857,7 +857,7 @@
   gap: 6px;
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -866,7 +866,7 @@
 .provider-picker-custom-count {
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -937,7 +937,7 @@
   margin: 7px 0 0;
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
-  line-height: 16px;
+  line-height: var(--openbot-leading-sm);
 }
 
 /* "More providers" is a button below the list, beside the hint. It uses the style of the heading's
@@ -1091,7 +1091,7 @@
   border-radius: var(--openbot-radius-md);
   padding: 12px 18px;
   font-size: var(--openbot-text-md);
-  font-weight: 620;
+  font-weight: var(--openbot-weight-semibold);
 }
 
 .initial-setup-save {
@@ -1364,6 +1364,15 @@ body,
   border-color: var(--openbot-border);
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);
+}
+
+.settings-field input,
+.settings-field textarea,
+.settings-field select,
+.setup-remote-form input,
+.setup-remote-form textarea,
+.account-login-form input {
+  border-color: var(--openbot-border-control);
 }
 
 .search-field:focus-within,

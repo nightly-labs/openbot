@@ -1,6 +1,6 @@
 export function CloseIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-3.5 fill-none stroke-current">
       <path d="m5 5 10 10M15 5 5 15" stroke-linecap="round" />
     </svg>
   );
@@ -24,7 +24,7 @@ export function DownloadIcon() {
 
 export function StopIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-3.5 fill-current">
       <rect x="6" y="6" width="8" height="8" rx="1.5" />
     </svg>
   );
@@ -32,7 +32,7 @@ export function StopIcon() {
 
 export function PlusIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-3.5 fill-none stroke-current">
       <path d="M10 4v12M4 10h12" stroke-linecap="round" />
     </svg>
   );
@@ -122,7 +122,7 @@ export function CheckIcon() {
 
 export function ComputerIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-3.5 fill-none stroke-current">
       <rect x="2.5" y="3" width="15" height="10" rx="1.5" />
       <path d="M7 17h6M10 13v4" stroke-linecap="round" />
     </svg>
@@ -131,7 +131,7 @@ export function ComputerIcon() {
 
 export function RemoteDesktopIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[14px] fill-none stroke-current">
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-3.5 fill-none stroke-current">
       <rect x="2.5" y="3" width="15" height="10" rx="1.5" />
       <path d="M7 17h6M10 13v4" stroke-linecap="round" />
       <path d="M13.8 6.2c.9.45 1.45 1.15 1.65 2.05M13.65 8.3h.01" stroke-linecap="round" />

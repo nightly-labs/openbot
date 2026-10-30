@@ -213,7 +213,8 @@ export function ServerMenu(props: ServerMenuProps) {
                       onClick={() => selectServer(server())}
                       ref={(row) => selectOnKey(row, server)}
                     >
-                      <CheckCircle checked={server().active} />
+                      {/* The logo stands in the icon column of the menu, so every name starts at one
+                          edge. The current server is marked at the end of its row. */}
                       <span class="server-menu-mark" aria-hidden="true">
                         <ServerMark server={server()} />
                       </span>
@@ -221,6 +222,9 @@ export function ServerMenu(props: ServerMenuProps) {
                       <ServerSleepDot server={server()} class="server-menu-sleep" />
                       <Show when={server().notificationsMuted}>
                         <BellOff class="server-menu-muted size-3" aria-hidden="true" />
+                      </Show>
+                      <Show when={server().active}>
+                        <Check class="server-menu-current size-4" aria-hidden="true" />
                       </Show>
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </DropdownMenu.SubTrigger>

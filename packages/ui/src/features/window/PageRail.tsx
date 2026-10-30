@@ -15,7 +15,11 @@ import {
   Workflow,
 } from "@openbot/ui";
 import { AccountUsageDetails } from "@openbot/ui/features/account/AccountUsageDetails";
-import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
+import {
+  type AccountUsageProviderRow,
+  type AccountUsageWindowRow,
+  accountUsageRowKey,
+} from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Show } from "solid-js";
@@ -59,13 +63,14 @@ function RailButton(props: {
   );
 }
 
-/** Two tracks in a 34px box, with 4.5px between their centers. */
-const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
+/** One track in a 34px box. The stroke is the icon stroke, so the ring does not look heavier than the
+ * rail icons. */
+const RING = { size: 34, stroke: 1.75 };
 
 /**
- * The limits of one provider as concentric rings: the outer ring is the longest window, the inner
- * ring the shortest. Each arc shows how much is left, in the tone of that window. The hover card
- * shows the windows with their reset times. `shared` are the readings that count the same quota, such
+ * The limit of one provider as one ring: the window that stops work first, so every provider in the
+ * rail has the same mark. The arc shows how much is left, in the tone of that window. The hover card
+ * shows all windows with their reset times. `shared` are the readings that count the same quota, such
  * as Cursor on a merged Grok plan: the card lists them, with no ring of their own. The ring draws the
  * reading with the least left, so a shared reading that runs out first still shows.
  */
@@ -86,8 +91,13 @@ function UsageRings(props: {
     });
   const ringRow = () =>
     rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
-  const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
-  const outerRadius = (RING.size - RING.stroke) / 2;
+  // The shortest window comes first, so on a tie the shorter window shows.
+  const binding = () =>
+    ringRow().ringWindows.reduce<AccountUsageWindowRow | undefined>(
+      (lowest, item) => (lowest === undefined || item.remainingPercent < lowest.remainingPercent ? item : lowest),
+      undefined,
+    );
+  const radius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
       label={label()}
@@ -106,14 +116,14 @@ function UsageRings(props: {
       onClick={props.onOpen}
     >
       <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
-        <For each={windows()} keyed={false}>
-          {(window, index) => (
+        <Show when={binding()}>
+          {(window) => (
             <g>
               <circle
                 class="window-rail-usage-track"
                 cx={RING.size / 2}
                 cy={RING.size / 2}
-                r={outerRadius - index * RING.spacing}
+                r={radius}
                 stroke-width={RING.stroke}
               />
               <Show when={window().remainingPercent > 0}>
@@ -122,7 +132,7 @@ function UsageRings(props: {
                   data-usage-tone={window().tone}
                   cx={RING.size / 2}
                   cy={RING.size / 2}
-                  r={outerRadius - index * RING.spacing}
+                  r={radius}
                   stroke-width={RING.stroke}
                   stroke-linecap="round"
                   pathLength={100}
@@ -131,7 +141,7 @@ function UsageRings(props: {
               </Show>
             </g>
           )}
-        </For>
+        </Show>
       </svg>
       <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
     </RailButton>
