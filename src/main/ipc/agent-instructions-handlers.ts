@@ -3,7 +3,7 @@
 
 import { type AgentInstructionsFile, parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import {
   type AgentInstructionsFileFailed,
   type AgentInstructionsFileRefused,
@@ -19,32 +19,23 @@ export interface AgentInstructionsIpcDependencies {
   service: AgentService;
 }
 
+const REFUSED_MESSAGES = {
+  "too-large": "error.agent.instructionsTooLarge",
+  outside: "error.agent.instructionsOutside",
+  changed: "error.agent.instructionsChanged",
+} as const satisfies Record<AgentInstructionsFileRefused["reason"], string>;
+
 /** The page gets a message for each failure, never the native one, which names paths. */
-function run(
+async function run(
   operation: Effect.Effect<AgentInstructionsFile, AgentInstructionsFileRefused | AgentInstructionsFileFailed>,
 ): Promise<AgentInstructionsFile> {
-  return Effect.runPromise(
-    operation.pipe(
-      Effect.catchTags({
-        AgentInstructionsFileRefused: (refused) =>
-          Effect.die(
-            new Error(
-              sourceText(
-                refused.reason === "too-large" ? "error.agent.instructionsTooLarge" : "error.agent.instructionsOutside",
-              ),
-            ),
-          ),
-        AgentInstructionsFileFailed: (failed) =>
-          Effect.die(
-            new Error(
-              sourceText(
-                failed.operation === "read"
-                  ? "error.agent.instructionsReadFailed"
-                  : "error.agent.instructionsSaveFailed",
-              ),
-            ),
-          ),
-      }),
+  const result = await Effect.runPromise(Effect.result(operation));
+  if (Result.isSuccess(result)) return result.success;
+  const failure = result.failure;
+  if (failure._tag === "AgentInstructionsFileRefused") throw new Error(sourceText(REFUSED_MESSAGES[failure.reason]));
+  throw new Error(
+    sourceText(
+      failure.operation === "read" ? "error.agent.instructionsReadFailed" : "error.agent.instructionsSaveFailed",
     ),
   );
 }
@@ -66,8 +57,8 @@ export function agentInstructionsIpcHandlers({
       readAgentInstructions: payloadHandler(parseAgentId, (agentId) =>
         run(readAgentInstructionsFile(workspace(agentId))),
       ),
-      saveAgentInstructions: payloadHandler(parseSaveAgentInstructionsInput, ({ agentId, text }) =>
-        oneAtATime(agentId, () => run(saveAgentInstructionsFile(workspace(agentId), text))),
+      saveAgentInstructions: payloadHandler(parseSaveAgentInstructionsInput, ({ agentId, text, expected }) =>
+        oneAtATime(agentId, () => run(saveAgentInstructionsFile(workspace(agentId), text, expected))),
       ),
     },
   };

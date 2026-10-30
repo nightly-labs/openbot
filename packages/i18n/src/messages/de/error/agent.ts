@@ -31,6 +31,8 @@ export const messages = {
   "error.agent.instructionsReadFailed": "Die Anweisungsdatei konnte nicht gelesen werden.",
   "error.agent.instructionsSaveFailed": "Die Anweisungsdatei konnte nicht gespeichert werden.",
   "error.agent.profileGenerationBusy": "Die Profilerstellung ist ausgelastet. Versuche es gleich noch einmal.",
+  "error.agent.instructionsChanged":
+    "Der Agent hat die Anweisungsdatei geändert. Ihre letzte Änderung wurde nicht gespeichert. Nehmen Sie sie erneut vor.",
   "error.agent.initialMessageRequired": "Eine erste Nachricht ist erforderlich.",
   "error.agent.initialMessageTooLong": "Die erste Nachricht ist zu lang.",
   "error.agent.setupCleanupFailed":

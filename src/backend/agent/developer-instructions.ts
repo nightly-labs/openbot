@@ -77,7 +77,8 @@ function instructionsFileSection(file: PromptInstructionsFile | null | undefined
   return [
     `Your instruction file, ${file.fileName} at your workspace root:`,
     "<agent_instructions>",
-    file.text,
+    // A closing tag in the file must not end the block early.
+    redactText(file.text).replace(/<(\/?agent_instructions)/giu, "&lt;$1"),
     "</agent_instructions>",
     ...(file.truncated ? [`This is the start of the file only; read the rest in ${file.fileName}.`] : []),
   ];

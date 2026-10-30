@@ -645,7 +645,10 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
 
 - `src/backend/agent/workspace-instructions.ts` finds, reads and saves the file. A link that goes
   outside the workspace is refused. A save writes the first file that exists, else it creates
-  `AGENTS.md` with mode 0600. A save never deletes the file.
+  `AGENTS.md` with mode 0600. An existing file keeps its mode; a hard link to it is replaced by a
+  new file. A save never deletes the file.
+- The editor sends the text that the edit started from. When the agent changed the file after
+  that, main refuses the save and the editor shows the agent's text.
 - The agent settings show the file as "Instructions" for a local agent only
   (`agentInstructions` IPC group). The Team API does not carry the file.
 - The developer instructions name the file and tell the agent to keep its rules there.
@@ -653,9 +656,11 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
   itself from its working directory. `ThreadLifecycle` adds the text of the file, at most 32,000
   characters, only when the CLI does not read that file. Claude in workspace-only mode reads user
   settings only, so it gets the text.
-- Codex keeps the developer instructions of a loaded session. The Codex tool fingerprint therefore
-  includes the file name when it is not `AGENTS.md`, and the text when the instructions carry it.
-  Codex reads `AGENTS.md` by itself when a session starts.
+- The text is redacted, and a `</agent_instructions>` tag in it is escaped.
+- Codex keeps the instructions of a loaded session: the developer instructions, and the
+  `AGENTS.md` that it read when the session started. The Codex tool fingerprint therefore includes
+  the file name when it is not `AGENTS.md`, and the file text. A change to the file starts a new
+  Codex session. Other providers read the file again when they start or resume a session.
 
 ## Agent import
 

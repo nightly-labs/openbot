@@ -24,6 +24,11 @@ export interface AgentInstructionsFile {
 export interface SaveAgentInstructionsInput {
   agentId: string;
   text: string;
+  /**
+   * The file text that the edit started from. The agent can change the file during an edit, so main
+   * refuses the save when the file text is different now.
+   */
+  expected: string;
 }
 
 /**
@@ -47,8 +52,9 @@ export function parseSaveAgentInstructionsInput(value: unknown): SaveAgentInstru
   if (
     !isDynamicRecord(value) ||
     !isIdentifier(value.agentId) ||
-    !isBoundedString(value.text, INPUT_LIMITS.agentInstructionsFile)
+    !isBoundedString(value.text, INPUT_LIMITS.agentInstructionsFile) ||
+    !isBoundedString(value.expected, AGENT_INSTRUCTIONS_READ_LIMIT)
   )
     throw new Error("Invalid agent instructions input.");
-  return { agentId: value.agentId, text: value.text };
+  return { agentId: value.agentId, text: value.text, expected: value.expected };
 }

@@ -26,6 +26,8 @@ export const messages = {
   "error.agent.instructionsReadFailed": "Не удалось прочитать файл инструкций.",
   "error.agent.instructionsSaveFailed": "Не удалось сохранить файл инструкций.",
   "error.agent.profileGenerationBusy": "Создание профиля уже выполняется. Повторите попытку чуть позже.",
+  "error.agent.instructionsChanged":
+    "Агент изменил файл инструкций. Ваше последнее изменение не сохранено. Внесите его ещё раз.",
   "error.agent.initialMessageRequired": "Нужно первое сообщение.",
   "error.agent.initialMessageTooLong": "Первое сообщение слишком длинное.",
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",

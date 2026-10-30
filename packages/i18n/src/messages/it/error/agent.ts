@@ -27,6 +27,8 @@ export const messages = {
   "error.agent.instructionsReadFailed": "Impossibile leggere il file delle istruzioni.",
   "error.agent.instructionsSaveFailed": "Impossibile salvare il file delle istruzioni.",
   "error.agent.profileGenerationBusy": "La generazione del profilo è occupata. Riprova tra poco.",
+  "error.agent.instructionsChanged":
+    "L'agente ha modificato il file delle istruzioni. L'ultima modifica non è stata salvata. Ripetila.",
   "error.agent.initialMessageRequired": "Serve il messaggio iniziale.",
   "error.agent.initialMessageTooLong": "Il messaggio iniziale è troppo lungo.",
   "error.agent.setupCleanupFailed":

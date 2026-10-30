@@ -28,6 +28,8 @@ export const messages = {
   "error.agent.instructionsReadFailed": "Kan het instructiebestand niet lezen.",
   "error.agent.instructionsSaveFailed": "Kan het instructiebestand niet opslaan.",
   "error.agent.profileGenerationBusy": "Er wordt al een profiel gemaakt. Probeer het zo opnieuw.",
+  "error.agent.instructionsChanged":
+    "De agent heeft het instructiebestand gewijzigd. Je laatste wijziging is niet opgeslagen. Breng deze opnieuw aan.",
   "error.agent.initialMessageRequired": "Een eerste bericht is verplicht.",
   "error.agent.initialMessageTooLong": "Het eerste bericht is te lang.",
   "error.agent.setupCleanupFailed":

@@ -112,6 +112,9 @@ type CodexToolApprovals = Array<[string, DynamicRecord]>;
 /** The instruction file that the developer instructions name, and its text when they carry it. */
 interface InstructionsFileInPrompt {
   fileName: PromptInstructionsFile["fileName"];
+  /** The file, when there is one. */
+  found: PromptInstructionsFile | null;
+  /** The file that the instructions carry: the CLI does not read it by itself. */
   file: PromptInstructionsFile | null;
 }
 
@@ -946,10 +949,10 @@ export class ThreadLifecycle {
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(section ? [section.members.map((member) => member.id).sort()] : []),
           ...(proxy ? [proxy] : []),
-          // Codex reads `AGENTS.md` by itself. Only another file name, or a file that the
-          // instructions carry, adds a value.
+          // A loaded session keeps the instruction file that it read or got at its start, so a change
+          // to the file adds a new value. Only another file name, or a file with text, adds a value.
           ...(instructionsFile.fileName === "AGENTS.md" ? [] : [["instructions-file", instructionsFile.fileName]]),
-          ...(instructionsFile.file?.text ? [["instructions", instructionsFile.file.text]] : []),
+          ...(instructionsFile.found?.text ? [["instructions", instructionsFile.found.text]] : []),
         ]),
       )
       .digest("hex");
@@ -1157,6 +1160,7 @@ export class ThreadLifecycle {
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
     return {
       fileName: file?.fileName ?? "AGENTS.md",
+      found: file,
       file: file && !read.includes(file.fileName) ? file : null,
     } satisfies InstructionsFileInPrompt;
   });

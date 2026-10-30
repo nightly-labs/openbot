@@ -729,7 +729,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agent;
   }
 
-  /** The preview has no disk: a folder whose path ends in "(missing)" is not found. */
   // The instruction file of each agent, in memory. An agent with none shows an empty AGENTS.md.
   const mockInstructionFiles = new Map<string, AgentInstructionsFile>();
 
@@ -738,6 +737,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return mockInstructionFiles.get(agentId) ?? { fileName: "AGENTS.md", exists: false, text: "" };
   }
 
+  /** The preview has no disk: a folder whose path ends in "(missing)" is not found. */
   function mockAgentFolders(agentId: string): AgentFolderList {
     const agent = requireMockAgent(agentId);
     return {
@@ -1978,8 +1978,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return { outcome: "included", path, list: mockAgentFolders(agentId) };
       },
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
-      saveAgentInstructions: async ({ agentId, text }) => {
-        const file: AgentInstructionsFile = { fileName: mockAgentInstructions(agentId).fileName, exists: true, text };
+      saveAgentInstructions: async ({ agentId, text, expected }) => {
+        const current = mockAgentInstructions(agentId);
+        if (current.text !== expected) throw new Error(sourceText("error.agent.instructionsChanged"));
+        const file: AgentInstructionsFile = { fileName: current.fileName, exists: true, text };
         mockInstructionFiles.set(agentId, file);
         return file;
       },

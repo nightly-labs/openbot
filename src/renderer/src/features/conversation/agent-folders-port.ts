@@ -23,6 +23,6 @@ export function agentFolderCalls(): AgentFolderCalls {
 export function agentInstructionsCalls(): AgentInstructionsCalls {
   return {
     read: (agentId) => window.openbot.agent.readAgentInstructions(agentId),
-    save: (agentId, text) => window.openbot.agent.saveAgentInstructions({ agentId, text }),
+    save: (agentId, text, expected) => window.openbot.agent.saveAgentInstructions({ agentId, text, expected }),
   };
 }

@@ -27,6 +27,8 @@ export const messages = {
   "error.agent.instructionsReadFailed": "Talimat dosyası okunamadı.",
   "error.agent.instructionsSaveFailed": "Talimat dosyası kaydedilemedi.",
   "error.agent.profileGenerationBusy": "Profil oluşturma meşgul. Kısa bir süre sonra tekrar deneyin.",
+  "error.agent.instructionsChanged":
+    "Ajan talimat dosyasını değiştirdi. Son değişikliğiniz kaydedilmedi. Lütfen tekrar yapın.",
   "error.agent.initialMessageRequired": "İlk mesaj gereklidir.",
   "error.agent.initialMessageTooLong": "İlk mesaj çok uzun.",
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",

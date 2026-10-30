@@ -25,6 +25,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.instructionsReadFailed": "Could not read the instructions file.",
   "error.agent.instructionsSaveFailed": "Could not save the instructions file.",
   "error.agent.profileGenerationBusy": "Profile generation is busy. Try again shortly.",
+  "error.agent.instructionsChanged":
+    "The agent changed the instructions file. Your last change was not saved. Make it again.",
   "error.agent.initialMessageRequired": "Initial message is required.",
   "error.agent.initialMessageTooLong": "Initial message is too long.",
   "error.agent.setupCleanupFailed": "Agent setup failed and the incomplete agent could not be removed.",

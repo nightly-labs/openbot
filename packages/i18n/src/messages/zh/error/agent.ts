@@ -24,6 +24,7 @@ export const messages = {
   "error.agent.instructionsReadFailed": "无法读取指令文件。",
   "error.agent.instructionsSaveFailed": "无法保存指令文件。",
   "error.agent.profileGenerationBusy": "资料生成正忙，请稍后重试。",
+  "error.agent.instructionsChanged": "智能体已更改指令文件。你的最后一次更改未保存。请重新更改。",
   "error.agent.initialMessageRequired": "需要提供初始消息。",
   "error.agent.initialMessageTooLong": "初始消息过长。",
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
