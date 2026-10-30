@@ -28,11 +28,7 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
-import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relay-v2";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
@@ -378,12 +374,12 @@ export function providerAdminIpcHandlers({
         return startRelay(serverId, provider, SIGN_IN_RELAY_ROUTES.providerStart, { provider });
       }),
       startAccountRelaySignIn: relaySignIn(parseConnectProviderAccountInput, ({ provider, accountId }, serverId) => {
-        if (
-          !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_RELAY_CAPABILITY) ||
-          !PROVIDER_ACCOUNT_RELAY_PROVIDERS.some((candidate) => candidate === provider)
-        )
+        const accountRelay = providerAccountRelay((capability) =>
+          remoteServers.supportsCapability(serverId, capability),
+        );
+        if (!accountRelay?.providers.some((candidate) => candidate === provider))
           throw new Error(sourceText("error.team.providersUnsupported"));
-        return startRelay(serverId, provider, PROVIDER_ACCOUNT_RELAY_ROUTES.start, { provider, accountId });
+        return startRelay(serverId, provider, accountRelay.start, { provider, accountId });
       }),
       relaySignInStatus: relaySignIn(parseProviderId, (provider, serverId): ProviderRelaySignInStatus => {
         const key = relayKey(serverId, provider);

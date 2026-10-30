@@ -576,8 +576,9 @@ The account sign-in is the same ACP `authenticate` call as the first account's; 
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
 first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server signs the account in through the
-live view, because `provider-account-relay-v1` names Codex and Claude only.
+that two accounts are the same Google account. A joined server relays the account's sign-in to the
+client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
+names Codex and Claude only, signs the account in through the live view.
 
 From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
 reads the Google account's quota summary and sends one Markdown answer. The driver's

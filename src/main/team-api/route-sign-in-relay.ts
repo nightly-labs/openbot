@@ -4,6 +4,12 @@ import {
   PROVIDER_ACCOUNT_RELAY_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-relay-v1";
 import {
+  PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
+  PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS,
+  PROVIDER_ACCOUNT_RELAY_V2_ROUTES,
+  type ProviderAccountRelayProvider,
+} from "@openbot/contracts/team-protocol/provider-account-relay-v2";
+import {
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_PROVIDERS,
   SIGN_IN_RELAY_ROUTES,
@@ -17,10 +23,22 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, requireAdmin, stringField } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(SIGN_IN_RELAY_ROUTES));
+/** The `start` route of each account relay, with its capability and the providers its codec admits. */
+const ACCOUNT_STARTS: ReadonlyMap<string, { capability: string; providers: readonly ProviderAccountRelayProvider[] }> =
+  new Map([
+    [
+      PROVIDER_ACCOUNT_RELAY_ROUTES.start,
+      { capability: PROVIDER_ACCOUNT_RELAY_CAPABILITY, providers: PROVIDER_ACCOUNT_RELAY_PROVIDERS },
+    ],
+    [
+      PROVIDER_ACCOUNT_RELAY_V2_ROUTES.start,
+      { capability: PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY, providers: PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS },
+    ],
+  ]);
 
 /**
  * Sign-ins of this host that an administrator finishes in the browser of their own computer. Frozen
- * by `sign-in-relay-v1`, and by `provider-account-relay-v1` for the start of an account's sign-in.
+ * by `sign-in-relay-v1`, and by `provider-account-relay-v1` and `-v2` for the start of an account's sign-in.
  *
  * `complete` carries the query of the callback, which holds a grant. It travels only on the encrypted
  * Team channel, and `SignInRelayHost` never logs it. `requireAdmin` runs on every route, and a flow
@@ -31,14 +49,15 @@ export async function routeSignInRelay(
   relay: TeamApiSignInRelay | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
-  if (method === "POST" && url.pathname === PROVIDER_ACCOUNT_RELAY_ROUTES.start) {
+  const accountStart = method === "POST" ? ACCOUNT_STARTS.get(url.pathname) : undefined;
+  if (accountStart) {
     // The host advertises the capability only with `sign-in-relay-v1` and `provider-accounts-v1`.
-    if (!relay || !capabilities.has(PROVIDER_ACCOUNT_RELAY_CAPABILITY))
+    if (!relay || !capabilities.has(accountStart.capability))
       throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
     requireAdmin(member);
     const body = await readJson(request);
-    // The codec admits only `PROVIDER_ACCOUNT_RELAY_PROVIDERS` and a valid account id or null.
-    const provider = PROVIDER_ACCOUNT_RELAY_PROVIDERS.find((id) => id === stringField(body, "provider"));
+    // The codec admits only the providers of the route and a valid account id or null.
+    const provider = accountStart.providers.find((id) => id === stringField(body, "provider"));
     if (!provider) throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
     return json(
       200,
