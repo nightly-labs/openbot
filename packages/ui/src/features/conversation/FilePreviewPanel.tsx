@@ -9,6 +9,8 @@ import {
   File,
   Folder,
   FolderOpen,
+  LabelTooltip,
+  LabelTooltipTrigger,
   WrapText,
   X,
 } from "@openbot/ui";
@@ -210,15 +212,18 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       <header class="file-preview-header">
         <Show when={props.onBack}>
           {(back) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.back")}
-              onClick={() => back()()}
-            >
-              <ArrowLeft class="browser-toolbar-icon" />
-            </Button>
+            <LabelTooltip content={t("preview.panel.back")}>
+              <LabelTooltipTrigger
+                as={Button}
+                variant="ghost"
+                type="button"
+                class="browser-toolbar-button"
+                aria-label={t("preview.panel.back")}
+                onClick={() => back()()}
+              >
+                <ArrowLeft class="browser-toolbar-icon" />
+              </LabelTooltipTrigger>
+            </LabelTooltip>
           )}
         </Show>
         <Show when={props.directory} fallback={<File class="file-preview-file-icon" />}>
@@ -226,40 +231,49 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <h2 title={props.directory?.path ?? title()}>{title()}</h2>
         <Show when={previewKind() === "markdown"}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.rawMarkdown")}
-            aria-pressed={rawSource() ? "true" : "false"}
-            onClick={() => setRawSource((raw) => !raw)}
-          >
-            <Code class="browser-toolbar-icon" />
-          </Button>
+          <LabelTooltip content={t("preview.panel.rawMarkdown")}>
+            <LabelTooltipTrigger
+              as={Button}
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label={t("preview.panel.rawMarkdown")}
+              aria-pressed={rawSource() ? "true" : "false"}
+              onClick={() => setRawSource((raw) => !raw)}
+            >
+              <Code class="browser-toolbar-icon" />
+            </LabelTooltipTrigger>
+          </LabelTooltip>
         </Show>
         <Show when={hasPage()}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.rawHtml")}
-            aria-pressed={rawSource() ? "true" : "false"}
-            onClick={() => setRawSource((raw) => !raw)}
-          >
-            <Code class="browser-toolbar-icon" />
-          </Button>
+          <LabelTooltip content={t("preview.panel.rawHtml")}>
+            <LabelTooltipTrigger
+              as={Button}
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label={t("preview.panel.rawHtml")}
+              aria-pressed={rawSource() ? "true" : "false"}
+              onClick={() => setRawSource((raw) => !raw)}
+            >
+              <Code class="browser-toolbar-icon" />
+            </LabelTooltipTrigger>
+          </LabelTooltip>
         </Show>
         <Show when={showsSourceText()}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.wrapLines")}
-            aria-pressed={wrapLines() ? "true" : "false"}
-            onClick={toggleWrapLines}
-          >
-            <WrapText class="browser-toolbar-icon" />
-          </Button>
+          <LabelTooltip content={t("preview.panel.wrapLines")}>
+            <LabelTooltipTrigger
+              as={Button}
+              variant="ghost"
+              type="button"
+              class="browser-toolbar-button"
+              aria-label={t("preview.panel.wrapLines")}
+              aria-pressed={wrapLines() ? "true" : "false"}
+              onClick={toggleWrapLines}
+            >
+              <WrapText class="browser-toolbar-icon" />
+            </LabelTooltipTrigger>
+          </LabelTooltip>
         </Show>
         <Show when={source()}>
           {(value) => (
@@ -272,52 +286,64 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           )}
         </Show>
         <Show when={file() && props.allowExternalOpen !== false}>
-          <Button
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.openExternally")}
-            onClick={props.onOpenExternally}
-          >
-            <ExternalLink class="browser-toolbar-icon" />
-          </Button>
-        </Show>
-        <Show when={file() && props.onDownload}>
-          {(download) => (
-            <Button
+          <LabelTooltip content={t("preview.panel.openExternally")}>
+            <LabelTooltipTrigger
+              as={Button}
               variant="ghost"
               type="button"
               class="browser-toolbar-button"
-              aria-label={t("preview.panel.download")}
-              onClick={() => download()()}
+              aria-label={t("preview.panel.openExternally")}
+              onClick={props.onOpenExternally}
             >
-              <Download class="browser-toolbar-icon" />
-            </Button>
+              <ExternalLink class="browser-toolbar-icon" />
+            </LabelTooltipTrigger>
+          </LabelTooltip>
+        </Show>
+        <Show when={file() && props.onDownload}>
+          {(download) => (
+            <LabelTooltip content={t("preview.panel.download")}>
+              <LabelTooltipTrigger
+                as={Button}
+                variant="ghost"
+                type="button"
+                class="browser-toolbar-button"
+                aria-label={t("preview.panel.download")}
+                onClick={() => download()()}
+              >
+                <Download class="browser-toolbar-icon" />
+              </LabelTooltipTrigger>
+            </LabelTooltip>
           )}
         </Show>
         <Show when={file() && props.onReveal}>
           {(reveal) => (
-            <Button
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.reveal")}
-              onClick={() => reveal()()}
-            >
-              <FolderOpen class="browser-toolbar-icon" />
-            </Button>
+            <LabelTooltip content={t("preview.panel.reveal")}>
+              <LabelTooltipTrigger
+                as={Button}
+                variant="ghost"
+                type="button"
+                class="browser-toolbar-button"
+                aria-label={t("preview.panel.reveal")}
+                onClick={() => reveal()()}
+              >
+                <FolderOpen class="browser-toolbar-icon" />
+              </LabelTooltipTrigger>
+            </LabelTooltip>
           )}
         </Show>
-        <Button
-          variant="ghost"
-          type="button"
-          class="browser-toolbar-button"
-          aria-label={t("preview.panel.close")}
-          data-cuelume-tap="close"
-          onClick={props.onClose}
-        >
-          <X class="browser-toolbar-icon" />
-        </Button>
+        <LabelTooltip content={t("preview.panel.close")}>
+          <LabelTooltipTrigger
+            as={Button}
+            variant="ghost"
+            type="button"
+            class="browser-toolbar-button"
+            aria-label={t("preview.panel.close")}
+            data-cuelume-tap="close"
+            onClick={props.onClose}
+          >
+            <X class="browser-toolbar-icon" />
+          </LabelTooltipTrigger>
+        </LabelTooltip>
       </header>
       <div class="file-preview-content">
         <Show when={props.directory}>
