@@ -4,6 +4,7 @@ import {
   CUSTOM_PROVIDER_HARNESSES,
   type CustomProviderHarness,
   customAgentIdOfModel,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   defaultProviderModel,
   isCustomProviderHarness,
   PICKER_PROVIDERS,
@@ -128,11 +129,16 @@ export class CustomEndpoints {
     return this.#committedRevision;
   }
 
-  /** Takes the exclusion of one endpoint id on each harness, and answers what it replaced. */
-  #release(providerId: string): Record<CustomProviderHarness, number | undefined> {
+  /**
+   * Takes the exclusion of one endpoint id on `harness` and on the harness that runs it now, and
+   * answers what it replaced. Only these two restart for the change, and only a restart gives an
+   * exclusion back. The id can also name a provider of the other harness's own, whose models stay.
+   */
+  #release(providerId: string, harness: CustomProviderHarness): Record<CustomProviderHarness, number | undefined> {
     this.#revision += 1;
     const previous = { opencode: this.#released.opencode.get(providerId), pi: this.#released.pi.get(providerId) };
-    for (const harness of CUSTOM_PROVIDER_HARNESSES) this.#released[harness].set(providerId, this.#revision);
+    const saved = this.#hooks.endpointHarness(providerId) ?? harness;
+    for (const target of new Set([harness, saved])) this.#released[target].set(providerId, this.#revision);
     return previous;
   }
 
@@ -169,11 +175,12 @@ export class CustomEndpoints {
   readonly save = Effect.fn("CustomEndpoints.save")(function* <T>(
     this: CustomEndpoints,
     providerId: string,
+    harness: CustomProviderHarness,
     persist: () => Effect.Effect<T, EndpointChangeFailed>,
   ) {
     return yield* this.#chain.withPermit(
       Effect.gen({ self: this }, function* () {
-        const previous = this.#release(providerId);
+        const previous = this.#release(providerId, harness);
         const revision = this.#revision;
         this.#hooks.modelsChanged();
         // The same reason as a removal: a profile or channel client is a process of its own, holding
@@ -209,13 +216,14 @@ export class CustomEndpoints {
   readonly update = Effect.fn("CustomEndpoints.update")(function* <T>(
     this: CustomEndpoints,
     providerId: string,
+    harness: CustomProviderHarness,
     removedModelIds: readonly string[],
     persist: () => Effect.Effect<T, EndpointChangeFailed>,
   ) {
     return yield* this.#chain.withPermit(
       Effect.gen({ self: this }, function* () {
         yield* this.#moveOffRemovedModels(providerId, new Set(removedModelIds));
-        const previous = this.#release(providerId);
+        const previous = this.#release(providerId, harness);
         const revision = this.#revision;
         this.#hooks.modelsChanged();
         yield* this.#hooks.stopProfileClients();
@@ -320,7 +328,10 @@ export class CustomEndpoints {
   ) {
     return yield* this.#chain.withPermit(
       Effect.gen({ self: this }, function* () {
-        const previous = this.#release(providerId);
+        const previous = this.#release(
+          providerId,
+          this.#hooks.endpointHarness(providerId) ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+        );
         const revision = this.#revision;
         this.#hooks.modelsChanged();
         // A profile or channel client is a process of its own, spawned with the endpoints as they
@@ -450,15 +461,7 @@ export class CustomEndpoints {
     harness: CustomProviderHarness,
   ) {
     const models = this.available().filter((model) => model.provider === harness);
-    const affected = this.#store.list().filter((agent) => {
-      const provider = providerForAgent(agent);
-      return (
-        provider !== harness &&
-        isCustomProviderHarness(provider) &&
-        this.#hooks.endpointHarness(endpointOfModel(agent.model) ?? "") === harness
-      );
-    });
-    for (const agent of affected) {
+    for (const agent of this.#waitingFor(harness)) {
       const target = models.find((model) => model.id === agent.model);
       if (!target) continue;
       yield* this.#hooks
@@ -476,6 +479,23 @@ export class CustomEndpoints {
         );
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether agents wait for `harness` to start, to move there with `moveAgentsToHarness`. */
+  waitsForHarness(harness: CustomProviderHarness): boolean {
+    return this.#waitingFor(harness).length > 0;
+  }
+
+  /** The agents on another harness whose endpoint now runs on `harness`. */
+  #waitingFor(harness: CustomProviderHarness): AgentSummary[] {
+    return this.#store.list().filter((agent) => {
+      const provider = providerForAgent(agent);
+      return (
+        provider !== harness &&
+        isCustomProviderHarness(provider) &&
+        this.#hooks.endpointHarness(endpointOfModel(agent.model) ?? "") === harness
+      );
+    });
+  }
 
   /**
    * Moves every agent off a removed endpoint's models, onto a model that is still served.

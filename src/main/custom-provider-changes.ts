@@ -24,7 +24,11 @@ export interface CustomProviderChangeDependencies {
   // backend.
   service: Pick<
     AgentService,
-    "saveCustomProvider" | "updateCustomProvider" | "removeCustomProvider" | "reloadCustomProviderConfig"
+    | "saveCustomProvider"
+    | "updateCustomProvider"
+    | "removeCustomProvider"
+    | "reloadCustomProviderConfig"
+    | "startHarnessForMovedAgents"
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
 }
@@ -67,6 +71,9 @@ export function createCustomProviderChanges({
     const outcome: CustomProviderRestart = yield* service.reloadCustomProviderConfig(now);
     if (previous === undefined || previous === now) return outcome;
     const before = yield* service.reloadCustomProviderConfig(previous);
+    // The agents on the endpoint move to `now` when it activates, and a harness that is not running
+    // does not activate by itself.
+    if (outcome === "not-running") yield* service.startHarnessForMovedAgents(now);
     return before === "skipped-busy" ? before : outcome;
   });
   function serialize<T>(run: () => Effect.Effect<T, ProviderRuntimeFailure>): Effect.Effect<T, ProviderRuntimeFailure> {
@@ -90,7 +97,7 @@ export function createCustomProviderChanges({
           // before this write or already named models in that process's catalogue.
           const previous = harnessOf(input.id);
           const providers = yield* service
-            .saveCustomProvider(input.id, () =>
+            .saveCustomProvider(input.id, input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, () =>
               customProviders
                 .save(input)
                 .pipe(
@@ -119,7 +126,7 @@ export function createCustomProviderChanges({
           const kept = new Set(input.models.map((model) => model.id));
           const removed = (saved?.models ?? []).filter((model) => !kept.has(model.id)).map((model) => model.id);
           const providers = yield* service
-            .updateCustomProvider(input.id, removed, () =>
+            .updateCustomProvider(input.id, input.harness ?? previous ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, removed, () =>
               customProviders
                 .update(input)
                 .pipe(

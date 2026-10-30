@@ -3846,6 +3846,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.reloadCustomProviderConfig(harness);
   }
 
+  /**
+   * Starts the harness that an endpoint moved to, when agents wait for it. They move when it
+   * activates, and until then they stay on a harness that no longer lists the endpoint. The start is
+   * not awaited: a save does not wait for model discovery. A start that fails is reported.
+   */
+  startHarnessForMovedAgents(harness: CustomProviderHarness): Effect.Effect<void> {
+    return Effect.suspend(() =>
+      this.#endpoints.waitsForHarness(harness)
+        ? this.#providers.ensureProvider(harness).pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("agent_model_fallback_failed", failure.cause))),
+            Effect.forkIn(this.#scope),
+            Effect.asVoid,
+          )
+        : Effect.void,
+    );
+  }
+
   /** Replaces the custom agents' router so a saved or removed agent reaches it. Reports why, if it did not. */
   reloadCustomAgents(): Effect.Effect<CustomProviderRestart, AgentLifecycleFailed> {
     return this.#providers
@@ -3901,10 +3918,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** See `CustomEndpoints.save`: the exclusion of the id being saved and the caller's file write. */
   saveCustomProvider<T>(
     providerId: string,
+    harness: CustomProviderHarness,
     persist: () => Effect.Effect<T, AgentLifecycleFailed>,
   ): Effect.Effect<T, AgentLifecycleFailed> {
     return this.#endpoints
-      .save(providerId, () => persist().pipe(toEndpointChangeFailed))
+      .save(providerId, harness, () => persist().pipe(toEndpointChangeFailed))
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "saveCustomProvider", cause: failure.cause }),
@@ -3915,11 +3933,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** See `CustomEndpoints.update`: the agents on removed models, the exclusion, and the file write. */
   updateCustomProvider<T>(
     providerId: string,
+    harness: CustomProviderHarness,
     removedModelIds: readonly string[],
     persist: () => Effect.Effect<T, AgentLifecycleFailed>,
   ): Effect.Effect<T, AgentLifecycleFailed> {
     return this.#endpoints
-      .update(providerId, removedModelIds, () => persist().pipe(toEndpointChangeFailed))
+      .update(providerId, harness, removedModelIds, () => persist().pipe(toEndpointChangeFailed))
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "updateCustomProvider", cause: failure.cause }),
