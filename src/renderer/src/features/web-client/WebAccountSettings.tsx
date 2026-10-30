@@ -261,7 +261,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
               device="browser"
               onSetServerLevel={props.notifications.setServerLevel}
               onSetAgentLevel={props.notifications.setAgentLevel}
-              onTurnOnAgent={props.notifications.turnOnAgent}
               onMute={props.notifications.mute}
               onUnmute={props.notifications.unmute}
               onRetry={props.notifications.retry}

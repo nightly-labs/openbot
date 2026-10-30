@@ -2,6 +2,7 @@ import type { ServerNotificationLevel } from "@openbot/contracts/ipc";
 import { Heading, SettingsSection, Toaster } from "@openbot/ui";
 import {
   NotificationMatrix,
+  type NotificationMatrixAgent,
   type NotificationMatrixServer,
   NotificationScopeTitle,
 } from "@openbot/ui/features/settings/NotificationMatrix";
@@ -16,9 +17,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** An agent with a drawn avatar. `level` null uses the level of its server. */
+function agent(
+  id: string,
+  name: string,
+  detail: string,
+  level: ServerNotificationLevel | null,
+): NotificationMatrixAgent {
+  return { id, name, detail, avatarSeed: id, avatarHue: null, avatarUrl: null, level };
+}
+
 const LOCAL: NotificationMatrixServer = {
   id: "local",
   name: "Norbert’s MacBook Pro",
+  logoUrl: null,
   level: "all",
   muted: false,
   mutedUntil: null,
@@ -27,15 +39,16 @@ const LOCAL: NotificationMatrixServer = {
   agents: {
     status: "ready",
     agents: [
-      { id: "atlas", name: "Atlas", detail: "Research", sharedOff: false, level: null },
-      { id: "scout", name: "Scout", detail: "Morning news routine", sharedOff: false, level: "nothing" },
-      { id: "ledger", name: "Ledger", detail: "Invoices and receipts", sharedOff: false, level: null },
+      agent("atlas", "Atlas", "Research", null),
+      agent("scout", "Scout", "Morning news routine", "nothing"),
+      agent("ledger", "Ledger", "Invoices and receipts", null),
     ],
   },
 };
 const ACME: NotificationMatrixServer = {
   id: "acme",
   name: "Acme Studio",
+  logoUrl: null,
   level: "needs-me",
   muted: true,
   mutedUntil: Date.now() + 2 * 60 * 60_000,
@@ -44,9 +57,9 @@ const ACME: NotificationMatrixServer = {
   agents: {
     status: "ready",
     agents: [
-      { id: "nova", name: "Nova", detail: "Support inbox", sharedOff: false, level: "all" },
-      { id: "pixel", name: "Pixel", detail: "Design QA", sharedOff: false, level: null },
-      { id: "echo", name: "Echo", detail: "Release notes", sharedOff: true, level: null },
+      agent("nova", "Nova", "Support inbox", "all"),
+      agent("pixel", "Pixel", "Design QA", null),
+      agent("echo", "Echo", "Release notes", null),
     ],
   },
 };
@@ -54,6 +67,7 @@ const ACME: NotificationMatrixServer = {
 const LAB: NotificationMatrixServer = {
   id: "lab",
   name: "Old lab server",
+  logoUrl: null,
   level: "all",
   muted: false,
   mutedUntil: null,
@@ -64,6 +78,7 @@ const LAB: NotificationMatrixServer = {
 const RESEARCH: NotificationMatrixServer = {
   id: "research",
   name: "Research server",
+  logoUrl: null,
   level: "all",
   muted: false,
   mutedUntil: null,
@@ -128,7 +143,6 @@ function MatrixStory(props: {
             onMute={(serverId, durationMs) => setMuted(serverId, true, durationMs)}
             onUnmute={(serverId) => setMuted(serverId, false, null)}
             onRetry={fn()}
-            onTurnOnAgent={fn(async () => undefined)}
           />
         </SettingsSection>
       </div>
@@ -137,7 +151,7 @@ function MatrixStory(props: {
   );
 }
 
-/** Every row state: own levels, levels from the server, a shared switch that is off, mute, an old and an offline server. */
+/** Agents with their own level, agents to add, a muted server, an old and an offline server. */
 export const Default: Story = {
   render: () => <MatrixStory servers={SERVERS} />,
 };
@@ -159,7 +173,7 @@ export const Loading: Story = {
   ),
 };
 
-/** A server set to Nothing keeps every agent silent, so their choices are off. */
+/** A server set to Nothing keeps every agent silent, so its card shows no agents. */
 export const ServerSetToNothing: Story = {
   render: () => <MatrixStory servers={[{ ...LOCAL, level: "nothing" }]} />,
 };

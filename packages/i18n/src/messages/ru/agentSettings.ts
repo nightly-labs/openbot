@@ -180,7 +180,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",
   "agentSettings.notificationLevel.note":
     "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",
-  "agentSettings.notificationLevel.sharedOff": "Уведомления этого агента отключены для всех участников.",
 
   "agentSettings.newChat.title": "Новый чат",
   "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",

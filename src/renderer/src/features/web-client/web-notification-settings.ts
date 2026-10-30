@@ -118,7 +118,9 @@ export function createWebNotificationSettings(options: {
         name: agent.name,
         // Only the short title: a long description would change the height of the row.
         detail: agent.title,
-        sharedOff: !agent.notifications,
+        avatarSeed: agent.avatarSeed,
+        avatarHue: agent.avatarHue,
+        avatarUrl: agent.avatarUrl,
         level: own.get(agent.id) ?? null,
       })),
     };
@@ -128,13 +130,13 @@ export function createWebNotificationSettings(options: {
     options.servers().map((server) => ({
       id: server.id,
       name: server.name,
+      logoUrl: server.logoUrl,
       level: server.notificationLevel,
       muted: server.notificationsMuted,
       mutedUntil: server.notificationsMutedUntil,
       offline: server.state !== "online",
       deviceOnly: keepsLevels(server.id) === false,
       agents: matrixAgents(server.id),
-      canTurnOnAgents: server.id === options.openHostId(),
     })),
   );
 
@@ -149,19 +151,22 @@ export function createWebNotificationSettings(options: {
     options.setLocalLevel(hostId, level);
   }
 
+  /**
+   * Writes the level of the user for one agent. An agent that a member turned off for every member,
+   * with the agent switch of earlier versions, stays silent at each level, and no control shows that
+   * switch now. So a level of its own also turns the agent on again, on the open host: only it takes
+   * a change of an agent.
+   */
   async function setAgentLevel(hostId: string, agentId: string, level: ServerNotificationLevel | null): Promise<void> {
     const write = options.runtime.setHostAgentNotificationLevel;
     if (!write) return;
     rememberLevels(hostId, await write(hostId, { agentId, level }));
-  }
-
-  /** Turns on an agent of the open host that a member turned off for every member. */
-  async function turnOnAgent(hostId: string, agentId: string): Promise<void> {
-    if (hostId !== options.openHostId()) return;
+    const agent = entries[hostId]?.agents.find((candidate) => candidate.id === agentId);
+    if (level === null || !agent || agent.notifications || hostId !== options.openHostId()) return;
     await options.runtime.updateAgent({ agentId, notifications: true });
     setEntries((draft) => {
-      const agent = draft[hostId]?.agents.find((candidate) => candidate.id === agentId);
-      if (agent) agent.notifications = true;
+      const turnedOn = draft[hostId]?.agents.find((candidate) => candidate.id === agentId);
+      if (turnedOn) turnedOn.notifications = true;
     });
   }
 
@@ -178,7 +183,6 @@ export function createWebNotificationSettings(options: {
     matrixServers,
     setServerLevel,
     setAgentLevel,
-    turnOnAgent,
     mute,
     unmute,
     retry: (hostId: string) => void load(hostId),

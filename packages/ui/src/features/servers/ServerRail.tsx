@@ -598,7 +598,7 @@ function ServerRailButton(
   );
 }
 
-export function ServerMark(props: { server: ServerSummary }) {
+export function ServerMark(props: { server: Pick<ServerSummary, "id" | "logoUrl"> }) {
   const [failed, setFailed] = createSignal(false);
   createEffect(
     () => props.server.logoUrl,

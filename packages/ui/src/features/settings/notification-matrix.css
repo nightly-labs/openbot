@@ -1,4 +1,4 @@
-/* The notification levels of every server and agent in one table (NotificationMatrix.tsx). */
+/* The notification levels of every server and agent: one card for each server (NotificationMatrix.tsx). */
 
 .notification-scope-title {
   display: inline-flex;
@@ -8,157 +8,80 @@
 
 .notification-matrix {
   display: grid;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-3);
 }
 
-/* A narrow window scrolls the table, not the page. */
-.settings-modal-card.notification-matrix-card:is(.ui-item-group) {
-  display: block;
-  overflow-x: auto;
+.notification-matrix-server-mark {
+  --server-gradient-logo-size: 32px;
+  --server-gradient-logo-radius: var(--openbot-radius-md);
 }
 
-.notification-matrix-table {
+.notification-matrix-server-mark > img {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--openbot-radius-md);
+}
+
+/* Every row of a card starts at the same edge: the agent avatar stands in the 32px column of the server logo. */
+.notification-matrix-agent > .ui-item-media {
+  width: 32px;
+  justify-content: center;
+}
+
+.notification-matrix-level {
+  min-width: 72px;
+}
+
+.notification-matrix-levels[data-disabled] {
+  opacity: 0.5;
+}
+
+/* The last row of a card is one button as wide as the card. Its "+" stands in the column of the server logo. */
+.notification-matrix-add {
+  display: flex;
   width: 100%;
-  /* The name column keeps at least 12rem; a narrower card scrolls the table. */
-  min-width: 37rem;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: var(--openbot-text-sm);
-}
-
-.notification-matrix-level-column {
-  width: 7.5rem;
-}
-
-.notification-matrix-mute-column {
-  width: 3.5rem;
-}
-
-.notification-matrix-table th,
-.notification-matrix-table td {
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-  border-bottom: 1px solid var(--openbot-border);
-  text-align: center;
-  vertical-align: middle;
-}
-
-.notification-matrix-table :is(th, td):first-child {
-  padding-left: var(--openbot-space-4);
-  text-align: left;
-}
-
-.notification-matrix-table :is(th, td):last-child {
-  padding-right: var(--openbot-space-4);
-}
-
-.notification-matrix-table tbody:last-child tr:last-child :is(th, td) {
-  border-bottom: 0;
-}
-
-.notification-matrix-table thead th {
+  align-items: center;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border: 0;
+  background: transparent;
   color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+  text-align: left;
+  cursor: pointer;
 }
 
-.notification-matrix-table th[scope="row"] {
+.notification-matrix-add:hover,
+.notification-matrix-add[data-expanded] {
+  background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
 }
 
-/* One line each: a long name or title is cut, so every row keeps its height. */
-.notification-matrix-name,
-.notification-matrix-notes {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.notification-matrix-add:focus-visible {
+  outline: 1px solid var(--openbot-border-strong);
+  outline-offset: -1px;
 }
 
-.notification-matrix-server .notification-matrix-name {
-  font-weight: var(--openbot-weight-semibold);
+.notification-matrix-add-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
 }
 
-.notification-matrix-agent th[scope="row"] {
-  padding-left: var(--openbot-space-8);
-  font-weight: var(--openbot-weight-regular);
+.notification-matrix-add-icon > svg {
+  width: 14px;
+  height: 14px;
 }
 
-.notification-matrix-notes {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
-}
-
-.notification-matrix-notes > span + span {
-  margin-left: var(--openbot-space-2);
-}
-
-.notification-matrix-notes:empty {
-  display: none;
-}
-
-.notification-matrix-status td {
-  padding-left: var(--openbot-space-8);
-  color: var(--openbot-text-muted);
-  text-align: left;
-}
-
-.notification-matrix-status td:first-child {
-  padding-left: var(--openbot-space-8);
-}
-
-.notification-matrix-status .ui-button {
-  margin-left: var(--openbot-space-2);
-}
-
-.notification-matrix .notification-matrix-choice {
-  width: var(--openbot-icon-md);
-  height: var(--openbot-icon-md);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  appearance: none;
-  border: 1.5px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-pill);
-  background: transparent;
-  cursor: pointer;
-  vertical-align: middle;
-  transition:
-    background-color var(--openbot-duration-fast) var(--openbot-ease-out),
-    border-color var(--openbot-duration-fast) var(--openbot-ease-out);
-}
-
-/* The level that an agent takes from its server. */
-.notification-matrix .notification-matrix-choice[data-inherited] {
-  border-style: dashed;
-  border-color: var(--openbot-accent);
-}
-
-.notification-matrix .notification-matrix-choice:checked {
-  border-color: var(--openbot-accent);
-  background: var(--openbot-accent);
-  box-shadow: inset 0 0 0 3px var(--openbot-bg-surface);
-}
-
-.notification-matrix .notification-matrix-choice:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
-  outline-offset: 2px;
-}
-
-.notification-matrix .notification-matrix-choice:disabled {
-  cursor: default;
-  opacity: 0.35;
-}
-
-.notification-matrix-muted-icon {
-  color: var(--openbot-text-muted);
-}
-
-.notification-matrix-hint {
-  margin: 0;
-  padding: 0 var(--openbot-space-1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .notification-matrix .notification-matrix-choice {
-    transition: none;
-  }
+/* The notes of a server tell what its card can do, so they wrap and are never cut. */
+.ui-item-description.notification-matrix-notes {
+  white-space: normal;
 }
