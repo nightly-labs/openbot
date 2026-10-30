@@ -328,7 +328,7 @@ listener. Otherwise, for example under an external debugger, the result says tha
 | Person's click, or a tool that is not an input action | Native box. The agent is not told. |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
-| Tab closed or browser destroyed | The engine detaches its debugger and cancels the box, also when the box shows after the close. |
+| Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
 | `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
 
 The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a

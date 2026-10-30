@@ -10,7 +10,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 class FixtureProcessTimeout extends Error {}
 
 /** The case count of `browser-dialogs-electron.ts`. A case that stops running fails the check. */
-const DIALOG_CASES = 21;
+const DIALOG_CASES = 22;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const buildRoot = await mkdtemp(join(tmpdir(), "openbot-dialogs-"));

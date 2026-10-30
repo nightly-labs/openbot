@@ -293,9 +293,22 @@ async function main(): Promise<void> {
       agentDialog(await click(tabId, "#confirm", "turn-4"));
       const closed = await call("close_tab", { tabId }, "turn-4");
       assert.equal(closed.success, true, text(closed));
-      assert.equal((await box).aborted, true, "Electron's box stayed open after the tab closed.");
       assert(!host.listTabs().some((tab) => tab.id === tabId));
+      // The tab closes after its queue drains.
+      const shown = await box;
+      await waitUntil(async () => shown.aborted);
       recordCases("close-tab-with-open-dialog");
+    }
+
+    {
+      const { tabId, contents } = await open();
+      const box = nextBox();
+      // A person's dialog. Electron keeps its box open after the page closes.
+      void contents.executeJavaScript("document.getElementById('confirm').click()", true).catch(() => undefined);
+      const shown = await box;
+      await runCauseEffect(host.close(tabId));
+      await waitUntil(async () => shown.aborted);
+      recordCases("person-dialog-closed-with-tab");
     }
 
     {

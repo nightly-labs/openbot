@@ -676,7 +676,8 @@ export class BrowserCdpEngine {
   #dialog: (BrowserDialog & { owner: BrowserDialogOwner | undefined }) | undefined;
   #dialogChanged = Deferred.makeUnsafe<void>();
   #pageEnabled = false;
-  #dialogBoxShown = false;
+  /** CDP reported a dialog, and Electron did not show its box yet. */
+  #dialogBoxPending = false;
   #cancelDialogBox = false;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
@@ -693,7 +694,7 @@ export class BrowserCdpEngine {
     const internalEvents: NodeJS.EventEmitter = contents;
     // Runs after Electron's own listener, so its box can be cancelled here.
     internalEvents.on(RUN_DIALOG_EVENT, () => {
-      this.#dialogBoxShown = true;
+      this.#dialogBoxPending = false;
       if (!this.#cancelDialogBox) return;
       this.#cancelDialogBox = false;
       contents.emit(CANCEL_DIALOGS_EVENT);
@@ -1905,16 +1906,11 @@ export class BrowserCdpEngine {
 
   /**
    * The tab closes. The detach makes the commands that wait for the dialog fail, so the tab queue
-   * drains; Electron's box closes. The dialog itself closes with the page.
+   * drains. `destroy` then closes Electron's box, and the dialog closes with the page.
    */
   releaseDialogs(): void {
     this.#dialogWatches.clear();
-    if (!this.#dialog) return;
-    this.#detachOwnedDebugger();
-    // The tab can close before Electron shows its box. The emit only runs JavaScript listeners, so
-    // it is safe while the tab closes.
-    if (this.#dialogBoxShown) this.#contents.emit(CANCEL_DIALOGS_EVENT);
-    else this.#cancelDialogBox = true;
+    if (this.#dialog) this.#detachOwnedDebugger();
   }
 
   #dialogOpened(params: DynamicRecord): void {
@@ -1931,7 +1927,7 @@ export class BrowserCdpEngine {
       agent,
     };
     this.#dialog = { ...dialog, owner: agent ? watch.owner : undefined };
-    this.#dialogBoxShown = false;
+    this.#dialogBoxPending = true;
     for (const current of this.#dialogWatches) Deferred.doneUnsafe(current.opened, Effect.succeed(dialog));
     this.#signalDialogChange();
   }
@@ -2432,6 +2428,10 @@ export class BrowserCdpEngine {
     yield* Scope.close(this.#scope, Exit.void);
     this.#retainDebugger = false;
     this.#detachOwnedDebugger();
+    // Electron keeps its box open after the page closes, a person's box too, and nobody can answer it
+    // then. The box can also show after the close. The emit only runs JavaScript listeners.
+    if (this.#dialogBoxPending) this.#cancelDialogBox = true;
+    this.#contents.emit(CANCEL_DIALOGS_EVENT);
     this.#targetSessions.clear();
     this.#targets.clear();
     this.#lastSnapshot = null;
