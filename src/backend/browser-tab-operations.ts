@@ -290,6 +290,13 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                   outcome: "error",
                   detail: String(error.cause),
                 });
+              // The input can have changed the site already. A plain timeout invites a repeat.
+              if (dispatched && isTimeoutError(error.cause))
+                return yield* browserFailure(
+                  new Error(
+                    `Browser ${action} timed out after its input reached the page. Check the page before you repeat the action.`,
+                  ),
+                );
               return yield* error;
             }),
           ),
