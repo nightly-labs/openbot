@@ -1284,13 +1284,18 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     signOutProvider: async (provider) => {
       agentStatus = {
         ...agentStatus,
-        providers: agentStatus.providers?.map((row) => {
-          if (row.id !== provider) return row;
-          const { accounts: _signedOut, ...rest } = row;
-          return { ...rest, state: "sign-in-required", email: null, message: null };
-        }),
+        providers: agentStatus.providers?.map((row) =>
+          row.id === provider ? { ...row, state: "sign-in-required", email: null, message: null } : row,
+        ),
       };
-      return clone(agentStatus);
+      // The other accounts stay, as on the backend.
+      return clone(
+        changeProviderAccounts(provider, (accounts) =>
+          accounts.map((account) =>
+            account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? { ...account, email: null, state: "signed-out" } : account,
+          ),
+        ),
+      );
     },
     // Codex gives the preview's own sign-in two usage resets; each other connected Codex account has none.
     providerUsageResets: async (provider) =>
