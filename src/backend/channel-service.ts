@@ -1079,12 +1079,21 @@ export class ChannelService {
               }),
             ].join("\n");
           // Member descriptions get the room that the rest of the prompt leaves, shared evenly, so a
-          // channel of many members with long descriptions still routes.
+          // channel of many members with long descriptions still routes. JSON escapes make a
+          // description longer than its raw length, so the share gets smaller until the prompt fits.
           let prompt = routingPrompt();
-          if (prompt.length > ROUTING_PROMPT_CHARACTERS && agents.length > 0)
-            prompt = routingPrompt(
-              Math.max(0, Math.floor((ROUTING_PROMPT_CHARACTERS - routingPrompt(0).length) / agents.length)),
-            );
+          if (prompt.length > ROUTING_PROMPT_CHARACTERS && agents.length > 0) {
+            const base = routingPrompt(0).length;
+            let share = Math.max(0, Math.floor((ROUTING_PROMPT_CHARACTERS - base) / agents.length));
+            prompt = routingPrompt(share);
+            while (prompt.length > ROUTING_PROMPT_CHARACTERS && share > 0) {
+              share = Math.max(
+                0,
+                Math.min(share - 1, Math.floor((share * (ROUTING_PROMPT_CHARACTERS - base)) / (prompt.length - base))),
+              );
+              prompt = routingPrompt(share);
+            }
+          }
           if (prompt.length > ROUTING_PROMPT_CHARACTERS)
             throw new ChannelRoutingError(sourceText("error.backend.channelRoutingTooLong"));
           const response = channelResult(
