@@ -26,7 +26,8 @@
  * count of two digits takes the bottom row.
  */
 .channel-avatar-cluster {
-  --channel-avatar-size: 36px;
+  /* A sidebar row sets the size it gives an agent avatar; a cluster outside a row keeps 36px. */
+  --channel-avatar-size: var(--agent-row-avatar-size, 36px);
   --channel-avatar-pitch: calc(var(--channel-avatar-size) * 0.38);
   --channel-avatar-face: calc(var(--channel-avatar-size) * 0.54);
   --agent-avatar-outline-width: 2px;
@@ -72,7 +73,7 @@
 }
 /* The pinned rail draws the same cluster at the size it gives an agent avatar. */
 .agent-row.sidebar-pinned-row .channel-avatar-cluster {
-  --channel-avatar-size: 48px;
+  --channel-avatar-size: var(--sidebar-pinned-avatar-size, 56px);
   --agent-avatar-outline-width: 2.5px;
 }
 .agent-row.sidebar-pinned-row .channel-avatar-cluster .agent-avatar {
