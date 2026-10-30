@@ -3871,13 +3871,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * Starts the harness that an endpoint moved to, when agents wait for it. They move when it
    * activates, and until then they stay on a harness that no longer lists the endpoint. The start is
-   * not awaited: a save does not wait for model discovery. A start that fails is reported.
+   * not awaited: a save does not wait for model discovery. A start that fails is reported, and the
+   * agents then move to a model that their harness lists.
    */
   startHarnessForMovedAgents(harness: CustomProviderHarness): Effect.Effect<void> {
     return Effect.suspend(() =>
       this.#endpoints.waitsForHarness(harness)
         ? this.#providers.ensureProvider(harness).pipe(
-            Effect.catch((failure) => Effect.sync(() => this.#emitError("agent_model_fallback_failed", failure.cause))),
+            Effect.catch((failure) =>
+              Effect.sync(() => this.#emitError("agent_model_fallback_failed", failure.cause)).pipe(
+                Effect.andThen(this.#endpoints.abandonMovesTo(harness)),
+              ),
+            ),
             Effect.forkIn(this.#scope),
             Effect.asVoid,
           )

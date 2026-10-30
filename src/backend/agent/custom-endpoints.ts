@@ -361,7 +361,7 @@ export class CustomEndpoints {
         yield* this.#hooks.stopProfileClients();
         const result = yield* Effect.exit(
           Effect.gen({ self: this }, function* () {
-            yield* this.#releaseModels();
+            yield* this.#releaseModels(providerId);
             const persisted = yield* Effect.suspend(persist);
             // Only now is the removal on disk, so only now can a process read it. Removals run one at a
             // time on the chain, so this number never goes back.
@@ -502,6 +502,23 @@ export class CustomEndpoints {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * Drops the moves that wait for `harness` when it did not start. Those agents are on a model that
+   * their harness no longer lists, so they move to a model that it lists, as after a restart of OpenBot.
+   */
+
+  readonly abandonMovesTo = Effect.fn("CustomEndpoints.abandonMovesTo")(function* (
+    this: CustomEndpoints,
+    harness: CustomProviderHarness,
+  ) {
+    const from = new Set<AgentProvider>();
+    for (const agent of this.#waitingFor(harness)) {
+      this.#pendingMoves.delete(agent.id);
+      from.add(providerForAgent(agent));
+    }
+    for (const provider of from) yield* this.moveAgentsOffUnlistedModels(provider);
+  }, Effect.uninterruptible).bind(this);
+
   /** Whether agents wait for `harness` to start, to move there with `moveAgentsToHarness`. */
   waitsForHarness(harness: CustomProviderHarness): boolean {
     return this.#waitingFor(harness).length > 0;
@@ -542,15 +559,22 @@ export class CustomEndpoints {
    * and that is refused during a turn or a queued delivery. The check runs over all of them first,
    * so a refusal moves no agent at all.
    */
-  readonly #releaseModels = Effect.fn("CustomEndpoints.releaseModels")(function* (this: CustomEndpoints) {
+  readonly #releaseModels = Effect.fn("CustomEndpoints.releaseModels")(function* (
+    this: CustomEndpoints,
+    removedId: string,
+  ) {
     // Every endpoint already removed, not only this one. A removal during a turn leaves the running
     // CLI's catalogue as it was, so the models of an endpoint already taken out are still listed,
     // and choosing one here would move agents onto an endpoint that is gone.
     const remaining = this.available();
     for (const harness of CUSTOM_PROVIDER_HARNESSES) {
-      const affected = this.#store
-        .list()
-        .filter((agent) => providerForAgent(agent) === harness && !this.serves(agent.model, harness));
+      const affected = this.#store.list().filter(
+        (agent) =>
+          providerForAgent(agent) === harness &&
+          // An agent that waits to move to the removed endpoint's harness is on a model that its
+          // harness no longer lists, and only the removed endpoint's harness restarts.
+          (!this.serves(agent.model, harness) || this.#pendingMove(agent)?.endpointId === removedId),
+      );
       if (affected.length === 0) continue;
       // OpenCode declares no default model of its own -- its catalogue is whatever the CLI lists -- so
       // the fallback is chosen from the live list with the endpoint being removed taken out of it.
