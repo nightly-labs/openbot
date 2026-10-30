@@ -1,10 +1,10 @@
 {
-  "version": "0.54.0",
+  "version": "0.55.0",
   "highlights": [
-    "Buy a commercial license for work from Billing or from Add server: Starter for 1 user, or Team for 2 to 10 users. A new license is free until 1 December 2026.",
-    "A Workspace only agent can now change files in folders that you add, from the agent's settings or by dropping a folder on the chat.",
-    "openbot.run has a Pricing page with the hosted servers and the licenses in EUR, USD or PLN.",
-    "Set the context window of each model of a custom provider, so OpenCode compacts at the correct size.",
-    "Remote desktop pairing on macOS 27 works again, and Gemini continues when one MCP server does not start."
+    "In a Telegram group that you connected before this version, connect the group again or make OpenBot a group admin.",
+    "Settings › Notifications is now one table: choose All activity, Only when it needs me, or Nothing for each server and agent, on all your devices.",
+    "Create more servers on this computer, each a separate workspace with its own agents, chats and files.",
+    "In a channel, more than one agent can now answer the same request.",
+    "Connect your own OpenAI-compatible voice server for dictation and spoken replies, and Gemini no longer fills the memory of a server."
   ]
 }
