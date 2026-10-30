@@ -13,7 +13,8 @@ const logger = createOpenBotLogger("analytics-preference");
 /** The account side: the signed-in user, and the request that saves an answer on the account. */
 export interface AnalyticsAccount {
   getState(): CentralAuthState;
-  updateAnalytics(enabled: boolean): Effect.Effect<CentralAuthState, unknown>;
+  /** `ageMs` is the age of the choice. The account keeps it only when it has no newer answer. */
+  updateAnalytics(enabled: boolean, ageMs: number): Effect.Effect<CentralAuthState, unknown>;
 }
 
 export interface AnalyticsPreferenceServiceOptions {
@@ -30,10 +31,11 @@ export interface AnalyticsPreferenceServiceOptions {
 export class AnalyticsPreferenceService {
   // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
   readonly #writes = Semaphore.makeUnsafe(1);
+  // One send of a choice at a time. Each send reads the latest unsent choice.
+  readonly #sends = Semaphore.makeUnsafe(1);
   readonly #path: string;
   readonly #account: AnalyticsAccount;
   readonly #setTrackingEnabled: (enabled: boolean) => void;
-  #sending = false;
 
   constructor(options: AnalyticsPreferenceServiceOptions) {
     this.#path = options.path;
@@ -52,8 +54,8 @@ export class AnalyticsPreferenceService {
     return state.status === "signed_in" ? (state.user.analyticsEnabled ?? null) : null;
   }
 
-  saveDefault() {
-    return this.#writes.withPermit(saveAnalyticsDefault(this.#path));
+  saveDefault(setupCompleted: boolean) {
+    return this.#writes.withPermit(saveAnalyticsDefault(this.#path, setupCompleted));
   }
 
   readonly set = Effect.fn("AnalyticsPreferences.set")(function* (
@@ -62,64 +64,94 @@ export class AnalyticsPreferenceService {
     chosen: boolean,
   ) {
     const preference = yield* this.#writes.withPermit(
-      writeAnalyticsPreference(this.#path, enabled, chosen).pipe(
+      writeAnalyticsPreference(this.#path, enabled, chosen ? Date.now() : null).pipe(
         Effect.tap((saved) => Effect.sync(() => this.#setTrackingEnabled(saved.enabled))),
         Effect.uninterruptible,
       ),
     );
-    if (chosen && this.#account.getState().status === "signed_in") this.#send(enabled);
+    if (chosen) this.#run(this.#sendUnsent(), "The account did not save the analytics answer.");
     return preference;
   }).bind(this);
 
   /** Runs on each account change. A signed-in account brings its answer, or receives the unsent one. */
   followAccount(user: CentralAuthUser): void {
-    Effect.runFork(
-      this.#follow(user).pipe(
-        Effect.catch((error) =>
-          Effect.sync(() => logger.warn("The analytics answer did not sync.", toLogValue(error))),
-        ),
-      ),
-    );
+    this.#run(this.#follow(user), "The analytics answer did not sync.");
   }
 
+  #run(effect: Effect.Effect<void, unknown>, message: string): void {
+    Effect.runFork(effect.pipe(Effect.catch((error) => Effect.sync(() => logger.warn(message, toLogValue(error))))));
+  }
+
+  // The renderer reads the answer after an account change. This holds the write permit until this
+  // computer has the latest answer, also while an unsent choice goes to the account.
   readonly #follow = Effect.fn("AnalyticsPreferences.followAccount")(function* (
     this: AnalyticsPreferenceService,
     user: CentralAuthUser,
   ) {
     const account = user.analyticsEnabled ?? null;
-    const unsent = yield* this.#writes.withPermit(
+    yield* this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         const saved = yield* readSavedAnalyticsPreference(this.#path);
-        if (saved?.accountPending) {
-          if (account !== saved.enabled) return saved.enabled;
-          // The account has the choice now.
-          yield* writeAnalyticsPreference(this.#path, saved.enabled);
-          return null;
+        if (saved?.unsentAt != null) {
+          yield* this.#send(saved.enabled, saved.unsentAt);
+          return;
         }
-        if (account === null || account === saved?.enabled) return null;
+        if (account === null || account === saved?.enabled) return;
         yield* writeAnalyticsPreference(this.#path, account);
         this.#setTrackingEnabled(account);
-        return null;
       }),
     );
-    if (unsent !== null) this.#send(unsent);
   }).bind(this);
 
-  /** Sends a choice to the account. A failure keeps it unsent until the next account change. */
-  #send(enabled: boolean): void {
-    if (this.#sending) return;
-    this.#sending = true;
-    Effect.runFork(
-      this.#account.updateAnalytics(enabled).pipe(
-        Effect.catch((error) =>
-          Effect.sync(() => logger.warn("The account did not save the analytics answer.", toLogValue(error))),
-        ),
-        Effect.ensuring(
-          Effect.sync(() => {
-            this.#sending = false;
+  readonly #sendUnsent = Effect.fn("AnalyticsPreferences.sendUnsent")(function* (this: AnalyticsPreferenceService) {
+    yield* this.#sends.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const saved = yield* this.#writes.withPermit(readSavedAnalyticsPreference(this.#path));
+        if (saved?.unsentAt == null) return;
+        const unsentAt = saved.unsentAt;
+        const account = yield* this.#request(saved.enabled, unsentAt);
+        if (account === undefined) return;
+        yield* this.#writes.withPermit(
+          Effect.gen({ self: this }, function* () {
+            // A newer choice stays unsent; the send that it started reads it.
+            const current = yield* readSavedAnalyticsPreference(this.#path);
+            if (current?.unsentAt !== unsentAt) return;
+            yield* this.#keep(current.enabled, account);
           }),
-        ),
-      ),
+        );
+      }),
     );
-  }
+  }).bind(this);
+
+  /** Sends a choice while the caller holds the write permit, then keeps the account's answer. */
+  readonly #send = Effect.fn("AnalyticsPreferences.send")(function* (
+    this: AnalyticsPreferenceService,
+    enabled: boolean,
+    unsentAt: number,
+  ) {
+    const account = yield* this.#request(enabled, unsentAt);
+    if (account !== undefined) yield* this.#keep(enabled, account);
+  }).bind(this);
+
+  /** The account's answer after the send, null when it has none, or undefined when signed out. */
+  readonly #request = Effect.fn("AnalyticsPreferences.request")(function* (
+    this: AnalyticsPreferenceService,
+    enabled: boolean,
+    unsentAt: number,
+  ) {
+    if (this.#account.getState().status !== "signed_in") return undefined;
+    const state = yield* this.#account.updateAnalytics(enabled, Math.max(0, Date.now() - unsentAt));
+    return state.status === "signed_in" ? (state.user.analyticsEnabled ?? null) : undefined;
+  }).bind(this);
+
+  /** Clears the unsent mark. The account keeps a newer answer from another device, and this computer follows it. */
+  readonly #keep = Effect.fn("AnalyticsPreferences.keep")(function* (
+    this: AnalyticsPreferenceService,
+    enabled: boolean,
+    account: boolean | null,
+  ) {
+    const answer = account ?? enabled;
+    yield* writeAnalyticsPreference(this.#path, answer);
+    if (answer !== enabled) this.#setTrackingEnabled(answer);
+  }).bind(this);
 }

@@ -374,8 +374,11 @@ export async function revokeMobileAccountSession(session: MobileSession, target:
 }
 
 type MobileProfileFieldChange = { name: string } | { avatar: { bytes: Uint8Array; mimeType: AvatarMimeType } | null };
-/** `analyticsEnabled` saves the user's analytics answer on the account, so their other devices follow it. */
-export type MobileProfileChange = MobileProfileFieldChange | { analyticsEnabled: boolean };
+/**
+ * `analyticsEnabled` saves the user's analytics answer on the account, so their other devices follow
+ * it. `ageMs` is the age of the choice; the account keeps a newer answer from another device.
+ */
+export type MobileProfileChange = MobileProfileFieldChange | { analyticsEnabled: boolean; ageMs: number };
 
 export function updateMobileProfile(
   session: MobileSession,
@@ -385,19 +388,19 @@ export function updateMobileProfile(
   return serializeMobileProfile(async () => {
     const updated =
       "analyticsEnabled" in change
-        ? await writeMobileAnalytics(session, change.analyticsEnabled)
+        ? await writeMobileAnalytics(session, change.analyticsEnabled, change.ageMs)
         : await writeMobileProfile(session, change);
     onUpdated?.(updated);
     return updated;
   });
 }
 
-async function writeMobileAnalytics(session: MobileSession, enabled: boolean): Promise<MobileSession> {
+async function writeMobileAnalytics(session: MobileSession, enabled: boolean, ageMs: number): Promise<MobileSession> {
   const { response, body } = await withMobileAuthRequestTimeout(async (signal) => {
     const request = await fetch(new URL("/v1/me/analytics", session.apiUrl).toString(), {
       method: "PUT",
       headers: { Authorization: `Bearer ${session.sessionToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
+      body: JSON.stringify({ enabled, ageMs }),
       signal,
     });
     return { response: request, body: await readResponseBody(request, signal) };

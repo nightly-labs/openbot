@@ -1,7 +1,14 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { version } from "../../../../../package.json";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
-import { setWebAccountPending, setWebReportsEnabled, WEB_PREFERENCE, webReportsEnabled } from "../../error-reports";
+import {
+  setWebAccountPending,
+  setWebReportsEnabled,
+  WEB_PREFERENCE,
+  webAccountPending,
+  webReportsEnabled,
+} from "../../error-reports";
+import type { WebAccountCalls } from "./web-account";
 
 /**
  * Starts product analytics for the signed-in account of this browser. The sign-in screen loads this
@@ -27,6 +34,31 @@ export function setWebAnalyticsEnabled(value: boolean): boolean {
   desktopAnalytics.setTrackingEnabled(enabled);
   setWebAccountPending(value);
   return enabled;
+}
+
+let sending = false;
+
+/**
+ * Sends the choice that the account does not have yet, also a newer one that the user makes during
+ * the send. The account keeps a newer answer from another device, and this browser follows it. A
+ * failed send stays marked; the next session check or choice sends it again.
+ */
+export async function sendWebAnalyticsChoice(calls: Pick<WebAccountCalls, "updateAnalytics">): Promise<void> {
+  // The send in progress reads the latest choice when it ends.
+  if (sending) return;
+  sending = true;
+  try {
+    for (let choice = webAccountPending(); choice; choice = webAccountPending()) {
+      const account = await calls.updateAnalytics(choice.enabled, Math.max(0, Date.now() - choice.at));
+      if (webAccountPending()?.at !== choice.at) continue;
+      setWebAccountPending(null);
+      if (account === null || account === choice.enabled) continue;
+      setWebReportsEnabled(account);
+      followWebReportsPreference();
+    }
+  } finally {
+    sending = false;
+  }
 }
 
 /**

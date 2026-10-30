@@ -251,7 +251,8 @@ export function appIpcHandlers({
       ),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
         // Before the setup file: once setup is complete, a missing choice reads as an older user's "on".
-        await runCauseEffect(analyticsPreferences.saveDefault());
+        const before = await runCauseEffect(readSetupState(setupFile));
+        await runCauseEffect(analyticsPreferences.saveDefault(before.completed));
         const state = await runCauseEffect(writeSetupState(setupFile, input));
         await runCauseEffect(service.setPreferredProvider(input.preferredProvider, input.preferredModel));
         await initializeAgent();

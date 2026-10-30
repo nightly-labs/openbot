@@ -12,7 +12,7 @@ export function PrivacySettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
   const analytics = useAnalyticsPreference();
-  const { session, updateProfile } = useMobileSession();
+  const { session, sendAnalyticsChoice } = useMobileSession();
   const [error, setError] = useState<string | null>(null);
   const [retryValue, setRetryValue] = useState<boolean | null>(null);
   function save(enabled: boolean) {
@@ -21,8 +21,8 @@ export function PrivacySettingsScreen() {
     void saveAnalyticsPreference(enabled).then(
       () => {
         // The account keeps the answer for the user's other devices. A failed send stays marked,
-        // and the next profile refresh sends it again.
-        if (session) void updateProfile({ analyticsEnabled: enabled }).catch(() => undefined);
+        // and the next profile refresh or start sends it again.
+        if (session) void sendAnalyticsChoice().catch(() => undefined);
       },
       () => {
         setRetryValue(enabled);

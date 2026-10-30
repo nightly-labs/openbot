@@ -1,4 +1,5 @@
 import type { AppInfo, CentralAuthUser } from "@openbot/contracts/ipc";
+import { isBoolean, isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import {
   ANALYTICS_GENERATIONS,
   analyticsOnByDefault,
@@ -132,11 +133,19 @@ export function setWebReportsEnabled(value: boolean): boolean {
   return enabled;
 }
 
+/** A choice of the user that the account does not have yet, and its time (ms). */
+export interface WebAccountPending {
+  enabled: boolean;
+  at: number;
+}
+
 /** The user's choice that the account must still save, so their other devices follow it. */
-export function webAccountPending(): boolean | null {
+export function webAccountPending(): WebAccountPending | null {
   try {
-    const stored = localStorage.getItem(WEB_ACCOUNT_PENDING);
-    return stored === null ? null : stored === "true";
+    const stored = JSON.parse(localStorage.getItem(WEB_ACCOUNT_PENDING) ?? "null");
+    return isDynamicRecord(stored) && isBoolean(stored.enabled) && isNumber(stored.at)
+      ? { enabled: stored.enabled, at: stored.at }
+      : null;
   } catch {
     return null;
   }
@@ -146,7 +155,7 @@ export function webAccountPending(): boolean | null {
 export function setWebAccountPending(value: boolean | null): void {
   try {
     if (value === null) localStorage.removeItem(WEB_ACCOUNT_PENDING);
-    else localStorage.setItem(WEB_ACCOUNT_PENDING, String(value));
+    else localStorage.setItem(WEB_ACCOUNT_PENDING, JSON.stringify({ enabled: value, at: Date.now() }));
   } catch {
     // Without storage the choice stays on this page only; the account does not get it.
   }

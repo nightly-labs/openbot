@@ -265,7 +265,12 @@ export interface AuthRepository {
   revokeSession(sessionToken: string, now: number): Effect.Effect<void, AuthStoreError>;
   revokeMobileSession(sessionToken: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   updateUserName(userId: string, name: string, now: number): Effect.Effect<AuthUser, AuthStoreError>;
-  updateUserAnalytics(userId: string, enabled: boolean, now: number): Effect.Effect<AuthUser, AuthStoreError>;
+  updateUserAnalytics(
+    userId: string,
+    enabled: boolean,
+    answeredAt: number,
+    now: number,
+  ): Effect.Effect<AuthUser, AuthStoreError>;
   updateUserAvatar(
     userId: string,
     avatarUrl: string | null,

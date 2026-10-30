@@ -437,17 +437,24 @@ export class D1AuthRepository implements AuthRepository {
       this: D1AuthRepository,
       userId: string,
       enabled: boolean,
+      answeredAt: number,
       now: number,
     ): Effect.fn.Return<AuthUser, AuthStoreError, AuthDatabase> {
       const database = yield* AuthDatabase;
-      const row = yield* storeCall(() =>
+      // An answer older than the saved one changes nothing; the caller gets the saved answer.
+      yield* storeCall(() =>
         database
           .prepare(
-            `UPDATE users SET analytics_enabled = ?, updated_at = ?
-         WHERE id = ?
-         RETURNING id, email, name, avatar_url, analytics_enabled`,
+            `UPDATE users SET analytics_enabled = ?, analytics_answered_at = ?, updated_at = ?
+         WHERE id = ? AND (analytics_answered_at IS NULL OR analytics_answered_at <= ?)`,
           )
-          .bind(enabled ? 1 : 0, now, userId)
+          .bind(enabled ? 1 : 0, answeredAt, now, userId, answeredAt)
+          .run(),
+      );
+      const row = yield* storeCall(() =>
+        database
+          .prepare("SELECT id, email, name, avatar_url, analytics_enabled FROM users WHERE id = ?")
+          .bind(userId)
           .first<UserRow>(),
       );
       if (!row) return yield* new AuthStoreError({ message: "User not found." });

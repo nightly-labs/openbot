@@ -1707,11 +1707,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /** Saves the user's analytics answer on the account, so their other devices follow it. */
+  /**
+   * Saves the user's analytics answer on the account, so their other devices follow it. `ageMs` is
+   * the age of the choice; the account keeps a newer answer from another device.
+   */
   readonly updateAnalytics = Effect.fn("CentralAuth.updateAnalytics")(
     function* (
       this: CentralAuthManager,
       enabled: boolean,
+      ageMs: number,
     ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
       const sessionToken = this.#sessionToken;
       if (!sessionToken)
@@ -1723,7 +1727,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ enabled }),
+          body: JSON.stringify({ enabled, ageMs }),
         },
         decodeCentralAuthUser,
       );

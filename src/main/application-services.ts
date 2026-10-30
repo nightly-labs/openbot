@@ -144,7 +144,7 @@ import { HostAnalytics } from "./analytics";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
 import { catalogPluginSlug, isReportedMcpServerName, loadCatalogPluginServers } from "./analytics-plugin-catalog";
 import { AnalyticsPreferenceService } from "./analytics-preference-service";
-import { readAnalyticsPreference } from "./analytics-preference-store";
+import { readAnalyticsPreference, saveAnalyticsDefault } from "./analytics-preference-store";
 import { providerAuthKind } from "./analytics-provider-auth";
 import { AppBehaviorService } from "./app-behavior-service";
 import { AppearanceService } from "./appearance-service";
@@ -2414,7 +2414,10 @@ export async function createApplicationServices({
             })),
           ),
         set: (input) =>
-          writeSetupState(setupFile, input).pipe(
+          readSetupState(setupFile).pipe(
+            // As `saveSetup`: the analytics default is saved before the setup can complete.
+            Effect.flatMap((before) => saveAnalyticsDefault(analyticsPreferenceFile, before.completed)),
+            Effect.flatMap(() => writeSetupState(setupFile, input)),
             Effect.tap(() => service.setPreferredProvider(input.preferredProvider, input.preferredModel)),
             // The window read the setup once at start, so it gets the new choice.
             Effect.tap((state) =>

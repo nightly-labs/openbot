@@ -34,7 +34,9 @@ describe("user analytics answer migration", () => {
     database.exec(migration);
     expect(
       database
-        .prepare("SELECT id, email, name, avatar_url, created_at, updated_at, analytics_enabled FROM users ORDER BY id")
+        .prepare(
+          "SELECT id, email, name, avatar_url, created_at, updated_at, analytics_enabled, analytics_answered_at FROM users ORDER BY id",
+        )
         .all(),
     ).toEqual([
       {
@@ -45,6 +47,7 @@ describe("user analytics answer migration", () => {
         created_at: 1,
         updated_at: 2,
         analytics_enabled: null,
+        analytics_answered_at: null,
       },
       {
         id: "plain",
@@ -54,6 +57,7 @@ describe("user analytics answer migration", () => {
         created_at: 3,
         updated_at: 4,
         analytics_enabled: null,
+        analytics_answered_at: null,
       },
     ]);
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -66,9 +70,9 @@ describe("user analytics answer migration", () => {
     // The email sign-up insert of the deployed Worker names no analytics column.
     database.exec(`INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
       VALUES ('old-worker', 'old-worker', 'old@example.com', NULL, NULL, 1, 1)`);
-    expect(database.prepare("SELECT analytics_enabled FROM users WHERE id = 'old-worker'").get()).toEqual({
-      analytics_enabled: null,
-    });
+    expect(
+      database.prepare("SELECT analytics_enabled, analytics_answered_at FROM users WHERE id = 'old-worker'").get(),
+    ).toEqual({ analytics_enabled: null, analytics_answered_at: null });
     database.exec("UPDATE users SET analytics_enabled = 1 WHERE id = 'old-worker'");
     database.exec("UPDATE users SET analytics_enabled = 0 WHERE id = 'old-worker'");
     expect(() => database.exec("UPDATE users SET analytics_enabled = 2 WHERE id = 'old-worker'")).toThrow(

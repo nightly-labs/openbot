@@ -1,27 +1,30 @@
 import type { AnalyticsPreference } from "@openbot/contracts/ipc";
-import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/** The saved answer, and whether it is a choice of the user that the account does not have yet. */
+/**
+ * The saved answer. `unsentAt` is the time (ms) of a choice of the user that the account does not
+ * have yet, or null when the account has it or the answer is a default.
+ */
 export interface SavedAnalyticsPreference {
   enabled: boolean;
-  accountPending: boolean;
+  unsentAt: number | null;
 }
 
 /** Reads the saved answer. Null: no file. A file that cannot be read as an answer reads as "off". */
 export const readSavedAnalyticsPreference = Effect.fn("readSavedAnalyticsPreference")((path: string) =>
   readPreferenceFile(path, (parsed): SavedAnalyticsPreference => {
     if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isBoolean(parsed.enabled)) {
-      return { enabled: false, accountPending: false };
+      return { enabled: false, unsentAt: null };
     }
-    return { enabled: parsed.enabled, accountPending: parsed.accountPending === true };
+    return { enabled: parsed.enabled, unsentAt: isNumber(parsed.unsentAt) ? parsed.unsentAt : null };
   }).pipe(
     Effect.catch((failure) => {
       const error = failure.cause;
       if (isMissingFileError(error)) return Effect.succeed(null);
-      if (error instanceof SyntaxError) return Effect.succeed({ enabled: false, accountPending: false });
+      if (error instanceof SyntaxError) return Effect.succeed({ enabled: false, unsentAt: null });
       return Effect.fail(failure);
     }),
   ),
@@ -39,29 +42,33 @@ export const readAnalyticsPreference = Effect.fn("readAnalyticsPreference")((pat
 );
 
 /**
- * Saves "off" when no choice is saved. Setup calls it before it completes, so a setup that skips
- * the first-run choice, such as joining a server, cannot read as a user from before the choice.
+ * Saves the default when no choice is saved: "on" for a user from before the choice existed (setup
+ * already completed), else "off". Setup calls it before it completes, so a setup that skips the
+ * first-run choice, such as joining a server, cannot read as a user from before the choice.
  */
-export const saveAnalyticsDefault = Effect.fn("saveAnalyticsDefault")(function* (path: string) {
+export const saveAnalyticsDefault = Effect.fn("saveAnalyticsDefault")(function* (
+  path: string,
+  setupCompleted: boolean,
+) {
   // A file that cannot be read or parsed is a saved choice that reads as "off", so it stays.
   const saved = yield* readPreferenceFile(path, () => true).pipe(
     Effect.catch((failure) => Effect.succeed(!isMissingFileError(failure.cause))),
   );
-  if (!saved) yield* writeAnalyticsPreference(path, false);
+  if (!saved) yield* writeAnalyticsPreference(path, setupCompleted);
 });
 
 /**
- * `accountPending` marks a choice of the user that the account has not received. An older app
- * reads only `version` and `enabled`, so the extra field is safe after a downgrade.
+ * `unsentAt` marks a choice of the user that the account has not received. An older app reads only
+ * `version` and `enabled`, so the extra field is safe after a downgrade.
  */
 export function writeAnalyticsPreference(
   path: string,
   enabled: boolean,
-  accountPending = false,
+  unsentAt: number | null = null,
 ): Effect.Effect<AnalyticsPreference, PreferenceFileFailure> {
   return Effect.gen(function* () {
     const preference = { enabled };
-    yield* writePreferenceFile(path, { version: 1, enabled, ...(accountPending ? { accountPending: true } : {}) });
+    yield* writePreferenceFile(path, { version: 1, enabled, ...(unsentAt === null ? {} : { unsentAt }) });
     return preference;
   });
 }

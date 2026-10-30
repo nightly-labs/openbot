@@ -231,10 +231,12 @@ configured production build, is read before collection starts, and remains disab
 preference cannot be read.
 When the user signs in, the account service keeps their latest analytics answer: on, off, or no
 answer yet. A box that the user ticks or clears, and a Settings switch that the user changes on
-desktop, web or mobile, sends the answer (one true or false value) to the account. A default that
-the user did not change is not sent. After sign-in on another device, that device follows the
-account's answer. A choice made while the device was offline or signed out goes to the account at
-the next sign-in or profile refresh. Disabling it drops pending mobile events; it does not remove previously
+desktop, web or mobile, sends the answer (one true or false value) and the age of the choice in
+milliseconds to the account. The account service stores the time of the answer, from its own clock.
+A default that the user did not change is not sent. After sign-in on another device, that device
+follows the account's answer. A choice made while the device was offline or signed out goes to the
+account at the next sign-in, start or profile refresh; the account keeps it only if it has no newer
+answer from another device. Disabling it drops pending mobile events; it does not remove previously
 received events or retract an in-flight request. There is no persistent offline analytics queue.
 When a user turns product analytics off on desktop, web or mobile, the app first sends one event
 that says analytics was turned off, then stops. Turning it on again sends nothing.

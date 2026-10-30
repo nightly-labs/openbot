@@ -151,10 +151,16 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   // Kept here, not in the workspace, so each link waits through sign-in.
   // Before a session check, so a signed-out browser gets the saved answer or its regional default.
   // A browser that agreed once keeps its answer: the sign-in screen does not show the box again.
-  const analyticsAgreed = webReportsAgreed();
+  const [analyticsAgreed, setAnalyticsAgreed] = createSignal(webReportsAgreed());
   const [analyticsChoice, setAnalyticsChoice] = createSignal(webReportsEnabled());
   // Only a box that the user changed is a choice for the account; a regional default is not.
   let analyticsTouched = false;
+  // After a sign-out, the sign-in screen starts again from the saved answer of this browser.
+  function resetAnalyticsBox() {
+    setAnalyticsAgreed(webReportsAgreed());
+    setAnalyticsChoice(webReportsEnabled());
+    analyticsTouched = false;
+  }
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
@@ -191,6 +197,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       draft.account = null;
       draft.login = { status: "signed_out" };
     });
+    resetAnalyticsBox();
   }
   const accountFetch: typeof fetch = async (input, init) => {
     const generation = sessionGeneration;
@@ -280,16 +287,11 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
    * account does not have yet goes to it; otherwise this browser follows the account's answer.
    */
   async function followAccountAnalytics(answer: boolean | null | undefined) {
-    const pending = webAccountPending();
-    if (pending === null) {
-      if (answer === null || answer === undefined || answer === webReportsEnabled()) return;
-      setWebReportsEnabled(answer);
-      (await import("./web-analytics")).followWebReportsPreference();
-      return;
-    }
-    if (pending === answer) setWebAccountPending(null);
-    // The save checks the session again, and that check clears the mark.
-    else await accountCalls.updateAnalytics(pending);
+    const module = await import("./web-analytics");
+    if (webAccountPending()) return module.sendWebAnalyticsChoice(accountCalls);
+    if (answer === null || answer === undefined || answer === webReportsEnabled()) return;
+    setWebReportsEnabled(answer);
+    module.followWebReportsPreference();
   }
   async function checkSession() {
     const generation = sessionGeneration;
@@ -328,7 +330,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   async function start(email: string) {
     if (Date.now() < state.resendAt) throw new Error(text.t("webClient.login.wait"));
     // A request for a code answers the analytics box and accepts the Terms of Service.
-    if (!analyticsAgreed) {
+    if (!analyticsAgreed()) {
       setWebReportsEnabled(analyticsChoice());
       if (analyticsTouched) setWebAccountPending(analyticsChoice());
       import("./web-analytics").then((module) => module.followWebReportsPreference()).catch(() => undefined);
@@ -431,7 +433,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                     });
                   }}
                   consent={
-                    <Show when={!analyticsAgreed}>
+                    <Show when={!analyticsAgreed()}>
                       <AnalyticsConsentRow
                         class="web-consent-row"
                         checked={analyticsChoice()}
