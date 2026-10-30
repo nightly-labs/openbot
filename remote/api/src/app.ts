@@ -41,7 +41,9 @@ import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./proto
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import { probeTurnAllocation } from "./turn-probe";
 
+const TURN_HEALTH_CACHE = "1 minute";
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
@@ -147,9 +149,20 @@ export function createRemoteApiApp(
   // Null when Signal has no Discord bot token: the Discord route answers 503.
   discord: DiscordApi | null = null,
 ) {
+  // The route is public, so the relay gets one probe allocation a minute at most.
+  const turnHealth = Effect.runSync(Effect.cachedWithTTL(probeTurnAllocation(config), TURN_HEALTH_CACHE));
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
+    // For the status page: Signal can answer while the TURN relay refuses every allocation.
+    .get("/health/turn", async ({ set }) => {
+      const result = await runtime.runPromise(turnHealth.pipe(Effect.result));
+      if (Result.isSuccess(result)) return { service: "openbot-turn", status: "ready" };
+      set.status = 503;
+      return result.failure.reason === "full"
+        ? { error: { code: "turn_full", message: "The TURN relay has no free allocation." } }
+        : { error: { code: "turn_unavailable", message: "The TURN relay did not allocate a relay address." } };
+    })
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
       const signature = request.headers.get("OpenBot-Signature") ?? "";

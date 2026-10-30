@@ -65,7 +65,12 @@ remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys
 docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'
 curl --fail --silent --show-error https://signal.openbot.run/health/ready
 curl --fail --silent --show-error https://signal.openbot.run/health/live
+curl --fail --silent --show-error https://signal.openbot.run/health/turn
 ```
+
+`/health/turn` makes one real UDP allocation on the TURN server of `TURN_HOST` and frees it. It answers
+503 with `turn_full` when coturn refuses the allocation at its quota. The result stays cached for one
+minute. The status page probes it for "Connections".
 
 `/health/live` must show the release commit. Builds made before this field existed show no `commit`;
 builds made without `OPENBOT_SOURCE_COMMIT` show `unknown`.
