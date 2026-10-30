@@ -28,13 +28,13 @@ export const messages = {
   "error.site.fileOutsideRoot": "Los archivos del sitio deben permanecer dentro de la raíz del código fuente: {path}",
   "error.site.fileTooLarge": "Un archivo supera el límite de 1 MB: {path}",
   "error.site.serverLimit": {
-    one: "Este servidor alcanzó su límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o elige un plan de servidor con más sitios.",
+    one: "Este servidor alcanzó su límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
     other:
-      "Este servidor alcanzó su límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o elige un plan de servidor con más sitios.",
+      "Este servidor alcanzó su límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
   },
   "error.site.unlinkedLimit": {
-    one: "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o elige un plan de servidor con más sitios.",
+    one: "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitio activo. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
     other:
-      "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o elige un plan de servidor con más sitios.",
+      "Este equipo no es un servidor, y su cuenta alcanzó el límite de {count} sitios activos. Para publicar otro sitio, elimina un sitio o usa un servidor en la nube con un plan que tenga más sitios.",
   },
 } as const satisfies PartialTranslation<typeof source>;

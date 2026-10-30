@@ -27,13 +27,13 @@ export const messages = {
   "error.site.fileOutsideRoot": "I file del sito devono restare dentro la radice dell'origine: {path}",
   "error.site.fileTooLarge": "Un file supera il limite di 1 MB: {path}",
   "error.site.serverLimit": {
-    one: "Questo server ha raggiunto il limite di {count} sito attivo. Per pubblicare un altro sito, elimina un sito o scegli un piano server con più siti.",
+    one: "Questo server ha raggiunto il limite di {count} sito attivo. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
     other:
-      "Questo server ha raggiunto il limite di {count} siti attivi. Per pubblicare un altro sito, elimina un sito o scegli un piano server con più siti.",
+      "Questo server ha raggiunto il limite di {count} siti attivi. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
   },
   "error.site.unlinkedLimit": {
-    one: "Questo computer non è un server, e il suo account ha raggiunto il limite di {count} sito attivo. Per pubblicare un altro sito, elimina un sito o scegli un piano server con più siti.",
+    one: "Questo computer non è un server, e il suo account ha raggiunto il limite di {count} sito attivo. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
     other:
-      "Questo computer non è un server, e il suo account ha raggiunto il limite di {count} siti attivi. Per pubblicare un altro sito, elimina un sito o scegli un piano server con più siti.",
+      "Questo computer non è un server, e il suo account ha raggiunto il limite di {count} siti attivi. Per pubblicare un altro sito, elimina un sito o usa un server cloud con un piano che ha più siti.",
   },
 } as const satisfies PartialTranslation<typeof source>;

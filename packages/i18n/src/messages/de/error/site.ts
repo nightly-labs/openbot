@@ -28,13 +28,13 @@ export const messages = {
   "error.site.fileOutsideRoot": "Website-Dateien müssen innerhalb des Quellverzeichnisses bleiben: {path}",
   "error.site.fileTooLarge": "Eine Datei überschreitet die Grenze von 1 MB: {path}",
   "error.site.serverLimit": {
-    one: "Dieser Server hat sein Limit von {count} aktiven Website erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder wähle einen Server-Tarif mit mehr Websites.",
+    one: "Dieser Server hat sein Limit von {count} aktiven Website erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
     other:
-      "Dieser Server hat sein Limit von {count} aktiven Websites erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder wähle einen Server-Tarif mit mehr Websites.",
+      "Dieser Server hat sein Limit von {count} aktiven Websites erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
   },
   "error.site.unlinkedLimit": {
-    one: "Dieser Computer ist kein Server, und sein Konto hat das Limit von {count} aktiven Website erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder wähle einen Server-Tarif mit mehr Websites.",
+    one: "Dieser Computer ist kein Server, und sein Konto hat das Limit von {count} aktiven Website erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
     other:
-      "Dieser Computer ist kein Server, und sein Konto hat das Limit von {count} aktiven Websites erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder wähle einen Server-Tarif mit mehr Websites.",
+      "Dieser Computer ist kein Server, und sein Konto hat das Limit von {count} aktiven Websites erreicht. Um eine weitere Website zu veröffentlichen, lösche eine Website oder nutze einen Cloud-Server mit einem Tarif mit mehr Websites.",
   },
 } as const satisfies PartialTranslation<typeof source>;

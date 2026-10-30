@@ -27,13 +27,13 @@ export const messages = defineMessages("error.site", {
   "error.site.fileOutsideRoot": "Site files must stay inside the source root: {path}",
   "error.site.fileTooLarge": "A file exceeds the 1 MB limit: {path}",
   "error.site.serverLimit": {
-    one: "This server is at its limit of {count} active site. To publish another site, delete a site or choose a server plan with more sites.",
+    one: "This server is at its limit of {count} active site. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
     other:
-      "This server is at its limit of {count} active sites. To publish another site, delete a site or choose a server plan with more sites.",
+      "This server is at its limit of {count} active sites. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
   },
   "error.site.unlinkedLimit": {
-    one: "This computer is not a server, and its account is at its limit of {count} active site. To publish another site, delete a site or choose a server plan with more sites.",
+    one: "This computer is not a server, and its account is at its limit of {count} active site. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
     other:
-      "This computer is not a server, and its account is at its limit of {count} active sites. To publish another site, delete a site or choose a server plan with more sites.",
+      "This computer is not a server, and its account is at its limit of {count} active sites. To publish another site, delete a site or use a cloud server with a plan that has more sites.",
   },
 });
