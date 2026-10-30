@@ -2991,10 +2991,6 @@ function routingFailureText(error: unknown): string | null {
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
 }
 
-/**
- * Whether two tasks answer one request. A "continue" moves only the tasks it continues to the new
- * message, so siblings compare by the messages they share, not by their current request.
- */
 function terminal(task: ChannelTask): boolean {
   return task.state === "completed" || task.state === "cancelled";
 }

@@ -4,7 +4,8 @@
 // provider is signed in and runs turns at the same time, and one of them must run on Claude.
 //
 // It sends one request to both members and stops one of them at once, so that member writes no text.
-// The other member answers, and then the stopped one resumes the same request. It checks that the
+// The other member answers, and then a typed "continue" to the stopped one resumes the same request.
+// The follow-up becomes the request of that task, so this is the hard case. It checks that the
 // stop left no empty reply row, and that the packet of the resumed member does not carry the reply
 // of the member that answered first. OpenBot does not store the packet, so the script reads it from
 // the Claude session transcript of the resumed member. It finds that session in the dev database, in
@@ -123,8 +124,9 @@ try {
   assert.ok(firstText);
   report.firstReply = { agentId: lead.id, excerpt: firstText.slice(0, 80) };
 
-  // 3. The stopped member resumes the same request. Its packet has no reply of the first member.
-  await client.taskCommand("resume", channel.id, second.id);
+  // 3. A typed "continue" to the stopped member resumes the same request. Its packet has no reply of
+  // the first member, which is older than the follow-up.
+  await client.send(channel.id, "continue", other.id);
   const resumed = await waitFor(
     page,
     "the resumed member answers",

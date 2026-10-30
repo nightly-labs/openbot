@@ -74,7 +74,11 @@ function conversation(messages: ChannelMessage[]): ChannelMessage[] {
   );
 }
 
-/** Whether two tasks serve one request: a request to several members gives each its own task. */
+/**
+ * Whether two tasks answer one request. A request to several members gives each its own task. A
+ * "continue" moves only the tasks it continues to the new message, so siblings compare by the
+ * messages they share, not by their current request.
+ */
 export function sameRequest(task: ChannelTask, other: ChannelTask): boolean {
   return task.sourceMessageIds.some((id) => other.sourceMessageIds.includes(id));
 }
@@ -205,6 +209,8 @@ export class ChannelHistory {
       const memories = yield* channelSync(() => dependencies.memories.list(channel.id));
       const request = messages.find((message) => message.id === task.requestMessageId);
       const tasks = yield* channelSync(() => dependencies.store.tasks(channel.id));
+      // A typed "continue" makes the follow-up the request, so the siblings count from the first one.
+      const origin = messages.find((message) => message.id === task.sourceMessageIds[0]) ?? request;
       // Members that answer one request each give their own view. The reply of a member that
       // finished first made the next one copy its first sentence, so the rows that the other tasks
       // of this request wrote after the request stay out until this assignment ends.
@@ -219,7 +225,7 @@ export class ChannelHistory {
         message.author.kind === "agent" &&
         message.taskId !== null &&
         siblings.has(message.taskId) &&
-        message.sequence > (request?.sequence ?? 0);
+        message.sequence > (origin?.sequence ?? 0);
       const hidden = recent.find(sibling);
       const sources = new Set(task.sourceMessageIds);
       sources.add(task.requestMessageId);

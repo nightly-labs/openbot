@@ -158,7 +158,8 @@ request in the area of one member, or in the area of no member, goes to the one 
 answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
 gets the request's attachments; its packet names the other members that answer, but does not carry
-their replies to that request, so each member gives its own view. The packet cursor stops before the
+their replies to that request, so each member gives its own view. This stays true after a typed
+"continue" makes the follow-up the request of a task: the replies count from the first request. The packet cursor stops before the
 first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
 request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
