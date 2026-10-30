@@ -1,5 +1,6 @@
-import type { BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
+import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber } from "effect";
+import type { BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -63,6 +64,7 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
               new Error("Browser inspection is protected during authentication. Use takeover."),
             );
           }
+          tab.operations = (tab.operations ?? 0) + 1;
           active = yield* Effect.forkIn(
             browserSync(() => operation(tab, (work) => drains.push(work))).pipe(Effect.flatten, Effect.interruptible),
             tab.scope,
@@ -94,12 +96,49 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
   );
 });
 
+/**
+ * A page also changes with no tool action: live data, timers and late content. An image older than
+ * this does not count as current.
+ */
+const CURRENT_IMAGE_MS = 15_000;
+
+/**
+ * Call in a queued operation. True when the operation before it gave the agent a full-page image, or
+ * passed one on, of the same address, and the page is not loading. No queued operation changed the page
+ * since; the page itself can have.
+ */
+export function hasCurrentImage(tab: BrowserHostTab): boolean {
+  const image = tab.image;
+  return (
+    image !== undefined &&
+    image.operation === (tab.operations ?? 0) - 1 &&
+    Date.now() - image.taken < CURRENT_IMAGE_MS &&
+    !tab.contents.isLoading() &&
+    tab.contents.getURL() === image.url
+  );
+}
+
+/** Call in a queued operation that gave the agent a full-page image. */
+export function markImageTaken(tab: BrowserHostTab): void {
+  tab.image = { operation: tab.operations ?? 0, url: tab.contents.getURL(), taken: Date.now() };
+}
+
+/** Call in a queued operation that sent no image because `hasCurrentImage` was true. */
+export function passImageOn(tab: BrowserHostTab): void {
+  if (tab.image) tab.image.operation = tab.operations ?? 0;
+}
+
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
   tab: BrowserHostTab,
   revision: number,
   keepQueueBlocked: KeepQueueBlocked,
   timeoutMs = 10_000,
   timeoutMessage = "Browser snapshot timed out.",
+  /**
+   * The last work before the snapshot reaches the agent, such as a policy check or its image. When it
+   * fails, the agent gets no snapshot, so its entries stay undelivered for the next one.
+   */
+  release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const history = tab.diagnostics.snapshot();
   const result = yield* boundEngineOperation(
@@ -116,8 +155,55 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     keepQueueBlocked,
   );
   tab.revision = revision;
+  if (release) yield* release(result);
+  tab.diagnostics.delivered(history.cursor);
   return result;
 });
+
+/** Reads what an action returns once its input reached the page and the page settled. */
+export type ActionResultReader<A> = (
+  tab: BrowserHostTab,
+  keepQueueBlocked: KeepQueueBlocked,
+  timeoutMessage: string,
+) => Effect.Effect<A, BrowserOperationError>;
+
+/** A `run_script` step reads nothing: the script takes one snapshot at the end. */
+export const skipActionResult: ActionResultReader<null> = () => Effect.succeed(null);
+
+export const readActionSnapshot: ActionResultReader<BrowserSnapshot> = (tab, keepQueueBlocked, timeoutMessage) =>
+  readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked, ACTION_POST_DISPATCH_TIMEOUT_MS, timeoutMessage).pipe(
+    Effect.map((result) => result.snapshot),
+  );
+
+/**
+ * What an input action returns unless the model asks for a snapshot. Most actions are not followed by
+ * a read of their snapshot, and a full one costs the model thousands of tokens. No snapshot is read,
+ * so the revision stays and the refs of the last snapshot still work.
+ */
+export interface BrowserActionStatus extends BrowserPageStatus {
+  tabId: string;
+  revision: number;
+  errors?: BrowserDiagnosticEntry[];
+}
+
+export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.fn("BrowserTab.readActionStatus")(
+  function* (tab, keepQueueBlocked, timeoutMessage) {
+    const page = yield* boundEngineOperation(
+      tab,
+      tab.engine.pageStatus(),
+      ACTION_POST_DISPATCH_TIMEOUT_MS,
+      timeoutMessage,
+      keepQueueBlocked,
+    );
+    // A page can put a typed card value in an error message, as in a snapshot.
+    const errors = tab.diagnostics.takeStatusErrors().map((entry) => ({
+      ...entry,
+      message: tab.engine.scrubText(entry.message),
+      ...(entry.url === undefined ? {} : { url: tab.engine.scrubText(entry.url) }),
+    }));
+    return { tabId: tab.id, revision: tab.revision, ...page, ...(errors.length > 0 ? { errors } : {}) };
+  },
+);
 
 /** A deadline ends the response; the tab queue still owns transport cleanup. */
 export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(function* <A>(
@@ -158,7 +244,7 @@ const unwindStalledOperation = Effect.fn("BrowserTab.unwind")(function* <A>(
 });
 
 export const runTabAction = Effect.fn("BrowserTab.action")(
-  (
+  <A>(
     tab: BrowserHostTab,
     action: string,
     target: BrowserTarget | undefined,
@@ -167,10 +253,9 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
       deadline: number,
       markDispatched: () => void,
     ) => Effect.Effect<void, BrowserOperationError>,
+    readResult: ActionResultReader<A>,
     timeoutMs = 10_000,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
-    // A `run_script` step leaves the capture to the end of the run.
-    captureSnapshot = true,
   ) =>
     enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
       Effect.gen(function* () {
@@ -261,14 +346,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               : {}),
           });
           actionRecorded = true;
-          if (!captureSnapshot) return null;
-          return (yield* readTabSnapshot(
-            tab,
-            tab.revision + 1,
-            keepQueueBlocked,
-            ACTION_POST_DISPATCH_TIMEOUT_MS,
-            timeoutMessage,
-          )).snapshot;
+          return yield* readResult(tab, keepQueueBlocked, timeoutMessage);
         }).pipe(
           Effect.onInterrupt(() =>
             Effect.sync(() => {
@@ -459,9 +537,9 @@ export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
             keepQueueBlocked,
             yield* browserSync(() => remainingTime(deadline, "Browser fill_fields timed out.")),
             "Browser fill_fields timed out.",
+            // A card or takeover that appeared during capture must never release that capture.
+            () => browserSync(checkPolicy),
           );
-          // A card or takeover that appeared during capture must never release that capture.
-          yield* browserSync(checkPolicy);
           tab.diagnostics.action({ action: "fill_fields", outcome: "success" });
           return result(undefined, captured.snapshot);
         }).pipe(

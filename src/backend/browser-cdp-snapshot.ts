@@ -23,8 +23,8 @@ const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
 /** How much page text a text wait scans for its needle. */
 const MAX_SCANNED_TEXT = 100_000;
 /**
- * The page text a snapshot returns. Each action returns a fresh snapshot to the model, so this is
- * paid again on every step; the text in the viewport comes first, and a truncated snapshot says so.
+ * The page text a snapshot returns. The model pays for it on each page read; the text in the viewport
+ * comes first, and a truncated snapshot says so.
  */
 const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;

@@ -18,6 +18,7 @@ export interface ConversationPort {
     | "listRoutines"
     | "listTables"
     | "markConversationRead"
+    | "markConversationUnread"
     | "readConversationPage"
     | "releaseFilePreview"
     | "searchConversationMessages"

@@ -326,6 +326,7 @@ export const messages = defineMessages("chat", {
   "chat.menu.reply": "Reply",
   "chat.menu.copy": "Copy message",
   "chat.menu.react": "React",
+  "chat.menu.markUnread": "Mark unread",
   "chat.voice.play": "Play voice message",
   "chat.voice.pause": "Pause voice message",
   "chat.voice.pauseReading": "Pause reading",

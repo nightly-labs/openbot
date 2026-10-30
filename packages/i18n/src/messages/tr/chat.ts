@@ -343,6 +343,7 @@ export const messages = {
   "chat.menu.reply": "Yanıtla",
   "chat.menu.copy": "Mesajı kopyala",
   "chat.menu.react": "Tepki ver",
+  "chat.menu.markUnread": "Okunmadı olarak işaretle",
   "chat.voice.play": "Sesli mesajı oynat",
   "chat.voice.pause": "Sesli mesajı duraklat",
   "chat.voice.pauseReading": "Okumayı duraklat",

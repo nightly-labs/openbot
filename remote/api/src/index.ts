@@ -364,7 +364,7 @@ listen();
 // Telegram posts to this Signal only after the listener is up. A failure is logged and Signal runs on.
 if (signal.telegram) void signalRuntime.runPromise(signal.telegram.bot.setWebhooks());
 const healthServer = Bun.serve({
-  hostname: "127.0.0.1",
+  hostname: config.healthHost,
   port: config.healthPort,
   routes: {
     "/health/live": () => Response.json({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }),

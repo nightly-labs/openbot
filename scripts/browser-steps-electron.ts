@@ -10,6 +10,7 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_SCRIPT_MAX_STEPS } from "../src/backend/browser-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -94,12 +95,14 @@ async function main(): Promise<void> {
       const tab = await runCauseEffect(host.open(`${origin}${path}`, "fixture-thread", "fixture-agent"));
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
       assert(contents, "Missing owned fixture contents.");
-      const first = snapshotSchema.parse(JSON.parse(text(await call("snapshot", { tabId: tab.id, image: "never" }))));
+      const first = snapshotSchema.parse(
+        parseBrowserToolText(text(await call("snapshot", { tabId: tab.id, image: "never" }))),
+      );
       return { tab, contents, revision: first.revision };
     };
     const runScript = async (args: DynamicToolCallParams["arguments"]) => {
       const result = await call("run_script", args);
-      return { result, outcome: scriptSchema.parse(JSON.parse(text(result))) };
+      return { result, outcome: scriptSchema.parse(parseBrowserToolText(text(result))) };
     };
     const close = (id: string) => runCauseEffect(host.close(id));
 
@@ -220,7 +223,7 @@ async function main(): Promise<void> {
     );
     const protectedSnapshot = z
       .object({ revision: z.number(), elements: z.array(z.object({ ref: z.string(), name: z.string() })) })
-      .parse(JSON.parse(text(await call("snapshot", { tabId: protectedTab.id, image: "never" }))));
+      .parse(parseBrowserToolText(text(await call("snapshot", { tabId: protectedTab.id, image: "never" }))));
     const passwordRef = protectedSnapshot.elements.find((element) => element.name === "Password")?.ref;
     assert(passwordRef, "Protection fixture ref missing.");
     const protection = await runCauseEffect(

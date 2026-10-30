@@ -379,6 +379,44 @@
   flex: 0 0 auto;
 }
 
+/* A new NEW line: the badge comes in first, then each line grows out from it. */
+.unread-messages-divider[data-arrive] span {
+  animation: unread-divider-badge-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
+}
+
+.unread-messages-divider[data-arrive] hr {
+  animation: unread-divider-line-in var(--openbot-duration-toast-enter) var(--openbot-ease-out) 60ms both;
+}
+
+.unread-messages-divider[data-arrive] hr:first-child {
+  transform-origin: right center;
+}
+
+.unread-messages-divider[data-arrive] hr:last-child {
+  transform-origin: left center;
+}
+
+@keyframes unread-divider-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(2px);
+  }
+}
+
+@keyframes unread-divider-line-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unread-messages-divider[data-arrive] :is(hr, span) {
+    animation: none;
+  }
+}
+
 .time-marker {
   display: flex;
   align-items: center;

@@ -8,6 +8,7 @@ import {
   type BubbleVariant,
   Button,
   ChevronRight,
+  CircleDot,
   ContextMenu,
   DropdownMenu,
   Info,
@@ -892,6 +893,8 @@ export function MessageMenu(props: {
   onReply?: (() => void) | undefined;
   onCopy: () => void;
   readAloud?: { reading: boolean; onToggle: () => void } | undefined;
+  /** Marks this message and the messages after it unread. Without it, the menu has no such item. */
+  onMarkUnread?: (() => void) | undefined;
 }) {
   const { t } = useText();
   const authorName = () => props.authorName ?? t("chat.message.agentFallback");
@@ -957,6 +960,17 @@ export function MessageMenu(props: {
             {readAloud().reading ? <StopIcon /> : <AudioLines aria-hidden="true" />}
             <span>{readAloud().reading ? t("chat.actions.stopReading") : t("chat.actions.readAloud")}</span>
           </ContextMenu.Item>
+        )}
+      </Show>
+      <Show when={props.onMarkUnread}>
+        {(onMarkUnread) => (
+          <>
+            <ContextMenu.Separator />
+            <ContextMenu.Item onSelect={onMarkUnread()}>
+              <CircleDot aria-hidden="true" />
+              <span>{t("chat.menu.markUnread")}</span>
+            </ContextMenu.Item>
+          </>
         )}
       </Show>
     </ContextMenu.Content>

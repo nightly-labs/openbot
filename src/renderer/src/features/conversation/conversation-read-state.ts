@@ -87,7 +87,7 @@ function isIncomingConversationMessage(message: {
  * kinds of row the renderer synthesizes itself: streamed thinking and UI notices.
  * Neither exists in main, so neither can be read.
  */
-function isIncomingAgentMessage(message: AgentMessage): boolean {
+export function isIncomingAgentMessage(message: AgentMessage): boolean {
   return (
     isIncoming(message, message.author === "you") &&
     !message.id.startsWith("thinking:") &&

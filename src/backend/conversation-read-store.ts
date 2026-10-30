@@ -159,11 +159,21 @@ export class ConversationReadStore {
     return stateFromSnapshot(snapshot, null);
   }
 
-  /** Marks a thread unread without reading its message rows. */
-  markUnreadForThread(memberId: string, threadId: string | null): ConversationReadState {
+  /**
+   * Marks a thread unread without reading its message rows. With `fromMessageId`, that message and
+   * the messages after it are unread: the cursor moves back to the message shown before it.
+   */
+  markUnreadForThread(
+    memberId: string,
+    threadId: string | null,
+    fromMessageId: string | null = null,
+  ): ConversationReadState {
     if (!threadId) return emptyReadState();
-    this.#saveCursor(threadId, memberId, null, "marked");
-    return this.#stateFromDatabase(threadId, null);
+    const fromKey = fromMessageId ? this.#messageOrderKey(threadId, fromMessageId) : undefined;
+    if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
+    const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
+    this.#saveCursor(threadId, memberId, throughMessageId, "marked");
+    return this.#stateFromDatabase(threadId, throughMessageId);
   }
 
   #withSupportedCursor(
@@ -239,6 +249,22 @@ export class ConversationReadStore {
         )
         .get(threadId, candidateMessageId, ...boundary),
     );
+  }
+
+  #messageBefore(threadId: string, boundary: MessageOrderKey): string | null {
+    const row = this.database.connection
+      .prepare(
+        `${ORDERED_THREAD_MESSAGES}
+         SELECT message_id FROM ordered
+         WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
+         ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
+      )
+      .get(threadId, ...boundary);
+    if (row === undefined) return null;
+    if (!isDynamicRecord(row) || !isString(row.message_id)) {
+      throw new Error("The previous conversation message is malformed.");
+    }
+    return row.message_id;
   }
 
   #latestMessageId(threadId: string): string | null {

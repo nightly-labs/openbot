@@ -3,6 +3,7 @@ import type {
   BrowserActionHistoryEntry,
   BrowserDiagnosticEntry,
   BrowserEnvironment,
+  BrowserFocus,
   BrowserJsonValue,
   BrowserSnapshot,
   BrowserTarget,
@@ -92,6 +93,14 @@ export interface SnapshotReadResult {
   snapshot: BrowserSnapshot;
   recommendImage: boolean;
   imageReason: string;
+}
+
+/** The page state that an action reports when it does not read a snapshot. */
+export interface BrowserPageStatus {
+  title: string;
+  url: string;
+  loading: boolean;
+  focus: BrowserFocus | null;
 }
 
 export interface BrowserUploadAssignment {
@@ -714,6 +723,22 @@ export class BrowserCdpEngine {
     );
   });
 
+  /** The header fields of a snapshot, with the same card scrub, for an action that skips the snapshot. */
+  readonly pageStatus = Effect.fn("BrowserCdp.pageStatus")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<BrowserPageStatus, BrowserOperationError> {
+    const focus = yield* this.#leaseEffect((send) => collectFocus(send)).pipe(Effect.catch(() => Effect.succeed(null)));
+    // The action can close the tab. The caller then returns the closed-tab result.
+    if (this.#closing || this.#contents.isDestroyed())
+      return yield* browserFailure(new Error("Browser tab was closed."));
+    return {
+      title: this.#cardScrub.text(this.#contents.getTitle().slice(0, 500)),
+      url: this.#cardScrub.text(this.#contents.getURL()),
+      loading: this.#contents.isLoading(),
+      focus: focus && { ...focus, name: this.#cardScrub.text(focus.name) },
+    };
+  });
+
   readonly click = Effect.fn("BrowserCdp.click")(function* (
     this: BrowserCdpEngine,
     target: BrowserTarget,
@@ -1147,6 +1172,7 @@ export class BrowserCdpEngine {
           const desiredInitial = Array.from(desiredLabel)[0]?.toLocaleLowerCase() || '';
           const typeaheadCycleIndices = desiredInitial === '' ? [] : enabledIndices.filter(index =>
             (this.options[index].label || this.options[index].text).toLocaleLowerCase().startsWith(desiredInitial));
+          const box = this.getBoundingClientRect();
           return {
             multiple: this.multiple,
             desiredIndices: this.multiple ? uniqueDesiredIndices : uniqueDesiredIndices.slice(0, 1),
@@ -1154,6 +1180,8 @@ export class BrowserCdpEngine {
             selectedIndex: this.selectedIndex,
             typeaheadCycleIndices,
             enabledIndices,
+            labels: Array.from(this.options, option => option.label || option.text),
+            center: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
           };
         }`,
           [values],
@@ -1172,6 +1200,8 @@ export class BrowserCdpEngine {
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
+        // A page can render a new select on each change. The selection is then read from that one.
+        let selectNodeId = resolved.backendNodeId;
         if (!plan.multiple) {
           const cycleIndices = Array.isArray(plan.typeaheadCycleIndices)
             ? plan.typeaheadCycleIndices.filter(isNumber)
@@ -1182,13 +1212,10 @@ export class BrowserCdpEngine {
           const selectedIndex = plan.selectedIndex;
           const targetRank = enabledIndices.indexOf(firstDesiredIndex);
           if (firstDesiredIndex !== selectedIndex && cycleIndices.length > 0) {
-            const firstCycleRank = cycleIndices.findIndex((index) => index > selectedIndex);
-            const startCycleRank = firstCycleRank < 0 ? 0 : firstCycleRank;
             const targetCycleRank = cycleIndices.indexOf(firstDesiredIndex);
             if (targetCycleRank < 0) {
               return yield* browserFailure(new Error("Select target returned an invalid typeahead navigation plan."));
             }
-            const steps = ((targetCycleRank - startCycleRank + cycleIndices.length) % cycleIndices.length) + 1;
             const initial = Array.from(plan.desiredLabel)[0];
             if (!initial) return yield* browserFailure(new Error("Select target returned an empty typeahead key."));
             // Chromium keeps a typeahead buffer per select for about a second, so a second
@@ -1204,8 +1231,37 @@ export class BrowserCdpEngine {
               resolved.sessionId,
             );
             yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
-            for (let index = 0; index < steps; index++) {
+            const labels = Array.isArray(plan.labels) ? plan.labels.filter(isString) : [];
+            const center = recordValue(plan.center);
+            // Each key selects the next option with this initial and fires change. A page that renders
+            // a new select on change drops the focus, so the next key goes to the replacement.
+            // Every key is followed by at most one replacement, so the reads stay bounded.
+            let presses = 0;
+            for (let reads = 0; reads <= 2 * cycleIndices.length + 1; reads++) {
+              const state = yield* this.#callOnNode(
+                send,
+                selectNodeId,
+                "function() { return { connected: this.isConnected, selectedIndex: this.selectedIndex }; }",
+                [],
+                resolved.sessionId,
+              );
+              if (recordValue(state)?.connected !== true) {
+                const replacement = yield* this.#replacementSelectEffect(
+                  send,
+                  labels,
+                  numberValue(center?.x),
+                  numberValue(center?.y),
+                  resolved.sessionId,
+                );
+                if (replacement === null) break;
+                selectNodeId = replacement;
+                yield* send("DOM.focus", { backendNodeId: selectNodeId }, resolved.sessionId);
+                continue;
+              }
+              if (recordValue(state)?.selectedIndex === firstDesiredIndex || presses === cycleIndices.length) break;
+              yield* browserSync(() => assertBeforeDeadline(deadline));
               yield* dispatchTextKey(send, initial, resolved.sessionId);
+              presses++;
             }
           } else if (firstDesiredIndex !== selectedIndex) {
             yield* dispatchShortcut(send, "Home", resolved.sessionId);
@@ -1239,7 +1295,7 @@ export class BrowserCdpEngine {
         }
         const selected = yield* this.#callOnNode(
           send,
-          resolved.backendNodeId,
+          selectNodeId,
           "function() { return Array.from(this.options, (option, index) => option.selected ? index : -1).filter(index => index >= 0); }",
           [],
           resolved.sessionId,
@@ -1760,9 +1816,12 @@ export class BrowserCdpEngine {
 
   readonly screenshot = Effect.fn("BrowserCdp.screenshot")(function* (
     this: BrowserCdpEngine,
+    target?: BrowserTarget,
+    deadline?: number,
   ): Effect.fn.Return<NativeImage, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
+        const clip = target ? yield* this.#elementClipEffect(send, target, deadline) : undefined;
         const environment = this.#appliedEnvironment(this.#environment);
         const fill = !environment || environment.viewport.mode === "fill";
         if (fill) {
@@ -1784,7 +1843,7 @@ export class BrowserCdpEngine {
           });
         }
         return yield* Effect.gen({ self: this }, function* () {
-          return yield* browserCall(() => this.#contents.capturePage());
+          return yield* browserCall(() => this.#contents.capturePage(clip));
         }).pipe(
           Effect.ensuring(
             Effect.gen({ self: this }, function* () {
@@ -2737,6 +2796,47 @@ export class BrowserCdpEngine {
     );
   });
 
+  /**
+   * The visible box of an element, in view pixels, with a small margin. An element in a frame that
+   * runs in another process has coordinates in that frame, so it is refused.
+   */
+  readonly #elementClipEffect = Effect.fn("BrowserCdp.elementClip")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    target: BrowserTarget,
+    deadline?: number,
+  ): Effect.fn.Return<Electron.Rectangle, BrowserOperationError> {
+    const resolved = yield* this.#resolveElementEffect(send, target, deadline);
+    if (resolved.sessionId !== undefined)
+      return yield* browserFailure(
+        new Error("This element is in a frame that the image cannot clip. Call screenshot without a target."),
+      );
+    const { backendNodeId } = resolved;
+    yield* send("DOM.scrollIntoViewIfNeeded", { backendNodeId });
+    const box = yield* send("DOM.getBoxModel", { backendNodeId });
+    const quad = recordValue(box.model)?.border;
+    const corners = Array.isArray(quad) ? quad.filter(isFiniteNumber).slice(0, 8) : [];
+    const metrics = yield* send("Page.getLayoutMetrics", {});
+    const viewport = recordValue(metrics.cssLayoutViewport);
+    const xs = corners.filter((_, index) => index % 2 === 0);
+    const ys = corners.filter((_, index) => index % 2 === 1);
+    const margin = 8;
+    const left = Math.max(0, Math.min(...xs) - margin);
+    const top = Math.max(0, Math.min(...ys) - margin);
+    const right = Math.min(numberValue(viewport?.clientWidth), Math.max(...xs) + margin);
+    const bottom = Math.min(numberValue(viewport?.clientHeight), Math.max(...ys) + margin);
+    if (corners.length < 8 || right - left < 1 || bottom - top < 1)
+      return yield* browserFailure(new Error("Element has no visible bounds."));
+    // Box model values are CSS pixels; the capture takes view pixels, which page zoom scales.
+    const zoom = this.#contents.getZoomFactor();
+    return {
+      x: Math.floor(left * zoom),
+      y: Math.floor(top * zoom),
+      width: Math.ceil((right - left) * zoom),
+      height: Math.ceil((bottom - top) * zoom),
+    };
+  });
+
   readonly #callOnNode = Effect.fn("BrowserCdp.callOnNode")(function* (
     this: BrowserCdpEngine,
     send: SendCommand,
@@ -2773,6 +2873,46 @@ export class BrowserCdpEngine {
         }).pipe(Effect.orDie),
       ),
     );
+  });
+
+  /**
+   * The select that a page rendered in place of one it removed: a connected select with the same option
+   * labels at the old center point. A select with the same labels elsewhere, as in the next cart row,
+   * is a different control. Null when none matches.
+   */
+  readonly #replacementSelectEffect = Effect.fn("BrowserCdp.replacementSelect")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    labels: string[],
+    x: number,
+    y: number,
+    sessionId?: string,
+  ): Effect.fn.Return<number | null, BrowserOperationError> {
+    const executionContextId = yield* automationContextId(send, sessionId);
+    const found = yield* send(
+      "Runtime.callFunctionOn",
+      {
+        executionContextId,
+        functionDeclaration: `function(labels, x, y) {
+          const candidates = Array.from(document.querySelectorAll('select')).filter(select =>
+            !select.multiple && select.options.length === labels.length &&
+            Array.from(select.options).every((option, index) => (option.label || option.text) === labels[index]));
+          return candidates.find(select => {
+            const box = select.getBoundingClientRect();
+            return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+          }) ?? null;
+        }`,
+        arguments: [{ value: labels }, { value: x }, { value: y }],
+        returnByValue: false,
+      },
+      sessionId,
+    );
+    const objectId = stringValue(recordValue(found.result)?.objectId);
+    if (!objectId) return null;
+    return yield* Effect.gen(function* () {
+      const described = yield* send("DOM.describeNode", { objectId, depth: 0 }, sessionId);
+      return numberValue(recordValue(described.node)?.backendNodeId) || null;
+    }).pipe(Effect.ensuring(send("Runtime.releaseObject", { objectId }, sessionId).pipe(Effect.ignore)));
   });
 
   readonly #optionBackendNodeIdEffect = Effect.fn("BrowserCdp.optionBackendNodeId")(function* (

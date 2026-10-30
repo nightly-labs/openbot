@@ -40,6 +40,7 @@ import {
   type ListRoutineRunsInput,
   type MarkAgentTaskReadInput,
   type MarkConversationReadInput,
+  type MarkConversationUnreadInput,
   type OpenAttachmentInput,
   type OpenMessageLinkInput,
   type OpenSharedFileInput,
@@ -610,6 +611,14 @@ export function parseMarkConversationRead(value: unknown): MarkConversationReadI
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     throughMessageId:
       throughMessageId === null ? null : requireString(throughMessageId, "throughMessageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseMarkConversationUnread(value: unknown): MarkConversationUnreadInput {
+  if (!isObject(value)) throw new Error("Invalid conversation unread request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    fromMessageId: requireString(value.fromMessageId, "fromMessageId", INPUT_LIMITS.identifier),
   };
 }
 

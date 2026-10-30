@@ -103,7 +103,10 @@ const legacyActionSchema = z.discriminatedUnion("type", [
   z.object({ ...legacyActionFields, type: z.literal("reload") }),
 ]);
 
-const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout };
+/** Input tools return a short status. The model reads the page with `snapshot` when it needs to. */
+const ACTION_RESULT = "Returns a status; pass snapshot: true for a snapshot.";
+const actionSnapshot = z.boolean().optional();
+const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout, snapshot: actionSnapshot };
 
 // The fields of the tools that the `run_script` helpers also take as steps. A step names its tool
 // in `action` and acts on the tab of the call, so these fields leave out `tabId`.
@@ -156,7 +159,7 @@ const evaluateFields = {
 };
 
 export const BROWSER_SCRIPT_MAX_STEPS = 200;
-export const BROWSER_SCRIPT_MAX_CHARS = 20_000;
+const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
 
@@ -203,7 +206,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "snapshot",
     description:
-      "Read the current semantic page and obtain revision-bound element references. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more.",
+      'Read the current semantic page and obtain element refs. Refs stay valid until a navigation or the next snapshot. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more. Each element is a line: ref, role, "name", then <tag>, value=, description= and states when present. diagnostics and actions list only new entries, without successful requests and plain successful actions.',
     shape: { tabId, image },
   }),
   browserTool({
@@ -336,15 +339,13 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "click",
-    description:
-      "Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input and return a fresh snapshot.",
-    shape: { tabId, ...clickFields },
+    description: `Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input. ${ACTION_RESULT}`,
+    shape: { tabId, ...clickFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "type",
-    description:
-      "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the snapshot's focus field says where those keystrokes will land. Mode applies only to an element target.",
-    shape: { tabId, ...typeFields },
+    description: `Enter text in a unique target using trusted CDP input. ${ACTION_RESULT} Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the focus field says where those keystrokes will land. Mode applies only to an element target.`,
+    shape: { tabId, ...typeFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "fill_fields",
@@ -369,38 +370,43 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "press",
-    description: "Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P and return a fresh snapshot.",
-    shape: { tabId, ...pressFields },
+    description: `Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P. ${ACTION_RESULT}`,
+    shape: { tabId, ...pressFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "hover",
-    description: "Hover a unique target with trusted CDP pointer input and return a fresh snapshot.",
-    shape: { tabId, ...hoverFields },
+    description: `Hover a unique target with trusted CDP pointer input. ${ACTION_RESULT}`,
+    shape: { tabId, ...hoverFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "scroll",
-    description: "Scroll the page or a target container by X/Y pixels and return a fresh snapshot.",
-    shape: { tabId, ...scrollFields },
+    description: `Scroll the page or a target container by X/Y pixels. ${ACTION_RESULT}`,
+    shape: { tabId, ...scrollFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "select_option",
-    description: "Select one or more native select options by value or label and return a fresh snapshot.",
-    shape: { tabId, ...selectOptionFields },
+    description: `Select one or more native select options by value or label. ${ACTION_RESULT}`,
+    shape: { tabId, ...selectOptionFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "set_checked",
-    description: "Set a checkbox or radio target to the requested checked state and return a fresh snapshot.",
-    shape: { tabId, ...setCheckedFields },
+    description: `Set a checkbox or radio target to the requested checked state. ${ACTION_RESULT}`,
+    shape: { tabId, ...setCheckedFields, snapshot: actionSnapshot },
   }),
   browserTool({
     name: "drag",
-    description: "Drag from one unique target to another with trusted CDP pointer input and return a fresh snapshot.",
-    shape: { tabId, source: browserTargetSchema, target: browserTargetSchema, timeoutMs: timeout },
+    description: `Drag from one unique target to another with trusted CDP pointer input. ${ACTION_RESULT}`,
+    shape: {
+      tabId,
+      source: browserTargetSchema,
+      target: browserTargetSchema,
+      timeoutMs: timeout,
+      snapshot: actionSnapshot,
+    },
   }),
   browserTool({
     name: "upload_files",
-    description:
-      "Set local files on a file input or the file chooser a clicked target opens, then return a fresh snapshot.",
+    description: `Set local files on a file input or the file chooser a clicked target opens. ${ACTION_RESULT}`,
     shape: {
       ...targetAction,
       paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),
@@ -455,13 +461,14 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "screenshot",
-    description: "Capture the visible page as a separate image content item.",
-    shape: { tabId },
+    description:
+      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
+    shape: { tabId, ref: identifier.optional() },
   }),
   browserTool({
     name: "run_script",
     description:
-      "Run a short JavaScript program that drives one tab and returns one final snapshot, not one per action. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+      "Run a short JavaScript program that drives one tab in one call and returns one final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
       script: requiredString(BROWSER_SCRIPT_MAX_CHARS),

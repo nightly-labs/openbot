@@ -109,6 +109,7 @@ import {
   parseInterrupt,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
+  parseMarkConversationUnread,
   parseMessageReaction,
   parseOpenMessageLink,
   parseOptionalAgentId,
@@ -594,6 +595,12 @@ export function agentIpcHandlers({
       markConversationRead: scopedHandler(parseMarkConversationRead, {
         local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
         remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
+      }),
+      markConversationUnread: scopedHandler(parseMarkConversationUnread, {
+        local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
+        remote: () => {
+          throw new Error(sourceText("error.backend.markUnreadRemoteUnsupported"));
+        },
       }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),

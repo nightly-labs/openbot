@@ -154,7 +154,7 @@ export function namesInSearch(params: DynamicToolCallParams, names: readonly str
 }
 
 function toolGuidanceFor(entries: readonly (typeof BUILTIN_TOOL_CATALOG)[number][]): string[] {
-  return [...new Set(entries.map((entry) => toolGuidance(entry.namespace, entry.tool)))].filter(Boolean);
+  return [...new Set(entries.flatMap((entry) => toolGuidance(entry.namespace, entry.tool)))];
 }
 
 export function discoverTools(params: DynamicToolCallParams) {
@@ -184,8 +184,8 @@ export function discoverTools(params: DynamicToolCallParams) {
         .slice(0, READY_SEARCH_RESULTS)
         .map(({ entry }) => entry),
     );
-    // Agents search for the single actions that they know, such as click and navigate, and then pay
-    // for one snapshot per action. A browser result therefore always brings the multi-step tool.
+    // Agents search for the single actions that they know, such as click and navigate, and then use
+    // one model turn per action. A browser result therefore always brings the multi-step tool.
     if ([...ready].some((entry) => entry.namespace === OPENBOT_BROWSER_NAMESPACE)) {
       if (!found.some(({ entry }) => entry === BROWSER_SCRIPT_TOOL))
         found.push({ entry: BROWSER_SCRIPT_TOOL, strong: true });

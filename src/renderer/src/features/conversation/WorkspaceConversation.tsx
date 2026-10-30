@@ -159,6 +159,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     conversations,
     sendMessage,
     markAgentMessagesRead,
+    markAgentMessagesUnread,
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
@@ -597,6 +598,15 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}
         onMarkRead={() => markAgentMessagesRead()}
+        // The Team API unread route marks a whole chat, so only an agent on this computer has the item.
+        onMarkUnread={
+          activeServer()?.kind === "local"
+            ? (messageId) => {
+                const agentId = activeAgent()?.id;
+                return agentId ? markAgentMessagesUnread(agentId, messageId) : Promise.resolve();
+              }
+            : undefined
+        }
         onLoadOlder={() => void loadOlderAgentMessages()}
         onLoadLatest={() => (activeAgent() ? loadLatestAgentMessages(activeAgent()?.id ?? "") : Promise.resolve())}
         onSearchMessages={(query) =>

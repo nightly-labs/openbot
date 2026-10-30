@@ -327,6 +327,7 @@ export const messages = {
   "chat.menu.reply": "回复",
   "chat.menu.copy": "复制消息",
   "chat.menu.react": "回应",
+  "chat.menu.markUnread": "标为未读",
   "chat.voice.play": "播放语音消息",
   "chat.voice.pause": "暂停语音消息",
   "chat.voice.pauseReading": "暂停朗读",

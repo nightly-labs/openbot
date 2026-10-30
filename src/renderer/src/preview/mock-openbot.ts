@@ -2534,6 +2534,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (conversationReads.has(input.agentId)) conversationReads.set(input.agentId, state);
         return clone(state);
       },
+      markConversationUnread: async (input) => {
+        const { messages, revision } = getSnapshot(input.agentId);
+        const index = messages.findIndex((message) => message.id === input.fromMessageId);
+        if (index < 0) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
+        const throughMessageId = messages[index - 1]?.id ?? null;
+        conversationReads.set(input.agentId, { unreadCount: 0, firstUnreadMessageId: null, throughMessageId });
+        emitAgentEvent({ type: "conversation-invalidated", agentId: input.agentId, revision });
+        return clone(conversationReadState(input.agentId));
+      },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>
         data.map((file) => ({

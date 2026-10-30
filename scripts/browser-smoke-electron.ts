@@ -24,6 +24,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
 import { runSecretHandoffScenario } from "./browser-secret-smoke";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
@@ -376,6 +377,7 @@ const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
       <label>Mode <select aria-label="Mode" oninput="this.dataset.inputTrusted=String(event.isTrusted)" onchange="this.dataset.changeTrusted=String(event.isTrusted)"><option value="a">Alpha</option><option value="b">Beta</option><option value="">Any mode</option></select></label>
+      <span id="sort-host"></span>
       <label><input type="checkbox" aria-label="Agree" />Agree</label>
       <label><input type="radio" name="choice" aria-label="Primary choice" checked />Primary</label>
       <label><input type="radio" name="choice" aria-label="Secondary choice" />Secondary</label>
@@ -404,6 +406,16 @@ const server = createServer((request, response) => {
         root.innerHTML = '<button aria-label="Shadow action">Shadow action</button>';
         root.querySelector('button').onclick = event => { const trusted = event.isTrusted; fetch('/settle').then(() => { root.querySelector('button').textContent = 'Shadow settled:5:' + trusted; }); };
         document.addEventListener('keydown', event => { if (event.ctrlKey && event.key.toLowerCase() === 'k') document.querySelector('output').textContent = 'shortcut:' + event.isTrusted; });
+        // Like a React list sort: each change renders a new select, which drops the focus.
+        const renderSort = index => {
+          const select = document.createElement('select');
+          select.setAttribute('aria-label', 'Sort');
+          for (const label of ['Name (A to Z)', 'Name (Z to A)', 'Price (low to high)', 'Price (high to low)']) select.add(new Option(label, label));
+          select.selectedIndex = index;
+          select.onchange = event => { window.sortChanges = [...(window.sortChanges ?? []), select.selectedIndex + ':' + event.isTrusted]; renderSort(select.selectedIndex); };
+          document.querySelector('#sort-host').replaceChildren(select);
+        };
+        renderSort(0);
         console.error('v2 diagnostic marker'); fetch('/diagnostic-error?access_token=diagnostic-secret').catch(() => {});
       </script>`);
     return;
@@ -644,6 +656,25 @@ async function main(): Promise<void> {
     if (!v2SnapshotResult.contentItems.some((item) => item.type === "inputImage")) {
       throw new Error("Adaptive snapshot did not include an image for canvas/iframe content.");
     }
+    // A screenshot just before shows the same page, so the next adaptive snapshot sends no image.
+    if (!(await callBrowserTool(browser, "screenshot", { tabId: v2Tab.id })).success) {
+      throw new Error("V2 screenshot failed.");
+    }
+    for (const attempt of ["after a screenshot", "after a snapshot that sent no image"]) {
+      const repeated = await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id, image: "auto" });
+      const repeatedImage = toolTextPayload(repeated)?.image;
+      if (
+        repeated.contentItems.some((item) => item.type === "inputImage") ||
+        !isDynamicRecord(repeatedImage) ||
+        repeatedImage.included !== false
+      ) {
+        throw new Error(`Adaptive snapshot ${attempt} sent the same image again.`);
+      }
+    }
+    const requestedImage = await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id, image: "always" });
+    if (!requestedImage.contentItems.some((item) => item.type === "inputImage")) {
+      throw new Error("A requested snapshot image was skipped.");
+    }
     const v2Elements = v2Snapshot.elements.filter(isDynamicRecord);
     if (!v2Elements.some((element) => element.name === "Shadow action")) {
       throw new Error("V2 snapshot did not pierce shadow DOM.");
@@ -656,6 +687,7 @@ async function main(): Promise<void> {
     }
     const sameOriginClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Same-origin action", exact: true },
     });
     if (!sameOriginClick.success || !String(toolTextPayload(sameOriginClick)?.text).includes("Same-origin:true")) {
@@ -793,6 +825,7 @@ async function main(): Promise<void> {
     await v2Contents.executeJavaScript(`document.querySelector('[data-rejected-candidate-noise]').remove()`, true);
     const shadowClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Shadow action", exact: true },
       timeoutMs: 30_000,
     });
@@ -801,6 +834,7 @@ async function main(): Promise<void> {
     }
     const frameClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Frame action", exact: true },
       timeoutMs: 30_000,
     });
@@ -897,6 +931,7 @@ async function main(): Promise<void> {
     }
     const frameTyped = await callBrowserTool(browser, "type", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "textbox", name: "Frame field", exact: true },
       text: "iframe input",
       submit: true,
@@ -907,17 +942,19 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`V2 iframe text input used the wrong CDP session: ${toolError(frameTyped)}`);
     }
+    // The model already has the result of its own action, so the text leaves out a plain success.
     const frameTypedActions = toolTextPayload(frameTyped)?.actions;
     if (
       !Array.isArray(frameTypedActions) ||
-      !frameTypedActions.some(
-        (entry) => isDynamicRecord(entry) && entry.action === "type" && entry.outcome === "success",
+      frameTypedActions.some(
+        (entry) => isDynamicRecord(entry) && entry.action === "type" && entry.outcome === "success" && !entry.detail,
       )
     ) {
-      throw new Error("V2 action snapshot omitted the action that produced it.");
+      throw new Error(`V2 action snapshot repeated a plain success: ${JSON.stringify(frameTypedActions)}`);
     }
     const framePressed = await callBrowserTool(browser, "press", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "css", selector: 'input[aria-label="Frame field"]' },
       key: "Enter",
     });
@@ -927,6 +964,7 @@ async function main(): Promise<void> {
     const documentChangesBeforeFrameNavigation = documentChangedTabs.length;
     const scheduledFrameNavigation = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Schedule frame navigation", exact: true },
     });
     const scheduledFrameSnapshot = toolTextPayload(scheduledFrameNavigation);
@@ -1201,6 +1239,7 @@ async function main(): Promise<void> {
     await v2Contents.executeJavaScript("document.querySelector('[data-semantic-scan-limit]').remove(); true", true);
     const visibleTextTarget = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "text", text: "Unique action text", exact: true },
     });
     if (!visibleTextTarget.success || !String(toolTextPayload(visibleTextTarget)?.text).includes("visible-text:true")) {
@@ -1239,6 +1278,7 @@ async function main(): Promise<void> {
     }
     const partiallyCovered = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Partially covered", exact: true },
     });
     if (!partiallyCovered.success || !String(toolTextPayload(partiallyCovered)?.text).includes("partial:true")) {
@@ -1250,6 +1290,7 @@ async function main(): Promise<void> {
     );
     const freshTarget = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Fresh target", exact: true },
     });
     if (!freshTarget.success || !String(toolTextPayload(freshTarget)?.text).includes("fresh:true")) {
@@ -1260,6 +1301,7 @@ async function main(): Promise<void> {
       true,
     );
     if (!isDynamicRecord(point)) throw new Error("V2 canvas coordinates were not serializable.");
+    const beforeStatusAction = await runCauseEffect(browser.snapshot(v2Tab.id));
     const canvasClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
       target: { kind: "point", x: point.x, y: point.y },
@@ -1268,6 +1310,27 @@ async function main(): Promise<void> {
     const canvasValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
     if (canvasValue !== "canvas:true") {
       throw new Error("V2 canvas coordinate click was not trusted.");
+    }
+    // An input action returns a short status, so the refs of the snapshot before it still work.
+    const canvasStatus = toolTextPayload(canvasClick);
+    if (
+      !canvasStatus ||
+      "elements" in canvasStatus ||
+      "text" in canvasStatus ||
+      canvasStatus.revision !== beforeStatusAction.revision ||
+      canvasStatus.url !== v2Contents.getURL()
+    ) {
+      throw new Error(`V2 input action did not return a status: ${JSON.stringify(canvasStatus)}`);
+    }
+    const statusTarget = beforeStatusAction.elements.find((element) => element.name === "Fresh target");
+    if (!statusTarget) throw new Error("V2 action status fixture was not available.");
+    const reusedRefClick = await callBrowserTool(browser, "click", {
+      tabId: v2Tab.id,
+      target: { kind: "ref", ref: statusTarget.ref, revision: beforeStatusAction.revision },
+    });
+    const reusedRefValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (!reusedRefClick.success || reusedRefValue !== "fresh:true") {
+      throw new Error(`V2 ref from before a status action did not work: ${toolError(reusedRefClick)}`);
     }
     const offViewportClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
@@ -1437,6 +1500,16 @@ async function main(): Promise<void> {
       );
     }
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+    // An earlier snapshot already delivered the page-load diagnostics; this one must carry a new entry.
+    const errorsBeforeEnvironment =
+      browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0;
+    await v2Contents.executeJavaScript("fetch('/diagnostic-error?access_token=diagnostic-secret'); true", true);
+    await waitFor(
+      async () =>
+        (browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0) >
+        errorsBeforeEnvironment,
+      "the environment diagnostic error",
+    );
     const environment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
       preset: "mobile",
@@ -1473,6 +1546,20 @@ async function main(): Promise<void> {
       serializedEnvironmentSnapshot.includes("frame-secret")
     ) {
       throw new Error("V2 snapshot metadata exposed URL credentials.");
+    }
+    const repeatedSnapshot = toolTextPayload(await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id }));
+    const delivered = new Set(
+      [
+        ...environmentSnapshot.diagnostics,
+        ...(Array.isArray(environmentSnapshot.actions) ? environmentSnapshot.actions : []),
+      ].map((entry) => JSON.stringify(entry)),
+    );
+    const repeated = [
+      ...(Array.isArray(repeatedSnapshot?.diagnostics) ? repeatedSnapshot.diagnostics : []),
+      ...(Array.isArray(repeatedSnapshot?.actions) ? repeatedSnapshot.actions : []),
+    ].filter((entry) => delivered.has(JSON.stringify(entry)));
+    if (repeated.length > 0) {
+      throw new Error(`V2 snapshot repeated delivered history: ${JSON.stringify(repeated)}`);
     }
     const changesBeforeDiagnosticError = changedEventCount;
     const errorsBeforeDiagnosticError =
@@ -1593,6 +1680,7 @@ async function main(): Promise<void> {
       // did not always fit the highlight and the dispatch on a loaded runner.
       const timedActionNavigation = await callBrowserTool(browser, "click", {
         tabId: actionNavigationTab.id,
+        snapshot: true,
         target: { kind: "role", role: "button", name: "Slow action navigation", exact: true },
         timeoutMs: 5_000,
       });
@@ -1686,6 +1774,34 @@ async function main(): Promise<void> {
       throw new Error(`V2 reload snapshot did not wait for the new document: ${toolError(reloaded)}`);
     }
     if (!waitContents.isAudioMuted()) unmutedTabs.push("tab after navigation and reload");
+    // A status action reads no snapshot. When it navigates, the refs of the old document still go.
+    await waitContents.executeJavaScript(
+      `document.body.append(Object.assign(document.createElement('a'), { href: ${JSON.stringify(`${origin}/?status-navigation`)}, textContent: 'Status navigation' })); true`,
+      true,
+    );
+    const beforeStatusNavigation = await runCauseEffect(browser.snapshot(waitTab.id));
+    const statusNavigationLink = beforeStatusNavigation.elements.find(
+      (element) => element.name === "Status navigation",
+    );
+    if (!statusNavigationLink) throw new Error("V2 status navigation fixture was not available.");
+    const statusNavigationTarget = {
+      kind: "ref",
+      ref: statusNavigationLink.ref,
+      revision: beforeStatusNavigation.revision,
+    } as const;
+    const statusNavigation = await callBrowserTool(browser, "click", {
+      tabId: waitTab.id,
+      target: statusNavigationTarget,
+    });
+    if (!statusNavigation.success) throw new Error(`V2 status navigation click failed: ${toolError(statusNavigation)}`);
+    await waitFor(async () => waitContents.getURL().includes("status-navigation"), "the status navigation");
+    const staleStatusRef = await callBrowserTool(browser, "click", {
+      tabId: waitTab.id,
+      target: statusNavigationTarget,
+    });
+    if (staleStatusRef.success || !toolError(staleStatusRef).includes("Stale browser reference")) {
+      throw new Error("V2 navigation after a status action left an old reference valid.");
+    }
     const { tab: boundedTab, contents: boundedContents } = await openTabWithContents(
       browser,
       origin,
@@ -2423,6 +2539,7 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
   const actionTimeoutStarted = Date.now();
   const boundedAction = await callBrowserTool(browser, "click", {
     tabId: tabId,
+    snapshot: true,
     target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
     timeoutMs: 250,
   });
@@ -2987,6 +3104,14 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
   }
 }
 
+/** The pixel size of the PNG image in a tool result. */
+function imageSize(result: DynamicToolResult): { width: number; height: number } | null {
+  const image = result.contentItems.find((item) => item.type === "inputImage");
+  if (!result.success || !image || image.type !== "inputImage") return null;
+  const png = Buffer.from(image.imageUrl.replace(/^data:image\/png;base64,/u, ""), "base64");
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 async function runControlActions(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
   const selected = await callBrowserTool(browser, "select_option", {
     tabId: tabId,
@@ -3005,6 +3130,46 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
     selectionValue.changeTrusted !== "true"
   ) {
     throw new Error("V2 select did not use trusted native input.");
+  }
+  // The second option with the same initial needs a second key, and the first key's change replaced
+  // the select that had the focus.
+  const sorted = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Sort", exact: true },
+    values: ["Price (high to low)"],
+  });
+  const sortValue = await v2Contents.executeJavaScript(
+    `({ value: document.querySelector('[aria-label="Sort"]').value, changes: window.sortChanges })`,
+    true,
+  );
+  if (
+    !sorted.success ||
+    !isDynamicRecord(sortValue) ||
+    sortValue.value !== "Price (high to low)" ||
+    JSON.stringify(sortValue.changes) !== JSON.stringify(["2:true", "3:true"])
+  ) {
+    throw new Error(
+      `V2 select did not follow a select that the page replaced: ${toolError(sorted)} ${JSON.stringify(sortValue)}`,
+    );
+  }
+  // A screenshot with a ref holds only that element, so it is smaller than the page.
+  const sortRef = (await runCauseEffect(browser.snapshot(tabId))).elements.find(
+    (element) => element.name === "Sort",
+  )?.ref;
+  if (!sortRef) throw new Error("V2 snapshot did not expose the Sort select.");
+  const pageShot = await callBrowserTool(browser, "screenshot", { tabId });
+  const elementShot = await callBrowserTool(browser, "screenshot", { tabId, ref: sortRef });
+  const pageSize = imageSize(pageShot);
+  const elementSize = imageSize(elementShot);
+  if (
+    !pageSize ||
+    !elementSize ||
+    elementSize.width >= pageSize.width / 2 ||
+    elementSize.height >= pageSize.height / 2
+  ) {
+    throw new Error(
+      `V2 element screenshot was not clipped: ${toolError(elementShot)} ${JSON.stringify({ pageSize, elementSize })}`,
+    );
   }
   // An option whose value is the empty string is how a page spells "no selection", and the value is
   // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
@@ -3398,16 +3563,17 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   }
   const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
   if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
-  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
-  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
-    throw new Error("V2 page evaluation was not recorded in browser action history.");
-  }
   const thrownEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
     expression: "(() => { throw new Error('evaluation-smoke-error'); })()",
   });
   if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
     throw new Error("V2 page evaluation did not return a page exception.");
+  }
+  // A snapshot leaves out a plain success, so the failed evaluation shows the history records evaluations.
+  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
+  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "error")) {
+    throw new Error("V2 page evaluation was not recorded in browser action history.");
   }
   const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
@@ -3820,7 +3986,7 @@ function toolTextPayload(result: DynamicToolResult): DynamicRecord | undefined {
   if (item?.type !== "inputText") return undefined;
   let value: unknown;
   try {
-    value = JSON.parse(item.text);
+    value = parseBrowserToolText(item.text);
   } catch {
     return undefined;
   }
@@ -3874,7 +4040,9 @@ async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promis
       (brand) => getString(brand, "brand") === "Chromium" && getString(brand, "version") === chromiumMajorVersion,
     ) ||
     /Electron|OpenBot/u.test(clientHintBrands) ||
-    !clientHintBrands.includes(`"Chromium";v="${chromiumMajorVersion}"`)
+    // Cloudflare rejects a header that differs from the brands the page reads, GREASE brand and order included.
+    clientHintBrands !==
+      navigatorBrands.map((brand) => `"${getString(brand, "brand")}";v="${getString(brand, "version")}"`).join(", ")
   ) {
     throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
   }

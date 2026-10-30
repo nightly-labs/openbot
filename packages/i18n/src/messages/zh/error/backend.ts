@@ -174,6 +174,7 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "只有你自己的自动化任务运行才能唤醒等待，而你还没有自动化任务。请先用 openbot.create_routine 创建一个，再开启等待。",
   "error.backend.agentWaitRemoteUnsupported": "未关闭的等待仅适用于本电脑上的助手。",
+  "error.backend.markUnreadRemoteUnsupported": "仅本电脑上的助手可以将消息标为未读。",
   "error.backend.routineFlowHandoffFailed": "自动化任务无法把工作交给该助手。",
   "error.backend.mcpServerLimit": "OpenBot 最多保留 {limit} 个 MCP 服务器。",
   "error.backend.mcpServerNameTaken": "名为 {name} 的 MCP 服务器已存在。",

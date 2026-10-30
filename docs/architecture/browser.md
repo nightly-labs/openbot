@@ -104,7 +104,9 @@ tokens. They keep the installed Chromium version and host platform. Requests to 
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
-loopback HTTP, the host supplies the basic Chromium brand/version, desktop flag, and platform hints.
+loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
+be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
+chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
 It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
@@ -180,8 +182,9 @@ confirmation. They do not measure provider tokens, model speed, or billable cost
 
 ### Run many steps in one call
 
-Each single action tool returns a full new snapshot. `openbot_browser.run_script` does many actions
-in one call and returns one final snapshot, so a long task sends fewer snapshots to the model.
+Each single action tool takes one model turn, and the model reads the page with a separate snapshot.
+`openbot_browser.run_script` does many actions in one call and returns one final snapshot, so a long
+task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
@@ -193,11 +196,12 @@ site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 c
 `run_steps` 130k. With both tools in the catalog, agents used both, at 198k. So the catalog has only
 `run_script` (`bun run bench:browser-tools`). With the shipped guidance and no hint in the prompt,
 agents used 216k until a browser search also returned `run_script` (see
-[Providers](providers.md)); then 149k.
+[Providers](providers.md)); then 149k. These runs were before input actions returned a short status
+in place of a snapshot, so the token counts can be different now.
 
 The script runs each step through the same code as the single tool, with its own tab queue slot.
 Before each step, the host checks the tab again: ownership, secret protection, takeover, and user
-control. The action steps skip only their per-step snapshot. `evaluate` keeps the scripted-origin
+control. The action steps read no result. `evaluate` keeps the scripted-origin
 record and the secret-document check. When a person takes control of the tab, the call stops and
 returns its partial results with status `user_control`. It does not wait for the release. The
 control event uses the released `click` action, so the Team API wire values do not change.

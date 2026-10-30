@@ -75,6 +75,10 @@ For each email that the account service sends from its mailbox (a sign-in code, 
 message or a welcome email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
+Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
+and the number of Signal connections. It has no account ID, address, session or
+message content.
+
 The account service also records a return from Checkout without payment and later payment
 recovery. Verified paid invoices produce a revenue event in USD, with the original amount,
 currency, and dated exchange rate. Refunds and disputes produce an event with the same USD amount,

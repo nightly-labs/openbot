@@ -319,6 +319,7 @@ export const messages = {
   "chat.menu.reply": "返信",
   "chat.menu.copy": "メッセージをコピー",
   "chat.menu.react": "リアクション",
+  "chat.menu.markUnread": "未読にする",
   "chat.voice.play": "音声メッセージを再生",
   "chat.voice.pause": "音声メッセージを一時停止",
   "chat.voice.pauseReading": "読み上げを一時停止",
