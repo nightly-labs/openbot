@@ -337,6 +337,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:desktop-notifications
 
+      - name: Run the phone notification away and Live Activity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:push-notification-away
+
+      - name: Run the notification summary E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:notification-summary
+
       - name: Run the routine pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-pause-resume
@@ -529,6 +537,8 @@ jobs:
             .openbot-build/sign-in-relay-replay-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
+            .openbot-build/push-notification-away-e2e/
+            .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/

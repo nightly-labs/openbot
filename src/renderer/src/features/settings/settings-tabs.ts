@@ -100,6 +100,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.notifications.description",
     icon: Bell,
     rows: [
+      { titleKey: "settings.notifications.whatYouHear" },
       { titleKey: "settings.desktopNotifications.title", descriptionKey: "settings.desktopNotifications.description" },
       { titleKey: "settings.notificationPreview.title", descriptionKey: "settings.notificationPreview.description" },
       { titleKey: "settings.testNotification.title", descriptionKey: "settings.testNotification.description" },

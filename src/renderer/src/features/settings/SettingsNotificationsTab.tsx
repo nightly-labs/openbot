@@ -1,3 +1,4 @@
+import type { ServerNotificationLevel } from "@openbot/contracts/ipc";
 import {
   Button,
   Item,
@@ -11,10 +12,12 @@ import {
   toast,
 } from "@openbot/ui";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
 import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
 import { Show } from "solid-js";
 import { replayActionSoundChoice } from "../../action-sounds";
 import { useI18n } from "../../i18n-context";
+import type { NotificationLevelsStore } from "./notification-levels-store";
 
 interface SettingsNotificationsTabProps {
   value: GeneralSettingsValue;
@@ -24,6 +27,15 @@ interface SettingsNotificationsTabProps {
   onTestNotification?: (() => void | Promise<void>) | undefined;
   /** Opens the operating system notification settings. Absent where the system has no such page. */
   onOpenNotificationSettings?: (() => void | Promise<void>) | undefined;
+  /** The agents and levels of each server. */
+  levels: NotificationLevelsStore;
+  /** Writes the level of a server for all devices of the user, or for this computer on an older host. */
+  onSetServerLevel: (serverId: string, level: ServerNotificationLevel) => Promise<void>;
+  /** Mutes a server on this computer. No duration mutes until the user unmutes. */
+  onSetServerMuted: (serverId: string, muted: boolean, durationMs?: number) => Promise<void>;
+  /** Moves the tab to one server. Each nonce moves once. */
+  focusRequest?: { serverId: string; nonce: number } | null | undefined;
+  menuMount?: HTMLElement | undefined;
 }
 
 export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
@@ -40,7 +52,34 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
   };
   return (
     <>
-      <SettingsSection title={i18n.t("settings.alerts.title")}>
+      <SettingsSection
+        title={
+          <NotificationScopeTitle
+            title={i18n.t("settings.notifications.whatYouHear")}
+            scope="settings.notifications.allDevices"
+          />
+        }
+      >
+        <NotificationMatrix
+          data-settings-row="settings.notifications.whatYouHear"
+          servers={props.levels.matrixServers()}
+          device="computer"
+          onSetServerLevel={props.onSetServerLevel}
+          onSetAgentLevel={props.levels.setAgentLevel}
+          onTurnOnAgent={props.levels.turnOnAgent}
+          onMute={(serverId, durationMs) =>
+            durationMs === null
+              ? props.onSetServerMuted(serverId, true)
+              : props.onSetServerMuted(serverId, true, durationMs)
+          }
+          onUnmute={(serverId) => props.onSetServerMuted(serverId, false)}
+          onRetry={props.levels.retry}
+          focusRequest={props.focusRequest}
+          menuMount={props.menuMount}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={i18n.t("settings.notifications.thisComputer")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
             data-settings-row="settings.desktopNotifications.title"
@@ -94,11 +133,6 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
               </Item>
             )}
           </Show>
-        </ItemGroup>
-      </SettingsSection>
-
-      <SettingsSection title={i18n.t("settings.sounds.title")}>
-        <ItemGroup class="settings-modal-card">
           <SwitchField
             data-settings-row="settings.taskSound.title"
             checked={props.value.taskCompletionSound}

@@ -341,10 +341,15 @@ export const messages = {
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
-  "mobile.agent.notifications.title": "Notifications",
-  "mobile.agent.notifications.footer": "Les notifications sont les mêmes pour chaque membre de ce serveur.",
   "mobile.agent.notifications.failed": "Impossible de modifier les notifications",
   "mobile.agent.notifications.failedBody": "L’hôte n’a pas pu enregistrer cette modification.",
+  "mobile.agent.notificationLevel.title": "Me notifier pour",
+  "mobile.agent.notificationLevel.server": "Réglage du serveur",
+  "mobile.agent.notificationLevel.serverValue": "Réglage du serveur ({level})",
+  "mobile.agent.notificationLevel.footer":
+    "« Me notifier pour » ne concerne que vous et s’applique sur tous vos appareils.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Ce serveur ne peut pas garder votre propre niveau de notifications pour un agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.agent.newChat.title": "Nouvelle discussion",
   "mobile.agent.newChat.starting": "Démarrage de la nouvelle discussion…",
   "mobile.agent.newChat.footer": "L’agent oublie cette discussion. Sa configuration reste.",

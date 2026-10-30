@@ -63,6 +63,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "이 연결에서는 공유 데이터를 지원하지 않아요.",
   "error.team.agentInstallUnsupported": "이 연결에서는 에이전트 추가를 지원하지 않아요.",
   "error.team.agentHideUnsupported": "이 연결에서는 에이전트 숨기기를 지원하지 않아요.",
+  "error.team.agentNotificationLevelsUnsupported":
+    "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "error.team.agentPublishUnsupported": "이 연결에서는 에이전트 게시를 지원하지 않아요.",
   "error.team.agentUpdateUnsupported": "이 연결에서는 에이전트 업데이트를 지원하지 않아요.",
   "error.team.contextResetUnsupported": "이 연결에서는 새 채팅 시작을 지원하지 않아요.",

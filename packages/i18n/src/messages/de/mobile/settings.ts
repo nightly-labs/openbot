@@ -125,7 +125,6 @@ export const messages = {
     "Mitteilungen und die Live-Aktivität spielen diesen Ton. Die Live-Aktivität schaltet dabei auch den Bildschirm ein. Der OpenBot-Ton ist der Ton, den die Desktop-App spielt, wenn eine Aufgabe fertig ist. Die vier Töne danach sind die Töne der Klangthemen der Desktop-App.",
   "mobile.settings.notifications.soundFooterAndroid":
     "Benachrichtigungen spielen diesen Ton. Der OpenBot-Ton ist der Ton, den die Desktop-App spielt, wenn eine Aufgabe fertig ist. Die vier Töne danach sind die Töne der Klangthemen der Desktop-App.",
-  "mobile.settings.notifications.notifyAbout": "Benachrichtige mich über",
   "mobile.settings.notifications.level.all": "Alle Aktivitäten",
   "mobile.settings.notifications.level.needsMe": "Nur wenn ich gebraucht werde",
   "mobile.settings.notifications.level.nothing": "Nichts",
@@ -142,6 +141,22 @@ export const messages = {
     "Die Ereignisse dieses Servers, die dieses Telefon benachrichtigen. Die Desktop-App hat eigene Einstellungen.",
   "mobile.settings.notifications.serverUnsupported":
     "Dieser Server kann keine Mitteilungen senden. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "mobile.settings.notifications.thisPhone": "Dieses Telefon",
+  "mobile.settings.notifications.whatYouHear": "Was dich erreicht",
+  "mobile.settings.notifications.wholeServer": "Ganzer Server",
+  "mobile.settings.notifications.levelShort.all": "Alle",
+  "mobile.settings.notifications.levelShort.needsMe": "Braucht mich",
+  "mobile.settings.notifications.levelShort.nothing": "Aus",
+  "mobile.settings.notifications.thisPhoneOnly": "Nur dieses Telefon",
+  "mobile.settings.notifications.offForEveryone": "Für alle auf diesem Server aus",
+  "mobile.settings.notifications.turnOn": "Einschalten",
+  "mobile.settings.notifications.turnOnFor": "Benachrichtigungen von {name} für alle auf diesem Server einschalten",
+  "mobile.settings.notifications.levelsFooter":
+    "Tippe noch einmal auf die Stufe eines Agents, damit er wieder dem Server folgt.",
+  "mobile.settings.notifications.agentsUnsupported": "Aktualisiere OpenBot auf diesem Server, um Agents zu wählen.",
+  "mobile.settings.notifications.agentsOffline": "Agents erscheinen, wenn dieser Server online ist.",
+  "mobile.settings.notifications.scopeFooter":
+    "Deine Auswahl gilt auf allen deinen Geräten. Stummschalten gilt nur für dieses Telefon.",
   "mobile.settings.notifications.channel": "Agenten-Benachrichtigungen ({sound})",
   "mobile.settings.notifications.channelSilent": "Agenten-Benachrichtigungen (ohne Ton)",
   "mobile.settings.privacy.title": "Datenschutz",

@@ -353,10 +353,15 @@ export const messages = {
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
-  "mobile.agent.notifications.title": "Powiadomienia",
-  "mobile.agent.notifications.footer": "Powiadomienia są takie same dla każdego członka tego serwera.",
   "mobile.agent.notifications.failed": "Nie udało się zmienić powiadomień",
   "mobile.agent.notifications.failedBody": "Host nie mógł zapisać tej zmiany.",
+  "mobile.agent.notificationLevel.title": "Powiadamiaj mnie o",
+  "mobile.agent.notificationLevel.server": "Ustawienie serwera",
+  "mobile.agent.notificationLevel.serverValue": "Ustawienie serwera ({level})",
+  "mobile.agent.notificationLevel.footer":
+    "„Powiadamiaj mnie o” dotyczy tylko ciebie, na wszystkich twoich urządzeniach.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Ten serwer nie może zapisać twojego poziomu powiadomień dla agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "mobile.agent.newChat.title": "Nowy czat",
   "mobile.agent.newChat.starting": "Rozpoczynanie nowego czatu…",
   "mobile.agent.newChat.footer": "Agent zapomni ten czat. Jego konfiguracja zostanie.",

@@ -35,6 +35,7 @@ import {
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -111,6 +112,7 @@ import {
   installAgentSkill,
   installAgentTemplate,
   installMarketplaceAgent,
+  listAgentNotificationLevels,
   listAgentSkills,
   listEventActivity,
   listEventRoutines,
@@ -140,6 +142,7 @@ import {
   saveHostVaultItem,
   saveMcpServer,
   setAgentHidden,
+  setAgentNotificationLevel,
   setAgentProviderAccount,
   setAgentSessionSetting,
   setAgentSkillEnabled,
@@ -148,6 +151,7 @@ import {
   setHostTimezone,
   setHostUpdateSettings,
   setMcpServerEnabled,
+  setOwnServerNotificationLevel,
   setRoutineResultDestination,
   signInRelayStatus,
   signOutMcpServer,
@@ -270,6 +274,9 @@ type HostRequestActions = Pick<
   | "setAgentMemoryLimit"
   | "loadServerRoles"
   | "setServerRoles"
+  | "loadAgentNotificationLevels"
+  | "setAgentNotificationLevel"
+  | "setOwnServerNotificationLevel"
   | "githubConnector"
   | "loadGitHubRepositories"
   | "loadOnePasswordConnector"
@@ -419,6 +426,9 @@ export function createHostRequestActions({
   /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
+  /** Each member reads and sets only their own levels, so the host does not check a role. */
+  const notificationLevelsApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY, "mobile.agent.notificationLevel.unsupported");
   /** The connectors are optional admin route sets. */
   const connectorsAdmin = (serverId: string) =>
     capabilityApi(serverId, CONNECTORS_CAPABILITY, "mobile.server.connectors.unsupported");
@@ -460,6 +470,7 @@ export function createHostRequestActions({
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
@@ -484,6 +495,12 @@ export function createHostRequestActions({
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
     loadServerRoles: async (serverId) => runTeamRequest(getHostAgentAccess(rolesAdmin(serverId))),
     setServerRoles: async (change, serverId) => runTeamRequest(setHostAgentAccess(rolesAdmin(serverId), change)),
+    loadAgentNotificationLevels: async (serverId) =>
+      runTeamRequest(listAgentNotificationLevels(notificationLevelsApi(serverId))),
+    setAgentNotificationLevel: async (input, serverId) =>
+      runTeamRequest(setAgentNotificationLevel(notificationLevelsApi(serverId), input)),
+    setOwnServerNotificationLevel: async (level, serverId) =>
+      runTeamRequest(setOwnServerNotificationLevel(notificationLevelsApi(serverId), level)),
     githubConnector: async (route, serverId) =>
       runTeamRequest(githubConnectorRequest(connectorsAdmin(serverId), route)),
     loadGitHubRepositories: async (serverId) => runTeamRequest(githubConnectorRepositories(connectorsAdmin(serverId))),

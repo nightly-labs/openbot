@@ -12,6 +12,7 @@ import type {
   AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
+  AgentNotificationLevelsSnapshot,
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
@@ -76,7 +77,9 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveWorkflowGraphInput,
+  ServerNotificationLevel,
   SetAgentMemoryInclusionInput,
+  SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
   SetAgentSessionSettingInput,
   SetEnabledSkillInput,
@@ -300,6 +303,29 @@ export interface MobileWorkspaceContextValue {
    * `push-notifications-android-v1` for an Android phone.
    */
   canSendNotifications: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `agent-notification-levels-v1`. Every member keeps a notification
+   * level of their own for each agent.
+   */
+  canSetAgentNotificationLevel: (serverId: string) => boolean;
+  /**
+   * The user's own level for the agents of `serverId`. It replaces the server level of this phone for
+   * that agent, on each device of the user.
+   */
+  loadAgentNotificationLevels: (serverId: string) => Promise<AgentNotificationLevelsSnapshot>;
+  /** `level: null` removes the level, so the server level applies again. The host answers with all levels. */
+  setAgentNotificationLevel: (
+    input: SetAgentNotificationLevelInput,
+    serverId: string,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
+  /**
+   * The user's own level of the whole server, on each device of the user. `null` gives each device its
+   * own server level again. The host answers with all levels.
+   */
+  setOwnServerNotificationLevel: (
+    level: ServerNotificationLevel | null,
+    serverId: string,
+  ) => Promise<AgentNotificationLevelsSnapshot>;
   /** An absent field stays unchanged; a `null` logo removes it. */
   updateServerIdentity: (
     serverId: string,
@@ -718,7 +744,8 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canUseWorkflows"
-  | "canReadServerStorage";
+  | "canReadServerStorage"
+  | "canSetAgentNotificationLevel";
 
 type MobileWorkspaceStateKey =
   | MobileWorkspaceCapabilityCheck

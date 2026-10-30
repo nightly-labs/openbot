@@ -151,7 +151,11 @@ export const messages = {
   "agentSettings.taskLimit.default": "Padrão ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
-  "agentSettings.notifications.title": "Notificações",
+  "agentSettings.notificationLevel.title": "Me notificar",
+  "agentSettings.notificationLevel.server": "Padrão do servidor ({level})",
+  "agentSettings.notificationLevel.note":
+    "Esta escolha vale só para você, em todos os seus dispositivos. Se o servidor estiver silenciado ou em “Nada”, este agente também fica em silêncio.",
+  "agentSettings.notificationLevel.sharedOff": "As notificações deste agente estão desativadas para todos os membros.",
   "agentSettings.newChat.title": "Novo chat",
   "agentSettings.newChat.description": "O agente esquece este chat. Sua configuração é mantida.",
   "agentSettings.newChat.button": "Iniciar",

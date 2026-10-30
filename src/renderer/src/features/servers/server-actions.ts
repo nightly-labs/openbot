@@ -19,7 +19,6 @@ export function useServerActions() {
   const {
     servers,
     setServerMuted,
-    setServerNotificationLevel,
     setJoinServerOpen,
     setAddServerOpen,
     setCreateLocalServerOpen,
@@ -30,7 +29,7 @@ export function useServerActions() {
   } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings, requestLeaveServer, requestRestartServer } = useServerSettings();
-  const { openHostedServerDelete } = useSettings();
+  const { openHostedServerDelete, openNotificationLevels } = useSettings();
 
   /** Local servers above the saved remote-server order, as the rail draws them. */
   function orderedServers(): ServerSummary[] {
@@ -84,7 +83,7 @@ export function useServerActions() {
 
   const callbacks = {
     onSetMuted: (serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs),
-    onSetNotificationLevel: (serverId, level) => void setServerNotificationLevel(serverId, level),
+    onOpenNotificationSettings: openNotificationLevels,
     onOpenSettings: openServerSettings,
     onLeave: requestLeaveServer,
     // The same confirmation: main removes an owned server from the account instead of leaving it.

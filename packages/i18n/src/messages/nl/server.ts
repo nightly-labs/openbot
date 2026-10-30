@@ -311,13 +311,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Bekijk en bedien deze Mac vanaf een andere computer.",
   "server.settings.later": "Later",
   "server.settings.setUp": "Instellen",
-  "server.settings.notifications": "Meldingen",
-  "server.settings.muteNotifications": "Meldingen dempen",
-  "server.settings.muteDescription":
-    "Stop bureaubladmeldingen, geluiden en updates in de MacBook-notch van deze server.",
-  "server.settings.mutedUntilDescription": "{until}. Zet uit om het dempen nu op te heffen.",
-  "server.settings.notifyAbout": "Meld me over",
-  "server.settings.notifyAboutDescription": "Welke gebeurtenissen van agents een bureaubladmelding tonen.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":

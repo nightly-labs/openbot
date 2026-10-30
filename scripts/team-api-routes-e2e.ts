@@ -26,12 +26,15 @@ import {
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
+  type CustomProviderResult,
+  type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
   type HiddenAgentsSnapshot,
   type QueueSnapshot,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
@@ -39,6 +42,10 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import {
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -56,6 +63,11 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CODECS,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
   type MachineAlertEvent,
@@ -70,6 +82,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -84,6 +97,7 @@ import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
@@ -99,6 +113,7 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
+import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
@@ -591,6 +606,22 @@ const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-al
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real store of the levels that each member chose for each agent, on a temporary file.
+const agentLevelsFile = join(root, "agent-notification-levels.json");
+const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
+// The host's endpoints in memory. The one on Pi has a header and a context window that stay on the host.
+let customEndpoints: CustomProviderSummary[] = [
+  {
+    id: "spark",
+    name: "DGX Spark",
+    baseUrl: "http://spark.local:8080/v1",
+    hasApiKey: false,
+    headerNames: ["X-Tenant"],
+    models: [{ id: "qwen3-coder", name: "Qwen3 Coder", contextWindow: 131072 }],
+    harness: "pi",
+  },
+];
+const customEndpointResult = (): CustomProviderResult => ({ providers: customEndpoints, restart: "not-running" });
 const readMachine = () =>
   Effect.sync(() => {
     record("machineMetrics");
@@ -748,9 +779,27 @@ try {
             }),
         },
         customProviders: {
-          list: unused("providers.customProviders.list"),
-          save: unused("providers.customProviders.save"),
-          remove: unused("providers.customProviders.remove"),
+          list: () => customEndpoints,
+          save: (input) =>
+            Effect.sync(() => {
+              record("saveCustomProvider", input.id, input.harness);
+              const { apiKey, headers, harness, ...endpoint } = input;
+              customEndpoints = [
+                ...customEndpoints,
+                {
+                  ...endpoint,
+                  hasApiKey: apiKey !== null,
+                  headerNames: headers.map(({ name }) => name),
+                  harness: harness ?? "opencode",
+                },
+              ];
+              return customEndpointResult();
+            }),
+          remove: (id) =>
+            Effect.sync(() => {
+              customEndpoints = customEndpoints.filter((endpoint) => endpoint.id !== id);
+              return customEndpointResult();
+            }),
         },
         pasteSignIn: false,
       },
@@ -782,6 +831,12 @@ try {
           record("resetProviderUsage", { provider, accountId });
           return "reset" as const;
         }),
+    },
+    agentNotificationLevels: {
+      snapshot: (memberId, hiddenIds) => agentLevels.snapshot(memberId, hiddenIds),
+      set: (memberId, input) => agentLevels.set(memberId, input),
+      setServer: (memberId, level) => agentLevels.setServer(memberId, level),
+      subscribe: (listener) => agentLevels.subscribe(listener),
     },
     hiddenAgents: {
       listHiddenAgents: () => hidden,
@@ -885,7 +940,7 @@ try {
       "compatibility answers without protocol headers and names the supported range",
       compatibility.status === 200 &&
         field(compatibility.body, "protocol", "minimum") === 1 &&
-        field(compatibility.body, "protocol", "maximum") === 8,
+        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V9,
       summary(compatibility),
     );
     const noHeaders = await call("GET", TEAM_API_ROUTES.identity, { protocol: null });
@@ -902,12 +957,12 @@ try {
       badHeader.status === 400 && field(badHeader.body, "code") === "protocol_error",
       summary(badHeader),
     );
-    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: 9 });
+    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V9 + 1 });
     check(
       "a newer protocol gets 426 host_update_required with the client version",
       newer.status === 426 &&
         field(newer.body, "code") === "host_update_required" &&
-        field(newer.body, "client", "protocol") === 9,
+        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V9 + 1,
       summary(newer),
     );
     const zero = await call("GET", TEAM_API_ROUTES.identity, { protocol: 0 });
@@ -1694,6 +1749,290 @@ try {
     );
   }
 
+  // ---- Agent notification levels (agent-notification-levels-v1) ----
+  {
+    const capabilities = [AGENT_NOTIFICATION_LEVELS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-notification-levels-v1 to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY) &&
+        list(field(compatibility.body, "capabilities")).includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY),
+      summary(compatibility),
+    );
+    // Protocols 7 and 8 read at most 128 capabilities, so their list leaves out the protocol 9 ones.
+    for (const protocol of [7, 8]) {
+      const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol });
+      const names = list(field(older.body, "capabilities"));
+      check(
+        `a protocol ${protocol} peer gets at most 128 capabilities and none of protocol 9`,
+        older.status === 200 &&
+          names.length <= 128 &&
+          !names.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY) &&
+          !names.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY),
+        `${names.length} capabilities`,
+      );
+    }
+    const unsupported = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the agent notification level routes without the capability get 400 agentNotificationLevelsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentNotificationLevelsUnsupported")),
+      summary(unsupported),
+    );
+    const memberSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: "nothing" },
+      capabilities,
+    });
+    const memberRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    const adminRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "a member sets a level for an agent; it is the member's own, and another member does not see it",
+      memberSet.status === 200 &&
+        isDeepStrictEqual(memberSet.body, { server: null, agents: [{ agentId: "agent-ada", level: "nothing" }] }) &&
+        isDeepStrictEqual(memberRead.body, memberSet.body) &&
+        adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { server: null, agents: [] }),
+      [summary(memberSet), summary(memberRead), summary(adminRead)],
+    );
+    const missing = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-none", level: "all" },
+      capabilities,
+    });
+    const hiddenSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", level: "all" },
+      capabilities,
+      protocol: 6,
+    });
+    const invalid = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: "loud" },
+      capabilities,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404, and a wrong level gets 400",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        invalid.status === 400,
+      [summary(missing), summary(hiddenSet), summary(invalid)],
+    );
+    // The file has one entry: the member that chose a level. A restart reads it.
+    const saved = JSON.parse(readFileSync(agentLevelsFile, "utf8"));
+    const memberKeys = isDynamicRecord(saved) && isDynamicRecord(saved.members) ? Object.keys(saved.members) : [];
+    const reloaded = new AgentNotificationLevelStore(agentLevelsFile);
+    await runCauseEffect(reloaded.load());
+    const reloadedLevels = memberKeys.map((key) => reloaded.snapshot(key));
+    const cleared = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: null },
+      capabilities,
+    });
+    check(
+      "the host keeps the level after a restart, and a null level removes it",
+      memberKeys.length === 1 &&
+        isDeepStrictEqual(reloadedLevels, [{ server: null, agents: [{ agentId: "agent-ada", level: "nothing" }] }]) &&
+        cleared.status === 200 &&
+        isDeepStrictEqual(cleared.body, { server: null, agents: [] }),
+      [summary(cleared), reloadedLevels],
+    );
+    // The member's level of the whole server: their own, kept after a restart, and removed with null.
+    const serverSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: "needs-me" },
+      capabilities,
+    });
+    const adminServerRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const serverInvalid = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: "loud" },
+      capabilities,
+    });
+    const serverReloaded = new AgentNotificationLevelStore(agentLevelsFile);
+    await runCauseEffect(serverReloaded.load());
+    const keptServerLevels = memberKeys.map((key) => serverReloaded.serverLevel(key));
+    const serverCleared = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+    check(
+      "a member sets their own server level, another member does not see it, a restart keeps it, and null removes it",
+      serverSet.status === 200 &&
+        isDeepStrictEqual(serverSet.body, { server: "needs-me", agents: [] }) &&
+        isDeepStrictEqual(adminServerRead.body, { server: null, agents: [] }) &&
+        serverInvalid.status === 400 &&
+        isDeepStrictEqual(keptServerLevels, ["needs-me"]) &&
+        isDeepStrictEqual(serverCleared.body, { server: null, agents: [] }),
+      [summary(serverSet), summary(adminServerRead), summary(serverInvalid), keptServerLevels, summary(serverCleared)],
+    );
+
+    // Changes that a member makes at the same time all stay, as two fast clicks or a desktop and a phone
+    // do: each one builds on the one saved before it.
+    const together = await Promise.all([
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId: "agent-ada", level: "nothing" },
+        capabilities,
+      }),
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId: "agent-oc", level: "all" },
+        capabilities,
+      }),
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+        token: bobToken,
+        json: { level: "needs-me" },
+        capabilities,
+      }),
+    ]);
+    const afterTogether = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    const togetherAgents = isDynamicRecord(afterTogether.body)
+      ? list(afterTogether.body.agents).toSorted((left, right) =>
+          String(isDynamicRecord(left) ? left.agentId : "").localeCompare(
+            String(isDynamicRecord(right) ? right.agentId : ""),
+          ),
+        )
+      : [];
+    check(
+      "level changes that a member makes at the same time all stay",
+      together.every((reply) => reply.status === 200) &&
+        isDynamicRecord(afterTogether.body) &&
+        afterTogether.body.server === "needs-me" &&
+        isDeepStrictEqual(togetherAgents, [
+          { agentId: "agent-ada", level: "nothing" },
+          { agentId: "agent-oc", level: "all" },
+        ]),
+      [together.map(summary), summary(afterTogether)],
+    );
+    for (const agentId of ["agent-ada", "agent-oc"])
+      await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId, level: null },
+        capabilities,
+      });
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+
+    // A change on one device reaches the other devices of the same member at once, and no other member.
+    const openLevelsSocket = async (token: string) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: unknown[] = [];
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "agent-notification-levels-changed") {
+          events.push(value);
+          for (const wake of waiters) wake();
+        }
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [AGENT_NOTIFICATION_LEVELS_CAPABILITY],
+        }),
+      );
+      /** Whether a levels event came before the deadline. */
+      const arrived = (deadlineMs: number) =>
+        new Promise<boolean>((resolveArrived) => {
+          if (events.length > 0) return resolveArrived(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveArrived(false);
+          }, deadlineMs);
+          const wake = () => {
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveArrived(true);
+          };
+          waiters.add(wake);
+        });
+      return { socket, events, arrived };
+    };
+    /**
+     * Makes a change until the socket gets its event. The host reads the capabilities of the socket from
+     * its first message, and no answer says that it did, so a change can come before it.
+     */
+    const changeUntilEvent = async (
+      device: Awaited<ReturnType<typeof openLevelsSocket>>,
+      change: () => Promise<unknown>,
+    ) => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await change();
+        if (await device.arrived(5_000)) return true;
+      }
+      return false;
+    };
+    const bobOther = await openLevelsSocket(bobToken);
+    const adaDevice = await openLevelsSocket(adaToken);
+    const bobGot = await changeUntilEvent(bobOther, () =>
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, { token: bobToken, json: { level: "all" }, capabilities }),
+    );
+    // Ada's own change is her first event: an event of bob would have come before it on her socket.
+    const adaGot = await changeUntilEvent(adaDevice, () =>
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: adaToken,
+        json: { agentId: "agent-ada", level: "needs-me" },
+        capabilities,
+      }),
+    );
+    const bobEvents = [...bobOther.events].slice(0, 1);
+    const adaEvents = [...adaDevice.events].slice(0, 1);
+    bobOther.socket.close();
+    adaDevice.socket.close();
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: adaToken,
+      json: { agentId: "agent-ada", level: null },
+      capabilities,
+    });
+    check(
+      "a change of a member's levels reaches the other devices of that member at once, and no other member",
+      bobGot &&
+        adaGot &&
+        isDeepStrictEqual(bobEvents, [{ type: "agent-notification-levels-changed", server: "all", agents: [] }]) &&
+        isDeepStrictEqual(adaEvents, [
+          {
+            type: "agent-notification-levels-changed",
+            server: null,
+            agents: [{ agentId: "agent-ada", level: "needs-me" }],
+          },
+        ]),
+      [bobEvents, adaEvents],
+    );
+  }
+
   // ---- Default provider (provider-default-v1) ----
   {
     const capabilities = [PROVIDER_DEFAULT_CAPABILITY];
@@ -2160,6 +2499,92 @@ try {
         isDeepStrictEqual(callsOf("setProviderKey").at(-1), ["inception", key]) &&
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
+    );
+  }
+
+  // ---- Custom endpoint harness (custom-provider-harness-v1) ----
+  {
+    const harness = { token: adaToken, capabilities: [CUSTOM_PROVIDER_HARNESS_CAPABILITY] };
+    const released = { token: adaToken, capabilities: [PROVIDERS_ADMIN_CAPABILITY] };
+    const decoded = (route: string, reply: Reply) =>
+      CUSTOM_PROVIDER_HARNESS_CODECS.get(route)?.response(200, reply.body);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 7 });
+    check(
+      "the host advertises custom-provider-harness-v1",
+      list(field(compatibility.body, "capabilities")).includes(CUSTOM_PROVIDER_HARNESS_CAPABILITY),
+      summary(compatibility),
+    );
+    const spark = {
+      id: "spark",
+      name: "DGX Spark",
+      baseUrl: "http://spark.local:8080/v1",
+      hasApiKey: false,
+      models: [{ id: "qwen3-coder", name: "Qwen3 Coder" }],
+    };
+    const listed = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customList, { ...harness, json: {} });
+    const releasedList = await call("POST", PROVIDERS_ADMIN_ROUTES.customList, { ...released, json: {} });
+    check(
+      "an admin lists the endpoint on Pi with its harness, and providers-v1 lists it as it did, without the harness",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, [{ ...spark, harness: "pi" }]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customList, listed), [{ ...spark, harness: "pi" }]) &&
+        isDeepStrictEqual(releasedList.body, [spark]),
+      [summary(listed), summary(releasedList)],
+    );
+    const saved = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customSave, {
+      ...harness,
+      json: {
+        id: "studio",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        apiKey: null,
+        models: [{ id: "gpt-oss", name: "GPT-OSS" }],
+        headers: [],
+        harness: "pi",
+      },
+    });
+    const studio = {
+      id: "studio",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      hasApiKey: false,
+      models: [{ id: "gpt-oss", name: "GPT-OSS" }],
+      harness: "opencode",
+    };
+    check(
+      "a save names no harness: the host adds the endpoint on OpenCode, and the result names each harness",
+      saved.status === 200 &&
+        isDeepStrictEqual(callsOf("saveCustomProvider"), [["studio", undefined]]) &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customSave, saved), {
+          providers: [{ ...spark, harness: "pi" }, studio],
+          restart: "not-running",
+        }),
+      summary(saved),
+    );
+    const unsupported = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customList, { ...released, json: {} });
+    const member = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, {
+      ...harness,
+      token: bobToken,
+      json: { id: "studio" },
+    });
+    check(
+      "the harness routes without the capability get 400 providersUnsupported, and a member gets 403",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")),
+      [summary(unsupported), summary(member)],
+    );
+    const deleted = await call("POST", CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, {
+      ...harness,
+      json: { id: "studio" },
+    });
+    check(
+      "an admin removes the endpoint, and the result names the harness of the one that stays",
+      deleted.status === 200 &&
+        isDeepStrictEqual(decoded(CUSTOM_PROVIDER_HARNESS_ROUTES.customDelete, deleted), {
+          providers: [{ ...spark, harness: "pi" }],
+          restart: "not-running",
+        }),
+      summary(deleted),
     );
   }
 

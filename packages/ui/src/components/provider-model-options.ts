@@ -1,9 +1,14 @@
-import type { AgentProviderId, ClientAgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  ClientAgentModelOption,
+  CustomProviderHarness,
+  CustomProviderSummary,
+} from "@openbot/contracts/ipc";
 import {
   agentProviderName,
   CUSTOM_AGENT_DEFAULT_MODEL,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isAgentProvider,
-  isCustomProviderModelId,
   isFreeOpencodeModel,
   isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
@@ -186,11 +191,27 @@ export function groupPickerModels(models: PickerModel[], search: string): Picker
     .map(([, group]) => group);
 }
 
-export function customProviderIds(providers: readonly CustomProviderSummary[]): ReadonlySet<string> {
-  return new Set(providers.map((provider) => provider.id));
+/** Each saved endpoint id, with the provider that runs it. */
+export function customProviderIds(
+  providers: readonly CustomProviderSummary[],
+): ReadonlyMap<string, CustomProviderHarness> {
+  return new Map(providers.map((provider) => [provider.id, provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS]));
 }
 
-/** A model of the Custom tab: a custom endpoint's, which OpenCode serves, or a custom agent's. */
-export function isCustomModel(model: ClientAgentModelOption, customIds: ReadonlySet<string>): boolean {
-  return model.provider === "acp" || (model.provider === "opencode" && isCustomProviderModelId(model.id, customIds));
+/** A model of a custom endpoint, from the provider that runs that endpoint. */
+export function isCustomEndpointModel(
+  provider: ClientAgentModelOption["provider"],
+  modelId: string | null | undefined,
+  customIds: ReadonlyMap<string, CustomProviderHarness>,
+): boolean {
+  const separator = modelId?.indexOf("/") ?? -1;
+  return Boolean(modelId) && separator > 0 && customIds.get(modelId?.slice(0, separator) ?? "") === provider;
+}
+
+/** A model of the Custom tab: a custom endpoint's, which OpenCode or Pi serves, or a custom agent's. */
+export function isCustomModel(
+  model: ClientAgentModelOption,
+  customIds: ReadonlyMap<string, CustomProviderHarness>,
+): boolean {
+  return model.provider === "acp" || isCustomEndpointModel(model.provider, model.id, customIds);
 }

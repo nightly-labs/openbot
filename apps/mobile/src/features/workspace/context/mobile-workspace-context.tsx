@@ -41,7 +41,7 @@ import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -88,7 +88,9 @@ import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
+import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications/use-synced-notification-levels";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
@@ -551,6 +553,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   usePushNotifications({
     servers,
+    serversReady: serverDirectoryState === "ready",
     foreground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
@@ -733,7 +736,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
       context.stage = "compatibility";
-      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV7Base);
+      const compatibilityRead = client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9);
       // On a reconnect the capabilities of the last connection are known, so the workspace reads go
       // out with the compatibility read and do not wait one more round trip. Their results apply only
       // after the check. The read state applies when it arrives: it does not depend on the protocol,
@@ -1061,6 +1064,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applyHostHidden(serverId, event.agents);
         return;
       }
+      // The user changed their levels on another device. A read that started before it is older.
+      if (event.type === "agent-notification-levels-changed") {
+        setSyncedNotificationLevels(serverId, { server: event.server, agents: event.agents });
+        return;
+      }
       syncEventQueries(queryClient, queryScope, serverId, event);
       if (event.type === "channels-changed") void channelStore.refresh(serverId, event.channelId);
       if (
@@ -1258,6 +1266,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }),
     [request, teamApi, queryClient, queryScope],
   );
+  useSyncedNotificationLevelsLoader({
+    servers,
+    foreground,
+    supports: hostRequests.checks.canSetAgentNotificationLevel,
+    load: hostRequests.actions.loadAgentNotificationLevels,
+  });
   const workflows = useMemo(
     () => createWorkflowActions({ request, capabilities: serverCapabilities.current }),
     [request],

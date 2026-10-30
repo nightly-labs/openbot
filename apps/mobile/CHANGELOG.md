@@ -7,6 +7,50 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.4] - In review
+
+### Added
+
+- Tap the activity row of a working agent to open a sheet with each thought of the turn in full and the progress lines between them. The sheet updates live and keeps the newest text in view until you scroll up; "Latest" goes back to it.
+- A finished turn shows a row above its answer with how long the agent thought and its step count. Tap it to open the same sheet for that turn.
+- iPad support. The app fills the iPad screen in portrait and landscape.
+- On a wide screen, such as iPad, an open iPhone Duo or an open Android foldable, the chat list stays beside the open chat.
+- On a wide screen, you can drag the edge of the chat list to make it wider or narrower. Drag it to the left to show only avatars.
+- iPhone Duo support. When you open iPhone Duo, the chat list and the chat show on each side of the fold. When you fold it, the open chat stays open.
+- When a new version of the app is available, home shows a header with the OpenBot eyes. Tap Update to open the store page, or Later to hide it until the next version.
+- An update that does not need the store installs in the app: Update restarts OpenBot with the new version.
+- Tap What's new under the update buttons to read the release notes of each new version. The notes slide down from under the header, over the chat list.
+- Settings › Notifications is now the one place for notifications: choose a server, then All, Needs me, or Off for the whole server and for each of its agents. These choices apply on all your devices, and a change shows at once on the others; a mute applies to this phone only. The agent screen shows the level and opens Settings › Notifications; the server settings no longer have a Notifications row. The agent screen no longer has its own Notifications switch, and "Notify me about" opens the Notifications view inside the agent sheet. An agent that was switched off for everyone shows "Turn on". The server needs the latest OpenBot.
+
+### Changed
+
+- "Waiting for replies" shows when a teammate waits for your approval, your answer or you in the browser, with the command or the question. Review, Answer or Take over opens the teammate's chat.
+- Code blocks in chat now wrap long lines, so you can read an email draft or a long command without scrolling sideways. Line breaks and Copy do not change.
+- The MCP server screen now says that Claude and Codex agents get a server that has a working directory.
+- The Live Activity shows the first sentences of a reply, without code blocks, headings or mail headers, and hides secrets and email addresses as "•••". Approve shows only for a command that it shows in full.
+
+### Fixed
+
+- Show the reason of a group chat task that stopped because its member was removed or is not
+  available in your language. Before, the reason was always in English.
+- Show all of an iPhone message that starts a line with an agent name, code or a link. Before, the
+  lines had too much space between them, and the end of the message was cut with "…".
+- Buttons and text no longer go under the side bar of iPhone Duo or the screen edges in landscape.
+- On iPhone Duo with the side bar, the chat buttons now go into the side bar, as on the home screen.
+- On iPhone Duo with the side bar, page titles no longer go under the blur at the top.
+- Open a server that is online when the app starts and the first server of the list does not connect
+  in 4 seconds. Before, the app stayed on that server for 30 seconds or more, for example when the
+  computer of that server was asleep. The order of the servers does not change.
+- Open the iPhone app on iPhone Duo. Before, the app could stop on a black screen at start.
+- Open the mobile app in Expo Go. Before, it showed an error that the `ReservedRegionsView` native component is not registered.
+- A sign-in code request waits up to 35 seconds for the account server, as on desktop. Before, the app showed that the account service was not reachable after 10 seconds while the server still sent the code.
+- The Live Activity in the Apple Watch Smart Stack fits its card: the agent photo, the name, two lines of text and the unread count, with a margin at each edge. Before, the watch showed the Lock Screen layout made smaller, with the content at the edges and the unread count outside the card.
+- The Live Activity starts again when you open the app after iOS or the computer ended it. Before, it could stay frozen on the Lock Screen and in the Dynamic Island for hours. An activity that is almost 8 hours old also starts again, so iOS does not stop it while you are away.
+- Notifications show the agent name and the text also after the app starts without network. Before, they showed only "OpenBot", and a tap opened nothing.
+- Notifications start to work when Apple or Google gave no push token at the first try. Before, the phone got no notifications until you opened the app again.
+- Notifications and Live Activity updates reach an iPhone app that is not from the App Store, such as a build that Xcode installs or an ad hoc build. Before, the app could name the wrong Apple push environment, and Apple refused every notification and update for it.
+- Show the full names in the chat + menu. Before, a long name, such as "Use skill or app" in Polish, was cut off.
+
 ## [1.4.3] - 2026-10-29 (iOS)
 
 ### Added

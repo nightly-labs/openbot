@@ -28,6 +28,10 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -283,6 +287,13 @@ export function providerAdminIpcHandlers({
     if (running) await Effect.runPromise(Fiber.interrupt(running.fiber));
   }
 
+  /** `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does not. */
+  function customRoutes(serverId: string) {
+    return remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+      ? CUSTOM_PROVIDER_HARNESS_ROUTES
+      : PROVIDERS_ADMIN_ROUTES;
+  }
+
   /** `providers-v8` lists the runtimes as rows; the older route sets give the IPC record. */
   function runtimeDecoder(serverId: string) {
     return remoteServers.supportsCapability(serverId, PROVIDERS_V8_CAPABILITY)
@@ -457,17 +468,17 @@ export function providerAdminIpcHandlers({
       }),
       listCustomProviders: scopedQueryHandler({
         local: () => customProviders.list(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeCustomProviderSummaries),
+        remote: (serverId) => remote(serverId, customRoutes(serverId).customList, {}, decodeCustomProviderSummaries),
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
         local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeCustomProviderResult),
+          remote(serverId, customRoutes(serverId).customSave, input, decodeCustomProviderResult),
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
         local: ({ id }) => runCauseEffect(customProviders.remove(id)),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeCustomProviderResult),
+          remote(serverId, customRoutes(serverId).customDelete, input, decodeCustomProviderResult),
       }),
     },
   };

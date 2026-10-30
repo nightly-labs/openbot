@@ -175,7 +175,11 @@ export const messages = {
   "agentSettings.taskLimit.default": "По умолчанию ({count})",
   "agentSettings.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
 
-  "agentSettings.notifications.title": "Уведомления",
+  "agentSettings.notificationLevel.title": "Уведомлять меня",
+  "agentSettings.notificationLevel.server": "{level} (по умолчанию на сервере)",
+  "agentSettings.notificationLevel.note":
+    "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",
+  "agentSettings.notificationLevel.sharedOff": "Уведомления этого агента отключены для всех участников.",
 
   "agentSettings.newChat.title": "Новый чат",
   "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",

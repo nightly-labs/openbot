@@ -301,13 +301,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Ve y controla este Mac desde otro equipo.",
   "server.settings.later": "Más tarde",
   "server.settings.setUp": "Configurar",
-  "server.settings.notifications": "Notificaciones",
-  "server.settings.muteNotifications": "Silenciar notificaciones",
-  "server.settings.muteDescription":
-    "Detén las notificaciones de escritorio, los sonidos y las actualizaciones en la muesca del MacBook de este servidor.",
-  "server.settings.mutedUntilDescription": "{until}. Desactiva para volver a recibir notificaciones ahora.",
-  "server.settings.notifyAbout": "Notificarme sobre",
-  "server.settings.notifyAboutDescription": "Qué eventos de los agentes muestran una notificación de escritorio.",
   "server.settings.agents": "Agentes",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":

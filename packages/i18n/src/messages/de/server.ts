@@ -305,13 +305,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Sieh und steuere diesen Mac von einem anderen Computer aus.",
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
-  "server.settings.notifications": "Benachrichtigungen",
-  "server.settings.muteNotifications": "Benachrichtigungen stummschalten",
-  "server.settings.muteDescription":
-    "Deaktiviere Desktop-Benachrichtigungen, Töne und MacBook-Notch-Aktualisierungen von diesem Server.",
-  "server.settings.mutedUntilDescription": "{until}. Deaktiviere diese Option, um die Stummschaltung jetzt aufzuheben.",
-  "server.settings.notifyAbout": "Benachrichtige mich über",
-  "server.settings.notifyAboutDescription": "Welche Agentenereignisse eine Desktop-Benachrichtigung anzeigen.",
   "server.settings.agents": "Agenten",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":

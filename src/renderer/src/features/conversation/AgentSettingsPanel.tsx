@@ -1,9 +1,11 @@
 import {
   type AgentBrowserProfile,
   agentAutomationAllowed,
+  agentNotificationLevelMap,
   assignedSkillCount,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
+  type ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
 import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
@@ -14,6 +16,7 @@ import {
 } from "@openbot/ui/features/conversation/AgentSessionSettings";
 import SharedAgentSettingsPanel, {
   type AgentBrowserProfileOptions,
+  type AgentNotificationLevelOptions,
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
@@ -30,7 +33,7 @@ import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
-import type { ConversationRuntime } from "./conversation-runtime";
+import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
 import { type AgentRoutinesApi, agentRoutinesPort, eventRoutinesPort, type RoutinesPort } from "./routines-port";
@@ -39,7 +42,7 @@ import { SharedTablesModal } from "./SharedTablesModal";
 interface AgentSettingsPanelProps
   extends Omit<
     SharedAgentSettingsPanelProps,
-    "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles"
+    "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles" | "notificationLevel"
   > {
   remoteClient?: boolean;
   /** Routines can copy local run commands only on the computer that runs the agent. */
@@ -81,6 +84,12 @@ interface AgentSettingsPanelProps
   browserProfileCalls?: BrowserProfileCalls | undefined;
   /** Opens the Browser profiles section of the settings of the server that runs the agent. */
   onManageBrowserProfiles?: ((trigger: HTMLElement) => void) | undefined;
+  /** The user's own level of each agent on the server. Absent when the server cannot keep it. */
+  notificationLevelCalls?: AgentNotificationLevelCalls | undefined;
+  /** The level of the server that runs the agent. */
+  serverNotificationLevel?: ServerNotificationLevel | undefined;
+  /** Opens the notification settings of the server that runs the agent. Absent hides the row. */
+  onOpenNotificationSettings?: ((trigger: HTMLElement) => void) | undefined;
 }
 
 export type { AgentSkillsMode };
@@ -199,6 +208,53 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   // An effect runs again for an equal value, and each activity of the agent gives a new agent
   // object. The memo keeps an open view, such as a routine edit, until the agent changes.
   const currentAgentId = createMemo(() => props.agent.id);
+
+  // The user's own level of each agent. Undefined while it loads, and when the read fails: the row
+  // then stays hidden. Another device can change it, so it loads again for each agent.
+  const [ownLevels, setOwnLevels] = createSignal<ReadonlyMap<string, ServerNotificationLevel> | undefined>(undefined);
+  let levelsRequest = 0;
+  let levelsCalls: AgentNotificationLevelCalls | undefined;
+  createEffect(
+    () => ({ calls: props.notificationLevelCalls, agentId: currentAgentId() }),
+    ({ calls }) => {
+      const request = ++levelsRequest;
+      // The levels of the last server must not show for the next one.
+      if (calls !== levelsCalls) {
+        levelsCalls = calls;
+        setOwnLevels(undefined);
+      }
+      if (!calls) return;
+      calls.list().then(
+        (snapshot) => {
+          if (request === levelsRequest) setOwnLevels(agentNotificationLevelMap(snapshot));
+        },
+        () => undefined,
+      );
+    },
+  );
+  // A change on another device of the user shows at once.
+  createEffect(
+    () => props.notificationLevelCalls,
+    (calls) => {
+      if (!calls?.subscribe) return;
+      return calls.subscribe((snapshot) => {
+        if (calls === levelsCalls) {
+          ++levelsRequest;
+          setOwnLevels(agentNotificationLevelMap(snapshot));
+        }
+      });
+    },
+  );
+  const notificationLevelOptions = (): AgentNotificationLevelOptions | undefined => {
+    const open = props.onOpenNotificationSettings;
+    const levels = ownLevels();
+    if (!open || !levels) return undefined;
+    return {
+      current: levels.get(props.agent.id) ?? null,
+      serverLevel: props.serverNotificationLevel ?? "all",
+      onOpen: open,
+    };
+  };
   createEffect(
     () => ({
       agentId: currentAgentId(),
@@ -346,6 +402,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     <SharedAgentSettingsPanel
       {...props}
       browserProfiles={browserProfileOptions()}
+      notificationLevel={notificationLevelOptions()}
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}

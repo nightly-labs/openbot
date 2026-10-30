@@ -53,6 +53,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Working: Story = { args: { working: true } };
+/** The user's own level of the agent. The row opens the notification settings, the one place that changes it. */
+export const NotificationLevel: Story = {
+  args: { notificationLevel: { current: null, serverLevel: "needs-me", onOpen: fn() } },
+};
 export const WorkspaceOnly: Story = { args: { agent: { ...STORY_AGENT, access: "workspace" } } };
 
 const STORY_FOLDERS: AgentFolderList = {

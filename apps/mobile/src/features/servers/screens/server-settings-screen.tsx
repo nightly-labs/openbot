@@ -11,7 +11,6 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { ServerNotificationSettings } from "@/features/push-notifications/components/server-notification-settings";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
@@ -181,7 +180,6 @@ export function ServerSettingsScreen() {
           ) : null}
         </SettingsSection>
       ) : null}
-      <ServerNotificationSettings server={server} title={t("mobile.settings.notifications.title")} />
       <SettingsSection title={t("mobile.server.settings.maintenanceSection")} footer={error ?? restarted}>
         {update.access || update.query.data ? <ServerUpdatesRow serverId={serverId} update={update} /> : null}
         <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(() => refreshServer(serverId))}>

@@ -375,7 +375,7 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, hostedServerIds, hostedServersLoaded } = useServers();
+  const { hostStatus, hostedServerIds, hostedServersLoaded } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -704,8 +704,6 @@ function ServerSettings() {
           onSaveIdentity={saveServerIdentity}
           onSetPublished={setServerPublished}
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
-          onSetMuted={(muted) => setServerMuted(server().id, muted)}
-          onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -845,9 +843,10 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen } = useServers();
+  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
   const {
     appSettingsOpen,
+    notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
@@ -912,6 +911,9 @@ function AppSettings(props: AccountProps) {
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}
+        onSetServerNotificationLevel={setServerNotificationLevel}
+        onSetServerMuted={setServerMuted}
+        notificationFocusRequest={notificationFocusRequest()}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}

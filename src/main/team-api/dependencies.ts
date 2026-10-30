@@ -15,6 +15,7 @@ import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
+import type { PreferenceFileFailure } from "../preference-file";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
@@ -33,6 +34,7 @@ import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type {
   AgentEvent,
   AgentModelId,
+  AgentNotificationLevelsSnapshot,
   AgentProviderId,
   CentralAuthUser,
   DirectMessageRealtimeEvent,
@@ -41,6 +43,8 @@ import type {
   RoutineResultDestination,
   RoutineResultRoutineInput,
   SaveSetupInput,
+  ServerNotificationLevel,
+  SetAgentNotificationLevelInput,
   SetRoutineResultDestinationInput,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
@@ -237,6 +241,19 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
+
+/**
+ * `agent-notification-levels-v1`: the level that each member chose for this server and for each agent.
+ * The host keeps the levels of the owner under one key, so its desktop app and its phones read the
+ * same levels.
+ */
+export interface TeamApiAgentNotificationLevels {
+  snapshot(memberId: string, hidden: ReadonlySet<string>): AgentNotificationLevelsSnapshot;
+  set(memberId: string, input: SetAgentNotificationLevelInput): Effect.Effect<unknown, PreferenceFileFailure>;
+  setServer(memberId: string, level: ServerNotificationLevel | null): Effect.Effect<unknown, PreferenceFileFailure>;
+  /** Calls `listener` with the member after each change of their levels, from any of their devices. */
+  subscribe(listener: (memberId: string) => void): () => void;
+}
 
 /**
  * Its presence is what `#protocolSupport` advertises `agent-tasks-v1` and `agent-threads-v1` on. A member
@@ -508,6 +525,7 @@ export interface TeamApiOptions {
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
   hiddenAgents?: TeamApiHiddenAgents;
+  agentNotificationLevels?: TeamApiAgentNotificationLevels;
   /** `agent-access-v1`: the roles that limit what a member can do with each agent. */
   agentAccess?: TeamApiAgentAccess;
   agentTasks?: TeamApiAgentTasks;

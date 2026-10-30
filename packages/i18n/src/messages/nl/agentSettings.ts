@@ -152,7 +152,11 @@ export const messages = {
   "agentSettings.taskLimit.default": "Standaard ({count})",
   "agentSettings.taskLimit.oneTurn":
     "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
-  "agentSettings.notifications.title": "Meldingen",
+  "agentSettings.notificationLevel.title": "Meld mij",
+  "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
+  "agentSettings.notificationLevel.note":
+    "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",
+  "agentSettings.notificationLevel.sharedOff": "Meldingen van deze agent staan uit voor alle leden.",
   "agentSettings.newChat.title": "Nieuwe chat",
   "agentSettings.newChat.description": "De agent vergeet deze chat. De instellingen blijven.",
   "agentSettings.newChat.button": "Starten",

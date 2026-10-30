@@ -31,9 +31,9 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
-  TEAM_CURRENT_CAPABILITIES,
   TEAM_PROTOCOL_V8,
   TEAM_PROTOCOL_VERSION_HEADER,
+  teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES, channelResponse } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -306,6 +306,9 @@ function agentMessage(
   };
 }
 
+/** The capabilities that a protocol 8 peer sends. */
+const V8_PEER_CAPABILITIES = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V8);
+
 /** One HTTP request of a v8 peer that advertises `capabilities`. */
 async function wire(
   port: number,
@@ -420,6 +423,7 @@ try {
     getFormat: () => createFormat("en"),
     desktopNotificationsEnabled: () => true,
     notificationPreviewEnabled: () => false,
+    ownAgentNotificationLevels: () => new Map(),
   });
   const changed = () =>
     forwarders.forwardAgentEvent(LOCAL_SERVER_ID, {
@@ -587,13 +591,13 @@ try {
   const login = await wire(port, {
     method: "POST",
     path: "/v1/auth/login",
-    capabilities: TEAM_CURRENT_CAPABILITIES,
+    capabilities: V8_PEER_CAPABILITIES,
     body: OWNER,
   });
   assert.equal(login.status, 200, `Login failed: ${JSON.stringify(login.body)}`);
   assert.ok(isDynamicRecord(login.body) && typeof login.body.sessionToken === "string");
   const token = login.body.sessionToken;
-  const released = TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_CHANNEL_ATTENTION_CAPABILITY);
+  const released = V8_PEER_CAPABILITIES.filter((capability) => capability !== TEAM_CHANNEL_ATTENTION_CAPABILITY);
   const readBoth = async (capabilities: readonly string[]) => {
     const list = await wire(port, { method: "GET", path: CHANNEL_ROUTES.list, capabilities, token });
     const page = await wire(port, {
@@ -627,7 +631,7 @@ try {
   await step(
     "A peer with channel-attention-v1 gets the threads, the open tasks, the preview author and the UI block",
     async () => {
-      const { list, page } = await readBoth(TEAM_CURRENT_CAPABILITIES);
+      const { list, page } = await readBoth(V8_PEER_CAPABILITIES);
       const codec = teamSideRouteCodec(CHANNEL_ROUTES.list);
       assert.ok(codec);
       const options = { historyExtent: true, channelAttention: true };

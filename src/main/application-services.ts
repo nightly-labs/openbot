@@ -138,6 +138,7 @@ import {
   type AgentMemoryLimitSetting,
   reloadingAgentMemoryLimit,
 } from "./agent-memory-limit-preference-store";
+import { AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
@@ -353,6 +354,7 @@ const PROVIDER_CLI_APP_VERSION_FILE = "openbot-provider-cli-app-version-v1.json"
 const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
+const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const REMOTE_SESSION_REUSE_PREFERENCE_FILE = "openbot-remote-session-reuse-preference-v1.json";
@@ -566,6 +568,7 @@ export interface ApplicationServices {
   agentDefaults: AgentDefaultsPreferenceStore;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
+  agentNotificationLevels: AgentNotificationLevelStore;
   agentAccess: AgentAccessStore;
   serverTimezone: ServerTimezonePreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
@@ -1180,6 +1183,10 @@ export async function createApplicationServices({
   );
   await runCauseEffect(agentMemoryLimit.load());
   const memoryReview = new MemoryReviewPreferenceStore(join(app.getPath("userData"), MEMORY_REVIEW_PREFERENCE_FILE));
+  const agentNotificationLevels = new AgentNotificationLevelStore(
+    join(app.getPath("userData"), AGENT_NOTIFICATION_LEVELS_FILE),
+  );
+  await runCauseEffect(agentNotificationLevels.load());
   await runCauseEffect(memoryReview.load());
   const agentAccess = new AgentAccessStore(join(app.getPath("userData"), AGENT_ACCESS_FILE));
   if (!(await runCauseEffect(agentAccess.load())))
@@ -2351,6 +2358,8 @@ export async function createApplicationServices({
     workflows: { ...workflowRuntime, rotateWorkflowSecret: (input) => events.rotateWorkflowSecret(input) },
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
+    // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
+    agentNotificationLevels,
     // Present, so the host advertises `agent-access-v1`. Only owners and admins change the roles.
     agentAccess,
     // Present, so the host advertises `agent-tasks-v1`. Any member who can send a message to the agent.
@@ -2445,7 +2454,12 @@ export async function createApplicationServices({
       if (!Notification.isSupported()) return false;
       // Read when an event arrives, after the manager below exists.
       const local = remoteServers.list().find((server) => server.id === LOCAL_SERVER_ID);
-      return desktopShowsAgentEvent(event, local, notificationPreference.get().desktopNotifications);
+      return desktopShowsAgentEvent(
+        event,
+        local,
+        notificationPreference.get().desktopNotifications,
+        agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY),
+      );
     },
     verifyRemoteSessionTicket: (ticket) => centralAuth.verifyRemoteSessionTicket(ticket).pipe(toRemoteWorkflowError),
     endRemoteSession: (sessionId) => centralAuth.endRemoteSession(sessionId).pipe(toRemoteWorkflowError),
@@ -2661,6 +2675,16 @@ export async function createApplicationServices({
       selfHostedApiOrigin: selfHostedApiOrigin(centralAuthApiUrl),
       appVersion: app.getVersion(),
       connectTrace,
+      // The owner's levels on this computer's server, which the host also reads for the owner's phones.
+      localNotificationLevels: {
+        snapshot: () => agentNotificationLevels.snapshot(OWNER_NOTIFICATION_KEY),
+        setServer: (level) => agentNotificationLevels.setServer(OWNER_NOTIFICATION_KEY, level),
+        setAgent: (input) => agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, input),
+        subscribe: (listener) =>
+          agentNotificationLevels.subscribe((key) => {
+            if (key === OWNER_NOTIFICATION_KEY) listener();
+          }),
+      },
       accountReady: centralAuthInitialization,
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
       hostedServers: {
@@ -3169,6 +3193,7 @@ export async function createApplicationServices({
     agentDefaults,
     agentMemoryLimit: agentMemoryLimitSetting,
     memoryReview,
+    agentNotificationLevels,
     agentAccess,
     serverTimezone,
     promptCacheTtl,

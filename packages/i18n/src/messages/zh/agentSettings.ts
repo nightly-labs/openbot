@@ -147,7 +147,11 @@ export const messages = {
   "agentSettings.taskLimit.default": "默认（{count}）",
   "agentSettings.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
 
-  "agentSettings.notifications.title": "通知",
+  "agentSettings.notificationLevel.title": "通知我",
+  "agentSettings.notificationLevel.server": "服务器默认（{level}）",
+  "agentSettings.notificationLevel.note":
+    "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
+  "agentSettings.notificationLevel.sharedOff": "此助手的通知已对所有成员关闭。",
 
   "agentSettings.newChat.title": "新对话",
   "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",

@@ -306,13 +306,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Bu Mac'i başka bir bilgisayardan görüntüleyin ve kontrol edin.",
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
-  "server.settings.notifications": "Bildirimler",
-  "server.settings.muteNotifications": "Bildirimleri sessize al",
-  "server.settings.muteDescription":
-    "Bu sunucudan gelen masaüstü bildirimlerini, sesleri ve MacBook çentik güncellemelerini durdurun.",
-  "server.settings.mutedUntilDescription": "{until}. Şimdi sesi açmak için kapatın.",
-  "server.settings.notifyAbout": "Şunun hakkında bildir",
-  "server.settings.notifyAboutDescription": "Hangi ajan olaylarının bir masaüstü bildirimi göstereceği.",
   "server.settings.agents": "Ajanlar",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":

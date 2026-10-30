@@ -1,4 +1,4 @@
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 // One Team API call, from picking a wire format to recording that it failed.
 //
 // **Two encodings, on purpose. Never merge them.** The HTTPS path frames V1 or V3 according to the
@@ -386,7 +386,7 @@ export class RemoteServerClient {
       // treating a host talking nonsense as healthy.
       const value = yield* this.#hostRequestEffect(serverId, TEAM_API_ROUTES.compatibility);
       return yield* remoteDecode(() =>
-        decodeOrProtocolError(decodeTeamProtocolSupportV7Base, value, sourceText("error.remote.invalidCompatibility")),
+        decodeOrProtocolError(decodeTeamProtocolSupportV9, value, sourceText("error.remote.invalidCompatibility")),
       );
     }).pipe(Effect.result);
     if (Result.isFailure(attempt3)) {
@@ -412,7 +412,7 @@ export class RemoteServerClient {
   ): Effect.fn.Return<ServerCompatibility, RemoteWorkflowError> {
     if (!this.#appVersion) return assumedCompatibility(this.#appVersion);
     const attempt4 = yield* Effect.gen({ self: this }, function* () {
-      return yield* requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV7Base, {
+      return yield* requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9, {
         protocol: 7,
         capabilities: TEAM_BOOTSTRAP_CAPABILITIES,
       }).pipe(
@@ -586,7 +586,7 @@ export class RemoteServerClient {
     return yield* remoteDecode(() =>
       webRtcCompatibility(
         this.#appVersion,
-        decodeOrProtocolError(decodeTeamProtocolSupportV7Base, value, sourceText("error.remote.invalidCompatibility")),
+        decodeOrProtocolError(decodeTeamProtocolSupportV9, value, sourceText("error.remote.invalidCompatibility")),
       ),
     );
   });

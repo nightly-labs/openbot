@@ -301,13 +301,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Wyświetlaj i kontroluj tego Maca z innego komputera.",
   "server.settings.later": "Później",
   "server.settings.setUp": "Skonfiguruj",
-  "server.settings.notifications": "Powiadomienia",
-  "server.settings.muteNotifications": "Wycisz powiadomienia",
-  "server.settings.muteDescription":
-    "Zatrzymaj powiadomienia na pulpicie, dźwięki i aktualizacje w wycięciu MacBooka z tego serwera.",
-  "server.settings.mutedUntilDescription": "{until}. Wyłącz, aby od razu przywrócić dźwięk.",
-  "server.settings.notifyAbout": "Powiadamiaj mnie o",
-  "server.settings.notifyAboutDescription": "Które zdarzenia agentów pokazują powiadomienie na pulpicie.",
   "server.settings.agents": "Agenci",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":

@@ -39,6 +39,7 @@ import {
   encodeTeamProtocolV8WebRtcHttpRequest,
   highestCommonTeamProtocol,
   TEAM_APP_VERSION_HEADER,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_CAPABILITIES_HEADER,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_PROTOCOL_V1,
@@ -51,7 +52,14 @@ import {
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import {
+  decodeTeamProtocolSupportV9,
+  TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
+  TEAM_PROTOCOL_V9,
+} from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -1014,6 +1022,48 @@ try {
       `The host failed the DELETE: ${JSON.stringify(frame)}.`,
     );
     return { status };
+  });
+
+  await step("v9 RPC: a protocol 9 peer gets the full list; a protocol 8 peer gets at most 128", async () => {
+    // A WebRTC request has no protocol header: the host reads the protocol from the marker
+    // capabilities. Protocols 7 and 8 read at most 128 capabilities, so their list leaves out the
+    // protocol 9 ones.
+    const compatibility = async (capabilities: readonly string[]) => {
+      const requestId = randomUUID();
+      const from = v2.bridge.sent.length;
+      v2.bridge.emit(
+        "data",
+        "peer-v2",
+        "rpc",
+        encodeTeamProtocolV2Frame(
+          createTeamProtocolV2Request(requestId, "http.request", {
+            method: "GET",
+            path: "/v1/compatibility",
+            body: null,
+            capabilities: [...capabilities],
+          }),
+        ),
+      );
+      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
+      return record(frame.result, "RPC result").body;
+    };
+    // The bootstrap list of a protocol 9 client has the marker, so its first read is complete.
+    const first = decodeTeamProtocolSupportV9(await compatibility(TEAM_BOOTSTRAP_CAPABILITIES));
+    assert.equal(first.protocol.maximum, TEAM_PROTOCOL_V9);
+    assert.ok(first.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The protocol 9 list has no marker.");
+    // A protocol 9 request may carry more than 128 capabilities.
+    const full = decodeTeamProtocolSupportV9(await compatibility(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)));
+    assert.deepEqual(full.capabilities, first.capabilities);
+    // The released protocol 8 decoder still reads what a protocol 8 peer gets.
+    const v8 = decodeTeamProtocolSupportV8Base(await compatibility(teamCapabilitiesForProtocol(8)));
+    assert.ok(v8.capabilities.length <= 128, `A protocol 8 peer got ${v8.capabilities.length} capabilities.`);
+    assert.ok(!v8.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "A protocol 8 peer got the marker.");
+    assert.ok(
+      !v8.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+      "A protocol 8 peer got a protocol 9 capability.",
+    );
+    return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
   });
 
   await step("v8 RPC: a secure authentication answer over WebRTC reaches the agent (#3949)", async () => {

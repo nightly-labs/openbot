@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarImageInput, ServerNotificationLevel } from "@openbot/contracts/ipc";
-import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
+import type { AvatarImageInput } from "@openbot/contracts/ipc";
 import {
   Button,
   ConfirmDialog,
@@ -13,21 +12,11 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   SettingsSection,
-  SwitchField,
   Text,
 } from "@openbot/ui";
 import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
-import {
-  SERVER_NOTIFICATION_LEVEL_LABELS,
-  serverMuteDescription,
-} from "@openbot/ui/features/servers/ServerActionItems";
 import { ServerLogo } from "@openbot/ui/features/servers/ServerLogo";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -88,9 +77,9 @@ interface ServerGeneralSection {
   resetForServer(): void;
 }
 
-/** The General section: server identity, agent settings, notifications, and leaving a joined server. */
+/** The General section: server identity, agent settings, and leaving a joined server. */
 export function createServerGeneralSection(host: ServerSettingsSectionHost): ServerGeneralSection {
-  const { t, format, errorMessage } = useText();
+  const { t, errorMessage } = useText();
   const { props, local, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<GeneralPanels>({
     confirmLeave: false,
@@ -438,62 +427,6 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                   />
                 )}
               </Show>
-            </ItemGroup>
-          </SettingsSection>
-        </Show>
-        <Show when={props.onSetMuted && props.onSetNotificationLevel}>
-          <SettingsSection title={t("server.settings.notifications")}>
-            <ItemGroup class="settings-modal-card">
-              <SwitchField
-                class="server-settings-mute-setting"
-                size="default"
-                checked={props.server.notificationsMuted}
-                disabled={Boolean(busy())}
-                onChange={(value) => void run("mute", () => props.onSetMuted?.(value) ?? Promise.resolve())}
-                label={t("server.settings.muteNotifications")}
-                description={
-                  props.server.notificationsMutedUntil === null
-                    ? t("server.settings.muteDescription")
-                    : t("server.settings.mutedUntilDescription", {
-                        until: serverMuteDescription(props.server, t, format),
-                      })
-                }
-              />
-              <Item>
-                <ItemContent>
-                  <ItemTitle id="server-settings-notification-level-label">
-                    {t("server.settings.notifyAbout")}
-                  </ItemTitle>
-                  <ItemDescription>{t("server.settings.notifyAboutDescription")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Select<ServerNotificationLevel>
-                    options={[...SERVER_NOTIFICATION_LEVELS]}
-                    value={props.server.notificationLevel}
-                    disabled={Boolean(busy())}
-                    placement="bottom-end"
-                    onChange={(level) => {
-                      if (level)
-                        void run(
-                          "notification-level",
-                          () => props.onSetNotificationLevel?.(level) ?? Promise.resolve(),
-                        );
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>
-                        {t(SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue])}
-                      </SelectItem>
-                    )}
-                  >
-                    <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
-                      <SelectValue<ServerNotificationLevel>>
-                        {(state) => t(SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()])}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent mount={host.menuMount()} />
-                  </Select>
-                </ItemActions>
-              </Item>
             </ItemGroup>
           </SettingsSection>
         </Show>

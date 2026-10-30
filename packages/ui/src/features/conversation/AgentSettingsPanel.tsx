@@ -32,6 +32,7 @@ import {
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_BUSY_MESSAGE_MODE,
   type ProviderRuntimeStatus,
+  type ServerNotificationLevel,
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
   widensAgentPermission,
@@ -92,6 +93,7 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
+import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
@@ -127,6 +129,8 @@ export interface AgentSettingsPanelProps {
   quickAcknowledgementEditable?: boolean;
   /** The browser profile of the agent's tabs. Left out when the host cannot change it. */
   browserProfiles?: AgentBrowserProfileOptions | undefined;
+  /** The user's own notification level for the agent. Left out when the server cannot keep it. */
+  notificationLevel?: AgentNotificationLevelOptions | undefined;
   /** The busy-message setting can be changed locally or through the host's administrator route. */
   busyMessageModeEditable?: boolean;
   /** Whether the busy-message default belongs to a joined server's host, not to this app. */
@@ -191,6 +195,15 @@ export interface AgentBrowserProfileOptions {
   onCreate: (name: string) => Promise<string>;
   /** Opens the profiles in the settings of the computer that runs the agent. */
   onManage: (trigger: HTMLElement) => void;
+}
+
+export interface AgentNotificationLevelOptions {
+  /** The level that the user chose for the agent. Null follows the server level. */
+  current: ServerNotificationLevel | null;
+  /** The level of the server. It applies while `current` is null. */
+  serverLevel: ServerNotificationLevel;
+  /** Opens the notification settings, the one place where the user changes the level. */
+  onOpen: (trigger: HTMLElement) => void;
 }
 
 function browserProfileChoice(profile: AgentBrowserProfile): BrowserProfileChoice {
@@ -805,6 +818,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
+  /** "Server default (All activity)" while the agent follows the server, else the level of the agent. */
+  const notificationLevelLabel = (options: AgentNotificationLevelOptions) =>
+    options.current === null
+      ? t("agentSettings.notificationLevel.server", { level: t(SERVER_NOTIFICATION_LEVEL_LABELS[options.serverLevel]) })
+      : t(SERVER_NOTIFICATION_LEVEL_LABELS[options.current]);
+
   async function saveBusyMessage(next: BusyMessageChoice): Promise<void> {
     const agentId = props.agent.id;
     const previous = draft.busyMessage;
@@ -1327,25 +1346,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     onOpen={() => openPage("folders")}
                   />
                 </Show>
-                <div class="agent-settings-switch-row">
-                  <span class="settings-link-label">
-                    <span class="settings-link-icon">
-                      <Bell aria-hidden="true" />
-                    </span>
-                    {t("agentSettings.notifications.title")}
-                  </span>
-                  <Switch
-                    size="sm"
-                    aria-label={t("agentSettings.notifications.title")}
-                    checked={draft.notifications}
-                    onChange={(next) => {
-                      setDraft((state) => {
-                        state.notifications = next;
-                      });
-                      void saveAgentPatch({ notifications: next });
-                    }}
-                  />
-                </div>
                 <SettingsLinkRow
                   ref={pageRowRef("advanced")}
                   icon={<SlidersHorizontal aria-hidden="true" />}
@@ -1353,6 +1353,25 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onClick={() => openPage("advanced")}
                 />
               </SettingsLinkGroup>
+              <Show when={props.notificationLevel}>
+                {(options) => (
+                  <>
+                    <SettingsLinkGroup inset class="agent-settings-runtime-rows">
+                      <SettingsLinkRow
+                        icon={<Bell aria-hidden="true" />}
+                        label={t("agentSettings.notificationLevel.title")}
+                        value={notificationLevelLabel(options())}
+                        onClick={(trigger) => options().onOpen(trigger)}
+                      />
+                    </SettingsLinkGroup>
+                    <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+                      {draft.notifications
+                        ? t("agentSettings.notificationLevel.note")
+                        : t("agentSettings.notificationLevel.sharedOff")}
+                    </Text>
+                  </>
+                )}
+              </Show>
             </Show>
             <Show when={page() === "permissions"}>
               <Show when={props.onUpdatePermissions}>

@@ -304,13 +304,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Affichez et contrôlez ce Mac depuis un autre ordinateur.",
   "server.settings.later": "Plus tard",
   "server.settings.setUp": "Configurer",
-  "server.settings.notifications": "Notifications",
-  "server.settings.muteNotifications": "Mettre les notifications en sourdine",
-  "server.settings.muteDescription":
-    "Arrêtez les notifications de bureau, les sons et les mises à jour de l’encoche du MacBook pour ce serveur.",
-  "server.settings.mutedUntilDescription": "{until}. Désactivez pour réactiver le son maintenant.",
-  "server.settings.notifyAbout": "Me notifier pour",
-  "server.settings.notifyAboutDescription": "Les événements d’agent qui affichent une notification de bureau.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":

@@ -78,6 +78,7 @@ import type {
   SetAgentMemoryInclusionInput,
   UpdateAgentMemoryInput,
 } from "./ipc-agent-memories";
+import type { AgentNotificationLevelsSnapshot, SetAgentNotificationLevelInput } from "./ipc-agent-notification-levels";
 import type {
   AgentProfileDraft,
   GenerateAgentProfileInput,
@@ -1359,6 +1360,11 @@ export const IPC_ENDPOINTS = {
     // A joined server answers through `agent-hidden-v1`. A server without it has no hidden agents.
     listHiddenAgents: scopedQuery<HiddenAgentsSnapshot>()("agent:hidden:list"),
     setAgentHidden: scopedRequest<SetAgentHiddenInput, HiddenAgentsSnapshot>()("agent:hidden:set"),
+    // The user's own level for each agent. A joined server answers through `agent-notification-levels-v1`.
+    listAgentNotificationLevels: scopedQuery<AgentNotificationLevelsSnapshot>()("agent:notification-levels:list"),
+    setAgentNotificationLevel: scopedRequest<SetAgentNotificationLevelInput, AgentNotificationLevelsSnapshot>()(
+      "agent:notification-levels:set",
+    ),
     generateProfile: scopedRequest<GenerateAgentProfileInput, AgentProfileDraft>()("agent:generate-profile"),
     saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
     // Only the computer that runs the agent answers. A joined server has no route for it.

@@ -153,7 +153,11 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.taskLimit.oneTurn":
     "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
-  "agentSettings.notifications.title": "Notifications",
+  "agentSettings.notificationLevel.title": "Notify me",
+  "agentSettings.notificationLevel.server": "Server default ({level})",
+  "agentSettings.notificationLevel.note":
+    "This choice is only for you and applies on all your devices. When the server is muted or set to Nothing, this agent stays silent too.",
+  "agentSettings.notificationLevel.sharedOff": "Notifications are off for this agent for all members.",
 
   "agentSettings.newChat.title": "New chat",
   "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",

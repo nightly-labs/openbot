@@ -25,7 +25,9 @@ import {
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { mcpSecretValues, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
+import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
+import { createPiCustomEndpointExtension } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
@@ -79,6 +81,8 @@ export interface PiProviderOptions {
    * `<provider>/` prefix.
    */
   keyProvider?: { id: KeyOnlyProviderId; apiKey: () => string | null };
+  /** The custom endpoints that run on Pi, read at each spawn. Only for the main `pi` client. */
+  customEndpoints?: CustomProviderSource;
   providerStateDirectory?: string;
   profileGeneration?: boolean;
   mcpServers?: McpServerSource;
@@ -383,11 +387,19 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     );
   });
 
+  /** The extension that gives a key-only provider its key, or that registers the custom endpoints of `pi`. */
   readonly #keyExtension = Effect.fn("PiAgentClient.keyExtension")(function* (this: PiAgentClient) {
     const keyProvider = this.options.keyProvider;
-    const key = keyProvider?.apiKey();
-    if (!keyProvider || !key) return null;
-    const extension = yield* createPiKeyExtension(keyProvider.id, key, this.options.providerStateDirectory);
+    const directory = this.options.providerStateDirectory;
+    if (!keyProvider) {
+      const endpoints = this.options.customEndpoints?.() ?? [];
+      const extension = yield* createPiCustomEndpointExtension(endpoints, directory);
+      for (const secret of extension?.secrets ?? []) this.#secrets.add(secret);
+      return extension;
+    }
+    const key = keyProvider.apiKey();
+    if (!key) return null;
+    const extension = yield* createPiKeyExtension(keyProvider.id, key, directory);
     for (const secret of extension.secrets) this.#secrets.add(secret);
     return extension;
   });

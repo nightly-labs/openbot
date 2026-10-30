@@ -54,7 +54,7 @@ export interface DrainHooks {
    * OpenCode process until it restarts, and the restart waits for a busy agent, so this is what
    * keeps a delivery off an endpoint the user has taken out.
    */
-  servesModel(model: string): boolean;
+  servesModel(model: string, provider: AgentProvider): boolean;
   /**
    * One piece of provider text with the MCP credentials taken out of it. The queue keeps a failed
    * delivery's reason in the database and shows it again, and `MailboxStore` can only apply the
@@ -680,7 +680,7 @@ export class DrainScheduler {
       // started with, until it restarts. Thrown rather than failed here: the catch below also ends
       // the channel assignment, and an assignment left active holds back every other agent.
       const requireServedModel = () => {
-        if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        if (!this.#hooks.servesModel(agent.model, providerForAgent(agent))) throw new Error(REMOVED_ENDPOINT_MESSAGE);
       };
       yield* drainStep(requireServedModel);
       yield* this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));

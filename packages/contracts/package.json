@@ -124,6 +124,7 @@
     "./team-protocol/agent-memory-limit-v1": "./src/team-protocol/agent-memory-limit-v1.ts",
     "./team-protocol/memory-review-v1": "./src/team-protocol/memory-review-v1.ts",
     "./team-protocol/prompt-cache-ttl-v1": "./src/team-protocol/prompt-cache-ttl-v1.ts",
+    "./team-protocol/custom-provider-harness-v1": "./src/team-protocol/custom-provider-harness-v1.ts",
     "./team-protocol/provider-default-v1": "./src/team-protocol/provider-default-v1.ts",
     "./team-protocol/discord-access-v1": "./src/team-protocol/discord-access-v1.ts",
     "./team-protocol/agent-import-v1": "./src/team-protocol/agent-import-v1.ts",
@@ -153,6 +154,7 @@
     "./team-protocol/acp-registry-v1": "./src/team-protocol/acp-registry-v1.ts",
     "./team-protocol/agent-access-v1": "./src/team-protocol/agent-access-v1.ts",
     "./team-protocol/agent-hidden-v1": "./src/team-protocol/agent-hidden-v1.ts",
+    "./team-protocol/agent-notification-levels-v1": "./src/team-protocol/agent-notification-levels-v1.ts",
     "./team-protocol/agent-task-ui-blocks-v1": "./src/team-protocol/agent-task-ui-blocks-v1.ts",
     "./team-protocol/agent-tasks-v1": "./src/team-protocol/agent-tasks-v1.ts",
     "./team-protocol/agent-thread-files-v1": "./src/team-protocol/agent-thread-files-v1.ts",
@@ -188,7 +190,9 @@
     "./team-protocol/v8": "./src/team-protocol/v8.ts",
     "./team-protocol/v8-adapter": "./src/team-protocol/v8-adapter.ts",
     "./team-protocol/v8-base-adapter": "./src/team-protocol/v8-base-adapter.ts",
-    "./team-protocol/v8-webrtc-adapter": "./src/team-protocol/v8-webrtc-adapter.ts"
+    "./team-protocol/v8-webrtc-adapter": "./src/team-protocol/v8-webrtc-adapter.ts",
+    "./team-protocol/v9": "./src/team-protocol/v9.ts",
+    "./team-protocol/v9-webrtc-adapter": "./src/team-protocol/v9-webrtc-adapter.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"
