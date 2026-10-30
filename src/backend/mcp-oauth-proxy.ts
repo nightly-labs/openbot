@@ -67,7 +67,7 @@ export interface McpOAuthProxyOptions {
 }
 
 /** The client that a server sees: OpenBot, and the agent of the route when it has one. */
-export interface McpOAuthProxyClient {
+interface McpOAuthProxyClient {
   version: string;
   /** The current name of the agent whose key is `agentKey`, or `null` when no agent has it now. */
   agentName: (agentKey: string) => string | null;
