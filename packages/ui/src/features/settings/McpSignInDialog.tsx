@@ -26,7 +26,7 @@ export interface McpSignInDialogProps extends McpConnectBaseProps {
   hostName?: string | undefined;
   /** The sign-in page on that host's browser, once the host opened it. */
   page?: McpSignInPageSource | undefined;
-  /** Stops a joined server's sign-in, for the user who closes the dialog while the page waits. */
+  /** Stops the sign-in, for the user who closes the dialog while the browser waits. */
   onCancelSignIn?: (() => void) | undefined;
 }
 
@@ -45,7 +45,7 @@ export function McpSignInDialog(props: McpSignInDialogProps) {
       state={state}
       busy={busy}
       wide={Boolean(page())}
-      onCancelBusy={props.hostName ? props.onCancelSignIn : undefined}
+      onCancelBusy={props.onCancelSignIn}
       description={t("mcp.signIn.description", { name: props.subject.name })}
       onSubmit={connect}
       action={

@@ -87,6 +87,51 @@ Memory refresh behavior remains unchanged. The Codex fake-provider test proves t
 instructions are sent on resume; it does not prove native model adoption. Claude prompt snapshots
 stay off so they cannot freeze changed profile or memory text.
 
+## Background memory review
+
+`agent/memory-review.ts` reviews an agent's memories in the background. Each conversation has its
+own count: the agent's own chat and each side thread. A review starts after 20 completed turns of a
+conversation, after 15 minutes with no turn in a conversation that has 3 or more new turns, when
+the user clears the chat, and when a side thread with new turns closes. Turns of channels,
+messaging threads and routine runs do not count. A turn in which the agent changes its memories
+itself starts the count again. A deleted side thread is not reviewed, and its running review ends.
+The counts and the last reviewed message are in memory only; after a restart, a review reads the
+latest messages.
+
+The number of turns is a setting of the server that runs the agents: Server settings > General >
+Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
+it through `memory-review-v1` (see [servers.md](servers.md)). Main owns
+`openbot-memory-review-v1.json` (`MemoryReviewPreferenceStore`) and passes
+`memoryReviewInterval()` to the agent service, which reads it at each use, so a change applies from
+the next turn. Off starts no review of any kind: not after turns, a pause, a clear or a closed side
+thread. The counts continue while it is off, so the first turn after it is on again can start a
+review.
+
+The review is one profile-client generation without tools, on the agent's own provider. It uses
+the provider's default model (`defaultProviderModel`) when that model is listed and its standard
+input price in `usage-pricing.ts` is lower than the price of the agent's model, with that model's
+default reasoning effort. Otherwise, also when a price is not known, it uses the agent's own model
+and reasoning effort. Benchmark v2 measured the review quality on `claude-haiku-5-5`. The review
+does not reuse the main chat's prompt cache: its prompt and tools are not the chat's, so its input
+is billed at the full rate. It reads the agent's profile, its memories, and the conversation since the last review and after
+the latest context reset, with the side-question transcript budget. The prompt holds every
+essential memory and as many searchable memories as fit 12,000 characters: first those that share
+the most words with the reviewed conversation, then the newest. It states how many are not shown,
+so a review stays the same size at any memory limit. Chat and memory text pass through
+the secret redaction before the prompt is made. The model answers `add`, `update` and `forget`
+operations as JSON. `AgentMemories.applyReview` commits them as one turn through the checks of the
+memory tools: the memory limit, the essential budget, duplicates and the user's selections. A
+review does not change a memory that the user wrote or whose inclusion the user chose, a memory
+whose text changed after the review read it, or a memory whose text the redaction changed. A memory
+clear during the review drops all of its changes.
+
+Only one review runs at a time, and only when a profile-client slot stays free for the user. A
+review that cannot start waits, and starts when the running review ends or at the next turn. A
+clear's review that waits for longer reads the new chat, not the chat that the clear ended. A failed generation or an answer that is not JSON is logged
+and shows nothing. A usage limit is skipped silently and does not mark the model. The changes show as a
+memory-changes line with its own `memory-review-` turn id, in the conversation that was reviewed.
+While a turn of that conversation runs, the line waits for the turn to end. Agent deletion and service stop end a running review.
+
 ## Compaction ownership
 
 Codex and Muse complete explicit compaction through turn events. Pi completes it through the request
@@ -797,6 +842,34 @@ a refused `turn/start`, and a provider that fails to start do not fail over. A m
 most once for each model that failed it, so a move that cannot happen shows the error on the next
 failure; the check for a ready backup runs again when the turn ends.
 
+### Usage read pacing
+
+Each desktop window, web tab and phone polls the plan usage every five minutes, and each poll reaches
+the host. A usage endpoint allows few requests an hour for each login: Claude's is shared with Claude
+Code and answers HTTP 429 for an hour or more when a client asks too often. So `UsageReadGate`
+(`src/backend/agent/usage-read-gate.ts`) paces the reads of each provider's own sign-in in
+`ProviderRuntime.usage`, and of each account after the first in `ProviderAccounts.usage`. One read runs
+at a time; a request that comes during it waits and takes its reading. A reading answers for four
+minutes, a little less than the poll, so one view still gets a new reading at each poll. After a failed
+read, the next one waits 5 minutes, then 10, 20 and 40, up to an hour. Between reads and during the wait,
+the last reading stays on the rail, also when one of its windows has reset.
+A window that resets after the last read starts a read before the four minutes end, but not during the
+wait after a failure; a window that had already reset when the provider sent the reading does not.
+
+A read outside the poll of the provider's own sign-in, with the dock's model, also counts: when Codex
+starts, its reading replaces the kept one and the next poll does not read again. The read after a usage
+limit has no model, so for a provider whose limits depend on the model it resets the gate, and the next
+poll reads. These reads, and the reads of a usage reset, are not paced. A credential change, another
+login, a sign-out, turning the provider off or a new key resets the gate and forgets the kept reading and
+reset credits, so the next poll reads at once and no view shows the old login's reading; a read that
+started before the reset does not set the next read time. An account check or a usage reset of an
+account after the first also counts as a read.
+
+The values follow t3code (one refresh in five minutes for each host, one at a time) and openusage (5
+minutes, doubling up to an hour). CodexBar and openusage first wait for `Retry-After`; the Claude Agent
+SDK and the Codex app-server do not give OpenBot that header, so the gate uses only the doubling.
+`scripts/usage-read-pacing-e2e.ts` checks the gate with a fake Codex.
+
 ### Usage reset credits
 
 Codex can give an account usage reset credits: one restores the spent usage limits of the account at
@@ -804,8 +877,8 @@ once (issue #2859). `account/rateLimits/read` counts them in `rateLimitResetCred
 and `account/rateLimitResetCredit/consume` spends one; both are stable Codex app-server methods since
 0.156.0. `ProviderRuntime.#refreshUsage` keeps the count of each client with its usage reading.
 `usageResets` reads the provider's own sign-in again while its process runs, and keeps the last count
-while it is released; an account after the first uses the reading that the dock keeps for five
-minutes. An account whose reading has no count is left out. `resetUsage` sends the consume with a new
+while it is released; an account after the first uses the reading that the dock keeps (see
+[Usage read pacing](#usage-read-pacing)). An account whose reading has no count is left out. `resetUsage` sends the consume with a new
 `idempotencyKey` for each reset the user asks for, through the running client, an agent's process or a
 short one in the account's folder. Then it reads the account's usage again and sends `usage-changed`.
 After the answer `reset`, or `nothingToReset` (no limit of the account is spent), `AgentService` calls

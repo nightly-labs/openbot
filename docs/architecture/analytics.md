@@ -137,7 +137,8 @@ that host team can read totals. The public web and Signal service store no usage
 
 The Usage views show 7, 30, 90, or custom days, with 30 days as the default. Both expose exact daily
 values beside the SVG charts. Cost is a USD API-equivalent estimate, not a subscription charge.
-The bundled rates cite official sources and carry a verification date. Claude list-price estimates
+The bundled rates cite official sources and carry a verification date. A rate with a scheduled
+change uses the rate in force when the turn started. Claude list-price estimates
 come from SDK model usage; unknown or managed pricing is not treated as a list-price estimate.
 Codex cache writes use the 30-minute cache-write rate. An update under the provider's long-context
 threshold uses the short rates. An update over it uses the long rates only when it is one request

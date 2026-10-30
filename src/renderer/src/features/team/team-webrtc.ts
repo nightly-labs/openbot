@@ -87,6 +87,8 @@ interface PeerState {
   iceRestarts: number;
   /** Set by `replaceSignal`: after a network change the path can be dead while it still reports `connected`. */
   restartIceOnReady: boolean;
+  /** A host child whose path failed. Main counts the phone as away until the path comes back. */
+  pathLost: boolean;
   signalChain: Promise<void>;
   closed: boolean;
 }
@@ -181,6 +183,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
         iceRestarting: false,
         iceRestarts: 0,
         restartIceOnReady: false,
+        pathLost: false,
         signalChain: Promise.resolve(),
         closed: false,
       };
@@ -493,6 +496,7 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
         turnRefreshDueAt: 0,
         signalRenewTimer: null,
         disconnectedTimer: null,
+        pathLost: false,
         signalChain: Promise.resolve(),
       };
       state.clients.set(message.sessionId, client);
@@ -624,12 +628,22 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
     if (connection.connectionState === "connected") {
       clearPathRecovery(state);
       void reportSelectedPath(state, connection).catch(() => undefined);
+      if (state.signalHost && state.pathLost) {
+        state.pathLost = false;
+        post({ type: "peer-path-restored", peerId: state.id });
+      }
     }
     if (connection.connectionState === "disconnected" || connection.connectionState === "failed")
       recoverPath(state, connection);
     if (connection.connectionState === "failed") {
       state.iceRestartPending = true;
       void retryPendingIceRestart(state);
+      // ICE consent expired: the phone did not answer for 30 s, as when iOS suspends the app. The
+      // host keeps the peer for its return, but the phone cannot update its Live Activity now.
+      if (state.signalHost && !state.pathLost) {
+        state.pathLost = true;
+        post({ type: "peer-path-lost", peerId: state.id });
+      }
     }
     if (connection.connectionState === "closed") post({ type: "peer-disconnected", peerId: state.id });
   };

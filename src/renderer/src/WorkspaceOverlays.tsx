@@ -1,4 +1,10 @@
-import type { CentralAuthUser, RoutineFields, ServerSummary } from "@openbot/contracts/ipc";
+import {
+  type CentralAuthUser,
+  LOCAL_SERVER_ID,
+  LOCAL_SERVER_LIMIT,
+  type RoutineFields,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -27,6 +33,7 @@ import { useProviderDetection } from "./features/custom-providers/provider-detec
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { desktopScheduleSource } from "./features/schedule/schedule-port";
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import {
   createdRoutines,
@@ -50,7 +57,7 @@ import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { CreateLocalServerDialog, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -98,6 +105,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <CreateLocalServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -209,17 +217,43 @@ function JoinServer(props: AccountProps) {
   );
 }
 
+/** A new server on this computer, with its own agents, chats and files. */
+function CreateLocalServer() {
+  const { servers, createLocalServerOpen, setCreateLocalServerOpen } = useServers();
+  const { createLocalServer } = useServerSelection();
+  // Main refuses one more server too. This only tells the user before they type a name.
+  const limitReached = () => servers().filter((server) => server.thisComputer).length >= LOCAL_SERVER_LIMIT;
+  return (
+    <Show when={createLocalServerOpen()}>
+      <Loading>
+        <CreateLocalServerDialog
+          limitReached={limitReached()}
+          onClose={() => setCreateLocalServerOpen(false)}
+          onCreate={createLocalServer}
+        />
+      </Loading>
+    </Show>
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select } = useServerActions();
+  const { select, createLocal } = useServerActions();
   const { openAppSettings } = useSettings();
+  const onCreateLocal =
+    createLocal &&
+    (() => {
+      setAddServerOpen(false);
+      createLocal();
+    });
 
   return (
     <AddServerOverlay
       open={addServerOpen()}
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
+      license={appPort().license}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
@@ -231,6 +265,7 @@ function AddServer() {
         setAddServerOpen(false);
         setJoinServerOpen(true);
       }}
+      onCreateLocal={onCreateLocal}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -238,7 +273,8 @@ function AddServer() {
 
 /**
  * The offer of a hosted server when routines depend on this computer or on the user's own remote
- * computer. A routine that an agent makes shows the offer when that agent's turn ends.
+ * computer. The modal opens only after the first routine on this computer, when the turn of the agent
+ * that made it ends.
  */
 function HostedUpsell(props: AccountProps) {
   const { activeServer, hostedServersAvailable, hostedServersLoaded, hostedServerIds, setAddServerOpen } = useServers();
@@ -257,19 +293,40 @@ function HostedUpsell(props: AccountProps) {
       }
     }
   });
+  // Named functions, not conditional props: the controller reads these props in an effect callback,
+  // where the memo of a conditional prop halts the renderer.
+  function canOfferHostedServer(): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      hostedServerIds().size === 0 &&
+      (activeServer()?.kind === "local" || activeServer()?.role === "owner") &&
+      activeServer()?.hosted !== true
+    );
+  }
+  function upsellServerId(): string {
+    return activeServer()?.id ?? "local";
+  }
+  function upsellHost() {
+    const server = activeServer();
+    return server?.kind === "remote" ? { name: server.name ?? "" } : ("this-computer" as const);
+  }
+  // The calendar lists every routine of the host. A range in the future reads no run history.
+  function localActiveRoutineIds(): Promise<readonly string[] | null> {
+    if (untrack(activeServer)?.kind !== "local") return Promise.resolve(null);
+    const from = Date.now() + 60_000;
+    return desktopScheduleSource()
+      .calendar({ from: new Date(from).toISOString(), to: new Date(from + 60_000).toISOString() }, LOCAL_SERVER_ID)
+      .then((calendar) => calendar.routines.filter((routine) => routine.active).map((routine) => routine.id));
+  }
   return (
     <HostedServerUpsell
       accountId={props.account().id}
-      canOffer={
-        !platform.landingPreview &&
-        hostedServersAvailable() &&
-        hostedServersLoaded() &&
-        hostedServerIds().size === 0 &&
-        (activeServer()?.kind === "local" || activeServer()?.role === "owner") &&
-        activeServer()?.hosted !== true
-      }
-      serverId={activeServer()?.id ?? "local"}
-      host={activeServer()?.kind === "remote" ? { name: activeServer()?.name ?? "" } : "this-computer"}
+      canOffer={canOfferHostedServer()}
+      serverId={upsellServerId()}
+      activeHostRoutineIds={localActiveRoutineIds}
+      host={upsellHost()}
       busy={(agentId) => Boolean(activeTurns()[agentId])}
       openPlans={() => setAddServerOpen(true, "upsell")}
       track={(action, entryPoint) =>
@@ -286,6 +343,7 @@ function LeaveServer() {
     <LeaveServerDialog
       server={leaveConfirmServer()}
       removeOwned={leaveConfirmServer()?.role === "owner"}
+      deleteLocal={leaveConfirmServer()?.thisComputer === true}
       onClose={cancelLeaveServer}
       onLeave={leaveConfirmedServer}
       restoreFocusTarget={leaveRestoreTarget()}
@@ -293,7 +351,7 @@ function LeaveServer() {
   );
 }
 
-/** The hosted server restart that the server menu opens. */
+/** The restart of a hosted server, or of a server on this computer, that the server menu opens. */
 function RestartServer() {
   const { servers } = useServers();
   const { restartConfirmServer, restartRestoreTarget, cancelRestartServer, restartConfirmedServer } =
@@ -726,6 +784,7 @@ function ServerSettings() {
           hostUpdate={{}}
           hostTimezone={{}}
           hostMemoryLimit={{}}
+          memoryReview={{}}
           hostPromptCacheTtl={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}

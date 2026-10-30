@@ -13,4 +13,11 @@ export const messages = {
   "mobile.share.noAgents": "에이전트 없음",
   "mobile.share.chooseAgent": "에이전트 선택",
   "mobile.share.action": "{name}에게 공유",
+  "mobile.share.extension.send": "보내기",
+  "mobile.share.extension.footer": "OpenBot이 지금 이 내용을 에이전트에게 보냅니다. 앱은 열리지 않습니다.",
+  "mobile.share.extension.sending": "{name}에게 보내는 중…",
+  "mobile.share.extension.sent": "{name}에게 보냄",
+  "mobile.share.extension.failed": "OpenBot이 이 내용을 보내지 못했습니다. 앱을 열어 거기에서 보내세요.",
+  "mobile.share.extension.unconfirmed": "서버가 메시지를 확인하지 않았습니다. 다시 보내기 전에 채팅을 확인하세요.",
+  "mobile.share.extension.openApp": "OpenBot 열기",
 } as const satisfies PartialTranslation<typeof source>;

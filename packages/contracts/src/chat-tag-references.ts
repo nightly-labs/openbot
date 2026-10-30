@@ -90,6 +90,35 @@ export function chatTagReferences(value: string): ChatTagReference[] {
   }));
 }
 
+/**
+ * Addresses a message to every member of a channel. It is plain text, not a tag, so a client of
+ * any version can write it and an app that predates it shows the same text.
+ */
+export const EVERYONE_MENTION = "@everyone";
+
+/* `@everyone` is an address only as a whole word: "@everyone's notes" names no one. */
+const ADDRESS_SEPARATORS = /^(?:[\s,]|and\b|&|@everyone(?![\p{L}\p{N}_'’-]))*/iu;
+
+/**
+ * Whom a message opens by addressing, as a reader addresses several people: "@A @B, @C what do
+ * you think?" or "@everyone ideas?". Spaces, commas and "and" may separate them. A tag after the
+ * first other word is a reference in the text, not an address.
+ */
+export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean } {
+  const mentions: ChatTagReference[] = [];
+  let end = 0;
+  let everyone = false;
+  for (const reference of [...chatTagReferences(value), undefined]) {
+    const gap = value.slice(end, reference?.start);
+    const separators = ADDRESS_SEPARATORS.exec(gap)?.[0] ?? "";
+    everyone ||= separators.toLowerCase().includes(EVERYONE_MENTION);
+    if (reference?.kind !== "agent" || separators.length !== gap.length) break;
+    mentions.push(reference);
+    end = reference.end;
+  }
+  return { mentions, everyone };
+}
+
 function chatTagKind(value: string | undefined): ChatTagKind {
   if (value === "skill" || value === "mcp" || value === "quote") return value;
   return "agent";

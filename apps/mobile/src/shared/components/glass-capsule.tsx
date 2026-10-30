@@ -27,6 +27,7 @@ export function GlassCapsule({
   liquidGlass,
   fallbackBackground,
   width,
+  height = GLASS_CAPSULE_HEIGHT,
   animateGlass = false,
   glassHidden = false,
   tint,
@@ -42,6 +43,8 @@ export function GlassCapsule({
   blurPaused?: boolean;
   fallbackBackground: unknown;
   width?: number;
+  /** A capsule beside the chat composer takes its resting height, so the two match. */
+  height?: number;
   /**
    * A color over the glass, such as the agent color of a task result. Pass it before it shows, so the
    * tint is mounted and fades in.
@@ -77,8 +80,8 @@ export function GlassCapsule({
         isAndroid && !liquidGlass ? { backgroundColor: "transparent" } : null,
         {
           borderCurve: "continuous",
-          borderRadius: GLASS_CAPSULE_HEIGHT / 2,
-          height: GLASS_CAPSULE_HEIGHT,
+          borderRadius: height / 2,
+          height,
           overflow: "hidden",
           width,
         },

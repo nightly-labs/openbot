@@ -239,9 +239,9 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
       )}
 
       <View
-        className="absolute inset-x-0 z-20 flex-row items-center gap-2 px-4"
+        className="absolute inset-x-0 z-20 flex-row items-center gap-2"
         pointerEvents="box-none"
-        style={{ top: insets.top + HEADER_OFFSET }}
+        style={{ top: insets.top + HEADER_OFFSET, paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
       >
         <ChatGlassIconButton
           accessibilityLabel={t("common.back")}
@@ -341,10 +341,16 @@ function MarkdownPreview({
   note: string | null;
   insets: { top: number; bottom: number };
 }) {
+  const sides = useSafeAreaInsets();
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
+      contentContainerStyle={{
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom + 24,
+        paddingLeft: sides.left + 20,
+        paddingRight: sides.right + 20,
+      }}
       scrollIndicatorInsets={{ top: insets.top, bottom: insets.bottom }}
     >
       <ChatMarkdown body={source} color={undefined} finished selectable />

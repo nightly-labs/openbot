@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from "react-native";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { isIOS } from "@/shared/lib/platform";
 
 const HEADER_HEIGHT = 64;
@@ -50,7 +51,9 @@ function PreviewBubble({ text, onHeight }: { text: string; onHeight?: (height: n
  * that opens the chat does not also parse the latest message.
  */
 export function useAgentChatPreview(agent: MobileAgent) {
-  const { width: screenWidth, fontScale } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
+  // In the chat list pane, the preview has the width of the pane, not of the whole window.
+  const screenWidth = useColumnWidth();
   const [measuring, setMeasuring] = useState(false);
   const [bubbleHeight, setBubbleHeight] = useState<number | null>(null);
   const width = screenWidth - 2 * SIDE_INSET;

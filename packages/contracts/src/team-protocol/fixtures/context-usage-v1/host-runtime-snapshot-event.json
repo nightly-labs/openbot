@@ -1,0 +1,68 @@
+{
+  "type": "runtime-snapshot",
+  "snapshot": {
+    "bots": [],
+    "activeTurns": [],
+    "work": [],
+    "latestMessages": [],
+    "attentionComplete": true,
+    "pendingPrompts": [],
+    "pendingApprovals": [],
+    "pendingBrowserTakeovers": [],
+    "failedTurns": [],
+    "contextStates": [
+      {
+        "botId": "agent-1",
+        "threadId": "thread-1",
+        "usage": {
+          "usedTokens": 52000,
+          "windowTokens": 200000,
+          "autoCompactAt": 0.9,
+          "nativeManaged": true,
+          "estimated": false,
+          "categories": [
+            {
+              "category": "messages",
+              "tokens": 40000
+            },
+            {
+              "category": "tools",
+              "tokens": 12000
+            }
+          ]
+        },
+        "compaction": {
+          "id": "compaction-1",
+          "startedAt": 1793000000000,
+          "status": "completed",
+          "beforeTokens": 180000,
+          "afterTokens": 52000
+        }
+      }
+    ],
+    "threadContextStates": [
+      {
+        "botId": "agent-1",
+        "threadId": "thread-2",
+        "usage": {
+          "usedTokens": 52000,
+          "windowTokens": 200000,
+          "autoCompactAt": 0.9,
+          "nativeManaged": true,
+          "estimated": false,
+          "categories": [
+            {
+              "category": "messages",
+              "tokens": 40000
+            },
+            {
+              "category": "tools",
+              "tokens": 12000
+            }
+          ]
+        },
+        "compaction": null
+      }
+    ]
+  }
+}

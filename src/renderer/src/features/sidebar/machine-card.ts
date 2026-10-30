@@ -10,6 +10,7 @@ import {
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { createMemo, createSignal, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
+import { MACHINE_RESOURCES_SHOWN } from "../files/machine-resources";
 import { canManageStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { sidebarPort } from "./sidebar-port";
@@ -83,7 +84,10 @@ export function createMachineCard(server: () => ServerSummary | undefined) {
   const [dismissals, setDismissals] = createSignal(0);
   const target = createMemo(() => {
     const current = server();
-    return current && serverSupportsCapability(current, MACHINE_RESOURCES_CAPABILITY) && canManageStorage(current)
+    return MACHINE_RESOURCES_SHOWN &&
+      current &&
+      serverSupportsCapability(current, MACHINE_RESOURCES_CAPABILITY) &&
+      canManageStorage(current)
       ? current.id
       : null;
   });

@@ -540,7 +540,7 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const optional = optionalTeamEvent(value);
+            const optional = optionalTeamEvent(value, { agentTaskUiBlocks: true });
             const decoded = optional
               ? { kind: "known" as const, event: optionalTeamEventToCurrent(optional) }
               : decodeTeamProtocolV8BaseCurrentEvent(value);

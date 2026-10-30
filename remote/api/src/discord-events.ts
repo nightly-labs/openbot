@@ -41,6 +41,16 @@ type DiscordAttachmentData = {
   url: string;
 };
 
+/** The text and files of a message, and of a forwarded message in `message_snapshots`. */
+type DiscordBodyData = {
+  content?: string | undefined;
+  attachments?: DiscordAttachmentData[] | undefined;
+  message_reference?: { type?: number | undefined; message_id?: string | undefined } | undefined;
+  message_snapshots?:
+    | { message: { content?: string | undefined; attachments?: DiscordAttachmentData[] | undefined } }[]
+    | undefined;
+};
+
 /** The fields of a Gateway or REST message that Signal reads. */
 export interface DiscordMessageData {
   id: string;
@@ -53,14 +63,13 @@ export interface DiscordMessageData {
   member?: { nick?: string | null; roles?: string[] };
   mentions: { id: string }[];
   message_reference?: { type?: number; message_id?: string };
-  referenced_message?: {
-    id: string;
-    content?: string;
-    timestamp?: string;
-    author: { id: string; username?: string; global_name?: string | null };
-    message_reference?: { message_id?: string };
-    attachments?: DiscordAttachmentData[];
-  } | null;
+  referenced_message?:
+    | (DiscordBodyData & {
+        id: string;
+        timestamp?: string;
+        author: { id: string; username?: string; global_name?: string | null };
+      })
+    | null;
   attachments: DiscordAttachmentData[];
 }
 
@@ -88,7 +97,7 @@ export function discordAuthorName(message: {
 }
 
 /** Removes each mention of the bot user: a host does not know the bot user ID. */
-export function stripBotMention(content: string, botUserId: string | null): string {
+function stripBotMention(content: string, botUserId: string | null): string {
   if (!botUserId) return content.trim();
   return content.split(`<@${botUserId}>`).join("").split(`<@!${botUserId}>`).join("").trim();
 }
@@ -127,7 +136,7 @@ function normalizeGuildMessage(message: DiscordMessageData, botUserId: string): 
 }
 
 /** The attachments on Discord's CDN, up to Discord's limit. */
-export function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[] {
+function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[] {
   const attachments: DiscordInboundAttachment[] = [];
   for (const attachment of list) {
     if (attachments.length >= DISCORD_ATTACHMENTS_LIMIT) break;
@@ -144,22 +153,40 @@ export function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAtta
 }
 
 /**
+ * The text and files of a message. A forward has none of its own: Discord gives the forwarded
+ * message's in its snapshot.
+ */
+export function messageBody(
+  message: DiscordBodyData,
+  botUserId: string | null,
+): { content: string; attachments: DiscordInboundAttachment[]; forwarded: boolean } {
+  const forwarded = message.message_reference?.type === MessageReferenceType.Forward;
+  const body = forwarded ? (message.message_snapshots?.[0]?.message ?? {}) : message;
+  return {
+    content: stripBotMention(body.content ?? "", botUserId),
+    attachments: attachmentsOf(body.attachments ?? []),
+    forwarded,
+  };
+}
+
+/**
  * The replied-to message of a person, or null when Discord gave neither text nor attachments:
  * without the Message Content intent, Discord gives them only for a message that mentions the bot.
+ * A forward is kept without them, so that the host can say that its content is not available.
  */
 function quoteOf(
   referenced: NonNullable<DiscordMessageData["referenced_message"]>,
   botUserId: string,
 ): DiscordInboundQuote | null {
-  const content = stripBotMention(referenced.content ?? "", botUserId);
-  const attachments = attachmentsOf(referenced.attachments ?? []);
-  if ((!content && attachments.length === 0) || !referenced.timestamp) return null;
+  const { content, attachments, forwarded } = messageBody(referenced, botUserId);
+  if ((!content && attachments.length === 0 && !forwarded) || !referenced.timestamp) return null;
   return {
     authorId: referenced.author.id,
     authorName: referenced.author.global_name ?? referenced.author.username ?? referenced.author.id,
     content: content.slice(0, DISCORD_QUOTE_TEXT_LIMIT),
     sentAt: referenced.timestamp,
     attachments,
+    forwarded,
   };
 }
 

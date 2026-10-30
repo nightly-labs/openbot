@@ -1279,7 +1279,11 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
             status: frame.result.status,
             body: sideRoute
               ? yield* peerDecode(() =>
-                  sideRoute.response(pending.path, status, body, { historyExtent: true, channelAttention: true }),
+                  sideRoute.response(pending.path, status, body, {
+                    historyExtent: true,
+                    channelAttention: true,
+                    agentTaskUiBlocks: true,
+                  }),
                 )
               : yield* peerDecode(() =>
                   decodeTeamProtocolV8WebRtcHttpResponse(pending.method, pending.path, status, body),
@@ -1318,7 +1322,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         diagnose(state, "event-gap", `expected ${state.lastEventSequence + 1}, got ${frame.sequence}`);
         return yield* new RemotePeerError({ message: sourceText("error.remote.eventStreamGap") });
       }
-      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload));
+      const channel = yield* peerDecode(() => optionalTeamEvent(frame.payload, { agentTaskUiBlocks: true }));
       const decoded = channel
         ? { status: "known" as const, event: optionalTeamEventToCurrent(channel) }
         : yield* peerDecode(() => decodeTeamProtocolV8CurrentEvent(frame));

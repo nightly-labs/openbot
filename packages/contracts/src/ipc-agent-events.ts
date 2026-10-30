@@ -104,6 +104,12 @@ export type AgentEvent =
        * Peers without that capability receive the released completion event.
        */
       quiet?: true;
+      /**
+       * The turn ended with open plan steps, and OpenBot continues the request with one more turn.
+       * The request is not done, so this completion shows no notification, plays no sound, and is
+       * not read aloud. Only local listeners receive it; the Team API adapters leave it out.
+       */
+      continues?: true;
     }
   | {
       type: "prompt";
@@ -263,7 +269,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.threadId) &&
         isString(value.turnId) &&
         (value.origin === undefined || isAgentTurnOrigin(value.origin)) &&
-        (value.quiet === undefined || value.quiet === true)
+        (value.quiet === undefined || value.quiet === true) &&
+        (value.continues === undefined || value.continues === true)
       );
     case "prompt":
       return (

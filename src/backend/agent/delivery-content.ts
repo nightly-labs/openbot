@@ -2,7 +2,14 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { AgentSummary, AgentWait, ConversationSnapshot, QueueDelivery, RoutineRun } from "@openbot/contracts/ipc";
+import type {
+  AgentSummary,
+  AgentWait,
+  ConversationPlanStep,
+  ConversationSnapshot,
+  QueueDelivery,
+  RoutineRun,
+} from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
@@ -288,6 +295,20 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/**
+ * The input of an automatic continuation: the turn ended while the agent's own plan had open steps.
+ * The request is already in the provider session, so only this note goes in. The steps come from the
+ * stored plan, which is already in its bounds.
+ */
+export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
+    ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
+    "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
 }
 
 /**

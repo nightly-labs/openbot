@@ -75,4 +75,12 @@ export const messages = {
   "sitePage.report.sentTitle": "報告を送信しました",
   "sitePage.report.sentBody": "ありがとうございます。報告を受け付けました。",
   "sitePage.report.home": "ホームページへ",
+  "sitePage.pricing.title": "OpenBot の料金",
+  "sitePage.pricing.description":
+    "ホスト型サーバーとチーム向けライセンス。自分のコンピューターでの個人利用なら OpenBot は無料です。",
+  "sitePage.pricing.heading": "料金",
+  "sitePage.pricing.enterprise.title": "エンタープライズ",
+  "sitePage.pricing.enterprise.body":
+    "より大きなサーバー、{count} 人を超えるメンバー、そのほかのご要望にも対応します。エンタープライズサポート付きです。",
+  "sitePage.pricing.enterprise.contact": "営業に問い合わせる",
 } as const satisfies PartialTranslation<typeof source>;

@@ -21,6 +21,7 @@ import {
 import type { DuplicationGate } from "./duplication-gate";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
+import type { PlanContinuation } from "./plan-continuation";
 import type { ProfileSave } from "./profile-save";
 import { isPlanLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -35,7 +36,7 @@ import {
 import type { ThreadLifecycle } from "./thread-lifecycle";
 import { TurnSlots } from "./turn-slots";
 import type { UsageLimitGate } from "./usage-limit-gate";
-import { codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
+import { checkAgentFolders, codexSandboxPolicy, workspaceWritableRoots } from "./workspace-sandbox";
 
 /** Shown to the user when a message names a model of an endpoint that was taken out. */
 export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved");
@@ -131,6 +132,7 @@ export interface DrainSchedulerOptions {
   threads: ThreadLifecycle;
   memory: MemoryHold;
   usageLimits: UsageLimitGate;
+  planContinuation: PlanContinuation;
   tasks: TaskLanes;
   hooks: DrainHooks;
   channels?: ChannelService;
@@ -163,6 +165,7 @@ export class DrainScheduler {
   readonly #threads: ThreadLifecycle;
   readonly #memory: MemoryHold;
   readonly #usageLimits: UsageLimitGate;
+  readonly #planContinuation: PlanContinuation;
   readonly #tasks: TaskLanes;
   readonly #slots: TurnSlots;
   /** Lanes that a full set of turn slots held back. A drain that may free a slot tries them again. */
@@ -210,6 +213,7 @@ export class DrainScheduler {
     this.#threads = options.threads;
     this.#memory = options.memory;
     this.#usageLimits = options.usageLimits;
+    this.#planContinuation = options.planContinuation;
     this.#tasks = options.tasks;
     this.#hooks = options.hooks;
     this.#channels = options.channels;
@@ -516,6 +520,20 @@ export class DrainScheduler {
         if (taskId === null) yield* this.#hooks.startRequestedNewChat(agentId);
         return;
       }
+      // An automatic plan continuation runs only when nothing else waits in the lane and its chain
+      // is still in memory. Otherwise its deliveries end as their last turn did, and the drain runs again.
+      const planNote = context.planContinuation?.queued
+        ? this.#planContinuation.claim(
+            agentId,
+            taskId,
+            context.delivery.id,
+            this.#mailbox.laneQueuedIds(agentId, taskId).length > 0,
+          )
+        : null;
+      if (context.planContinuation?.queued && planNote === null) {
+        yield* this.endPlanContinuation(agentId, taskId);
+        return;
+      }
       // A side thread compacts at the end of its own turns (`TurnLifecycle`), and that compaction
       // holds its own lane only. Here the agent's own chat compacts its chat, or the thread of the
       // channel or messaging work it serves.
@@ -536,7 +554,7 @@ export class DrainScheduler {
           return;
         }
       }
-      yield* this.startDelivery(context);
+      yield* this.startDelivery(context, planNote ?? undefined);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -551,9 +569,43 @@ export class DrainScheduler {
     );
   }, Effect.uninterruptible);
 
+  /**
+   * Ends the automatic plan continuation of one lane, the agent's own chat when `taskId` is null:
+   * after a Stop, a new chat, a new message, or a restart. The waiting deliveries end as
+   * completed, as their last turn did.
+   */
+  readonly endPlanContinuation = Effect.fn("DrainScheduler.endPlanContinuation")(
+    function* (this: DrainScheduler, agentId: string, taskId: string | null) {
+      this.#planContinuation.cancel(agentId, taskId);
+      const settled = yield* this.#mailbox.settlePlanContinuations(agentId, taskId);
+      if (settled.length === 0) return;
+      for (const deliveryId of settled) {
+        const deliveryTaskId = this.#mailbox.taskIdForDelivery(deliveryId);
+        const taskThreadId = deliveryTaskId === null ? null : this.#tasks.threadId(deliveryTaskId);
+        const snapshot =
+          deliveryTaskId === null
+            ? this.#conversation.loadedSnapshot(agentId)
+            : taskThreadId
+              ? this.#conversation.loadedExecutionSnapshot(taskThreadId)
+              : undefined;
+        if (!snapshot) continue;
+        this.#mailboxSync.syncDeliveryMessage(snapshot, deliveryId);
+        this.#conversation.emitConversation(snapshot);
+      }
+      this.#mailboxSync.emitQueue(agentId);
+    },
+    (settle, agentId) =>
+      settle.pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#hooks.emitError("delivery_reconciliation_pending", failure, agentId)),
+        ),
+      ),
+  );
+
   readonly startDelivery = Effect.fn("DrainScheduler.startDelivery")(function* (
     this: DrainScheduler,
     context: DeliveryContext,
+    planNote?: string,
   ) {
     const { delivery } = context;
     const channelDelivery = this.#channels ? this.#channels.store.assignmentForDelivery(delivery.id) !== null : false;
@@ -565,14 +617,22 @@ export class DrainScheduler {
     // conversation takes the other answers to the same request. The person's message goes last, so
     // the turn answers it with the answers already read, and the person's later queued messages
     // follow it in queue order.
+    // A plan continuation runs again the deliveries of the turn it continues, and no others.
     const replies =
-      channelDelivery || ownSession || (messagingDelivery && delivery.sender.kind !== "agent")
+      planNote !== undefined || channelDelivery || ownSession || (messagingDelivery && delivery.sender.kind !== "agent")
         ? []
         : this.#mailbox.repliesToStartWith(delivery.id);
     const laterMessages =
-      channelDelivery || ownSession || messagingDelivery ? [] : this.#mailbox.userMessagesToStartWith(delivery.id);
+      planNote !== undefined
+        ? this.#mailbox.planContinuationsToStartWith(delivery.id)
+        : channelDelivery || ownSession || messagingDelivery
+          ? []
+          : this.#mailbox.userMessagesToStartWith(delivery.id);
     const companions = [...replies, ...laterMessages];
-    let batch = delivery.sender.kind === "user" ? [...replies, context, ...laterMessages] : [context, ...replies];
+    let batch =
+      planNote !== undefined || delivery.sender.kind === "user"
+        ? [...replies, context, ...laterMessages]
+        : [context, ...replies];
     let confirmedTurnId: string | null = null;
     // The session of a routine run in its own session. Closed here when no turn starts on it.
     let routineThreadId: string | null = null;
@@ -612,6 +672,8 @@ export class DrainScheduler {
         this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       }
       const agent = yield* this.#store.getOrCreate(delivery.recipientAgentId).pipe(toDeliveryStartFailed);
+      // Once for the turn: its process, its session and its sandbox roots read the result.
+      yield* checkAgentFolders(agent);
       requestedModel = agent.model;
       // The endpoint was removed while this agent was busy, so no other model could be given to it
       // then. The old process would still answer on the removed endpoint, with the credentials it
@@ -711,7 +773,9 @@ export class DrainScheduler {
           agentNames,
         );
       };
-      const completeInput = promptInput(execution?.text);
+      // The request is already in the session, so a plan continuation sends only its note.
+      const completeInput =
+        planNote === undefined ? promptInput(execution?.text) : [{ type: "text" as const, text: planNote }];
       // A channel packet with only unread messages, or an external message without the guidance, goes
       // only to the session that read the rest. The session can change from here to the retry below,
       // as when the provider cannot resume it.
@@ -766,7 +830,9 @@ export class DrainScheduler {
                 ),
                 clientUserMessageId: delivery.id,
                 // The delivery stays the same; a continuation must not overwrite the first turn's items.
-                ...(context.resumeAfterUsageLimit && client.provider !== "codex" ? { clientTurnId: randomUUID() } : {}),
+                ...((context.resumeAfterUsageLimit || planNote !== undefined) && client.provider !== "codex"
+                  ? { clientTurnId: randomUUID() }
+                  : {}),
                 // A teammate message that wants no answer tells the model to write nothing, so an empty
                 // turn is the expected result and not a provider that swallowed its error.
                 answerOptional:

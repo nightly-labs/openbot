@@ -16,6 +16,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { ConversationSideThread } from "./ConversationSideThread";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { conversationRuntime } from "./conversation-runtime";
@@ -31,6 +32,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
 import { createEffect, createMemo, Loading, lazy, onSettled, Show, untrack } from "solid-js";
+import { agentFolderCalls } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
 
 /** The voice conversation with the agent that is open when the pane opens. */
@@ -119,6 +121,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     askSideQuestion,
     voiceConversationAvailable,
     panelSubagentId,
+    shownPanelThreadId,
+    openPanelThread,
+    closePanelThread,
+    movePanelThreadToChat,
     channel,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
@@ -130,6 +136,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   // own agents, for an owner or admin, when it serves `agent-publish-v1`.
   // A remote agent's host resolves its settings, so the account defaults of this computer do not apply.
   const localAgentDefaults = () => (props.server?.kind === "local" ? props.agentDefaults : undefined);
+  const folderCalls = agentFolderCalls();
+  /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
+  const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
   const canPublish = () =>
     props.runtime
       ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
@@ -219,6 +228,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
    * it first in an effect callback when the last tab closes, which halts the reactive system.
    */
   const selectedPane = () => (activeRightPanel() === "side-panel" ? null : sidePanel().selected);
+  /** The side thread that shows, and whose tab is selected. */
+  const shownThread = () => (activeRightPanel() === "thread" ? shownPanelThreadId() : null);
+  /** With no side thread to show, the side panel lists the panes. */
+  const launcherShown = () =>
+    activeRightPanel() === "side-panel" || (activeRightPanel() === "thread" && shownPanelThreadId() === null);
+  const sideThreadTabs = () => props.threads?.side.tabs ?? [];
+  const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
     <>
       <Show when={sidePanelOpen()}>
@@ -230,12 +246,20 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           settingsLabel={channel ? t("channel.settings.title") : undefined}
           onSelect={openSidePanelPane}
           onClose={closeSidePanelPane}
+          threads={{
+            items: sideThreadTabs(),
+            selectedId: shownThread(),
+            onSelect: openPanelThread,
+            onClose: closePanelThread,
+            onMove: moveSideThread,
+            onToChat: movePanelThreadToChat,
+          }}
           onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
           onCollapse={toggleSidePanel}
         />
       </Show>
 
-      <Show when={activeRightPanel() === "side-panel"}>
+      <Show when={launcherShown()}>
         <aside class="browser-panel side-panel-empty" aria-label={t("conversation.sidePanel.label")}>
           <SidePanelLauncher
             available={sidePanelPanes()}
@@ -255,6 +279,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             <Loading>
               <FilePreviewPanel
                 allowExternalOpen={!props.runtime}
+                macWindowControls={props.platform === "darwin"}
                 preview={file().preview}
                 directory={file().directory ?? null}
                 agents={props.agents}
@@ -324,6 +349,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onAsk={askSideQuestion}
             onClosePanel={() => closeSidePanelPane("question")}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            macWindowControls={props.platform === "darwin"}
           />
         )}
       </Show>
@@ -339,6 +365,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         keyed
       >
         <VoiceConversationPane />
+      </Show>
+
+      {/* Keyed, so each side thread gets its own messages and read state. */}
+      <Show when={shownThread()} keyed>
+        {(threadId) => <ConversationSideThread threadId={threadId} />}
       </Show>
 
       <Show when={activeRightPanel() === "subagent"}>
@@ -400,6 +431,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
               localHost={props.server?.kind === "local"}
+              folders={localFolderCalls()}
               sessionSettingsEditable={serverCanAdminister(props.server, "agent-session-settings-v1")}
               adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
@@ -423,7 +455,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 props.server?.kind === "local" ||
                 (serverCanAdminister(props.server, "agent-host-settings-v1") && agent().allowAutomation !== undefined)
               }
-              busyMessageModeEditable={props.server?.kind === "local"}
+              busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
+              busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local"}
               quickAcknowledgementEditable={props.server?.kind === "local"}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}

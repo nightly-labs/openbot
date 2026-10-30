@@ -5,6 +5,8 @@
 // The chat gets about 45,000 tokens of history, then a routine runs twice. The check asserts that
 // each run starts an ephemeral session and closes it, that its request stays small, that its answer
 // shows in the chat, that the chat keeps its session, and that the next chat turn reads the answers.
+// It also drives saved password and authenticator fills through the routine tool router, checks
+// the sign-in guidance, and checks that no secret reaches the provider.
 // `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -12,9 +14,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { AGENT_PROVIDERS, decodeUsageTokens } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, type BrowserTab, decodeUsageTokens } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
+import { getRecord, getString } from "../src/backend/protocol";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-fresh-session-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-routine-session-"));
@@ -41,6 +44,10 @@ const BASE_TOKENS = 3_000;
 const HISTORY_CHARACTERS = 45_000;
 const ROUTINE_INPUT_LIMIT = 10_000;
 const ROUTINE_MARK = "ROUTINE-CHECK";
+const VAULT_ORIGIN = "https://routine.openbot.test";
+const VAULT_LOGIN = "routine-login";
+const PASSWORD = "fixture-routine-password";
+const CODE = "739182";
 
 /**
  * A Codex app-server with the methods that the service calls. It writes each `thread/start`,
@@ -60,6 +67,17 @@ let buffer = "";
 let threads = 0;
 let turns = 0;
 let reports = 0;
+const waiting = new Map();
+const callNext = (turn) => {
+  const call = turn.calls.shift();
+  if (!call) return turn.finish();
+  const id = "tool-" + turn.turnId + "-" + turn.calls.length;
+  waiting.set(id, { turn, tool: call.arguments.name ?? call.tool });
+  write({ id, method: "item/tool/call", params: {
+    threadId: turn.threadId, turnId: turn.turnId, callId: id,
+    namespace: "openbot", tool: call.tool, arguments: call.arguments,
+  } });
+};
 /** threadId -> characters of all input so far, and the prompt and totals of the last request. */
 const context = new Map();
 process.stdout.on("error", (error) => {
@@ -81,7 +99,7 @@ const answer = (message) => {
     case "config/batchWrite": return write({ id: message.id, result: {} });
     case "thread/start": {
       const id = "thread-" + (++threads);
-      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null });
+      log({ method: "thread/start", threadId: id, ephemeral: params.ephemeral ?? null, persistSession: params.persistSession ?? null, instructions: params.developerInstructions });
       return write({ id: message.id, result: { thread: { id, turns: [] } } });
     }
     case "thread/resume":
@@ -108,11 +126,24 @@ const answer = (message) => {
       const tokenUsage = { total: breakdown(state.input, state.cached, state.output), last: breakdown(prompt, cached, 100), modelContextWindow: 1000000 };
       write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
       const reply = text.includes(${JSON.stringify(ROUTINE_MARK)}) ? "Routine report " + (++reports) + ": the build is green." : "Done.";
-      setTimeout(() => {
+      const finish = () => {
         const item = { type: "agentMessage", id: "message-" + turnId, text: reply, phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
-      }, 50);
+      };
+      const browserCall = (tool, args) => ({ tool: "tool_call", arguments: { name: "openbot_browser." + tool, arguments: args } });
+      const secret = (method) => browserCall("submit_secret", {
+        tabId: "routine-tab", loginId: ${JSON.stringify(VAULT_LOGIN)}, method, digits: 6,
+        targets: [{ kind: "css", selector: "#secret" }], submission: "click",
+        submitTarget: { kind: "css", selector: "#submit" },
+      });
+      const calls = text.includes(${JSON.stringify(ROUTINE_MARK)}) ? [
+        { tool: "tool_describe", arguments: { names: ["openbot_browser.list_logins"] } },
+        browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
+        browserCall("list_logins", { tabId: "routine-tab" }),
+        secret("password"), secret("authenticator"),
+      ] : [];
+      callNext({ threadId: params.threadId, turnId, calls, finish });
       return;
     }
     case "turn/interrupt": {
@@ -133,6 +164,12 @@ process.stdin.on("data", (chunk) => {
     if (line) {
       const message = JSON.parse(line);
       if (message.method && message.id !== undefined) answer(message);
+      else if (!message.method && waiting.has(message.id)) {
+        const { turn, tool } = waiting.get(message.id);
+        waiting.delete(message.id);
+        log({ method: "tool-result", threadId: turn.threadId, turnId: turn.turnId, tool, result: message.result, error: message.error });
+        callNext(turn);
+      }
     }
     newline = buffer.indexOf("\\n");
   }
@@ -148,6 +185,10 @@ interface LogEntry {
   characters?: number;
   prompt?: number;
   text?: string;
+  instructions?: string;
+  tool?: string;
+  result?: { success: boolean; contentItems: { type: string; text?: string }[] };
+  error?: { message: string };
 }
 
 interface TurnReport {
@@ -172,12 +213,46 @@ const report: {
 } = { threadStarts: [], closedThreads: [], turns: [], routineAnswersInChat: [], checks: [], passed: false };
 
 const unused = () => Effect.die(new Error("Not used by this check."));
+let tab: BrowserTab | undefined;
+const fills: string[] = [];
+let takeoverRequests = 0;
 const browser: AgentBrowserHost = {
-  listTabs: () => [],
+  listTabs: () => (tab ? [tab] : []),
+  prepareSecret: (params) =>
+    Effect.sync(() => {
+      assert.equal(params.ownerAgentId, tab?.ownerAgentId);
+      assert.equal(params.threadId, tab?.ownerThreadId);
+      const method = getString(getRecord(params, "arguments"), "method");
+      assert.ok(method === "password" || method === "authenticator");
+      return {
+        request: { method, origin: VAULT_ORIGIN, digits: 6 },
+        agentScriptedOrigin: false,
+        vaultFillable: true,
+        submit: (value) =>
+          Effect.sync(() => {
+            assert.equal(value, method === "password" ? PASSWORD : CODE);
+            fills.push(method);
+            return "submitted" as const;
+          }),
+        cancel: () => {},
+      };
+    }),
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
-  handleDynamicTool: unused,
+  handleDynamicTool: (params) =>
+    Effect.sync(() => {
+      assert.equal(params.tool, "open");
+      tab = {
+        id: "routine-tab",
+        title: "Sign in",
+        url: VAULT_ORIGIN,
+        loading: false,
+        ownerThreadId: params.threadId,
+        ownerAgentId: params.ownerAgentId ?? null,
+      };
+      return { success: true, contentItems: [{ type: "inputText" as const, text: JSON.stringify(tab) }] };
+    }),
   userControlTabFor: () => null,
   awaitUserControlRelease: unused,
   onChanged: () => () => {},
@@ -227,7 +302,24 @@ const agents = new AgentService({
   mailbox,
   browser,
   preferredProvider: "codex",
+  passwordVault: {
+    connected: () => true,
+    loginsFor: (origin) => {
+      assert.equal(origin, VAULT_ORIGIN);
+      return Effect.succeed([
+        { id: VAULT_LOGIN, title: "Routine", username: "routine@example.test", hasOneTimePassword: true },
+      ]);
+    },
+    secretFor: (id, origin, kind) => {
+      assert.equal(id, VAULT_LOGIN);
+      assert.equal(origin, VAULT_ORIGIN);
+      return Effect.succeed(kind === "password" ? PASSWORD : CODE);
+    },
+  },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+});
+agents.on("event", (event: AgentEvent) => {
+  if (event.type === "browser-takeover-requested") takeoverRequests += 1;
 });
 let connection: DatabaseSync | null = null;
 const sqlite = () => {
@@ -358,6 +450,50 @@ try {
     .filter((entry) => entry.method === "thread/unsubscribe")
     .map((entry) => entry.threadId);
   const routineStarts = report.threadStarts.filter((entry) => entry.ephemeral === true);
+  const results = entries.filter((entry) => entry.method === "tool-result");
+  pass(
+    "Routine Vault tool calls succeed",
+    results.length === 10 && results.every((entry) => entry.result?.success && !entry.error),
+  );
+  pass(
+    "Each routine fills its saved password and authenticator code",
+    fills.join() === "password,authenticator,password,authenticator",
+  );
+  const listed = results.filter((entry) => entry.tool === "openbot_browser.list_logins");
+  pass(
+    "Each routine can discover its saved login",
+    listed.length === 2 &&
+      listed.every((entry) => {
+        const text = entry.result?.contentItems[0]?.text ?? "";
+        return text.includes(VAULT_LOGIN) && text.includes("routine@example.test") && text.includes('"connected":true');
+      }),
+  );
+  pass("Saved logins need no user takeover", takeoverRequests === 0);
+  pass(
+    "Routine browser tabs belong to the public chat",
+    tab?.ownerThreadId === chatThread && tab.ownerAgentId === agent.id,
+  );
+  pass(
+    "Secrets stay outside provider input and tool results",
+    [PASSWORD, CODE].every((value) => !JSON.stringify(entries).includes(value)),
+  );
+  const routineRule = "In a routine run, first check saved logins with openbot_browser.list_logins";
+  pass(
+    "Routine sessions receive the saved-login rule",
+    routineStarts.every((entry) => entry.instructions?.includes(routineRule)),
+  );
+  pass(
+    "Discovered browser guidance reports only a sign-in that needs the user",
+    results
+      .filter((entry) => entry.tool === "tool_describe")
+      .every((entry) => JSON.stringify(entry.result).includes("report a sign-in that needs the user, not a takeover")),
+  );
+  pass(
+    "Routine guidance reports steps that need a person",
+    routineStarts.every((entry) =>
+      entry.instructions?.includes("do not call request_takeover or submit_secret without loginId"),
+    ),
+  );
   pass("Each routine run starts one new session", routineStarts.length === 2);
   pass(
     "Routine sessions are ephemeral and not saved",

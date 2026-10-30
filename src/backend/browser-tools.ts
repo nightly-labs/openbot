@@ -345,7 +345,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "upload_files",
     description:
-      "Set local files readable by OpenBot on a file input after validating paths, then return a fresh snapshot.",
+      "Set local files on a file input or the file chooser a clicked target opens, then return a fresh snapshot.",
     shape: {
       ...targetAction,
       paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),

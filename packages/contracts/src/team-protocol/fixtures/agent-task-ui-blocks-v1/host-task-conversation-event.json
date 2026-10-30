@@ -1,0 +1,49 @@
+{
+  "type": "agent-task-conversation",
+  "taskId": "task-1",
+  "snapshot": {
+    "agentId": "agent-1",
+    "threadId": "thread-2",
+    "activeTurnId": "turn-1",
+    "revision": 4,
+    "messages": [
+      {
+        "id": "message-1",
+        "turnId": "turn-1",
+        "author": "user",
+        "text": "Use OpenAI for this.",
+        "createdAt": "2026-10-27T10:00:00.000Z",
+        "status": "completed"
+      },
+      {
+        "id": "question-prompt:turn-1:1",
+        "turnId": "turn-1",
+        "author": "agent",
+        "text": "OpenAI API key",
+        "createdAt": "2026-10-27T10:00:05.000Z",
+        "status": "completed",
+        "uiBlock": {
+          "version": 1,
+          "blockId": "block-1",
+          "spec": {
+            "type": "form",
+            "title": "OpenAI API key",
+            "fields": [
+              {
+                "id": "key",
+                "kind": "text",
+                "label": "API key",
+                "secret": true,
+                "required": true
+              }
+            ],
+            "submit": "Save"
+          },
+          "state": {
+            "status": "pending"
+          }
+        }
+      }
+    ]
+  }
+}

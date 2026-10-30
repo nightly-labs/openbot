@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
@@ -150,8 +151,10 @@ export function ChatAttachmentPanel({
    */
   progress: SharedValue<number>;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // The camera centres between the side insets: the rail of iPhone Duo and the edges in landscape.
+  const safeWidth = useColumnWidth() - insets.left - insets.right;
   const { t } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
@@ -165,7 +168,7 @@ export function ChatAttachmentPanel({
   // A photo taken but not yet held. It waits for the card to be gone.
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
-  const cameraWidth = Math.min(440, width - 24);
+  const cameraWidth = Math.min(440, safeWidth - 24);
   // Read once, for this card's whole life: the keyboard is not dismissed for
   // the camera any more, and the glass behind the card must never be resized.
   // The card already rides the keyboard's lift, so the camera takes the room
@@ -174,7 +177,7 @@ export function ChatAttachmentPanel({
   const cameraHeight = Math.min(height * 0.58, height - insets.top - anchor.bottom - keyboardInset - CAMERA_TOP_GAP);
   // The card keeps the plus's left edge while it is the options list, and
   // centres itself once it is the camera.
-  const cameraShift = (width - cameraWidth) / 2 - anchor.left;
+  const cameraShift = insets.left + (safeWidth - cameraWidth) / 2 - anchor.left;
   const listHeight = optionsHeight(onUseSkill ? 4 : 3);
 
   useEffect(() => {

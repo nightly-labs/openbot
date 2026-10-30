@@ -287,7 +287,7 @@ const Turns = createSimpleContext({
       agentId: string,
       requestId: string | number,
       decision: "accept" | "decline",
-      options?: { onError?: (error: unknown) => void },
+      options?: PromptAnswerOptions,
     ): Promise<boolean> {
       const serverId = activeServerId();
       const approval = approvals().find(
@@ -324,7 +324,11 @@ const Turns = createSimpleContext({
     }
 
     /** Answers the takeover of the agent's chat, or of its side thread `threadId`. */
-    async function respondToBrowserTakeover(decision: "complete" | "cancel", threadId?: string): Promise<boolean> {
+    async function respondToBrowserTakeover(
+      decision: "complete" | "cancel",
+      threadId?: string,
+      options?: PromptAnswerOptions,
+    ): Promise<boolean> {
       const agent = activeAgent();
       const key = agent ? attentionKey(agent.id, threadId ?? agent.threadId) : undefined;
       const event = key ? pendingPrompts()[key] : undefined;
@@ -335,7 +339,8 @@ const Turns = createSimpleContext({
         setPendingPrompts((current) => ({ ...current, [key]: undefined }));
         return true;
       } catch (error) {
-        appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
+        if (options?.onError) options.onError(error);
+        else appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
         return false;
       }
     }
@@ -376,6 +381,10 @@ const Turns = createSimpleContext({
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
           // After the turn ended, the message runs as the next turn. The refusal is old news (#3206).
           if (activeTurns()[agent.id] !== turnId) return;
+          // A message that left the queue is in the turn already: an agent that steers each message
+          // sent while it works can take it first.
+          const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
+          if (delivery && delivery.status !== "queued") return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }

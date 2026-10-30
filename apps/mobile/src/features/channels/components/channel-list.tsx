@@ -12,6 +12,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
@@ -26,7 +27,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { ChannelAvatar } from "./channel-avatar";
@@ -249,6 +250,7 @@ export const ChannelListRow = memo(function ChannelListRow({
 }) {
   const { t, format } = useText();
   const [background, accent] = useThemeColor(["background", "accent"]);
+  const rowBackground = useChatRowBackground(channel.id);
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
@@ -301,7 +303,11 @@ export const ChannelListRow = memo(function ChannelListRow({
         if (event.nativeEvent.actionName === "pin") togglePin();
       }}
       className={pinned ? "w-full items-center gap-2 px-1" : "w-full"}
-      onLongPress={isAndroid ? () => setMenuKey((key) => key + 1) : undefined}
+      delayLongPress={longPressDelay}
+      onLongPress={() => {
+        void haptics.longPress();
+        if (isAndroid) setMenuKey((key) => key + 1);
+      }}
       style={pinned ? ({ pressed }) => ({ opacity: pressed ? 0.58 : 1 }) : undefined}
     >
       {pinned ? (
@@ -333,7 +339,7 @@ export const ChannelListRow = memo(function ChannelListRow({
           <View
             className="min-h-20 w-full flex-row items-center gap-3 py-1"
             style={{
-              backgroundColor: background,
+              backgroundColor: rowBackground,
               opacity: pressed ? 0.58 : 1,
               paddingLeft: leftInset,
               paddingRight: rightInset,

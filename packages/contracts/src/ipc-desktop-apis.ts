@@ -1,4 +1,5 @@
 import type { AgentEvent } from "./ipc-agent-events";
+import type { AgentFolderChange } from "./ipc-agent-folders";
 import type { AttachmentImportEvent } from "./ipc-attachments";
 import type { BrowserLiveViewInput } from "./ipc-browser";
 import type { BridgedDesktopApi, GroupApi, IpcEndpoints, PathApi } from "./ipc-endpoints";
@@ -10,6 +11,8 @@ import type { DirectMessageRealtimeEvent, DirectTypingRealtimeEvent, TeamPresenc
  * `onAttachmentImport` reports the files the preload imports from a drop or a paste.
  */
 export interface AgentDesktopApi extends PathApi<"agent"> {
+  /** Gives the agent a folder that the user dropped. The preload reads its path; the page never does. */
+  addDroppedAgentFolder: (agentId: string, folder: File) => Promise<AgentFolderChange>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
 }

@@ -1,14 +1,17 @@
 import type { AgentTask } from "@openbot/contracts/ipc";
 import { taskTone } from "@openbot/team-client/agent-tasks";
 import { Typography } from "heroui-native";
+import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentTaskMark } from "@/features/servers/components/agent-task-mark";
 import { agentTaskStatus } from "@/features/servers/model/agent-task-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -27,34 +30,55 @@ export function TaskListRow({
   agent,
   dimmed = false,
   onPress,
+  menu,
 }: {
   task: AgentTask;
   agent?: MobileAgent;
   /** A closed task. */
   dimmed?: boolean;
   onPress: () => void;
+  /** The thread's actions, which a long press on the row opens. */
+  menu?: { actions: MenuAction[]; onAction: (id: string) => void };
 }) {
   const { t, format } = useText();
+  const { theme } = useUniwind();
+  const menuRef = useRef<MenuComponentRef | null>(null);
+  // The iOS menu host takes the size of its content, so the row gets the width of its slot.
+  const [width, setWidth] = useState<number>();
   const status = agentTaskStatus(task, t);
   const when = formatUpdatedAt(task.closedAt ?? task.updatedAt, format);
   const line = agent
-    ? t("mobile.server.tasks.rowMetaTime", { agent: agent.name, status: STATUS_MARK, when })
-    : t("mobile.server.tasks.rowMetaTimeOnly", { status: STATUS_MARK, when });
+    ? t("mobile.server.threads.rowMetaTime", { agent: agent.name, status: STATUS_MARK, when })
+    : t("mobile.server.threads.rowMetaTimeOnly", { status: STATUS_MARK, when });
   const [before = "", after = ""] = line.split(STATUS_MARK);
   const tone = taskTone(task);
   const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
   // `taskTone` says "attention" for an answer and "danger" for a failure or a stop.
   const mark = tone === "attention" ? String(success) : tone === "danger" ? String(danger) : null;
-  return (
+  const menuItems = menu ? leafActions(menu.actions) : [];
+  const row = (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("mobile.chat.tasks.open", { title: task.title, status })}
+      accessibilityLabel={t("mobile.chat.threads.open", { title: task.title, status })}
+      accessibilityActions={menuItems.map((action) => ({ name: action.id, label: action.title }))}
+      onAccessibilityAction={(event) => menu?.onAction(event.nativeEvent.actionName)}
       className="flex-row items-center gap-3 px-5 py-2.5"
-      style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
+      style={({ pressed }) => ({ width: menu ? width : undefined, opacity: pressed ? 0.58 : 1 })}
       onPress={() => {
         void haptics.selection();
         onPress();
       }}
+      // The native context menu does not cancel this touch. Without a long-press handler, lifting the
+      // finger after the menu opens counts as a tap. Android opens its menu from the row.
+      delayLongPress={longPressDelay}
+      onLongPress={
+        menu
+          ? () => {
+              void haptics.longPress();
+              if (isAndroid) menuRef.current?.show();
+            }
+          : undefined
+      }
     >
       {agent ? (
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -105,5 +129,37 @@ export function TaskListRow({
         <AgentTaskMark task={task} />
       )}
     </Pressable>
+  );
+  if (!menu) return row;
+  // The iOS menu host keeps the size of the content that it first measures. Until the slot has a
+  // width, the row lays out without the menu, so a long title does not make the row wider than the slot.
+  return (
+    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {width === undefined ? (
+        row
+      ) : (
+        <MenuView
+          {...(isAndroid
+            ? { ref: menuRef, colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const) }
+            : null)}
+          shouldOpenOnLongPress
+          actions={menu.actions}
+          onPressAction={(event) => menu.onAction(event.nativeEvent.event)}
+        >
+          {row}
+        </MenuView>
+      )}
+    </View>
+  );
+}
+
+/** The actions that run, with the actions of each inline group, for VoiceOver and TalkBack. */
+function leafActions(actions: readonly MenuAction[]): { id: string; title: string }[] {
+  return actions.flatMap((action) =>
+    action.subactions
+      ? leafActions(action.subactions)
+      : action.attributes?.disabled || action.attributes?.hidden
+        ? []
+        : [{ id: action.id ?? action.title, title: action.title }],
   );
 }

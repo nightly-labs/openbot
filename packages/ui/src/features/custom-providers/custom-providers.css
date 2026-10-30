@@ -120,6 +120,11 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+/* A token count is short, so the context window column is narrower than the ID and the name. */
+.custom-provider-row-inputs.custom-provider-row-triple {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) auto;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {

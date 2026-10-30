@@ -2,8 +2,11 @@ import { z } from "zod";
 
 /** The side threads that have a tab on this device, in tab order, and the open tab. */
 export interface AgentThreadTabs {
+  /** The tabs of the chat header. */
   open: string[];
   active: string | null;
+  /** The tabs of the side panel, where each thread shows beside the agent's own chat. */
+  side: string[];
 }
 
 /** Server id → agent id → tabs. */
@@ -16,9 +19,11 @@ const MAX_STORED_TABS = 50;
 type ThreadTabsStorage = Pick<Storage, "getItem" | "setItem">;
 
 const id = z.string().trim().min(1).max(200);
+const idList = z.array(id.nullable().catch(null)).catch([]);
 const agentTabsSchema = z.object({
-  open: z.array(id.nullable().catch(null)).catch([]),
+  open: idList,
   active: id.nullable().catch(null),
+  side: idList,
 });
 const threadTabsSchema = z.record(id, z.record(id, agentTabsSchema.nullable().catch(null)).catch({}));
 
@@ -31,8 +36,10 @@ export function readThreadTabs(storage: ThreadTabsStorage = window.localStorage)
       const byAgent: Record<string, AgentThreadTabs> = {};
       for (const [agentId, tabs] of Object.entries(agents)) {
         if (!tabs) continue;
-        const open = [...new Set(tabs.open.flatMap((tab) => (tab ? [tab] : [])))].slice(0, MAX_STORED_TABS);
-        if (open.length > 0 || tabs.active) byAgent[agentId] = { open, active: tabs.active };
+        const side = uniqueIds(tabs.side);
+        // `open` also holds the side panel tabs, so an older version shows them in the chat header.
+        const open = uniqueIds(tabs.open).filter((tab) => !side.includes(tab));
+        if (open.length > 0 || side.length > 0 || tabs.active) byAgent[agentId] = { open, active: tabs.active, side };
       }
       if (Object.keys(byAgent).length > 0) result[serverId] = byAgent;
     }
@@ -42,9 +49,24 @@ export function readThreadTabs(storage: ThreadTabsStorage = window.localStorage)
   }
 }
 
+function uniqueIds(ids: readonly (string | null)[]): string[] {
+  return [...new Set(ids.flatMap((tab) => (tab ? [tab] : [])))].slice(0, MAX_STORED_TABS);
+}
+
 export function writeThreadTabs(tabs: ThreadTabsByServer, storage: ThreadTabsStorage = window.localStorage): void {
+  const stored = Object.fromEntries(
+    Object.entries(tabs).map(([serverId, agents]) => [
+      serverId,
+      Object.fromEntries(
+        Object.entries(agents).map(([agentId, agent]) => [
+          agentId,
+          { open: [...agent.open, ...agent.side], active: agent.active, side: agent.side },
+        ]),
+      ),
+    ]),
+  );
   try {
-    storage.setItem(THREAD_TABS_STORAGE_KEY, JSON.stringify(tabs));
+    storage.setItem(THREAD_TABS_STORAGE_KEY, JSON.stringify(stored));
   } catch {
     // A UI preference must not block navigation when browser storage is unavailable.
   }

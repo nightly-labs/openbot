@@ -16,6 +16,8 @@ import {
   parseSpeechSettings,
   parseVoiceApiKey,
   parseVoiceModelRequest,
+  parseVoiceServerConnection,
+  parseVoiceServerSave,
   parseVoiceSettings,
   parseVoiceStream,
   parseVoiceStreamAudio,
@@ -85,6 +87,9 @@ function registerVoice(transcribe: (input: VoiceTranscriptionInput) => VoiceTran
     speak: payloadHandler(parseSpeechInput, () => ({ pcm: new Uint8Array(2), sampleRate: 44_100 })),
     warmSpeech: handler(() => undefined),
     keepRecording: payloadHandler(decodeNote, () => RECORDING),
+    getServer: handler(() => null),
+    probeServer: payloadHandler(parseVoiceServerConnection, () => ({ ok: false, field: "address", message: "" })),
+    setServer: payloadHandler(parseVoiceServerSave, () => null),
   });
 }
 

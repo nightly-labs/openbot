@@ -1,9 +1,10 @@
 import type { AgentTask } from "@openbot/contracts/ipc";
+import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID, type ThreadItem, type ThreadStatus } from "./thread-types";
 
-/** What a side thread does now. A turn that waits for an approval waits for the user. */
-export function agentTaskThreadStatus(task: AgentTask, waitsForApproval: boolean): ThreadStatus {
-  if (task.state === "running") return waitsForApproval ? { kind: "waiting", reason: "approval" } : { kind: "working" };
+/** What a side thread does now. A turn that waits for an approval or an answer waits for the user. */
+export function agentTaskThreadStatus(task: AgentTask, waitsFor: SidebarWaitReason | undefined): ThreadStatus {
+  if (task.state === "running") return waitsFor ? { kind: "waiting", reason: waitsFor } : { kind: "working" };
   if (task.state === "queued") return { kind: "queued" };
   if (task.outcome === "failed") return { kind: "failed" };
   return { kind: "idle" };
@@ -21,7 +22,8 @@ export interface ThreadListsInput {
   draftTitle: string;
   /** Side threads that wait to be deleted: they show nowhere. */
   hidden: ReadonlySet<string>;
-  waitsForApproval: (task: AgentTask) => boolean;
+  /** What the running turn of a side thread waits for the user to do, if anything. */
+  waitsFor: (task: AgentTask) => SidebarWaitReason | undefined;
 }
 
 export interface ThreadLists {
@@ -46,7 +48,7 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
       kind: "side",
       title: task.title,
       updatedAt: task.updatedAt,
-      status: agentTaskThreadStatus(task, input.waitsForApproval(task)),
+      status: agentTaskThreadStatus(task, input.waitsFor(task)),
     };
     if (task.state === "closed") archived.push(item);
     else {

@@ -122,6 +122,7 @@ export function ConversationTimeline() {
     composerHasContent,
     copiedMessageId,
     dismissPendingSend,
+    downloadMessageImageFile,
     editingDeliveryId,
     editPendingSend,
     copyMessage,
@@ -170,6 +171,7 @@ export function ConversationTimeline() {
     setExpandedEmojiMessageId,
     setOpenReactionMessageId,
     setRequiredInteractionElement,
+    registerPromptComposerAnswer,
     showScrollToLatest,
     unreadDividerVisible,
     updateScrollFade,
@@ -359,6 +361,7 @@ export function ConversationTimeline() {
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             onOpenQuote={openQuote}
+            macWindowControls={props.platform === "darwin"}
           />
         )}
       </Show>
@@ -1101,6 +1104,7 @@ export function ConversationTimeline() {
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
                             isAppShortcut={isChatVisualAppShortcut}
+                            macWindowControls={props.platform === "darwin"}
                           />
                         </article>
                       </ChatRowBoundary>
@@ -1220,6 +1224,7 @@ export function ConversationTimeline() {
                             onOpenQuote={openQuote}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             mediaSource={runtime.attachmentMedia}
+                            macWindowControls={props.platform === "darwin"}
                             loadImageFile={
                               loadImageFile &&
                               ((file) =>
@@ -1228,6 +1233,9 @@ export function ConversationTimeline() {
                                   messageId: message()?.id ?? initialMessage.id,
                                   agentId: workspaceAgentId(),
                                 }))
+                            }
+                            onDownloadImageFile={
+                              loadImageFile && ((file) => downloadMessageImageFile(file, workspaceAgentId()))
                             }
                             actions={
                               <>
@@ -1388,7 +1396,10 @@ export function ConversationTimeline() {
             </div>
             {/* Under an open side thread, the thread draws the card of its own question. */}
             <Show when={!sideThreadOpen()}>
-              <ConversationQuestionPrompt elementRef={setRequiredInteractionElement} />
+              <ConversationQuestionPrompt
+                elementRef={setRequiredInteractionElement}
+                registerComposerAnswer={registerPromptComposerAnswer}
+              />
             </Show>
             <Show keyed when={props.approval}>
               {(approval) => (

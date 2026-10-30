@@ -32,6 +32,7 @@ const PRESENTATION: BrowserDockPresentation = {
   hold: null,
   editingDeliveryId: null,
   canSteer: true,
+  steerSupported: true,
   canRunAsTask: false,
   island: { kind: "activity", control: "agent", label: "Reading the page" },
   handoffPending: false,

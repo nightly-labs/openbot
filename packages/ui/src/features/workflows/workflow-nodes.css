@@ -197,6 +197,16 @@
   font-weight: var(--openbot-weight-medium);
 }
 
+/* A long model name gives up its room first and ends with "…", so it stays in the field. */
+.wfn-stage .wfn-model-pill {
+  flex-shrink: 1;
+}
+
+/* An agent next to a model keeps its full name, but leaves 96px: the model logo, a few letters and the arrow. */
+.wfn-stage .wfn-agent-pill:has(+ .wfn-model-pill) {
+  max-width: calc(100% - 96px - var(--openbot-space-2));
+}
+
 .wfn-stage .wfn-field-foot .provider-model-trigger {
   gap: var(--openbot-space-1);
   height: 20px;

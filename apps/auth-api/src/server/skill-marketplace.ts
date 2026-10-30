@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
-import { isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH, type SkillCategory } from "@openbot/contracts/ipc";
+import {
+  isSkillCategory,
+  type MarketplaceSkillSort,
+  SKILL_DESCRIPTION_MAX_LENGTH,
+  type SkillCategory,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Schema } from "effect";
 import { unzipSync } from "fflate";
@@ -31,6 +36,7 @@ interface ApprovedRow {
   slug: string;
   installs: number;
   featured: number;
+  verified: number;
   name: string;
   description: string;
   category: string;
@@ -75,7 +81,8 @@ export class SkillMarketplace {
     query?: string | undefined;
     category?: string | undefined;
     featured?: boolean;
-    sort?: "installs" | undefined;
+    verified?: boolean | undefined;
+    sort?: MarketplaceSkillSort | undefined;
     cursor?: string | undefined;
     limit?: number;
   }) {
@@ -102,34 +109,24 @@ export class SkillMarketplace {
           values.push(input.category);
         }
         if (input.featured) clauses.push("skills.featured = 1");
+        if (input.verified !== undefined) clauses.push(`skills.verified = ${input.verified ? 1 : 0}`);
         const limit = normalizeMarketplaceLimit(input.limit);
-        const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
-        const cursor = decodeMarketplaceCursor(input.cursor, sort);
-        // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
-        // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
-        // and its v1 cursor then pages the rest, which costs one request and loses no skill.
-        if (cursor && !("legacyUpdatedAt" in cursor)) {
-          const primary = sort === "installs" ? "skills.installs" : "skills.featured";
-          clauses.push(
-            `(${primary} < ? OR (${primary} = ? AND (skills.updated_at < ? OR (skills.updated_at = ? AND skills.id < ?))))`,
-          );
-          values.push(cursor.primary, cursor.primary, cursor.updatedAt, cursor.updatedAt, cursor.id);
+        const order = skillListOrder(input.sort, input.cursor);
+        if (order.clause) {
+          clauses.push(order.clause.sql);
+          values.push(...order.clause.values);
         }
-        const orderBy =
-          sort === "installs"
-            ? "skills.installs DESC, skills.updated_at DESC, skills.id DESC"
-            : "skills.featured DESC, skills.updated_at DESC, skills.id DESC";
         values.push(limit + 1);
         const result = yield* marketplaceCall(() =>
           bindings.DB.prepare(
-            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
+            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.verified, skills.updated_at,
               versions.id AS version_id, versions.name, versions.description, versions.category,
               versions.version, versions.bundle_sha256, versions.files_json, versions.icon_key,
               skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
        FROM marketplace_skills skills
        JOIN marketplace_skill_versions versions ON ${clauses.join(" AND ")}
        JOIN users ON users.id = skills.owner_user_id
-       ORDER BY ${orderBy}
+       ORDER BY ${order.orderBy}
        LIMIT ?`,
           )
             .bind(...values)
@@ -140,14 +137,7 @@ export class SkillMarketplace {
         const last = page.at(-1);
         return {
           skills: yield* marketplaceDecode(() => page.map(publicSummary)),
-          nextCursor:
-            rows.length > limit && last
-              ? encodeMarketplaceCursor(sort, {
-                  primary: sort === "installs" ? last.installs : last.featured,
-                  updatedAt: last.updated_at,
-                  id: last.id,
-                })
-              : null,
+          nextCursor: rows.length > limit && last ? order.nextCursor(last) : null,
         };
       }),
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
@@ -601,10 +591,32 @@ export class SkillMarketplace {
         const bindings = yield* MarketplaceStorage;
 
         const result = yield* marketplaceCall(() =>
+          // A feature is not a change of the skill, so "Recently updated" keeps its order.
           bindings.DB.prepare(
-            "UPDATE marketplace_skills SET featured = ?, updated_at = ? WHERE id = ? AND approved_version_id IS NOT NULL",
+            "UPDATE marketplace_skills SET featured = ? WHERE id = ? AND approved_version_id IS NOT NULL",
           )
-            .bind(featured ? 1 : 0, Date.now(), skillId)
+            .bind(featured ? 1 : 0, skillId)
+            .run(),
+        );
+        if (result.meta.changes !== 1)
+          return yield* Effect.fail(
+            marketplaceError(new SkillMarketplaceError(404, "skill_not_found", "The skill was not found.")),
+          );
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  setVerified(skillId: string, verified: boolean) {
+    return Effect.fn("SkillMarketplace.setVerified")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const result = yield* marketplaceCall(() =>
+          // A check is not a change of the skill, so "Recently updated" keeps its order.
+          bindings.DB.prepare(
+            "UPDATE marketplace_skills SET verified = ? WHERE id = ? AND approved_version_id IS NOT NULL",
+          )
+            .bind(verified ? 1 : 0, skillId)
             .run(),
         );
         if (result.meta.changes !== 1)
@@ -624,7 +636,7 @@ export class SkillMarketplace {
 
         return yield* marketplaceCall(() =>
           bindings.DB.prepare(
-            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
+            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.verified, skills.updated_at,
               versions.id AS version_id, versions.name, versions.description, versions.category,
               versions.version, versions.bundle_key, versions.bundle_sha256, versions.files_json, versions.icon_key,
               skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
@@ -650,7 +662,7 @@ export class SkillMarketplace {
 
         return yield* marketplaceCall(() =>
           bindings.DB.prepare(
-            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.updated_at,
+            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.verified, skills.updated_at,
               versions.name, versions.description, versions.category, versions.version,
               versions.id AS version_id, versions.bundle_key, versions.bundle_sha256,
               versions.files_json, versions.icon_key, skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
@@ -819,6 +831,66 @@ function iconUrl(row: {
   const cacheKey = row.status ? `${versionId}-${row.status}` : versionId;
   return `/v1/skills/${skillId}/icon${cacheKey ? `?v=${encodeURIComponent(cacheKey)}` : ""}`;
 }
+/** The ORDER BY of a catalog page, the clause that starts after the cursor, and the cursor of the next page. */
+function skillListOrder(
+  sort: MarketplaceSkillSort | undefined,
+  value: string | undefined,
+): {
+  orderBy: string;
+  clause: { sql: string; values: unknown[] } | null;
+  nextCursor: (last: ApprovedRow) => string;
+} {
+  if (sort === "updated") {
+    const cursor = decodeMarketplaceCursor(value, "recent");
+    return {
+      orderBy: "skills.updated_at DESC, skills.id DESC",
+      clause: cursor
+        ? {
+            sql: "(skills.updated_at < ? OR (skills.updated_at = ? AND skills.id < ?))",
+            values: [cursor.updatedAt, cursor.updatedAt, cursor.id],
+          }
+        : null,
+      nextCursor: (last) => encodeMarketplaceCursor("recent", { updatedAt: last.updated_at, id: last.id }),
+    };
+  }
+  if (sort === "name") {
+    const cursor = decodeMarketplaceCursor(value, "name");
+    // lower() on both sides: the cursor holds the name as stored, and SQLite folds the case the same way.
+    return {
+      orderBy: "lower(versions.name) ASC, skills.id ASC",
+      clause: cursor
+        ? {
+            sql: "(lower(versions.name) > lower(?) OR (lower(versions.name) = lower(?) AND skills.id > ?))",
+            values: [cursor.name, cursor.name, cursor.id],
+          }
+        : null,
+      nextCursor: (last) => encodeMarketplaceCursor("name", { name: last.name, id: last.id }),
+    };
+  }
+  const order: MarketplaceSort = sort === "installs" ? "installs" : "updated";
+  const cursor = decodeMarketplaceCursor(value, order);
+  const primary = order === "installs" ? "skills.installs" : "skills.featured";
+  return {
+    orderBy: `${primary} DESC, skills.updated_at DESC, skills.id DESC`,
+    // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
+    // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
+    // and its v1 cursor then pages the rest, which costs one request and loses no skill.
+    clause:
+      cursor && !("legacyUpdatedAt" in cursor)
+        ? {
+            sql: `(${primary} < ? OR (${primary} = ? AND (skills.updated_at < ? OR (skills.updated_at = ? AND skills.id < ?))))`,
+            values: [cursor.primary, cursor.primary, cursor.updatedAt, cursor.updatedAt, cursor.id],
+          }
+        : null,
+    nextCursor: (last) =>
+      encodeMarketplaceCursor(order, {
+        primary: order === "installs" ? last.installs : last.featured,
+        updatedAt: last.updated_at,
+        id: last.id,
+      }),
+  };
+}
+
 function publicSummary(row: ApprovedRow) {
   return {
     id: row.id,
@@ -831,6 +903,7 @@ function publicSummary(row: ApprovedRow) {
     version: row.version,
     installs: row.installs,
     featured: row.featured === 1,
+    verified: row.verified === 1,
     iconUrl: iconUrl(row),
     updatedAt: new Date(row.updated_at).toISOString(),
   };

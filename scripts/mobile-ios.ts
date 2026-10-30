@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -54,8 +54,29 @@ process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), p
 
 // run:ios skips prebuild when ios/ exists. Apply config plugins to existing projects too.
 // run:ios installs pods only when Podfile.lock changes. Install them again when their generated
-// output is missing, because Xcode's fallback codegen does not match the Pods project.
+// output is missing, because Xcode's fallback codegen does not match the Pods project, and when a
+// native dependency changed after the last install: a removed package otherwise stays a Pods target
+// whose source files no longer exist, and a new local module is not built.
 const podsOutput = join(mobileRoot, "ios/build/generated/autolinking/autolinking.json");
-const installPods = existsSync(join(mobileRoot, "ios/Pods")) && !existsSync(podsOutput);
+const podfileLock = join(mobileRoot, "ios/Podfile.lock");
+const modulesRoot = join(mobileRoot, "modules");
+const nativeInputs = [
+  join(mobileRoot, "package.json"),
+  join(mobileRoot, "../../bun.lock"),
+  ...(existsSync(modulesRoot)
+    ? readdirSync(modulesRoot).flatMap((name) => {
+        const ios = join(modulesRoot, name, "ios");
+        return existsSync(ios)
+          ? readdirSync(ios)
+              .filter((file) => file.endsWith(".podspec"))
+              .map((file) => join(ios, file))
+          : [];
+      })
+    : []),
+];
+const podsStale =
+  !existsSync(podfileLock) ||
+  nativeInputs.some((input) => existsSync(input) && statSync(input).mtimeMs > statSync(podfileLock).mtimeMs);
+const installPods = existsSync(join(mobileRoot, "ios/Pods")) && (!existsSync(podsOutput) || podsStale);
 run("node", [expo, "prebuild", "--platform", "ios", "--no-clean", ...(installPods ? [] : ["--no-install"])]);
 run("node", [expo, "run:ios", ...args]);

@@ -167,6 +167,7 @@ function presentationDatabase(): DatabaseSync {
   database.exec(migration("0010_agents_marketplace.sql"));
   seedMarketplace(database);
   database.exec(migration("0019_marketplace_presentation.sql"));
+  database.exec(migration("0042_marketplace_skill_verified.sql"));
   database.exec("UPDATE users SET avatar_url = '/v1/avatars/user-1?v=one'");
   return database;
 }

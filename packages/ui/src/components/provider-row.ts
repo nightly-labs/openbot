@@ -133,9 +133,10 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
   };
   /**
    * A sign-in that Connect started and that waits for the browser. A download or an update also
-   * marks the row connecting, until its new runtime is ready.
+   * marks the row connecting, until its new runtime is ready, and so does a check again after a key
+   * change or a restart, which `signInPending` marks false.
    */
-  const signingIn = () => connecting() && browserConnect() && runtimeReady();
+  const signingIn = () => connecting() && option().signInPending !== false && browserConnect() && runtimeReady();
   const hostSignInHint = () =>
     !off() &&
     option().id === "antigravity" &&

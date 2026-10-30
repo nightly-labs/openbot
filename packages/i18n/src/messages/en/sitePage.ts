@@ -85,4 +85,13 @@ export const messages = defineMessages("sitePage", {
   "sitePage.report.sentTitle": "Report sent",
   "sitePage.report.sentBody": "Thanks. We received your report.",
   "sitePage.report.home": "Go to the home page",
+  "sitePage.pricing.title": "OpenBot pricing",
+  "sitePage.pricing.description":
+    "Hosted servers and a license for teams. OpenBot is free for personal use on your own computer.",
+  "sitePage.pricing.heading": "Pricing",
+  "sitePage.pricing.enterprise.title": "Enterprise",
+  // {count} is the largest number of members that the page sells, such as 25.
+  "sitePage.pricing.enterprise.body":
+    "Larger servers, more than {count} members, or anything else you need. With enterprise support.",
+  "sitePage.pricing.enterprise.contact": "Contact sales",
 });

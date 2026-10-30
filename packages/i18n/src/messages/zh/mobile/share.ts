@@ -12,4 +12,11 @@ export const messages = {
   "mobile.share.noAgents": "没有助手",
   "mobile.share.chooseAgent": "选择助手",
   "mobile.share.action": "分享给{name}",
+  "mobile.share.extension.send": "发送",
+  "mobile.share.extension.footer": "OpenBot 现在会把这些内容发送给代理，不会打开应用。",
+  "mobile.share.extension.sending": "正在发送给 {name}…",
+  "mobile.share.extension.sent": "已发送给 {name}",
+  "mobile.share.extension.failed": "OpenBot 无法发送这些内容。请打开应用，从应用中发送。",
+  "mobile.share.extension.unconfirmed": "服务器没有确认这条消息。再次发送前，请先查看聊天。",
+  "mobile.share.extension.openApp": "打开 OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

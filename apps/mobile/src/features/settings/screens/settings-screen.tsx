@@ -38,6 +38,9 @@ export function SettingsScreen() {
         <SettingsRow onPress={() => router.push("/settings/language")}>
           <Typography.Paragraph>{t("mobile.settings.language.title")}</Typography.Paragraph>
         </SettingsRow>
+        <SettingsRow onPress={() => router.push("/settings/voice")}>
+          <Typography.Paragraph>{t("mobile.settings.voice.title")}</Typography.Paragraph>
+        </SettingsRow>
         <SettingsRow onPress={() => router.push("/settings/haptics")}>
           <Typography.Paragraph>{t("mobile.settings.feedback.haptics")}</Typography.Paragraph>
         </SettingsRow>

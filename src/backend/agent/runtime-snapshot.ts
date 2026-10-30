@@ -75,8 +75,8 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
 function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
-  // Local-only context goes first, so it never costs Team clients a field they had before. The side
-  // threads go before the agents' own chats.
+  // The context goes first: only context-usage-v1 carries it, so it never costs a Team client a field
+  // that it had before. The side threads go before the agents' own chats.
   if (snapshot.threadContextStates?.length) {
     snapshot.threadContextStates = [];
     if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;

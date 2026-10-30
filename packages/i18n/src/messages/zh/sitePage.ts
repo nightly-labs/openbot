@@ -77,4 +77,11 @@ export const messages = {
   "sitePage.report.sentTitle": "举报已发送",
   "sitePage.report.sentBody": "谢谢，我们已收到你的举报。",
   "sitePage.report.home": "前往首页",
+  "sitePage.pricing.title": "OpenBot 价格",
+  "sitePage.pricing.description": "托管服务器和团队许可证。在你自己的电脑上个人使用 OpenBot 免费。",
+  "sitePage.pricing.heading": "价格",
+  "sitePage.pricing.enterprise.title": "企业版",
+  // {count} is the largest number of members that the page sells, such as 25.
+  "sitePage.pricing.enterprise.body": "更大的服务器、超过 {count} 名成员，或你需要的其他任何内容，并提供企业级支持。",
+  "sitePage.pricing.enterprise.contact": "联系销售",
 } as const satisfies PartialTranslation<typeof source>;

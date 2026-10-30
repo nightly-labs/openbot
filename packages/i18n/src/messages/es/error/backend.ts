@@ -81,6 +81,8 @@ export const messages = {
   "error.backend.channelDeliveryNotCreated": "No se creó la entrega del canal.",
   "error.backend.channelAssignmentStopped": "Esta asignación del canal se detuvo o se reemplazó.",
   "error.backend.channelAssigneeUnavailable": "El agente asignado no está disponible.",
+  "error.backend.channelAssigneeRemoved": "Se quitó al miembro asignado.",
+  "error.backend.channelAssigneeReassign": "El miembro asignado no está disponible. Reasigna esta tarea.",
   "error.backend.channelAssignmentChanged": "Esta asignación del canal cambió.",
   "error.backend.channelMemberRequired": "Selecciona un miembro disponible de este canal.",
   "error.backend.memoryEssentialBudget":
@@ -197,6 +199,7 @@ export const messages = {
   "error.backend.routineFlowHandoffFailed": "La rutina no pudo pasar el trabajo a este agente.",
   "error.backend.mcpServerLimit": "OpenBot mantiene hasta {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Ya existe un servidor MCP llamado {name}.",
+  "error.backend.mcpServerInvalid": "OpenBot no puede guardar esta configuración del servidor MCP.",
   "error.backend.mcpServerNoAnswer": "El servidor no respondió en {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
   "error.backend.mcpSignInClientRefused":
@@ -222,6 +225,7 @@ export const messages = {
     "OpenBot no pudo leer la información de inicio de sesión de este servidor. Revisa la dirección del servidor y vuelve a intentarlo.",
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
+  "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":

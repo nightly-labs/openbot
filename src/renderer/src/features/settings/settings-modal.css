@@ -149,3 +149,48 @@
 .settings-sound-theme-row > .sound-theme-picker {
   flex-basis: 100%;
 }
+
+/* The voice server dialog is wider than the provider dialog, so each route fits on one line. */
+.custom-provider-dialog.voice-server-dialog {
+  width: min(640px, 100%);
+}
+
+/* One route on one line: name, model, voice, and its switch. The card draws the line between routes. */
+.voice-server-dialog .voice-server-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 2fr) auto;
+  gap: var(--openbot-space-2) var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.voice-server-dialog .voice-server-name {
+  display: grid;
+  grid-column: 1;
+  min-width: 0;
+}
+
+.voice-server-dialog .voice-server-model {
+  grid-column: 2;
+  min-width: 0;
+}
+
+/* Dictation has no voice, so its model takes the voice column too. */
+.voice-server-dialog .voice-server-wide {
+  grid-column: 2 / 4;
+}
+
+.voice-server-dialog .voice-server-voice {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.voice-server-dialog .voice-server-end {
+  display: flex;
+  grid-column: 4;
+  justify-content: flex-end;
+}
+
+.voice-server-dialog .voice-server-line .settings-modal-select {
+  width: 100%;
+}

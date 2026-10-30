@@ -147,15 +147,30 @@ thread is never replaced. Provider sessions, turns, questions, approvals, attach
 and restart recovery use the explicit execution thread. These internal execution records do not
 create extra navigation entries. The per-agent drain scheduler remains the authority for work.
 
-`ChannelService` selects one owner. A selected recipient has priority, followed by the task attached
-to a reply, a reply to a member message that has no task, a clear follow-up to the sole open task,
-and a channel with one available member. These selections use no model. Other requests use the
-lead's provider, model, and reasoning setting in a separate session with no work tools. The request
-supplies the accepted result schema and the channel summary in place of the transcript. Invalid or
-stale routing cannot broadcast a request. Routing can select an existing task, ask a question, or
-indicate that no work is needed. A selected owner or existing task adds one channel message from the
-lead, so the selection is visible and the user can correct it. Deterministic selection adds no
-message. A request that needs routing in a channel with no lead stops with the reason
+`ChannelService` selects the owners of a request. A selected recipient has priority, followed by the
+task attached to a reply, a reply to a member message that has no task, a clear follow-up to the sole
+open task or to the open root tasks that several members own for one request, and a channel with one
+available member. These selections use no model. Other requests use
+the lead's provider, model, and reasoning setting in a separate session with no work tools. The
+request supplies the accepted result schema and the channel summary in place of the transcript.
+Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
+request in the area of one member, or in the area of no member, goes to the one member best able to
+answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
+different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
+gets the request's attachments; its packet names the other members that answer. A member that the
+model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
+request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
+Each selected owner or existing task adds one channel message from the lead, so the selection is
+visible and the user can correct it. Deterministic selection adds no message.
+
+A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
+that can take work, with no routing turn. A message that opens with `@everyone` goes to each member
+that can take work. `@everyone` is plain text, not a tag; the channel composer's mention picker
+offers it. The host reads the address from the text (`leadingAddress`), so a client that sends only
+the first mention in `recipientAgentId` reaches all of them, and the Team API wire does not change.
+A routine run reads its text in the same way. A request to more than one member does not continue
+the task of the message it replies to. After a stop, "continue" continues each stopped task of the
+request and leaves a member that still works as it is. A request that needs routing in a channel with no lead stops with the reason
 `channelLeadRequired`. A save that sets a new lead queues these requests again, and the lead routes
 them. A lead change does not move a task that already has an owner. The member packet names the lead
 (`leadAgentId`).

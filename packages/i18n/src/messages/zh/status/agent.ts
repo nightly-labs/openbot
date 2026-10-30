@@ -25,6 +25,12 @@ export const messages = {
   "status.agent.vaultCardFillFrames": "银行卡字段位于来自 {origins} 的框架中。",
   "status.agent.screenCaptureProgress": "正在请求截屏…",
   "status.agent.screenCaptureReviewing": "正在查看截屏…",
+  "status.agent.browserOpening": "正在打开网页…",
+  "status.agent.browserReading": "正在读取网页…",
+  "status.agent.browserClicking": "正在点击网页…",
+  "status.agent.browserTyping": "正在网页中输入…",
+  "status.agent.browserActing": "正在使用网页…",
+  "status.agent.browserReviewing": "正在查看网页…",
   "status.agent.memoriesSearching": "正在搜索记忆…",
   "status.agent.memoriesSearched": { other: "已搜索记忆：找到 {count} 条" },
   "status.agent.memoriesUpdating": "正在更新记忆…",
@@ -44,4 +50,5 @@ export const messages = {
   "status.agent.vaultAdded": "已保存到保险库：{name}",
   "status.agent.vaultUpdated": "已在保险库中修改：{name}",
   "status.agent.vaultDeleted": "已从保险库删除：{name}",
+  "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
 } as const satisfies PartialTranslation<typeof source>;

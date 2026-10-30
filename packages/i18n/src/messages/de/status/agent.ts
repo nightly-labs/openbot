@@ -26,6 +26,12 @@ export const messages = {
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
   "status.agent.screenCaptureReviewing": "Bildschirmaufnahme wird geprüft…",
+  "status.agent.browserOpening": "Webseite wird geöffnet…",
+  "status.agent.browserReading": "Webseite wird gelesen…",
+  "status.agent.browserClicking": "Klick auf der Webseite…",
+  "status.agent.browserTyping": "Eingabe auf der Webseite…",
+  "status.agent.browserActing": "Webseite wird bedient…",
+  "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
   "status.agent.memoriesSearched": {
     one: "Erinnerungen durchsucht: {count} gefunden",
@@ -37,4 +43,5 @@ export const messages = {
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
+  "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
 } as const satisfies PartialTranslation<typeof source>;

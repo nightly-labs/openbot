@@ -7,6 +7,9 @@ import type { FilesPort } from "./files-port";
 /** Disk and memory change slowly, and the host reads CPU since the reading before. */
 const MACHINE_REFRESH_MS = 60_000;
 
+/** Machine use and its alerts are hidden for now: in Storage and in the sidebar card. */
+export const MACHINE_RESOURCES_SHOWN: boolean = false;
+
 /**
  * The machine use of one server and its alert settings, for an owner or admin. It reads again each
  * minute while Storage is open. `available` is false for a member, for a client with no machine
@@ -22,6 +25,7 @@ export function createMachineResources(target: () => { serverId: string; canMana
   }>({ available: false, metrics: null, alerts: null, error: null });
 
   createEffect(target, ({ serverId, canManage }) => {
+    if (!MACHINE_RESOURCES_SHOWN) return;
     const port = untrack(calls);
     const read = port.storage.getMachineMetrics;
     const admin = port.hostAdmin;

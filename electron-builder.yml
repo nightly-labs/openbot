@@ -128,7 +128,8 @@ mac:
     ElectronTeamID: ZTRDTUL87R
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
     # Computer Use runs the driver as a child process, so macOS asks for both grants in OpenBot's
-    # name and shows these sentences.
+    # name and shows these sentences. Under the hardened runtime, macOS shows the Automation prompt
+    # only when the app has `com.apple.security.automation.apple-events` in its entitlements.
     NSScreenCaptureUsageDescription: OpenBot captures the screen so an agent can see the app windows you ask it to control.
     NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
     NSUserActivityTypes:

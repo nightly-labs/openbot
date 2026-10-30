@@ -126,6 +126,15 @@ export interface UsageLimitContinuation {
   previousTurnIds: string[];
 }
 
+/**
+ * The turns that OpenBot added to a delivery because its plan still had open steps. `queued` is set
+ * from the end of one turn to the start of the next; the queue then shows the delivery as running.
+ */
+interface PlanContinuationMarker {
+  turnIds: string[];
+  queued?: true;
+}
+
 interface StoredDelivery {
   editId?: string | undefined;
   finishedEditOutcomes?: Record<string, StoredFinishedEdit> | undefined;
@@ -143,6 +152,13 @@ interface StoredDelivery {
   steerFallback?: QueueSteerFallback;
   /** The interrupted turn whose work continues after a usage-limit switch. Kept out of queue snapshots. */
   resumeAfterUsageLimit?: UsageLimitContinuation;
+  /** OpenBot's automatic plan continuations of this delivery. Kept out of queue snapshots. */
+  planContinuation?: PlanContinuationMarker;
+}
+
+/** A delivery that waits for its automatic plan continuation. It is queued, but not in the queue the user sees. */
+function waitsForPlanContinuation(delivery: StoredDelivery): boolean {
+  return delivery.status === "queued" && delivery.planContinuation?.queued === true;
 }
 
 function isActiveDelivery(delivery: StoredDelivery): boolean {
@@ -205,6 +221,7 @@ export interface DeliveryContext {
   delivery: QueueDelivery;
   managedAttachments: Array<AttachmentSummary & { path: string }>;
   resumeAfterUsageLimit?: UsageLimitContinuation;
+  planContinuation?: PlanContinuationMarker;
   channelId?: string;
 }
 
@@ -777,6 +794,7 @@ export class MailboxStore {
         (delivery) =>
           delivery.recipientAgentId === agentId &&
           delivery.status === "queued" &&
+          !waitsForPlanContinuation(delivery) &&
           executionMessageIds.has(delivery.messageId),
       )
       .sort(compareQueueOrder)
@@ -842,6 +860,7 @@ export class MailboxStore {
     options: { teammateAnswers?: boolean } = {},
   ): Array<{ deliveryId: string; text: string; createdAt: string }> {
     return this.#queuedFor(agentId).flatMap((delivery) => {
+      if (waitsForPlanContinuation(delivery)) return [];
       const message = this.#requireMessage(delivery.messageId);
       if (message.taskId !== taskId) return [];
       if (options.teammateAnswers === false && message.sender.kind === "agent" && message.sender.agentId !== agentId)
@@ -858,6 +877,14 @@ export class MailboxStore {
         (delivery.status === "starting" || delivery.status === "running") &&
         this.#taskIdOf(delivery) === taskId,
     );
+  }
+
+  /** The queued deliveries of one lane, without those that wait for their automatic plan continuation. */
+  laneQueuedIds(agentId: string, taskId: string | null): string[] {
+    const messages = this.#messagesById();
+    return this.#queuedFor(agentId)
+      .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#taskIdOf(delivery, messages) === taskId)
+      .map((delivery) => delivery.id);
   }
 
   /** Whether a message of this task is queued, starting or running. */
@@ -1172,7 +1199,8 @@ export class MailboxStore {
         const delivery = this.#publicDelivery(storedDelivery, positions, message);
         messages.push({
           id: delivery.id,
-          turnId: storedDelivery.turnId ?? undefined,
+          // A plan continuation keeps the request in its first turn, like `syncDeliveryMessage`.
+          turnId: storedDelivery.planContinuation?.turnIds[0] ?? storedDelivery.turnId ?? undefined,
           author: message.sender.kind === "agent" ? "agent" : "user",
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
@@ -1397,6 +1425,22 @@ export class MailboxStore {
     return this.#contexts(run);
   }
 
+  /** The other deliveries of this lane that wait for the same automatic plan continuation. */
+  planContinuationsToStartWith(deliveryId: string): DeliveryContext[] {
+    const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!next || !waitsForPlanContinuation(next)) return [];
+    const messages = this.#messagesById();
+    const lane = this.#taskIdOf(next, messages);
+    return this.#contexts(
+      this.#queuedFor(next.recipientAgentId).filter(
+        (candidate) =>
+          candidate.id !== next.id &&
+          waitsForPlanContinuation(candidate) &&
+          this.#taskIdOf(candidate, messages) === lane,
+      ),
+    );
+  }
+
   /** The agents that were sent a request and whose delivery ended with no answer. */
   unansweredRecipients(requestId: string): string[] {
     return this.#state.deliveries
@@ -1472,6 +1516,11 @@ export class MailboxStore {
       .map((delivery) => delivery.id);
   }
 
+  /** The file name of an attachment draft, or null when the draft is gone. */
+  draftName(draftId: string): string | null {
+    return this.#state.drafts.find((draft) => draft.id === draftId)?.name ?? null;
+  }
+
   getDelivery(deliveryId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     return delivery ? this.#context(delivery) : null;
@@ -1484,7 +1533,8 @@ export class MailboxStore {
         candidate.recipientAgentId === agentId &&
         (candidate.id === messageId ||
           (candidate.resumeAfterUsageLimit !== undefined &&
-            (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId)))),
+            (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
+          candidate.planContinuation?.turnIds.includes(messageId) === true),
     );
     return delivery ? this.#context(delivery) : null;
   }
@@ -1719,9 +1769,9 @@ export class MailboxStore {
     turnId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const continuation = this.#state.deliveries.find(
-        (candidate) => candidate.id === deliveryId,
-      )?.resumeAfterUsageLimit;
+      const stored = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      const continuation = stored?.resumeAfterUsageLimit;
+      const planContinuation = stored?.planContinuation;
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
         status: "running",
         turnId,
@@ -1733,6 +1783,11 @@ export class MailboxStore {
                 previousTurnIds: [...new Set([...continuation.previousTurnIds, turnId])],
               },
             }
+          : {}),
+        // Not cleared at `starting`: a start that Codex refuses during a compaction goes back to the
+        // queue and must still continue the plan.
+        ...(planContinuation
+          ? { planContinuation: { turnIds: [...new Set([...planContinuation.turnIds, turnId])] } }
           : {}),
       });
     } catch (cause) {
@@ -2111,9 +2166,10 @@ export class MailboxStore {
       const allQueued = this.#state.deliveries.filter(
         (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
       );
-      const heldIds = new Set(allQueued.filter((delivery) => delivery.editId).map((delivery) => delivery.id));
+      const held = (delivery: StoredDelivery) => Boolean(delivery.editId) || waitsForPlanContinuation(delivery);
+      const heldIds = new Set(allQueued.filter(held).map((delivery) => delivery.id));
       const requested = deliveryIds.filter((deliveryId) => !heldIds.has(deliveryId));
-      const queued = allQueued.filter((delivery) => !delivery.editId);
+      const queued = allQueued.filter((delivery) => !held(delivery));
       const expected = new Set(queued.map((delivery) => delivery.id));
       if (
         requested.length !== queued.length ||
@@ -2125,7 +2181,7 @@ export class MailboxStore {
       let nextVisible = 0;
       const orderedIds = [...allQueued]
         .sort(compareQueueOrder)
-        .map((delivery) => (delivery.editId ? delivery.id : requested[nextVisible++]));
+        .map((delivery) => (held(delivery) ? delivery.id : requested[nextVisible++]));
       const orders = new Map(orderedIds.map((deliveryId, index) => [deliveryId, index]));
       for (const delivery of allQueued) {
         delivery.queueOrder = orders.get(delivery.id) ?? delivery.queueOrder;
@@ -2218,6 +2274,65 @@ export class MailboxStore {
         error: null,
         ...(resumeAfterUsageLimit ? { resumeAfterUsageLimit } : {}),
       });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * A delivery whose turn ended with open plan steps, back in the queue for one more turn. It keeps
+   * the turn id until that turn starts, and the queue shows it as running.
+   */
+  requeueForPlan = Effect.fn("MailboxStore.requeueForPlan")(function* (
+    this: MailboxStore,
+    deliveryId: string,
+    turnId: string,
+  ): Effect.fn.Return<void, StoredStateFailure> {
+    try {
+      const turnIds = this.#state.deliveries.find((candidate) => candidate.id === deliveryId)?.planContinuation
+        ?.turnIds;
+      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+        status: "queued",
+        turnId: null,
+        error: null,
+        planContinuation: { turnIds: [...new Set([...(turnIds ?? []), turnId])], queued: true },
+      });
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Ends the deliveries of this lane that wait for an automatic plan continuation that will not run:
+   * after a restart, a Stop, or a new message. Their last turn completed. Returns their ids.
+   */
+  settlePlanContinuations = Effect.fn("MailboxStore.settlePlanContinuations")(function* (
+    this: MailboxStore,
+    agentId: string,
+    taskId?: string | null,
+  ): Effect.fn.Return<string[], StoredStateFailure> {
+    try {
+      const messages = this.#messagesById();
+      const settled: string[] = [];
+      for (const delivery of this.#state.deliveries) {
+        if (
+          delivery.recipientAgentId !== agentId ||
+          !waitsForPlanContinuation(delivery) ||
+          (taskId !== undefined && this.#taskIdOf(delivery, messages) !== taskId)
+        )
+          continue;
+        const turnIds = delivery.planContinuation?.turnIds ?? [];
+        Object.assign(delivery, {
+          status: "completed",
+          turnId: turnIds.at(-1) ?? null,
+          error: null,
+          planContinuation: { turnIds },
+        });
+        this.#changes.deliveryIds.add(delivery.id);
+        settled.push(delivery.id);
+      }
+      if (settled.length > 0) this.#persist("delivery.updated");
+      return settled;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
@@ -2588,6 +2703,7 @@ export class MailboxStore {
     return {
       delivery: this.#publicDelivery(delivery, positions, message),
       ...(delivery.resumeAfterUsageLimit ? { resumeAfterUsageLimit: delivery.resumeAfterUsageLimit } : {}),
+      ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
@@ -2615,8 +2731,14 @@ export class MailboxStore {
       steeredAt: _steeredAt,
       steerFallback,
       resumeAfterUsageLimit: _resumeAfterUsageLimit,
+      planContinuation: _planContinuation,
       ...publicDelivery
     } = delivery;
+    // Between two turns of one request, the request still runs for the person who sent it.
+    if (waitsForPlanContinuation(delivery)) {
+      publicDelivery.status = "running";
+      publicDelivery.turnId = delivery.planContinuation?.turnIds.at(-1) ?? null;
+    }
     return {
       ...publicDelivery,
       ...(steerFallback && delivery.status === "queued" ? { steerFallback } : {}),
@@ -2626,7 +2748,7 @@ export class MailboxStore {
       replyToMessageId: message.replyToMessageId,
       ...(message.expectsReply === false ? { expectsReply: false } : {}),
       position:
-        delivery.status === "queued"
+        publicDelivery.status === "queued"
           ? positions
             ? (positions.get(delivery.id) ?? null)
             : this.#queuedPosition(delivery)
@@ -2639,7 +2761,7 @@ export class MailboxStore {
     const counts = new Map<string, number>();
     const positions = new Map<string, number>();
     const queued = [...this.#state.deliveries]
-      .filter((delivery) => delivery.status === "queued")
+      .filter((delivery) => delivery.status === "queued" && !waitsForPlanContinuation(delivery))
       .sort(compareQueueOrder);
     for (const delivery of queued) {
       const position = (counts.get(delivery.recipientAgentId) ?? 0) + 1;
@@ -2655,6 +2777,7 @@ export class MailboxStore {
     for (const candidate of this.#state.deliveries)
       if (
         candidate.status === "queued" &&
+        !waitsForPlanContinuation(candidate) &&
         candidate.recipientAgentId === delivery.recipientAgentId &&
         compareQueueOrder(candidate, delivery) < 0
       )
@@ -3017,7 +3140,12 @@ function isStoredDelivery(value: unknown): value is StoredDelivery {
         isString(value.resumeAfterUsageLimit.turnId) &&
         isString(value.resumeAfterUsageLimit.workSteps) &&
         Array.isArray(value.resumeAfterUsageLimit.previousTurnIds) &&
-        value.resumeAfterUsageLimit.previousTurnIds.every(isString)))
+        value.resumeAfterUsageLimit.previousTurnIds.every(isString))) &&
+    (value.planContinuation === undefined ||
+      (isRecord(value.planContinuation) &&
+        Array.isArray(value.planContinuation.turnIds) &&
+        value.planContinuation.turnIds.every(isString) &&
+        (value.planContinuation.queued === undefined || value.planContinuation.queued === true)))
   );
 }
 

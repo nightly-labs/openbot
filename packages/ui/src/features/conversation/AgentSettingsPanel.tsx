@@ -92,6 +92,7 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
+import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
 
@@ -126,15 +127,19 @@ export interface AgentSettingsPanelProps {
   quickAcknowledgementEditable?: boolean;
   /** The browser profile of the agent's tabs. Left out when the host cannot change it. */
   browserProfiles?: AgentBrowserProfileOptions | undefined;
-  /** The busy-message setting is local-only too: the Team API does not carry it. */
+  /** The busy-message setting can be changed locally or through the host's administrator route. */
   busyMessageModeEditable?: boolean;
+  /** Whether the busy-message default belongs to a joined server's host, not to this app. */
+  busyMessageDefaultIsHost?: boolean;
   /** Tasks run only on this computer: the Team API has no task route. */
   taskLimitEditable?: boolean;
   /** Backup models are local-only too: the Team API does not carry them. */
   backupModelsEditable?: boolean;
+  /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
+  folders?: AgentFolderCalls | undefined;
   /** Whether a usage limit holds this model and account now, for the backup models page. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
-  /** The app default an agent without its own busy-message setting follows. */
+  /** The app or host default an agent without its own busy-message setting follows. */
   defaultBusyMessageMode?: BusyMessageMode | undefined;
   /** The account defaults an agent without its own value follows. Absent for a remote agent. */
   agentDefaults?: AgentDefaults | undefined;
@@ -202,10 +207,11 @@ const INSTRUCTIONS_SAVE_DELAY_MS = 400;
  * The pages behind the root list. The root edits the agent's face, name, title and instructions
  * in place, as the mobile app does, and shows one row for each page.
  */
-type AgentSettingsPage = "permissions" | "backup-models" | "advanced";
+type AgentSettingsPage = "permissions" | "folders" | "backup-models" | "advanced";
 
 const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
   permissions: "agentSettings.permissions.title",
+  folders: "agentSettings.folders.title",
   "backup-models": "agentSettings.backupModels.title",
   advanced: "agentSettings.advanced.title",
 };
@@ -326,6 +332,38 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   function closePage(): void {
     returnFocusPage = page();
     setPage(null);
+  }
+
+  function folderSource() {
+    const calls = props.folders;
+    return calls ? { agentId: props.agent.id, agentName: props.agent.name, calls } : undefined;
+  }
+  const agentFolders = createAgentFolders(folderSource);
+  // Each activity of the agent gives a new agent object, so the list loads again only when the
+  // agent, its saved or excluded folders or the page change. The page opening reads which folders
+  // are gone.
+  const folderLoadKey = createMemo(() =>
+    props.folders
+      ? [
+          props.agent.id,
+          page() === "folders",
+          ...(props.agent.additionalFolders ?? []),
+          "",
+          ...(props.agent.excludedFolders ?? []),
+        ].join("\n")
+      : "",
+  );
+  createEffect(
+    () => {
+      folderLoadKey();
+      return untrack(folderSource);
+    },
+    (source) => agentFolders.load(source),
+  );
+
+  /** The access label when the agent can change all files: the folders then do not apply. */
+  function wideAccess(): string | null {
+    return draft.permission === "workspace" ? null : t(ACCESS_LABEL[draft.permission]);
   }
 
   function workspaceEnforcementNote(provider: AgentProviderId): string {
@@ -832,14 +870,16 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return count > 0 ? t("agentSettings.backupModels.valueCount", { mode, count }) : mode;
   };
 
-  const appBusyMessageMode = () => props.defaultBusyMessageMode ?? DEFAULT_BUSY_MESSAGE_MODE;
+  const defaultBusyMessageMode = () => props.defaultBusyMessageMode ?? DEFAULT_BUSY_MESSAGE_MODE;
+  const defaultBusyMessageLabels = () =>
+    props.busyMessageDefaultIsHost ? HOST_DEFAULT_BUSY_MESSAGE_LABEL : APP_DEFAULT_BUSY_MESSAGE_LABEL;
   const busyMessageLabel = (choice: BusyMessageChoice) =>
-    t(choice === "default" ? APP_DEFAULT_BUSY_MESSAGE_LABEL[appBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
+    t(choice === "default" ? defaultBusyMessageLabels()[defaultBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
   const steerUnsupported = () => {
     const provider = knownProvider();
     return (
       provider !== undefined &&
-      (draft.busyMessage === "default" ? appBusyMessageMode() : draft.busyMessage) === "steer" &&
+      (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
       agentProviderDescriptor(provider).steer !== "native"
     );
   };
@@ -1274,6 +1314,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   value={t(ACCESS_LABEL[draft.permission])}
                   onClick={() => openPage("permissions")}
                 />
+                <Show when={props.folders}>
+                  <AgentFoldersRow
+                    ref={pageRowRef("folders")}
+                    folders={agentFolders}
+                    wideAccess={wideAccess()}
+                    onOpen={() => openPage("folders")}
+                  />
+                </Show>
                 <div class="agent-settings-switch-row">
                   <span class="settings-link-label">
                     <span class="settings-link-icon">
@@ -1380,6 +1428,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   />
                 </div>
               </Show>
+            </Show>
+            <Show when={page() === "folders"}>
+              <AgentFoldersPage
+                folders={agentFolders}
+                agentName={props.agent.name}
+                wideAccess={wideAccess()}
+                workspaceAccess={t(ACCESS_LABEL.workspace)}
+                onChangeAccess={() => openPage("permissions")}
+              />
             </Show>
             <Show when={page() === "backup-models"}>
               <BackupModelsPage
@@ -1643,6 +1700,11 @@ const BUSY_MESSAGE_LABEL = {
 const APP_DEFAULT_BUSY_MESSAGE_LABEL = {
   queue: "agentSettings.busyMessage.appDefaultQueue",
   steer: "agentSettings.busyMessage.appDefaultSteer",
+} as const satisfies Record<BusyMessageMode, AppTextKey>;
+
+const HOST_DEFAULT_BUSY_MESSAGE_LABEL = {
+  queue: "agentSettings.busyMessage.hostDefaultQueue",
+  steer: "agentSettings.busyMessage.hostDefaultSteer",
 } as const satisfies Record<BusyMessageMode, AppTextKey>;
 
 const ACCESS_LABEL = {

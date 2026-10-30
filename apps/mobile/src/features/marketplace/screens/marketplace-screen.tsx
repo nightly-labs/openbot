@@ -9,7 +9,6 @@ import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-
 import { GLASS_CAPSULE_HEIGHT } from "@/shared/components/glass-capsule";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { AgentCard, AppTile, FeaturedAgent, ListingRow } from "../components/marketplace-parts";
@@ -106,11 +105,13 @@ export function MarketplaceScreen() {
     <View className="flex-1 bg-sheet">
       <Animated.ScrollView
         className="flex-1"
-        contentInsetAdjustmentBehavior="always"
+        // The side insets go outside the scroll view, as in `LargeTitleScrollView`.
+        style={{ marginLeft: insets.left, marginRight: insets.right }}
+        contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
         // Android has no content inset, so the content starts below the transparent header. The bottom
         // keeps the last row above the field.
         contentContainerStyle={{
-          paddingTop: isAndroid ? scroll.headerHeight : 0,
+          paddingTop: scroll.ownsInset ? scroll.headerHeight : 0,
           paddingBottom: insets.bottom + GLASS_CAPSULE_HEIGHT + 32,
         }}
         keyboardDismissMode="on-drag"

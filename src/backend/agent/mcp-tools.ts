@@ -225,6 +225,43 @@ const findServer = (servers: AgentMcpServers, name: string) => {
     : Effect.fail(new ToolOperationFailed({ cause: new Error(sourceText("error.agent.mcpServerUnknown", { name })) }));
 };
 
+const SIGN_IN_NEXT =
+  "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
+
+/**
+ * A silent test of each saved http server that a tool search names and that has no sign-in on this
+ * computer. A provider that reaches such a server tries its own sign-in and fails, so the search is
+ * where the agent looks for its tools. A server that needs a sign-in gets its card; others are left out.
+ */
+export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function* (
+  servers: AgentMcpServers,
+  named: readonly McpServerConfig[],
+  requestSignIn: McpServerToolCall["requestSignIn"],
+) {
+  const signIns = servers.signIns();
+  const signedIn = new Set(signIns.flatMap((state) => (state.signedIn ? [state.mcpServerId] : [])));
+  const candidates = named.filter(
+    (config) => config.enabled && config.transport === "http" && !signedIn.has(config.id),
+  );
+  // Each probe can wait for its whole deadline, so the search waits for the slowest server only.
+  const found = yield* Effect.forEach(
+    candidates,
+    (config) =>
+      Effect.gen(function* () {
+        const outcome = yield* servers.inspect(config);
+        if (outcome.needs !== "sign_in") return null;
+        yield* requestSignIn(config);
+        return {
+          status: "needs_sign_in",
+          server: describeServer(config, signIns),
+          next: `When the user's request needs this server: ${SIGN_IN_NEXT}`,
+        };
+      }),
+    { concurrency: "unbounded" },
+  );
+  return found.filter((entry) => entry !== null);
+});
+
 /** What a test found, in words the agent acts on. A sign-in also puts its card in the conversation. */
 const report = Effect.fnUntraced(function* (
   servers: AgentMcpServers,
@@ -251,7 +288,7 @@ const report = Effect.fnUntraced(function* (
     return openBotToolResult({
       status: "needs_sign_in",
       server,
-      next: "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.",
+      next: SIGN_IN_NEXT,
     });
   }
   if (outcome.needs === "key")

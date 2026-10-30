@@ -49,6 +49,7 @@ const PRESENTATION: BrowserDockPresentation = {
   hold: null,
   editingDeliveryId: null,
   canSteer: false,
+  steerSupported: true,
   canRunAsTask: false,
   island: null,
   handoffPending: false,

@@ -1,6 +1,7 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
@@ -115,6 +116,20 @@ export interface AgentTaskInput {
 /** A person's new title for a side thread. */
 export interface RenameAgentTaskInput extends AgentTaskInput {
   title: string;
+}
+
+/** Moves the person's read mark of a side thread to a message of that thread. */
+export interface MarkAgentTaskReadInput extends AgentTaskInput {
+  throughMessageId: string;
+}
+
+/** The person's read mark of one side thread, by its task id. */
+export interface AgentTaskReadState extends ConversationReadState {
+  taskId: string;
+}
+
+export function isAgentTaskReadState(value: unknown): value is AgentTaskReadState {
+  return isDynamicRecord(value) && isIdentifier(value.taskId) && isConversationReadState(value);
 }
 
 /**

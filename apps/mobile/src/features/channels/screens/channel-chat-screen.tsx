@@ -141,6 +141,12 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     showsOnline(server) && canSend,
     respondToPrompt,
   );
+  // A voice conversation in the channel shows the leader, then the member that gets the task, and
+  // reads the first answer.
+  const liveChannel = useMemo(
+    () => ({ messages: page?.messages ?? [], tasks: page?.tasks ?? [], leadAgentId: channel?.leadAgentId ?? null }),
+    [page?.messages, page?.tasks, channel?.leadAgentId],
+  );
   const name = channel?.name ?? t("mobile.channel.chat.fallbackName");
   const target = useMemo(
     () => ({ kind: "channel" as const, id: channelId, serverId, name, members }),
@@ -160,6 +166,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       notice={archived ? t("mobile.channel.chat.deletedNotice") : null}
       activities={activities}
       activeTurnId={null}
+      liveChannel={liveChannel}
       questionForm={questionForm}
       onSelectQuestion={selectPrompt}
       approvals={approvals}

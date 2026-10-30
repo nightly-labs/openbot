@@ -66,4 +66,11 @@ export const messages = {
   "skill.preview.examplePrompt": "帮我使用这个技能。",
   "skill.preview.try": "试用技能",
   "skill.preview.linkFailed": "无法打开链接。",
+
+  "skill.marketplace.changed": { other: "{name} 已在 {count} 个助手上更改。" },
+  "skill.marketplace.updated": { other: "{name} 已在 {count} 个助手上更新。" },
+  "skill.marketplace.undone": "已撤销对 {name} 的更改。",
+  "skill.marketplace.confirmAgents": "助手：{agents}。",
+  "skill.marketplace.limitReason": "每个助手最多可以有 {limit} 个技能。",
+  "skill.marketplace.cannotRemove": "OpenBot 无法移除内置技能，也无法移除不是它安装的技能。",
 } as const satisfies PartialTranslation<typeof source>;

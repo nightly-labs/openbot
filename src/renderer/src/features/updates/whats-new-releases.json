@@ -1,5 +1,133 @@
 [
   {
+    "version": "0.54.0",
+    "date": "2026-10-29",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "A Workspace only agent can change files in folders that you add. Open the agent's settings, then Folders, or drop a folder on the chat.",
+          "Set the context window of each model of a custom provider, so OpenCode compacts the conversation at the correct size.",
+          "Ctrl+F (⌘F on macOS) searches the open side thread.",
+          "Buy a commercial license for work from Billing or from Add server: Starter for 1 user, or Team for 2 to 10 users. A new license is free until 1 December 2026."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new server allows fewer members: Starter 1, Standard 5 and Pro 10. Servers that already exist keep their limits.",
+          "An agent's post to Slack, Discord or Telegram gives the agent the ID of the post, so it can link to it."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Remote desktop pairing on macOS 27 works again.",
+          "OpenBot keeps working when a page in the browser requests an address that it cannot read.",
+          "Gemini continues when one MCP server does not start. OpenBot tells you which server it left out.",
+          "A new Gemini account stays added when its first usage reading fails.",
+          "The chat stays steady when you switch between agents that have queued messages.",
+          "A side thread shows the agent's steps, as in the agent's own chat.",
+          "An agent that a Codex usage limit moved to a backup model goes back to its model when Codex ends the limit early."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.53.2",
+    "date": "2026-10-28",
+    "notices": [
+      "On Windows, if OpenBot was installed in the folder that holds your agents, it now runs from a new folder. If the taskbar pin no longer opens OpenBot, pin it again from the Start menu."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents now save lasting preferences and facts from your chats and side threads in the background. The conversation shows each change.",
+          "Server settings → General → Memory review sets how often agents review their memories: every 10, 20 or 40 turns, or Off.",
+          "Memory search also finds other forms of a word, so \"closing\" finds \"closes\"."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": ["An agent can keep 256 memories by default instead of 64. A limit that you set stays as it is."]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "On Windows, updates work again when OpenBot was installed in the folder that holds your agents. Your agents, Shared and Downloads stay where they are.",
+          "The Windows installer no longer lets you choose the folder that holds your agents or your user data."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.53.1",
+    "date": "2026-10-28",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": ["Usage shows an estimated cost for Gemini (Antigravity) turns."]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Server settings → Storage no longer shows machine use and alerts, and the sidebar no longer shows the machine card.",
+          "Queued messages show Steer only for providers that can take a message into a running turn."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "The activity line says when the agent waits for your answer, your approval or you in the browser.",
+          "The model picker shows the Gemini models also when Gemini starts slowly.",
+          "Agent chats in the sidebar show their unread replies when the app starts before your account signs in.",
+          "A group chat no longer shows a paused lead as working.",
+          "On macOS, the Computer Use rim no longer shows on top of the OpenBot window.",
+          "A message with a Markdown table is as wide as an agent table."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.53.0",
+    "date": "2026-10-28",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Server settings → Storage shows the disk, memory and CPU use of the server's computer. Set an alert level and choose who gets the alert.",
+          "A side thread shows how full its context is next to the send button. Select Compact to compact the thread's context now.",
+          "Send images and files in a side thread, also in a thread of a joined server and in the web app.",
+          "A thread that you read on this computer is read on your phone too."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Settings → Mobile Connect shows your phones as cards. \"Add phone\" shows only the one QR code that you need.",
+          "When an agent names an output file by its path, OpenBot attaches the file to the answer.",
+          "The Timezone list and the \"Add backup model\" list have a search field."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot starts after an upgrade when its database has broken links between rows from an earlier version.",
+          "When an agent asks a question in a side thread, the thread shows the question card and waits for your answer.",
+          "On Windows, Remote Desktop starts again.",
+          "On macOS, the Apple apps and Messages tools can ask for Automation access.",
+          "Gemini sign-in and a slow first start of Gemini work on Windows and Intel Macs.",
+          "In Discord, the agent gets the text and files of a forwarded message.",
+          "A channel no longer stops all work when a member repeats its result as its last reply."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.52.1",
     "date": "2026-10-27",
     "notices": [],

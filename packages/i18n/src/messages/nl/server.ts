@@ -98,8 +98,21 @@ export const messages = {
   "server.add.custom.description":
     "Krijg een eigen infrastructuur, extra opslag of functies die passen bij je manier van werken.",
   "server.add.custom.action": "Neem contact op",
-  "server.add.join.title": "Heb je een uitnodiging?",
   "server.add.join.action": "Word lid van een server",
+  "server.add.otherOptions": "Andere opties",
+  "server.local.createTitle": "Nieuwe server op deze computer",
+  "server.local.createDescription": "De server heeft eigen agents, chats en bestanden. Hij draait op deze computer.",
+  "server.local.nameLabel": "Servernaam",
+  "server.local.create": "Server maken",
+  "server.local.creating": "Server maken…",
+  "server.local.createFailed": "Kan de server niet maken.",
+  "server.local.limitReached":
+    "Je kunt maximaal {limit} servers op deze computer hebben. Wis er een om een nieuwe te maken.",
+  "server.local.deleteConfirmTitle": "{name} wissen?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stopt de server en verplaatst de agents, chats en bestanden ervan naar de prullenbak.",
+  "server.local.deleting": "Server wissen…",
+  "server.local.deletedTitle": "{name} gewist",
   "server.add.limit.title": "Dit account heeft het maximale aantal servers",
   "server.add.limit.description": {
     one: "Een account kan {count} betaalde server hebben. Verwijder eerst een server om er een toe te voegen.",
@@ -184,6 +197,7 @@ export const messages = {
   "server.rail.addRemote": "Externe server toevoegen",
   "server.rail.add": "Server toevoegen",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "op deze computer",
   "server.rail.notificationsMuted": "meldingen gedempt",
   "server.rail.actions": "Serveracties",
   "server.rail.unmute": "Server niet meer dempen",
@@ -313,6 +327,12 @@ export const messages = {
   "server.settings.memoryLimit": "Herinneringen per agent",
   "server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
+  "server.settings.memoryReview": "Geheugencontrole",
+  "server.settings.memoryReviewDescription":
+    "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",
+  "server.settings.memoryReviewOff": "Uit",
+  "server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
+  "server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
   "server.settings.rolesTitle": "Rollen",
   "server.settings.rolesDescription":
     "Kies de agents die leden kunnen gebruiken. Een lid krijgt de hoogste toegang van Iedereen en van zijn rollen. Eigenaars en beheerders kunnen alle agents gebruiken.",
@@ -432,8 +452,10 @@ export const messages = {
   "server.invite.showQr": "Toon QR-code van uitnodiging",
   "server.invite.permaHint":
     "Verloopt nooit en kan vaak worden gebruikt. Iedereen met deze link kan lid worden; trek hem in om hem uit te schakelen.",
-  "server.invite.full":
-    "Deze server heeft het maximum van {limit} leden. Verwijder een lid om een nieuwe persoon uit te nodigen.",
+  "server.invite.full": {
+    one: "Deze server heeft het maximum van {count} lid. Verwijder een lid om een nieuwe persoon uit te nodigen.",
+    other: "Deze server heeft het maximum van {count} leden. Verwijder een lid om een nieuwe persoon uit te nodigen.",
+  },
   "server.invite.qrLabel": "QR-code van uitnodiging",
   "server.invite.qrDescription": "Scan deze code in OpenBot Mobile om lid te worden van deze server.",
   "server.invite.accepted": "Uitnodiging geaccepteerd",

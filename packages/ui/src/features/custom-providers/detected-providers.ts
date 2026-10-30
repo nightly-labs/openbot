@@ -94,7 +94,7 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
   const models = source
     .slice(0, CUSTOM_PROVIDER_LIMITS.models)
-    .map((model) => ({ id: model.id, name: model.name ?? "" }));
+    .map((model) => ({ id: model.id, name: model.name ?? "", contextWindow: model.contextWindow?.toString() ?? "" }));
   return {
     providerId: provider.id,
     displayName: provider.name,

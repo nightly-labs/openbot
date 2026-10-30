@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   createMcpServerId,
   isMcpKeyValue,
+  isMcpServerConfig,
   isReservedMcpServerName,
   type McpKeyValue,
   type McpServerConfig,
@@ -10,7 +11,8 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { databaseRow, databaseRows, requiredStringColumn } from "./database/database-rows";
+import { createOpenBotLogger, type Logger } from "@openbot/logging";
+import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
 import { registerMcpSecretValues } from "./mcp-redaction";
 import type { OpenBotDatabase } from "./openbot-database";
 
@@ -58,12 +60,18 @@ const MCP_REMOTE_BRIDGES: ReadonlyArray<{ name: string; remoteUrl: string; url: 
 const MCP_REMOTE_ARGS = (remoteUrl: string): string[] => ["-y", "mcp-remote@latest", remoteUrl];
 
 export class McpServerStore {
-  constructor(private readonly database: OpenBotDatabase) {}
+  /** Each unreadable row is said once a process, because `list()` runs for every save and hand-off. */
+  private readonly reported = new Set<string>();
+
+  constructor(
+    private readonly database: OpenBotDatabase,
+    private readonly logger: Pick<Logger, "warn"> = createOpenBotLogger("mcp-server-store"),
+  ) {}
 
   list(): McpServerConfig[] {
     return databaseRows(
       this.database.connection.prepare("SELECT * FROM projection_mcp_servers ORDER BY position, mcp_server_id").all(),
-    ).map(toConfig);
+    ).flatMap((row) => readServer(row, this.report)?.config ?? []);
   }
 
   listEnabled(): McpServerConfig[] {
@@ -71,10 +79,7 @@ export class McpServerStore {
   }
 
   get(mcpServerId: string): McpServerConfig | null {
-    const row = databaseRow(
-      this.database.connection.prepare("SELECT * FROM projection_mcp_servers WHERE mcp_server_id = ?").get(mcpServerId),
-    );
-    return row ? toConfig(row) : null;
+    return this.read(mcpServerId)?.config ?? null;
   }
 
   /** Inserts or replaces one configuration and answers the stored form of it. */
@@ -83,6 +88,8 @@ export class McpServerStore {
     const errors = mcpConfigErrors(normalized);
     const firstError = errors.name ?? errors.command ?? errors.url;
     if (firstError) throw new McpServerError(firstError);
+    // The read guards are the bounds of the wire, so a row stored here is a row the next start can read.
+    if (!isMcpServerConfig(normalized)) throw new McpServerError(sourceText("error.backend.mcpServerInvalid"));
 
     const db = this.database.connection;
     db.exec("BEGIN IMMEDIATE");
@@ -144,8 +151,13 @@ export class McpServerStore {
   }
 
   setEnabled(mcpServerId: string, enabled: boolean, now = new Date().toISOString()): McpServerConfig {
-    const current = this.get(mcpServerId);
-    if (!current) throw new McpServerError("This MCP server no longer exists.");
+    const stored = this.read(mcpServerId);
+    if (!stored) throw new McpServerError(sourceText("error.backend.mcpServerGone"));
+    const current = stored.config;
+    // Turned on, the columns that could not be read are stored as they are shown, empty, so the row
+    // that runs is the row the user saw and the next read does not turn it off again. Turned off, the
+    // row already reads as off, and its stored values stay.
+    if (enabled && stored.unreadable.length > 0) return this.save({ ...current, enabled }, now);
     this.database.connection
       .prepare("UPDATE projection_mcp_servers SET enabled = ?, updated_at = ? WHERE mcp_server_id = ?")
       .run(enabled ? 1 : 0, now, mcpServerId);
@@ -199,59 +211,157 @@ export class McpServerStore {
     }
   }
 
+  private read(mcpServerId: string): StoredServer | null {
+    const row = databaseRow(
+      this.database.connection.prepare("SELECT * FROM projection_mcp_servers WHERE mcp_server_id = ?").get(mcpServerId),
+    );
+    return row ? readServer(row, this.report) : null;
+  }
+
+  private readonly report: ReportRow = (row, message, reason) => {
+    const mcpServerId = isString(row.mcp_server_id) ? row.mcp_server_id : null;
+    const key = `${mcpServerId}\u0000${reason}`;
+    if (this.reported.has(key)) return;
+    this.reported.add(key);
+    this.logger.warn(message, { mcpServerId, reason });
+  };
+
+  // The table, not `list()`: a row that cannot be read still holds its name and its place in the limit.
   private count(): number {
-    return this.list().length;
+    const row = databaseRow(
+      this.database.connection.prepare("SELECT COUNT(*) AS count FROM projection_mcp_servers").get(),
+    );
+    return row ? requiredNumberColumn(row, "count") : 0;
   }
 
   private nameTaken(name: string, exceptId: string | null): boolean {
     if (isReservedMcpServerName(name)) return true;
-    return this.list().some((config) => config.name === name && config.id !== exceptId);
+    const row = this.database.connection
+      .prepare("SELECT 1 AS taken FROM projection_mcp_servers WHERE name = ? AND mcp_server_id IS NOT ?")
+      .get(name, exceptId);
+    return databaseRow(row) !== null;
   }
 
+  // The table too: an index in `list()` skips the rows left out, and would share their place.
   private positionOf(mcpServerId: string): number {
-    const index = this.list().findIndex((config) => config.id === mcpServerId);
-    return index < 0 ? this.nextPosition() : index;
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT position FROM projection_mcp_servers WHERE mcp_server_id = ?")
+        .get(mcpServerId),
+    );
+    return row ? requiredNumberColumn(row, "position") : this.nextPosition();
   }
 
   private nextPosition(): number {
-    return this.list().length;
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT COALESCE(MAX(position) + 1, 0) AS position FROM projection_mcp_servers")
+        .get(),
+    );
+    return row ? requiredNumberColumn(row, "position") : 0;
   }
 }
+
+/** A row as it was read, and the list columns that could not be read. */
+interface StoredServer {
+  config: McpServerConfig;
+  unreadable: string[];
+}
+
+type ReportRow = (row: DynamicRecord, message: string, reason: string) => void;
 
 /**
  * A row becomes a configuration only if every parsed value is the shape the spawn expects. A
  * hand-edited database must not be able to put a non-string into a child process environment.
+ *
+ * Startup reads this table, so one row must not stop the app (#3643). A list column that cannot be
+ * read, or a column past a bound of `isMcpServerConfig`, is read as empty and the server as turned
+ * off: the user still sees it in Server settings and corrects or removes it there. The row is not
+ * changed until the user saves it or turns it on. A row whose text cannot be read at all, or whose id
+ * or name is past a bound, has nothing to show, and is left out.
  */
 // Every read goes through here, so each stored secret is masked in logs before any caller can
 // pass it to a provider or quote it in an error.
-function toConfig(row: DynamicRecord): McpServerConfig {
-  const transport = requiredStringColumn(row, "transport");
-  if (transport !== "stdio" && transport !== "http") throw new Error("Invalid SQLite column transport.");
-  const config: McpServerConfig = {
-    id: requiredStringColumn(row, "mcp_server_id"),
-    name: requiredStringColumn(row, "name"),
-    transport,
-    enabled: row.enabled === 1,
-    command: requiredStringColumn(row, "command"),
-    args: parseStrings(row, "args_json"),
-    env: parsePairs(row, "env_json"),
-    envPassthrough: parseStrings(row, "env_passthrough_json"),
-    workingDirectory: requiredStringColumn(row, "working_directory"),
-    url: requiredStringColumn(row, "url"),
-    headers: parsePairs(row, "headers_json"),
+function readServer(row: DynamicRecord, report: ReportRow): StoredServer | null {
+  const unreadable: string[] = [];
+  const unread = (key: string): never[] => {
+    unreadable.push(key);
+    return [];
   };
+  // A hand-edited database is untrusted input: a non-string here would reach a spawn's `env`, so
+  // every parsed column goes through a guard rather than being believed.
+  const list = <T>(key: string, decode: (value: unknown, key: string) => T[]): T[] => {
+    try {
+      return decode(JSON.parse(requiredStringColumn(row, key)), key);
+    } catch {
+      // The parse error can quote the stored text, which can be a key: only the column is named.
+      return unread(key);
+    }
+  };
+  let config: McpServerConfig;
+  try {
+    const transport = requiredStringColumn(row, "transport");
+    if (transport !== "stdio" && transport !== "http") throw new Error("Invalid SQLite column transport.");
+    config = {
+      id: requiredStringColumn(row, "mcp_server_id"),
+      name: requiredStringColumn(row, "name"),
+      transport,
+      enabled: row.enabled === 1,
+      command: requiredStringColumn(row, "command"),
+      args: list("args_json", decodeStringList),
+      env: list("env_json", decodePairList),
+      envPassthrough: list("env_passthrough_json", decodeStringList),
+      workingDirectory: requiredStringColumn(row, "working_directory"),
+      url: requiredStringColumn(row, "url"),
+      headers: list("headers_json", decodePairList),
+    };
+  } catch (error) {
+    // These errors name a column only, never its value.
+    report(row, "An MCP server row cannot be read, so it is left out.", error instanceof Error ? error.message : "");
+    return null;
+  }
+  // The renderer decodes the whole list with `isMcpServerConfig`, so a row past one of its bounds -
+  // from an earlier build or an import - would hide every server from Server settings. Each column
+  // is checked alone; only the id and the name cannot be shown empty.
+  const bare: McpServerConfig = {
+    ...config,
+    command: "",
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  };
+  if (!isMcpServerConfig(bare)) {
+    report(row, "An MCP server row cannot be read, so it is left out.", "The id or the name is past its limit.");
+    return null;
+  }
+  const fits = (column: Partial<McpServerConfig>) => isMcpServerConfig({ ...bare, ...column });
+  const unreadText = (key: string): "" => {
+    unreadable.push(key);
+    return "";
+  };
+  config = {
+    ...config,
+    command: fits({ command: config.command }) ? config.command : unreadText("command"),
+    workingDirectory: fits({ workingDirectory: config.workingDirectory })
+      ? config.workingDirectory
+      : unreadText("working_directory"),
+    url: fits({ url: config.url }) ? config.url : unreadText("url"),
+    args: fits({ args: config.args }) ? config.args : unread("args_json"),
+    env: fits({ env: config.env }) ? config.env : unread("env_json"),
+    envPassthrough: fits({ envPassthrough: config.envPassthrough })
+      ? config.envPassthrough
+      : unread("env_passthrough_json"),
+    headers: fits({ headers: config.headers }) ? config.headers : unread("headers_json"),
+  };
+  if (unreadable.length > 0) {
+    config = { ...config, enabled: false };
+    report(row, "An MCP server row has columns that cannot be read, so it is turned off.", unreadable.join(", "));
+  }
   registerMcpSecretValues(config);
-  return config;
-}
-
-// A hand-edited database is untrusted input: a non-string here would reach a spawn's `env`, so
-// every parsed column goes through a guard rather than being believed.
-function parseStrings(row: DynamicRecord, key: string): string[] {
-  return decodeStringList(JSON.parse(requiredStringColumn(row, key)), key);
-}
-
-function parsePairs(row: DynamicRecord, key: string): McpKeyValue[] {
-  return decodePairList(JSON.parse(requiredStringColumn(row, key)), key);
+  return { config, unreadable };
 }
 
 function decodeStringList(value: unknown, key: string): string[] {

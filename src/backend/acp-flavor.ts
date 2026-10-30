@@ -35,6 +35,21 @@ export interface AcpFlavor {
   restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
+  /**
+   * The model belongs to the agent's process, not to one session: a model set moves every session
+   * to it. A set of the model the process already runs on is not sent again.
+   */
+  processWideModel?: true;
+  /**
+   * The agent frees what a session holds only when its process ends, not at `session/close`. Model
+   * discovery then resumes one probe session for each process rather than opening another.
+   */
+  closeKeepsSession?: true;
+  /**
+   * Each session gets a process of its own, and an idle session is closed by ending that process.
+   * For an agent with `closeKeepsSession`.
+   */
+  sessionProcesses?: true;
   /** An agent that sends a failed prompt as answer text and ends the turn as a success. */
   sdkHarness?: {
     /** The session whose prompt failed, from a stderr line. */
@@ -45,6 +60,8 @@ export interface AcpFlavor {
     turnFailure(text: string): string;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
     quota(text: string): string | null;
+    /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
+    mcpLoadFailure(text: string): { name: string; reason: string } | null;
   };
   /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;
@@ -94,6 +111,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // Cursor 2026.10.22-27dcf5f sends "\n\nError: RetriableError: WritableIterable is closed" as one
   // chunk after a turn that succeeded, and then ends the turn (#3334). Only the full chunk matches.
   noiseChunk: /^\s*Error: (?:[\w$]+: )?WritableIterable is closed\s*$/u,
+  // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
+  // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
+  processWideModel: true,
 };
 
 /**

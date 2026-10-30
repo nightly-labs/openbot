@@ -1,4 +1,5 @@
 import { BILLING_CURRENCIES, BILLING_METADATA, type BillingCurrency } from "@openbot/contracts/billing";
+import { LICENSE_LOOKUP_KEYS, LICENSE_METADATA, LICENSE_METADATA_KIND } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Result, Schema } from "effect";
 import { constantTimeEqual, hexToBytes, importHmacSha256Key } from "./crypto";
@@ -47,15 +48,17 @@ const stripeErrorSchema = Schema.Struct({
 });
 const sessionSchema = Schema.Struct({ id: Schema.String, url: Schema.NullOr(Schema.String) });
 const customerSchema = Schema.Struct({ id: Schema.String, deleted: Schema.optional(Schema.Boolean) });
+const deletedSchema = Schema.Struct({ id: Schema.String });
 const checkoutSessionSchema = Schema.Struct({
   id: Schema.String,
   url: Schema.NullOr(Schema.String),
   status: Schema.NullOr(Schema.String),
   subscription: Schema.optional(Schema.NullOr(Schema.String)),
+  metadata: Metadata,
 });
 export type StripeCheckoutSession = typeof checkoutSessionSchema.Type;
 const checkoutSessionListSchema = Schema.Struct({
-  data: Schema.Array(Schema.Struct({ ...checkoutSessionSchema.fields, created: Schema.Int, metadata: Metadata })),
+  data: Schema.Array(Schema.Struct({ ...checkoutSessionSchema.fields, created: Schema.Int })),
 });
 export type StripeOpenCheckoutSession = (typeof checkoutSessionListSchema.Type)["data"][number];
 const priceSchema = Schema.Struct({
@@ -64,6 +67,7 @@ const priceSchema = Schema.Struct({
   currency: Schema.String,
   unit_amount: Schema.NullOr(Schema.Int),
   currency_options: CurrencyOptions,
+  metadata: Metadata,
 });
 export type StripePrice = typeof priceSchema.Type;
 const priceListSchema = Schema.Struct({ data: Schema.Array(priceSchema) });
@@ -78,6 +82,7 @@ const subscriptionSchema = Schema.Struct({
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
+  default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
     data: Schema.Array(
       Schema.Struct({
@@ -97,6 +102,7 @@ const subscriptionSchema = Schema.Struct({
   }),
 });
 export type StripeSubscription = typeof subscriptionSchema.Type;
+export type StripeSubscriptionItem = StripeSubscription["items"]["data"][number];
 const subscriptionListSchema = Schema.Struct({ data: Schema.Array(subscriptionSchema) });
 const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ invoice: expandable })) });
 const invoiceSchema = Schema.Struct({
@@ -194,7 +200,8 @@ export class StripeClient {
   /**
    * Sets the quantity of one subscription item. With `always_invoice`, Stripe invoices the prorated
    * difference now and refuses the change when that payment fails, so the quantity never goes up unpaid.
-   * With `none`, the new quantity applies from the next invoice.
+   * With `none`, the new quantity applies from the next invoice. A `priceId` also moves the item to
+   * that Price, with the same proration.
    */
 
   readonly setSubscriptionQuantity = Effect.fn("StripeClient.setSubscriptionQuantity")(function* (
@@ -204,6 +211,7 @@ export class StripeClient {
       itemId: string;
       quantity: number;
       proration: "always_invoice" | "none";
+      priceId?: string;
       metadata?: Readonly<Record<string, string>>;
     },
   ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
@@ -212,6 +220,7 @@ export class StripeClient {
       "items[0][quantity]": String(input.quantity),
       proration_behavior: input.proration,
     });
+    if (input.priceId) body.set("items[0][price]", input.priceId);
     for (const [key, value] of Object.entries(input.metadata ?? {})) body.set(`metadata[${key}]`, value);
     if (input.proration === "always_invoice") body.set("payment_behavior", "error_if_incomplete");
     return yield* this.#requestEffect(
@@ -279,8 +288,17 @@ export class StripeClient {
       serverId?: string;
       /** The number of units. A server plan is 1. A license is its number of users. */
       quantity?: number;
+      /**
+       * More Prices on the same subscription and invoice, such as the license of a server order. Each must
+       * have the interval and the currency of `priceId`.
+       */
+      extraItems?: readonly { priceId: string; quantity: number }[];
       /** More metadata for the session and the subscription. */
       metadata?: Readonly<Record<string, string>>;
+      /** Metadata for the session only, such as the order that a later page for the same server repeats. */
+      sessionMetadata?: Readonly<Record<string, string>>;
+      /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
+      trialEndSeconds?: number;
       successUrl: string;
       cancelUrl: string;
       nowSeconds: number;
@@ -298,12 +316,18 @@ export class StripeClient {
       cancel_url: input.cancelUrl,
       expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),
     });
+    for (const [index, item] of (input.extraItems ?? []).entries()) {
+      body.set(`line_items[${index + 1}][price]`, item.priceId);
+      body.set(`line_items[${index + 1}][quantity]`, String(item.quantity));
+    }
     if (input.serverId) body.set("client_reference_id", input.serverId);
+    if (input.trialEndSeconds !== undefined) body.set("subscription_data[trial_end]", String(input.trialEndSeconds));
     for (const prefix of ["metadata", "subscription_data[metadata]"]) {
       body.set(`${prefix}[${BILLING_METADATA.userId}]`, input.userId);
       if (input.serverId) body.set(`${prefix}[${BILLING_METADATA.serverId}]`, input.serverId);
       for (const [key, value] of Object.entries(input.metadata ?? {})) body.set(`${prefix}[${key}]`, value);
     }
+    for (const [key, value] of Object.entries(input.sessionMetadata ?? {})) body.set(`metadata[${key}]`, value);
     const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
@@ -347,6 +371,78 @@ export class StripeClient {
   ): Effect.fn.Return<StripeSubscription[], StripeRequestError | StripeTransportError> {
     const query = new URLSearchParams({ customer: customerId, status: "all", limit: "100" });
     return [...(yield* this.#requestEffect("GET", `/v1/subscriptions?${query}`, null, subscriptionListSchema)).data];
+  }).bind(this);
+
+  /**
+   * Makes a subscription with one Price that renews at `anchorSeconds`. Stripe charges nothing until then:
+   * the period up to the anchor has no proration. With `trial`, that period is a free trial, and the
+   * subscription is `trialing` until it ends. The same idempotency key gives the same subscription.
+   */
+
+  readonly createSubscription = Effect.fn("StripeClient.createSubscription")(function* (
+    this: StripeClient,
+    input: {
+      customerId: string;
+      priceId: string;
+      quantity: number;
+      currency: BillingCurrency;
+      anchorSeconds: number;
+      trial?: boolean;
+      paymentMethodId: string | null;
+      metadata: Readonly<Record<string, string>>;
+    },
+    idempotencyKey: string,
+  ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      customer: input.customerId,
+      "items[0][price]": input.priceId,
+      "items[0][quantity]": String(input.quantity),
+      currency: input.currency,
+      ...(input.trial
+        ? { trial_end: String(input.anchorSeconds) }
+        : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
+      "expand[]": "items.data.price.currency_options",
+    });
+    if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
+    for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
+    return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
+  }).bind(this);
+
+  /** Sets metadata on a subscription. An empty value removes the key. */
+
+  readonly setSubscriptionMetadata = Effect.fn("StripeClient.setSubscriptionMetadata")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    metadata: Readonly<Record<string, string>>,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams();
+    for (const [key, value] of Object.entries(metadata)) body.set(`metadata[${key}]`, value);
+    yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionSchema,
+    );
+  }).bind(this);
+
+  /** Removes one item from a subscription. With no proration, Stripe gives no credit for the rest of the period. */
+
+  readonly deleteSubscriptionItem = Effect.fn("StripeClient.deleteSubscriptionItem")(function* (
+    this: StripeClient,
+    itemId: string,
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const query = new URLSearchParams({ proration_behavior: "none" });
+    const result = yield* Effect.result(
+      this.#requestEffect(
+        "DELETE",
+        `/v1/subscription_items/${encodeURIComponent(itemId)}?${query}`,
+        null,
+        deletedSchema,
+      ),
+    );
+    // An item that an earlier attempt removed is already gone.
+    if (Result.isFailure(result) && !(result.failure instanceof StripeRequestError && result.failure.status === 404))
+      return yield* result.failure;
   }).bind(this);
 
   /** Cancels a subscription now. Stripe gives no refund and no credit for the rest of the period. */
@@ -449,9 +545,35 @@ export class StripeClient {
   });
 }
 
+/** True for a Price of the license: a license lookup key, or the license kind in its metadata. */
+export function isLicensePrice(price: { lookup_key: string | null; metadata: Readonly<Record<string, string>> }) {
+  return (
+    (price.lookup_key !== null && LICENSE_LOOKUP_KEYS.includes(price.lookup_key)) ||
+    price.metadata[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND
+  );
+}
+
+/**
+ * The license item of a subscription. A server order has a server item and a license item until the
+ * split moves the license to its own subscription, so no code reads the first item only.
+ */
+export function subscriptionLicenseItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
+  return subscription.items.data.find((item) => isLicensePrice(item.price)) ?? null;
+}
+
+/** The item of a subscription that is not the license: the server plan. */
+export function subscriptionServerItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
+  return subscription.items.data.find((item) => !isLicensePrice(item.price)) ?? null;
+}
+
+/** The item that names the product of a subscription: the server plan when there is one, else the license. */
+function subscriptionMainItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
+  return subscriptionServerItem(subscription) ?? subscriptionLicenseItem(subscription);
+}
+
 /** The subscription's period end in milliseconds, from the item or, for older API versions, the subscription. */
 export function subscriptionPeriodEnd(subscription: StripeSubscription): number | null {
-  const seconds = subscription.items.data[0]?.current_period_end ?? subscription.current_period_end;
+  const seconds = subscriptionMainItem(subscription)?.current_period_end ?? subscription.current_period_end;
   return seconds === undefined ? null : seconds * 1_000;
 }
 
@@ -461,7 +583,7 @@ export function subscriptionPeriodEnd(subscription: StripeSubscription): number 
  * Null for a Price with no fixed amount, such as a tiered Price.
  */
 export function subscriptionAmount(subscription: StripeSubscription): number | null {
-  const item = subscription.items.data[0];
+  const item = subscriptionMainItem(subscription);
   if (!item) return null;
   const currency = subscription.currency.toLowerCase();
   const unitAmount =
@@ -471,6 +593,13 @@ export function subscriptionAmount(subscription: StripeSubscription): number | n
   if (unitAmount === null) return null;
   const amount = unitAmount * (item.quantity ?? 1);
   return Number.isSafeInteger(amount) && amount >= 0 ? amount : null;
+}
+
+/** The ID of the subscription's default payment method, or null when it has none. */
+export function subscriptionPaymentMethodId(subscription: StripeSubscription): string | null {
+  const method = subscription.default_payment_method;
+  if (!method) return null;
+  return typeof method === "string" ? method : method.id;
 }
 
 /** The ID of the subscription's latest invoice, or null before its first invoice. */

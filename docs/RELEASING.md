@@ -404,6 +404,11 @@ it, `bun run mobile:release:published ios` (or `android`) writes the date of tha
 `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`. A date with no store is the date of both
 stores. `/changelog` shows each store, and a store that does not have the version as "In review".
 
+When a store makes a version available, also set that version for the store in
+`MOBILE_LATEST_VERSIONS` in `apps/auth-api/src/server/mobile-features-config.ts` and deploy the account
+service. An app with an older version then shows the update header on home. Set it only after the
+store has the build: before, Update opens a store page that cannot install the version.
+
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a
 group, a placeholder such as `TODO`, or a heading with no real date. These steps run it:

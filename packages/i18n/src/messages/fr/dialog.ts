@@ -4,6 +4,8 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   // Native file pickers.
   "dialog.chooseSiteDirectory": "Choisir un dossier de site statique",
+  "dialog.chooseAgentFolder": "Choisir un dossier pour {agent}",
+  "dialog.chooseAgentExclusion": "Choisir un dossier que {agent} ne doit pas modifier",
   "dialog.chooseSkill": "Choisir un dossier ou un fichier ZIP de compétence",
   "dialog.filter.skillPackages": "Paquets de compétences",
   "dialog.filter.images": "Images",

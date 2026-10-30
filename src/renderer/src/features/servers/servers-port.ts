@@ -2,8 +2,8 @@ import type { OpenBotDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 
 /**
  * What the servers domain reaches in main: the server list and selection, the account changes, the local host, the
- * settings of one server, the name, logo and update of a joined server's host, and the remote desktop
- * setup of a server.
+ * settings of one server, the name, logo and update of a joined server's host, the servers that
+ * run on this computer, and the remote desktop setup of a server.
  */
 export interface ServersPort {
   agent: Pick<
@@ -38,6 +38,7 @@ export interface ServersPort {
     "cancelUpdate" | "getUpdateStatus" | "startUpdate" | "updateIdentity"
   >;
   hostedServers: Pick<OpenBotDesktopApi["hostedServers"], "list" | "restart" | "wake">;
+  localServers: OpenBotDesktopApi["localServers"];
   host: Pick<
     OpenBotDesktopApi["host"],
     | "configure"

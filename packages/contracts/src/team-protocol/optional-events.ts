@@ -1,6 +1,7 @@
 import { type AgentAccessEvent, agentAccessEvent } from "./agent-access-v1";
 import { type AgentHiddenEvent, agentHiddenEvent } from "./agent-hidden-v1";
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
+import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
@@ -31,9 +32,17 @@ export type OptionalTeamEvent =
   | VaultEvent
   | WorkflowsEvent;
 
+export interface OptionalTeamEventOptions {
+  /**
+   * agent-task-ui-blocks-v1: a task conversation keeps its UI blocks. A host passes the negotiated
+   * capability; a client passes `true`, because a host sends the blocks only when it was negotiated.
+   */
+  agentTaskUiBlocks?: boolean;
+}
+
 /** The optional event in `value`, or null for any other event. A malformed optional event throws. */
-export function optionalTeamEvent(value: unknown): OptionalTeamEvent | null {
-  return (
+export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOptions): OptionalTeamEvent | null {
+  const event =
     agentAccessEvent(value) ??
     agentHiddenEvent(value) ??
     agentSessionSettingsEvent(value) ??
@@ -47,8 +56,8 @@ export function optionalTeamEvent(value: unknown): OptionalTeamEvent | null {
     quietTurnEvent(value) ??
     routineFlowsEvent(value) ??
     vaultEvent(value) ??
-    workflowsEvent(value)
-  );
+    workflowsEvent(value);
+  return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
 }
 
 /** Translate the optional wire event at each native transport boundary. */

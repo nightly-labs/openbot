@@ -216,6 +216,7 @@ export function createSetupProviders(
         message: status?.message,
         email: status?.email,
         connectionState: status?.connectionState,
+        signInPending: status?.signInPending,
         checkError: status?.checkError,
         availableVersion: props.providerAvailableVersions?.[provider.id] ?? null,
         freeModels: provider.id === "opencode",
@@ -720,6 +721,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
       <Show when={source().onAddCustomProvider}>
         <CustomProviderDialog
           open={props.providers.host.state.open}
+          contextWindows={!source().hostProviders}
           busy={props.providers.host.state.saving}
           submitError={props.providers.host.state.submitError}
           takenProviderIds={(source().customProviders ?? []).map((provider) => provider.id)}

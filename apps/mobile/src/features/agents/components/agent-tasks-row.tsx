@@ -1,7 +1,7 @@
 import { useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { useOpenAgentTasks } from "@/features/chat/components/chat-task-rows";
+import { useOpenAgentTasks } from "@/features/chat/components/use-open-agent-tasks";
 import { SettingsRow } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -31,7 +31,7 @@ export function AgentTasksRow({ agent }: { agent: MobileAgent }) {
         sheetStack.dispatch(StackActions.replace(TASKS_ROUTE, { serverId: agent.serverId, agentId: agent.id }));
       }}
     >
-      <Typography.Paragraph>{t("mobile.app.route.tasks")}</Typography.Paragraph>
+      <Typography.Paragraph>{t("mobile.app.route.threads")}</Typography.Paragraph>
     </SettingsRow>
   );
 }

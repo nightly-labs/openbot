@@ -132,6 +132,13 @@ const ServerScope = createSimpleContext({
     /** This scope still owns the screen - the successor to `activeServerId() !== serverId`. */
     const scopeIsCurrent = (): boolean => !(owner && isDisposed(owner));
 
+    const signedInAccount = () => {
+      const auth = centralAuth();
+      return auth.status === "signed_in" ? auth.user.id : null;
+    };
+    /** The account signed in when the last load started. Undefined until a load starts. */
+    let loadedAccount: string | null | undefined;
+
     let loadGeneration = 0;
     async function loadWorkspace(): Promise<void> {
       const generation = ++loadGeneration;
@@ -141,6 +148,7 @@ const ServerScope = createSimpleContext({
       const isCurrent = () =>
         scopeIsCurrent() && generation === loadGeneration && sequence === selectedServer()?.connectionSequence;
       if (!isCurrent() || !transportReady()) return;
+      loadedAccount = untrack(signedInAccount);
       setConnection((draft) => {
         draft.failed = false;
         draft.failure = null;
@@ -291,6 +299,15 @@ const ServerScope = createSimpleContext({
         untrack(() => {
           if (request?.serverId === activeServerId()) recovery.refresh();
         }),
+    );
+
+    // Read states and direct threads belong to the signed-in reader. At a cold start the saved account
+    // can restore after the first load, which then had no reader, so a sign-in, or another account,
+    // loads the workspace again.
+    createEffect(signedInAccount, (account) =>
+      untrack(() => {
+        if (account && loadedAccount !== undefined && account !== loadedAccount) recovery.refresh();
+      }),
     );
 
     createEffect(

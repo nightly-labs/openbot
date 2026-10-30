@@ -10,6 +10,9 @@
 // 3. Control: a session with a rollout is read again after each provider start.
 // 4. The next message to the agent of case 1 cannot resume its session (`no rollout found`), so it
 //    starts a new session and runs, rather than fail each time.
+// 5. A provider start runs the backfill while the first turn of a new session runs. Codex 0.165.0
+//    answers the read with `-32601 paginated_threads is not supported yet` then (#3609). The backfill
+//    shows no error, and the next provider start after that turn imports the session.
 // `bun run test:codex-missing-rollout`. Writes .openbot-build/codex-missing-rollout-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -63,6 +66,8 @@ const log = (entry) => fs.appendFileSync(process.env.OPENBOT_FAKE_CODEX_LOG, JSO
 log({ start: true });
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 const loaded = new Set();
+// The threads with a turn started in this process.
+const started = new Set();
 let buffer = "";
 let threads = 0;
 let turns = 0;
@@ -93,6 +98,9 @@ const answer = (message) => {
       return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "unsubscribed" } });
     case "thread/turns/list":
+      // Codex 0.165.0 cannot read a new thread while its first turn starts and is not saved yet.
+      if (started.has(params.threadId) && !hasRollout(params.threadId))
+        return write({ id: message.id, error: { code: -32601, message: "paginated_threads is not supported yet" } });
       if (!loaded.has(params.threadId) && !hasRollout(params.threadId))
         return write({ id: message.id, error: { code: -32600, message: "thread not loaded: " + params.threadId } });
       return write({ id: message.id, result: {
@@ -110,12 +118,16 @@ const answer = (message) => {
       const turnId = "turn-" + process.pid + "-" + (++turns);
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
-      setTimeout(() => {
+      started.add(params.threadId);
+      const complete = () => {
+        // The control file holds the turn open, and with it the unsaved first turn of a new thread.
+        if (control().holdTurns) return setTimeout(complete, 25);
         fs.writeFileSync(rolloutsPath, JSON.stringify([...rollouts(), { threadId: params.threadId, turnId }]));
         const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
-      }, 50);
+      };
+      setTimeout(complete, 50);
       return;
     }
     default:
@@ -155,6 +167,7 @@ interface Report {
   providerRestart?: { refusedReads: number; accountReadsOnSharedProcess: number; completeReads: number };
   backfillErrors?: { agent: string; message: string }[];
   refusedNextTurn?: { resumeRefused: boolean; newThread: string | null; turnStarted: boolean; errors: string[] };
+  startingSession?: { read: boolean; errors: string[]; importedAfterTurn?: boolean };
   error?: string;
 }
 
@@ -354,6 +367,55 @@ try {
     errors: app.errors.filter((error) => error.agentId === refused.id).map((error) => error.code),
   };
 
+  // A provider start runs the backfill while the first turn of a new session runs in another
+  // process, as when an agent moves to a backup provider (#3609).
+  writeFileSync(controlPath, JSON.stringify({ holdTurns: true }));
+  const starting = await runCauseEffect(
+    app.agents.createAgent(
+      {
+        name: "Starting",
+        description: "Has a session whose first turn is not saved yet.",
+        avatarSeed: "starting",
+        avatarHue: null,
+        initialMessage: "First message.",
+      },
+      (agent) => app.agents.updateAgent({ agentId: agent.id, providerAccountId: account.id }),
+    ),
+  );
+  const startingThread = await waitFor("the first turn of the new session", () => {
+    const session = app.store.activeProviderSession(starting.id)?.externalSessionId;
+    const asked = protocol().some((line) => line.method === "turn/start" && line.threadId === session);
+    return session && asked ? session : null;
+  });
+  const secondRestartAt = new Date().toISOString();
+  process.kill(restarted.pid, "SIGTERM");
+  await waitFor("Codex to start again", () =>
+    protocol().find(
+      (line) => line.start && line.codexHome === defaultHome && line.pid !== shared.pid && line.pid !== restarted.pid,
+    ),
+  );
+  await waitFor("the backfill during the first turn", () => importedSince(complete.id, secondRestartAt));
+  report.startingSession = {
+    read: protocol().some((line) => line.method === "thread/turns/list" && line.threadId === startingThread),
+    errors: app.errors
+      .filter((error) => error.agentId === starting.id && error.code === "provider_history_backfill_pending")
+      .map((error) => error.message),
+  };
+  writeFileSync(controlPath, JSON.stringify({}));
+  await waitFor("the first turn of the new session to end", () => idle(app, starting.id));
+  // The session is readable once its first turn is saved, so the next provider start imports it.
+  const thirdRestartAt = new Date().toISOString();
+  const lastShared = protocol().findLast((line) => line.start && line.codexHome === defaultHome);
+  if (lastShared) process.kill(lastShared.pid, "SIGTERM");
+  // A third exit in a short time stops the automatic restarts. The user then refreshes the provider.
+  await waitFor(
+    "Codex to exit",
+    () => app.agents.getStatus().providers?.find((provider) => provider.id === "codex")?.state !== "available",
+  );
+  await runCauseEffect(app.agents.refreshProvider("codex"));
+  await waitFor("the backfill after the first turn", () => importedSince(starting.id, thirdRestartAt));
+  report.startingSession.importedAfterTurn = true;
+
   report.passed =
     report.accountHomeUsedForAccountTurn &&
     report.firstStart.refusedReads === 1 &&
@@ -366,7 +428,10 @@ try {
     report.refusedNextTurn.newThread !== null &&
     report.refusedNextTurn.newThread !== refusedThread &&
     report.refusedNextTurn.turnStarted &&
-    report.refusedNextTurn.errors.length === 0;
+    report.refusedNextTurn.errors.length === 0 &&
+    report.startingSession.read &&
+    report.startingSession.errors.length === 0 &&
+    report.startingSession.importedAfterTurn === true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

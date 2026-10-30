@@ -88,6 +88,7 @@ export const messages = {
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",
   "error.team.agentMemoryLimitUnsupported": "이 연결에서는 에이전트 메모리 한도를 지원하지 않아요.",
+  "error.team.memoryReviewUnsupported": "이 연결에서는 메모리 검토를 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
   "error.team.agentAccessStale": "다른 사람이 역할을 변경했어요. 역할을 다시 열어서 변경해 주세요.",

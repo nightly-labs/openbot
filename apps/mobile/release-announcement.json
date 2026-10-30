@@ -1,10 +1,10 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "highlights": [
-    "The iPhone app is now on the App Store.",
-    "The server drawer has a Marketplace: add agents, skills and apps, then try a skill or an app in a chat.",
-    "Type `@` in a chat to pick a skill or a connected app as well as a teammate.",
-    "The app previews text, code, JSON, emails, HTML pages, PDFs and spreadsheets, and shows visual replies as live pages.",
-    "Faster reconnects and chat loading, and Korean and Simplified Chinese interfaces."
+    "Talk with an agent by voice: tap the microphone in a chat or a channel, and the agent listens, answers aloud and listens again.",
+    "Workflows on the phone: see runs, approve or retry steps, pin a workflow to the sidebar, and edit or make workflows.",
+    "Agent chats have threads, as on desktop. Start, rename, archive and send files in a thread from the agent's name.",
+    "Share to an agent from any iPhone app without opening OpenBot.",
+    "Manage a server's Vault and connect Bitwarden or Vaultwarden, plus a Dutch interface and new Marketplace apps."
   ]
 }

@@ -3,7 +3,6 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
 import { memo, type PropsWithChildren, useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
@@ -25,13 +24,15 @@ import { useAgentPinTransition } from "@/features/agents/components/agent-pin-tr
 import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChatZoomSource } from "@/features/agents/components/chat-zoom-source";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import { useAgentWaitReason } from "@/features/workspace/components/use-agent-activity";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
-import { isAndroid } from "@/shared/lib/platform";
+import { haptics } from "@/shared/lib/haptics";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -101,7 +102,7 @@ interface AgentListRowProps {
  */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
-  const [background] = useThemeColor(["background"]);
+  const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
     ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
   );
@@ -157,7 +158,11 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       }}
       className="w-full"
       onPressIn={agentChatPreview.onPressIn}
-      onLongPress={isAndroid ? () => setMenuKey((key) => key + 1) : undefined}
+      delayLongPress={longPressDelay}
+      onLongPress={() => {
+        void haptics.longPress();
+        if (isAndroid) setMenuKey((key) => key + 1);
+      }}
     >
       {({ pressed }) => (
         <View

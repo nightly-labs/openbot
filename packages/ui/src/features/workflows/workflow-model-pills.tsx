@@ -119,7 +119,7 @@ export function ModelPill(props: {
       modal
     >
       <Popover.Trigger
-        class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill`}
+        class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill wfn-model-pill`}
         aria-label={t("workflow.model.label", { name: current()?.name ?? props.value })}
         disabled={props.disabled}
       >

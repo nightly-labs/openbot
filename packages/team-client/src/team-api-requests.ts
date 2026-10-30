@@ -11,6 +11,7 @@ import {
   type AgentMemorySelectionState,
   type AgentTask,
   type AgentTaskInput,
+  type AgentTaskReadState,
   type AgentTasksSnapshot,
   type ApplyAgentImportInput,
   type AttachmentSummary,
@@ -33,6 +34,7 @@ import {
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
+  isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAttachmentSummary,
   isConversationSnapshot,
@@ -42,6 +44,7 @@ import {
   isRoutineFlowLink,
   isRoutineRun,
   type LocalBrowserSecretResponse,
+  type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
   type QueuedMessageReceipt,
   type RemoteAgentImportResult,
@@ -66,6 +69,8 @@ import {
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
+import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -191,30 +196,56 @@ export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
 });
 
+/**
+ * Starts a task. With files it uses `agent-thread-files-v1`, so send files only to a host that serves
+ * it; `agent-tasks-v1` carries text only.
+ */
 export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
   request: TeamApiRequest,
-  { agentId, text, clientMessageId }: StartAgentTaskInput,
+  { agentId, text, attachmentDraftIds, clientMessageId }: StartAgentTaskInput,
 ): Effect.fn.Return<AgentTask, TeamRequestError> {
   return yield* teamCall(() =>
-    request("POST", AGENT_TASKS_ROUTES.start, decodeAgentTask, {
-      agentId,
-      text,
-      ...(clientMessageId === undefined ? {} : { clientMessageId }),
-    }),
+    attachmentDraftIds?.length
+      ? request("POST", AGENT_THREAD_FILES_ROUTES.start, decodeAgentTask, {
+          agentId,
+          text,
+          attachmentDraftIds,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        })
+      : request("POST", AGENT_TASKS_ROUTES.start, decodeAgentTask, {
+          agentId,
+          text,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        }),
   );
 });
 
+/** Sends to a task. With files it uses `agent-thread-files-v1`, as `startAgentTask` does. */
 export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")(function* (
   request: TeamApiRequest,
-  { agentId, taskId, text, clientMessageId }: AgentTaskInput & { text: string; clientMessageId?: string },
+  {
+    agentId,
+    taskId,
+    text,
+    attachmentDraftIds,
+    clientMessageId,
+  }: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId?: string },
 ): Effect.fn.Return<QueuedMessageReceipt, TeamRequestError> {
   return yield* teamCall(() =>
-    request("POST", AGENT_TASKS_ROUTES.send, decodeTaskReceipt, {
-      agentId,
-      taskId,
-      text,
-      ...(clientMessageId === undefined ? {} : { clientMessageId }),
-    }),
+    attachmentDraftIds?.length
+      ? request("POST", AGENT_THREAD_FILES_ROUTES.send, decodeTaskReceipt, {
+          agentId,
+          taskId,
+          text,
+          attachmentDraftIds,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        })
+      : request("POST", AGENT_TASKS_ROUTES.send, decodeTaskReceipt, {
+          agentId,
+          taskId,
+          text,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        }),
   );
 });
 
@@ -243,6 +274,32 @@ export const deleteAgentThread = Effect.fn("TeamClient.deleteAgentThread")(funct
   { agentId, taskId }: AgentTaskInput,
 ): Effect.fn.Return<void, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_THREADS_ROUTES.delete, ignoreResponse, { agentId, taskId }));
+});
+
+const decodeThreadReadState = guardedDecoder(isAgentTaskReadState, "thread read state");
+const decodeThreadReads = guardedDecoder(
+  (value: unknown): value is { reads: AgentTaskReadState[] } =>
+    isDynamicRecord(value) && Array.isArray(value.reads) && value.reads.every(isAgentTaskReadState),
+  "thread read states",
+);
+
+/** The person's read mark of each open side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
+export const listAgentThreadReads = Effect.fn("TeamClient.listAgentThreadReads")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<AgentTaskReadState[], TeamRequestError> {
+  const answer = yield* teamCall(() => request("POST", AGENT_THREAD_READS_ROUTES.list, decodeThreadReads, { agentId }));
+  return answer.reads;
+});
+
+/** Moves the person's read mark of a side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
+export const markAgentThreadRead = Effect.fn("TeamClient.markAgentThreadRead")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, throughMessageId }: MarkAgentTaskReadInput,
+): Effect.fn.Return<AgentTaskReadState, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_READS_ROUTES.mark, decodeThreadReadState, { agentId, taskId, throughMessageId }),
+  );
 });
 
 /** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */

@@ -11,7 +11,8 @@ import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller
 import Animated, { FadeIn, FadeOut, useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
-import { GLASS_CAPSULE_HEIGHT, GlassCapsule } from "@/shared/components/glass-capsule";
+import { useBottomFieldMetrics } from "@/shared/components/bottom-field-metrics";
+import { GlassCapsule } from "@/shared/components/glass-capsule";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -60,7 +61,7 @@ export function MarketplaceSearchBar({
   const [foreground, muted, fieldBackground] = useThemeColor(["foreground", "muted", "default"]);
   const accent = String(useCSSVariable("--openbot-accent-text"));
   // As home search: iOS sets the field into the home indicator area; Android stays above the handle.
-  const bottomGap = isAndroid ? insets.bottom + 8 : Math.max(insets.bottom - 8, 12);
+  const { height: fieldHeight, bottomGap } = useBottomFieldMetrics();
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const barStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, Math.abs(keyboardHeight.get()) - (bottomGap - KEYBOARD_GAP)) }],
@@ -146,12 +147,12 @@ export function MarketplaceSearchBar({
 
   return (
     <Animated.View
-      className="absolute right-4 left-4 flex-row items-center gap-2"
+      className="absolute flex-row items-center gap-2"
       pointerEvents="box-none"
-      style={[{ bottom: bottomGap }, barStyle]}
+      style={[{ bottom: bottomGap, left: insets.left + 16, right: insets.right + 16 }, barStyle]}
     >
       <View className="min-w-0 flex-1">
-        <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground}>
+        <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} height={fieldHeight}>
           <View className="flex-1 flex-row items-center gap-2 pr-3 pl-4">
             <Search color={String(muted)} size={18} strokeWidth={2} />
             {tokens.map((token) => (
@@ -214,7 +215,12 @@ export function MarketplaceSearchBar({
         actions={actions}
         onPressAction={({ nativeEvent }) => choose(nativeEvent.event)}
       >
-        <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} width={GLASS_CAPSULE_HEIGHT}>
+        <GlassCapsule
+          liquidGlass={liquidGlass}
+          fallbackBackground={fieldBackground}
+          width={fieldHeight}
+          height={fieldHeight}
+        >
           <View
             accessible
             accessibilityRole="button"
@@ -232,7 +238,12 @@ export function MarketplaceSearchBar({
           entering={reduced ? undefined : FadeIn.duration(200)}
           exiting={reduced ? undefined : FadeOut.duration(160)}
         >
-          <GlassCapsule liquidGlass={liquidGlass} fallbackBackground={fieldBackground} width={GLASS_CAPSULE_HEIGHT}>
+          <GlassCapsule
+            liquidGlass={liquidGlass}
+            fallbackBackground={fieldBackground}
+            width={fieldHeight}
+            height={fieldHeight}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.marketplace.search.close")}

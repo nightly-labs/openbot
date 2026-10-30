@@ -22,8 +22,11 @@ import { createOpenBotLogger } from "@openbot/logging";
 
 // Methods that `src/preload/index.ts` writes by hand. Each one narrows a scoped event and must
 // subscribe to its channel. `onAttachmentImport` has no channel: the preload's own handlers call it.
+// `addDroppedAgentFolder` has no one channel: it adds the folder's path, or lists the folders when
+// the dropped item has no path.
 const HAND_WRITTEN_METHODS: ReadonlyMap<string, IpcEndpoint | null> = new Map<string, IpcEndpoint | null>([
   ["agent.onAttachmentImport", null],
+  ["agent.addDroppedAgentFolder", null],
   ["agent.onEvent", IPC_ENDPOINTS.agent.scopedEvent],
   ["servers.onPresence", IPC_ENDPOINTS.servers.scopedPresence],
   ["servers.onDirectMessage", IPC_ENDPOINTS.servers.scopedDirectMessage],

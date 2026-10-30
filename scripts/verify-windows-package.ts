@@ -68,6 +68,12 @@ await Promise.all([
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/web-server.exe")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/streamer.exe")),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/static/stream.html")),
+  access(
+    resolve(
+      resourcesPath,
+      "remote-desktop-runtime/win32/x64/assets/shaders/directx/convert_yuv420_packed_uv_type0_ps.hlsl",
+    ),
+  ),
   access(resolve(resourcesPath, "remote-desktop-runtime/win32/x64/SHA256SUMS.txt")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/cua-driver.exe")),
   access(resolve(resourcesPath, "cua-driver/win32/x64/LICENSE.md")),

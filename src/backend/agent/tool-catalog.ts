@@ -107,7 +107,7 @@ const BROWSER_SEARCH_NOTE =
 function words(text: string): string[] {
   return text
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
+    .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
 }
 
@@ -129,18 +129,35 @@ export function resolveDeferredTool(params: DynamicToolCallParams): DynamicToolC
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
 }
 
+/** The lowercase queries of a tool search and their words, or `null` for invalid arguments. */
+function searchTerms(params: DynamicToolCallParams) {
+  const parsed = searchSchema.safeParse(params.arguments);
+  if (!parsed.success) return null;
+  const queries = [...(parsed.data.queries ?? []), ...(parsed.data.query ? [parsed.data.query] : [])].map((query) =>
+    query.toLowerCase(),
+  );
+  return { queries, terms: new Set(queries.flatMap(words)), limit: parsed.data.limit };
+}
+
+/** The names that a tool search names with each of their words, such as an MCP server's name. */
+export function namesInSearch(params: DynamicToolCallParams, names: readonly string[]): string[] {
+  const search = params.tool === "tool_search" ? searchTerms(params) : null;
+  if (!search) return [];
+  return names.filter((name) => {
+    const nameWords = words(name);
+    return nameWords.length > 0 && nameWords.every((word) => search.terms.has(word));
+  });
+}
+
 function toolGuidanceFor(entries: readonly (typeof BUILTIN_TOOL_CATALOG)[number][]): string[] {
   return [...new Set(entries.map((entry) => toolGuidance(entry.namespace, entry.tool)))].filter(Boolean);
 }
 
 export function discoverTools(params: DynamicToolCallParams) {
   if (params.tool === "tool_search") {
-    const parsed = searchSchema.safeParse(params.arguments);
-    if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
-    const queries = [...(parsed.data.queries ?? []), ...(parsed.data.query ? [parsed.data.query] : [])].map((query) =>
-      query.toLowerCase(),
-    );
-    const terms = new Set(queries.flatMap(words));
+    const search = searchTerms(params);
+    if (!search) throw new Error(sourceText("error.agent.toolRequestInvalid"));
+    const { queries, terms } = search;
     const matches = BUILTIN_TOOL_CATALOG.map((entry, index) => {
       const nameWords = new Set(words(entry.name));
       const descriptionWords = new Set(words(entry.description));
@@ -156,7 +173,7 @@ export function discoverTools(params: DynamicToolCallParams) {
     })
       .filter((result) => result.exact || result.score > 0)
       .sort((a, b) => Number(b.exact) - Number(a.exact) || b.score - a.score || a.index - b.index);
-    const found = matches.slice(0, parsed.data.limit ?? 5);
+    const found = matches.slice(0, search.limit ?? 5);
     const ready = new Set(
       found
         .filter((result) => result.strong)

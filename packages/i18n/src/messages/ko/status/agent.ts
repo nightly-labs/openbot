@@ -25,6 +25,12 @@ export const messages = {
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
   "status.agent.screenCaptureReviewing": "화면 캡처를 확인하는 중…",
+  "status.agent.browserOpening": "웹 페이지를 여는 중…",
+  "status.agent.browserReading": "웹 페이지를 읽는 중…",
+  "status.agent.browserClicking": "웹 페이지를 클릭하는 중…",
+  "status.agent.browserTyping": "웹 페이지에 입력하는 중…",
+  "status.agent.browserActing": "웹 페이지를 사용하는 중…",
+  "status.agent.browserReviewing": "웹 페이지를 확인하는 중…",
   "status.agent.memoriesSearching": "메모리를 검색하는 중…",
   "status.agent.memoriesSearched": {
     other: "메모리를 검색했어요: {count}개 찾음",
@@ -43,4 +49,5 @@ export const messages = {
   "status.agent.mcpServerDisable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 꺼요.",
   "status.agent.mcpServerRemove": "이 서버의 모든 에이전트에서 MCP 서버 {name}과(와) 로그인 정보를 제거해요.",
   "status.agent.mcpSignInRequested": "MCP 서버 {name}에 로그인이 필요해요. 서버 설정의 MCP에서 로그인해 주세요.",
+  "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
 } as const satisfies PartialTranslation<typeof source>;

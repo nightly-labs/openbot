@@ -1120,7 +1120,17 @@ export class BrowserHost {
       (args.targets.length !== 1 && args.targets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
-      return yield* browserFailure(new Error("Invalid authentication targets."));
+      return yield* browserFailure(
+        new Error(
+          args.submission === "click" && !args.submitTarget
+            ? "Invalid authentication targets: submission=click needs submitTarget."
+            : args.submission !== "click" && args.submitTarget
+              ? "Invalid authentication targets: submitTarget is only for submission=click."
+              : args.method === "password"
+                ? "Invalid authentication targets: method=password needs exactly one field target."
+                : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
+        ),
+      );
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
     tab.secret = protection;
     this.#invalidateViews(tab);
@@ -1250,11 +1260,16 @@ export class BrowserHost {
           }),
       };
     }).pipe(
-      Effect.catch(() =>
+      // Keep the reason, such as which target is wrong, so the agent can correct the request.
+      Effect.catch((error) =>
         Effect.gen({ self: this }, function* () {
           tab.secret = undefined;
           this.#syncAttachedView();
-          return yield* browserFailure(new Error("Secure authentication is unavailable. Use browser takeover."));
+          // A reason can end in a selector, so end it with a period before the next sentence.
+          const reason = error.cause instanceof Error ? ` ${error.cause.message.replace(/\.?\s*$/u, ".")}` : "";
+          return yield* browserFailure(
+            new Error(`Secure authentication is unavailable.${reason} Correct the request, or use browser takeover.`),
+          );
         }),
       ),
     );

@@ -1,5 +1,6 @@
 import {
   type MarketplaceAgentSummary,
+  type MarketplaceSkillSort,
   type MarketplaceSkillSummary,
   type McpServerConfig,
   SKILL_CATEGORIES,
@@ -14,7 +15,17 @@ export type MarketplaceView =
   | { kind: "browse" }
   | { kind: "agent"; listing: MarketplaceAgentSummary }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
-  | { kind: "app"; id: string };
+  | { kind: "app"; id: string }
+  /** "Your skills" or one catalog category, on its own page. */
+  | { kind: "skillGroup"; group: SkillGroup }
+  /** A skill made on this computer. It has no catalog listing. */
+  | { kind: "localSkill"; skillId: string };
+
+/** "Your skills", or a catalog category. */
+export type SkillGroup = "yours" | SkillCategory;
+
+/** Which catalog skills the Skills tab shows. No source shows all of them. */
+export type SkillSource = "verified" | "public";
 
 export type MarketplaceTab = "apps" | "agents" | "skills";
 
@@ -38,10 +49,17 @@ export interface MarketplaceNavigationState {
   query: string;
   agentCategory: SkillCategory | null;
   agentsOwned: OwnedFilter | null;
-  skillCategory: SkillCategory | null;
-  skillsOwned: OwnedFilter | null;
+  /** The order of a skill group page. */
+  skillSort: MarketplaceSkillSort;
+  skillSource: SkillSource | null;
   /** The slug of a link that names no app of this catalog. */
   missingApp: string | null;
+}
+
+/** The `verified` value of a catalog query for a source. */
+export function sourceVerified(source: SkillSource | null): boolean | undefined {
+  if (source === null) return undefined;
+  return source === "verified";
 }
 
 export interface MarketplaceNavigation {
@@ -64,8 +82,8 @@ function initialState(): MarketplaceNavigationState {
     query: "",
     agentCategory: null,
     agentsOwned: null,
-    skillCategory: null,
-    skillsOwned: null,
+    skillSort: "installs",
+    skillSource: null,
     missingApp: null,
   };
 }

@@ -1,4 +1,5 @@
 import type { HostedServerEntryPoint } from "@openbot/contracts/hosted-servers";
+import type { PricingOrder } from "@openbot/contracts/license";
 import { createEffect, createSignal } from "solid-js";
 import type { AddServerResume } from "../servers/AddServerOverlay";
 import { createWebHostedServerCalls } from "./web-hosted-servers";
@@ -20,6 +21,8 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
   const [addServer, setAddServer] = createSignal<{
     resume: AddServerResume | null;
     entryPoint: HostedServerEntryPoint;
+    /** The order from the pricing page. The dialog fills it in and goes on to Checkout. */
+    order: PricingOrder | null;
   } | null>(null);
   // True when the account can create hosted servers. The plus button then opens the plans.
   const [available, setAvailable] = createSignal(false);
@@ -53,7 +56,7 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
   );
   createEffect(options.hostingReturn, (resume) => {
     if (!resume) return;
-    setAddServer({ resume, entryPoint: "checkout_resume" });
+    setAddServer({ resume, entryPoint: "checkout_resume", order: null });
     options.onHostingReturnConsumed?.();
   });
 
@@ -72,8 +75,8 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
      * join dialog. It uses the last answer, so the click does not wait for the network; the read after it
      * is for the next click.
      */
-    openAddServer(entryPoint: HostedServerEntryPoint): void {
-      if (available()) setAddServer({ resume: null, entryPoint });
+    openAddServer(entryPoint: HostedServerEntryPoint, order: PricingOrder | null = null): void {
+      if (available()) setAddServer({ resume: null, entryPoint, order });
       else options.onJoin();
       void refresh();
     },

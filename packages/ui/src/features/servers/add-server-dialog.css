@@ -60,6 +60,12 @@
   letter-spacing: var(--openbot-tracking-tight);
 }
 
+/* The "Other options" button is wider than the close button. The same padding on the two sides keeps
+ * the title in the centre, with space for the longest translation of the button. */
+.add-server-dialog:has(.add-server-other) .add-server-intro .ui-heading {
+  padding-inline: 160px;
+}
+
 .add-server-intro .ui-text {
   max-width: 560px;
   font-size: var(--openbot-text-lg);
@@ -88,6 +94,31 @@
   transform: translateY(-50%);
 }
 
+/* The account pays in one currency, so the code is text: the same height as the select, no chevron. */
+.hosted-currency-locked {
+  display: inline-flex;
+  align-items: center;
+  height: var(--openbot-control-md);
+  padding-inline: 10px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* With a license offer: personal or work use at the left, the currency and billing at the right. */
+.add-server-bar[data-license] {
+  justify-content: flex-end;
+  padding-inline: 0;
+}
+
+.add-server-bar[data-license] .hosted-use {
+  margin-right: auto;
+}
+
+.add-server-bar[data-license] .hosted-currency {
+  position: static;
+  transform: none;
+}
+
 /* Two equal columns, so the pill moves by exactly its own width. */
 .hosted-billing {
   --hosted-billing-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
@@ -113,7 +144,8 @@
   transition: transform 300ms var(--hosted-billing-ease);
 }
 
-.hosted-billing[data-billing="yearly"]::before {
+.hosted-billing[data-billing="yearly"]::before,
+.hosted-billing[data-use="work"]::before {
   transform: translateX(100%);
 }
 
@@ -164,6 +196,11 @@
   background: var(--openbot-success-soft);
   color: var(--openbot-success-text);
   animation: hosted-billing-save-pop 300ms var(--hosted-billing-ease) 80ms both;
+}
+
+/* The saving changes between personal and work use; equal digit widths keep the switch in place. */
+.add-server-bar[data-license] .hosted-billing-save {
+  font-variant-numeric: tabular-nums;
 }
 
 /* One framed panel. Hairlines divide the plans. */
@@ -355,9 +392,120 @@
   line-height: var(--openbot-leading-md);
 }
 
+/* The bundle discount of a server with its license, in place of the "Best value" badge. */
+.hosted-plan-bundle {
+  padding: 0 var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success-text);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
+  white-space: nowrap;
+}
+
+/* For work, the price includes the license: the line has the success color of the bundle and an icon. */
+.hosted-plan-summary[data-license] {
+  display: flex;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* The icon bottom is on the baseline of the first line. It moves down so that its middle is on the
+ * middle of the capital letters. */
+.hosted-plan-summary svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  translate: 0 calc((var(--openbot-icon-sm) - 1cap) / 2);
+  color: var(--openbot-success-text);
+}
+
+/* The personal and work summaries differ in length; two lines for both, so the buttons stay in place. */
+.hosted-plans[data-license] .hosted-plan-summary {
+  min-height: 2lh;
+}
+
+/* The price line breaks for all counts or for none. LongestPrice measures the longest price. */
+.hosted-plans[data-license] .hosted-plan-price {
+  position: relative;
+}
+
+.hosted-plan-longest {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Only the visible price: the copy must not change the width that it measures. */
+.hosted-plans[data-stacked] .hosted-plan-price > .hosted-plan-was[data-shown] {
+  flex-basis: 100%;
+}
+
+/* The people row closes the frame of the plans. It stays for personal use, disabled, so nothing moves. */
+.hosted-plans[data-license] {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.hosted-license-people {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-6);
+  border: 1px solid var(--openbot-border);
+  border-top: 0;
+  border-radius: 0 0 var(--openbot-radius-card) var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  transition: color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.hosted-license-people[data-disabled] {
+  color: var(--openbot-text-muted);
+}
+
+.hosted-license-people > span {
+  white-space: nowrap;
+}
+
+.hosted-license-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* As wide as "10 members", so the buttons stay in place while the count changes. */
+.hosted-license-stepper > span {
+  min-width: 11ch;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hosted-license-stepper .ui-icon-button {
+  border-radius: var(--openbot-radius-pill);
+}
+
 /* The buttons line up when the summaries wrap to different lengths. */
 .hosted-plan-choose.ui-button {
   margin-top: auto;
+}
+
+/* With the people row, the summaries have one height, and a work plan has one fact less: the
+ * buttons follow the summary, so they stay on one line. */
+.hosted-plans[data-license] .hosted-plan-choose.ui-button {
+  margin-top: 0;
 }
 
 .hosted-plan-facts {
@@ -411,9 +559,21 @@
   flex: 0 0 auto;
 }
 
-.add-server-join {
-  margin: 0;
-  text-align: center;
+/* The ways to add a server without a plan, across from the close button of the shell. */
+.add-server-other {
+  position: absolute;
+  top: var(--openbot-space-6);
+  left: var(--openbot-space-6);
+  z-index: 2;
+}
+
+.add-server-other .ui-button {
+  color: var(--openbot-text-muted);
+}
+
+/* The menu opens over the dialog, which is on a higher layer than menus. */
+.ui-action-menu.add-server-other-menu {
+  z-index: calc(var(--openbot-layer-dialog) + 1);
 }
 
 /* Progress */
@@ -789,6 +949,20 @@
     line-height: var(--openbot-leading-2xl);
   }
 
+  /* The title goes under the row of the "Other options" button and the close button. */
+  .add-server-dialog:has(.add-server-other) .add-server-intro {
+    padding-top: calc(var(--openbot-control-md) + var(--openbot-space-1));
+  }
+
+  .add-server-dialog:has(.add-server-other) .add-server-intro .ui-heading {
+    padding-inline: 0;
+  }
+
+  .add-server-other {
+    top: var(--openbot-space-3);
+    left: var(--openbot-space-3);
+  }
+
   .add-server-intro .ui-text {
     font-size: var(--openbot-text-md);
     line-height: var(--openbot-leading-md);
@@ -807,6 +981,16 @@
   .add-server-bar .hosted-currency {
     top: 0;
     transform: none;
+  }
+
+  /* Personal or work use and the currency on one line, the billing under them. */
+  .add-server-bar[data-license] {
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+
+  .add-server-bar[data-license] .hosted-billing:not(.hosted-use) {
+    flex: 1 1 100%;
   }
 
   .add-server-custom {
@@ -833,6 +1017,7 @@
   .hosted-billing-save,
   .hosted-plan,
   .hosted-plan-was,
+  .hosted-license-people,
   .add-server-progress[data-status] .add-server-ring-segment circle,
   .add-server-progress[data-status] .add-server-ring-core {
     transition: none;

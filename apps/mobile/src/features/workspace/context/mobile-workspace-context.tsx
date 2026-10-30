@@ -89,6 +89,7 @@ import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
+import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
@@ -153,6 +154,7 @@ import { withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
+import { appendTurnStepLine, latestThoughtId } from "@/features/workspace/model/turn-step-lines";
 import {
   decodeAgent,
   decodeAgentSummaries,
@@ -196,6 +198,8 @@ const NO_IDS: string[] = [];
 const NO_AGENTS: MobileAgent[] = [];
 /** The longest that the servers which are not selected wait for the selected one on a return to the app. */
 const OTHER_SERVERS_RETURN_DELAY_MS = 3_000;
+/** How long the app waits at start for the first server before it opens a server that is online. */
+const STARTUP_SERVER_WAIT_MS = 4_000;
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -418,6 +422,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
       liveState.update("unreadCounts", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("activityByServer", (current) => withoutKeys(current, serverIds));
+      liveState.update("turnLinesByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
@@ -1008,6 +1013,36 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     if (hold && hold.serverId !== activeServerId) setHold(null);
   }, [hold, activeServerId]);
 
+  // The app starts on the first server of the list. When that server does not connect soon, such as
+  // a computer that sleeps, the first server that is online opens instead. The saved order stays.
+  // A selection by the user, or the start server online, ends this. A hosted server stays selected:
+  // it starts only while it is selected, and a start takes longer than this wait.
+  const startupFallback = useRef(true);
+  const [startupWaitOver, setStartupWaitOver] = useState(false);
+  // The wait starts when the list of servers arrives, because the connections start then.
+  const startServerListed = servers.some((server) => server.id === activeServerId);
+  useEffect(() => {
+    if (!startServerListed) return;
+    const timer = setTimeout(() => setStartupWaitOver(true), STARTUP_SERVER_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [startServerListed]);
+  useEffect(() => {
+    if (!startupFallback.current) return;
+    const active = servers.find((server) => server.id === activeServerId);
+    if (showsOnline(active) || active?.hosted === true) {
+      startupFallback.current = false;
+      return;
+    }
+    const activeFailed = active?.state === "offline" || active?.state === "error";
+    if (!startupWaitOver && !activeFailed) return;
+    const online = sortByPreference(servers).find((server) => server.state === "online");
+    if (!online) return;
+    startupFallback.current = false;
+    loadGeneration.current += 1;
+    conversationStore.cancelRequests();
+    setActiveServerId(online.id);
+  }, [servers, activeServerId, startupWaitOver, sortByPreference, conversationStore]);
+
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
@@ -1059,6 +1094,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         liveState.update("activityByServer", (current) => {
           const previous = current[serverId] ?? {};
           const next = reduceAgentActivity(previous, chatEvent);
+          return next === previous ? current : { ...current, [serverId]: next };
+        });
+      }
+      if (chatEvent?.type === "turn-progress") {
+        const { agentId, turnId, detail } = chatEvent;
+        const after = latestThoughtId(conversationStore.get(agentId)?.messages ?? [], turnId);
+        liveState.update("turnLinesByServer", (current) => {
+          const previous = current[serverId] ?? {};
+          const next = appendTurnStepLine(previous, turnId, detail, after);
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
@@ -1272,6 +1316,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       respondToBrowserTakeover: (serverId, input) => runTeamRequest(respondToBrowserTakeover(teamApi(serverId), input)),
       respondToBrowserSecret: (serverId, input) => runTeamRequest(respondToBrowserSecret(teamApi(serverId), input)),
       selectServer: (id) => {
+        startupFallback.current = false;
         loadGeneration.current += 1;
         conversationStore.cancelRequests();
         setActiveServerId(id);
@@ -1329,6 +1374,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ...current.filter((server) => server.id !== host.hostId),
           serverFromHost(host, "remote"),
         ]);
+        startupFallback.current = false;
         setActiveServerId(host.hostId);
         // Membership is already committed. Directory failure must not reuse the consumed invite.
         void refreshHosts().catch(() => undefined);
@@ -1763,6 +1809,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             activeServerId={activeServerId}
             agents={agents}
             preferences={visiblePreferences}
+          />
+          <ShareExtensionSync
+            apiUrl={session.apiUrl}
+            userId={session.user.id}
+            sessionToken={session.sessionToken}
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={agents}
           />
           {servers.map((server) => (
             <ServerConnection

@@ -109,6 +109,11 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
+/* The macOS traffic lights take x 12..71 (`src/main/main-window.ts`), as in `browser-full-view.css`. */
+.image-lightbox-mac-controls .image-lightbox-toolbar {
+  padding-inline-start: 82px;
+}
+
 .image-lightbox-caption {
   display: flex;
   min-width: 0;

@@ -25,6 +25,12 @@ export const messages = {
     "Capturar el área de la pantalla en {x}, {y}, de {width} × {height} puntos, y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureProgress": "Pidiendo permiso para capturar la pantalla…",
   "status.agent.screenCaptureReviewing": "Revisando la captura de pantalla…",
+  "status.agent.browserOpening": "Abriendo una página web…",
+  "status.agent.browserReading": "Leyendo la página web…",
+  "status.agent.browserClicking": "Haciendo clic en la página web…",
+  "status.agent.browserTyping": "Escribiendo en la página web…",
+  "status.agent.browserActing": "Usando la página web…",
+  "status.agent.browserReviewing": "Revisando la página web…",
   "status.agent.memoriesSearching": "Buscando en sus recuerdos…",
   "status.agent.memoriesSearched": {
     one: "Buscó en sus recuerdos: {count} encontrado",
@@ -36,4 +42,5 @@ export const messages = {
   "status.agent.memoryChanges": "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados.",
   "status.agent.memoryChangesWithConflicts":
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
+  "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
 } as const satisfies PartialTranslation<typeof source>;

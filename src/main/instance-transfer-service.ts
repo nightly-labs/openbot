@@ -39,6 +39,7 @@ import {
   type InstanceTransferResult,
   type InstanceTransferSummary,
   isAgentImportKey,
+  isCustomProviderContextWindow,
   type McpServerConfig,
   type Routine,
   type RoutineFlowLink,
@@ -684,7 +685,9 @@ export class InstanceTransferService {
           name: provider.name,
           baseUrl: provider.baseUrl,
           apiKey: null,
-          models: [...provider.models],
+          models: provider.models.map(({ id, name, contextWindow }) =>
+            isCustomProviderContextWindow(contextWindow) ? { id, name, contextWindow } : { id, name },
+          ),
           headers: [],
         }),
       );

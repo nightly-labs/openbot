@@ -123,6 +123,20 @@ import {
   type TeamWebRtcClientTransport,
 } from "./team-webrtc-client-transport";
 
+/** Where a stopped local server points: port 0 accepts no connection, so no request leaves this app. */
+const STOPPED_LOCAL_SERVER_URL = "http://127.0.0.1:0";
+
+export interface LocalServerAttachInput {
+  serverId: string;
+  apiUrl: string;
+  fingerprint: string;
+  publicKey: string;
+  username: string;
+  password: string;
+  /** Selects the server: true only when the user just made it. */
+  select: boolean;
+}
+
 interface RemoteServerEvents {
   directoryInvalidated: [];
   changed: [servers: ServerSummary[]];
@@ -218,6 +232,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #getLocalHostId: () => string | null;
   /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
   #localMemberLimit: number | null = null;
+  /** The local servers that this app runs as its child processes. See `local-servers/`. */
+  #thisComputerServers: ReadonlySet<string> = new Set();
   readonly #hostedServers: HostedServerWakeHooks | null;
   /** When each hosted server that starts after a wake request started. */
   readonly #hostedStartAt = new Map<string, number>();
@@ -537,6 +553,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#store.activeServerId,
       (serverId) => this.#connections.statusFor(serverId),
       this.#localMemberLimit,
+      (serverId) => this.#thisComputerServers.has(serverId),
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
       return {
@@ -848,6 +865,89 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#emitChanged();
       yield* this.#events.restart(stored.id, true);
       return yield* remoteDecode(() => requiredServerSummary(this.list(), stored.id));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Called by the local servers before they start, so that the directory sync keeps their entries. */
+  setThisComputerServers(serverIds: Iterable<string>): void {
+    this.#thisComputerServers = new Set(serverIds);
+    this.#emitChanged();
+  }
+
+  /**
+   * A local server that started: it proves the key pinned when it was made, then this app logs in as
+   * its owner. A new session at each start, so no session can expire while the server runs.
+   */
+  readonly attachLocalServer = Effect.fn("RemoteManager.attachLocalServer")(
+    function* (
+      this: RemoteServerManager,
+      input: LocalServerAttachInput,
+    ): Effect.fn.Return<ServerSummary, RemoteWorkflowError, RemoteRequest> {
+      const verifiedIdentity = yield* this.#client.verifyIdentity(input.apiUrl, input.serverId, input.fingerprint);
+      if (verifiedIdentity.publicKey !== input.publicKey)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.identityNotVerified")) });
+      const result = yield* requestJson(input.apiUrl, TEAM_API_ROUTES.auth.login, decodeJoinResult, {
+        method: "POST",
+        body: { username: input.username, password: input.password },
+        ...this.#client.requestProtocol(verifiedIdentity.compatibility),
+      }).pipe(
+        Effect.mapError(
+          (failure) =>
+            new RemoteWorkflowError({
+              cause:
+                failure instanceof RemoteRequestError || failure instanceof RemoteProtocolError
+                  ? failure
+                  : failure.cause,
+            }),
+        ),
+      );
+      const stored: StoredRemoteServer = {
+        id: input.serverId,
+        name: verifiedIdentity.serverName,
+        apiUrl: input.apiUrl,
+        fingerprint: input.fingerprint,
+        publicKey: input.publicKey,
+        username: input.username,
+        encryptedToken: yield* remoteDecode(() => this.#store.sealToken(result.sessionToken)),
+        remoteDesktopAvailable: false,
+        logoVersion: verifiedIdentity.logoVersion,
+        role: result.member.role,
+      };
+      this.#connections.setCompatibility(stored.id, verifiedIdentity.compatibility);
+      this.#connections.clearIssue(stored.id);
+      this.#connections.setState(stored.id, "online");
+      yield* this.#store.attachLocal(stored, input.select);
+      this.#events.syncScopes();
+      this.#emitChanged();
+      yield* this.#events.restart(stored.id, true);
+      return yield* remoteDecode(() => requiredServerSummary(this.list(), stored.id));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * A local server stopped (`forget` false) or was deleted (`forget` true). A stopped one keeps its
+   * slot, but not its port or its session: another process can take the port before the next start.
+   */
+  readonly detachLocalServer = Effect.fn("RemoteManager.detachLocalServer")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      forget: boolean,
+    ): Effect.fn.Return<void, RemoteWorkflowError> {
+      const current = this.#store.find(serverId);
+      if (!current) return;
+      this.#clearServerConnectionState(serverId);
+      if (forget) {
+        yield* this.#store.remove(serverId);
+      } else {
+        const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
+        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken }, false);
+        this.#connections.setState(serverId, "offline");
+        this.#events.suspendReconnect(serverId);
+      }
+      this.#emitChanged();
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -1993,6 +2093,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       isHiddenHost: (hostId) => this.#store.isHiddenHost(hostId),
       username: email.trim().toLowerCase(),
       keepOtherTransports: this.#allowLocalDevelopmentInvites,
+      isThisComputer: (serverId) => this.#thisComputerServers.has(serverId),
     });
     for (const { hostId, publicKey } of pinnedKeys) transport.pinHostKey(hostId, publicKey);
     for (const serverId of removedHostIds) {

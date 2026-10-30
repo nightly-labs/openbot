@@ -12,6 +12,7 @@ import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -263,6 +264,7 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') != 'plan'
       AND COALESCE(item_type, '') != 'subagents'
       AND COALESCE(item_type, '') != '${CONVERSATION_MEMORY_CHANGES_ITEM_TYPE}'
+      AND COALESCE(item_type, '') != '${PLAN_CONTINUATION_ITEM_TYPE}'
       AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
       AND COALESCE(item_type, '') != 'agent_attachment'
       AND COALESCE(item_type, '') NOT LIKE '${CHAT_VISUAL_ITEM_TYPE_PREFIX}%'
@@ -368,6 +370,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
         message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
         message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
+        message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
         message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
         message.itemType !== "agent_attachment" &&
         !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&

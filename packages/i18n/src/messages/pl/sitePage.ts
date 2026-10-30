@@ -75,4 +75,12 @@ export const messages = {
   "sitePage.report.sentTitle": "Zgłoszenie wysłane",
   "sitePage.report.sentBody": "Dziękujemy. Otrzymaliśmy Twoje zgłoszenie.",
   "sitePage.report.home": "Przejdź do strony głównej",
+  "sitePage.pricing.title": "Cennik OpenBot",
+  "sitePage.pricing.description":
+    "Hostowane serwery i licencja dla zespołów. OpenBot jest darmowy do użytku osobistego na własnym komputerze.",
+  "sitePage.pricing.heading": "Cennik",
+  "sitePage.pricing.enterprise.title": "Enterprise",
+  "sitePage.pricing.enterprise.body":
+    "Większe serwery, ponad {count} członków lub cokolwiek innego, czego potrzebujesz. Ze wsparciem dla firm.",
+  "sitePage.pricing.enterprise.contact": "Kontakt ze sprzedażą",
 } as const satisfies PartialTranslation<typeof source>;

@@ -65,7 +65,7 @@ const routeNames = {
   private: new RegExp(`^${literal(english("settings.mobileConnect.route.private.title"))}`),
 } satisfies Record<RemoteNetworkRoute, RegExp>;
 
-/** Opens Settings › Mobile Connect. Each visit of the tab reads the route from main again. */
+/** Opens Settings › Mobile Connect and its route popover. Each visit of the tab reads the route from main again. */
 async function openRoutes(): Promise<void> {
   await desktop
     .getByRole("navigation", { name: english("app.rail.label") })
@@ -73,11 +73,23 @@ async function openRoutes(): Promise<void> {
     .click();
   await desktop.getByRole("tab", { name: english("settings.tab.general.title"), exact: true }).click();
   await desktop.getByRole("tab", { name: english("settings.tab.mobileConnect.title"), exact: true }).click();
+  await showRoutes();
+}
+
+/** The routes are in a popover under the route chip in the tab header. Opens it when it is closed. */
+async function showRoutes(): Promise<void> {
+  if (await routes.isVisible()) return;
+  const chipLabel = literal(english("settings.mobileConnect.route.chipLabel", { route: "ROUTE" })).replace(
+    "ROUTE",
+    ".+",
+  );
+  await desktop.getByRole("button", { name: new RegExp(`^${chipLabel}$`) }).click();
   await routes.waitFor({ timeout: UI_WAIT_MS });
 }
 
 /** Selects a route by its card, as the user does, and waits until main saved it. */
 async function selectRoute(route: RemoteNetworkRoute): Promise<void> {
+  await showRoutes();
   const radio = routes.getByRole("radio", { name: routeNames[route] });
   // The radio input is hidden; the user clicks its card.
   if (!(await radio.isChecked()))

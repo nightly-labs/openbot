@@ -5,6 +5,8 @@ import { type SharedValue, useSharedValue, withTiming } from "react-native-reani
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
+import { parakeetSupported, useParakeetModel } from "@/features/voice/model/parakeet-model";
+import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
 import { isIOS } from "@/shared/lib/platform";
@@ -26,6 +28,7 @@ import {
   retriesWithSystemService,
   spokenText,
 } from "../model/voice-dictation";
+import { type ModelRecognition, modelCaptureAvailable, useModelDictation } from "./use-model-dictation";
 
 type Recognizer = NonNullable<typeof speechRecognition>;
 type StartOptions = Parameters<Recognizer["start"]>[0];
@@ -176,10 +179,11 @@ export interface VoiceDictation {
 }
 
 /**
- * Live dictation into the composer draft. Each result replaces the spoken part
- * of the draft, so the user sees the text while speaking. Nothing is sent here.
+ * Live dictation into the composer draft with the phone's recognizer, in one
+ * language. Each result replaces the spoken part of the draft, so the user sees
+ * the text while speaking. Nothing is sent here.
  */
-export function useVoiceDictation({
+function useSystemDictation({
   enabled,
   onDraft,
 }: {
@@ -399,4 +403,45 @@ export function useVoiceDictation({
   );
 
   return { available, phase, level, start, finish, cancel };
+}
+
+/**
+ * The recognizer that Settings > Voice chose, when it can run now. Parakeet needs its model and
+ * enough memory, ElevenLabs needs a key, and both need a speech module with a microphone. Otherwise
+ * the phone's recognizer listens, so the microphone always works.
+ */
+function useActiveRecognition(): "system" | ModelRecognition {
+  const recognition = useVoiceSettings((state) => state.recognition);
+  const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
+  const parakeetReady = useParakeetModel((state) => state.phase === "ready");
+  if (!modelCaptureAvailable()) return "system";
+  if (recognition === "parakeet" && parakeetReady && parakeetSupported()) return "parakeet";
+  if (recognition === "elevenlabs" && hasKey) return "elevenlabs";
+  return "system";
+}
+
+/**
+ * Live dictation into the composer draft with the recognizer of Settings > Voice: the phone's own,
+ * Parakeet on the phone, or ElevenLabs Scribe. Nothing is sent here.
+ */
+export function useVoiceDictation({
+  enabled,
+  onDraft,
+  onSpeaking,
+}: {
+  /** False stops listening and keeps the text, for example when the chat goes offline. */
+  enabled: boolean;
+  onDraft: (text: string) => void;
+  /** The user speaks now. Only Parakeet and ElevenLabs report it, about ten times a second. */
+  onSpeaking?: () => void;
+}): VoiceDictation {
+  const engine = useActiveRecognition();
+  const system = useSystemDictation({ enabled: enabled && engine === "system", onDraft });
+  const model = useModelDictation({
+    engine: engine === "system" ? null : engine,
+    enabled: enabled && engine !== "system",
+    onDraft,
+    onSpeaking,
+  });
+  return engine === "system" ? system : model;
 }
