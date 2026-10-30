@@ -7,6 +7,8 @@
 // - v3: agent duplication, its idempotent retry, and the refused request shapes.
 // - v7 and v8: a v7 client on this host gets no v8 field; the v8 decoder reads the released v4-v7
 //   fixtures; the v7 decoder still refuses a provider that it does not know.
+// - v9: the v9 decoder reads the v9 fixtures, which have more than 128 capabilities; the v8 decoder
+//   refuses them.
 // - v8 over WebRTC: a browser tab opened from an agent's panel keeps its owner agent, and a secure
 //   authentication answer and an agent profile save keep their agent (#3949).
 // - context-usage-v1: a v8 client that asks for it gets the context of each agent it can see; any other
@@ -59,6 +61,7 @@ import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   TEAM_PROTOCOL_V9,
+  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
@@ -605,6 +608,28 @@ try {
       );
     }
     return { read };
+  });
+
+  await step("v9 decoder: reads the v9 fixtures; the v8 decoder refuses more than 128 capabilities", async () => {
+    const client = fixture("v9/client-capabilities.json");
+    assert.ok(Array.isArray(client), "v9/client-capabilities.json is not a list.");
+    assert.ok(
+      client.length > 128 && client.length <= TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
+      `v9/client-capabilities.json has ${client.length} capabilities.`,
+    );
+    assert.ok(client.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The v9 client list has no marker.");
+    const host = decodeTeamProtocolSupportV9(fixture("v9/host-compatibility.json"));
+    assert.equal(host.protocol.maximum, TEAM_PROTOCOL_V9);
+    assert.ok(
+      host.capabilities.length > 128,
+      `v9/host-compatibility.json has ${host.capabilities.length} capabilities.`,
+    );
+    assert.ok(host.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY), "The v9 host list has no marker.");
+    assert.throws(
+      () => decodeTeamProtocolSupportV8Base(fixture("v9/host-compatibility.json")),
+      "The v8 decoder read v9/host-compatibility.json.",
+    );
+    return { client: client.length, host: host.capabilities.length };
   });
 
   await step("v7 client: this host serves protocol 7 without the v8 `displayName`", async () => {
