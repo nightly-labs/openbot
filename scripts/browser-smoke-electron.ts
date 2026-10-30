@@ -494,7 +494,9 @@ async function main(): Promise<void> {
     window.show();
     app.focus({ steal: true });
     window.focus();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // On Linux, CDP key events do not reach a page before its window has focus, and xvfb can give
+    // focus later than a fixed wait. The typing-focus scenario runs first and lost its first Enter.
+    await waitFor(async () => window.isFocused(), "test window focus");
     const downloadsRoot = join(temporaryRoot, "downloads");
     const statePath = join(temporaryRoot, "browser-tabs.json");
     const browser = new BrowserHost(window, downloadsRoot, statePath, {
