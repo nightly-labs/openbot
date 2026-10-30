@@ -228,9 +228,9 @@ Send `{ "answers": { "build": ["Debug"] } }` with `Content-Type: application/jso
 Use question IDs as keys and answer strings as array values. The normal question handler resumes
 the agent. A successful response is `200 { "ok": true }`.
 
-A question with `options: null` takes typed text. When an agent asks the person to pick one or more
-choices, the question has the ID `choice`, `options: null`, and the choices as a `- ` list in
-`question`. Send each picked label as one array value, for example
+A question with `options: null` takes typed text. When an agent shows a choice that allows several
+picks, or that has more than five options, the question has the ID `choice`, `options: null`, and
+the choices as a `- ` list in `question`. Send each picked label as one array value, for example
 `{ "answers": { "choice": ["Monday", "Friday"] } }`.
 
 ### `POST /v1/agents/:agentId/approvals/:requestId/respond`
