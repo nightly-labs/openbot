@@ -6,6 +6,7 @@ import { type BrowserOperationError, browserFailure, browserSync } from "./brows
 const NAVIGATION_TIMED_OUT = "Navigation timed out.";
 const TAB_CLOSED = "Browser tab was closed during navigation.";
 const ERR_ABORTED = -3;
+const SUCCESSOR_TIMEOUT_MS = 10_000;
 
 /**
  * Starts a navigation and settles when the main frame finishes it. `initiate` returns `false` when
@@ -68,10 +69,13 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       let settled = false;
       let timedOut = false;
       let initiationPending = false;
+      let committed = false;
+      let successorStarted = false;
       let timer: NodeJS.Timeout | undefined;
       const cleanup = () => {
         clearTimeout(timer);
         contents.off("did-start-navigation", didStartNavigation);
+        contents.off("did-navigate", didNavigate);
         contents.off("did-stop-loading", didStopLoading);
         contents.off("did-navigate-in-page", didNavigateInPage);
         contents.off("did-fail-load", didFailLoad);
@@ -87,14 +91,23 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const complete = () => {
         finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
       };
-      // A page that starts its next page while it loads, as a sign-in redirect does, aborts its own
-      // load with `ERR_ABORTED`. The main frame still loads the next page, so wait for that load.
-      const supersededBy = (code: unknown) => code === ERR_ABORTED && !timedOut && contents.isLoading();
+      // A document that commits and then starts its next page while it loads, as a sign-in redirect
+      // does, aborts its own load with `ERR_ABORTED`. The main frame still loads the next page, so wait
+      // for that load. A wait without a deadline gets one here, so that a redirect loop ends.
+      const supersededBy = (code: unknown) => {
+        if (code !== ERR_ABORTED || timedOut || !successorStarted || !contents.isLoading()) return false;
+        if (timer === undefined) startDeadline(SUCCESSOR_TIMEOUT_MS);
+        return true;
+      };
       const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
         if (!isMainFrame) return;
+        if (committed && !isInPlace) successorStarted = true;
         // A page that calls `pushState` while it loads must not end the wait for that load.
         inPlace = started ? inPlace && isInPlace : isInPlace;
         started = true;
+      };
+      const didNavigate = () => {
+        if (started) committed = true;
       };
       const didStopLoading = () => {
         if (started && !inPlace) complete();
@@ -110,11 +123,12 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         finish(new Error(TAB_CLOSED));
       };
       contents.on("did-start-navigation", didStartNavigation);
+      contents.on("did-navigate", didNavigate);
       contents.on("did-stop-loading", didStopLoading);
       contents.on("did-navigate-in-page", didNavigateInPage);
       contents.on("did-fail-load", didFailLoad);
       contents.once("destroyed", destroyed);
-      if (timeoutMs !== null) {
+      const startDeadline = (ms: number) => {
         timer = setTimeout(() => {
           timedOut = true;
           try {
@@ -124,9 +138,10 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
           } catch (error) {
             finish(error);
           }
-        }, timeoutMs);
+        }, ms);
         timer.unref();
-      }
+      };
+      if (timeoutMs !== null) startDeadline(timeoutMs);
       if (!initiate) return Effect.sync(cleanup);
       try {
         const initiation = initiate();

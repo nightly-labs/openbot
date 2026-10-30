@@ -2043,7 +2043,7 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
  */
 async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
   const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
-  const outcomes: { via: string; url: string; success: boolean; error?: string }[] = [];
+  const outcomes: { via: string; url: string; success: boolean; finalUrl?: string; error?: string }[] = [];
   try {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       for (const url of [`${origin}/redirect-start`, `${origin}/redirect-start?slow`]) {
@@ -2065,8 +2065,8 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
         outcomes.push({
           via: "open",
           url,
-          success: opened._tag === "Success",
-          ...(opened._tag === "Success" ? {} : { error: String(opened.cause) }),
+          success: opened._tag === "Success" && opened.value.url.includes("/redirect-end"),
+          ...(opened._tag === "Success" ? { finalUrl: opened.value.url } : { error: String(opened.cause) }),
         });
         if (opened._tag === "Success") await runCauseEffect(browser.close(opened.value.id));
       }
