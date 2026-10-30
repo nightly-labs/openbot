@@ -482,6 +482,12 @@
    * rail is the way back, so these titles have no Back button and no server name. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
     top: var(--left-header-height);
+    -webkit-app-region: no-drag;
+  }
+
+  /* The hidden chat header no longer moves the window, so the empty top row of the settings page does. */
+  .app-frame-edge[data-window-page-kind="settings"] {
+    -webkit-app-region: drag;
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
