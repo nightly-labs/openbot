@@ -33,6 +33,7 @@ import {
   type ChannelTextModel,
   type DeliveredChannelContext,
   isMemberThinking,
+  sameRequest,
 } from "./channel-history";
 import {
   CHANNEL_MANAGEMENT_TOOLS,
@@ -1848,6 +1849,14 @@ export class ChannelService {
           );
         }
       }
+      // A stop in older versions gave no reason, so the task showed no way to continue it. An archive
+      // also pauses with no reason, so only a channel that is not archived gets the stop reason.
+      if (!archived.has(channelId)) {
+        const stopped = (yield* channelSync(() => this.store.tasks(channelId)))
+          .filter((task) => task.state === "paused" && !task.error)
+          .map((task): ChannelTask => ({ ...task, error: sourceText("error.backend.channelTaskStopped") }));
+        if (stopped.length) yield* channelSync(() => this.store.update(this.store.get(channelId), { tasks: stopped }));
+      }
       this.publish(channelId);
     }
     yield* this.wake();
@@ -2100,6 +2109,7 @@ export class ChannelService {
       return history.get(id) ?? undefined;
     };
     const messages: ChannelMessage[] = [];
+    const active = assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
     for (let message of turnId === undefined
       ? snapshot.messages
       : snapshot.messages.filter((item) => item.turnId === turnId)) {
@@ -2109,13 +2119,34 @@ export class ChannelService {
         !(message.attachments?.length && message.author !== "user")
       )
         continue;
+      const original = existing(message.id);
+      // The first rows of a turn come before its assignment knows the turn id, so they go to the
+      // running assignment. A row of another turn does not: in a whole snapshot, every old row of
+      // the thread went to the task that ran now.
       const assignment =
         assignments.find((item) => item.turnId === message.turnId) ??
-        assignments.find((item) => item.agentId === snapshot.agentId && activeAssignment(item));
+        (turnId !== undefined ||
+        message.turnId === snapshot.activeTurnId ||
+        (original !== undefined && original.taskId === active?.taskId)
+          ? active
+          : undefined);
       if (!assignment) continue;
+      // A turn sends its final rows before it completes, so a new row of an ended assignment is not
+      // part of its reply. After a restart, the Claude history import wrote old turns again with new
+      // ids, and each such row showed as a new reply under a completed task.
+      if (!original && !activeAssignment(assignment)) continue;
+      // An empty row has nothing to show or to give another member. A streaming row gets its row
+      // when its first text arrives.
+      if (
+        !original &&
+        message.author === "assistant" &&
+        !message.text.trim() &&
+        !message.attachments?.length &&
+        !message.questionPrompt
+      )
+        continue;
       const task = tasks.get(assignment.taskId);
       const result = existing(`channel-result-${assignment.id}-revision-${assignment.taskRevision}`);
-      const original = existing(message.id);
       // A repeat of the result adds nothing. But a row that streamed before its text matched still
       // completes: a row left at streaming stopped every later assignment in the channel (#3673).
       if (result?.message.text === message.text && original?.message.status !== "streaming") continue;
@@ -2397,7 +2428,7 @@ export class ChannelService {
       message.message.turnId = turnId;
       yield* channelSync(() => this.store.update(channel, { messages: [message] }, operationId));
       this.publish(channelId);
-      return { accepted: true, instruction: "The result is in the shared chat. End this turn without repeating it." };
+      return { accepted: true, instruction: "The result is in the shared chat. End your turn now with no more text." };
     }
     /**
      * The two memory tools commit at call time, unlike an agent's `remember`, which stages into the
@@ -2966,14 +2997,6 @@ function routingFailureText(error: unknown): string | null {
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
-}
-
-/**
- * Whether two tasks answer one request. A "continue" moves only the tasks it continues to the new
- * message, so siblings compare by the messages they share, not by their current request.
- */
-function sameRequest(task: ChannelTask, other: ChannelTask): boolean {
-  return task.sourceMessageIds.some((id) => other.sourceMessageIds.includes(id));
 }
 
 function terminal(task: ChannelTask): boolean {
