@@ -31,7 +31,7 @@ import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortc
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { children, createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 
 const HOLD_TEXT = {
   "agent-restarting": "conversation.threads.hold.agentRestarting",
@@ -168,12 +168,16 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   let scroller: HTMLElement | undefined;
   let atEnd = true;
+  let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
   // The view stays when another thread opens in its place, so each thread opens at its latest message.
+  // The effect can run again with the same thread, which must not move the reader.
   createEffect(
     () => props.task?.id,
-    () => {
+    (taskId) => {
+      if (taskId === shownTaskId) return;
+      shownTaskId = taskId;
       atEnd = true;
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
@@ -189,6 +193,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (atEnd) element.scrollTop = element.scrollHeight;
     });
     follow.observe(list);
+    element.scrollTop = element.scrollHeight;
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
