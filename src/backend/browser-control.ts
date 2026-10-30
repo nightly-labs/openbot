@@ -17,6 +17,8 @@ export function browserControlAction(call: BrowserToolCall): BrowserControlActio
       return "screenshot";
     case "close_tab":
       return "close-tab";
+    case "handle_dialog":
+      return "click";
     case "status":
       return "list-tabs";
     case "navigate":

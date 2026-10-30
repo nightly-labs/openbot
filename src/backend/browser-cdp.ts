@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import type {
   BrowserActionHistoryEntry,
@@ -10,6 +11,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
@@ -247,6 +249,39 @@ function shortcutLetter(key: string, code: string): string {
 
 /** Ctrl or Meta: either one is the command modifier, whichever system the client runs. */
 const COMMAND_MODIFIERS = 2 | 4;
+
+export type BrowserDialogType = "alert" | "confirm";
+
+/** A JavaScript dialog that is open in the tab. `agent` is true when the agent can answer it with `handle_dialog`. */
+export interface BrowserDialog {
+  id: string;
+  type: BrowserDialogType;
+  message: string;
+  agent: boolean;
+}
+
+/** The agent turn whose action opened a dialog. Only this turn answers it. */
+export interface BrowserDialogOwner {
+  threadId: string;
+  turnId: string;
+}
+
+interface DialogWatch {
+  owner: BrowserDialogOwner;
+  opened: Deferred.Deferred<BrowserDialog>;
+}
+
+/** A dialog can show a page text of any length. The agent reads a bounded part. */
+const DIALOG_MESSAGE_LIMIT = 2_000;
+/**
+ * Electron shows its own box for a dialog and keeps it open after a CDP answer. This internal event of
+ * Electron closes the box and does not answer the page again. Without a listener for it, a person answers.
+ */
+const CANCEL_DIALOGS_EVENT = "-cancel-dialogs";
+// Electron shows its box in this listener, in the same task as the CDP event but after it.
+const RUN_DIALOG_EVENT = "-run-dialog";
+const DIALOG_CLOSED_ERROR = "This dialog is closed. A person answered it, or the page closed it. Read the tab again.";
+const DIALOG_FOR_PERSON_ERROR = "Only a person can answer this dialog in the tab. Ask the user to answer it.";
 
 export class BrowserCdpEngine {
   readonly #contents: WebContents;
@@ -635,6 +670,14 @@ export class BrowserCdpEngine {
    * perfectly healthy.
    */
   #activeLeases = 0;
+  /** Agent actions that run now. A dialog that opens while one runs is the agent's to answer. */
+  readonly #dialogWatches = new Set<DialogWatch>();
+  /** The open dialog. Tracked only while this engine owns the debugger and has `Page` enabled. */
+  #dialog: (BrowserDialog & { owner: BrowserDialogOwner | undefined }) | undefined;
+  #dialogChanged = Deferred.makeUnsafe<void>();
+  #pageEnabled = false;
+  #dialogBoxShown = false;
+  #cancelDialogBox = false;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -645,6 +688,15 @@ export class BrowserCdpEngine {
       // Native teardown can start before isDestroyed() becomes true. Detaching a debugger
       // during that interval can crash Electron; Chromium will dispose it with the page.
       this.#closing = true;
+    });
+    // Electron's internal events are not in its WebContents event types.
+    const internalEvents: NodeJS.EventEmitter = contents;
+    // Runs after Electron's own listener, so its box can be cancelled here.
+    internalEvents.on(RUN_DIALOG_EVENT, () => {
+      this.#dialogBoxShown = true;
+      if (!this.#cancelDialogBox) return;
+      this.#cancelDialogBox = false;
+      contents.emit(CANCEL_DIALOGS_EVENT);
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
@@ -663,6 +715,9 @@ export class BrowserCdpEngine {
           this.#targetSessions.set(targetId, { sessionId: attachedSessionId, url: stringValue(targetInfo?.url) });
         }
       }
+      // Child sessions do not enable `Page`. A dialog of a frame in another process stays with a person.
+      if (method === "Page.javascriptDialogOpening" && !sessionId && isRecord(params)) this.#dialogOpened(params);
+      if (method === "Page.javascriptDialogClosed" && !sessionId) this.#dialogClosed();
       if (method === "Target.detachedFromTarget" && isRecord(params)) {
         const detached = stringValue(params.sessionId);
         for (const [targetId, target] of this.#targetSessions) {
@@ -1768,8 +1823,136 @@ export class BrowserCdpEngine {
     return values.some((value) => value !== undefined && this.#cardScrub.reveals(value));
   }
 
+  /**
+   * Reports each dialog that opens until `end`. A dialog that opens while a watch runs is the agent's,
+   * and only `owner` answers it.
+   */
+  watchDialogs(owner: BrowserDialogOwner): { opened: Effect.Effect<BrowserDialog>; end: () => void } {
+    const watch: DialogWatch = { owner, opened: Deferred.makeUnsafe<BrowserDialog>() };
+    this.#dialogWatches.add(watch);
+    return {
+      opened: Deferred.await(watch.opened),
+      end: () => {
+        if (this.#dialogWatches.delete(watch)) this.#signalDialogChange();
+      },
+    };
+  }
+
+  /** The dialog that is open now, if this engine saw it open. */
+  get dialog(): BrowserDialog | undefined {
+    if (!this.#dialog) return undefined;
+    const { owner: _owner, ...dialog } = this.#dialog;
+    return dialog;
+  }
+
+  /** Whether the dialog that is open now is the one that the agent turn `owner` can answer. */
+  dialogOwnedBy(owner: BrowserDialogOwner): boolean {
+    const dialog = this.#dialog;
+    return dialog?.agent === true && dialog.owner?.threadId === owner.threadId && dialog.owner.turnId === owner.turnId;
+  }
+
+  /**
+   * The next dialog after an answer: the dialog that is open, or none when no watched action runs. A
+   * page can open a second dialog as soon as the first closes.
+   */
+  readonly nextDialog = Effect.fn("BrowserCdp.nextDialog")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<BrowserDialog | undefined> {
+    while (true) {
+      const dialog = this.dialog;
+      if (dialog || this.#dialogWatches.size === 0) return dialog;
+      yield* Deferred.await(this.#dialogChanged);
+    }
+  });
+
+  readonly answerDialog = Effect.fn("BrowserCdp.answerDialog")(function* (
+    this: BrowserCdpEngine,
+    id: string,
+    accept: boolean,
+    owner: BrowserDialogOwner,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if (this.#dialog?.id !== id) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
+    if (!this.dialogOwnedBy(owner)) return yield* browserFailure(new Error(DIALOG_FOR_PERSON_ERROR));
+    const answered = yield* browserCall(() =>
+      this.#contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }).then(() => {
+        // In the same task as the answer, before the page can open its next dialog.
+        this.#contents.emit(CANCEL_DIALOGS_EVENT);
+      }),
+    ).pipe(
+      Effect.as(true),
+      // "No dialog is showing": a person answered first.
+      Effect.catch(() => Effect.succeed(false)),
+    );
+    if (this.#dialog?.id === id) {
+      this.#dialog = undefined;
+      this.#signalDialogChange();
+    }
+    if (!answered) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
+  });
+
+  /**
+   * The agent turn ended. Its dialog stays open in Electron's box for a person, and the engine still
+   * sees it close. Without `turnId`, every turn of the thread; without `threadId`, every turn.
+   */
+  handOffDialogs(threadId?: string, turnId?: string): void {
+    const matches = (owner: BrowserDialogOwner) =>
+      (threadId === undefined || owner.threadId === threadId) && (turnId === undefined || owner.turnId === turnId);
+    for (const watch of this.#dialogWatches) if (matches(watch.owner)) this.#dialogWatches.delete(watch);
+    if (this.#dialog?.owner && matches(this.#dialog.owner))
+      this.#dialog = { ...this.#dialog, agent: false, owner: undefined };
+    this.#signalDialogChange();
+  }
+
+  /**
+   * The tab closes. The detach makes the commands that wait for the dialog fail, so the tab queue
+   * drains; Electron's box closes. The dialog itself closes with the page.
+   */
+  releaseDialogs(): void {
+    this.#dialogWatches.clear();
+    if (!this.#dialog) return;
+    this.#detachOwnedDebugger();
+    // The tab can close before Electron shows its box. The emit only runs JavaScript listeners, so
+    // it is safe while the tab closes.
+    if (this.#dialogBoxShown) this.#contents.emit(CANCEL_DIALOGS_EVENT);
+    else this.#cancelDialogBox = true;
+  }
+
+  #dialogOpened(params: DynamicRecord): void {
+    const type = stringValue(params.type);
+    // Electron answers `prompt` and `beforeunload` itself, with no box.
+    if (type !== "alert" && type !== "confirm") return;
+    const watch = [...this.#dialogWatches].at(-1);
+    const agent = watch !== undefined && this.#ownsDebugger && this.#contents.listenerCount(CANCEL_DIALOGS_EVENT) > 0;
+    const dialog: BrowserDialog = {
+      id: randomUUID(),
+      type,
+      // A page can show a typed card value or a secret in its dialog, as in a snapshot.
+      message: redactText(this.#cardScrub.text(stringValue(params.message))).slice(0, DIALOG_MESSAGE_LIMIT),
+      agent,
+    };
+    this.#dialog = { ...dialog, owner: agent ? watch.owner : undefined };
+    this.#dialogBoxShown = false;
+    for (const current of this.#dialogWatches) Deferred.doneUnsafe(current.opened, Effect.succeed(dialog));
+    this.#signalDialogChange();
+  }
+
+  #dialogClosed(): void {
+    if (!this.#dialog) return;
+    this.#dialog = undefined;
+    this.#signalDialogChange();
+    if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
+  }
+
+  #signalDialogChange(): void {
+    const changed = this.#dialogChanged;
+    this.#dialogChanged = Deferred.makeUnsafe<void>();
+    Deferred.doneUnsafe(changed, Effect.void);
+  }
+
   cancelPendingCommands(): boolean {
-    if (!this.#ownsDebugger) return false;
+    // A detach leaves an open dialog to Electron's box, which does not report its answer. The command
+    // waits for the answer.
+    if (!this.#ownsDebugger || this.#dialog) return false;
     this.#detachOwnedDebugger();
     return true;
   }
@@ -2994,6 +3177,10 @@ export class BrowserCdpEngine {
         return result;
       });
     return yield* Effect.gen({ self: this }, function* () {
+      if (this.#dialogWatches.size > 0 && this.#ownsDebugger && !this.#pageEnabled) {
+        yield* send("Page.enable");
+        this.#pageEnabled = true;
+      }
       yield* send("Emulation.setFocusEmulationEnabled", { enabled: true });
       if (attachFrames) {
         yield* send("Target.setAutoAttach", {
@@ -3010,7 +3197,8 @@ export class BrowserCdpEngine {
       Effect.ensuring(
         Effect.sync(() => {
           this.#activeLeases -= 1;
-          if (this.#activeLeases === 0 && !this.#retainDebugger) this.#detachOwnedDebugger();
+          // The engine sees an open dialog close only while it stays attached.
+          if (this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog) this.#detachOwnedDebugger();
         }),
       ),
     );
@@ -3027,6 +3215,11 @@ export class BrowserCdpEngine {
   #clearDebuggerSessions(): void {
     this.#targetSessions.clear();
     this.#highlightSessionId = undefined;
+    this.#pageEnabled = false;
+    if (this.#dialog) {
+      this.#dialog = undefined;
+      this.#signalDialogChange();
+    }
   }
 
   readonly #applyEnvironmentEffect = Effect.fn("BrowserCdp.applyEnvironment")(function* (
