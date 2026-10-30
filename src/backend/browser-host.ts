@@ -5,10 +5,8 @@ import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentBrowserProfile,
-  BrowserActionHistoryEntry,
   BrowserBounds,
   BrowserControlState,
-  BrowserDiagnosticEntry,
   BrowserElement,
   BrowserEnvironment,
   BrowserImageMode,
@@ -3202,12 +3200,7 @@ function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {
 function snapshotJson(value: SnapshotToolPayload): string {
   return JSON.stringify(value, function (this: unknown, key, field: unknown) {
     if (!Array.isArray(field) || !isDynamicRecord(this) || !Array.isArray(this.elements)) return field;
-    if (key === "elements") return field.map(elementLine);
-    if (key === "diagnostics")
-      return field.filter((entry: BrowserDiagnosticEntry) => entry.kind !== "network" || entry.level !== "info");
-    if (key === "actions")
-      return field.filter((entry: BrowserActionHistoryEntry) => entry.outcome !== "success" || entry.detail);
-    return field;
+    return key === "elements" ? field.map(elementLine) : field;
   });
 }
 

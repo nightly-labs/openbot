@@ -52,15 +52,23 @@ export class BrowserDiagnostics {
     this.#addedActions += 1;
   }
 
-  /** The entries no delivered snapshot has carried yet. Pass the cursor to `delivered` once the snapshot is read. */
+  /**
+   * The entries no delivered snapshot has carried yet. Pass the cursor to `delivered` once the snapshot is
+   * read. A successful request or a plain successful action tells the model nothing, so it is left out
+   * before the limit: on a busy page they would fill the window and push out the error that matters.
+   */
   snapshot(): {
     diagnostics: BrowserDiagnosticEntry[];
     actions: BrowserActionHistoryEntry[];
     cursor: BrowserHistoryCursor;
   } {
     return {
-      diagnostics: newest(this.#diagnostics, this.#addedDiagnostics - this.#deliveredDiagnostics, SNAPSHOT_DIAGNOSTICS),
-      actions: newest(this.#actions, this.#addedActions - this.#deliveredActions, SNAPSHOT_ACTIONS),
+      diagnostics: newest(this.#diagnostics, this.#addedDiagnostics - this.#deliveredDiagnostics, DIAGNOSTIC_LIMIT)
+        .filter((entry) => entry.kind !== "network" || entry.level !== "info")
+        .slice(-SNAPSHOT_DIAGNOSTICS),
+      actions: newest(this.#actions, this.#addedActions - this.#deliveredActions, ACTION_LIMIT)
+        .filter((entry) => entry.outcome !== "success" || entry.detail)
+        .slice(-SNAPSHOT_ACTIONS),
       cursor: { diagnostics: this.#addedDiagnostics, actions: this.#addedActions },
     };
   }

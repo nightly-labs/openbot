@@ -3563,16 +3563,17 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   }
   const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
   if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
-  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
-  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
-    throw new Error("V2 page evaluation was not recorded in browser action history.");
-  }
   const thrownEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
     expression: "(() => { throw new Error('evaluation-smoke-error'); })()",
   });
   if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
     throw new Error("V2 page evaluation did not return a page exception.");
+  }
+  // A snapshot leaves out a plain success, so the failed evaluation shows the history records evaluations.
+  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
+  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "error")) {
+    throw new Error("V2 page evaluation was not recorded in browser action history.");
   }
   const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
