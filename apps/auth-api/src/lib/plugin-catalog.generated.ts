@@ -16,7 +16,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  updatedAt: "2026-09-30T00:00:00.000Z",
+  updatedAt: "2026-10-30T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -179,6 +179,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "c82e20182383885515660dd72b85ec638d4ad7143f4fd04a5f950440c875ecbb",
+    },
+    {
+      slug: "spicrawl",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "b5a4040ba0e809f21318bacf7428a0a99407f8419270dfcfb66a521b5cac146e",
     },
     {
       slug: "brave-search",
@@ -1246,6 +1252,58 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.firecrawl.dev",
     privacyPolicyUrl: "https://www.firecrawl.dev/privacy",
     termsUrl: "https://www.firecrawl.dev/terms",
+    skills: [],
+  },
+  spicrawl: {
+    slug: "spicrawl",
+    name: "Spicrawl",
+    tagline: "Web scraping for AI agents",
+    description:
+      "Spicrawl lets agents scrape web pages to Markdown, HTML, text or JSON, run batch jobs over lists of URLs, extract structured data with CSS selectors, and keep persistent login sessions.",
+    category: "research",
+    creatorName: "Spicrawl",
+    iconUrl: "https://spicrawl.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-scrape", text: "Fetch this page as clean Markdown." },
+      { id: "prompt-research", text: "Research these competitors and cite each source." },
+      { id: "prompt-batch", text: "Scrape every URL in this list and summarize them." },
+    ],
+    apps: [
+      {
+        id: "app-spicrawl-mcp",
+        name: "Spicrawl",
+        description:
+          "Web scraping, batch jobs, and session management over Spicrawl's hosted MCP server with an API key.",
+        iconUrl: "https://spicrawl.com/favicon.ico",
+        server: {
+          name: "spicrawl",
+          transport: "http",
+          url: "https://mcp.spicrawl.com/mcp",
+          auth: [
+            {
+              id: "spicrawl-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "Create a key at https://app.spicrawl.com",
+                },
+              ],
+              docsUrl: "https://docs.spicrawl.com/agents/mcp",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://spicrawl.com",
+    privacyPolicyUrl: "https://spicrawl.com/privacy",
+    termsUrl: "https://spicrawl.com/terms",
     skills: [],
   },
   "brave-search": {

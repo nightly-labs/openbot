@@ -1,0 +1,50 @@
+{
+  "slug": "spicrawl",
+  "name": "Spicrawl",
+  "tagline": "Web scraping for AI agents",
+  "description": "Spicrawl lets agents scrape web pages to Markdown, HTML, text or JSON, run batch jobs over lists of URLs, extract structured data with CSS selectors, and keep persistent login sessions.",
+  "category": "research",
+  "creatorName": "Spicrawl",
+  "iconUrl": "https://spicrawl.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-scrape", "text": "Fetch this page as clean Markdown." },
+    { "id": "prompt-research", "text": "Research these competitors and cite each source." },
+    { "id": "prompt-batch", "text": "Scrape every URL in this list and summarize them." }
+  ],
+  "apps": [
+    {
+      "id": "app-spicrawl-mcp",
+      "name": "Spicrawl",
+      "description": "Web scraping, batch jobs, and session management over Spicrawl's hosted MCP server with an API key.",
+      "iconUrl": "https://spicrawl.com/favicon.ico",
+      "server": {
+        "name": "spicrawl",
+        "transport": "http",
+        "url": "https://mcp.spicrawl.com/mcp",
+        "auth": [
+          {
+            "id": "spicrawl-key",
+            "kind": "key",
+            "label": "API key",
+            "fields": [
+              {
+                "id": "token",
+                "label": "API key",
+                "header": "Authorization",
+                "prefix": "Bearer ",
+                "hint": "Create a key at https://app.spicrawl.com"
+              }
+            ],
+            "docsUrl": "https://docs.spicrawl.com/agents/mcp",
+            "docsLabel": "Get a key"
+          }
+        ]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://spicrawl.com",
+  "privacyPolicyUrl": "https://spicrawl.com/privacy",
+  "termsUrl": "https://spicrawl.com/terms"
+}
