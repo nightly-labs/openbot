@@ -45,7 +45,7 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
     mobileAnalytics.setEnabled(false);
   }
   try {
-    await savePreference(enabled);
+    await savePreference(enabled, await keepsOff());
     mobileAnalytics.setEnabled(enabled);
     useAnalyticsPreference.setState({ enabled });
     await SecureStore.setItemAsync(accountPendingKey, JSON.stringify({ enabled, at: Date.now() }));
@@ -56,7 +56,8 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
 
 /**
  * True when this phone keeps an "off" that it saved before the account kept answers. An account
- * answer of "on" does not replace it; only a choice on this phone does.
+ * answer of "on" does not replace it; only a choice on this phone does. A keychain that cannot be
+ * read keeps "off".
  */
 async function keepsOff(): Promise<boolean> {
   try {
@@ -64,14 +65,17 @@ async function keepsOff(): Promise<boolean> {
       (await SecureStore.getItemAsync(key)) === "false" && (await SecureStore.getItemAsync(keepOffKey)) !== "false"
     );
   } catch {
-    return false;
+    return true;
   }
 }
 
-/** A kept "off" stays kept until this phone turns analytics on. */
-async function savePreference(enabled: boolean): Promise<void> {
-  await SecureStore.setItemAsync(keepOffKey, String(!enabled && (await keepsOff())));
+/**
+ * `keepOff` is the mark before this write: a kept "off" stays kept until this phone turns analytics
+ * on. The value goes first: when the mark write fails, an "off" without its mark reads as kept.
+ */
+async function savePreference(enabled: boolean, keepOff: boolean): Promise<void> {
   await SecureStore.setItemAsync(key, String(enabled));
+  await SecureStore.setItemAsync(keepOffKey, String(!enabled && keepOff));
 }
 
 /** Sends a choice to the account with its age in ms, and returns the account's answer. */
@@ -90,8 +94,11 @@ async function readUnsentChoice(): Promise<{ enabled: boolean; at: number } | nu
 
 async function followAnswer(answer: boolean): Promise<void> {
   const state = useAnalyticsPreference.getState();
-  if (state.saving || answer === state.enabled || (answer && (await keepsOff()))) return;
-  await savePreference(answer);
+  if (state.saving || answer === state.enabled) return;
+  const keepOff = await keepsOff();
+  // A choice that the user made during the read comes first.
+  if ((answer && keepOff) || useAnalyticsPreference.getState().saving) return;
+  await savePreference(answer, keepOff);
   mobileAnalytics.setEnabled(answer);
   useAnalyticsPreference.setState({ enabled: answer });
 }

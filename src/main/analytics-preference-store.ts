@@ -64,23 +64,24 @@ export const saveAnalyticsDefault = Effect.fn("saveAnalyticsDefault")(function* 
   const saved = yield* readPreferenceFile(path, () => true).pipe(
     Effect.catch((failure) => Effect.succeed(!isMissingFileError(failure.cause))),
   );
-  if (!saved) yield* writeAnalyticsPreference(path, setupCompleted);
+  if (!saved) yield* writeAnalyticsPreference(path, setupCompleted, false);
 });
 
 /**
- * `unsentAt` marks a choice of the user that the account has not received. A kept "off" stays kept
- * until this computer turns analytics on. An older app reads only `version` and `enabled`, so the
- * extra fields are safe after a downgrade.
+ * `keepOff` is the mark of the answer before this write: a kept "off" stays kept until this computer
+ * turns analytics on. `unsentAt` marks a choice of the user that the account has not received. An
+ * older app reads only `version` and `enabled`, so the extra fields are safe after a downgrade.
  */
 export function writeAnalyticsPreference(
   path: string,
   enabled: boolean,
+  keepOff: boolean,
   unsentAt: number | null = null,
 ): Effect.Effect<AnalyticsPreference, PreferenceFileFailure> {
-  return Effect.gen(function* () {
-    const keepOff =
-      !enabled && (yield* readSavedAnalyticsPreference(path).pipe(Effect.orElseSucceed(() => null)))?.keepOff === true;
-    yield* writePreferenceFile(path, { version: 1, enabled, keepOff, ...(unsentAt === null ? {} : { unsentAt }) });
-    return { enabled };
-  });
+  return writePreferenceFile(path, {
+    version: 1,
+    enabled,
+    keepOff: !enabled && keepOff,
+    ...(unsentAt === null ? {} : { unsentAt }),
+  }).pipe(Effect.as({ enabled }));
 }

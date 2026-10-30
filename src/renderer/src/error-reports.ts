@@ -124,13 +124,14 @@ export function configureWebReports(user: Pick<CentralAuthUser, "id" | "email"> 
 
 /**
  * True when this browser keeps an "off" that it saved before the account kept answers. An account
- * answer of "on" does not replace it; only a choice in this browser does.
+ * answer of "on" does not replace it; only a choice in this browser does. Storage that cannot be
+ * read keeps "off".
  */
 export function webKeepsOff(): boolean {
   try {
     return localStorage.getItem(WEB_PREFERENCE) === "false" && localStorage.getItem(WEB_KEEP_OFF) !== "false";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -139,9 +140,11 @@ export function setWebReportsEnabled(value: boolean): boolean {
   if (!value) configureErrorReports(false);
   webChoice = value;
   try {
-    // A kept "off" stays kept until this browser turns analytics on.
-    localStorage.setItem(WEB_KEEP_OFF, String(!value && webKeepsOff()));
+    // A kept "off" stays kept until this browser turns analytics on. The value goes first: when the
+    // mark write fails, an "off" without its mark reads as kept.
+    const keepOff = !value && webKeepsOff();
     localStorage.setItem(WEB_PREFERENCE, String(value));
+    localStorage.setItem(WEB_KEEP_OFF, String(keepOff));
     configureErrorReports(value);
   } catch {
     configureErrorReports(false);

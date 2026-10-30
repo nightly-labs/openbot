@@ -241,8 +241,9 @@ A default that the user did not change is not sent. After sign-in on another dev
 follows the account's answer. A device that saved "off" before the account kept answers stays off
 when the account's answer is "on"; only a change on that device turns it on. A choice made while
 the device was offline or signed out goes to the account at the next sign-in, start or profile
-refresh; the account keeps it only if it has no newer answer from another device. Disabling it drops pending mobile events; it does not remove previously
-received events or retract an in-flight request. There is no persistent offline analytics queue.
+refresh; the account keeps it only if it has no newer answer from another device. Disabling it
+drops pending mobile events; it does not remove previously received events or retract an in-flight
+request. There is no persistent offline analytics queue.
 When a user turns product analytics off on desktop, web or mobile, the app first sends one event
 that says analytics was turned off, then stops. Turning it on again sends nothing.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the

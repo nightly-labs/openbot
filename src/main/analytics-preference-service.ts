@@ -70,7 +70,11 @@ export class AnalyticsPreferenceService {
     chosen: boolean,
   ) {
     const preference = yield* this.#writes.withPermit(
-      writeAnalyticsPreference(this.#path, enabled, chosen ? Date.now() : null).pipe(
+      readSavedAnalyticsPreference(this.#path).pipe(
+        // A choice is always saved. When the earlier answer cannot be read, an "off" stays kept.
+        Effect.map((saved) => saved?.keepOff ?? false),
+        Effect.orElseSucceed(() => true),
+        Effect.flatMap((keepOff) => writeAnalyticsPreference(this.#path, enabled, keepOff, chosen ? Date.now() : null)),
         Effect.tap((saved) => Effect.sync(() => this.#setTrackingEnabled(saved.enabled))),
         Effect.uninterruptible,
       ),
@@ -99,7 +103,7 @@ export class AnalyticsPreferenceService {
         const saved = yield* readSavedAnalyticsPreference(this.#path);
         if (saved?.unsentAt != null) return true;
         if (account === null || account === saved?.enabled || (account && saved?.keepOff)) return false;
-        yield* writeAnalyticsPreference(this.#path, account);
+        yield* writeAnalyticsPreference(this.#path, account, saved?.keepOff ?? false);
         this.#adopt(account);
         return false;
       }),
@@ -149,7 +153,7 @@ export class AnalyticsPreferenceService {
     account: boolean | null,
   ) {
     const answer = saved.keepOff ? saved.enabled : (account ?? saved.enabled);
-    yield* writeAnalyticsPreference(this.#path, answer);
+    yield* writeAnalyticsPreference(this.#path, answer, saved.keepOff);
     if (answer !== saved.enabled) this.#adopt(answer);
   }).bind(this);
 
