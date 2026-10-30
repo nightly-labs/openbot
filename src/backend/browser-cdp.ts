@@ -2106,7 +2106,11 @@ export class BrowserCdpEngine {
       const frames = frameIds(yield* send("Page.getFrameTree", {}, node.sessionId));
       let frameId: string | undefined;
       for (const id of frames) {
-        const contextId = yield* frameAutomationContextId(send, id, node.sessionId);
+        // A frame that detached since the tree was read, or that has no world, is not the target's.
+        const contextId = yield* frameAutomationContextId(send, id, node.sessionId).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        );
+        if (contextId === undefined) continue;
         const own = yield* this.#callOnNode(
           send,
           node.backendNodeId,
