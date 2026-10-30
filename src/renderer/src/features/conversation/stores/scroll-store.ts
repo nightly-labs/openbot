@@ -23,6 +23,7 @@ import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { groupAgentMessageMarkers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
+import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -70,7 +71,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   const [openRoutineRuns, setOpenRoutineRuns] = createSignal<RoutineRunOpenState>(new Map());
   const shownMessages = createMemo(() =>
-    deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
+    summarizeHostedSiteMessages(
+      deps.props.messages.filter((message) => message.kind !== "thinking" && !silentAgentAnswer(message)),
+    ),
   );
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   /* The messages of a routine run follow its row and open and close with it. */
