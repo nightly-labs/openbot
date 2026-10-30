@@ -1706,32 +1706,44 @@ export class BrowserHost {
         const capture = yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
           Effect.gen({ self: this }, function* () {
             if (mode === "always") yield* browserSync(() => this.#requireNoFilledCard(tab, "A snapshot image"));
-            const result = yield* readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked);
-            const recommended = mode === "auto" && result.recommendImage && !tab.filledCard;
-            // A screenshot or snapshot image just before this one shows the same page.
-            const imageCurrent = hasCurrentImage(tab);
-            if (mode !== "always" && (!recommended || imageCurrent)) {
-              if (imageCurrent) passImageOn(tab);
-              if (recommended) {
-                result.snapshot.image = {
-                  included: false,
-                  reason:
-                    "The last image is of this page, and no tool action ran since. Pass image: always if the page can have changed.",
-                  width: result.snapshot.viewport.width,
-                  height: result.snapshot.viewport.height,
-                };
-              }
-              return { result, imageUrl: null };
-            }
-            const image = yield* boundEngineOperation(
+            let imageUrl: string | null = null;
+            // The image comes before delivery: when it fails, the next snapshot still carries the entries.
+            const result = yield* readTabSnapshot(
               tab,
-              tab.engine.screenshot(),
-              10_000,
-              "Browser screenshot timed out.",
+              tab.revision + 1,
               keepQueueBlocked,
+              undefined,
+              undefined,
+              (read) =>
+                Effect.gen(function* () {
+                  const recommended = mode === "auto" && read.recommendImage && !tab.filledCard;
+                  // A screenshot or snapshot image just before this one shows the same page.
+                  const imageCurrent = hasCurrentImage(tab);
+                  if (mode !== "always" && (!recommended || imageCurrent)) {
+                    if (imageCurrent) passImageOn(tab);
+                    if (recommended) {
+                      read.snapshot.image = {
+                        included: false,
+                        reason:
+                          "The last image is of this page, and no tool action ran since. Pass image: always if the page can have changed.",
+                        width: read.snapshot.viewport.width,
+                        height: read.snapshot.viewport.height,
+                      };
+                    }
+                    return;
+                  }
+                  const image = yield* boundEngineOperation(
+                    tab,
+                    tab.engine.screenshot(),
+                    10_000,
+                    "Browser screenshot timed out.",
+                    keepQueueBlocked,
+                  );
+                  markImageTaken(tab);
+                  imageUrl = boundedCaptureDataUrl(image);
+                }),
             );
-            markImageTaken(tab);
-            return { result, imageUrl: boundedCaptureDataUrl(image) };
+            return { result, imageUrl };
           }),
         );
         return this.#snapshotResult(capture.result, mode, capture.imageUrl);

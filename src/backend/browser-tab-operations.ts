@@ -1,6 +1,6 @@
 import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber } from "effect";
-import type { BrowserPageStatus } from "./browser-cdp";
+import type { BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -134,8 +134,11 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
   keepQueueBlocked: KeepQueueBlocked,
   timeoutMs = 10_000,
   timeoutMessage = "Browser snapshot timed out.",
-  /** Throws when the snapshot must not reach the agent. Its entries then stay undelivered. */
-  release?: () => void,
+  /**
+   * The last work before the snapshot reaches the agent, such as a policy check or its image. When it
+   * fails, the agent gets no snapshot, so its entries stay undelivered for the next one.
+   */
+  release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const history = tab.diagnostics.snapshot();
   const result = yield* boundEngineOperation(
@@ -152,7 +155,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
     keepQueueBlocked,
   );
   tab.revision = revision;
-  if (release) yield* browserSync(release);
+  if (release) yield* release(result);
   tab.diagnostics.delivered(history.cursor);
   return result;
 });
@@ -524,7 +527,7 @@ export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
             yield* browserSync(() => remainingTime(deadline, "Browser fill_fields timed out.")),
             "Browser fill_fields timed out.",
             // A card or takeover that appeared during capture must never release that capture.
-            checkPolicy,
+            () => browserSync(checkPolicy),
           );
           tab.diagnostics.action({ action: "fill_fields", outcome: "success" });
           return result(undefined, captured.snapshot);
