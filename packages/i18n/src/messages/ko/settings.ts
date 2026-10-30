@@ -81,6 +81,17 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "모든 에이전트에 {setting} 설정",
   "settings.agentDefaults.agentLabel": "{agent}의 {setting}",
   "settings.agentDefaults.loadFailed": "에이전트를 읽을 수 없어요.",
+  "settings.backgroundProcesses.title": "백그라운드 프로세스",
+  "settings.backgroundProcesses.description":
+    "에이전트가 시작한 뒤 계속 실행 중인 프로그램이에요(예: 개발 서버). 채팅이 끝나도, OpenBot을 종료해도 계속 실행돼요.",
+  "settings.backgroundProcesses.empty": "실행 중인 에이전트 프로그램이 없어요.",
+  "settings.backgroundProcesses.loadFailed": "백그라운드 프로세스를 읽을 수 없어요.",
+  "settings.backgroundProcesses.noAgent": "에이전트 없음",
+  "settings.backgroundProcesses.started": "시작 {time}",
+  "settings.backgroundProcesses.ports": "포트 {ports}",
+  "settings.backgroundProcesses.stop": "중지",
+  "settings.backgroundProcesses.stopLabel": "프로세스 {pid} 중지",
+  "settings.backgroundProcesses.stopFailed": "프로세스를 중지할 수 없어요.",
   "settings.keepRemoteSessions.title": "서버에 빠르게 연결",
   "settings.keepRemoteSessions.description":
     "참여 중인 서버와의 연결을 실행 사이에도 유지해요. OpenBot이 약 1초 더 빨리 시작돼요. OpenBot을 종료해도 OpenBot 서비스가 연결을 닫지 않아요.",

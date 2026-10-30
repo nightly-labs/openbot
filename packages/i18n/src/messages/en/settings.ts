@@ -87,6 +87,17 @@ export const messages = defineMessages("settings", {
   "settings.agentDefaults.setAllLabel": "Set {setting} for all agents",
   "settings.agentDefaults.agentLabel": "{setting} for {agent}",
   "settings.agentDefaults.loadFailed": "The agents could not be read.",
+  "settings.backgroundProcesses.title": "Background processes",
+  "settings.backgroundProcesses.description":
+    "Programs that agents started and left running, such as dev servers. They keep running after the chat ends and after you quit OpenBot.",
+  "settings.backgroundProcesses.empty": "No programs from agents are running.",
+  "settings.backgroundProcesses.loadFailed": "The background processes could not be read.",
+  "settings.backgroundProcesses.noAgent": "No agent",
+  "settings.backgroundProcesses.started": "Started {time}",
+  "settings.backgroundProcesses.ports": "Port {ports}",
+  "settings.backgroundProcesses.stop": "Stop",
+  "settings.backgroundProcesses.stopLabel": "Stop process {pid}",
+  "settings.backgroundProcesses.stopFailed": "The process could not be stopped.",
   "settings.keepRemoteSessions.title": "Fast connection to servers",
   "settings.keepRemoteSessions.description":
     "Keep the connection to your joined servers between launches. OpenBot starts about a second faster. When you quit OpenBot, the OpenBot service does not close the connection.",

@@ -46,6 +46,7 @@ import {
   agentExclusionCoverage,
   agentFolderCoverage,
   agentTaskLimit,
+  type BackgroundProcess,
   type BrowserProfileSummary,
   type BusyMessageModePreference,
   type CentralAuthState,
@@ -400,6 +401,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     options.setupState ?? { completed: true, preferredProvider: "codex", preferredModel: null },
   );
   const grantedComputerUsePermissions = new Set<MacPermissionId>();
+  // A dev server that an agent left running two hours ago, and one with no owner. Stop removes it.
+  let backgroundProcesses: BackgroundProcess[] = [
+    {
+      id: "48210:1",
+      pid: 48210,
+      command: "node /mock/OpenBot/Agents/research/site/node_modules/.bin/vite --port 5173",
+      startedAt: Date.now() - 2 * 60 * 60_000,
+      ports: [5173],
+      agentId: "research",
+    },
+    {
+      id: "51377:1",
+      pid: 51377,
+      command: "python3 -m http.server 8000",
+      startedAt: Date.now() - 3 * 24 * 60 * 60_000,
+      ports: [8000],
+      agentId: null,
+    },
+  ];
   const computerUseState = (): ComputerUseState => {
     const permissions = (["screen-recording", "accessibility"] as const).map((id) => ({
       id,
@@ -1170,6 +1190,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // The preview has no Apple apps to ask, so every app answers as allowed.
     macAutomation: {
       request: async (targets) => targets.map((target) => ({ target, status: "granted" })),
+    },
+    backgroundProcesses: {
+      list: async () => clone(backgroundProcesses),
+      stop: async (id) => {
+        backgroundProcesses = backgroundProcesses.filter((process) => process.id !== id);
+      },
     },
     computerUse: {
       getState: async () => computerUseState(),

@@ -137,6 +137,7 @@ import type {
   AnalyticsPreference,
   AppInfo,
   AppSetupState,
+  BackgroundProcess,
   CentralAuthState,
   ChatWindowTarget,
   ComputerUseHighlightPlacement,
@@ -900,6 +901,12 @@ export const IPC_ENDPOINTS = {
   macAutomation: {
     /** Sends one harmless Apple Event to each app, so macOS shows its Automation prompts now. */
     request: request<readonly MacAutomationTarget[], MacAutomationResult[]>()("mac-automation:request"),
+  },
+  // The programs that agents left running on this computer. `list` answers null where OpenBot cannot
+  // find them (Windows). `stop` takes the id of one, and ends it with its children.
+  backgroundProcesses: {
+    list: request<undefined, BackgroundProcess[] | null>()("background-processes:list"),
+    stop: request<string, void>()("background-processes:stop"),
   },
   skills: {
     localList: request<undefined, MarketplaceSkillDetail[]>()("skills:local-list"),
@@ -1839,6 +1846,7 @@ export const IPC_GROUP_PATHS = {
   browserDock: "browserDock",
   computerUse: "computerUse",
   macAutomation: "macAutomation",
+  backgroundProcesses: "backgroundProcesses",
   skills: "skills",
   customProviders: "customProviders",
   providerDetection: "providerDetection",

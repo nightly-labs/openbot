@@ -83,6 +83,17 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "为所有助手设置{setting}",
   "settings.agentDefaults.agentLabel": "{agent}的{setting}",
   "settings.agentDefaults.loadFailed": "无法读取助手。",
+  "settings.backgroundProcesses.title": "后台进程",
+  "settings.backgroundProcesses.description":
+    "助手启动后仍在运行的程序，例如开发服务器。聊天结束后、退出 OpenBot 后，它们仍会继续运行。",
+  "settings.backgroundProcesses.empty": "没有正在运行的助手程序。",
+  "settings.backgroundProcesses.loadFailed": "无法读取后台进程。",
+  "settings.backgroundProcesses.noAgent": "无助手",
+  "settings.backgroundProcesses.started": "启动于 {time}",
+  "settings.backgroundProcesses.ports": "端口 {ports}",
+  "settings.backgroundProcesses.stop": "停止",
+  "settings.backgroundProcesses.stopLabel": "停止进程 {pid}",
+  "settings.backgroundProcesses.stopFailed": "无法停止该进程。",
   "settings.keepRemoteSessions.title": "快速连接服务器",
   "settings.keepRemoteSessions.description":
     "在两次启动之间保持与已加入服务器的连接，OpenBot 启动约快一秒。退出 OpenBot 时，OpenBot 服务不会关闭该连接。",

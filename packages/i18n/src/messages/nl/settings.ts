@@ -82,6 +82,17 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Stel {setting} in voor alle agents",
   "settings.agentDefaults.agentLabel": "{setting} voor {agent}",
   "settings.agentDefaults.loadFailed": "De agents konden niet worden gelezen.",
+  "settings.backgroundProcesses.title": "Achtergrondprocessen",
+  "settings.backgroundProcesses.description":
+    "Programma's die agents hebben gestart en laten draaien, zoals dev-servers. Ze blijven draaien als de chat eindigt en als je OpenBot afsluit.",
+  "settings.backgroundProcesses.empty": "Er draaien geen programma's van agents.",
+  "settings.backgroundProcesses.loadFailed": "De achtergrondprocessen konden niet worden gelezen.",
+  "settings.backgroundProcesses.noAgent": "Geen agent",
+  "settings.backgroundProcesses.started": "Gestart {time}",
+  "settings.backgroundProcesses.ports": "Poort {ports}",
+  "settings.backgroundProcesses.stop": "Stoppen",
+  "settings.backgroundProcesses.stopLabel": "Proces {pid} stoppen",
+  "settings.backgroundProcesses.stopFailed": "Het proces kon niet worden gestopt.",
   "settings.keepRemoteSessions.title": "Snelle verbinding met servers",
   "settings.keepRemoteSessions.description":
     "Houd de verbinding met de servers waaraan je deelneemt tussen starts open. OpenBot start dan ongeveer een seconde sneller. Als je OpenBot afsluit, sluit de OpenBot-service de verbinding niet.",

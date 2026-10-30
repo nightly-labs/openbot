@@ -1,6 +1,8 @@
 import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
+import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
+import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -262,6 +264,37 @@ export const MAC_AUTOMATION_STATUSES = ["granted", "denied", "failed"] as const;
 export interface MacAutomationResult {
   target: MacAutomationTarget;
   status: (typeof MAC_AUTOMATION_STATUSES)[number];
+}
+
+/**
+ * A program that an agent started and left running after its tool call, such as a dev server that
+ * `nohup ... &` started. The system adopted it, so no provider process of OpenBot holds it now.
+ */
+export interface BackgroundProcess {
+  /** The pid and the start time: a pid is reused. Stop takes it. */
+  id: string;
+  pid: number;
+  /** The command line with secrets redacted. */
+  command: string;
+  /** Milliseconds since the epoch. */
+  startedAt: number;
+  /** The TCP ports that the process or its children listen on. */
+  ports: number[];
+  /** The agent whose workspace holds the working folder of the process, or null when none does. */
+  agentId: string | null;
+}
+
+export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    integerInRange(value.pid, 1, Number.MAX_SAFE_INTEGER) &&
+    isString(value.command) &&
+    isFiniteNumber(value.startedAt) &&
+    Array.isArray(value.ports) &&
+    value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
+    (value.agentId === null || isIdentifier(value.agentId))
+  );
 }
 
 /**
