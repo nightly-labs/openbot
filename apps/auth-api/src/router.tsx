@@ -4,8 +4,9 @@ import { routeTree } from "./routeTree.gen";
 const CHUNK_RELOAD_KEY = "openbot:chunk-reload-at";
 const CHUNK_RELOAD_WINDOW_MS = 10_000;
 
-// A deploy removes the previous build's chunks. Reload once to get the new build; if the chunk is
-// still missing after that reload, let the error page show instead of looping.
+// A deploy keeps the chunks of earlier builds for 24 hours (scripts/keep-previous-assets.ts). After that,
+// or when a copy failed, a chunk is missing. Reload once to get the new build; if the chunk is still
+// missing after that reload, let the error page show instead of looping.
 if (typeof window !== "undefined") {
   window.addEventListener("vite:preloadError", (event) => {
     try {

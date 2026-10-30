@@ -24,8 +24,8 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
 export const REMOTE_RETRY_INTERVAL_MS = 2_000;
 export const REMOTE_RETRY_LIMIT = 5;
 /**
- * The wait after `REMOTE_RETRY_LIMIT` failed attempts, and between the attempts after them. A server that
- * comes back is found within this time, without a manual reconnect (issue #4087).
+ * The wait after `REMOTE_RETRY_LIMIT` failed attempts. Then the attempts start again from the first wait.
+ * A server that comes back is found within this time, without a manual reconnect (issue #4087).
  */
 export const REMOTE_RETRY_COOLDOWN_MS = 30_000;
 /** Up to this fraction of a wait is added at random, so phones that lost the same service do not retry together. */
@@ -363,7 +363,7 @@ export function createRemoteConnectionRecovery(
     /**
      * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
      * the same thing. Stops the loop rather than joining it -- `offline` would schedule five
-     * attempts and then one every 30 seconds, for as long as the app is open.
+     * attempts, a wait of 30 seconds and five attempts again, for as long as the app is open.
      * Reversible: `refresh`, returning to the foreground, and switching servers each clear it.
      */
     suspend(error?: unknown) {

@@ -96,12 +96,12 @@ async function main(): Promise<void> {
   const site = await serveSite();
   try {
     // 1. No history on the site.
-    const first = await build(join(work, "first"), { "index-a.js": "a", "shared.js": "shared" });
+    const first = await build(join(work, "first"), { "index-a.js": "a", "pkg@1~a.js": "pkg", "shared.js": "shared" });
     const one = await deploy(site.origin, first);
     report.deploys.push({ name: "first", ...one });
     assert.equal(one.result.historyFound, false);
     assert.equal(one.result.kept, 0);
-    assert.deepEqual(one.history.files, { "index-a.js": null, "shared.js": null });
+    assert.deepEqual(one.history.files, { "index-a.js": null, "pkg@1~a.js": null, "shared.js": null });
 
     // 2. The first deploy is live. Its history also names files that must not be kept.
     const now = Date.now();
@@ -127,12 +127,13 @@ async function main(): Promise<void> {
     assert.equal(two.result.historyFound, true);
     assert.deepEqual(
       { kept: two.result.kept, missing: two.result.missing, failed: two.result.failed, expired: two.result.expired },
-      { kept: 1, missing: 1, failed: 1, expired: 1 },
+      { kept: 2, missing: 1, failed: 1, expired: 1 },
     );
     assert.equal(await readFile(join(second, "assets", "index-a.js"), "utf8"), "a");
+    assert.equal(await readFile(join(second, "assets", "pkg@1~a.js"), "utf8"), "pkg");
     assert.equal(existsSync(join(second, "assets", "stale.js")), false);
     assert.equal(existsSync(join(second, "assets", "page.js")), false);
-    assert.deepEqual(Object.keys(two.history.files).sort(), ["index-a.js", "index-b.js", "shared.js"]);
+    assert.deepEqual(Object.keys(two.history.files).sort(), ["index-a.js", "index-b.js", "pkg@1~a.js", "shared.js"]);
     const retiredA = two.history.files["index-a.js"];
     assert.ok(typeof retiredA === "number" && retiredA >= before, "The first build stops being live now.");
     assert.equal(two.history.files["shared.js"], null);
@@ -142,7 +143,7 @@ async function main(): Promise<void> {
     const third = await build(join(work, "third"), { "index-c.js": "c", "shared.js": "shared" });
     const three = await deploy(site.origin, third);
     report.deploys.push({ name: "third", ...three });
-    assert.equal(three.result.kept, 2);
+    assert.equal(three.result.kept, 3);
     assert.equal(await readFile(join(third, "assets", "index-a.js"), "utf8"), "a");
     assert.equal(await readFile(join(third, "assets", "index-b.js"), "utf8"), "b");
     assert.equal(three.history.files["index-a.js"], retiredA, "A kept file keeps its time.");

@@ -21,8 +21,10 @@ const RETENTION_MS = 24 * 60 * 60 * 1000;
 /** A Workers static asset version holds at most 20,000 files. One build has about 850. */
 const MAX_KEPT_FILES = 10_000;
 const DOWNLOAD_CONCURRENCY = 16;
-/** Vite writes flat names with a content hash. Any other name cannot be a path under /assets/. */
-const ASSET_NAME = /^[\w-][\w.-]*$/u;
+/** A stalled request must not hold the deploy until the job times out. */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** Vite writes flat names. A name with a separator, or a dot name, is not a file under /assets/. */
+const ASSET_NAME = /^[^./\\][^/\\]*$/u;
 
 const AssetHistory = Schema.Struct({
   version: Schema.Literal(1),
@@ -51,8 +53,9 @@ async function keepPreviousAssets(options: { origin: string; clientDir: string }
   const retired: [name: string, retiredAt: number][] = [];
   for (const [name, retiredAt] of Object.entries(history?.files ?? {})) {
     if (built.has(name) || !ASSET_NAME.test(name)) continue;
-    // A file that a live build had stops being live with this deploy.
-    retired.push([name, retiredAt ?? now]);
+    // A file that a live build had stops being live with this deploy. A time after now comes from a
+    // computer with a fast clock, and would keep the file for longer than `RETENTION_MS`.
+    retired.push([name, Math.min(retiredAt ?? now, now)]);
   }
   retired.sort((a, b) => b[1] - a[1]);
   const candidates = retired.filter(([, retiredAt]) => now - retiredAt <= RETENTION_MS).slice(0, MAX_KEPT_FILES);
@@ -95,19 +98,19 @@ async function readLiveHistory(origin: string, now: number): Promise<AssetHistor
   const url = new URL(`/${ASSET_HISTORY_FILE}?deploy=${now}`, origin);
   let response: Response;
   try {
-    response = await fetch(url, { cache: "no-store" });
+    response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (error) {
-    logger.warn("The live asset history could not be read. Only this build's files are deployed.", toLogValue(error));
+    warn("The live asset history could not be read. Only this build's files are deployed.", error);
     return null;
   }
   if (response.status === 404) return null;
   if (!response.ok) {
-    logger.warn(`The live asset history answered ${response.status}. Only this build's files are deployed.`);
+    warn(`The live asset history answered ${response.status}. Only this build's files are deployed.`);
     return null;
   }
   const decoded = Schema.decodeUnknownOption(AssetHistory)(await response.json().catch(() => undefined));
   if (Option.isNone(decoded)) {
-    logger.warn("The live asset history is not readable. Only this build's files are deployed.");
+    warn("The live asset history is not readable. Only this build's files are deployed.");
     return null;
   }
   return decoded.value;
@@ -115,7 +118,9 @@ async function readLiveHistory(origin: string, now: number): Promise<AssetHistor
 
 async function downloadAsset(origin: string, name: string): Promise<Uint8Array | "missing" | "failed"> {
   try {
-    const response = await fetch(new URL(`/assets/${name}`, origin));
+    const response = await fetch(new URL(`/assets/${encodeURIComponent(name)}`, origin), {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     if (response.status === 404) return "missing";
     // A page in place of a code file is the Worker's answer for a path with no file.
     if (!response.ok || response.headers.get("content-type")?.startsWith("text/html")) return "failed";
@@ -123,6 +128,15 @@ async function downloadAsset(origin: string, name: string): Promise<Uint8Array |
   } catch {
     return "failed";
   }
+}
+
+/**
+ * Fewer kept files do not stop the deploy: a tab that needs a missing file reloads, as before this
+ * script. In CI, the warning also shows on the run, so a failure that repeats is seen.
+ */
+function warn(message: string, error?: unknown): void {
+  logger.warn(message, ...(error === undefined ? [] : [toLogValue(error)]));
+  if (process.env.GITHUB_ACTIONS === "true") process.stdout.write(`::warning title=Earlier code files::${message}\n`);
 }
 
 function argument(name: string): string | undefined {
@@ -136,6 +150,6 @@ if (!existsSync(join(clientDir, "assets"))) {
   process.exit(1);
 }
 const result = await keepPreviousAssets({ origin: argument("origin") ?? PRODUCTION_ORIGIN, clientDir });
-// The end-to-end test reads this line.
+if (result.failed > 0) warn(`${result.failed} code files of earlier builds could not be downloaded.`);
+// The end-to-end test reads the last line.
 process.stdout.write(`${JSON.stringify(result)}\n`);
-if (result.failed > 0) logger.warn(`${result.failed} code files of earlier builds could not be downloaded.`);
