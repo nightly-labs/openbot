@@ -46,7 +46,7 @@ export const messages = {
   "provider.status.checking": "Sprawdzanie",
   "provider.status.off": "Wyłączony",
   "provider.gemini.hostSignIn":
-    "Aby połączyć Gemini, otwórz OpenBot na hoście i wybierz „Połącz” w sekcji Ustawienia > Dostawcy. Logowanie Google wymaga przeglądarki na tym hoście. Zdalne logowanie nie jest obsługiwane.",
+    "Aby połączyć Gemini, otwórz OpenBot na hoście i wybierz „Połącz” w sekcji Ustawienia serwera > Dostawcy. Logowanie Google wymaga przeglądarki na tym hoście. Zdalne logowanie nie jest obsługiwane.",
 
   "provider.key.free": "Darmowy",
 

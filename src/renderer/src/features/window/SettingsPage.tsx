@@ -1,15 +1,23 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Input, Search } from "@openbot/ui";
+import { Button, Input, Search, Server } from "@openbot/ui";
 import { createSignal, For, flush, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
+import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
+import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { navItem, type SettingsTab } from "../settings/settings-tabs";
 import { ServerSettingsPageTitle, SettingsPageFrame } from "./SettingsPageFrame";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
+type PersonalRow = { tab: SettingsTab; titleKey: AppTextKey; descriptionKey: AppTextKey };
+
+/** A section of the active server's settings. A user looks for providers in the user settings too. */
+type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey: AppTextKey };
+
 /** The row titles of each personal tab, in page order, with the description that the search also reads. */
-const SEARCH_ROWS: { tab: SettingsTab; titleKey: AppTextKey; descriptionKey: AppTextKey }[] = [
+const SEARCH_ROWS: PersonalRow[] = [
   { tab: "general", titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
   { tab: "general", titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
   { tab: "general", titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
@@ -56,13 +64,25 @@ const SEARCH_ROWS: { tab: SettingsTab; titleKey: AppTextKey; descriptionKey: App
   },
 ];
 
+const PROVIDERS_ROW: ServerRow = {
+  section: "providers",
+  titleKey: "server.settings.providersTitle",
+  descriptionKey: "server.settings.providersDescription",
+};
+
+const IMPORT_ROW: ServerRow = {
+  section: "import",
+  titleKey: "server.settings.importTitle",
+  descriptionKey: "server.settings.importDescription",
+};
+
 /** A broad query shows a short list, not every row. */
 const SEARCH_LIMIT = 12;
 
-type SearchRow = (typeof SEARCH_ROWS)[number];
+type SearchRow = PersonalRow | ServerRow;
 
 /** The rows whose title or description holds the query. A title match comes first. */
-function rankRows(query: string, text: (key: AppTextKey) => string): SearchRow[] {
+function rankRows(query: string, rows: SearchRow[], text: (key: AppTextKey) => string): SearchRow[] {
   const needle = query.toLocaleLowerCase();
   const score = (row: SearchRow) => {
     const title = text(row.titleKey).toLocaleLowerCase();
@@ -70,7 +90,8 @@ function rankRows(query: string, text: (key: AppTextKey) => string): SearchRow[]
     if (title.includes(needle)) return 1;
     return text(row.descriptionKey).toLocaleLowerCase().includes(needle) ? 2 : 3;
   };
-  return SEARCH_ROWS.map((row) => ({ row, rank: score(row) }))
+  return rows
+    .map((row) => ({ row, rank: score(row) }))
     .filter((entry) => entry.rank < 3)
     .sort((a, b) => a.rank - b.rank)
     .slice(0, SEARCH_LIMIT)
@@ -87,8 +108,19 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   const windowPage = useWindowPage();
   const settings = useSettings();
   const serverSettings = useServerSettings();
+  const { activeServer } = useServers();
   const [query, setQuery] = createSignal("");
-  const results = () => (query().trim() ? rankRows(query().trim(), (key) => i18n.t(key)) : null);
+  /** The personal rows, then the sections that the settings of the active server show. */
+  const searchRows = (): SearchRow[] => {
+    const server = activeServer();
+    if (!server) return SEARCH_ROWS;
+    return [
+      ...SEARCH_ROWS,
+      ...(activeServerHasProviderSettings(server) ? [PROVIDERS_ROW] : []),
+      ...(serverSupportsCapability(server, "agent-import-v1") ? [IMPORT_ROW] : []),
+    ];
+  };
+  const results = () => (query().trim() ? rankRows(query().trim(), searchRows(), (key) => i18n.t(key)) : null);
   /** What a screen reader hears while the user types a query. */
   const resultStatus = () => {
     const rows = results();
@@ -99,9 +131,17 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   };
   let content: HTMLElement | undefined;
 
-  /** Opens the tab of the row, then scrolls to the row, marks it and puts the focus on its control. */
+  /**
+   * Opens the tab of the row, then scrolls to the row, marks it and puts the focus on its control. A
+   * server row opens that section of the active server's settings.
+   */
   const openResult = (row: SearchRow) => {
     setQuery("");
+    if ("section" in row) {
+      const server = activeServer();
+      if (server) serverSettings.openServerSettings(server.id, null, row.section);
+      return;
+    }
     // The modal applies a tab when the requested tab changes, so clear it first: a repeated tab opens again.
     settings.openAppSettings(null, undefined);
     flush();
@@ -179,8 +219,10 @@ export function SettingsPage(props: { kind: SettingsKind }) {
               <ul class="settings-page-results" aria-label={i18n.t("app.settingsPage.results")}>
                 <For each={rows()}>
                   {(row) => {
-                    const tab = navItem(row.tab);
-                    const TabIcon = tab.icon;
+                    // A server row names the server, as the server rows of the command palette do.
+                    const PlaceIcon = "section" in row ? Server : navItem(row.tab).icon;
+                    const place = () =>
+                      "section" in row ? (activeServer()?.name ?? "") : i18n.t(navItem(row.tab).titleKey);
                     return (
                       <li>
                         <Button
@@ -190,8 +232,8 @@ export function SettingsPage(props: { kind: SettingsKind }) {
                           onClick={() => openResult(row)}
                         >
                           <span class="settings-page-result-section">
-                            <TabIcon aria-hidden="true" />
-                            {i18n.t(tab.titleKey)}
+                            <PlaceIcon aria-hidden="true" />
+                            {place()}
                           </span>
                           <span class="settings-page-result-title">{i18n.t(row.titleKey)}</span>
                         </Button>

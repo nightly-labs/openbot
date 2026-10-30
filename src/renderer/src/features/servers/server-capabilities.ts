@@ -179,6 +179,14 @@ export function remoteAdminServer(
 }
 
 /**
+ * Whether the settings of the active server show Providers: this computer, or a joined host that the
+ * account administers with `providers-v1`. `providerSettings` in `WorkspaceOverlays.tsx` has the same rule.
+ */
+export function activeServerHasProviderSettings(server: ServerSummary): boolean {
+  return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
+}
+
+/**
  * Which side of a connection runs the older OpenBot release, so a version notice can say what to
  * update. Only the release numbers count. `null` when they are equal or one does not parse.
  */

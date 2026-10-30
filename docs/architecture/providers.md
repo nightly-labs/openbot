@@ -310,7 +310,7 @@ callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session 
 VM. A browser on another computer cannot complete this loopback callback. A server with no
 desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
 
-The local Settings > Providers screen offers Connect for both a managed runtime and an
+The local Server settings > Providers screen offers Connect for both a managed runtime and an
 external runtime. Gemini has no device-code flow, so a remote host signs it in on a page in its
 own browser. A Linux host advertises `provider-host-sign-in-v1` (Team API v7 only). Connect sends
 `start` to the host. The host runs the same sign-in as its own Connect, and opens the Google link
