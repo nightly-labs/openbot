@@ -355,7 +355,7 @@ it to a tester group. Upload is manual; the command does not run EAS Submit.
 
 The `Release iOS to TestFlight` workflow builds the selected `main` commit on a GitHub-hosted
 `macos-26` runner with Xcode 26.6. Expo SDK 58 requires Xcode 26.4 or newer; the desktop release's
-`macos-14` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
+`macos-15` runner is not suitable. EAS CLI 24.1.2 runs with `--local --non-interactive`, so compilation
 uses GitHub Actions compute. Fastlane uploads directly to Apple without EAS Submit.
 
 One-time setup:
