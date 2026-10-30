@@ -1,3 +1,3 @@
 ### Changed
 
-- Text blocks in chat, such as an email draft in a `text` block, now wrap long lines. Before, you scrolled sideways to read each paragraph. Code blocks still scroll.
+- Code blocks in chat now wrap long lines, so you can read an email draft or a long command without scrolling sideways. Line breaks and Copy do not change.
