@@ -26,6 +26,8 @@ export interface ConversationTraceStep {
   endedAt: string | null;
   /** Set when the provider reported the item as failed or declined. */
   failed?: true | undefined;
+  /** On a failed tool step: the provider's error text, with known secrets removed. */
+  error?: string | undefined;
 }
 
 export interface ConversationTurnTrace {
@@ -41,6 +43,8 @@ export interface ConversationTurnTrace {
 
 export const CONVERSATION_TRACE_STEP_LIMIT = 500;
 export const CONVERSATION_TRACE_TEXT_LIMIT = 500;
+/** The most text kept from one failed tool step. The steps list shows it collapsed. */
+export const TOOL_FAILURE_TEXT_LIMIT = 2_000;
 const TIME_LIMIT = 160;
 
 export function isConversationTurnTrace(value: unknown): value is ConversationTurnTrace {
@@ -69,7 +73,8 @@ function isConversationTraceStep(value: unknown): value is ConversationTraceStep
         value.recipientAgentIds.every(isIdentifier))) &&
     isBoundedString(value.startedAt, TIME_LIMIT) &&
     isNullableBoundedString(value.endedAt, TIME_LIMIT) &&
-    (value.failed === undefined || value.failed === true)
+    (value.failed === undefined || value.failed === true) &&
+    (value.error === undefined || isBoundedString(value.error, TOOL_FAILURE_TEXT_LIMIT))
   );
 }
 
