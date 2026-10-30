@@ -72,7 +72,7 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "バックグラウンドプロセスを読み込めませんでした。",
   "settings.backgroundProcesses.noAgent": "エージェントなし",
   "settings.backgroundProcesses.started": "開始 {time}",
-  "settings.backgroundProcesses.ports": "ポート {ports}",
+  "settings.backgroundProcesses.ports": { other: "ポート {ports}" },
   "settings.backgroundProcesses.stop": "停止",
   "settings.backgroundProcesses.stopLabel": "プロセス {pid} を停止",
   "settings.backgroundProcesses.stopFailed": "プロセスを停止できませんでした。",

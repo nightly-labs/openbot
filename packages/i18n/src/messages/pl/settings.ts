@@ -73,7 +73,12 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "Nie udało się odczytać procesów w tle.",
   "settings.backgroundProcesses.noAgent": "Brak agenta",
   "settings.backgroundProcesses.started": "Uruchomiono {time}",
-  "settings.backgroundProcesses.ports": "Port {ports}",
+  "settings.backgroundProcesses.ports": {
+    one: "Port {ports}",
+    few: "Porty {ports}",
+    many: "Porty {ports}",
+    other: "Porty {ports}",
+  },
   "settings.backgroundProcesses.stop": "Zatrzymaj",
   "settings.backgroundProcesses.stopLabel": "Zatrzymaj proces {pid}",
   "settings.backgroundProcesses.stopFailed": "Nie udało się zatrzymać procesu.",

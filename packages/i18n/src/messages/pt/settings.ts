@@ -74,7 +74,7 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "Não foi possível ler os processos em segundo plano.",
   "settings.backgroundProcesses.noAgent": "Nenhum agente",
   "settings.backgroundProcesses.started": "Iniciado {time}",
-  "settings.backgroundProcesses.ports": "Porta {ports}",
+  "settings.backgroundProcesses.ports": { one: "Porta {ports}", other: "Portas {ports}" },
   "settings.backgroundProcesses.stop": "Parar",
   "settings.backgroundProcesses.stopLabel": "Parar o processo {pid}",
   "settings.backgroundProcesses.stopFailed": "Não foi possível parar o processo.",

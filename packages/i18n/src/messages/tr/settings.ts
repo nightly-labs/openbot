@@ -73,7 +73,7 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "Arka plan işlemleri okunamadı.",
   "settings.backgroundProcesses.noAgent": "Ajan yok",
   "settings.backgroundProcesses.started": "Başlatıldı: {time}",
-  "settings.backgroundProcesses.ports": "Bağlantı noktası {ports}",
+  "settings.backgroundProcesses.ports": { one: "Bağlantı noktası {ports}", other: "Bağlantı noktaları {ports}" },
   "settings.backgroundProcesses.stop": "Durdur",
   "settings.backgroundProcesses.stopLabel": "{pid} işlemini durdur",
   "settings.backgroundProcesses.stopFailed": "İşlem durdurulamadı.",

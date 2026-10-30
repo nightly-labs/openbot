@@ -88,7 +88,7 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "백그라운드 프로세스를 읽을 수 없어요.",
   "settings.backgroundProcesses.noAgent": "에이전트 없음",
   "settings.backgroundProcesses.started": "시작 {time}",
-  "settings.backgroundProcesses.ports": "포트 {ports}",
+  "settings.backgroundProcesses.ports": { other: "포트 {ports}" },
   "settings.backgroundProcesses.stop": "중지",
   "settings.backgroundProcesses.stopLabel": "프로세스 {pid} 중지",
   "settings.backgroundProcesses.stopFailed": "프로세스를 중지할 수 없어요.",

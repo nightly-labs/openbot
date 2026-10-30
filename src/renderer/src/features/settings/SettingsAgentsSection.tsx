@@ -23,7 +23,7 @@ interface AgentsSectionState {
   agents: AgentDefaultsAgent[];
   loadFailed: boolean;
   setting: AgentDefaultSetting | null;
-  /** Null where this computer cannot list them (Windows). */
+  /** Null until the first answer, and where this computer cannot list them (Windows). */
   processes: BackgroundProcess[] | null;
   processesFailed: boolean;
   stopping: string[];
@@ -66,12 +66,13 @@ export function createSettingsAgentsSection(options: {
     agents: [],
     loadFailed: false,
     setting: null,
-    processes: [],
+    processes: null,
     processesFailed: false,
     stopping: [],
   });
   /** Bumped for each read, so an answer of an earlier read is dropped. */
   let generation = 0;
+  let processGeneration = 0;
 
   function applyAgent(agent: ClientAgentSummary): void {
     setState((draft) => {
@@ -100,20 +101,23 @@ export function createSettingsAgentsSection(options: {
   }
 
   function loadProcesses(): void {
+    const current = ++processGeneration;
     settingsPort()
       .backgroundProcesses.list()
-      .then((processes) =>
+      .then((processes) => {
+        if (current !== processGeneration) return;
         setState((draft) => {
           draft.processes = processes;
           draft.processesFailed = false;
-        }),
-      )
-      .catch(() =>
+        });
+      })
+      .catch(() => {
+        if (current !== processGeneration) return;
         setState((draft) => {
           draft.processes = [];
           draft.processesFailed = true;
-        }),
-      );
+        });
+      });
   }
 
   function stopProcess(id: string): void {

@@ -74,7 +74,12 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "Не удалось прочитать фоновые процессы.",
   "settings.backgroundProcesses.noAgent": "Без агента",
   "settings.backgroundProcesses.started": "Запущен {time}",
-  "settings.backgroundProcesses.ports": "Порт {ports}",
+  "settings.backgroundProcesses.ports": {
+    one: "Порт {ports}",
+    few: "Порты {ports}",
+    many: "Порты {ports}",
+    other: "Порты {ports}",
+  },
   "settings.backgroundProcesses.stop": "Остановить",
   "settings.backgroundProcesses.stopLabel": "Остановить процесс {pid}",
   "settings.backgroundProcesses.stopFailed": "Не удалось остановить процесс.",

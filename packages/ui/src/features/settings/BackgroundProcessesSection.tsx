@@ -41,7 +41,12 @@ export function BackgroundProcessesSection(props: BackgroundProcessesSectionProp
         time: format.date(process.startedAt, { dateStyle: "medium", timeStyle: "short" }),
       }),
       ...(process.ports.length > 0
-        ? [t("settings.backgroundProcesses.ports", { ports: process.ports.join(", ") })]
+        ? [
+            t("settings.backgroundProcesses.ports", {
+              count: process.ports.length,
+              ports: format.list(process.ports.map(String)),
+            }),
+          ]
         : []),
     ].join(" · ");
   const message = (text: string) => (

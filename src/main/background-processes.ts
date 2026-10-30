@@ -52,7 +52,10 @@ interface LeftProcess {
   tree: ProcessRow[];
 }
 
-/** C locale: `lstart` is then `Fri Oct 30 14:42:59 2026` on macOS and with procps. */
+/**
+ * `ps` runs in the C locale: `lstart` is then `Fri Oct 30 14:42:59 2026` on macOS and with procps. lsof
+ * keeps the user's locale, because in the C locale it writes a non-ASCII byte of a path as `\xNN`.
+ */
 function run(command: string, args: readonly string[]): Effect.Effect<string, BackgroundProcessFailure> {
   return io(
     (signal) =>
@@ -65,7 +68,7 @@ function run(command: string, args: readonly string[]): Effect.Effect<string, Ba
             timeout: COMMAND_TIMEOUT_MS,
             maxBuffer: COMMAND_MAX_BUFFER,
             signal,
-            env: { ...process.env, LC_ALL: "C" },
+            env: command === "ps" ? { ...process.env, LC_ALL: "C" } : process.env,
           },
           (error, stdout) => {
             // lsof exits with 1 when no file matches.
@@ -261,5 +264,7 @@ export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(funct
     if (!pids.some((pid) => signal(pid, 0))) return;
     yield* Effect.sleep(STOP_CHECK_INTERVAL_MS);
   }
-  for (const pid of pids) signal(pid, "SIGKILL");
+  // A pid that ended in the grace period can name a new program now: only the same start is killed.
+  const current = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
+  for (const row of found.tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
 });

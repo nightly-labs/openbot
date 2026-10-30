@@ -90,7 +90,7 @@ export const messages = {
   "settings.backgroundProcesses.loadFailed": "无法读取后台进程。",
   "settings.backgroundProcesses.noAgent": "无助手",
   "settings.backgroundProcesses.started": "启动于 {time}",
-  "settings.backgroundProcesses.ports": "端口 {ports}",
+  "settings.backgroundProcesses.ports": { other: "端口 {ports}" },
   "settings.backgroundProcesses.stop": "停止",
   "settings.backgroundProcesses.stopLabel": "停止进程 {pid}",
   "settings.backgroundProcesses.stopFailed": "无法停止该进程。",
