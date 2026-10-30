@@ -170,9 +170,10 @@ export interface AgentProviderDescriptor {
    */
   readonly approvalsInFullAccess: boolean;
   /**
-   * Whether the CLI's own file tools reach only the workspace, the shared folder and the added
-   * folders also outside Workspace only. Antigravity 1.4.5 limits them to `cwd` and
-   * `additionalDirectories` for every session that is not a Google admin session (#3843).
+   * Whether the added folders apply in Full access too. `true`: the CLI's own file tools reach only
+   * the workspace, the shared folder and the added folders in every access level, so the user can add
+   * folders in Full access. Antigravity 1.4.5 limits them to `cwd` and `additionalDirectories` for
+   * every session that is not a Google admin session (#3843).
    */
   readonly foldersInFullAccess: boolean;
 }

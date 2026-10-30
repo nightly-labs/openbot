@@ -1440,6 +1440,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 agentName={props.agent.name}
                 wideAccess={wideAccess()}
                 workspaceAccess={t(ACCESS_LABEL.workspace)}
+                showExclusions={draft.permission === "workspace" || wideAccess() !== null}
                 onChangeAccess={() => openPage("permissions")}
               />
             </Show>

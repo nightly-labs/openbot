@@ -1363,10 +1363,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
   }
 
-  /** Whether the session got other `additionalDirectories` than these params send. */
+  /**
+   * Whether the session got other `additionalDirectories` than these params send. A history read
+   * sends no roots and keeps the session as it is.
+   */
   #workspaceRootsChanged(thread: AcpThread, params: unknown): boolean {
-    if (!this.#acceptsAdditionalDirectories) return false;
-    const roots = getArray(params, "runtimeWorkspaceRoots").filter(isString);
+    if (!this.#acceptsAdditionalDirectories || !isRecord(params) || !Array.isArray(params.runtimeWorkspaceRoots))
+      return false;
+    const roots = params.runtimeWorkspaceRoots.filter(isString);
     return roots.join("\n") !== thread.workspaceRoots.join("\n");
   }
 
