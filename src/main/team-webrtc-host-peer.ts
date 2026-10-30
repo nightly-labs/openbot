@@ -9,6 +9,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
@@ -674,13 +675,13 @@ export class TeamWebRtcHostPeer {
                 });
                 // The local Team API decodes the body again, and with semantic tags its frozen projection
                 // reads only the wire keys: `ownerAgentId` is dropped where `ownerBotId` is kept. So the
-                // decoded frame goes back to the wire key names first. The secure authentication answer is
-                // read as `agentId` on every protocol, so it keeps its keys.
+                // decoded frame goes back to the wire key names first. The secure authentication answer and
+                // the agent profile routes read `agentId` on the wire, so they keep their keys.
+                const currentKeysOnWire =
+                  (input.method === "POST" && input.path === BROWSER_SECRET_RESPONSE_PATH) ||
+                  isAgentProfileRoute(input.method, input.path);
                 return JSON.stringify(
-                  decoded !== null &&
-                    typeof decoded === "object" &&
-                    !Array.isArray(decoded) &&
-                    input.path !== BROWSER_SECRET_RESPONSE_PATH
+                  decoded !== null && typeof decoded === "object" && !Array.isArray(decoded) && !currentKeysOnWire
                     ? toWireAgentKeysObjectForPath(input.path, decoded)
                     : decoded,
                 );
