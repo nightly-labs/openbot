@@ -157,7 +157,9 @@ Routing selects each member whose role or area the request touches, and only tho
 request in the area of one member, or in the area of no member, goes to the one member best able to
 answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
-gets the request's attachments; its packet names the other members that answer. A member that the
+gets the request's attachments; its packet names the other members that answer, but does not carry
+their replies to that request, so each member gives its own view. The packet cursor stops before the
+first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
 request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
@@ -243,7 +245,14 @@ summary covers older messages, with a sequence and source IDs. Full messages rem
 The provider acceptance cursor records context delivery. Context packets remain self-contained so
 provider replacement or compaction does not remove shared decisions. Unrelated server conversations
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
-their existing meaning.
+their existing meaning. A packet leaves out a member's thinking, and the commentary of a turn that
+posted a `channel_result`: the result is the answer of that turn.
+
+The channel copies the assistant rows of a member's execution thread. The first rows of a turn go
+to the running assignment before it knows the turn id; a row of another turn does not. A new row
+of an assignment that has ended is not copied: a turn sends its final rows before it completes, and
+after a restart the provider history import can write an old turn again with new row ids. An empty
+row is not copied until its first text arrives.
 
 Task revisions prevent an old assignment from completing a corrected request. The stored request
 keeps its own text and files: only its first dispatch converts the attachment drafts, and a later
