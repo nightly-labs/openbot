@@ -3874,7 +3874,9 @@ async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promis
       (brand) => getString(brand, "brand") === "Chromium" && getString(brand, "version") === chromiumMajorVersion,
     ) ||
     /Electron|OpenBot/u.test(clientHintBrands) ||
-    !clientHintBrands.includes(`"Chromium";v="${chromiumMajorVersion}"`)
+    // Cloudflare rejects a header that differs from the brands the page reads, GREASE brand and order included.
+    clientHintBrands !==
+      navigatorBrands.map((brand) => `"${getString(brand, "brand")}";v="${getString(brand, "version")}"`).join(", ")
   ) {
     throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
   }

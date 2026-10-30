@@ -104,7 +104,9 @@ tokens. They keep the installed Chromium version and host platform. Requests to 
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
-loopback HTTP, the host supplies the basic Chromium brand/version, desktop flag, and platform hints.
+loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
+be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
+chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
 It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
