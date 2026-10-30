@@ -70,6 +70,10 @@ curl --fail --silent --show-error https://signal.openbot.run/health/live
 `/health/live` must show the release commit. Builds made before this field existed show no `commit`;
 builds made without `OPENBOT_SOURCE_COMMIT` show `unknown`.
 
+Wait for Docker health to become `healthy`. Check the running source for `multiplex` and record its
+checksum. Keep the previous image until the device checks below pass. Do not print container environment
+variables, resume tokens, tickets, or raw connection logs.
+
 The capacity reporter (`capacity-report`) uses the Signal image and sends `signal_capacity`
 (ANALYTICS.md) every 5 minutes. It reads the coturn metrics on `127.0.0.1:9641` and the Signal metrics
 on `127.0.0.1:9642`. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` in the host
@@ -85,10 +89,6 @@ docker logs openbot-remote-capacity-report-1 2>&1 | tail -5
 ```
 
 A failed sample writes only `Capacity report failed.` and its source (`turn`, `signal` or `openpanel`).
-
-Wait for Docker health to become `healthy`. Check the running source for `multiplex` and record its
-checksum. Keep the previous image until the device checks below pass. Do not print container environment
-variables, resume tokens, tickets, or raw connection logs.
 
 Signal replacement closes signaling WebSockets. Existing WebRTC data channels should continue while
 signaling reconnects. The first resume after a restart checks the durable control plane. When the

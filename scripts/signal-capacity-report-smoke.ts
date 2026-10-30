@@ -27,8 +27,6 @@ const TURN_PAGE = [
   'turn_total_allocations{type="UDP"} 1343',
   'turn_total_allocations{type="TCP"} 710',
   'turn_total_allocations{type="TLS/TCP"} 616',
-  'turn_total_traffic_rcvb{realm="turn.example.com"} 1000',
-  "turn_total_traffic_sentb 2000",
 ].join("\n");
 
 const listen = (server: Server) =>

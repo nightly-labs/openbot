@@ -178,7 +178,7 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `billing_snapshot` | What is recurring revenue at the sample time? | Daily aggregate without a profile. `snapshot_date`, `as_of`, `reported_at`, `currency`, `mrr`, `arr`, `overdue_mrr`, `paying_accounts`, `paid_servers`, `cancellations_scheduled`, `checkout_mature_accounts`, `checkout_converted_accounts`, `checkout_pending_accounts`, `skipped_subscriptions` (subscriptions left out because Stripe has no valid data for them). From account service generation 11, `mrr`, `arr`, `overdue_mrr` and `paying_accounts` count servers only; `license_mrr`, `license_accounts` and `licensed_users` count licenses; `total_mrr` and `total_arr` count both. `skipped_subscriptions` counts both. Money is USD cents. Never sum snapshots across days. |
 | `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message`, `restart`, `schedule` or `retention`) and `error` (an allowlisted hosted server error code) |
 | `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP from `hello@openbot.run`, after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, or `welcome`. `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
-| `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`), and how much does it relay? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, or `turn2.openbot.run` on the standby); `turn_allocations` and its parts `turn_allocations_udp`, `_tcp` and `_tls` (the client transport); `turn_traffic_kbps`, the average of all relayed bytes in both directions since the previous event (none on the first event after a reporter or coturn restart); `signal_sockets` and `signal_peer_connections`. Generation 1 |
+| `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`)? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, or `turn2.openbot.run` on the standby); `turn_allocations`, and `turn_allocations_udp`, `_tcp` and `_tls` for the client transports (0 when a transport has none); `signal_sockets` and `signal_peer_connections`. Generation 1 |
 
 ## Privacy and runtime validation
 
@@ -245,8 +245,9 @@ and only a loopback `http:` origin is accepted.
     500-message hourly limit of the mailbox, and all results per hour by `result`. OpenPanel counts clock hours, but the mail server counts
     the last 60 minutes, so two hours below the limit can still go above it together.
 11. Dev: `signal_capacity` (`surface = signal`) per hour: the largest `turn_allocations` by
-    `turn_host` against the `total-quota`, the largest `signal_peer_connections`, and the average
-    `turn_traffic_kbps`.
+    `turn_host` against the `total-quota`, the largest per transport, and the largest
+    `signal_sockets` and `signal_peer_connections`. coturn adds relayed bytes to its metrics only
+    when an allocation closes, so the event has no live traffic value.
 
 Every dashboard must filter by the intended `surface` and that surface's current
 `event_schema_version`. Website bounce
