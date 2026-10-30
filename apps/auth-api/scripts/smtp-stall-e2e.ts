@@ -6,7 +6,7 @@
 // - a stall after `354`: the result is unknown and there is no second connection;
 // - a normal relay: one connection, one message;
 // - a relay that never answers: the last error is a timeout inside the delivery budget.
-// `bun apps/auth-api/scripts/smtp-stall-e2e.ts`. Writes .openbot-build/smtp-stall-e2e.json.
+// `bun run test:smtp-stall`. Writes .openbot-build/smtp-stall-e2e.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket, connect as tcpConnect } from "node:net";

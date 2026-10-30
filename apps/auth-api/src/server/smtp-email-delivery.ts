@@ -257,7 +257,8 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
     }),
     ({ session }) =>
       Effect.gen(function* () {
-        // Observe the deadline only. The release step stops the session, and the result comes from `state`.
+        // Observe the deadline only. The release step stops the session, so `state` is final when the
+        // result is decided after it.
         const result = yield* Fiber.join(session).pipe(
           Effect.timeoutOrElse({
             duration: SMTP_TIMEOUT_MS,
