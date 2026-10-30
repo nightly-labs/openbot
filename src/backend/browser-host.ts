@@ -109,6 +109,7 @@ import {
   storedTabSession,
 } from "./browser-state";
 import {
+  BrowserActionFailure,
   BrowserToolHold,
   BrowserUserControlHeld,
   boundEngineOperation,
@@ -137,6 +138,7 @@ import { runCauseEffect } from "./effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import type { VaultCardSecret } from "./vault-items";
+import { withTimeout } from "./with-timeout";
 
 interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
@@ -2064,14 +2066,56 @@ export class BrowserHost {
   ): Effect.fn.Return<DynamicToolResult, BrowserOperationError> {
     yield* browserSync(() => this.#requireToolTab(params, call.args.tabId));
     const action = yield* browserSync(() => browserInputAction(call, hooks));
-    return textResult(
-      yield* this.#runAction(
-        call.args.tabId,
-        action.name,
-        action.target,
-        (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
-        browserToolTimeout(call.args.timeoutMs),
-        call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
+    return yield* this.#runAction(
+      call.args.tabId,
+      action.name,
+      action.target,
+      (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
+      browserToolTimeout(call.args.timeoutMs),
+      call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
+      true,
+    ).pipe(
+      Effect.map(textResult),
+      Effect.catch((failure) =>
+        Effect.gen({ self: this }, function* () {
+          const outcome = failure.cause;
+          if (!(outcome instanceof BrowserActionFailure)) return yield* failure;
+          const snapshot =
+            outcome.inputState === "not_started"
+              ? yield* withTimeout(
+                  this.#enqueue(call.args.tabId, (tab, keepQueueBlocked) =>
+                    Effect.gen({ self: this }, function* () {
+                      yield* browserSync(() => this.#requireToolTab(params, tab.id));
+                      const capture = yield* readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked, 2_000);
+                      yield* browserSync(() => this.#requireToolTab(params, tab.id));
+                      return capture.snapshot;
+                    }),
+                  ),
+                  2_000,
+                  "Browser recovery snapshot timed out.",
+                ).pipe(Effect.catch(() => Effect.succeed(null)))
+              : null;
+          return {
+            success: false,
+            contentItems: [
+              {
+                type: "inputText",
+                text: JSON.stringify({
+                  tabId: outcome.tabId,
+                  inputState: outcome.inputState,
+                  stage: outcome.stage,
+                  reason: outcome.reason,
+                  message: redactText(outcome.message).slice(0, 500),
+                  recovery:
+                    outcome.inputState === "not_started"
+                      ? "Inspect fresh targets before another attempt."
+                      : "Input may have changed the site. Verify the result before another action; do not replay input.",
+                  ...(snapshot ? { snapshot } : {}),
+                }),
+              },
+            ],
+          } satisfies DynamicToolResult;
+        }),
       ),
     );
   });
@@ -2906,9 +2950,10 @@ export class BrowserHost {
     ) => Effect.Effect<void, BrowserOperationError>,
     timeoutMs?: number,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
+    reportFailure = false,
   ): Effect.fn.Return<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
-    return yield* runTabAction(tab, action, target, operation, timeoutMs, onOperationStarted);
+    return yield* runTabAction(tab, action, target, operation, timeoutMs, onOperationStarted, reportFailure);
   });
 
   readonly #runEvaluation = Effect.fn("BrowserHost.runEvaluation")(function* (

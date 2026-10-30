@@ -132,6 +132,37 @@ non-login work. The host does not rewrite site scripts or weaken cross-origin se
 Input dispatch runs inside those checks and queues. Upload staging also uses the shared parser before
 it checks local file access.
 
+### Failed input actions
+
+Authorized input-action failures report `inputState`, `stage`, `reason`, and a redacted message.
+Parsing, permission and unknown-tab refusals can keep the existing text-only error. Native input
+delivery is separate from the result of the website operation:
+
+| `inputState` | Meaning |
+| --- | --- |
+| `not_started` | The action did not attempt native input, including an already-satisfied checkbox. Inspect fresh targets before another attempt. |
+| `attempted` | Native input was attempted without confirmed completion. It can have changed the page. |
+| `completed` | The input operation was acknowledged before the action failed. |
+
+`stage` identifies target resolution, input, settling, or the final snapshot. A failure after input
+does not undo it. Inspect the site result before another action; do not replay the input.
+
+Only `not_started` can include one fresh recovery snapshot. Its two-second deadline includes the
+tab queue wait. The host checks ownership, protected input and takeover before and after capture;
+if the capture fails or permission changes, it returns no snapshot. Existing queue drain and
+transport cancellation still own pending work. Other browser tools and legacy action errors keep
+their existing result shape.
+
+The focused native check is `bun run test:browser --scenario=input-delivery`. The default browser
+smoke runs it in a separate process so deliberate deadlines keep their own backstop. It writes
+`.openbot-build/browser-input-delivery.json`. Its local page commits
+one server receipt before freezing its renderer, so failed input acknowledgement and failed final
+observation can be checked without a real account, transaction, or replaced CDP response. Recovery
+cases also check a renderer frozen before target resolution and a real user-control transition
+ordered after capture data is read, before exposure. Those checks observe and forward native CDP
+acknowledgements without changing them. An already-checked control also confirms that an
+acknowledged no-op is not reported as completed input when later observation fails.
+
 ### Fill inspected ordinary fields
 
 `openbot_browser.fill_fields` is a deferred tool in the original browser catalog. It replaces

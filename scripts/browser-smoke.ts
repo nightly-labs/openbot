@@ -80,6 +80,19 @@ try {
     } finally {
       await close(persistenceServer);
     }
+    if (!process.exitCode) {
+      // Deliberate renderer deadlines get their own process backstop.
+      process.exitCode = await run(
+        electron,
+        [
+          ...electronFlags,
+          outputPath,
+          `--smoke-root=${join(outputRoot, "input-delivery")}`,
+          "--scenario=input-delivery",
+        ],
+        true,
+      );
+    }
   }
 } finally {
   await rm(outputRoot, { recursive: true, force: true });

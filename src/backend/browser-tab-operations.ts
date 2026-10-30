@@ -1,5 +1,5 @@
 import type { BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
-import { Context, Deferred, Effect, Fiber } from "effect";
+import { Context, Deferred, Effect, Fiber, Schema } from "effect";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -15,6 +15,15 @@ const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 // Let an operation report its own deadline before the transport backstop wins.
 const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+
+/** Input delivery does not establish the result of the site's operation. */
+export class BrowserActionFailure extends Schema.TaggedError<BrowserActionFailure>()("BrowserActionFailure", {
+  tabId: Schema.String,
+  message: Schema.String,
+  inputState: Schema.Literals(["not_started", "attempted", "completed"]),
+  stage: Schema.Literals(["target_resolution", "input", "settling", "snapshot"]),
+  reason: Schema.Literals(["deadline", "target_unavailable", "operation_failed", "snapshot_failed"]),
+}) {}
 
 /**
  * Whether a person controls a tab. Only the agent tool paths provide it, so a person's own actions and
@@ -169,6 +178,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
     ) => Effect.Effect<void, BrowserOperationError>,
     timeoutMs = 10_000,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
+    reportFailure = false,
   ) =>
     enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
       Effect.gen(function* () {
@@ -180,6 +190,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
         const timeoutMessage = `Browser ${action} timed out.`;
         let actionRecorded = false;
         let dispatched = false;
+        let inputCompleted = false;
+        let stage: BrowserActionFailure["stage"] = "target_resolution";
         let cancellationConfirmed = false;
         let stalledSettle: Fiber.Fiber<void, BrowserOperationError> | undefined;
         const completion = yield* Effect.forkIn(
@@ -195,7 +207,9 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               yield* browserSync(() => remainingTime(deadline, timeoutMessage));
               yield* operation(tab, deadline, () => {
                 dispatched = true;
+                stage = "input";
               });
+              inputCompleted = dispatched;
             }).pipe(
               Effect.ensuring(
                 Effect.suspend(() =>
@@ -232,6 +246,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               }),
             ),
           );
+          stage = "settling";
           const settleTimeout = Math.max(1, deadline - Date.now());
           const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, { startImmediately: true });
           yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
@@ -259,6 +274,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               : {}),
           });
           actionRecorded = true;
+          stage = "snapshot";
           return (yield* readTabSnapshot(
             tab,
             tab.revision + 1,
@@ -290,6 +306,25 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                   outcome: "error",
                   detail: String(error.cause),
                 });
+              if (reportFailure) {
+                const cause = error.cause;
+                return yield* browserFailure(
+                  new BrowserActionFailure({
+                    tabId: tab.id,
+                    message: cause instanceof Error ? cause.message : String(cause),
+                    inputState: inputCompleted ? "completed" : dispatched ? "attempted" : "not_started",
+                    stage,
+                    reason:
+                      cause instanceof TimeoutError
+                        ? "deadline"
+                        : stage === "snapshot"
+                          ? "snapshot_failed"
+                          : stage === "target_resolution"
+                            ? "target_unavailable"
+                            : "operation_failed",
+                  }),
+                );
+              }
               return yield* error;
             }),
           ),

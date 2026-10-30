@@ -35,6 +35,7 @@ const actionNavigationReleased = new Promise<void>((resolve) => {
   releaseActionNavigation = resolve;
 });
 let browserToolCall = 0;
+const inputDeliveryReceipts = new Map<string, number>();
 // The user agent each `/headers` hit carried, keyed by `?source=`. A subframe request that
 // bypasses the session identity shows up here under its own source with the raw build string.
 const recordedIdentityAgents: Record<string, string> = {};
@@ -48,6 +49,33 @@ interface PersistenceSnapshot {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/input-delivery-receipt") {
+    const name = url.searchParams.get("case") ?? "";
+    inputDeliveryReceipts.set(name, (inputDeliveryReceipts.get(name) ?? 0) + 1);
+    response.writeHead(200).end("committed");
+    return;
+  }
+  if (url.pathname === "/input-delivery-observe-ready") {
+    response.writeHead(200).end("ready");
+    return;
+  }
+  if (url.pathname === "/input-delivery") {
+    const name = url.searchParams.get("case") ?? "";
+    const receipt = JSON.stringify(`/input-delivery-receipt?case=${encodeURIComponent(name)}`);
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<input type="checkbox" aria-label="Already checked" checked><button>Commit local action</button><output>Ready</output><script>
+      document.querySelector('button').onclick = event => {
+        if (!event.isTrusted) return;
+        document.querySelector('output').textContent = 'Committed';
+        ${
+          name === "attempted"
+            ? `const request = new XMLHttpRequest(); request.open('POST', ${receipt}, false); request.send(); while (true) {}`
+            : `fetch(${receipt}, { method: 'POST' }).then(() => fetch('/input-delivery-observe-ready')).then(() => { while (true) {} });`
+        }
+      };
+    </script>`);
+    return;
+  }
   if (url.pathname === "/popup-parent") {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<style>
@@ -432,6 +460,7 @@ const SCENARIOS = [
   "focus",
   "controls",
   "typing-focus",
+  "input-delivery",
   "tool-boundary",
   "evaluation",
   "wait-deadlines",
@@ -528,6 +557,8 @@ async function main(): Promise<void> {
           await runRedirectNavigationScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
+        } else if (scenario === "input-delivery") {
+          await runInputDeliveryScenario(origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -2205,6 +2236,208 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
   } finally {
     await runCauseEffect(browser.close(tab.id));
   }
+}
+
+async function runInputDeliveryScenario(origin: string): Promise<void> {
+  const cases: Array<{
+    name: string;
+    passed: boolean;
+    receipts: number;
+    success: boolean;
+    recoveryCaptureCount: number;
+    elapsedMs: number;
+    result: string;
+    noopConfirmed?: boolean;
+    noopReleased?: boolean;
+    inputCommands?: number;
+  }> = [];
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-input-delivery.json",
+    JSON.stringify({ status: "running", versions: process.versions, cases }, null, 2),
+  );
+  for (const name of ["not_started", "completed", "attempted", "frozen_target", "held_capture", "checked_noop"]) {
+    inputDeliveryReceipts.set(name, 0);
+    const caseRoot = join(app.getPath("userData"), "input-delivery", name);
+    await mkdir(caseRoot, { recursive: true });
+    const window = new BrowserWindow({ show: false, opacity: 0, width: 800, height: 600 });
+    try {
+      const browser = new BrowserHost(window, join(caseRoot, "downloads"), join(caseRoot, "browser-tabs.json"));
+      try {
+        window.show();
+        app.focus({ steal: true });
+        window.focus();
+        await waitFor(async () => window.isFocused(), "the focused input-delivery case window");
+        await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+        const { tab, contents } = await openTabWithContents(
+          browser,
+          `${origin}/input-delivery?case=${name}`,
+          "smoke-thread",
+          "smoke-bot",
+        );
+        const native = contents.debugger.sendCommand.bind(contents.debugger);
+        const beforeInput = name !== "completed" && name !== "attempted";
+        let layoutMetricCount = 0;
+        let capturedText = false;
+        let noopConfirmed = false;
+        let noopReleased = false;
+        let inputCommands = 0;
+        let held: Promise<void> | undefined;
+        try {
+          if (beforeInput) {
+            await waitFor(
+              async () => (await contents.executeJavaScript("document.readyState === 'complete'", true)) === true,
+              "the input-delivery document",
+            );
+          } else {
+            await waitForPresentedFrame(contents);
+          }
+          if (name === "frozen_target") {
+            inputDeliveryReceipts.set(`${name}-ready`, 0);
+            await contents.executeJavaScript(
+              `setTimeout(() => {
+                const ready = new XMLHttpRequest();
+                ready.open('POST', '/input-delivery-receipt?case=frozen_target-ready', false);
+                ready.send();
+                while (true) {}
+              }, 0); true`,
+              true,
+            );
+            await waitFor(async () => inputDeliveryReceipts.get(`${name}-ready`) === 1, "the frozen target renderer");
+          }
+          if (beforeInput)
+            contents.debugger.sendCommand = async (method, params, sessionId) => {
+              if (method.startsWith("Input.")) inputCommands++;
+              const result = await native(method, params, sessionId);
+              if (beforeInput && method === "Page.getLayoutMetrics") layoutMetricCount++;
+              if (
+                name === "checked_noop" &&
+                method === "Runtime.callFunctionOn" &&
+                params?.functionDeclaration === "function() { return Boolean(this.checked); }" &&
+                isDynamicRecord(result?.result) &&
+                result.result.value === true
+              ) {
+                noopConfirmed = true;
+              }
+              if (name === "checked_noop" && method === "Runtime.releaseObject" && noopConfirmed && !noopReleased) {
+                noopReleased = true;
+                const crashed = new Promise<void>((resolve) => contents.once("render-process-gone", () => resolve()));
+                contents.forcefullyCrashRenderer();
+                await crashed;
+              }
+              if (name === "held_capture") {
+                if (
+                  method === "Runtime.callFunctionOn" &&
+                  isDynamicRecord(result?.result) &&
+                  result.result.value === "Commit local action"
+                )
+                  capturedText = true;
+                // Native capture has read the control; the user takes the tab before its data can leave.
+                if (method === "Runtime.releaseObject" && layoutMetricCount === 1 && capturedText && !held) {
+                  held = runCauseEffect(browser.takeUserControl(tab.id, { kind: "local" }));
+                  await waitFor(
+                    async () => browser.listTabs().find((item) => item.id === tab.id)?.userControl === true,
+                    "user control during recovery capture",
+                  );
+                }
+              }
+              return result;
+            };
+          const started = Date.now();
+          const result =
+            name === "checked_noop"
+              ? await callBrowserTool(browser, "set_checked", {
+                  tabId: tab.id,
+                  target: { kind: "role", role: "checkbox", name: "Already checked", exact: true },
+                  checked: true,
+                  timeoutMs: 500,
+                })
+              : await callBrowserTool(browser, "click", {
+                  tabId: tab.id,
+                  target: {
+                    kind: "role",
+                    role: "button",
+                    name: beforeInput ? "Absent action password=synthetic-delivery-secret" : "Commit local action",
+                    exact: true,
+                  },
+                  timeoutMs: 500,
+                });
+          const elapsedMs = Date.now() - started;
+          if (held) await held;
+          const payload = toolTextPayload(result);
+          const receipts = inputDeliveryReceipts.get(name) ?? 0;
+          const recovery = isDynamicRecord(payload?.snapshot) ? payload.snapshot : undefined;
+          const recoveryCaptureCount =
+            name === "checked_noop" && payload?.stage === "snapshot"
+              ? Math.max(0, layoutMetricCount - 1)
+              : layoutMetricCount;
+          const passed =
+            !result.success &&
+            !JSON.stringify(result).includes("synthetic-delivery-secret") &&
+            payload?.inputState === (beforeInput ? "not_started" : name) &&
+            (name === "checked_noop"
+              ? payload.stage === "settling" || payload.stage === "snapshot"
+              : payload.stage === (beforeInput ? "target_resolution" : name === "completed" ? "snapshot" : "input")) &&
+            receipts === (beforeInput ? 0 : 1) &&
+            (!beforeInput || recoveryCaptureCount <= 1) &&
+            (name === "not_started"
+              ? recovery !== undefined &&
+                Array.isArray(recovery.elements) &&
+                recovery.elements.length <= 200 &&
+                Buffer.byteLength(JSON.stringify(recovery)) <= 128 * 1024 &&
+                String(recovery.text).includes("Commit local action") &&
+                recoveryCaptureCount === 1
+              : recovery === undefined) &&
+            (name !== "frozen_target" || elapsedMs <= 5_000) &&
+            (name !== "checked_noop" || (noopConfirmed && noopReleased && inputCommands === 0)) &&
+            (name !== "held_capture" ||
+              (held !== undefined &&
+                capturedText &&
+                browser.listTabs().find((item) => item.id === tab.id)?.userControl === true));
+          cases.push({
+            name,
+            passed,
+            receipts,
+            success: result.success,
+            recoveryCaptureCount,
+            elapsedMs,
+            result: toolError(result),
+            ...(name === "checked_noop" ? { noopConfirmed, noopReleased, inputCommands } : {}),
+          });
+          await writeFile(
+            ".openbot-build/browser-input-delivery.json",
+            JSON.stringify({ status: "running", versions: process.versions, cases }, null, 2),
+          );
+        } finally {
+          contents.debugger.sendCommand = native;
+          browser.releaseUserControl(tab.id);
+          if ((name === "completed" || name === "attempted" || name === "frozen_target") && !contents.isDestroyed()) {
+            const crashed = new Promise<void>((resolve) => contents.once("render-process-gone", () => resolve()));
+            contents.forcefullyCrashRenderer();
+            await crashed;
+          }
+          await runCauseEffect(browser.close(tab.id));
+        }
+        assert.equal(inputDeliveryReceipts.get(name), beforeInput ? 0 : 1, "Input was replayed.");
+      } finally {
+        await runCauseEffect(browser.destroy());
+      }
+    } finally {
+      window.destroy();
+    }
+  }
+  await writeFile(
+    ".openbot-build/browser-input-delivery.json",
+    JSON.stringify(
+      { status: cases.every((item) => item.passed) ? "passed" : "issues_found", versions: process.versions, cases },
+      null,
+      2,
+    ),
+  );
+  assert(
+    cases.every((item) => item.passed),
+    JSON.stringify(cases),
+  );
 }
 
 async function runFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
