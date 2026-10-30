@@ -31,7 +31,7 @@ const CREDENTIAL_TTL_SECONDS = 60;
 const PROBE_USER = "openbot-status-probe";
 
 /** `full`: the relay refused the allocation at its quota. `refused`: another error. `no-answer`: no reply in time. */
-export class TurnProbeError extends Schema.TaggedError<TurnProbeError>()("TurnProbeError", {
+class TurnProbeError extends Schema.TaggedError<TurnProbeError>()("TurnProbeError", {
   reason: Schema.Literals(["full", "refused", "no-answer"]),
 }) {}
 
@@ -114,12 +114,15 @@ const noAnswer = () => new TurnProbeError({ reason: "no-answer" });
 
 const openSocket = (address: string, port: number) => {
   let receive: ((bytes: Uint8Array) => void) | null = null;
+  let fail: (() => void) | null = null;
   return Effect.acquireRelease(
     Effect.tryPromise({
       try: () =>
         Bun.udpSocket({
           connect: { hostname: address, port },
-          socket: { data: (_socket, bytes) => receive?.(bytes) },
+          // When coturn is down, the host answers with ICMP port unreachable and the socket gets
+          // ECONNREFUSED. Without this handler Bun reports it as an uncaught error.
+          socket: { data: (_socket, bytes) => receive?.(bytes), error: () => fail?.() },
         }),
       catch: noAnswer,
     }),
@@ -128,21 +131,35 @@ const openSocket = (address: string, port: number) => {
     Effect.map((socket) => ({
       /** Sends the request until its response arrives. */
       request: (method: number, attributes: Attribute[], key: Uint8Array | null) =>
-        Effect.callback<StunResponse>((resume) => {
+        Effect.callback<StunResponse, TurnProbeError>((resume) => {
           const transactionId = randomBytes(12);
           const message = encodeMessage(method, transactionId, attributes, key);
-          const resend = setInterval(() => socket.send(message), RESEND_MILLISECONDS);
           const stop = () => {
             clearInterval(resend);
             receive = null;
+            fail = null;
           };
+          const end = () => {
+            stop();
+            resume(Effect.fail(noAnswer()));
+          };
+          // A send can throw too. In the timer that would stop the process.
+          const send = () => {
+            try {
+              socket.send(message);
+            } catch {
+              end();
+            }
+          };
+          const resend = setInterval(send, RESEND_MILLISECONDS);
           receive = (bytes) => {
             const response = decodeResponse(bytes, transactionId);
             if (!response) return;
             stop();
             resume(Effect.succeed(response));
           };
-          socket.send(message);
+          fail = end;
+          send();
           return Effect.sync(stop);
         }),
     })),
