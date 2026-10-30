@@ -25,7 +25,7 @@ import {
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireReleasedSchedule, stringField } from "./request-helpers";
+import { readJson, requireAgentLevel, requireReleasedSchedule, stringField } from "./request-helpers";
 
 /**
  * The settings half of a channel is served from `AgentService`, the same object the IPC handlers
@@ -82,6 +82,10 @@ export async function routeChannels(
   const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
   if (input.type === "archive" && !canAdministerServer(member.role))
     throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
+  // A restore undoes a delete, so only the people who can delete a channel can restore it.
+  if (input.type === "restore" && !canAdministerServer(member.role))
+    throw new HttpError(403, sourceText("error.team.membersCannotRestoreChannels"));
+  if (input.type === "save") requireChatForAddedAgents(context, input, channels, hiddenAgentIds);
   return json(
     200,
     await runCauseEffect(
@@ -116,6 +120,25 @@ function keepHiddenMembers(
       : input.draft.leadAgentId;
   if (kept.length === 0 && leadAgentId === input.draft.leadAgentId) return input;
   return { ...input, draft: { ...input.draft, members: [...input.draft.members, ...kept], leadAgentId } };
+}
+
+/** An agent that a save adds to a channel talks there, so the member needs `chat` for it. */
+function requireChatForAddedAgents(
+  context: TeamApiRequestContext,
+  input: Extract<ChannelCommand, { type: "save" }>,
+  channels: ChannelService,
+  hiddenAgentIds: ReadonlySet<string>,
+): void {
+  const stored = new Set(
+    channels.store.exists(input.channelId)
+      ? channels.store.get(input.channelId).members.map((item) => item.agentId)
+      : [],
+  );
+  for (const { agentId } of input.draft.members) {
+    if (stored.has(agentId)) continue;
+    if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+    requireAgentLevel(context, agentId, "chat");
+  }
 }
 
 async function routeChannelSettings(

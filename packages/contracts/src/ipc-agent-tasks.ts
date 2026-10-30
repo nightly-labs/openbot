@@ -1,6 +1,7 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { integerInRange, isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
 /** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
@@ -59,7 +60,8 @@ export interface AgentTaskQueuedMessage {
 
 /**
  * A second conversation of one agent. The agent keeps its identity, workspace and memories; the task
- * has its own thread, provider session, progress and stop. Local only: the Team API has no task route.
+ * has its own thread, provider session, progress and stop. A joined server sends its tasks through the
+ * optional `agent-tasks-v1` capability, in the frozen bounds of `team-protocol/agent-tasks-v1.ts`.
  */
 export interface AgentTask {
   id: string;
@@ -109,6 +111,35 @@ export interface RunQueuedMessageAsTaskInput {
 export interface AgentTaskInput {
   agentId: string;
   taskId: string;
+}
+
+/** A person's new title for a side thread. */
+export interface RenameAgentTaskInput extends AgentTaskInput {
+  title: string;
+}
+
+/** Moves the person's read mark of a side thread to a message of that thread. */
+export interface MarkAgentTaskReadInput extends AgentTaskInput {
+  throughMessageId: string;
+}
+
+/** The person's read mark of one side thread, by its task id. */
+export interface AgentTaskReadState extends ConversationReadState {
+  taskId: string;
+}
+
+export function isAgentTaskReadState(value: unknown): value is AgentTaskReadState {
+  return isDynamicRecord(value) && isIdentifier(value.taskId) && isConversationReadState(value);
+}
+
+/**
+ * A thread title that a person writes, trimmed: one line with no control, line or paragraph separator
+ * characters. Null when the value is not a valid title. IPC and the Team API use this one rule.
+ */
+export function agentThreadTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.trim();
+  return title && title.length <= INPUT_LIMITS.agentTaskTitle && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(title) ? title : null;
 }
 
 function isAgentTaskQueuedMessage(value: unknown): value is AgentTaskQueuedMessage {

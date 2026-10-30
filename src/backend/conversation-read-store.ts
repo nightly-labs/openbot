@@ -4,12 +4,15 @@ import {
   AGENT_EXCHANGE_ITEM_TYPE,
   type AgentSummary,
   CONTEXT_RESET_ITEM_TYPE,
+  CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationReadState,
   type ConversationSnapshot,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -156,11 +159,21 @@ export class ConversationReadStore {
     return stateFromSnapshot(snapshot, null);
   }
 
-  /** Marks a thread unread without reading its message rows. */
-  markUnreadForThread(memberId: string, threadId: string | null): ConversationReadState {
+  /**
+   * Marks a thread unread without reading its message rows. With `fromMessageId`, that message and
+   * the messages after it are unread: the cursor moves back to the message shown before it.
+   */
+  markUnreadForThread(
+    memberId: string,
+    threadId: string | null,
+    fromMessageId: string | null = null,
+  ): ConversationReadState {
     if (!threadId) return emptyReadState();
-    this.#saveCursor(threadId, memberId, null, "marked");
-    return this.#stateFromDatabase(threadId, null);
+    const fromKey = fromMessageId ? this.#messageOrderKey(threadId, fromMessageId) : undefined;
+    if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
+    const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
+    this.#saveCursor(threadId, memberId, throughMessageId, "marked");
+    return this.#stateFromDatabase(threadId, throughMessageId);
   }
 
   #withSupportedCursor(
@@ -238,6 +251,22 @@ export class ConversationReadStore {
     );
   }
 
+  #messageBefore(threadId: string, boundary: MessageOrderKey): string | null {
+    const row = this.database.connection
+      .prepare(
+        `${ORDERED_THREAD_MESSAGES}
+         SELECT message_id FROM ordered
+         WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
+         ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
+      )
+      .get(threadId, ...boundary);
+    if (row === undefined) return null;
+    if (!isDynamicRecord(row) || !isString(row.message_id)) {
+      throw new Error("The previous conversation message is malformed.");
+    }
+    return row.message_id;
+  }
+
   #latestMessageId(threadId: string): string | null {
     const row = this.database.connection
       .prepare(
@@ -259,6 +288,9 @@ export class ConversationReadStore {
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
       AND COALESCE(item_type, '') != 'plan'
+      AND COALESCE(item_type, '') != 'subagents'
+      AND COALESCE(item_type, '') != '${CONVERSATION_MEMORY_CHANGES_ITEM_TYPE}'
+      AND COALESCE(item_type, '') != '${PLAN_CONTINUATION_ITEM_TYPE}'
       AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
       AND COALESCE(item_type, '') != 'agent_attachment'
       AND COALESCE(item_type, '') NOT LIKE '${CHAT_VISUAL_ITEM_TYPE_PREFIX}%'
@@ -362,6 +394,9 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         message.author !== "user" &&
         message.itemType !== "commentary" &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+        message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
+        message.itemType !== CONVERSATION_MEMORY_CHANGES_ITEM_TYPE &&
+        message.itemType !== PLAN_CONTINUATION_ITEM_TYPE &&
         message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE &&
         message.itemType !== "agent_attachment" &&
         !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&

@@ -29,10 +29,10 @@ export function AboutSettingsScreen() {
     <SettingsContent>
       <SettingsSection title={t("mobile.settings.about.resources")}>
         <SettingsRow onPress={() => open("https://openbot.run")}>
-          <Typography.Paragraph type="body-sm">{t("mobile.settings.about.website")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.about.website")}</Typography.Paragraph>
         </SettingsRow>
-        <SettingsRow onPress={() => open("https://github.com/nightly-labs/openbot/blob/main/PRIVACY.md")}>
-          <Typography.Paragraph type="body-sm">{t("mobile.settings.about.privacy")}</Typography.Paragraph>
+        <SettingsRow onPress={() => open("https://openbot.run/privacy-policy")}>
+          <Typography.Paragraph>{t("mobile.settings.about.privacy")}</Typography.Paragraph>
         </SettingsRow>
         {error ? <SettingsNote>{error}</SettingsNote> : null}
       </SettingsSection>

@@ -6,7 +6,7 @@ import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   codexTag,
   cursorPackageUrl,
-  OPENCODE_UMBRELLA_PACKAGE,
+  OPENCODE_CLI_PACKAGE,
   providerRuntimeDescriptor,
   type RuntimeSpec,
   type RuntimeTarget,
@@ -75,7 +75,7 @@ const LATEST_RELEASES: Record<
     const release = yield* fetchJsonEffect(fetch, "https://api.github.com/repos/earendil-works/pi/releases/latest", {
       Accept: "application/vnd.github+json",
     });
-    const version = isString(release.tag_name) ? versionFromTag(release.tag_name) : null;
+    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
     const assetName = `pi-${target.replace("win32", "windows")}.${target === "win32-x64" ? "zip" : "tar.gz"}`;
     const asset = Array.isArray(release.assets)
       ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
@@ -152,7 +152,7 @@ const LATEST_RELEASES: Record<
     const pinned = providerRuntimeDescriptor("codex").spec(target, lock);
     const api = lock.codex.repository.replace("https://github.com/", "https://api.github.com/repos/");
     const release = yield* fetchJsonEffect(fetch, `${api}/releases/latest`, { Accept: "application/vnd.github+json" });
-    const version = isString(release.tag_name) ? versionFromTag(release.tag_name) : null;
+    const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "rust-v") : null;
     if (!(version && Array.isArray(release.assets))) {
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.codexReleaseShape")) });
     }
@@ -202,13 +202,13 @@ const LATEST_RELEASES: Record<
     fetch,
   }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
     const pinned = providerRuntimeDescriptor("opencode").spec(target, lock);
-    // The umbrella package names the release. Staging takes the LICENSE from it, so a platform
-    // package published before it is not offered yet.
-    const umbrella = yield* fetchJsonEffect(fetch, `${lock.opencode.registry}/${OPENCODE_UMBRELLA_PACKAGE}/latest`);
+    // The umbrella package names the release, so a platform package published before it is not
+    // offered yet.
+    const umbrella = yield* fetchJsonEffect(fetch, `${lock.opencode.registry}/${OPENCODE_CLI_PACKAGE}/latest`);
     const version = isString(umbrella.version) && VERSION.test(umbrella.version) ? umbrella.version : null;
     if (!version)
       return yield* new ProviderRuntimeFailure({
-        cause: new Error(sourceText("error.provider.releaseNoDownload", { name: OPENCODE_UMBRELLA_PACKAGE })),
+        cause: new Error(sourceText("error.provider.releaseNoDownload", { name: OPENCODE_CLI_PACKAGE })),
       });
     const artifact = yield* npmArtifactEffect(
       fetch,
@@ -396,9 +396,10 @@ function sha512Hex(integrity: string): string | null {
   return match?.[1] ? Buffer.from(match[1], "base64").toString("hex") : null;
 }
 
-function versionFromTag(tag: string): string | null {
-  const version = /^rust-v(\d+\.\d+\.\d+)$/u.exec(tag)?.[1];
-  return version ?? null;
+/** Codex tags each release `rust-v<version>`, and Pi tags it `v<version>`. */
+function versionFromTag(tag: string, prefix: "rust-v" | "v"): string | null {
+  const version = tag.startsWith(prefix) ? tag.slice(prefix.length) : "";
+  return VERSION.test(version) ? version : null;
 }
 
 /**

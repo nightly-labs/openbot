@@ -2,7 +2,7 @@ import type {
   AccountUsage,
   AccountUsageLimit,
   AgentStatus,
-  AgentSummary,
+  ClientAgentSummary,
   HostProviderAccounts,
 } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -30,7 +30,7 @@ function hostAgentAccount(host: HostProviderAccounts, agentId: string): string |
   return host.agents.find((agent) => agent.agentId === agentId)?.accountId;
 }
 
-export function withHostAgentAccount(agent: AgentSummary, host: HostProviderAccounts | null): AgentSummary {
+export function withHostAgentAccount(agent: ClientAgentSummary, host: HostProviderAccounts | null): ClientAgentSummary {
   if (!host) return agent;
   const accountId = hostAgentAccount(host, agent.id);
   if (accountId === agent.providerAccountId) return agent;
@@ -58,6 +58,18 @@ export function withHostAccountUsage(
   return { limits: [...usage.limits.filter((limit) => limit.accountId === undefined), ...accountLimits] };
 }
 
+/** Whether an account is connected in `next` and was not in `previous`. */
+function newlyConnected(previous: HostProviderAccounts, next: HostProviderAccounts): boolean {
+  const connected = (host: HostProviderAccounts) =>
+    host.providers.flatMap((row) =>
+      row.accounts
+        .filter((account) => account.state === "connected")
+        .map((account) => `${row.provider}\n${account.id}`),
+    );
+  const before = new Set(connected(previous));
+  return connected(next).some((key) => !before.has(key));
+}
+
 export interface HostAccountsSource {
   /** The joined server that serves `provider-accounts-v1` to this account, if any. */
   serverId: Accessor<string | undefined>;
@@ -77,6 +89,7 @@ export function createHostAccounts(source: HostAccountsSource) {
   const [limits, setLimits] = createSignal<AccountUsageLimit[]>([]);
   const isCurrent = createScopeGuard();
   let generation = 0;
+  let usageGeneration = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   async function refresh(): Promise<void> {
@@ -90,15 +103,20 @@ export function createHostAccounts(source: HostAccountsSource) {
     }
     const next = await source.accounts(serverId);
     if (!isCurrent() || request !== generation) return;
+    const previous = untrack(host);
     setHost(next);
     source.applied?.(next);
+    // The rail shows an account only with a reading, and the host sends no reading after a sign-in.
+    if (previous && newlyConnected(previous, next)) void refreshUsage().catch(() => undefined);
   }
 
   async function refreshUsage(): Promise<void> {
     const serverId = untrack(source.serverId);
     if (!serverId) return;
+    // Two reads can run together, such as after an account action and after a new account connects.
+    const request = ++usageGeneration;
     const usage = await source.usage(serverId);
-    if (isCurrent() && serverId === untrack(source.serverId)) setLimits(usage.limits);
+    if (isCurrent() && request === usageGeneration && serverId === untrack(source.serverId)) setLimits(usage.limits);
   }
 
   /** Several changes often come together, such as the status and the agents after a sign-in. */

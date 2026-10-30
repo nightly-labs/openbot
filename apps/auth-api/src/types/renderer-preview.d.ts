@@ -3,6 +3,7 @@ declare module "@openbot/renderer-preview" {
 
   export interface OpenBotPlaygroundProps {
     variant?: "default" | "landing";
+    theme?: "dark" | "light";
   }
 
   export function OpenBotPlayground(props: OpenBotPlaygroundProps): JSX.Element;

@@ -99,11 +99,20 @@ jobs:
       # The generated android/gradle.properties gives the Gradle daemon 512 MB of
       # Metaspace, and release lint runs out of it. Gradle reads the Gradle user
       # home file before the project file, so this value applies on the runner only.
+      # Each Gradle worker runs a CMake build with one compiler per core. Skia,
+      # Reanimated and Worklets compiled together with R8 can use all 16 GB of the
+      # runner, and then the runner stops the job. Two workers keep all cores busy.
       - name: Give Gradle more memory
         shell: bash
         run: |
           mkdir -p ~/.gradle
           echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+          echo 'org.gradle.workers.max=2' >> ~/.gradle/gradle.properties
+          sudo fallocate -l 8G /swapfile-build
+          sudo chmod 600 /swapfile-build
+          sudo mkswap /swapfile-build
+          sudo swapon /swapfile-build
+          free -h
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -118,10 +127,12 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: >-
-          bunx eas-cli@24.1.2 build
-          --platform android --profile production --local --non-interactive
-          --output "$AAB_PATH"
+        run: |
+          vmstat -S M 30 &
+          trap 'kill $!' EXIT
+          bunx eas-cli@24.1.2 build \
+            --platform android --profile production --local --non-interactive \
+            --output "$AAB_PATH"
 
       - name: Save signed AAB
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

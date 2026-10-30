@@ -1,0 +1,42 @@
+diff --git a/ios/RNUITextView.mm b/ios/RNUITextView.mm
+index 2f76e86a8cda5f8cb4154552f3bf5cead201ee53..8a7eeb85fcfcd76942aff137b996f17b7dbbf27c 100644
+--- a/ios/RNUITextView.mm
++++ b/ios/RNUITextView.mm
+@@ -240,7 +240,9 @@ static NSLineBreakMode RCTNSLineBreakModeFromEllipsizeMode(RNUITextViewEllipsize
+   const auto &props = *std::static_pointer_cast<RNUITextViewProps const>(_props);
+ 
+   const auto attrString = _state->getData().attributedString;
+-  const auto convertedAttrString = RCTNSAttributedStringFromAttributedString(attrString);
++  NSMutableAttributedString *convertedAttrString =
++      [RCTNSAttributedStringFromAttributedString(attrString) mutableCopy];
++  RCTApplyBaselineOffset(convertedAttrString);
+ 
+   // Setting attributedText clears any active text selection, and re-assigning
+   // the frame triggers a layout flush that has the same effect. Bail out
+@@ -700,6 +702,14 @@ static NSLineBreakMode RCTNSLineBreakModeFromEllipsizeMode(RNUITextViewEllipsize
+   }
+ 
+   if (sender.state == UIGestureRecognizerStateChanged && _pressIsActive) {
++    // A finger that travels is a drag, such as a scroll of the parent list.
++    // The text moves with the finger, so the lift stays on the span and would
++    // otherwise press it. A drag never presses.
++    if (sender.exceededLongPressMovement) {
++      [self invalidateActivePress];
++      [self clearPressHighlightAfterMinimumDuration];
++      return;
++    }
+     const auto location = [self getLocationOfPress:sender];
+     const auto isWithinRetention = [self isLocationWithinActivePressRect:location];
+     if (sender.exceededLongPressMovement || !isWithinRetention) {
+diff --git a/ios/RNUITextViewManager.mm b/ios/RNUITextViewManager.mm
+index e2e062d4f7be71217ffe479182cff4e71d0cbaac..47ea37e935ce559add45bbbc31ced0419c908d0c 100644
+--- a/ios/RNUITextViewManager.mm
++++ b/ios/RNUITextViewManager.mm
+@@ -1,6 +1,6 @@
+ #import <React/RCTViewManager.h>
+ #import <React/RCTUIManager.h>
+-#import "RCTBridge.h"
++#import <React/RCTBridge.h>
+ 
+ @interface RNUITextViewManager : RCTViewManager
+ @end

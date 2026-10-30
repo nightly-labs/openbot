@@ -14,7 +14,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamStore } from "../team-store";
-import type { TeamApiRemoteScreen } from "./dependencies";
+import type { TeamApiBrowser, TeamApiBrowserView, TeamApiRemoteScreen } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, pathIdentifier, readJson, requireAdmin, stringField } from "./request-helpers";
@@ -34,6 +34,9 @@ export interface TeamRouteDependencies {
     | "revokeSession"
   >;
   remoteScreen?: Pick<TeamApiRemoteScreen, "revokeTeamSession" | "revokeMember">;
+  /** A session or a member that ends gives back the browser tabs it controls. */
+  browser?: Pick<TeamApiBrowser, "releaseUserControlHeldBy">;
+  browserView?: Pick<TeamApiBrowserView, "revokeTeamSession">;
   createInvite?: TeamApiOptions["createInvite"];
   updateMember?: TeamApiOptions["updateMember"];
   removeMember?: TeamApiOptions["removeMember"];
@@ -47,6 +50,8 @@ export async function routeTeam(
   {
     store,
     remoteScreen,
+    browser,
+    browserView,
     createInvite,
     updateMember,
     removeMember: removeHostMember,
@@ -71,6 +76,7 @@ export async function routeTeam(
     if (removeHostMember && hostChanges(memberId)) return runCauseEffect(removeHostMember(memberId));
     await runCauseEffect(store.removeMember(memberId));
     await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(memberId)) : undefined);
+    browser?.releaseUserControlHeldBy({ kind: "member", memberId });
     refreshPresence();
   }
 
@@ -81,6 +87,8 @@ export async function routeTeam(
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.logout) {
     await runCauseEffect(store.logout(token));
     await (remoteScreen ? runCauseEffect(remoteScreen.revokeTeamSession(sessionId)) : undefined);
+    browser?.releaseUserControlHeldBy({ kind: "session", sessionId });
+    await (browserView ? runCauseEffect(browserView.revokeTeamSession(sessionId)) : undefined);
     refreshPresence();
     return empty(204);
   }
@@ -94,6 +102,7 @@ export async function routeTeam(
       ),
     );
     await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(member.id)) : undefined);
+    browser?.releaseUserControlHeldBy({ kind: "member", memberId: member.id });
     refreshPresence();
     return empty(204);
   }
@@ -155,7 +164,10 @@ export async function routeTeam(
     if (updateMember && hostChanges(memberId))
       return json(200, await runCauseEffect(updateMember({ memberId, ...patch })));
     const updated = await runCauseEffect(store.updateMember(memberId, patch));
-    if (updated.disabled) await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(updated.id)) : undefined);
+    if (updated.disabled) {
+      await (remoteScreen ? runCauseEffect(remoteScreen.revokeMember(updated.id)) : undefined);
+      browser?.releaseUserControlHeldBy({ kind: "member", memberId: updated.id });
+    }
     refreshPresence();
     return json(200, updated);
   }
@@ -208,6 +220,8 @@ export async function routeTeam(
     await runCauseEffect(store.revokeSession(revokedSessionId));
     await (onSessionRevoked ? runCauseEffect(onSessionRevoked(revokedSessionId)) : undefined);
     await (remoteScreen ? runCauseEffect(remoteScreen.revokeTeamSession(revokedSessionId)) : undefined);
+    browser?.releaseUserControlHeldBy({ kind: "session", sessionId: revokedSessionId });
+    await (browserView ? runCauseEffect(browserView.revokeTeamSession(revokedSessionId)) : undefined);
     refreshPresence();
     return empty(204);
   }

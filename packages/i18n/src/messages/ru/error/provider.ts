@@ -6,6 +6,10 @@ export const messages = {
     "OpenBot не удалось зарегистрировать серверы MCP в конфигурации Codex. Проверьте, что файл config.toml Codex корректен и доступен для записи, затем перезапустите OpenBot.",
   "error.provider.computerUseConfig":
     "OpenBot не смог зарегистрировать управление компьютером в конфигурации Codex. Убедитесь, что ваш config.toml для Codex корректен и доступен для записи, затем перезапустите OpenBot. Чтобы продолжить без него, отключите управление компьютером в настройках агента.",
+  "error.provider.codexUnresponsive": "Codex перестал отвечать, поэтому OpenBot завершил его процесс.",
+  "error.provider.acpUnresponsive": "{provider} не ответил вовремя, поэтому OpenBot завершил его процесс.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} не загрузил инструменты OpenBot, поэтому этот агент не может ими пользоваться и связываться с коллегами. Политика команды {provider} может блокировать локальные MCP-серверы. Попросите администратора команды разрешить их и повторите попытку.",
   "error.provider.endpointsReadOnly":
     "Сохранённые эндпоинты записаны более новой версией OpenBot, либо файл не читается. Чтобы изменить их, обновите OpenBot.",
   "error.provider.endpointNoSecureStorage":
@@ -56,6 +60,10 @@ export const messages = {
     "OpenBot не смог связаться с источниками релизов провайдеров. Проверьте соединение и повторите попытку.",
   "error.provider.runtimesUnsupported": "Среды выполнения провайдеров недоступны на этой платформе.",
   "error.provider.closing": "OpenBot закрывается.",
+  "error.provider.removeWhileOn": "Выключите провайдера, прежде чем удалять его загрузку.",
+  "error.provider.removeWhileDownloading": "Дождитесь окончания загрузки, затем удалите её.",
+  "error.provider.removeIncomplete": "Программа использует файлы этого CLI. Закройте её и повторите попытку.",
+  "error.provider.removeDownloadsFailed": "Не удалось удалить загруженные CLI: {providers}.",
   "error.provider.cliOverride": "Удалите явно заданный путь к CLI, прежде чем обновлять в OpenBot.",
   "error.provider.runtimeUpdateIncomplete": "Обновление среды выполнения не завершено.",
   "error.provider.downloadHttp": "Загрузка среды выполнения не удалась: HTTP {status}.",
@@ -93,11 +101,13 @@ export const messages = {
   "error.provider.modelsTooMany": "Слишком много моделей.",
   "error.provider.modelIdCharacter": "В ID модели есть недопустимый символ.",
   "error.provider.modelIdDuplicate": "У двух моделей одинаковый ID.",
+  "error.provider.contextWindowInvalid": "Контекстное окно модели должно быть целым числом токенов от {min} до {max}.",
   "error.provider.headersTooMany": "Слишком много заголовков.",
   "error.provider.headerNameCharacter": "В имени заголовка есть символ, недопустимый в HTTP.",
   "error.provider.headerNameTooLong": "Имя заголовка слишком длинное.",
   "error.provider.headerNameDuplicate": "У двух заголовков одинаковое имя.",
   "error.provider.headerValueInvalid": "Значение заголовка отсутствует или слишком длинное.",
+  "error.provider.headerValueMissing": "Введите значение заголовка {name}.",
   "error.provider.apiKeyTooLong": "API-ключ слишком длинный.",
   "error.provider.localOnly": "Провайдеров можно изменить только на компьютере, где работают агенты.",
   "error.provider.keyRequired": "Нужен ключ провайдера.",
@@ -113,6 +123,8 @@ export const messages = {
   "error.provider.codexNotStarted": "Codex CLI найден, но запустить его не удалось.",
   "error.provider.codexNotStartedHint":
     "Codex CLI найден, но запустить его не удалось. Выполните `codex --version` в новом терминале.",
+  "error.provider.codexManagedNotStarted":
+    "ChatGPT загружен, но запустить его не удалось. Загрузите его заново в OpenBot.",
   "error.provider.codexMissing": "ChatGPT не загружен. Загрузите его в OpenBot, чтобы продолжить.",
   "error.provider.codexConfigIgnored": {
     one: "Codex проигнорировал {count} настройку в своей конфигурации: {settings}. Исправьте или удалите её либо обновите Codex.",
@@ -131,6 +143,8 @@ export const messages = {
   "error.provider.claudeNotStarted": "Claude CLI найден, но запустить его не удалось.",
   "error.provider.claudeNotStartedHint":
     "Claude CLI найден, но запустить его не удалось. Выполните `claude --version` в новом терминале.",
+  "error.provider.claudeManagedNotStarted":
+    "Claude загружен, но запустить его не удалось. Загрузите его заново в OpenBot.",
   "error.provider.claudeMissing": "Claude не загружен. Загрузите его в OpenBot, чтобы продолжить.",
   "error.provider.grokOutdated": "Grok CLI {version} слишком старый. OpenBot требует версию 1.0.5 или новее.",
   "error.provider.grokNotStarted": "Grok CLI найден, но запустить его не удалось.",
@@ -172,8 +186,15 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
   "error.provider.cliBusyReconnect":
     "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем подключитесь заново.",
+  "error.provider.cliBusySignOut": "CLI {provider} обрабатывает ход. Дождитесь окончания, затем отключите.",
   "error.provider.opencodeCredentialsRejected":
     "Провайдер моделей отклонил API-ключ. Исправьте ключ OpenCode в настройках или ключ провайдера командой `opencode auth login`. Затем повторите попытку или выберите другую модель.\n{detail}",
+  "error.provider.opencodeAuthRequired":
+    "OpenCode не выполнил вход у провайдера модели «{provider}». Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
+  "error.provider.opencodeAuthRequiredUnknown":
+    "OpenCode не выполнил вход у провайдера этой модели. Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
+  "error.provider.opencodeKeyExpired":
+    "Срок действия API-ключа OpenCode истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
   "error.provider.opencodeServiceFailure":
     "OpenCode не смог завершить этот ход из-за сбоя локальной службы. Повторите попытку. Если ошибка повторяется, подключите OpenCode заново в настройках.",
   "error.provider.opencodeRateLimited":
@@ -182,10 +203,16 @@ export const messages = {
     "Провайдер моделей отклонил запрос из-за оплаты аккаунта. Ожидание не поможет. Добавьте способ оплаты или средства в аккаунте провайдера либо выберите другую модель.\n{detail}",
   "error.provider.opencodeInvalidUpload":
     "Провайдер моделей OpenCode сообщил о некорректном запросе на загрузку. Выберите другую модель и продолжайте. Проверьте сохранённые регулярные задачи, прежде чем создавать их заново.\n{detail}",
+  "error.provider.opencodeUnreadableContent":
+    "Эта модель не может прочитать файл или изображение в этом чате. Выберите модель, которая читает файлы, затем отправьте сообщение ещё раз.",
+  "error.provider.opencodeFreeLimit":
+    "Бесплатные модели OpenCode исчерпали лимит использования. Этот лимит общий для всех бесплатных моделей. Чтобы продолжить, вставьте ключ OpenCode Go в настройках OpenCode или выберите модель другого провайдера.",
   "error.provider.opencodeProviderFailed":
     "У провайдера моделей произошёл сбой на его стороне. Дело не в вашем соединении. Повторите попытку позже или выберите другую модель.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode не смог подключиться к провайдеру моделей. Проверьте сетевое подключение компьютера, где работает OpenBot, и повторите попытку.\n{detail}",
+  "error.provider.opencodeDatabaseNewer":
+    "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
   "error.provider.opencodeNoAnswer":
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -208,6 +235,8 @@ export const messages = {
   "error.provider.antigravitySignIn": "Войдите через Google, чтобы использовать Gemini.",
   "error.provider.antigravityRateLimited":
     "Gemini отклонил запрос: достигнут лимит частоты запросов или квота тарифа. Подождите несколько минут или выберите другую модель и повторите попытку.\n{detail}",
+  "error.provider.antigravityQuotaReached":
+    "Google сообщает, что достигнут лимит использования Gemini. Лимит может относиться к одной модели, поэтому на странице использования вашего тарифа может быть показан остаток. Выберите другую модель Gemini или дождитесь сброса.\n{detail}",
   "error.provider.antigravityModelUnavailable":
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
@@ -240,6 +269,8 @@ export const messages = {
   "error.provider.acpSignInStopped": "Вход прервался, не завершившись.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini не удалось открыть страницу входа. Установите браузер и xdg-utils, затем подключитесь из сеанса рабочего стола на этом хосте. Сервер без рабочего стола не может завершить этот вход.",
+  "error.provider.geminiBrowserOpenFailed":
+    "Gemini не удалось открыть страницу входа в браузере. Проверьте браузер по умолчанию и подключитесь снова.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -247,11 +278,17 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем подключитесь снова.",
+  "error.provider.keyProviderRefused":
+    "{provider} отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем повторите попытку.",
+  "error.provider.keyProviderNoBalance":
+    "На аккаунте {provider} для сохранённого ключа API нет средств. Пополните баланс аккаунта, затем повторите попытку.",
   "error.provider.messageTooLarge": "OpenBot остановил {provider}, потому что он отправил сообщение больше {limit} МБ.",
   "error.provider.customAgentIdInvalid":
     "ID агента должен состоять из строчных букв, цифр или `-` и не может совпадать с ID встроенного провайдера.",
   "error.provider.customAgentEnvInvalid":
     "Имя переменной должно состоять из букв, цифр или `_` и не начинаться с цифры. Каждое имя используйте один раз, всего не более 16 имён.",
+  "error.provider.customAgentUsagePromptInvalid":
+    "Команда использования должна быть одной строкой не длиннее 256 символов.",
   "error.provider.customAgentCommandInvalid":
     "Команда должна быть полным путём, путём, начинающимся с ~/, или именем команды без пробелов.",
   "error.provider.customAgentArgsInvalid":
@@ -283,11 +320,17 @@ export const messages = {
   "error.provider.useChangeFailed": "OpenBot не удалось изменить настройку провайдера.",
   "error.provider.accountsUnsupported": "{provider} поддерживает только один аккаунт.",
   "error.provider.accountNeedsConnection": "Подключите {provider}, прежде чем добавлять ещё один аккаунт.",
+  "error.provider.usageResetUnsupported": "{provider} не может сбрасывать лимиты использования.",
+  "error.provider.signOutUnsupported": "OpenBot не может отключить вход в {provider}.",
+  "error.provider.usageResetNotConnected":
+    "Снова войдите в этот аккаунт {provider}, прежде чем сбрасывать его использование.",
   "error.provider.accountLimit": "Максимум аккаунтов {provider}: {limit}.",
   "error.provider.accountNotFound":
     "Этого аккаунта {provider} нет на этом компьютере. Обновите список и повторите попытку.",
   "error.provider.accountAlreadyAdded": "Этот аккаунт {provider} уже подключён.",
   "error.provider.accountDefault": "Первый аккаунт {provider} нельзя удалить.",
+  "error.provider.accountUsesKey":
+    "Этот аккаунт {provider} использует сохранённый API-ключ и не имеет входа. Измените ключ в Настройки сервера → Провайдеры.",
   "error.provider.accountInUse": "Агент с этим аккаунтом сейчас работает. Попробуйте ещё раз, когда агент остановится.",
   "error.provider.accountsReadOnly":
     "Не удаётся прочитать сохранённые аккаунты провайдеров. Обновите OpenBot, прежде чем их менять.",
@@ -342,6 +385,9 @@ export const messages = {
   "error.provider.museAuthUnverified":
     "Аутентификация Muse не подтверждена. Подключитесь на компьютере-хосте или задайте ключ API Meta.",
   "error.provider.museSignIn": "Чтобы продолжить, войдите в Muse на компьютере-хосте.",
+  "error.provider.inceptionSignIn": "Чтобы продолжить, добавьте ключ API Inception.",
+  "error.provider.deepseekSignIn": "Добавьте ключ API DeepSeek, чтобы продолжить.",
+  "error.provider.openrouterSignIn": "Добавьте ключ API OpenRouter, чтобы продолжить.",
   "error.provider.terminalLoginFailed":
     "Не удалось открыть терминал для входа. Откройте CLI провайдера на этом хосте, войдите там, затем обновите список провайдеров.",
   "error.provider.nativeArchiveInvalid": "Загруженный файл провайдера не содержит корректной установки.",

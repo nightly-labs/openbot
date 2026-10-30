@@ -20,7 +20,7 @@ const { width: WIDTH, height: HEIGHT } = AGENT_TEMPLATE_CARD;
 const HERO = { x: 40, y: 40, size: 550, radius: 40 };
 const AVATAR_SIZE = 300;
 const COLUMN = { x: 650, width: 490 };
-const FONT = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+export const FONT = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 export async function renderAgentTemplateCard(preview: AgentTemplatePreview): Promise<Uint8Array> {
   const canvas = document.createElement("canvas");
@@ -172,12 +172,12 @@ async function drawColumn(
 }
 
 /** The app mark from `@openbot/brand`, with its CSS colours written onto the shapes. */
-async function drawLogo(
+export async function drawLogo(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   size: number,
-  colors: ThemeColors,
+  colors: Pick<ThemeColors, "logo" | "logoEye">,
 ): Promise<void> {
   const host = document.createElement("span");
   const dispose = render(() => <AppLogo variant="production" />, host);
@@ -219,7 +219,7 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, width: numbe
 }
 
 /** Cuts at a word where it can, so the line does not end in half a word. */
-function ellipsize(context: CanvasRenderingContext2D, text: string, width: number): string {
+export function ellipsize(context: CanvasRenderingContext2D, text: string, width: number): string {
   let value = text;
   while (value && context.measureText(`${value}…`).width > width) {
     const space = value.lastIndexOf(" ");

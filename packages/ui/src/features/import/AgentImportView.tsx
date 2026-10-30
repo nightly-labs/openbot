@@ -1,8 +1,10 @@
-import type {
-  AgentImportPreview,
-  AgentImportPreviewAgent,
-  AgentImportPreviewChannel,
-  AgentImportResult,
+import {
+  type AgentImportPreview,
+  type AgentImportPreviewAgent,
+  type AgentImportPreviewChannel,
+  type AgentImportResult,
+  type AgentImportSkillSource,
+  HERMES_EXPORT_SKILL_ID,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -18,8 +20,9 @@ import {
   FolderOpen,
   Hash,
   Info,
+  LabelTooltip,
+  LabelTooltipTrigger,
   SlidingTabs,
-  Tooltip,
   TriangleAlert,
   Upload,
 } from "@openbot/ui";
@@ -38,10 +41,18 @@ export type AgentImportPhase = "idle" | "reading" | "review" | "importing" | "do
 export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
 
 /**
- * How the user gets the export agent into Grok Bot. `agent`: install the ready one from its link.
- * `skill`: create a new agent there and add the export skill by hand.
+ * How the user starts the export. Grok Bot: `agent` installs the ready export agent from its link,
+ * `skill` adds the export skill to a new agent by hand. Hermes: `folder` reads the Hermes folder on
+ * this computer with no export, `command` installs the export skill with `/skills install`, and
+ * `skill` adds it by hand.
  */
-export type AgentImportSetup = "agent" | "skill";
+export type AgentImportSetup = "agent" | "skill" | "folder" | "command";
+
+const SETUPS: readonly AgentImportSetup[] = ["agent", "skill", "folder", "command"];
+
+/** What the user types in a Hermes chat to install the export skill, and then to run it. */
+export const HERMES_SKILL_COMMAND = `/skills install ${HERMES_EXPORT_SKILL_ID}`;
+const HERMES_EXPORT_PROMPT = "/openbot-export";
 
 /** The name of the export agent on its Grok Bot page. */
 const EXPORT_AGENT_NAME = "OpenBot export";
@@ -51,6 +62,8 @@ const EXPORT_SKILL_ID = "openbot-export";
 type CountKind = "agent" | "channel" | "skill" | "routine" | "memory" | "file";
 
 export interface AgentImportViewProps {
+  /** The app the export comes from. Grok Bot when not set. */
+  source?: AgentImportSkillSource;
   phase: AgentImportPhase;
   error?: string | null;
   preview?: AgentImportPreview | null;
@@ -62,6 +75,8 @@ export interface AgentImportViewProps {
   onSetupChange: (setup: AgentImportSetup) => void;
   onOpenExportAgent: () => void;
   onSaveExportSkill: () => void;
+  /** Hermes on this computer: reads its folder with no export. Without it, Hermes offers the export only. */
+  onReadFolder?: (() => void) | undefined;
   onChoose: () => void;
   onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
@@ -100,6 +115,8 @@ export function AgentImportView(props: AgentImportViewProps) {
       </Show>
       <Show when={props.phase === "idle" || (props.phase === "reading" && !props.preview)}>
         <ImportGuide
+          source={props.source ?? "grok-bot"}
+          onReadFolder={props.onReadFolder}
           reading={props.phase === "reading"}
           error={props.error}
           setup={props.setup}
@@ -115,8 +132,10 @@ export function AgentImportView(props: AgentImportViewProps) {
 }
 
 function ImportGuide(props: {
+  source: AgentImportSkillSource;
+  onReadFolder?: (() => void) | undefined;
   reading: boolean;
-  error?: string | null;
+  error?: string | null | undefined;
   setup: AgentImportSetup;
   exportSkill: string | null;
   onSetupChange: (setup: AgentImportSetup) => void;
@@ -126,13 +145,17 @@ function ImportGuide(props: {
 }) {
   const { t, format, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
+  const hermes = () => props.source === "hermes-agent";
+  // Reading the Hermes folder needs no export, so its tab has one step.
+  const exports = () => props.setup !== "folder";
+  const prompt = () => (hermes() ? HERMES_EXPORT_PROMPT : AGENT_IMPORT_PROMPT);
   return (
     <section class="agent-import-guide" aria-labelledby={headingId}>
       <header class="agent-import-intro">
         <h3 id={headingId} class="agent-import-heading">
-          {t("import.guide.title")}
+          {hermes() ? t("import.guide.hermesTitle") : t("import.guide.title")}
         </h3>
-        <p class="agent-import-lede">{t("import.guide.lede")}</p>
+        <p class="agent-import-lede">{hermes() ? t("import.guide.hermesLede") : t("import.guide.lede")}</p>
       </header>
 
       <Show when={props.error}>
@@ -145,31 +168,79 @@ function ImportGuide(props: {
             1
           </span>
           <div class="agent-import-step-body">
-            <p class="agent-import-step-title">{t("import.guide.step1")}</p>
+            <p class="agent-import-step-title">
+              {!hermes()
+                ? t("import.guide.step1")
+                : exports()
+                  ? t("import.guide.hermesStep1")
+                  : t("import.guide.hermesStepFolder")}
+            </p>
             <SlidingTabs.Root
               class="agent-import-setup"
               value={props.setup}
-              onChange={(value) => props.onSetupChange(value === "skill" ? "skill" : "agent")}
+              onChange={(value) => props.onSetupChange(SETUPS.find((setup) => setup === value) ?? props.setup)}
             >
-              <SlidingTabs.List aria-label={t("import.guide.setupLabel")}>
-                <SlidingTabs.Trigger value="agent">{t("import.guide.setupAgent")}</SlidingTabs.Trigger>
+              <SlidingTabs.List
+                aria-label={hermes() ? t("import.guide.hermesSetupLabel") : t("import.guide.setupLabel")}
+              >
+                <Show when={hermes() && props.onReadFolder}>
+                  <SlidingTabs.Trigger value="folder">{t("import.guide.setupFolder")}</SlidingTabs.Trigger>
+                </Show>
+                <Show
+                  when={hermes()}
+                  fallback={<SlidingTabs.Trigger value="agent">{t("import.guide.setupAgent")}</SlidingTabs.Trigger>}
+                >
+                  <SlidingTabs.Trigger value="command">{t("import.guide.setupCommand")}</SlidingTabs.Trigger>
+                </Show>
                 <SlidingTabs.Trigger value="skill">{t("import.guide.setupSkill")}</SlidingTabs.Trigger>
               </SlidingTabs.List>
               <SlidingTabs.ContentSlot>
-                <SlidingTabs.Content value="agent" class="agent-import-setup-panel">
-                  <div class="agent-import-card">
-                    <AgentAvatar seed="openbot-export" class="storage-row-avatar" />
-                    <span class="agent-import-card-copy">
-                      <span class="agent-import-card-name">{EXPORT_AGENT_NAME}</span>
-                      <span class="agent-import-card-meta">{t("import.guide.agentMeta")}</span>
-                    </span>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenExportAgent()}>
-                      <ExternalLink aria-hidden="true" />
-                      {t("import.guide.openAgent")}
-                    </Button>
-                  </div>
-                  <p class="agent-import-step-note">{t("import.guide.agentNote")}</p>
-                </SlidingTabs.Content>
+                <Show when={hermes() && props.onReadFolder}>
+                  {(readFolder) => (
+                    <SlidingTabs.Content value="folder" class="agent-import-setup-panel agent-import-setup-folder">
+                      <Button type="button" variant="ghost" class="agent-import-picker" onClick={() => readFolder()()}>
+                        <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
+                        <span class="agent-import-picker-copy">
+                          <span class="agent-import-picker-title">{t("import.guide.readFolder")}</span>
+                          <span class="agent-import-picker-meta">{t("import.guide.readFolderMeta")}</span>
+                        </span>
+                      </Button>
+                      <p class="agent-import-step-note">{t("import.guide.readFolderNote")}</p>
+                    </SlidingTabs.Content>
+                  )}
+                </Show>
+                <Show
+                  when={hermes()}
+                  fallback={
+                    <SlidingTabs.Content value="agent" class="agent-import-setup-panel">
+                      <div class="agent-import-card">
+                        <AgentAvatar seed="openbot-export" class="storage-row-avatar" />
+                        <span class="agent-import-card-copy">
+                          <span class="agent-import-card-name">{EXPORT_AGENT_NAME}</span>
+                          <span class="agent-import-card-meta">{t("import.guide.agentMeta")}</span>
+                        </span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenExportAgent()}>
+                          <ExternalLink aria-hidden="true" />
+                          {t("import.guide.openAgent")}
+                        </Button>
+                      </div>
+                      <p class="agent-import-step-note">{t("import.guide.agentNote")}</p>
+                    </SlidingTabs.Content>
+                  }
+                >
+                  <SlidingTabs.Content value="command" class="agent-import-setup-panel">
+                    <div class="agent-import-prompt">
+                      <code class="agent-import-prompt-text agent-import-command">{HERMES_SKILL_COMMAND}</code>
+                      <CopyButton
+                        iconOnly
+                        value={HERMES_SKILL_COMMAND}
+                        label={t("import.guide.copyCommand")}
+                        copiedLabel={t("import.guide.commandCopied")}
+                      />
+                    </div>
+                    <p class="agent-import-step-note">{t("import.guide.commandNote")}</p>
+                  </SlidingTabs.Content>
+                </Show>
                 <SlidingTabs.Content value="skill" class="agent-import-setup-panel">
                   <div class="agent-import-card">
                     <File class="agent-import-card-icon" aria-hidden="true" />
@@ -192,52 +263,58 @@ function ImportGuide(props: {
                       {t("import.guide.saveFile")}
                     </Button>
                   </div>
-                  <p class="agent-import-step-note">{t("import.guide.skillNote")}</p>
+                  <p class="agent-import-step-note">
+                    {hermes() ? t("import.guide.hermesSkillNote") : t("import.guide.skillNote")}
+                  </p>
                 </SlidingTabs.Content>
               </SlidingTabs.ContentSlot>
             </SlidingTabs.Root>
           </div>
         </li>
-        <li class="agent-import-step">
-          <span class="agent-import-marker" aria-hidden="true">
-            2
-          </span>
-          <div class="agent-import-step-body">
-            <p class="agent-import-step-title">{t("import.guide.step2")}</p>
-            <div class="agent-import-prompt">
-              <span class="agent-import-prompt-text">{AGENT_IMPORT_PROMPT}</span>
-              <CopyButton
-                iconOnly
-                value={AGENT_IMPORT_PROMPT}
-                label={t("import.guide.copyMessage")}
-                copiedLabel={t("import.guide.messageCopied")}
-              />
+        <Show when={exports()}>
+          <li class="agent-import-step">
+            <span class="agent-import-marker" aria-hidden="true">
+              2
+            </span>
+            <div class="agent-import-step-body">
+              <p class="agent-import-step-title">{t("import.guide.step2")}</p>
+              <div class="agent-import-prompt">
+                <span class="agent-import-prompt-text">{prompt()}</span>
+                <CopyButton
+                  iconOnly
+                  value={prompt()}
+                  label={t("import.guide.copyMessage")}
+                  copiedLabel={t("import.guide.messageCopied")}
+                />
+              </div>
+              <p class="agent-import-step-note">
+                {hermes() ? t("import.guide.hermesMessageNote") : t("import.guide.messageNote")}
+              </p>
             </div>
-            <p class="agent-import-step-note">{t("import.guide.messageNote")}</p>
-          </div>
-        </li>
-        <li class="agent-import-step">
-          <span class="agent-import-marker" aria-hidden="true">
-            3
-          </span>
-          <div class="agent-import-step-body">
-            <p class="agent-import-step-title">{t("import.guide.step3")}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              class="agent-import-picker"
-              loading={props.reading}
-              loadingLabel={t("import.guide.reading")}
-              onClick={() => props.onChoose()}
-            >
-              <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
-              <span class="agent-import-picker-copy">
-                <span class="agent-import-picker-title">{t("import.guide.choose")}</span>
-                <span class="agent-import-picker-meta">{t("import.guide.chooseNote")}</span>
-              </span>
-            </Button>
-          </div>
-        </li>
+          </li>
+          <li class="agent-import-step">
+            <span class="agent-import-marker" aria-hidden="true">
+              3
+            </span>
+            <div class="agent-import-step-body">
+              <p class="agent-import-step-title">{t("import.guide.step3")}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                class="agent-import-picker"
+                loading={props.reading}
+                loadingLabel={t("import.guide.reading")}
+                onClick={() => props.onChoose()}
+              >
+                <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
+                <span class="agent-import-picker-copy">
+                  <span class="agent-import-picker-title">{t("import.guide.choose")}</span>
+                  <span class="agent-import-picker-meta">{t("import.guide.chooseNote")}</span>
+                </span>
+              </Button>
+            </div>
+          </li>
+        </Show>
       </ol>
     </section>
   );
@@ -247,8 +324,8 @@ function ImportReview(props: {
   preview: AgentImportPreview;
   reading: boolean;
   importing: boolean;
-  error?: string | null;
-  now?: Date;
+  error?: string | null | undefined;
+  now?: Date | undefined;
   onChoose: () => void;
   onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
@@ -496,24 +573,36 @@ function NameExistsHint(props: { name: string }) {
   const { t } = useText();
   const text = () => t("import.review.nameExists", { name: props.name });
   return (
-    <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
-      <Tooltip.Trigger as="span" tabindex={0} class="agent-import-name-hint" aria-label={text()}>
+    <LabelTooltip content={text()}>
+      <LabelTooltipTrigger as="span" tabindex={0} class="agent-import-name-hint" aria-label={text()}>
         <Info aria-hidden="true" />
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content class="ui-tooltip agent-import-name-tooltip">{text()}</Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+      </LabelTooltipTrigger>
+    </LabelTooltip>
   );
 }
 
-function ImportResult(props: {
+/** The result of one import. A Hermes import names the agents it updated rather than made. */
+export function ImportResult(props: {
   result: AgentImportResult;
+  /** Ids of the agents in the result that existed before the import. */
+  updated?: ReadonlySet<string> | undefined;
   onOpenAgent: (agentId: string) => void;
   onDone: () => void;
 }) {
   const { t, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
+  const updates = () => props.result.agents.filter((agent) => props.updated?.has(agent.id)).length;
+  const created = () => props.result.agents.length - updates();
+  const doneLabel = () => {
+    if (props.result.channels.length > 0)
+      return t("import.result.importedBoth", {
+        agents: countLabel(props.result.agents.length, "agent", t),
+        channels: countLabel(props.result.channels.length, "channel", t),
+      });
+    if (updates() === 0) return t("import.result.importedAgents", { agents: countLabel(created(), "agent", t) });
+    if (created() === 0) return t("import.result.updatedAgents", { count: updates() });
+    return t("import.result.importedAndUpdated", { agents: countLabel(created(), "agent", t), updates: updates() });
+  };
   const notImported = () => props.result.skipped.length + props.result.skippedChannels.length;
   const notImportedLabel = () => {
     const agents = countLabel(props.result.skipped.length, "agent", t);
@@ -532,12 +621,7 @@ function ImportResult(props: {
           <Show when={props.result.agents.length > 0}>
             <CircleCheck class="agent-import-done-icon" aria-hidden="true" />
           </Show>
-          {props.result.channels.length > 0
-            ? t("import.result.importedBoth", {
-                agents: countLabel(props.result.agents.length, "agent", t),
-                channels: countLabel(props.result.channels.length, "channel", t),
-              })
-            : t("import.result.importedAgents", { agents: countLabel(props.result.agents.length, "agent", t) })}
+          {doneLabel()}
         </p>
         <Show when={notImported() > 0}>
           <p class="storage-summary-caption">{notImportedLabel()}</p>
@@ -684,7 +768,9 @@ function countLabel(count: number, kind: CountKind, t: AppTranslate): string {
 }
 
 function sourceLabel(app: string): string {
-  return app === "grok-bot" ? "Grok Bot" : app;
+  if (app === "grok-bot") return "Grok Bot";
+  if (app === "hermes-agent") return "Hermes Agent";
+  return app;
 }
 
 function formatDate(value: string, format: AppFormat, now = new Date()): string {

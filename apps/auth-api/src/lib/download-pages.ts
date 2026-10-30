@@ -279,7 +279,7 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
         title: "A server with no screen",
         steps: [
           {
-            text: "On Ubuntu 24.04 with systemd, install OpenBot as an always-on server of your account, then sign in with an email code:",
+            text: "On Ubuntu 24.04 or 26.04 with systemd, install OpenBot as an always-on server of your account, then sign in with an email code:",
             code: "curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash\nsudo openbot login",
           },
           { text: "Then use it from the desktop app, the mobile app or openbot.run/app." },
@@ -287,10 +287,9 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
       },
     ],
     notes: [
-      "Each release is tested on Ubuntu 24.04 on x64.",
+      "Each release is tested on Ubuntu 24.04 on x64. OpenBot also runs on Ubuntu 26.04.",
       UPDATES_NOTE,
       NETWORK_NOTE,
-      "Voice prompts are not available on Linux.",
       "Remote desktop works with the x64 AppImage in an X11 session, such as Xorg or Xvfb. It does not work under Wayland, and the arm64 AppImage does not include it.",
     ],
     faq: [
@@ -316,43 +315,34 @@ export const DOWNLOAD_PAGES: Record<DownloadPagePlatform, DownloadPageContent> =
     name: "iPhone",
     title: "Download OpenBot for iPhone: your AI agents on your phone",
     description:
-      "Join the OpenBot for iPhone beta on TestFlight. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
+      "Get OpenBot for iPhone on the App Store. Chat with the AI agents on your computer, follow their work and send files from anywhere.",
     heading: "OpenBot for iPhone",
     intro:
-      "Chat with the agents on your computer from anywhere, follow their progress and send them files. The app is in public beta on TestFlight.",
+      "Chat with the agents on your computer from anywhere, follow their progress and send them files. Get the app on the App Store.",
     installers: [
       {
-        label: "Join the TestFlight beta",
-        shortLabel: "TestFlight beta",
-        detail: "Install TestFlight from the App Store first",
+        label: "Download on the App Store",
+        shortLabel: "App Store",
+        detail: "For an iPhone with iOS 16.4 or later",
         href: MOBILE_APPS.ios.href,
         external: true,
       },
     ],
     specs: [
       { label: "System", value: "iOS 16.4 or later" },
-      { label: "Store", value: "TestFlight public beta" },
+      { label: "Store", value: "App Store" },
       { label: "Needs", value: "OpenBot on a computer" },
-      { label: "Updates", value: "Through TestFlight" },
+      { label: "Updates", value: "Through the App Store" },
     ],
     installSteps: [
       COMPUTER_STEP,
-      { text: "On your iPhone, install TestFlight from the App Store." },
-      { text: "Open the TestFlight invite on your iPhone. In TestFlight, tap Accept, then Install." },
+      { text: "On your iPhone, install OpenBot from the App Store." },
       GENERATE_CODE_STEP,
       { text: "Open OpenBot on your iPhone, choose Scan QR code and point the camera at the code." },
     ],
     extraSections: [],
     notes: PHONE_NOTES,
-    faq: [
-      { question: "Is OpenBot for iPhone free?", answer: PHONE_FREE_ANSWER },
-      {
-        question: "Why is the iPhone app on TestFlight?",
-        answer:
-          "OpenBot for iPhone is in public beta. Anyone with the invite link can join, and TestFlight installs each new beta build.",
-      },
-      PHONE_COMPUTER_QUESTION,
-    ],
+    faq: [{ question: "Is OpenBot for iPhone free?", answer: PHONE_FREE_ANSWER }, PHONE_COMPUTER_QUESTION],
     operatingSystem: "iOS 16.4 or later",
   },
   android: {

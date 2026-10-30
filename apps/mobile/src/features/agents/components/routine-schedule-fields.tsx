@@ -21,11 +21,11 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
+import { nativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
 
 const PROBLEM_TEXT = {
-  endBeforeStart: "mobile.agent.record.problem.endBeforeStart",
   invalidDate: "mobile.agent.record.problem.invalidDate",
   cronRequired: "mobile.agent.record.problem.cronRequired",
   cronTooLong: "mobile.agent.record.problem.cronTooLong",
@@ -114,6 +114,7 @@ export function RoutineScheduleFields({
                   label={t("mobile.agent.record.allDay")}
                   value={draft.window === null}
                   disabled={disabled}
+                  modifiers={nativeLabelFont}
                   onValueChange={(allDay) =>
                     onChange(
                       allDay

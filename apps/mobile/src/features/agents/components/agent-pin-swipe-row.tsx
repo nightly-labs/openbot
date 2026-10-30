@@ -100,7 +100,7 @@ export function AgentPinSwipeRow({
   const { t } = useText();
 
   return (
-    <GestureDetector gesture={swipe.gesture}>
+    <GestureDetector gesture={swipe.detectorGesture}>
       <ReanimatedSwipeable
         ref={swipe.swipeable}
         enabled={!swipe.pinPending}
@@ -111,8 +111,8 @@ export function AgentPinSwipeRow({
         overshootFriction={1}
         rightThreshold={PIN_REVEAL_DISTANCE / 2}
         enableTrackpadTwoFingerGesture
-        simultaneousWithExternalGesture={swipe.gesture}
-        requireExternalGestureToFail={openingGesture}
+        simultaneousWith={swipe.gesture}
+        requireToFail={swipe.swipeRequires}
         onSwipeableWillOpen={swipe.onWillOpen}
         onSwipeableWillClose={swipe.onWillClose}
         onSwipeableClose={swipe.onClose}

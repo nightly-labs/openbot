@@ -14,7 +14,11 @@ export interface BrowserPort {
     | "getDisplayState"
     | "hidePictureInPicture"
     | "onDisplayState"
+    | "onLiveViewEvent"
+    | "sendLiveViewInput"
     | "setVisible"
+    | "startLiveView"
+    | "stopLiveView"
   >;
 }
 

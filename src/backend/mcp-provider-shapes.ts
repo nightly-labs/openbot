@@ -8,11 +8,12 @@ import {
   COMPUTER_USE_MCP_SERVER_ID,
   isReservedMcpServerName,
   type McpServerConfig,
+  type McpTransport,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
-import { runInLoginShell } from "./cli";
+import { isWindowsRunnable, runInLoginShell } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
@@ -47,14 +48,31 @@ export const NO_MCP_TOOL_RUNTIMES: McpToolRuntimes = { binDirectories: [], comma
 export type McpToolRuntimeSource = () => McpToolRuntimes;
 
 /**
- * The bearer token for an http server this machine has signed in to, or `null` for every other one.
+ * Where one http server is reached, and the bearer OpenBot adds, asked at each spawn.
  *
- * Read at each spawn and never stored on the row: the token is OpenBot's to refresh, and a value in
- * the configuration would be a credential the panel shows, the Team API carries and a user edits.
- * Asked per configuration rather than per URL, so a listing that grows a second way in can answer
- * differently without this signature moving.
+ * The bearer is never stored on the row: a value in the configuration would be a credential the
+ * panel shows, the Team API carries and a user edits. A server OpenBot signed in to is reached
+ * through the loopback OAuth proxy (`McpOAuthProxy`): `url` is then the proxy route, `authorization`
+ * is that route's own bearer, and the OAuth token never leaves this process. Asked per
+ * configuration rather than per URL, because two rows on one URL are two routes.
  */
-export type McpAuthorizationSource = (config: McpServerConfig) => Effect.Effect<string | null, McpOperationError>;
+export interface McpEndpoint {
+  url: string;
+  authorization: string | null;
+  /** Through the proxy, which adds the row's own headers upstream; the provider is given none of them. */
+  proxied: boolean;
+}
+
+/** An http server that cannot be handed over, with the sentence the drop report shows. */
+export interface McpEndpointRefusal {
+  error: string;
+}
+
+/** `agentId` is the agent whose session connects, or `null` for a session that has none. */
+export type McpEndpointSource = (
+  config: McpServerConfig,
+  agentId: string | null,
+) => Effect.Effect<McpEndpoint | McpEndpointRefusal, McpOperationError>;
 
 /**
  * Why an enabled configuration was not given to a provider.
@@ -63,7 +81,12 @@ export type McpAuthorizationSource = (config: McpServerConfig) => Effect.Effect<
  * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
  * say so without probing anything.
  */
-type McpDropReason = "command_not_found" | "working_directory_unsupported" | "name_conflict" | "unusable";
+type McpDropReason =
+  | "command_not_found"
+  | "working_directory_unsupported"
+  | "name_conflict"
+  | "unusable"
+  | "failed_to_start";
 
 /** One server a provider did not get, named so the user can be told which one and why. */
 export interface McpServerDrop {
@@ -91,7 +114,7 @@ export interface McpHandoff<T> {
   dropped: McpServerDrop[];
 }
 
-/** Said by both providers that cannot carry one, so the user reads the same sentence either way. */
+/** Said by the providers that cannot carry one, so the user reads the same sentence each time. */
 const WORKING_DIRECTORY_UNSUPPORTED = "This provider cannot start a server in a working directory.";
 
 /** Said when two names differ only in characters the provider replaces. */
@@ -109,8 +132,12 @@ export type UsableMcpServer =
       command: string;
       workingDirectory: string;
       path: string | null;
-      /** The bearer token OpenBot holds for this server, added at hand-off. `null` for all others. */
+      /** Where an http server is reached: its own URL, or a route of the OAuth proxy. `""` for stdio. */
+      url: string;
+      /** The bearer OpenBot adds at hand-off. `null` for all others. */
       authorization: string | null;
+      /** See `McpEndpoint.proxied`. */
+      proxied: boolean;
       error?: undefined;
       reason?: undefined;
     }
@@ -119,7 +146,9 @@ export type UsableMcpServer =
       command?: undefined;
       workingDirectory?: undefined;
       path?: undefined;
+      url?: undefined;
       authorization?: undefined;
+      proxied?: undefined;
       error: string;
       /** Machine-readable beside the sentence, so a reporter never has to match on the wording. */
       reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict">;
@@ -153,13 +182,23 @@ export function computerUseParam(params: unknown): boolean {
   return !isDynamicRecord(params) || params.computerUse !== false;
 }
 
+/**
+ * The agent of a `thread/start` or `thread/resume`. `ThreadLifecycle` sends `openbotAgentId` to
+ * Claude and the ACP clients, which read the MCP servers themselves, so that the proxy can name the
+ * agent to a server it signed in to.
+ */
+export function mcpAgentParam(params: unknown): string | null {
+  return isDynamicRecord(params) && typeof params.openbotAgentId === "string" ? params.openbotAgentId : null;
+}
+
 export const usableMcpServers = Effect.fnUntraced(function* (
   configs: readonly McpServerConfig[],
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
-  authorization?: McpAuthorizationSource,
+  endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ) {
   const candidates = configs.filter((config) => config.enabled && !isReservedMcpServerName(config.name));
-  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, authorization), {
+  return yield* Effect.forEach(candidates, (config) => usableMcpServer(config, tools, endpoint, agentId), {
     concurrency: "unbounded",
   });
 });
@@ -167,20 +206,18 @@ export const usableMcpServers = Effect.fnUntraced(function* (
 export const usableMcpServer = Effect.fnUntraced(function* (
   config: McpServerConfig,
   tools: McpToolRuntimes = NO_MCP_TOOL_RUNTIMES,
-  authorization?: McpAuthorizationSource,
+  endpoint?: McpEndpointSource,
+  agentId: string | null = null,
 ): Effect.fn.Return<UsableMcpServer, McpShapeFailed> {
   // An http server starts no process, so it needs neither a command nor a `PATH`. It is the only
   // kind that can carry a sign-in, because a token travels in a header.
   if (config.transport !== "stdio") {
-    return {
-      config,
-      command: "",
-      workingDirectory: "",
-      path: null,
-      authorization: authorization
-        ? yield* authorization(config).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
-        : null,
-    };
+    const resolved = endpoint
+      ? yield* endpoint(config, agentId).pipe(Effect.mapError(({ cause }) => new McpShapeFailed({ cause })))
+      : { url: config.url, authorization: null, proxied: false };
+    // Never the raw token instead: a proxy that cannot start is a server this hand-off leaves out.
+    if ("error" in resolved) return { config, error: resolved.error, reason: "unusable" };
+    return { config, command: "", workingDirectory: "", path: null, ...resolved };
   }
   // A `PATH` the configuration carries is the one the server runs with, so it is the one the command
   // is looked up in: `python` with a virtual environment's `PATH` names that interpreter, and the
@@ -199,7 +236,9 @@ export const usableMcpServer = Effect.fnUntraced(function* (
     command,
     workingDirectory: expandHomePath(config.workingDirectory),
     path,
+    url: "",
     authorization: null,
+    proxied: false,
   };
 });
 
@@ -299,9 +338,6 @@ export function clearMcpCommandCache(): void {
   resolvedCommands.clear();
 }
 
-/** The extensions Windows runs when `PATHEXT` is unset, in the order the system itself uses. */
-const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
-
 /**
  * The first `where.exe` line this machine can actually spawn.
  *
@@ -319,20 +355,7 @@ export function pickWindowsExecutable(stdout: string, pathext: string | undefine
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  const runnable = new Set(
-    (pathext?.trim() || DEFAULT_PATHEXT)
-      .split(";")
-      .map((entry) => entry.trim().toLowerCase())
-      .filter((entry) => entry.startsWith(".")),
-  );
-  return lines.find((line) => runnable.has(windowsExtension(line))) ?? lines[0] ?? null;
-}
-
-/** The last extension of a path, or `""`. A dot inside a directory name is not one. */
-function windowsExtension(line: string): string {
-  const dot = line.lastIndexOf(".");
-  const separator = Math.max(line.lastIndexOf("\\"), line.lastIndexOf("/"));
-  return dot > separator ? line.slice(dot).toLowerCase() : "";
+  return lines.find((line) => isWindowsRunnable(line, pathext)) ?? lines[0] ?? null;
 }
 
 const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
@@ -466,7 +489,7 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandof
             env: mcpLaunchEnvironment(server),
             ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
           }
-        : { type: "http", url: config.url, headers: mcpHandoffHeaders(server) };
+        : { type: "http", url: server.url, headers: mcpHandoffHeaders(server) };
   }
   return { servers: record, dropped };
 }
@@ -479,6 +502,11 @@ export function claudeMcpServers(servers: readonly UsableMcpServer[]): McpHandof
  * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
  * create a second, empty database beside the agent's workspace. The form says so before the save,
  * the row says so afterwards, and the hand-off reports it as a drop.
+ *
+ * **Names travel as `providerMcpServerName`.** Antigravity refuses `session/new` with `invalid
+ * params` when one name has a space, so a server the user named "My Server" failed every Gemini
+ * task (#2801). A changed name that another server already has, such as "computer use", or that is
+ * one of OpenBot's own, is reported as a drop. So is the second of two names that become the same.
  */
 export type AcpMcpServer =
   | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
@@ -487,12 +515,21 @@ export type AcpMcpServer =
 export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
+  const configured = new Set(servers.map((server) => server.config.name));
   for (const server of servers) {
     if (server.error !== undefined) {
       dropped.push(unusableDrop(server));
       continue;
     }
     const { config } = server;
+    const name = providerMcpServerName(config.name);
+    if (
+      entries.some((entry) => entry.name === name) ||
+      (name !== config.name && (configured.has(name) || isReservedMcpServerName(name)))
+    ) {
+      dropped.push({ name: config.name, reason: "name_conflict", detail: NAME_CONFLICT });
+      continue;
+    }
     if (config.transport === "stdio") {
       if (config.workingDirectory) {
         dropped.push({
@@ -503,7 +540,7 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
         continue;
       }
       entries.push({
-        name: config.name,
+        name,
         command: server.command,
         args: [...config.args],
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
@@ -511,8 +548,8 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
     } else {
       entries.push({
         type: "http",
-        name: config.name,
-        url: config.url,
+        name,
+        url: server.url,
         headers: Object.entries(mcpHandoffHeaders(server)).map(([name, value]) => ({ name, value })),
       });
     }
@@ -524,37 +561,74 @@ export function acpMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<A
  * Codex reads `config.mcp_servers`, a record keyed by name, which `profile-generation.ts` already
  * writes to disable the user's own servers.
  *
- * **stdio needs no working directory.** Neither a key for a working directory nor any other guess
- * could be confirmed against the pinned Codex app-server, and a guessed key name would fail
- * silently at the next turn. A server that names a directory is left out of the Codex payload
- * instead: a directory that does not arrive would start the server in the wrong place, which a
- * server told to open `./data.db` answers by creating a second database. Every other capable
- * provider still gets it.
+ * **stdio takes its working directory as `cwd`.** Codex starts the server there; without it, Codex
+ * starts it in its own directory. A server whose start script names a local `.venv` was left out
+ * when OpenBot did not send the key, so a Codex agent had no tools from it (#3869).
  *
  * **http travels as `url` with `http_headers`.** Both were confirmed against the pinned Codex
  * app-server: an entry with an invalid credential is listed as failed with the server's own 401,
  * which is the handshake reaching the server rather than the shape being dropped.
  *
- * **Names travel as `codexMcpServerName`.** Codex does not start a server whose name does not match
+ * **Names travel as `providerMcpServerName`.** Codex does not start a server whose name does not match
  * `^[a-zA-Z0-9_-]+$`, and it tells no one. A server the user named "Home Assistant" passed its test
  * and gave a Codex agent no tools. Two names that become the same key keep the first; the second is
  * reported as a drop.
+ *
+ * **A key Codex's own files use with the other transport travels as `openbot_<key>`.** See
+ * `codexMcpServerKey`.
  */
 export type CodexMcpServer =
-  | { command: string; args: string[]; env: Record<string, string>; enabled?: boolean; tools?: DynamicRecord }
+  | {
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      cwd?: string;
+      enabled?: boolean;
+      tools?: DynamicRecord;
+    }
   | { url: string; http_headers: Record<string, string> };
+
+/**
+ * The disabled placeholders OpenBot saves in the Codex user file for its own servers, so Codex can
+ * keep their tool approvals. They are not the user's entries.
+ */
+export const CODEX_PLACEHOLDER_COMMAND = "openbot-mcp";
+export const CODEX_PLACEHOLDER_URL = "http://127.0.0.1:1";
+
+/** The transport of each server that Codex's own files declare, without OpenBot's placeholders. */
+export type CodexOwnTransports = Readonly<Record<string, McpTransport>>;
+
+/** What Codex declares in its own files: each name turned off, and the transport each one uses. */
+export interface CodexOwnServers {
+  disabled: Record<string, CodexDisabledMcpServer>;
+  transports: CodexOwnTransports;
+}
+
+export function codexOwnTransports(configured: DynamicRecord | null): CodexOwnTransports {
+  return Object.fromEntries(
+    Object.entries(configured ?? {}).flatMap(([name, entry]): Array<[string, McpTransport]> => {
+      if (!isDynamicRecord(entry)) return [];
+      if (typeof entry.command === "string" && entry.command !== CODEX_PLACEHOLDER_COMMAND) return [[name, "stdio"]];
+      if (typeof entry.url === "string" && entry.url !== CODEX_PLACEHOLDER_URL) return [[name, "http"]];
+      return [];
+    }),
+  );
+}
 
 export const codexDisabledServers = Effect.fn("McpShape.codexDisabledServers")(function* (
   readConfig: () => Effect.Effect<DynamicRecord, McpShapeFailed>,
-) {
+): Effect.fn.Return<CodexOwnServers, McpShapeFailed> {
   const config = yield* readConfig();
   const configured = getRecord(getRecord(config, "config"), "mcp_servers");
-  return Object.fromEntries(
-    Object.keys(configured ?? {}).map((name) => {
-      const tools = getRecord(getRecord(configured, name), "tools");
-      return [name, { enabled: false, ...(tools ? { tools } : {}) } satisfies CodexDisabledMcpServer];
-    }),
-  );
+  return {
+    disabled: Object.fromEntries(
+      Object.keys(configured ?? {}).map((name) => {
+        const tools = getRecord(getRecord(configured, name), "tools");
+        return [name, { enabled: false, ...(tools ? { tools } : {}) } satisfies CodexDisabledMcpServer];
+      }),
+    ),
+    transports: codexOwnTransports(configured),
+  };
 });
 
 /** A name Codex found in its own file and must not start. It carries no command; that is the point. */
@@ -563,12 +637,73 @@ export interface CodexDisabledMcpServer {
   tools?: DynamicRecord;
 }
 
-/** A server name in the form Codex accepts. Claude makes the same change by itself. */
-export function codexMcpServerName(name: string): string {
+/** A server name in the form Codex and ACP agents accept. Claude makes the same change by itself. */
+export function providerMcpServerName(name: string): string {
   return name.replace(/[^A-Za-z0-9_-]/gu, "_");
 }
 
-export function codexMcpServers(servers: readonly UsableMcpServer[]): McpHandoff<Record<string, CodexMcpServer>> {
+/**
+ * The key one server travels under to Codex. Codex merges a thread entry with the entry of the same
+ * key in its own files. A stdio `command` and an http `url` under one key stop Codex from loading
+ * its configuration at all, and the chat cannot start. The server then travels as `openbot_<key>`,
+ * and the user's own entry stays as written, turned off. A clash with the same transport keeps the
+ * key.
+ *
+ * Computer Use keeps its key: its tool consent and its instructions are found by that name.
+ */
+export function codexMcpServerKey(config: McpServerConfig, own: CodexOwnTransports = {}): string {
+  const name = providerMcpServerName(config.name);
+  return config.id !== COMPUTER_USE_MCP_SERVER_ID && Object.hasOwn(own, name) && own[name] !== config.transport
+    ? `openbot_${name}`
+    : name;
+}
+
+/** Whether a key from `codexMcpServerKey` is taken by another server, or a renamed key by OpenBot's own tools. */
+function codexMcpServerKeyTaken(
+  key: string,
+  config: McpServerConfig,
+  own: CodexOwnTransports,
+  record: Readonly<Record<string, CodexMcpServer>>,
+): boolean {
+  if (Object.hasOwn(record, key)) return true;
+  if (key === providerMcpServerName(config.name)) return false;
+  return Object.hasOwn(own, key) || isReservedMcpServerName(key);
+}
+
+/**
+ * The thread's `mcp_servers`: every name from Codex's own files turned off, then OpenBot's servers
+ * turned on. A name in both resolves to the one the panel shows, with the approvals Codex saved.
+ */
+export function codexThreadMcpServers(
+  disabled: Readonly<Record<string, CodexDisabledMcpServer>>,
+  servers: Readonly<Record<string, CodexMcpServer>>,
+): Record<string, CodexMcpServer | CodexDisabledMcpServer> {
+  const record: Record<string, CodexMcpServer | CodexDisabledMcpServer> = { ...disabled, ...servers };
+  for (const [name, server] of Object.entries(servers)) {
+    record[name] = { ...disabled[name], ...server, enabled: true };
+  }
+  return record;
+}
+
+/**
+ * The namespace Codex gives the tools of each server OpenBot turns on. For a code-mode-only model,
+ * such as GPT-6, Codex otherwise defers MCP tools into `exec` without naming them, and the model
+ * does not find them. These join the direct-only list, so the request names the tools. The keys are
+ * the ones `codexMcpServers` chose, renamed keys included; a name Codex's own files declare is turned
+ * off and has no tools. Codex changes each character other than a letter, a digit or `_` to `_`, then
+ * adds `mcp__` unless the name starts with it.
+ */
+export function codexMcpNamespaces(servers: Readonly<Record<string, CodexMcpServer>>): string[] {
+  return Object.keys(servers).map((key) => {
+    const name = key.replace(/[^A-Za-z0-9_]/gu, "_");
+    return name.startsWith("mcp__") ? name : `mcp__${name}`;
+  });
+}
+
+export function codexMcpServers(
+  servers: readonly UsableMcpServer[],
+  own: CodexOwnTransports = {},
+): McpHandoff<Record<string, CodexMcpServer>> {
   const record: Record<string, CodexMcpServer> = {};
   const dropped: McpServerDrop[] = [];
   for (const server of servers) {
@@ -576,28 +711,21 @@ export function codexMcpServers(servers: readonly UsableMcpServer[]): McpHandoff
       dropped.push(unusableDrop(server));
       continue;
     }
-    const name = codexMcpServerName(server.config.name);
-    if (Object.hasOwn(record, name)) {
+    const name = codexMcpServerKey(server.config, own);
+    if (codexMcpServerKeyTaken(name, server.config, own, record)) {
       dropped.push({ name: server.config.name, reason: "name_conflict", detail: NAME_CONFLICT });
       continue;
     }
     if (server.config.transport === "stdio") {
-      if (server.config.workingDirectory) {
-        dropped.push({
-          name: server.config.name,
-          reason: "working_directory_unsupported",
-          detail: WORKING_DIRECTORY_UNSUPPORTED,
-        });
-        continue;
-      }
       record[name] = {
         command: server.command,
         args: [...server.config.args],
         env: mcpLaunchEnvironment(server),
+        ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
       };
     } else {
       record[name] = {
-        url: server.config.url,
+        url: server.url,
         http_headers: mcpHandoffHeaders(server),
       };
     }
@@ -640,20 +768,22 @@ function secretDigest(config: McpServerConfig): string {
 }
 
 /**
- * The headers one http server is handed, with the OAuth token added here and only here.
+ * The headers one http server is handed, with OpenBot's bearer added here and only here.
  *
- * The token is never written to the row. That is the whole reason this stage exists: a credential
- * `mcp-remote` kept in a file of its own was one OpenBot could not redact, and a credential written
- * into `McpServerConfig.headers` would be one the panel shows, the Team API carries to a remote
- * administrator, and a user can edit into something OpenBot then refreshes over. Injected at the
- * hand-off, it is a value `McpHandoffLog` has already seen, so every log, export and send path
- * removes it.
+ * The bearer is never written to the row: a credential written into `McpServerConfig.headers`
+ * would be one the panel shows, the Team API carries to a remote administrator, and a user can edit
+ * into something OpenBot then refreshes over. Added at the hand-off, it is a value `McpHandoffLog`
+ * has already seen, so every log, export and send path removes it.
  *
- * A header the user typed wins. Someone who pasted their own `Authorization` has said which
- * credential this server takes, and silently replacing it would be OpenBot overruling them with an
- * account they did not choose.
+ * A proxied server is handed the proxy bearer alone. The proxy adds the row's own headers upstream,
+ * so a key the user typed beside a sign-in stays in this process too.
+ *
+ * A header the user typed wins otherwise. Someone who pasted their own `Authorization` has said
+ * which credential this server takes, and silently replacing it would be OpenBot overruling them
+ * with an account they did not choose. Such a row is never proxied: see `McpGateway.endpoint`.
  */
 export function mcpHandoffHeaders(server: ResolvedMcpServer): Record<string, string> {
+  if (server.proxied) return server.authorization ? { Authorization: `Bearer ${server.authorization}` } : {};
   const headers = Object.fromEntries(server.config.headers.map((pair) => [pair.key, pair.value]));
   const named = Object.keys(headers).some((key) => key.toLowerCase() === "authorization");
   if (server.authorization && !named) headers.Authorization = `Bearer ${server.authorization}`;

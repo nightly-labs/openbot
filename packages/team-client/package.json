@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ed25519": "./src/ed25519.ts",
+    "./host-key-handover": "./src/host-key-handover.ts",
     "./remote-directory": "./src/remote-directory.ts",
     "./remote-peer": "./src/remote-peer.ts",
     "./remote-recovery": "./src/remote-recovery.ts",
@@ -16,6 +17,7 @@
     "./routine-schedule-draft": "./src/routine-schedule-draft.ts",
     "./runtime-attention": "./src/runtime-attention.ts",
     "./agent-notifications": "./src/agent-notifications.ts",
+    "./channel-notifications": "./src/channel-notifications.ts",
     "./webrtc-framing": "./src/webrtc-framing.ts",
     "./workspace-preferences": "./src/workspace-preferences.ts",
     "./browser-view": "./src/browser-view.ts",
@@ -31,13 +33,16 @@
     "./live-activity-props": "./src/live-activity-props.ts",
     "./live-activity-seal": "./src/live-activity-seal.ts",
     "./push-notification-seal": "./src/push-notification-seal.ts",
-    "./usage-series": "./src/usage-series.ts"
+    "./usage-series": "./src/usage-series.ts",
+    "./plan-limits": "./src/plan-limits.ts",
+    "./agent-tasks": "./src/agent-tasks.ts",
+    "./workflow-decoding": "./src/workflow-decoding.ts"
   },
   "scripts": {
-    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@noble/ed25519": "3.1.0",
+    "@noble/ed25519": "3.2.0",
     "@noble/hashes": "catalog:",
     "@openbot/contracts": "workspace:*",
     "@openbot/i18n": "workspace:*",

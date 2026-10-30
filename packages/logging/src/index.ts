@@ -131,10 +131,17 @@ let registeredSecretPattern: RegExp | null = null;
  * keep the length limit so values such as port numbers stay readable.
  */
 export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {
-  if (!value || (!options.allowShort && value.length < MIN_REGISTERED_SECRET_LENGTH)) return;
+  registerSecretValues([value], options);
+}
+
+/** `registerSecretValue` for many values, such as an imported password list, with one pattern rebuild. */
+export function registerSecretValues(values: Iterable<string>, options: { allowShort?: boolean } = {}): void {
   const size = registeredSecrets.size;
-  for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
-    if (form !== null) registeredSecrets.add(form);
+  for (const value of values) {
+    if (!value || (!options.allowShort && value.length < MIN_REGISTERED_SECRET_LENGTH)) continue;
+    for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
+      if (form !== null) registeredSecrets.add(form);
+    }
   }
   if (registeredSecrets.size === size) return;
   const alternatives = [...registeredSecrets]

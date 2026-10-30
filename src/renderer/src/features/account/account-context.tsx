@@ -1,9 +1,11 @@
 import type { AccountUsage, AccountUsageLimit, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
+import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { accountPort } from "./account-port";
+
+type MobileConnectAction = DesktopAnalyticsProperties<"mobile_connect_action">["action"];
 
 /** How long the sign-in success animation holds the account out of the view. */
 const AUTH_SUCCESS_HOLD_MS = 600;
@@ -68,6 +70,8 @@ const Auth = createSimpleContext({
     /** The providers an event updated while the current refresh runs. Their rows are newer than it. */
     let accountUsageEventIds = new Set<string>();
     let authSuccessTimer: ReturnType<typeof setTimeout> | undefined;
+    /** The phones of the last list for this account. A phone that is new in a later list connected since then. */
+    let knownMobileDevices: ReadonlySet<string> | null = null;
 
     onCleanup(() => {
       if (authSuccessTimer !== undefined) clearTimeout(authSuccessTimer);
@@ -82,6 +86,7 @@ const Auth = createSimpleContext({
      */
     function applyCentralAuthState(state: CentralAuthState): void {
       desktopAnalytics.setUser(state.status === "signed_in" ? state.user : null);
+      if (state.status !== "signed_in") knownMobileDevices = null;
       const completedCodeChallenge = centralAuth().status === "code_sent" && state.status === "signed_in";
       if (state.status !== "signed_in") {
         if (authSuccessTimer !== undefined) clearTimeout(authSuccessTimer);
@@ -246,16 +251,40 @@ const Auth = createSimpleContext({
       return usage;
     }
 
-    function createMobileConnect() {
-      return accountPort().auth.createMobileConnect();
+    /** Runs a Mobile Connect call and records its result. A failure still rejects for the panel. */
+    function trackMobileConnect<Result>(action: MobileConnectAction, call: () => Promise<Result>): Promise<Result> {
+      return call().then(
+        (result) => {
+          desktopAnalytics.track("mobile_connect_action", { action, result: "succeeded" });
+          return result;
+        },
+        (error: unknown) => {
+          desktopAnalytics.track("mobile_connect_action", { action, result: "failed" });
+          throw error;
+        },
+      );
     }
 
-    function listMobileConnectedDevices() {
-      return accountPort().auth.listMobileConnectedDevices();
+    function createMobileConnect() {
+      return trackMobileConnect("code_shown", () => accountPort().auth.createMobileConnect());
+    }
+
+    async function listMobileConnectedDevices() {
+      const devices = await accountPort().auth.listMobileConnectedDevices();
+      const ids = new Set(devices.map((device) => device.sessionId));
+      const known = knownMobileDevices;
+      if (known) {
+        for (const id of ids) {
+          if (!known.has(id))
+            desktopAnalytics.track("mobile_connect_action", { action: "connected", result: "succeeded" });
+        }
+      }
+      knownMobileDevices = ids;
+      return devices;
     }
 
     function revokeMobileConnectedDevice(sessionId: string) {
-      return accountPort().auth.revokeMobileConnectedDevice(sessionId);
+      return trackMobileConnect("revoked", () => accountPort().auth.revokeMobileConnectedDevice(sessionId));
     }
 
     const signedInAccount = createMemo(() => {
@@ -283,10 +312,12 @@ const Auth = createSimpleContext({
       updateAccountName,
       updateAccountAvatar,
       createMobileConnect,
-      cancelMobileConnect: () => accountPort().auth.cancelMobileConnect(),
+      cancelMobileConnect: () => trackMobileConnect("cancelled", () => accountPort().auth.cancelMobileConnect()),
       getMobileConnectLink: () => accountPort().auth.getMobileConnectLink(),
-      createMobileConnectLink: () => accountPort().auth.createMobileConnectLink(),
-      revokeMobileConnectLink: () => accountPort().auth.revokeMobileConnectLink(),
+      createMobileConnectLink: () =>
+        trackMobileConnect("link_created", () => accountPort().auth.createMobileConnectLink()),
+      revokeMobileConnectLink: () =>
+        trackMobileConnect("link_revoked", () => accountPort().auth.revokeMobileConnectLink()),
       listMobileConnectedDevices,
       revokeMobileConnectedDevice,
       listAccountSessions: () => accountPort().auth.listAccountSessions(),

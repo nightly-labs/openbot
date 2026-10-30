@@ -5,29 +5,38 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
 import { memo, useEffect, useRef, useState } from "react";
-import { type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
+import { type ColorValue, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
+import { useListSettled } from "./use-list-settled";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
 
-export const ChatCodeBlock = memo(function ChatCodeBlock({
-  text,
-  language,
-  selectable = true,
-  finished = false,
-}: {
+interface ChatCodeBlockProps {
   text: string;
   language?: string;
   selectable?: boolean;
   /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
-}) {
-  const { fontScale } = useWindowDimensions();
+}
+
+export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
+  // A block that mounts during a fast fling of the chat colours its code when the list slows down.
+  const settled = useListSettled();
+  return <CodeBlockBody {...props} highlight={settled} />;
+});
+
+const CodeBlockBody = memo(function CodeBlockBody({
+  text,
+  language,
+  selectable = true,
+  finished = false,
+  highlight: highlightAllowed,
+}: ChatCodeBlockProps & { highlight: boolean }) {
   const { t } = useText();
   const { foreground, muted, colors } = useCodeTokenColors();
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
@@ -44,6 +53,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
       );
       return;
     }
+    if (!highlightAllowed) return;
     let active = true;
     const run = () => {
       lastHighlight.current = Date.now();
@@ -63,7 +73,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
       active = false;
       if (timer !== null) clearTimeout(timer);
     };
-  }, [text, language, finished]);
+  }, [text, language, finished, highlightAllowed]);
   const tokens =
     !highlight || highlight.language !== language || !text.startsWith(highlight.text)
       ? [{ text, offset: 0 }]
@@ -97,12 +107,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}
         </Button>
       </View>
-      <ScrollView
-        horizontal
-        bounces={false}
-        style={{ flexGrow: 0, flexShrink: 0, height: text.split("\n").length * 20 * fontScale + 20, maxWidth: "100%" }}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14, alignItems: "flex-start" }}
-      >
+      <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 14 }}>
         <Typography.Code
           selectable={selectable}
           className="bg-transparent p-0"
@@ -122,7 +127,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
             </Typography.Code>
           ))}
         </Typography.Code>
-      </ScrollView>
+      </View>
     </View>
   );
 });

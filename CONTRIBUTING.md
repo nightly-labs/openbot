@@ -6,7 +6,8 @@ review.
 ## What you can send
 
 These rules apply to people outside the `nightly-labs` organization. Organization members and
-users with write access to this repository skip them.
+users with write access to this repository skip them. So do their agents, which act as
+`openbotgit[bot]` through the OpenBot GitHub App.
 
 You can open a pull request without an issue for:
 

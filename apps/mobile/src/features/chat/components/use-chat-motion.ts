@@ -1,45 +1,49 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Keyboard, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import type { AnchoredEndSpaceConfig, LegendListRef } from "@legendapp/list/react-native";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Keyboard, type LayoutChangeEvent, type NativeScrollEvent } from "react-native";
 import { useKeyboardHandler } from "react-native-keyboard-controller";
-import type Animated from "react-native-reanimated";
 import {
   cancelAnimation,
   Easing,
   ReduceMotion,
   useAnimatedReaction,
-  useAnimatedRef,
   useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
-import {
-  type ChatLayout,
-  chatBlankSpace,
-  chatContentIsVisible,
-  chatEndOffset,
-  chatSendOffset,
-} from "../model/chat-layout";
+import { isAndroid } from "@/shared/lib/platform";
+import { chatContentIsVisible } from "../model/chat-layout";
+
+/** The space under each row of the list. */
+export const CHAT_ROW_GAP = 10;
+/** A message from search opens this far under the header. */
+const FOCUS_GAP = 12;
+/** On Android the chat takes the latest message this many frames after the last row has its size. */
+const ANDROID_PLACE_FRAMES = 2;
+/** The longest wait on Android before the chat takes the latest message, also without a measured row. */
+const ANDROID_PLACE_TIMEOUT_MS = 250;
+/** How long the list keeps the latest message in view after the chat has its rows and its latest page. */
+const OPENING_FOLLOW_MS = 600;
+
+type AnchorReadyInfo = Parameters<NonNullable<AnchoredEndSpaceConfig["onReady"]>>[0];
 
 export function useChatMotion(
   header: number,
   keyboardOffset: number,
   ready: boolean,
+  /** The list has rows. Rows that come into an empty list get a new first position. */
+  hasRows: boolean,
   lastUserId: string | null,
   requiredInputId: string | null = null,
   /** The chat opens at a message from search: do not move to the latest message while it loads. */
   holdOpening = false,
+  /** The chat shows the messages that the phone kept, and reads the latest page of the host. */
+  catchingUp = false,
 ) {
-  const ref = useAnimatedRef<Animated.ScrollView>();
-  const setScrollRef = useCallback(
-    (instance: Animated.ScrollView | null) => {
-      ref(instance);
-    },
-    [ref],
-  );
+  const listRef = useRef<LegendListRef>(null);
   const reducedMotion = useReducedMotion();
   const keyboardHeight = useSharedValue(0);
   // 0 while the keyboard is down, 1 while it is fully up, and every value
@@ -109,253 +113,216 @@ export function useChatMotion(
   const composerStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, keyboardHeight.get() - keyboardOffset) }],
   }));
-  const layout = useSharedValue<ChatLayout>({ viewport: 0, content: 0, header, tailY: 0, tailHeight: 0 });
   const composerHeight = useSharedValue(0);
-  const blankSpace = useDerivedValue(() =>
-    lastUserId && layout.get().tailHeight > 0 ? chatBlankSpace(layout.get()) : 0,
-  );
-  const scrollY = useSharedValue(0);
+  const viewport = useSharedValue(0);
+  const content = useSharedValue(0);
+  // The list writes its scroll position here on the UI thread, so scrolling runs no JavaScript here.
+  const scrollOffset = useSharedValue(0);
+  const lowestOffset = useSharedValue(0);
+  const scrolledUp = useSharedValue(false);
   const firstOffset = useSharedValue(0);
   const firstOpacity = useSharedValue(1);
   const responseOpacity = useSharedValue(1);
   const revealed = useSharedValue(false);
   const [atLatest, setAtLatest] = useState(false);
+  const atLatestNow = useRef(false);
   // The opening position is not the user's choice. Until the user drags the
   // list, the whole chat counts as seen, wherever the list lands.
   const [userScrolled, setUserScrolled] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
-  const pending = useRef<{ baseline: string | null; first: boolean } | null>(null);
+  const pending = useRef<{ baseline: string | null; first: boolean; fromLatest: boolean } | null>(null);
   const followLatest = useRef(true);
   const [keyboardLiftBehavior, setKeyboardLiftBehavior] = useState<"whenAtEnd" | "never">("whenAtEnd");
   // Counts the returns to the latest messages from a window around a searched message.
   const [latestGeneration, setLatestGeneration] = useState(0);
-  const pendingRequiredInput = useRef<{ id: string; contentRevision: number } | null>(null);
   const lastRequiredInputId = useRef(requiredInputId);
-  const frame = useRef<number | null>(null);
-  // Separate from `frame`, which each layout event starts again.
-  const openFrame = useRef<number | null>(null);
-  const measurements = useRef<{
-    layout: ChatLayout;
-    inset: number;
-    composer: number;
-    userHeight: number;
-    tailId: string | null;
-    contentRevision: number;
-    initialized: boolean;
-    virtualized: boolean;
-  }>({
-    layout: { viewport: 0, content: 0, header, tailY: 0, tailHeight: 0 },
-    inset: 0,
-    composer: 0,
-    userHeight: 0,
-    tailId: null,
-    contentRevision: 0,
-    initialized: false,
-    virtualized: false,
-  });
-  const current = useRef({ ready, lastUserId, requiredInputId, holdOpening });
-  current.current = { ready, lastUserId, requiredInputId, holdOpening };
+  const requiredInputFrame = useRef<number | null>(null);
+  const sendScrollFrame = useRef<number | null>(null);
+  const measurements = useRef({ viewport: 0, content: 0, composer: 0 });
+  // Whether the list had rows when it last finished its first position. Null until it does once.
+  const [placedWithRows, setPlacedWithRows] = useState<boolean | null>(null);
+  // Rows that come into an empty list get a new first position, so the list waits for it. An empty
+  // list has no position to wait for, and Legend List calls `onReady` only after it lays out a row.
+  const listPlaced = !hasRows || placedWithRows === true;
+  const shown = useRef(false);
+  // While the chat opens, the list keeps the latest message in view: older rows come above the
+  // first rows and get their sizes, and the latest page can add messages after the kept ones.
+  const [openingFollow, setOpeningFollow] = useState(!holdOpening);
+  const heldOpening = useRef(holdOpening);
+  const current = useRef({ lastUserId });
+  current.current = { lastUserId };
 
   const finishFirstMessage = useCallback(() => setResponseVisible(true), []);
-  const revealHistory = useCallback(() => setHistoryVisible(true), []);
-  const position = useCallback(() => {
-    if (frame.current !== null) cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
-      frame.current = null;
-      const m = measurements.current;
-      if (current.current.holdOpening && !m.initialized) return;
-      if (!current.current.ready || !m.layout.viewport || !m.composer) return;
-      if (current.current.lastUserId && (m.tailId !== current.current.lastUserId || !m.layout.tailHeight)) return;
-      if (m.layout.content + 2 < m.layout.tailY + m.layout.tailHeight) return;
-      const floor = current.current.lastUserId ? chatBlankSpace(m.layout) : 0;
-      // Wait for the native inset commit; Android otherwise clamps to the old range.
-      if (m.inset + 2 < Math.max(floor, m.composer)) return;
-      const requiredInput = pendingRequiredInput.current;
-      if (requiredInput && m.contentRevision <= requiredInput.contentRevision) return;
-      if (requiredInput) {
-        pendingRequiredInput.current = null;
-        pending.current = null;
-        m.initialized = true;
-        revealed.set(true);
-        setHistoryVisible(true);
-        ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: !reducedMotion });
-        return;
-      }
-      const send = pending.current;
-      if (send && current.current.lastUserId === send.baseline) return;
-      if (send) {
-        pending.current = null;
-        m.initialized = true;
-        revealed.set(true);
-        setHistoryVisible(true);
-        ref.current?.scrollTo({ y: chatSendOffset(m.layout, m.inset), animated: !send.first && !reducedMotion });
-        if (send.first) {
-          const lift = Math.max(0, keyboardHeight.get() - keyboardOffset);
-          firstOffset.set(Math.max(0, m.layout.viewport - lift - m.composer - m.layout.header - m.userHeight));
-          firstOpacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
-          firstOffset.set(
-            withSpring(0, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }, (finished) => {
-              if (!finished) return;
-              responseOpacity.set(withTiming(1, { duration: 350, reduceMotion: ReduceMotion.System }));
-              scheduleOnRN(finishFirstMessage);
-            }),
-          );
-        }
-        return;
-      }
-      if (m.initialized) {
-        if (current.current.requiredInputId && followLatest.current) {
-          ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: false });
-        }
-        return;
-      }
-      const target = chatEndOffset(m.layout, m.inset);
-      ref.current?.scrollTo({ y: target, animated: false });
-      // Repeat after layout/inset commits, then reveal without showing the top of history.
-      frame.current = requestAnimationFrame(() => {
-        frame.current = null;
-        const latest = measurements.current;
-        ref.current?.scrollTo({ y: chatEndOffset(latest.layout, latest.inset), animated: false });
-        latest.initialized = true;
-        revealed.set(true);
-        revealHistory();
-      });
-    });
-  }, [
-    finishFirstMessage,
-    firstOffset,
-    firstOpacity,
-    keyboardHeight,
-    keyboardOffset,
-    reducedMotion,
-    ref,
-    responseOpacity,
-    revealHistory,
-    revealed,
-  ]);
+  const updateAtLatest = useCallback((visible: boolean) => {
+    atLatestNow.current = visible;
+    setAtLatest(visible);
+  }, []);
+  const reveal = useCallback(() => {
+    if (shown.current) return;
+    shown.current = true;
+    revealed.set(true);
+    setHistoryVisible(true);
+  }, [revealed]);
+  /** The list finished the first position of its rows. */
+  const onListReady = useCallback((withRows: boolean) => setPlacedWithRows(withRows), []);
 
+  // The list shows once it has its place at the latest message. A message from search shows it itself.
   useLayoutEffect(() => {
-    current.current = { ready, lastUserId, requiredInputId, holdOpening };
-    if (requiredInputId !== lastRequiredInputId.current) {
-      pendingRequiredInput.current =
-        requiredInputId && followLatest.current
-          ? { id: requiredInputId, contentRevision: measurements.current.contentRevision }
-          : null;
+    // The hold stays recorded until the list shows: it can end while the history still loads.
+    if (holdOpening) heldOpening.current = true;
+    if (shown.current || !listPlaced || !ready || holdOpening) return;
+    const held = heldOpening.current;
+    heldOpening.current = false;
+    // The message from search did not open the chat, and the list did not take the end while it waited.
+    if (held) void (listRef.current?.scrollToEnd({ animated: false }) ?? Promise.resolve()).then(reveal, reveal);
+    else reveal();
+  }, [listPlaced, ready, holdOpening, reveal]);
+  // Android moves the list to the latest message with a native scroll, and Legend List can wait for
+  // seconds for that scroll to report before it calls `onReady`. Once the last row has its size,
+  // the chat takes the end itself: this ends the wait, and the list calls `onReady`. iOS places the
+  // list without a native scroll, so it keeps the wait.
+  useEffect(() => {
+    if (!isAndroid || shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
+    const started = Date.now();
+    let measuredFrames = 0;
+    let frame = requestAnimationFrame(function place() {
+      const list = listRef.current;
+      const state = list?.getState();
+      const last = state ? state.data.length - 1 : -1;
+      // The size of a row is unset until the list has measured it.
+      if (state && last >= 0 && state.sizeAtIndex(last) > 0) measuredFrames += 1;
+      if (list && (measuredFrames > ANDROID_PLACE_FRAMES || Date.now() - started >= ANDROID_PLACE_TIMEOUT_MS)) {
+        // The list calls `onReady` when this ends its wait. The end of the scroll places the list
+        // also if it had no wait left to end.
+        void list.scrollToEnd({ animated: false }).then(() => setPlacedWithRows(true));
+        return;
+      }
+      frame = requestAnimationFrame(place);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [hasRows, placedWithRows, ready, holdOpening]);
+  useEffect(() => {
+    if (!openingFollow || !ready || catchingUp) return;
+    const timer = setTimeout(() => setOpeningFollow(false), OPENING_FOLLOW_MS);
+    return () => clearTimeout(timer);
+  }, [openingFollow, ready, catchingUp]);
+  useLayoutEffect(() => {
+    if (requiredInputId !== lastRequiredInputId.current && requiredInputId && followLatest.current && shown.current) {
+      // The question row renders in this commit; its size is known from the next frame.
+      if (requiredInputFrame.current !== null) cancelAnimationFrame(requiredInputFrame.current);
+      requiredInputFrame.current = requestAnimationFrame(() => {
+        requiredInputFrame.current = null;
+        if (followLatest.current) void listRef.current?.scrollToEnd({ animated: !reducedMotion });
+      });
     }
     lastRequiredInputId.current = requiredInputId;
-    position();
-  }, [position, ready, lastUserId, requiredInputId, holdOpening]);
+  }, [requiredInputId, reducedMotion]);
   useEffect(
     () => () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-      if (openFrame.current !== null) cancelAnimationFrame(openFrame.current);
+      if (requiredInputFrame.current !== null) cancelAnimationFrame(requiredInputFrame.current);
+      if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
     },
     [],
   );
 
   const onViewportLayout = useCallback(
     (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
-      measurements.current.layout = {
-        ...measurements.current.layout,
-        viewport: event.nativeEvent.layout.height,
-        header,
-      };
-      layout.set(measurements.current.layout);
-      position();
+      measurements.current.viewport = event.nativeEvent.layout.height;
+      viewport.set(event.nativeEvent.layout.height);
     },
-    [header, layout, position],
+    [viewport],
   );
   const onContentSizeChange = useCallback(
     (_width: number, height: number) => {
-      measurements.current.contentRevision += 1;
-      measurements.current.layout = {
-        ...measurements.current.layout,
-        content: height,
-        ...(measurements.current.virtualized
-          ? { tailHeight: Math.max(0, height - measurements.current.layout.tailY) }
-          : {}),
-      };
-      layout.set(measurements.current.layout);
-      position();
+      measurements.current.content = height;
+      content.set(height);
     },
-    [layout, position],
-  );
-  const onTailLayout = useCallback(
-    (id: string, event: Pick<LayoutChangeEvent, "nativeEvent">) => {
-      const { y, height } = event.nativeEvent.layout;
-      measurements.current.tailId = id;
-      measurements.current.layout = { ...measurements.current.layout, tailY: y, tailHeight: height };
-      layout.set(measurements.current.layout);
-      position();
-    },
-    [layout, position],
-  );
-  const onTailStartLayout = useCallback(
-    (id: string, event: Pick<LayoutChangeEvent, "nativeEvent">) => {
-      const m = measurements.current;
-      m.virtualized = true;
-      m.tailId = id;
-      m.layout = {
-        ...m.layout,
-        tailY: event.nativeEvent.layout.y,
-        tailHeight: Math.max(event.nativeEvent.layout.height, m.layout.content - event.nativeEvent.layout.y),
-      };
-      layout.set(m.layout);
-      position();
-    },
-    [layout, position],
-  );
-
-  const onUserLayout = useCallback(
-    (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
-      measurements.current.userHeight = event.nativeEvent.layout.height;
-      position();
-    },
-    [position],
+    [content],
   );
   const onComposerLayout = useCallback(
     (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
       const height = event.nativeEvent.layout.height + 20;
       measurements.current.composer = height;
       composerHeight.set(height);
-      position();
     },
-    [composerHeight, position],
+    [composerHeight],
   );
-  const onContentInsetChange = useCallback(
-    (inset: { bottom: number }) => {
-      measurements.current.inset = inset.bottom;
-      position();
+  /**
+   * The rows from the latest user message to the end have their sizes, so the blank space under that
+   * message is known. A sent message now moves to the top of the chat.
+   */
+  const onAnchorReady = useCallback(
+    (info: AnchorReadyInfo) => {
+      const send = pending.current;
+      const list = listRef.current;
+      if (!send || !list || info.anchorKey === undefined || info.anchorKey === send.baseline) return;
+      pending.current = null;
+      reveal();
+      // From older messages the list jumps: a long animated scroll would render every row on the way.
+      const animated = !send.first && send.fromLatest && !reducedMotion;
+      if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
+      if (animated) {
+        sendScrollFrame.current = requestAnimationFrame(() => {
+          sendScrollFrame.current = requestAnimationFrame(() => {
+            sendScrollFrame.current = null;
+            void listRef.current?.scrollToEnd({ animated: true });
+          });
+        });
+      } else {
+        sendScrollFrame.current = null;
+        void list.scrollToEnd({ animated: false });
+      }
+      if (!send.first || info.anchorIndex === undefined) return;
+      const m = measurements.current;
+      const lift = Math.max(0, keyboardHeight.get() - keyboardOffset);
+      const userHeight = Math.max(0, list.getState().sizeAtIndex(info.anchorIndex) - CHAT_ROW_GAP);
+      // The first message rises from the composer to its place under the header.
+      firstOffset.set(Math.max(0, m.viewport - lift - m.composer - header - userHeight));
+      firstOpacity.set(withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+      firstOffset.set(
+        withSpring(0, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }, (finished) => {
+          if (!finished) return;
+          responseOpacity.set(withTiming(1, { duration: 350, reduceMotion: ReduceMotion.System }));
+          scheduleOnRN(finishFirstMessage);
+        }),
+      );
     },
-    [position],
+    [
+      finishFirstMessage,
+      firstOffset,
+      firstOpacity,
+      header,
+      keyboardHeight,
+      keyboardOffset,
+      reducedMotion,
+      responseOpacity,
+      reveal,
+    ],
   );
 
-  const lowestY = useRef(0);
-  const onScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = event.nativeEvent.contentOffset.y;
-      scrollY.set(y);
-      if (!revealed.get()) return;
-      // A status-bar tap or an assistive scroll moves the list up without a drag.
-      lowestY.current = Math.max(lowestY.current, y);
-      if (y < lowestY.current - 24) setUserScrolled(true);
-    },
-    [revealed, scrollY],
-  );
-  const updateAtLatest = useCallback((visible: boolean) => {
-    setAtLatest(visible);
-  }, []);
   useAnimatedReaction(
     () =>
       revealed.get() &&
       chatContentIsVisible(
-        layout.get(),
-        scrollY.get(),
+        content.get(),
+        viewport.get(),
+        scrollOffset.get(),
         composerHeight.get() + Math.max(0, keyboardHeight.get() - keyboardOffset),
       ),
     (visible, previous) => {
       if (visible !== previous) scheduleOnRN(updateAtLatest, visible);
+    },
+  );
+  useAnimatedReaction(
+    () => scrollOffset.get(),
+    (y) => {
+      if (!revealed.get() || scrolledUp.get()) return;
+      // A status-bar tap or an assistive scroll moves the list up without a drag.
+      lowestOffset.set(Math.max(lowestOffset.get(), y));
+      if (y >= lowestOffset.get() - 24) return;
+      scrolledUp.set(true);
+      scheduleOnRN(setUserScrolled, true);
     },
   );
   const historyStyle = useAnimatedStyle(() => ({
@@ -367,124 +334,150 @@ export function useChatMotion(
   }));
   const responseStyle = useAnimatedStyle(() => ({ opacity: responseOpacity.get() }));
 
-  const needsSendPosition = useCallback(() => pending.current !== null, []);
-  const needsInitialPosition = useCallback(() => !measurements.current.initialized && !current.current.holdOpening, []);
-
-  function beginSend() {
+  const beginSend = useCallback(() => {
+    // A sent message takes its own place in the list.
+    setOpeningFollow(false);
     followLatest.current = true;
     setKeyboardLiftBehavior("whenAtEnd");
-    const first = current.current.lastUserId === null;
-    pending.current = { baseline: current.current.lastUserId, first };
+    const baseline = current.current.lastUserId;
+    const first = baseline === null;
+    pending.current = { baseline, first, fromLatest: atLatestNow.current };
     if (first) {
       firstOpacity.set(0);
       responseOpacity.set(0);
       setResponseVisible(false);
     }
-  }
-  function cancelSend() {
+  }, [firstOpacity, responseOpacity]);
+  const cancelSend = useCallback(() => {
     pending.current = null;
+    if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
+    sendScrollFrame.current = null;
     cancelAnimation(firstOffset);
     firstOffset.set(0);
     firstOpacity.set(1);
     responseOpacity.set(1);
     setResponseVisible(true);
-  }
+  }, [firstOffset, firstOpacity, responseOpacity]);
   /** The reader, not the chat, now chooses the position. */
-  function leaveLatest() {
+  const leaveLatest = useCallback(() => {
     setUserScrolled(true);
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
-    pendingRequiredInput.current = null;
-    if (frame.current !== null) cancelAnimationFrame(frame.current);
-    frame.current = null;
-    measurements.current.initialized = true;
-  }
-  function onScrollBeginDrag() {
+  }, []);
+  const onScrollBeginDrag = useCallback(() => {
+    // A drag is the reader's choice. A move of the list while rows get their sizes is not.
+    setOpeningFollow(false);
     leaveLatest();
-    if (openFrame.current !== null) cancelAnimationFrame(openFrame.current);
-    openFrame.current = null;
-    revealed.set(true);
-    setHistoryVisible(true);
+    reveal();
     cancelSend();
-  }
-  /** Opens the chat with the row at content offset `y` under the header, instead of at the latest message. */
-  function openAt(y: number) {
-    leaveLatest();
-    if (openFrame.current !== null) cancelAnimationFrame(openFrame.current);
-    // Wait one frame for the content size of the same layout pass, then show the list in its place.
-    openFrame.current = requestAnimationFrame(() => {
-      const m = measurements.current;
-      ref.current?.scrollTo({
-        y: Math.max(0, Math.min(y - m.layout.header - 12, chatEndOffset(m.layout, m.inset))),
-        animated: false,
-      });
-      openFrame.current = requestAnimationFrame(() => {
-        openFrame.current = null;
-        revealed.set(true);
-        setHistoryVisible(true);
-      });
-    });
-  }
+  }, [leaveLatest, reveal, cancelSend]);
+  /** Opens the chat with row `index` under the header, instead of at the latest message. */
+  const openAt = useCallback(
+    (index: number): Promise<void> => {
+      leaveLatest();
+      const scrolled = listRef.current?.scrollToIndex({ index, viewOffset: header + FOCUS_GAP, animated: false });
+      return (scrolled ?? Promise.resolve()).then(reveal, reveal);
+    },
+    [leaveLatest, header, reveal],
+  );
   /** Positions the chat at the latest message again, after the latest page replaces a window around a searched message. */
-  function returnToLatest() {
+  const returnToLatest = useCallback(() => {
     followLatest.current = true;
     setKeyboardLiftBehavior("whenAtEnd");
-    measurements.current.initialized = false;
     setLatestGeneration((generation) => generation + 1);
-    position();
-  }
-  function onScrollEndDrag(event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) {
-    // Only a user scroll can resume following. Keyboard dismissal can make the
-    // reply visible without the user choosing to return to it.
-    followLatest.current = chatContentIsVisible(
-      measurements.current.layout,
-      event.nativeEvent.contentOffset.y,
-      measurements.current.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
-    );
-    setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
-  }
-  function scrollToLatest() {
-    const m = measurements.current;
+  }, []);
+  const onScrollEndDrag = useCallback(
+    (event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) => {
+      // Only a user scroll can resume following. Keyboard dismissal can make the
+      // reply visible without the user choosing to return to it.
+      const m = measurements.current;
+      followLatest.current = chatContentIsVisible(
+        m.content,
+        m.viewport,
+        event.nativeEvent.contentOffset.y,
+        m.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
+      );
+      setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
+    },
+    [keyboardHeight, keyboardOffset],
+  );
+  const scrollToLatest = useCallback(() => {
     followLatest.current = true;
     setKeyboardLiftBehavior("whenAtEnd");
-    ref.current?.scrollTo({ y: chatEndOffset(m.layout, m.inset), animated: !reducedMotion });
-  }
+    void listRef.current?.scrollToEnd({ animated: !reducedMotion });
+  }, [reducedMotion]);
 
-  return {
-    ref,
-    setScrollRef,
-    atLatest,
-    userScrolled,
-    historyVisible,
-    responseVisible,
-    composerHeight,
-    composerStyle,
-    keyboardHeight,
-    keyboardProgress,
-    keyboardLiftBehavior,
-    blankSpace,
-    historyStyle,
-    firstMessageStyle,
-    responseStyle,
-    onViewportLayout,
-    onContentSizeChange,
-    onTailLayout,
-    onTailStartLayout,
-    onUserLayout,
-    onComposerLayout,
-    onContentInsetChange,
-    onScroll,
-    onScrollBeginDrag,
-    onScrollEndDrag,
-    beginSend,
-    needsSendPosition,
-    needsInitialPosition,
-    cancelSend,
-    scrollToLatest,
-    openAt,
-    returnToLatest,
-    latestGeneration,
-  };
+  return useMemo(
+    () => ({
+      listRef,
+      listPlaced,
+      /** While a message from search opens the chat, the list does not take the latest message. */
+      startsAtEnd: !holdOpening,
+      atLatest,
+      userScrolled,
+      historyVisible,
+      responseVisible,
+      composerHeight,
+      composerStyle,
+      keyboardHeight,
+      keyboardProgress,
+      keyboardLiftBehavior,
+      /**
+       * The list keeps the latest message in view. A question waits for the reader at the end of the
+       * chat while it grows, and an opening chat stays at the latest message until the reader drags.
+       */
+      followsEnd: (requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd") || (openingFollow && !holdOpening),
+      scrollOffset,
+      historyStyle,
+      firstMessageStyle,
+      responseStyle,
+      onListReady,
+      onAnchorReady,
+      onViewportLayout,
+      onContentSizeChange,
+      onComposerLayout,
+      onScrollBeginDrag,
+      onScrollEndDrag,
+      beginSend,
+      cancelSend,
+      scrollToLatest,
+      openAt,
+      returnToLatest,
+      latestGeneration,
+    }),
+    [
+      listPlaced,
+      holdOpening,
+      atLatest,
+      userScrolled,
+      historyVisible,
+      responseVisible,
+      composerHeight,
+      composerStyle,
+      keyboardHeight,
+      keyboardProgress,
+      keyboardLiftBehavior,
+      requiredInputId,
+      openingFollow,
+      scrollOffset,
+      historyStyle,
+      firstMessageStyle,
+      responseStyle,
+      onListReady,
+      onAnchorReady,
+      onViewportLayout,
+      onContentSizeChange,
+      onComposerLayout,
+      onScrollBeginDrag,
+      onScrollEndDrag,
+      beginSend,
+      cancelSend,
+      scrollToLatest,
+      openAt,
+      returnToLatest,
+      latestGeneration,
+    ],
+  );
 }
 
 export type ChatMotion = ReturnType<typeof useChatMotion>;

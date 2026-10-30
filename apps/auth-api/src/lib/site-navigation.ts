@@ -6,10 +6,14 @@
 // collections that the header offers. No JSX here, for the same reason
 // `content-collection.ts` holds none.
 
+import type { LandingIconName } from "../components/landing/LandingIcon";
+import { BRAND_ROUTE } from "./brand-page";
 import { CHANGELOG_ROUTE } from "./changelog";
 import { HEADER_COLLECTIONS } from "./content";
 import type { CollectionArticle, ContentCollection } from "./content-collection";
+import { OPENBOT_LINKS } from "./landing-links";
 import { PLUGIN_INDEX_ROUTE, SITE_PLUGINS, type SitePlugin } from "./plugins";
+import { PRICING_ROUTE } from "./pricing-page";
 import { TEAMS_ROUTE } from "./teams-page";
 
 /** How many articles a panel lists: one featured, and the rest under it. */
@@ -43,7 +47,26 @@ export interface PluginNavigationSection {
   pluginCount: number;
 }
 
-export type SiteNavigationSection = ArticleNavigationSection | PluginNavigationSection;
+/** One row of the Resources panel: a page of this site, or a page somewhere else. */
+export type ResourceLink = {
+  label: string;
+  description: string;
+  /** "logo" draws the OpenBot mark. */
+  icon: LandingIconName | "logo";
+} & ({ to: typeof CHANGELOG_ROUTE | typeof BRAND_ROUTE | "/download" } | { href: string });
+
+/** The pages that have no section of their own. It has no index page, so its trigger is a button. */
+export interface ResourceNavigationSection {
+  kind: "resources";
+  id: "resources";
+  label: string;
+  summary: string;
+  /** The footer link of the panel, on another site. */
+  footer: { label: string; href: string };
+  links: readonly ResourceLink[];
+}
+
+export type SiteNavigationSection = ArticleNavigationSection | PluginNavigationSection | ResourceNavigationSection;
 
 const COLLECTION_COPY: Record<HeaderCollectionId, { summary: string; indexLabel: string }> = {
   news: { summary: "What shipped, and why it matters.", indexLabel: "All news" },
@@ -77,16 +100,36 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     ),
     pluginCount: SITE_PLUGINS.length,
   },
+  {
+    kind: "resources",
+    id: "resources",
+    label: "Resources",
+    summary: "The source code of OpenBot is open.",
+    footer: { label: "Source code", href: OPENBOT_LINKS.repository },
+    links: [
+      { label: "Download", description: "macOS, Windows and Linux", icon: "download", to: "/download" },
+      { label: "Changelog", description: "What changed in each version", icon: "refresh", to: CHANGELOG_ROUTE },
+      { label: "Community", description: "Talk with us on Discord", icon: "contact", href: OPENBOT_LINKS.discord },
+      {
+        label: "Documentation",
+        description: "Set up and use OpenBot",
+        icon: "folder",
+        href: OPENBOT_LINKS.documentation,
+      },
+      { label: "Brand", description: "The logo as SVG and PNG", icon: "logo", to: BRAND_ROUTE },
+      { label: "Status", description: "Is the service up", icon: "cloud", href: OPENBOT_LINKS.status },
+    ],
+  },
 ];
 
 /** A header entry with no panel: one page, reached in one press. */
 export interface SiteNavigationLink {
   label: string;
-  to: typeof CHANGELOG_ROUTE | typeof TEAMS_ROUTE;
+  to: typeof TEAMS_ROUTE | typeof PRICING_ROUTE;
 }
 
 /** After the sections, in both the desktop menu and the mobile sheet. */
 export const SITE_NAVIGATION_LINKS: readonly SiteNavigationLink[] = [
-  { label: "Changelog", to: CHANGELOG_ROUTE },
   { label: "For Teams", to: TEAMS_ROUTE },
+  { label: "Pricing", to: PRICING_ROUTE },
 ];

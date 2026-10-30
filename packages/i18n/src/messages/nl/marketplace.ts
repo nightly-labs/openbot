@@ -1,0 +1,495 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/marketplace";
+
+export const messages = {
+  "marketplace.category.coding": "Programmeren",
+  "marketplace.category.design": "Ontwerp",
+  "marketplace.category.dataAnalytics": "Data en analyse",
+  "marketplace.category.documents": "Documenten",
+  "marketplace.category.productivity": "Productiviteit",
+  "marketplace.category.research": "Onderzoek",
+  "marketplace.category.automation": "Automatisering",
+  "marketplace.category.other": "Overig",
+  "marketplace.loadFailed": "Kan de marktplaats niet laden.",
+  "marketplace.loading.skills": "Vaardigheden laden",
+  "marketplace.loading.agents": "Agents laden",
+  "marketplace.noMatch.skills": "Geen vaardigheden gevonden voor deze zoekopdracht.",
+  "marketplace.noMatch.agents": "Geen agents gevonden voor deze zoekopdracht.",
+  "marketplace.loadMore": "Meer laden",
+  "marketplace.version": "Versie {version}",
+  "marketplace.title": "Marktplaats",
+  "marketplace.kinds": "Inhoudstypen in de marktplaats",
+  "marketplace.tab.agents": "Agents",
+  "marketplace.tab.skills": "Vaardigheden",
+  "marketplace.description.apps": "Koppel de tools en diensten waarmee je agents werken.",
+  "marketplace.description.agents": "Kant-en-klare agents met eigen instructies en vaardigheden.",
+  "marketplace.description.skills": "Instructies die een agent een taak of tool leren.",
+  "marketplace.plugins.missing": "Deze plug-in staat niet in de OpenBot-catalogus.",
+  "marketplace.agents.loadingDetail": "Agentgegevens laden…",
+  "marketplace.agents.skills": "Vaardigheden",
+  "marketplace.agents.routines": "Routines",
+  "marketplace.agents.routineActive": "Actief",
+  "marketplace.agents.routineInactive": "Inactief",
+  "marketplace.skill.loading": "Vaardigheid laden",
+  "marketplace.try.readFailed": "OpenBot kan de vaardigheden van deze agent niet lezen. Probeer het opnieuw.",
+  "marketplace.try.enable": "Schakel deze vaardigheid in bij de agentinstellingen om haar te proberen.",
+  "marketplace.try.repair": "Herstel deze vaardigheid bij de agentinstellingen om haar te proberen.",
+  "marketplace.try.update": "Werk deze vaardigheid bij om deze versie te proberen.",
+  "marketplace.try.composerUnavailable": "Het invoerveld van de agent is niet beschikbaar.",
+  "marketplace.open": "{name} openen",
+  "marketplace.tab.apps": "Apps",
+  "marketplace.crumbs.label": "Locatie",
+  "marketplace.search.label": "Zoek in de marktplaats",
+  "marketplace.search.placeholder": "Zoeken",
+  "marketplace.installs": { one: "{installs} installatie", other: "{installs} installaties" },
+  "marketplace.filter": "Filter",
+  "marketplace.filter.on": "Filter: {filters}",
+  "marketplace.filter.all": "Alle",
+  "marketplace.filter.status": "Status",
+  "marketplace.filter.category": "Categorie",
+  "marketplace.filter.added": "Toegevoegd",
+  "marketplace.filter.notAdded": "Niet toegevoegd",
+  "marketplace.filter.clear": "Filters wissen",
+  "marketplace.noMatch.apps": "Geen apps gevonden voor deze zoekopdracht.",
+  "marketplace.noMatch.filters": "Niets komt overeen met de filters.",
+  "marketplace.noMatch.showAgents": { one: "Toon {count} agent", other: "Toon {count} agents" },
+  "marketplace.noMatch.showApps": { one: "Toon {count} app", other: "Toon {count} apps" },
+  "marketplace.noMatch.showSkills": { one: "Toon {count} vaardigheid", other: "Toon {count} vaardigheden" },
+  "marketplace.empty.agents": "Er staan nog geen agents in de marktplaats.",
+  "marketplace.empty.apps": "Er staan nog geen apps in de marktplaats.",
+  "marketplace.empty.skills": "Er staan nog geen vaardigheden in de marktplaats.",
+  "marketplace.properties.agent": "Over deze agent",
+  "marketplace.properties.creator": "Maker",
+  "marketplace.properties.category": "Categorie",
+  "marketplace.properties.version": "Versie",
+  "marketplace.properties.updated": "Bijgewerkt",
+  "marketplace.properties.installs": "Installaties",
+  "marketplace.agent.add": "Toevoegen",
+  "marketplace.agent.addNamed": "{name} toevoegen",
+  "marketplace.agent.addAgent": "Agent toevoegen",
+  "marketplace.agent.added": "Toegevoegd",
+  "marketplace.agent.updateAvailable": "Update beschikbaar",
+  "marketplace.agent.update": "Bijwerken",
+  "marketplace.agent.openChat": "Open chat",
+  "marketplace.app.connect": "Koppelen",
+  "marketplace.app.reconnect": "Opnieuw koppelen",
+  "marketplace.app.connectNamed": "{name} koppelen",
+  "marketplace.app.reconnectNamed": "{name} opnieuw koppelen",
+  "marketplace.app.connected": "Gekoppeld",
+  "marketplace.app.attention": "Actie nodig",
+  "marketplace.app.partialTitle": "{name} is niet compleet",
+  "marketplace.app.partialDescription":
+    "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
+  "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.custom": "MCP-server",
+  "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
+  "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
+  "marketplace.app.slackTagline": "Vermeldingen en privéberichten in Slack",
+  "marketplace.app.discordTagline": "Vermeldingen en privéberichten in Discord",
+  "marketplace.app.telegramTagline": "Groepen en privéchats in Telegram",
+  "marketplace.app.bitwardenTagline": "Log in op sites met logins uit een gedeelde map",
+  "marketplace.app.onePasswordCategory": "Beheer van logins en inloggegevens",
+  "marketplace.app.yourApps": "Jouw apps",
+  "marketplace.app.addCustom": "Eigen toevoegen",
+  "marketplace.app.server": "Server",
+  "marketplace.app.command": "Opdracht",
+  "marketplace.app.address": "Adres",
+  "marketplace.app.disconnect.title": "{name} ontkoppelen",
+  "marketplace.app.disconnect.description":
+    "Verwijder {name} en de vaardigheden ervan van deze computer. Je kunt het later opnieuw koppelen.",
+  "marketplace.app.disconnect.action": "Ontkoppelen",
+  "marketplace.app.remove.title": "Server verwijderen",
+  "marketplace.app.remove.description":
+    "Je agents kunnen deze server niet meer gebruiken. De instellingen ervan worden verwijderd.",
+  "marketplace.app.remove.action": "Verwijderen",
+  "marketplace.app.remove.confirmTitle": "{name} verwijderen?",
+  "marketplace.app.remove.keep": "Behouden",
+  "marketplace.app.connection": "Verbinding",
+  "marketplace.app.setup.account": "Log via de browser in met je {name}-account.",
+  "marketplace.app.setup.key": "Vereist een API-sleutel van je {name}-account.",
+  "marketplace.app.setup.keySaved": "{field} opgeslagen op {host}.",
+  "marketplace.app.setup.desktop": "Draait in de desktop-app van {name} op {address}.",
+  "marketplace.app.setup.desktopConnected": "Verbonden met {address}.",
+  "marketplace.app.setup.open": "Geen login of sleutel nodig.",
+  "marketplace.app.connectAgain": "Opnieuw koppelen",
+  "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
+  "marketplace.app.automation.title": "Toegang tot Apple-apps",
+  "marketplace.app.automation.description":
+    "macOS toont voor elke app één vraag. Een gesloten app opent even en stopt daarna.",
+  "marketplace.app.automation.request": "Toegang vragen",
+  "marketplace.app.automation.allowed": "OpenBot kan nu alle Apple-apps besturen.",
+  "marketplace.app.automation.refused":
+    "macOS heeft geen toegang gegeven tot {apps}. Sta OpenBot toe in Systeeminstellingen › Privacy en beveiliging › Automatisering.",
+  "marketplace.app.automation.failed": "OpenBot kon macOS niet vragen naar {apps}. Probeer het opnieuw.",
+  "marketplace.app.automation.app.calendar": "Agenda",
+  "marketplace.app.automation.app.contacts": "Contacten",
+  "marketplace.app.automation.app.mail": "Mail",
+  "marketplace.app.automation.app.notes": "Notities",
+  "marketplace.app.automation.app.reminders": "Herinneringen",
+  "marketplace.app.automation.app.messages": "Berichten",
+  "marketplace.app.automation.app.safari": "Safari",
+  "marketplace.app.signInTitle": "Log opnieuw in bij {name}",
+  "marketplace.app.signInDescription":
+    "{name} heeft de opgeslagen login geweigerd. Je agents kunnen het pas gebruiken als je opnieuw inlogt.",
+  "marketplace.plugin.aave.tagline": "Aave-data en transacties",
+  "marketplace.plugin.aave.description":
+    "Met Aave verken je live markten van Aave V3 en V4, bekijk je walletposities en DAO-governance, simuleer je leenacties en bereid je non-custodial transacties voor. Elke transactie komt ongetekend terug: de plug-in leest de markten en schrijft de aanroep, en de wallet blijft bij de gebruiker.",
+  "marketplace.plugin.aave.app":
+    "Live markten van V3 en V4, walletposities, DAO-governance en voorbereide transacties, via één MCP-server.",
+  "marketplace.plugin.aave.prompt.stablecoinYield": "Waar kan ik nu het meest verdienen op stablecoins bij Aave?",
+  "marketplace.plugin.aave.prompt.usdcRates": "Wat levert nu meer op voor USDC: Aave V3 of V4 op Ethereum?",
+  "marketplace.plugin.aave.prompt.healthFactor":
+    "Wat is de health factor van 0x0a42b2f3a0d54157dbd7cc346335a4f1909fc02c, en hoe ver is die van liquidatie?",
+  "marketplace.plugin.canva.tagline": "Ontwerpen, assets en exports",
+  "marketplace.plugin.canva.description":
+    "Met Canva maak en bewerk je ontwerpen met woorden, doorzoek je je eigen ontwerpbibliotheek, upload en orden je assets, exporteer je in het formaat dat een kanaal nodig heeft en plaats je opmerkingen waar het werk is. Elke gebruiker logt in met een eigen Canva-account, en de agent kan doen wat dat account kan.",
+  "marketplace.plugin.canva.app":
+    "Ontwerpen maken en bewerken, bibliotheek doorzoeken, assets en huisstijl beheren, exports en opmerkingen, via één MCP-server.",
+  "marketplace.plugin.canva.prompt.recentDesign": "Toon mijn laatst bewerkte Canva-ontwerp.",
+  "marketplace.plugin.canva.prompt.socialResize":
+    "Pas het formaat van mijn lanceringsposter aan voor Instagram en exporteer beide als PNG.",
+  "marketplace.plugin.canva.prompt.deckFromNotes": "Maak van deze release notes een Canva-presentatie van zes dia’s.",
+  "marketplace.plugin.linear.tagline": "Issues en projecttriage",
+  "marketplace.plugin.linear.description":
+    "Met Linear kunnen agents toegewezen issues tonen, de backlog triëren, statussen bijwerken en nieuwe issues opstellen in de werkruimte van het ingelogde account. Elke gebruiker logt via de browser in met een eigen Linear-account.",
+  "marketplace.plugin.linear.app":
+    "Issues zoeken, triëren, statussen bijwerken en issues maken, via de MCP-server van Linear met inloggen in de browser.",
+  "marketplace.plugin.linear.prompt.myWeek": "Wat is er deze week aan mij toegewezen?",
+  "marketplace.plugin.linear.prompt.backlog":
+    "Triëer de backlog: wat is verouderd, geblokkeerd of heeft geen eigenaar?",
+  "marketplace.plugin.linear.prompt.newIssue":
+    "Maak een issue aan voor de crash in de sync-wachtrij, met stappen om die te reproduceren.",
+  "marketplace.plugin.notion.tagline": "Documenten en kennisbank",
+  "marketplace.plugin.notion.description":
+    "Met Notion kunnen agents pagina’s lezen en schrijven, de werkruimte doorzoeken en vergadernotities en specificaties bijhouden waar het team al werkt. Elke gebruiker logt via de browser in met een eigen Notion-account.",
+  "marketplace.plugin.notion.app":
+    "Pagina’s zoeken, lezen, schrijven en door de werkruimte navigeren, via de MCP-server van Notion met inloggen in de browser.",
+  "marketplace.plugin.notion.prompt.findSpec": "Zoek de huidige lanceringsspecificatie en vat de open vragen samen.",
+  "marketplace.plugin.notion.prompt.meetingNotes":
+    "Maak van deze opsommingstekens een gestructureerde vergadernotitie in mijn teamruimte.",
+  "marketplace.plugin.notion.prompt.updateDoc": "Werk het onboardingdocument bij met de nieuwe releasechecklist.",
+  "marketplace.plugin.cobrain.tagline": "Gedeeld geheugen voor je AI-agents",
+  "marketplace.plugin.cobrain.description":
+    "Cobrain is een Markdown-geheugen dat elke AI die je koppelt kan lezen en schrijven. Agents laden de context van een klant of project voordat ze beginnen, doorzoeken eerdere notities en beslissingen en slaan op wat ze leren, zodat de volgende thread begint waar de vorige eindigde. Elke gebruiker logt in met een eigen Cobrain-account.",
+  "marketplace.plugin.cobrain.app": "Lees, zoek en schrijf notities in je Cobrain-brein via één MCP-server.",
+  "marketplace.plugin.cobrain.prompt.startSession": "Laad mijn Cobrain-context voor dit project voordat we beginnen.",
+  "marketplace.plugin.cobrain.prompt.searchDecision":
+    "Zoek in mijn Cobrain-notities wat we over de prijzen hebben besloten.",
+  "marketplace.plugin.cobrain.prompt.saveNote":
+    "Sla een notitie op in Cobrain met wat we vandaag hebben gedaan en wat er nog moet.",
+  "marketplace.plugin.figma.tagline": "Ontwerpen en prototypes",
+  "marketplace.plugin.figma.description":
+    "Met Figma kunnen agents ontwerpbestanden lezen, componenten, stijlen en variabelen inspecteren en productiespecificaties aan ontwikkelaars overdragen. Het koppelt met de MCP-server in de Figma-desktopapp op deze computer. De server kan alleen ontwerpen lezen; ondersteuning voor schrijven komt eraan.",
+  "marketplace.plugin.figma.app":
+    "Ontwerpcontext, metadata, variabelen en screenshots, via de MCP-server in de Figma-desktopapp. Voorlopig alleen-lezen.",
+  "marketplace.plugin.figma.prompt.handoff": "Draag het checkout-bestand over: toon schermen, componenten en stijlen.",
+  "marketplace.plugin.figma.prompt.audit": "Controleer dit bestand op inconsistente witruimte en kleurgebruik.",
+  "marketplace.plugin.figma.prompt.assets": "Exporteer de marketingiconen op 2x voor de app-bundel.",
+  "marketplace.plugin.paper.tagline": "Ontwerpcanvas op basis van HTML en CSS",
+  "marketplace.plugin.paper.description":
+    "Met Paper kunnen agents het ontwerpbestand lezen en schrijven dat open is in Paper Desktop: artboards, selecties, berekende stijlen, JSX en tokens inspecteren, en frames, tekst en stijlen maken of wijzigen. Installeer Paper Desktop, open het één keer en open een bestand voordat je begint. OpenBot start de Paper CLI die Paper Desktop installeert. Paper heeft geen sleutel nodig. Schrijftools wijzigen het open bestand, dus controleer elke wijziging voordat je die goedkeurt.",
+  "marketplace.plugin.paper.app":
+    "Leest en schrijft het open Paper Desktop-bestand, via de lokale MCP-server die de Paper CLI doorgeeft. Vereist Paper Desktop met een open bestand.",
+  "marketplace.plugin.paper.prompt.implement":
+    "Bouw het geselecteerde Paper-frame in deze codebase, volgens onze codeconventies.",
+  "marketplace.plugin.paper.prompt.codeToDesign":
+    "Gebruik de stijlen in deze repository en ontwerp een instellingenpagina in Paper.",
+  "marketplace.plugin.paper.prompt.tokens":
+    "Toon de designtokens in het open Paper-bestand en vergelijk ze met ons thema.",
+  "marketplace.plugin.appleApps.tagline": "Mail, Agenda en meer op je Mac",
+  "marketplace.plugin.appleApps.description":
+    "Met Apple-apps kunnen agents Mail, Agenda, Contacten, Herinneringen, Notities, Berichten en Safari op deze Mac gebruiken. Het werkt alleen op macOS. OpenBot start mcp-icloud, een communityserver die niet van Apple of OpenBot is. De server bestuurt de apps via AppleScript op deze computer en heeft geen account en geen sleutel nodig. Bij de installatie kan OpenBot macOS in één keer om toegang tot al deze apps vragen, met één vraag per app. Anders vraagt macOS het de eerste keer dat een agent een app gebruikt. Om dit later te wijzigen, open je Systeeminstellingen › Privacy en beveiliging › Automatisering. Agents kunnen e-mail en iMessages versturen en afspraken, contacten en herinneringen wijzigen of verwijderen, dus controleer elke wijziging voordat je die goedkeurt. Wat de tools lezen, zoals de tekst van e-mails, gaat naar de modelaanbieder van de agent.",
+  "marketplace.plugin.appleApps.app":
+    "Mail, Agenda, Contacten, Herinneringen, Notities, Berichten en Safari, via de lokale mcp-icloud-server. Vereist macOS en toegang tot Automatisering.",
+  "marketplace.plugin.appleApps.prompt.unread": "Vat mijn ongelezen e-mail van vandaag in Apple Mail samen.",
+  "marketplace.plugin.appleApps.prompt.today": "Wat staat er vandaag en morgen in mijn Apple-agenda?",
+  "marketplace.plugin.appleApps.prompt.schedule":
+    "Zoek de laatste e-mail over de projectvergadering en zet de vergadering in mijn agenda.",
+  "marketplace.plugin.sentry.tagline": "Fouten en crashtriage",
+  "marketplace.plugin.sentry.description":
+    "Met Sentry kunnen agents recente fouten zoeken, stacktraces en getroffen releases inspecteren en samenvatten wat er na een deploy kapot ging. Elke gebruiker logt via de browser in met een eigen Sentry-account.",
+  "marketplace.plugin.sentry.app":
+    "Fouten zoeken, issues inspecteren en releasestatus, via de MCP-server van Sentry met inloggen in de browser.",
+  "marketplace.plugin.sentry.prompt.newErrors": "Welke nieuwe fouten zijn er sinds de deploy van gisteren?",
+  "marketplace.plugin.sentry.prompt.topCrash":
+    "Leg de meest voorkomende crash in het mobiele project uit en de waarschijnlijke oorzaak.",
+  "marketplace.plugin.sentry.prompt.releaseHealth": "Hoe gezond is de huidige release vergeleken met de vorige?",
+  "marketplace.plugin.vercel.tagline": "Deployments, buildlogs en projecten",
+  "marketplace.plugin.vercel.description":
+    "Met Vercel kunnen agents projecten en recente deployments tonen, build- en runtimelogs lezen en uitzoeken waarom een build mislukte. Elke gebruiker logt via de browser in met een eigen Vercel-account en kiest de teams die agents mogen gebruiken. In die teams krijgen agents dezelfde rechten als het account van de gebruiker. Ze kunnen ook omgevingsvariabelen, domeinen, DNS-records en deployments wijzigen, en domeinen kopen.",
+  "marketplace.plugin.vercel.app":
+    "Projecten, deployments, buildlogs en runtimelogs, via de MCP-server van Vercel met inloggen in de browser.",
+  "marketplace.plugin.vercel.prompt.failedBuild": "Waarom is de laatste productiedeployment mislukt?",
+  "marketplace.plugin.vercel.prompt.recentDeployments": "Toon de deployments van vandaag en hun status.",
+  "marketplace.plugin.vercel.prompt.runtimeErrors": "Welke routes hadden het afgelopen uur runtimefouten?",
+  "marketplace.plugin.cloudflare.tagline": "Workers, DNS, opslag en logs",
+  "marketplace.plugin.cloudflare.description":
+    "Met Cloudflare kunnen agents Workers, DNS-records, R2, D1 en KV tonen en beheren via de Cloudflare-API, Workers-logs doorzoeken en de Cloudflare-documentatie doorzoeken. Elke gebruiker logt via de browser in met een eigen Cloudflare-account. Kies op de toestemmingspagina van Cloudflare voor Read only: met de standaardoptie, Minimal, zien agents geen Workers, logs of DNS-records. Met schrijfrechten kunnen agents Workers deployen en verwijderen, DNS-records wijzigen en andere accountinstellingen wijzigen.",
+  "marketplace.plugin.cloudflare.app":
+    "Workers, DNS, opslag en logs, via de API-MCP-server van Cloudflare met inloggen in de browser.",
+  "marketplace.plugin.cloudflare.prompt.workers": "Welke Workers zijn er gedeployd in mijn Cloudflare-account?",
+  "marketplace.plugin.cloudflare.prompt.errors": "Welke Cloudflare Workers hebben het afgelopen uur fouten gelogd?",
+  "marketplace.plugin.cloudflare.prompt.dns": "Toon de DNS-records van elke zone in mijn Cloudflare-account.",
+  "marketplace.plugin.supabase.tagline": "Databases, logs en edge functions",
+  "marketplace.plugin.supabase.description":
+    "Met Supabase kunnen agents projecten tonen, SQL uitvoeren, tabelschema’s en logs lezen, de beveiligings- en prestatieadviezen bekijken, edge functions en branches beheren en de Supabase-documentatie doorzoeken. Elke gebruiker logt via de browser in met een eigen Supabase-account en kiest een organisatie. Agents krijgen volledige toegang: ze kunnen SQL uitvoeren die data wijzigt of verwijdert, migraties toepassen, edge functions deployen en projecten maken of pauzeren.",
+  "marketplace.plugin.supabase.app":
+    "Databases, logs en edge functions, via de MCP-server van Supabase met inloggen in de browser.",
+  "marketplace.plugin.supabase.prompt.projects": "Welke projecten staan er in mijn Supabase-organisatie?",
+  "marketplace.plugin.supabase.prompt.tables": "Toon de tabellen en kolommen van mijn Supabase-database.",
+  "marketplace.plugin.supabase.prompt.errors": "Welke fouten heeft mijn Supabase-project het afgelopen uur gelogd?",
+  "marketplace.plugin.context7.tagline": "Actuele documentatie van bibliotheken",
+  "marketplace.plugin.context7.description":
+    "Context7 haalt actuele documentatie en API-referenties op voor bibliotheken en frameworks, zodat antwoorden de versie gebruiken die het project echt draait. Het heeft geen account en geen sleutel nodig.",
+  "marketplace.plugin.context7.app":
+    "Actuele documentatie van bibliotheken opzoeken, via de Context7-MCP-server zonder inloggen.",
+  "marketplace.plugin.context7.prompt.apiCheck":
+    "Wat is de huidige API voor gevirtualiseerde lijsten in dit framework?",
+  "marketplace.plugin.context7.prompt.migrate": "Wat is er veranderd tussen v2 en v3 van deze router?",
+  "marketplace.plugin.context7.prompt.example": "Toon een actueel voorbeeld van geauthenticeerde bestandsuploads.",
+  "marketplace.plugin.stripe.tagline": "Betalingen en facturatie",
+  "marketplace.plugin.stripe.description":
+    "Met Stripe kunnen agents betalingen, klanten en facturen opzoeken en betaallinks opstellen, in het account waar de ingelogde gebruiker bij kan. Elke gebruiker logt via de browser in met een eigen Stripe-account.",
+  "marketplace.plugin.stripe.app":
+    "Betalingen, klanten en facturen opzoeken, via de MCP-server van Stripe met inloggen in de browser.",
+  "marketplace.plugin.stripe.prompt.payment": "Zoek deze betaling op en leg uit waarom die mislukte.",
+  "marketplace.plugin.stripe.prompt.customer": "Vat de facturen en het openstaande saldo van deze klant samen.",
+  "marketplace.plugin.stripe.prompt.link": "Stel een betaallink op voor het Pro-abonnement van 49 per maand.",
+  "marketplace.plugin.posthog.tagline": "Productanalyse en flags",
+  "marketplace.plugin.posthog.description":
+    "Met PostHog kunnen agents events en funnels opvragen, feature flags inspecteren en samenvatten wat er na een release veranderde. Een persoonlijke API-sleutel uit de projectinstellingen gaat in één Authorization-header.",
+  "marketplace.plugin.posthog.app":
+    "Toegang tot events, funnels en feature flags, via de MCP-server van PostHog met een persoonlijke API-sleutel.",
+  "marketplace.plugin.posthog.prompt.funnel": "Hoe ziet de aanmeldfunnel van de afgelopen 14 dagen eruit?",
+  "marketplace.plugin.posthog.prompt.flag": "Welke feature flags staan aan voor deze gebruiker?",
+  "marketplace.plugin.posthog.prompt.release": "Is de activatie veranderd na de release van vorige week?",
+  "marketplace.plugin.airtable.tagline": "Bases en records",
+  "marketplace.plugin.airtable.description":
+    "Met Airtable kunnen agents bases tonen, records lezen en bijwerken en de inhoud van tabellen samenvatten. Een API-sleutel van de accountpagina gaat als één omgevingsvariabele naar de lokale server.",
+  "marketplace.plugin.airtable.app":
+    "Bases tonen en toegang tot records, via een lokale MCP-server met een Airtable-API-sleutel.",
+  "marketplace.plugin.airtable.prompt.bases": "Tot welke bases heb ik toegang?",
+  "marketplace.plugin.airtable.prompt.records": "Vat de tabel met de lanceringstracker samen.",
+  "marketplace.plugin.airtable.prompt.update": "Markeer de opgeleverde functies als klaar in de roadmap-base.",
+  "marketplace.plugin.firecrawl.tagline": "Webextractie en zoeken",
+  "marketplace.plugin.firecrawl.description":
+    "Met Firecrawl kunnen agents pagina’s scrapen, gestructureerde data extraheren en het web doorzoeken via één API. Een API-sleutel uit het Firecrawl-dashboard gaat als één omgevingsvariabele naar de lokale server.",
+  "marketplace.plugin.firecrawl.app":
+    "Pagina’s scrapen, extraheren en op het web zoeken, via een lokale MCP-server met een Firecrawl-API-sleutel.",
+  "marketplace.plugin.firecrawl.prompt.scrape": "Haal de prijstabel van deze pagina op als gestructureerde data.",
+  "marketplace.plugin.firecrawl.prompt.research": "Onderzoek de prijzen van concurrenten en vermeld elke bronpagina.",
+  "marketplace.plugin.firecrawl.prompt.monitor": "Wat is er deze maand veranderd op onze changelogpagina?",
+  "marketplace.plugin.braveSearch.tagline": "Privé zoeken op het web",
+  "marketplace.plugin.braveSearch.description":
+    "Met Brave Search kunnen agents het web en lokale resultaten doorzoeken zonder tracking. Een API-sleutel uit het dashboard van de Brave Search API gaat als één omgevingsvariabele naar de lokale server.",
+  "marketplace.plugin.braveSearch.app":
+    "Zoeken op het web en lokaal, via een lokale MCP-server met een Brave-API-sleutel.",
+  "marketplace.plugin.braveSearch.prompt.search": "Wat zeggen reviewers over deze versie van het framework?",
+  "marketplace.plugin.braveSearch.prompt.news": "Zoek de aankondigingen van vandaag voor dit productgebied.",
+  "marketplace.plugin.braveSearch.prompt.compare": "Vergelijk deze twee leveranciers met bronvermelding.",
+  "marketplace.plugin.obsidian.tagline": "Notities in je kluis",
+  "marketplace.plugin.obsidian.description":
+    "Met Obsidian kunnen agents de notities in je kluis doorzoeken, lezen en schrijven, zodat de kluis hun geheugen kan zijn. De lokale server koppelt met de plug-in Local REST API in de Obsidian-app op deze computer. De API-sleutel van de plug-in gaat als één omgevingsvariabele naar de lokale server. Houd Obsidian open terwijl agents het gebruiken.",
+  "marketplace.plugin.obsidian.app":
+    "Notities zoeken, lezen en bewerken, via een lokale MCP-server met de sleutel van de plug-in Local REST API.",
+  "marketplace.plugin.obsidian.prompt.recall": "Wat zeggen mijn notities over de beslissingen in dit project?",
+  "marketplace.plugin.obsidian.prompt.save": "Sla deze beslissing op als nieuwe notitie in mijn kluis.",
+  "marketplace.plugin.obsidian.prompt.log":
+    "Voeg een samenvatting van het werk van vandaag toe aan mijn notitie Work log.",
+  "marketplace.plugin.obsidian.hint.apiKey":
+    "Open in Obsidian Settings > Local REST API. Kopieer de API-sleutel en zet “Enable non-encrypted (HTTP) server” aan.",
+  "marketplace.plugin.resend.tagline": "Transactionele e-mail",
+  "marketplace.plugin.resend.description":
+    "Met Resend kunnen agents transactionele e-mail versturen en de bezorging controleren via één API. Een API-sleutel uit het Resend-dashboard gaat als één omgevingsvariabele naar de lokale server.",
+  "marketplace.plugin.resend.app":
+    "E-mail versturen en bezorging controleren, via een lokale MCP-server met een Resend-API-sleutel.",
+  "marketplace.plugin.resend.prompt.send": "Stuur het concept van de lanceringsaankondiging naar de bètalijst.",
+  "marketplace.plugin.resend.prompt.status": "Is de factuurmail bij de klant aangekomen?",
+  "marketplace.plugin.resend.prompt.template":
+    "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
+  "marketplace.plugin.composio.tagline": "Veel apps via je eigen Composio-link",
+  "marketplace.plugin.composio.description":
+    "Composio koppelt agents met Gmail, Slack, GitHub en honderden andere apps via één MCP-server. Koppel de apps die je wilt in je Composio-account en plak hier de MCP-URL en API-sleutel ervan.",
+  "marketplace.plugin.composio.app":
+    "De apps die je toevoegt aan je Composio-MCP-server, via de link uit je Composio-account.",
+  "marketplace.plugin.composio.prompt.inbox":
+    "Vat mijn ongelezen e-mail samen en stel antwoorden op voor de dringende.",
+  "marketplace.plugin.composio.prompt.handoff": "Plaats een samenvatting van deze pull request in ons teamkanaal.",
+  "marketplace.plugin.composio.prompt.apps": "Welke apps en acties kun je via Composio gebruiken?",
+  "marketplace.plugin.composio.hint.url": "De URL van een MCP-server in je Composio-account",
+  "marketplace.plugin.composio.hint.apiKey":
+    "Je vindt deze in je Composio-account, onder Settings > Sessions & API Key.",
+  "marketplace.plugin.neon.tagline": "Postgres-projecten, branches en migraties",
+  "marketplace.plugin.neon.description":
+    "Met Neon kunnen agents projecten en branches tonen, SQL uitvoeren, tabelschema’s lezen, schemawijzigingen testen op een tijdelijke branch, trage query’s vinden en de Neon-documentatie doorzoeken. Elke gebruiker logt via de browser in met een eigen Neon-account en kan bij het autoriseren alleen-lezentoegang kiezen. Met volledige toegang kunnen agents SQL uitvoeren die data wijzigt of verwijdert, en branches, databases en projecten maken, resetten of verwijderen. Neon raadt de MCP-server aan voor ontwikkeling en testen, niet voor productiedatabases.",
+  "marketplace.plugin.neon.app":
+    "Postgres-projecten, branches, SQL en migraties, via de MCP-server van Neon met inloggen in de browser.",
+  "marketplace.plugin.neon.prompt.projects": "Welke projecten en branches staan er in mijn Neon-account?",
+  "marketplace.plugin.neon.prompt.slowQueries": "Welke query’s zijn het traagst in mijn Neon-database, en waarom?",
+  "marketplace.plugin.neon.prompt.migration":
+    "Voeg in een tijdelijke branch een index toe op de tabel orders, en toon me het resultaat voordat je het toepast.",
+  "marketplace.plugin.prisma.tagline": "Postgres-databases, back-ups en Compute-apps",
+  "marketplace.plugin.prisma.description":
+    "Met Prisma kunnen agents Prisma Postgres-databases tonen en maken, schema’s lezen, SQL uitvoeren, back-ups tonen en terugzetten naar een nieuwe database, Object Storage-buckets beheren, Compute-builds en -logs lezen en de Prisma-documentatie doorzoeken. Elke gebruiker logt via de browser in met een eigen Prisma-account en kiest een werkruimte. Agents krijgen volledige toegang: ze kunnen SQL uitvoeren die data wijzigt of verwijdert, schema’s bijwerken, databases en buckets verwijderen, en Compute-deployments stoppen, terugdraaien of verwijderen.",
+  "marketplace.plugin.prisma.app":
+    "Databases, SQL, back-ups en Compute-apps, via de MCP-server van Prisma met inloggen in de browser.",
+  "marketplace.plugin.prisma.prompt.databases": "Welke databases staan er in mijn Prisma-werkruimte?",
+  "marketplace.plugin.prisma.prompt.backups": "Toon alle beschikbare back-ups van mijn database.",
+  "marketplace.plugin.prisma.prompt.logs": "Toon de runtimelogs van mijn laatste Compute-deployment.",
+  "marketplace.plugin.netlify.tagline": "Projecten, deploys en requestlogs",
+  "marketplace.plugin.netlify.description":
+    "Met Netlify kunnen agents projecten en deploys tonen, edge-requestlogs lezen, projecten maken en code deployen naar een bestaand project. Elke gebruiker logt via de browser in met een eigen Netlify-account. Agents krijgen dezelfde toegang als het account van de gebruiker: ze kunnen omgevingsvariabelen, formulieren en bezoekerstoegang wijzigen, extensies installeren of verwijderen, en formulierinzendingen en omgevingsvariabelen verwijderen.",
+  "marketplace.plugin.netlify.app":
+    "Projecten, deploys, requestlogs en site-instellingen, via de MCP-server van Netlify met inloggen in de browser.",
+  "marketplace.plugin.netlify.prompt.latestDeploy":
+    "Wat is de status van de laatste deploy van elk van mijn Netlify-projecten?",
+  "marketplace.plugin.netlify.prompt.errors": "Welke URL’s van mijn site gaven de afgelopen dag serverfouten?",
+  "marketplace.plugin.netlify.prompt.deploy": "Deploy deze map naar mijn bestaande Netlify-project.",
+  "marketplace.plugin.railway.tagline": "Projecten, services en deployments",
+  "marketplace.plugin.railway.description":
+    "Met Railway kunnen agents projecten en services tonen, projecten maken, services opnieuw deployen en feature flags beheren. Agents kunnen ook werk in meerdere stappen geven aan de Railway Agent, die logs leest, uitzoekt waarom een deploy mislukte, services maakt en variabelen instelt. Elke gebruiker logt via de browser in met een eigen Railway-account en kiest de werkruimten en projecten die agents mogen gebruiken. In die projecten krijgen agents volledige toegang: ze kunnen klaargezette wijzigingen deployen, feature flags verwijderen en via de Railway Agent services, variabelen, databases en netwerkinstellingen wijzigen.",
+  "marketplace.plugin.railway.app":
+    "Projecten, services en deployments, via de MCP-server van Railway met inloggen in de browser.",
+  "marketplace.plugin.railway.prompt.projects": "Welke projecten en services staan er in mijn Railway-werkruimte?",
+  "marketplace.plugin.railway.prompt.crash": "Waarom crasht mijn backendservice op Railway bij het deployen?",
+  "marketplace.plugin.railway.prompt.redeploy": "Deploy de API-service in mijn Railway-project opnieuw.",
+  "marketplace.plugin.render.tagline": "Services, deploys en logs",
+  "marketplace.plugin.render.description":
+    "Met Render kunnen agents werkruimten en services tonen, logs, events en metrics lezen, de deploygeschiedenis bekijken, deploys starten en alleen-lezen-SQL uitvoeren op Render Postgres. Een Render-API-sleutel gaat in één Authorization-header. De sleutel geeft toegang tot elke werkruimte van het Render-account. Agents kunnen webservices, statische sites, cronjobs, Postgres-databases en Key Value-instanties maken, wat geld kan kosten, en ze kunnen de omgevingsvariabelen van een service vervangen. De server kan geen resource verwijderen.",
+  "marketplace.plugin.render.app":
+    "Services, deploys, logs en metrics, via de MCP-server van Render met een API-sleutel.",
+  "marketplace.plugin.render.prompt.services": "Welke services staan er in mijn Render-werkruimte?",
+  "marketplace.plugin.render.prompt.logs": "Welke fouten heeft mijn Render-webservice het afgelopen uur gelogd?",
+  "marketplace.plugin.render.prompt.deploy": "Waarom is de laatste deploy van mijn Render-service mislukt?",
+  "marketplace.plugin.atlassian.tagline": "Jira-werkitems en Confluence-pagina’s",
+  "marketplace.plugin.atlassian.description":
+    "Met Atlassian kunnen agents Jira-werkitems, Confluence-pagina’s en Bitbucket-pull requests zoeken en lezen, en werkitems, pagina’s en opmerkingen maken of bijwerken. Elke gebruiker logt via de browser in met een eigen Atlassian-account en keurt de toegang goed op een toestemmingsscherm. Agents krijgen dezelfde rechten als de gebruiker: ze kunnen werkitems en pagina’s wijzigen, paginarechten wijzigen en pull requests mergen. Tools die Jira-data verwijderen blijven uit tot een organisatiebeheerder ze aanzet. Elke toolaanroep gebruikt Rovo-credits.",
+  "marketplace.plugin.atlassian.app":
+    "Jira, Confluence en Bitbucket, via de MCP-server van Atlassian met inloggen in de browser.",
+  "marketplace.plugin.atlassian.prompt.assigned": "Welke open Jira-werkitems zijn aan mij toegewezen?",
+  "marketplace.plugin.atlassian.prompt.releasePage":
+    "Zoek de Confluence-pagina over ons releaseproces en vat die samen.",
+  "marketplace.plugin.atlassian.prompt.newItem":
+    "Maak een Jira-werkitem voor de loginbug, met stappen om die te reproduceren.",
+  "marketplace.plugin.todoist.tagline": "Taken, projecten en herinneringen",
+  "marketplace.plugin.todoist.description":
+    "Met Todoist kunnen agents taken vinden op datum, tekst, label of filter, taken toevoegen en verzetten, en projecten, secties, labels, opmerkingen en herinneringen beheren. Elke gebruiker logt via de browser in met een eigen Todoist-account. Agents krijgen lees- en schrijftoegang: ze kunnen taken, projecten en andere items wijzigen, afronden en verwijderen.",
+  "marketplace.plugin.todoist.app":
+    "Taken, projecten en herinneringen, via de MCP-server van Todoist met inloggen in de browser.",
+  "marketplace.plugin.todoist.prompt.today": "Welke Todoist-taken moeten vandaag af?",
+  "marketplace.plugin.todoist.prompt.capture": "Zet deze actiepunten in mijn Todoist-inbox.",
+  "marketplace.plugin.todoist.prompt.overdue": "Verzet mijn achterstallige Todoist-taken naar morgen.",
+  "marketplace.plugin.trello.tagline": "Borden, lijsten en kaarten",
+  "marketplace.plugin.trello.description":
+    "Met Trello kunnen agents borden, lijsten, kaarten, checklists en opmerkingen zoeken en lezen, borden en kaarten maken, lijsten en kaarten verplaatsen, kaarten als klaar markeren, en checklists, opmerkingen en labels toevoegen. Agents kunnen ook kaarten in de Trello-inbox van de gebruiker lezen en toevoegen, en Planner-events lezen, die uit een gekoppelde Google- of Outlook-agenda kunnen komen. Elke gebruiker logt via de browser in met een eigen Trello-account en kiest de werkruimten op een toestemmingsscherm. Agents krijgen dezelfde rechten als de gebruiker in die werkruimten. Ze kunnen kaarten en lijsten archiveren, maar de server kan niets definitief verwijderen.",
+  "marketplace.plugin.trello.app":
+    "Borden, lijsten en kaarten, via de MCP-server van Trello met inloggen in de browser.",
+  "marketplace.plugin.trello.prompt.myCards": "Welke Trello-kaarten zijn aan mij toegewezen?",
+  "marketplace.plugin.trello.prompt.board": "Vat samen wat er onderhanden is op mijn Trello-bord.",
+  "marketplace.plugin.trello.prompt.newCards": "Zet deze actiepunten als kaarten op mijn Trello-bord.",
+  "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
+  "marketplace.plugin.huggingface.description":
+    "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",
+  "marketplace.plugin.huggingface.app":
+    "Modellen, datasets, Spaces, papers en documentatie zoeken, via de MCP-server van Hugging Face zonder inloggen.",
+  "marketplace.plugin.huggingface.prompt.models": "Zoek kleine open modellen voor spraakherkenning op Hugging Face.",
+  "marketplace.plugin.huggingface.prompt.papers": "Welke papers zijn vandaag populair op Hugging Face?",
+  "marketplace.plugin.huggingface.prompt.dataset": "Zoek een dataset met weertijdreeksen en toon de kolommen.",
+  "marketplace.auth.apiKey": "API-sleutel",
+  "marketplace.auth.personalApiKey": "Persoonlijke API-sleutel",
+  "marketplace.auth.mcpUrl": "MCP-URL",
+  "marketplace.auth.createKey": "Sleutel maken",
+  "marketplace.skill.doc": "SKILL.md",
+  "marketplace.try.in": "Probeer in {name}",
+  "marketplace.skills.yours": "Jouw vaardigheden",
+  "marketplace.skills.seeAll": "Alles bekijken",
+  "marketplace.skills.seeAllName": "Alles bekijken: {name}",
+  "marketplace.skills.none": "Nog geen agent heeft een vaardigheid.",
+  "marketplace.skills.noneHint":
+    "Een vaardigheid leert een agent één taak. Voeg er hieronder een toe of maak er zelf een.",
+  "marketplace.skills.sourceLabel": "Bron",
+  "marketplace.skills.source.all": "Alle",
+  "marketplace.skills.source.verified": "Geverifieerd",
+  "marketplace.skills.source.public": "Openbaar",
+  "marketplace.skills.source.verifiedLong": "Geverifieerd door OpenBot",
+  "marketplace.skills.source.publicLong": "Openbaar: OpenBot heeft dit niet gecontroleerd",
+  "marketplace.skills.sortLabel": "Sorteren",
+  "marketplace.skills.sortName": "Sorteren: {name}",
+  "marketplace.skills.sort.installs": "Meest gebruikt",
+  "marketplace.skills.sort.updated": "Recent bijgewerkt",
+  "marketplace.skills.sort.name": "Naam",
+  "marketplace.skills.featured": "Uitgelicht",
+  "marketplace.skills.all": "Alle vaardigheden",
+  "marketplace.skills.count": { one: "{count} vaardigheid", other: "{count} vaardigheden" },
+  "marketplace.skills.searchIn": "Zoeken in {name}",
+  "marketplace.skills.state.off": "Uit",
+  "marketplace.skills.state.repair": "Herstel nodig",
+  "marketplace.skills.state.update": "Update beschikbaar",
+  "marketplace.skills.state.modified": "Door jou gewijzigd",
+  "marketplace.skills.stateOn": "{state} op {agents}",
+  "marketplace.skills.version": "Versie {version}",
+  "marketplace.skills.origin.local": "Gemaakt op deze computer",
+  "marketplace.skills.origin.workspace": "In de map van deze agent",
+  "marketplace.skills.origin.marketplace": "Uit de Marktplaats · versie {version}",
+  "marketplace.skills.status.notAdded": "Niet toegevoegd",
+  "marketplace.skills.status.on": "Aan op {agents}",
+  "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },
+  "marketplace.skills.allAgents": "alle agents",
+  "marketplace.skills.agentsTitle": "Agents · {total}",
+  "marketplace.skills.agents.search": "Agents zoeken",
+  "marketplace.skills.agents.searchName": "Agents met {name} zoeken",
+  "marketplace.skills.agents.noMatch": "Geen agent gevonden voor “{query}”.",
+  "marketplace.skills.agents.removeAll": "Alles verwijderen",
+  "marketplace.skills.agents.removeAllName": {
+    one: "{name} verwijderen van {count} agent",
+    other: "{name} verwijderen van alle {count} agents",
+  },
+  "marketplace.skills.agent.toggle": "{name} voor {agent}",
+  "marketplace.skills.agent.remove": "Verwijderen",
+  "marketplace.skills.agent.removeName": "{name} verwijderen van {agent}",
+  "marketplace.skills.add": "Toevoegen",
+  "marketplace.skills.addName": "{name} aan agents toevoegen",
+  "marketplace.skills.addToAgents": "Aan agents toevoegen",
+  "marketplace.skills.onOf": "Aan op {have} van {total}",
+  "marketplace.skills.chooseAgents": "{name} staat op {agents}. Agents kiezen",
+  "marketplace.skills.dialog.list": "Agents met {name}",
+  "marketplace.skills.dialog.search": { one: "{count} agent doorzoeken", other: "{count} agents doorzoeken" },
+  "marketplace.skills.dialog.all": { one: "{count} agent", other: "Alle {count} agents" },
+  "marketplace.skills.dialog.allMatches": { one: "{count} resultaat", other: "Alle {count} resultaten" },
+  "marketplace.skills.dialog.checked": "{checked} van {total}",
+  "marketplace.skills.dialog.save": "Opslaan",
+  "marketplace.skills.dialog.saveBoth": "Opslaan: {added} toevoegen, {removed} verwijderen",
+  "marketplace.skills.dialog.addTo": "Toevoegen aan {agents}",
+  "marketplace.skills.dialog.removeFrom": "Verwijderen van {agents}",
+  "marketplace.skills.dialog.full": "Limiet voor vaardigheden bereikt",
+  "marketplace.skills.dialog.unread": "Vaardigheden niet gelezen",
+  "marketplace.skills.local.gone": "Geen agent heeft deze vaardigheid nu.",
+  "marketplace.notice.agentAdded": "{name} toegevoegd.",
+  "marketplace.notice.agentUpdated": "{name} bijgewerkt.",
+  "marketplace.notice.appConnected": "{name} gekoppeld.",
+  "marketplace.notice.appDisconnected": "{name} ontkoppeld.",
+  "marketplace.notice.serverRemoved": "{name} verwijderd.",
+  "marketplace.notice.skillInstalled": {
+    one: "{name} geïnstalleerd op {count} agent.",
+    other: "{name} geïnstalleerd op {count} agents.",
+  },
+  "marketplace.notice.skillRemoved": {
+    one: "{name} verwijderd van {count} agent.",
+    other: "{name} verwijderd van {count} agents.",
+  },
+  "marketplace.error.skillPartial": "{name} is niet gewijzigd bij deze agents: {agents}. {reason}",
+  "marketplace.error.openLink": "Kan de link niet openen.",
+  "marketplace.error.copyLink": "Kan de link niet kopiëren.",
+  "marketplace.error.connectNoServer": "Kies een lokale server om deze app te koppelen.",
+  "marketplace.error.installNoServer": "Kies een lokale server om een plug-in te installeren.",
+  "marketplace.error.installNoAgent": "Kies een agent om de vaardigheden van deze plug-in te installeren.",
+  "marketplace.error.installLocalOnHost":
+    "Installeer {name} op de computer waarop deze agents draaien: de app ervan draait de server op die computer.",
+  "marketplace.error.installOnHost":
+    "Installeer {name} op de computer waarop deze agents draaien: de app ervan vereist inloggen in de browser.",
+  "marketplace.error.appInvalid": "{name} kan niet worden toegevoegd: {reason}",
+  "marketplace.error.uninstallNoServer": "Kies een lokale server om een plug-in te verwijderen.",
+  "marketplace.error.uninstallPartial": "Een deel van {name} kon niet worden verwijderd. {failures}",
+  "marketplace.error.actionFailed": "Kan de marktplaatsactie niet voltooien. Probeer het opnieuw.",
+  "marketplace.thisAgent": "deze agent",
+} as const satisfies PartialTranslation<typeof source>;

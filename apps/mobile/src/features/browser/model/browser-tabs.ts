@@ -92,3 +92,41 @@ export function agentBrowserTab(
     null
   );
 }
+
+/** A tab's title, or the site it shows when the page has no title yet. */
+export function browserTabTitle(tab: MobileBrowserTab, untitled: string): string {
+  if (tab.title.trim()) return tab.title;
+  return browserTabHost(tab) || untitled;
+}
+
+/** The site of a tab's address, or an empty string for an address with no host. */
+export function browserTabHost(tab: MobileBrowserTab): string {
+  try {
+    return new URL(tab.url).host;
+  } catch {
+    return "";
+  }
+}
+
+const SEARCH_URL = "https://www.google.com/search?q=";
+
+/**
+ * The page that the text in the address field opens: a web address, or a Google search. The same
+ * rule as the desktop address bar (`browserAddressUrl` in `@openbot/ui`, which mobile cannot import).
+ */
+export function browserAddressUrl(value: string): string {
+  const hasProtocol = /^https?:\/\//i.test(value);
+  const candidate = hasProtocol ? value : `https://${value}`;
+  try {
+    const url = new URL(candidate);
+    if (
+      !/\s/.test(value) &&
+      (hasProtocol || url.hostname.includes(".") || url.hostname === "localhost" || url.hostname.startsWith("["))
+    ) {
+      return candidate;
+    }
+  } catch {
+    // Text that is not a web address is a search query.
+  }
+  return `${SEARCH_URL}${encodeURIComponent(value.replace(/^https?:\/\//i, ""))}`;
+}

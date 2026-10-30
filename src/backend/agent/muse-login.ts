@@ -1,7 +1,7 @@
 import { type SpawnedMspConnection, spawnMspConnection } from "@muse-code/sdk";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
-import { type AgentCliInfo, cliSpawnTarget } from "../cli";
+import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "../cli";
 import { providerCall, providerFailure, providerSync } from "../provider-client-effects";
 import { CliCodeLoginFailed, type CliCodePrompt } from "./cli-code-login";
 import type { CliLoginProcess } from "./cli-login-flow";
@@ -32,7 +32,11 @@ export const startMuseDeviceLogin = Effect.fn("MuseLogin.start")(function* (opti
   if (target.windowsVerbatimArguments) {
     return yield* new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.museNativeWindows")) });
   }
-  const environment: NodeJS.ProcessEnv = { ...process.env, MUSE_NO_AUTO_UPDATE: "1" };
+  const environment: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...cliPathEnvironment(options.cli),
+    MUSE_NO_AUTO_UPDATE: "1",
+  };
   for (const key of Object.keys(environment)) if (key.toUpperCase() === "META_API_KEY") delete environment[key];
   const handshake = yield* Effect.acquireRelease(
     Effect.try({
@@ -125,7 +129,12 @@ export const readMuseAccount = Effect.fn("MuseLogin.readAccount")(
     const target = cliSpawnTarget(options.cli.executable, ["serve", "--disable-shell", "--disable-write"]);
     if (target.windowsVerbatimArguments)
       return yield* providerFailure(new Error(sourceText("error.provider.museNativeWindows")));
-    const environment: NodeJS.ProcessEnv = { ...process.env, ...options.extraEnv, MUSE_NO_AUTO_UPDATE: "1" };
+    const environment: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...cliPathEnvironment(options.cli),
+      ...options.extraEnv,
+      MUSE_NO_AUTO_UPDATE: "1",
+    };
     for (const key of Object.keys(environment)) if (key.toUpperCase() === "META_API_KEY") delete environment[key];
     if (options.apiKey) environment.META_API_KEY = options.apiKey;
     const handshake = yield* Effect.acquireRelease(

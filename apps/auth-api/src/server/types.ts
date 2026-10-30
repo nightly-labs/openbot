@@ -68,6 +68,11 @@ export interface WorkerBindings {
   /** A Stripe sandbox (`sk_test_`) key in development and test. */
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
+   * a new license is paid at once.
+   */
+  LICENSE_TRIAL_END?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
@@ -272,7 +277,7 @@ export interface AuthRepository {
     expiresAt: number;
   }): Effect.Effect<void, AuthStoreError>;
   replaceMobileAuthTicket(input: {
-    host?: import("@openbot/contracts/mobile-connect").MobileConnectHostBinding;
+    host?: import("@openbot/contracts/mobile-connect").MobileConnectHostBinding | undefined;
     ticketHash: string;
     userId: string;
     serverId: string;
@@ -314,7 +319,12 @@ export interface AuthRepository {
     device: MobileAuthDeviceIdentity;
   }): Effect.Effect<MobileAuthSessionResult | null, AuthStoreError>;
   authenticateMobileSession(sessionToken: string, now: number): Effect.Effect<AuthUser | null, AuthStoreError>;
-  listMobileAuthDevices(userId: string, now: number): Effect.Effect<MobileAuthDevice[], AuthStoreError>;
+  /** With a host, only the phones that can open it: none when the host is not in the account directory. */
+  listMobileAuthDevices(
+    userId: string,
+    now: number,
+    hostId: string | null,
+  ): Effect.Effect<MobileAuthDevice[], AuthStoreError>;
   revokeMobileAuthDevice(userId: string, sessionId: string, now: number): Effect.Effect<boolean, AuthStoreError>;
   /** Creates the user of the email when there is none. */
   createServerClaim(input: {

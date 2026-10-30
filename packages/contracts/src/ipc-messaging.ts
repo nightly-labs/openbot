@@ -41,6 +41,11 @@ export const MESSAGING_LIMITS = {
   scope: 64,
   scopes: 32,
   connections: 32,
+  /** The roles one Discord server can allow. */
+  allowedRoles: 50,
+  /** Discord's own limit of roles in a server. */
+  roles: 250,
+  roleName: 100,
 } as const;
 
 export interface MessagingConnection {
@@ -88,6 +93,37 @@ export interface AddMessagingOrchestratorResult {
   agentId: string;
   sectionId: string | null;
 }
+
+/** One Discord role, by the name it had when the host read it. */
+export interface MessagingRole {
+  id: string;
+  name: string;
+}
+
+/**
+ * Who can use OpenBot in one Discord server: the members with one of these roles. Empty lets everyone.
+ * OpenBot ignores a mention from anyone else.
+ */
+export interface DiscordAccess {
+  allowedRoles: MessagingRole[];
+}
+
+/** The roles of a Discord server that a person can have, highest first, to choose from. */
+export interface DiscordRoleList {
+  roles: MessagingRole[];
+}
+
+export interface SetDiscordAccessInput {
+  workspaceId: string;
+  allowedRoles: MessagingRole[];
+}
+
+/** The Discord server of a joined server: its Discord guild ID. */
+export interface HostDiscordAccessInput {
+  workspaceId: string;
+}
+
+export type HostSetDiscordAccessInput = SetDiscordAccessInput;
 
 /** The Slack workspaces connected on this computer. */
 export type SlackOverview = MessagingOverview;
@@ -227,4 +263,34 @@ export function isTelegramOverview(value: unknown): value is TelegramOverview {
     value.connections.length <= TELEGRAM_ROUTE_CHATS_LIMIT &&
     value.connections.every(isMessagingConnection)
   );
+}
+
+const ROLE_ID = /^[0-9]{1,24}$/u;
+
+export function isMessagingRole(value: unknown): value is MessagingRole {
+  return (
+    isDynamicRecord(value) &&
+    typeof value.id === "string" &&
+    ROLE_ID.test(value.id) &&
+    isBoundedString(value.name, MESSAGING_LIMITS.roleName)
+  );
+}
+
+function isRoleList(value: unknown, limit: number): value is MessagingRole[] {
+  return Array.isArray(value) && value.length <= limit && value.every(isMessagingRole);
+}
+
+export function isDiscordAccess(value: unknown): value is DiscordAccess {
+  return isDynamicRecord(value) && isRoleList(value.allowedRoles, MESSAGING_LIMITS.allowedRoles);
+}
+
+export function isDiscordRoleList(value: unknown): value is DiscordRoleList {
+  return isDynamicRecord(value) && isRoleList(value.roles, MESSAGING_LIMITS.roles);
+}
+
+/** A new role list, or null when it is too long, repeats a role, or has an invalid role. */
+export function parseDiscordAllowedRoles(value: unknown): MessagingRole[] | null {
+  if (!isRoleList(value, MESSAGING_LIMITS.allowedRoles)) return null;
+  const ids = new Set(value.map((role) => role.id));
+  return ids.size === value.length ? value.map((role) => ({ id: role.id, name: role.name })) : null;
 }

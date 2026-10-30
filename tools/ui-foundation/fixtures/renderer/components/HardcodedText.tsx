@@ -3,6 +3,8 @@ declare const Alert: { alert: (title: string, message?: string) => void };
 declare const text: { errorMessage: (error: unknown, fallback: string) => string };
 declare const error: unknown;
 declare function SearchField(props: { placeholder: string }): null;
+declare const name: string;
+declare const count: number;
 
 export function notify(): void {
   toast.error("Could not save the file."); // flag
@@ -18,3 +20,7 @@ export const accessibleName = <a href="/" aria-label="Close" />; // flag
 export const tooltip = <span title={"Open the file"} />; // flag
 export const hint = <SearchField placeholder='Search' />; // flag
 export const image = <img alt={`Profile photo`} src="a.png" />; // flag
+export const namedButton = <a href="/" aria-label={`Open ${name}`} />; // flag
+export const namedTooltip = <span title={`${name} was deleted`} />; // flag
+export const countedHint = <SearchField placeholder={`Search ${count} chats`} />; // flag
+export const namedImage = <img alt={`Photo of ${name}, ${count}`} src="a.png" />; // flag

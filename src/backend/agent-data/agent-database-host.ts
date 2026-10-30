@@ -289,7 +289,7 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
       kind: "not-authorized",
       message:
         "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped or altered.",
-      sqliteCode: code,
+      ...(code === undefined ? {} : { sqliteCode: code }),
     };
   }
   return redactFailure({ kind: "sqlite", message, ...(code === undefined ? {} : { sqliteCode: code }) }, databasePath);

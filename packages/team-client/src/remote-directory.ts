@@ -1,4 +1,4 @@
-import { sha256 } from "@noble/hashes/sha2.js";
+import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import {
   createInviteUrl,
   type InviteLinkOptions,
@@ -15,8 +15,8 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contrac
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
-import { bytesToBase64Url } from "./base64";
 import { runTeamEffect } from "./effect-boundary";
+import { followHostKeyHandovers, type HostKeySignatureCheck, remoteHostFingerprint } from "./host-key-handover";
 import type { TeamClientFetch } from "./index";
 
 export interface RemoteTeamHost {
@@ -70,16 +70,13 @@ export interface RemoteInvitePreview {
   emailBound: boolean;
   permanent: boolean;
   devicePublicKey: string | null;
+  /** The host's signed key handovers. An account service from before handovers sends none. */
+  keyHandovers: HostKeyHandover[];
 }
 
 export interface RemoteHostKeyStore {
   get(hostId: string): Promise<string | null>;
   set(hostId: string, publicKey: string): Promise<void>;
-}
-
-export function remoteHostFingerprint(publicKey: string): string {
-  const digest = sha256(new TextEncoder().encode(publicKey));
-  return bytesToBase64Url(digest);
 }
 
 /**
@@ -111,6 +108,7 @@ const DIRECTORY_ERROR_TEXT = new Map<string, string>([
   ["invite_already_used", sourceText("error.remote.inviteAlreadyUsed")],
   ["invite_not_found", sourceText("error.remote.inviteNotFound")],
   ["member_limit_reached", sourceText("error.remote.memberLimitReached")],
+  ["license_users_full", sourceText("error.remote.licenseUsersFull")],
   ["host_not_found", sourceText("error.remote.hostNotRegistered")],
   ["membership_not_found", sourceText("error.remote.membershipEnded")],
   ["session_inactive", sourceText("error.remote.accountSessionInactive")],
@@ -137,6 +135,7 @@ export class RemoteTeamDirectoryClient {
   readonly #hostKeys: RemoteHostKeyStore;
   readonly #pairedHost: MobileConnectHostBinding | undefined;
   readonly #inviteLinks: InviteLinkOptions;
+  readonly #verifyHostKeySignature: HostKeySignatureCheck;
   readonly #pinLock = Semaphore.makeUnsafe(1);
 
   constructor(
@@ -147,6 +146,8 @@ export class RemoteTeamDirectoryClient {
       pairedHost?: MobileConnectHostBinding;
       /** A development client passes `allowLocalDevelopmentApiUrl` to use a local account service. */
       inviteLinks?: InviteLinkOptions;
+      /** Checks the signatures of a host key handover, usually `verifyEd25519Base64Url`. */
+      verifyHostKeySignature: HostKeySignatureCheck;
     } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
   ) {
     this.#apiUrl = input.apiUrl;
@@ -154,6 +155,7 @@ export class RemoteTeamDirectoryClient {
     this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
+    this.#verifyHostKeySignature = input.verifyHostKeySignature;
     // A self-hosted account service accepts invitations that name it. `previewInvite` still refuses
     // an invitation for any other service.
     this.#inviteLinks = { selfHostedApiOrigin: selfHostedApiOrigin(input.apiUrl), ...input.inviteLinks };
@@ -171,6 +173,7 @@ export class RemoteTeamDirectoryClient {
       const value = yield* this.#request("/v2/remote/hosts/");
       if (!isDynamicRecord(value) || !Array.isArray(value.hosts))
         return yield* directoryFailure("The server list is invalid.");
+      const handoversByHost = new Map<string, HostKeyHandover[]>();
       const hosts = yield* Effect.all(
         value.hosts.map((candidate) =>
           Effect.gen({ self: this }, function* (): Effect.fn.Return<RemoteTeamHost[], DirectoryFailure> {
@@ -190,16 +193,15 @@ export class RemoteTeamDirectoryClient {
               return yield* directoryFailure("A server record is invalid.");
             }
             const hostId = candidate.hostId;
-            const pinnedKey = yield* directoryIO(() => this.#hostKeys.get(hostId));
-            if (pinnedKey && remoteHostFingerprint(candidate.devicePublicKey) !== remoteHostFingerprint(pinnedKey)) {
-              return yield* directoryFailure(sourceText("error.remote.serverIdentityChanged"));
-            }
+            const handovers = optionalHostKeyHandovers(candidate.keyHandovers);
+            handoversByHost.set(hostId, handovers);
+            const devicePublicKey = yield* this.#trustedHostKey(hostId, candidate.devicePublicKey, handovers);
             return [
               {
                 hostId: candidate.hostId,
                 name: candidate.name,
                 logoKey: candidate.logoKey,
-                devicePublicKey: pinnedKey ?? candidate.devicePublicKey,
+                devicePublicKey,
                 membershipId: candidate.membershipId,
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
@@ -213,8 +215,19 @@ export class RemoteTeamDirectoryClient {
       );
       const directory = hosts.flat();
       if (this.#pairedHost) {
-        const paired = directory.find((host) => host.hostId === this.#pairedHost?.hostId);
-        if (paired && remoteHostFingerprint(paired.devicePublicKey) !== this.#pairedHost.fingerprint) {
+        const binding = this.#pairedHost;
+        const paired = directory.find((host) => host.hostId === binding.hostId);
+        if (
+          paired &&
+          remoteHostFingerprint(paired.devicePublicKey) !== binding.fingerprint &&
+          !(yield* followHostKeyHandovers({
+            hostId: paired.hostId,
+            trustedFingerprint: binding.fingerprint,
+            advertisedPublicKey: paired.devicePublicKey,
+            handovers: handoversByHost.get(paired.hostId) ?? [],
+            verify: this.#verifyHostKeySignature,
+          }))
+        ) {
           return yield* directoryFailure(sourceText("error.remote.pairedIdentityChanged"));
         }
         if (paired) yield* this.#pinHostKey(paired.hostId, paired.devicePublicKey);
@@ -425,7 +438,19 @@ export class RemoteTeamDirectoryClient {
         authenticated: false,
       });
       const preview = yield* directoryDecode(() => decodeInvitePreview(value, invite.serverId));
-      if (!preview.devicePublicKey || remoteHostFingerprint(preview.devicePublicKey) !== invite.fingerprint) {
+      // An invitation names the key that the host had when it made the invitation. A handover chain
+      // from that key keeps the invitation valid after the host rotates its key.
+      if (
+        !preview.devicePublicKey ||
+        (remoteHostFingerprint(preview.devicePublicKey) !== invite.fingerprint &&
+          !(yield* followHostKeyHandovers({
+            hostId: invite.serverId,
+            trustedFingerprint: invite.fingerprint,
+            advertisedPublicKey: preview.devicePublicKey,
+            handovers: preview.keyHandovers,
+            verify: this.#verifyHostKeySignature,
+          })))
+      ) {
         return yield* directoryFailure(sourceText("error.remote.inviteFingerprintMismatch"));
       }
       return preview;
@@ -438,6 +463,7 @@ export class RemoteTeamDirectoryClient {
       const preview = yield* this.previewInvite(inviteUrl);
       if (!preview.devicePublicKey) return yield* directoryFailure(sourceText("error.remote.inviteHostKeyMissing"));
       // Save the pin before consuming the one-use token, including across app restarts.
+      yield* this.#trustedHostKey(invite.serverId, preview.devicePublicKey, preview.keyHandovers);
       yield* this.#pinHostKey(invite.serverId, preview.devicePublicKey);
       const accepted = yield* this.#request("/v2/remote/invites/accept", {
         method: "POST",
@@ -460,6 +486,35 @@ export class RemoteTeamDirectoryClient {
         role: preview.role,
       };
     });
+  }
+
+  /**
+   * The key to use for a listed host. A pinned key is replaced only when a signed handover chain leads
+   * from it to the advertised key; otherwise a changed key fails as before.
+   */
+  #trustedHostKey(
+    hostId: string,
+    advertisedPublicKey: string,
+    handovers: readonly HostKeyHandover[],
+  ): Effect.Effect<string, DirectoryFailure> {
+    return this.#pinLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const pinnedKey = yield* directoryIO(() => this.#hostKeys.get(hostId));
+        if (!pinnedKey) return advertisedPublicKey;
+        const pinnedFingerprint = remoteHostFingerprint(pinnedKey);
+        if (remoteHostFingerprint(advertisedPublicKey) === pinnedFingerprint) return pinnedKey;
+        const followed = yield* followHostKeyHandovers({
+          hostId,
+          trustedFingerprint: pinnedFingerprint,
+          advertisedPublicKey,
+          handovers,
+          verify: this.#verifyHostKeySignature,
+        });
+        if (!followed) return yield* directoryFailure(sourceText("error.remote.serverIdentityChanged"));
+        yield* directoryIO(() => this.#hostKeys.set(hostId, advertisedPublicKey));
+        return advertisedPublicKey;
+      }),
+    );
   }
 
   #pinHostKey(hostId: string, publicKey: string): Effect.Effect<void, DirectoryFailure> {
@@ -557,6 +612,7 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
     emailBound: value.emailBound,
     permanent: isPermanentInvite(value.permanent, value.expiresAt),
     devicePublicKey: value.devicePublicKey,
+    keyHandovers: optionalHostKeyHandovers(value.keyHandovers),
   };
 }
 

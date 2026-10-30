@@ -13,4 +13,12 @@ export const messages = {
   "mobile.share.noAgents": "No hay agentes",
   "mobile.share.chooseAgent": "Elige un agente",
   "mobile.share.action": "Compartir con {name}",
+  "mobile.share.extension.send": "Enviar",
+  "mobile.share.extension.footer": "OpenBot envía esto al agente ahora. La app no se abre.",
+  "mobile.share.extension.sending": "Enviando a {name}…",
+  "mobile.share.extension.sent": "Enviado a {name}",
+  "mobile.share.extension.failed": "OpenBot no pudo enviar esto. Abre la app para enviarlo desde allí.",
+  "mobile.share.extension.unconfirmed":
+    "El servidor no confirmó el mensaje. Revisa el chat antes de enviarlo de nuevo.",
+  "mobile.share.extension.openApp": "Abrir OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

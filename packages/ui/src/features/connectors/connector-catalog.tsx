@@ -2,7 +2,7 @@ import type { SkillCategory } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { DiscordMark, GitHubMark, OnePasswordMark, SlackMark, TelegramMark } from "../settings/IntegrationLayout";
+import { DiscordMark, GitHubMark, OnePasswordMark, SlackMark, TelegramMark } from "../settings/brand-marks";
 import type { ConnectorId } from "./connectors";
 
 export interface ConnectorListing {
@@ -19,19 +19,19 @@ export interface ConnectorListing {
 export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>> = {
   slack: {
     title: "connector.slack.title",
-    tagline: "connector.slack.description",
+    tagline: "marketplace.app.slackTagline",
     category: "productivity",
     Mark: () => <SlackMark />,
   },
   discord: {
     title: "connector.discord.title",
-    tagline: "connector.discord.description",
+    tagline: "marketplace.app.discordTagline",
     category: "productivity",
     Mark: () => <DiscordMark />,
   },
   telegram: {
     title: "connector.telegram.title",
-    tagline: "connector.telegram.description",
+    tagline: "marketplace.app.telegramTagline",
     category: "productivity",
     Mark: () => <TelegramMark />,
   },
@@ -49,7 +49,7 @@ export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>>
   },
   bitwarden: {
     title: "connector.bitwarden.title",
-    tagline: "connector.bitwarden.description",
+    tagline: "marketplace.app.bitwardenTagline",
     category: "productivity",
     Mark: () => <Lock aria-hidden="true" />,
   },

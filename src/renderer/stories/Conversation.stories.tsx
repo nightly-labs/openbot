@@ -1,7 +1,14 @@
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import type { AgentEvent, AttachmentSummary, DraftAttachment, QueueSnapshot } from "@openbot/contracts/ipc";
+import {
+  type ConversationUiBlock,
+  type UiChoiceBlock,
+  type UiConfirmBlock,
+  uiBlockFallbackQuestions,
+} from "@openbot/contracts/ui-blocks";
 import type { AgentMessage as RendererAgentMessage, RoutineRunMarkerModel } from "@openbot/ui/data";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import type { VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { currentText } from "@openbot/ui/text";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
@@ -12,7 +19,6 @@ import { Conversation, createConversationController } from "../src/features/conv
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import { composerDraftKey } from "../src/features/conversation/conversation-keys";
-import type { VoicePhase } from "../src/features/conversation/voice-status";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
   CONVERSATION_STORY_ARGS,
@@ -27,6 +33,7 @@ import {
   STORY_ATTACHMENTS,
   STORY_PRESENCE,
   STORY_QUEUES,
+  STORY_REPLY_QUOTE_BODY,
 } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -498,6 +505,52 @@ const markdownImageMessages: RendererAgentMessage[] = [
   },
 ];
 
+/** A reply that names a file by its full path, beside a user message, in a medium-width chat. */
+const longPathReplyMessages: RendererAgentMessage[] = [
+  {
+    id: "long-path-user",
+    author: "you",
+    body: "Clean up the old build logs, and keep a copy of what you delete first.",
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "long-path-agent",
+    author: "agent",
+    body: [
+      "I deleted 42 build logs older than 30 days. Together they took 3.2 GB, and none of them belonged to an open release.",
+      "",
+      "- **Nightly builds:** removed. The 28 logs of the nightly channel from before the last release are gone.",
+      "- **Disk after the clean-up:**",
+      "  - Used: 81% → **64%**. The next full rotation is due in 12 days.",
+      "  - Largest folder now: **release-candidates**, with 410 MB.",
+      "- **Copies:** I kept the list of deleted logs and their checksums in `/Users/test/OpenBot/Agents/agent-5b0c2e7a-91d4-4f3e-8a6b-2c7d9e1f0a3b/backups/build-log-cleanup-2026-10-15/deleted-build-logs-with-checksums.json`.",
+      "",
+      "Nothing else on the disk changed. Tell me if you also want the crash dumps archived.",
+    ].join("\n"),
+    time: "10:03",
+    kind: "text",
+  },
+];
+
+const replyQuoteMessages: RendererAgentMessage[] = [
+  {
+    id: "reply-quote-agent",
+    author: "agent",
+    body: STORY_REPLY_QUOTE_BODY,
+    time: "10:02",
+    kind: "text",
+  },
+  {
+    id: "reply-quote-user",
+    author: "you",
+    body: "Approved. Tag it after the checks pass.",
+    time: "10:03",
+    kind: "text",
+    replyToMessageId: "reply-quote-agent",
+  },
+];
+
 const markdownMessages: RendererAgentMessage[] = [
   {
     id: "markdown-user",
@@ -641,6 +694,69 @@ function StreamingMarkdownConversation(props: { args: Parameters<typeof Conversa
   return <MockedConversation args={{ ...props.args, activeTurnId: "streaming-markdown" }} messages={stableMessages} />;
 }
 
+const readingHistoryMessages = (length: number) =>
+  Array.from(
+    { length },
+    (_, index): RendererAgentMessage => ({
+      id: `reading-history-${index + 1}`,
+      author: index % 2 === 0 ? "you" : "agent",
+      body:
+        index % 2 === 0
+          ? `Can you check step ${index + 1} of the release plan?`
+          : `I checked step ${index + 1}. The owner, the date and the open risk are in the plan now.`,
+      time: "10:00",
+      kind: "text",
+    }),
+  );
+
+const readingHistoryStreamSentence = "I am still checking the release plan and adding each finding to this reply. ";
+
+/**
+ * A reply that grows and a thinking line that changes for as long as the story is open, under a
+ * history that is long enough to scroll. The reader can scroll up while the agent is working.
+ */
+function StreamingWhileReadingHistoryConversation(props: {
+  args: Parameters<typeof Conversation>[0];
+  history: RendererAgentMessage[];
+}) {
+  const [tick, setTick] = createSignal(0);
+  const thinkingMessage: RendererAgentMessage = {
+    id: "reading-history-thinking",
+    author: "agent",
+    body: "",
+    time: "10:01",
+    kind: "thinking",
+    streaming: true,
+  };
+  Object.defineProperty(thinkingMessage, "items", {
+    configurable: true,
+    enumerable: true,
+    get: () => [`Checking step ${Math.floor(tick() / 4) + 1} of the release plan`],
+  });
+  const streamingMessage: RendererAgentMessage = {
+    id: "reading-history-reply",
+    author: "agent",
+    body: "",
+    time: "10:01",
+    kind: "text",
+    streaming: true,
+  };
+  Object.defineProperty(streamingMessage, "body", {
+    configurable: true,
+    enumerable: true,
+    get: () => readingHistoryStreamSentence.repeat(tick() + 1),
+  });
+  const interval = window.setInterval(() => setTick((current) => current + 1), 150);
+  onCleanup(() => window.clearInterval(interval));
+
+  return (
+    <MockedConversation
+      args={{ ...props.args, activeTurnId: "reading-history-turn" }}
+      messages={[...props.history, thinkingMessage, streamingMessage]}
+    />
+  );
+}
+
 const comparisonTableMessages: RendererAgentMessage[] = [
   {
     id: "comparison-table-user",
@@ -750,6 +866,87 @@ const promptChatMessages: RendererAgentMessage[] = [
     author: "agent",
     body: "I have a few decisions to confirm before I finish the setup.",
     time: "10:01",
+    kind: "text",
+  },
+];
+
+const uiBlockLetter: UiConfirmBlock = {
+  type: "confirm",
+  title: "Send the letter to the board?",
+  danger: true,
+  fields: [
+    { label: "To", value: "board@example.com" },
+    { label: "From", select: "from", options: ["me@example.com", "team@example.com"] },
+  ],
+  preview: "Hello,\n\nThe **heating** is off in block B since Monday. Could you send someone?",
+  actions: [
+    { id: "send", label: "Send", style: "primary" },
+    { id: "cancel", label: "Do not send", style: "ghost" },
+  ],
+};
+
+const uiBlockAudience: UiChoiceBlock = {
+  type: "choice",
+  title: "Who gets the offer?",
+  options: [
+    { id: "active", label: "Active customers", meta: "1 284" },
+    { id: "sleeping", label: "Sleeping customers", meta: "3 102" },
+  ],
+};
+
+const uiBlockPendingLetter: ConversationUiBlock = {
+  version: 1,
+  blockId: "letter",
+  spec: uiBlockLetter,
+  state: { status: "pending" },
+};
+
+const uiBlockPrompt: Extract<AgentEvent, { type: "prompt" }> = {
+  type: "prompt",
+  requestId: "ui-block-letter",
+  agentId: "chief",
+  threadId: "thread-chief",
+  turnId: "turn-ui-block",
+  questions: uiBlockFallbackQuestions(uiBlockLetter),
+};
+
+const uiBlockChatMessages: RendererAgentMessage[] = [
+  {
+    id: "ui-block-chat-user",
+    author: "you",
+    body: "Write to the board about the heating, and pick who gets the spring offer.",
+    time: "10:00",
+    kind: "text",
+  },
+  {
+    id: "question-prompt:turn-ui-block-earlier:ui-block-audience",
+    turnId: "turn-ui-block-earlier",
+    author: "agent",
+    body: "",
+    time: "10:01",
+    kind: "question",
+    itemType: "question_prompt",
+    questionPrompt: {
+      requestId: "ui-block-audience",
+      questions: uiBlockFallbackQuestions(uiBlockAudience),
+      resolution: { status: "answered", responses: {} },
+    },
+    uiBlock: {
+      version: 1,
+      blockId: "audience",
+      spec: uiBlockAudience,
+      state: {
+        status: "answered",
+        response: { actionId: "submit", values: { selected: ["sleeping"] } },
+        outcome: "Sleeping customers",
+      },
+    },
+  },
+  {
+    id: "ui-block-chat-agent",
+    author: "agent",
+    body: "The offer goes to sleeping customers. Here is the letter for the board.",
+    time: "10:02",
     kind: "text",
   },
 ];
@@ -889,6 +1086,7 @@ function MockedConversation(props: {
   voicePhase?: VoicePhase;
   takeoverStateGallery?: boolean;
   conversationError?: string;
+  replyToMessageId?: string;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
@@ -902,6 +1100,12 @@ function MockedConversation(props: {
       controller.setDrafts({
         [initialAgentId]: { text: "", attachments: props.initialAttachments ?? [], replyToMessageId: null },
       });
+    });
+  }
+  const replyToMessageId = props.replyToMessageId;
+  if (initialAgentId && replyToMessageId) {
+    onSettled(() => {
+      controller.setDrafts({ [initialAgentId]: { text: "", attachments: [], replyToMessageId } });
     });
   }
   if (props.voiceModelProgress !== undefined) {
@@ -1010,7 +1214,7 @@ function MockedConversation(props: {
         </ConversationControllerProvider>
       </StoryAppProviders>
       <Show when={props.takeoverStateGallery && takeoverGalleryMount()}>
-        <Portal mount={takeoverGalleryMount() ?? undefined}>
+        <Portal mount={takeoverGalleryMount() ?? document.body}>
           <div class="browser-takeover-story-states">
             <BrowserTakeoverCard
               agentName={props.args.agent?.name ?? "the agent"}
@@ -1151,7 +1355,7 @@ export const ProviderErrorBanner: Story = {
   render: (storyArgs) => (
     <MockedConversation
       args={storyArgs}
-      conversationError="Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 61)"
+      conversationError="stream disconnected before completion: Connection refused (os error 61)"
     />
   ),
 };
@@ -1261,7 +1465,7 @@ export const ScrollToLatest: Story = {
   },
 };
 
-/** Five days of history, 120 messages: scroll to bring in the day rail on the right edge. */
+/** Five days of history, 120 messages: the scroll rail is on the right edge. */
 export const LongHistory: Story = {
   args: {
     messages: Array.from({ length: 120 }, (_, index): RendererAgentMessage => {
@@ -1391,6 +1595,27 @@ export const MarkdownInChat: Story = {
   },
 };
 
+export const LongFilePathInReply: Story = {
+  name: "Long file path in a reply",
+  args: {
+    messages: longPathReplyMessages,
+  },
+  render: (storyArgs) => (
+    <section style={{ width: "720px", height: "820px", overflow: "hidden" }}>
+      <MockedConversation args={storyArgs} />
+    </section>
+  ),
+};
+
+/** The composer and the sent reply quote the same Markdown message, and render it the same way. */
+export const MarkdownReplyQuote: Story = {
+  name: "Markdown reply quote",
+  args: {
+    messages: replyQuoteMessages,
+  },
+  render: (storyArgs) => <MockedConversation args={storyArgs} replyToMessageId="reply-quote-agent" />,
+};
+
 export const StreamingMarkdownInChat: Story = {
   name: "Streaming Markdown in chat",
   args: {
@@ -1398,6 +1623,81 @@ export const StreamingMarkdownInChat: Story = {
     activeTurnId: "streaming-markdown",
   },
   render: (storyArgs) => <StreamingMarkdownConversation args={storyArgs} />,
+};
+
+const shortReadingHistory = readingHistoryMessages(40);
+
+export const StreamingWhileReadingHistory: Story = {
+  args: {
+    messages: shortReadingHistory,
+    activeTurnId: "reading-history-turn",
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+  render: (storyArgs) => <StreamingWhileReadingHistoryConversation args={storyArgs} history={shortReadingHistory} />,
+};
+
+/** More than 100 rows, so the timeline draws only the rows near the screen. */
+const longReadingHistory = readingHistoryMessages(120);
+
+export const StreamingWhileReadingLongHistory: Story = {
+  args: {
+    messages: longReadingHistory,
+    activeTurnId: "reading-history-turn",
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+  render: (storyArgs) => <StreamingWhileReadingHistoryConversation args={storyArgs} history={longReadingHistory} />,
+};
+
+/**
+ * A new agent message arrives every 400ms for as long as the story is open, and the newest one is still
+ * streaming, as when several agents report in a row. The reader can scroll up and read.
+ */
+function ReplyBurstConversation(props: { args: Parameters<typeof Conversation>[0]; history: RendererAgentMessage[] }) {
+  const [count, setCount] = createSignal(1);
+  const replies = () =>
+    Array.from(
+      { length: count() },
+      (_, index): RendererAgentMessage => ({
+        id: `reply-burst-${index + 1}`,
+        author: "agent",
+        body: `Update ${index + 1}: I finished one more step of the release plan and noted its owner and date.`,
+        time: "10:01",
+        kind: "text",
+        ...(index === count() - 1 ? { streaming: true } : {}),
+      }),
+    );
+  const interval = window.setInterval(() => setCount((current) => current + 1), 400);
+  onCleanup(() => window.clearInterval(interval));
+
+  return (
+    <MockedConversation
+      args={{ ...props.args, activeTurnId: "reply-burst-turn" }}
+      messages={[...props.history, ...replies()]}
+    />
+  );
+}
+
+export const ReplyBurstWhileReadingHistory: Story = {
+  args: {
+    messages: shortReadingHistory,
+    activeTurnId: "reply-burst-turn",
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+  render: (storyArgs) => <ReplyBurstConversation args={storyArgs} history={shortReadingHistory} />,
+};
+
+/** More than 100 rows, so the timeline draws only the rows near the screen. */
+export const ReplyBurstWhileReadingLongHistory: Story = {
+  args: {
+    messages: longReadingHistory,
+    activeTurnId: "reply-burst-turn",
+    unreadCount: 0,
+    firstUnreadMessageId: null,
+  },
+  render: (storyArgs) => <ReplyBurstConversation args={storyArgs} history={longReadingHistory} />,
 };
 
 export const ComparisonTableInChat: Story = {
@@ -1492,6 +1792,15 @@ export const PromptQuestionsInChat: Story = {
   },
 };
 
+export const UiBlocksInChat: Story = {
+  name: "Agent UI blocks in chat",
+  args: {
+    messages: uiBlockChatMessages,
+    prompt: uiBlockPrompt,
+    promptUiBlock: uiBlockPendingLetter,
+  },
+};
+
 export const Queued: Story = {
   args: { queue },
 };
@@ -1528,6 +1837,11 @@ export const WaitingForReplies: Story = {
     queue: { agentId: "chief", deliveries: [...(STORY_QUEUES.chief ?? []), queuedDelivery, runningDelivery] },
     activeTurnId: "turn-active",
   },
+};
+
+/** Every card above the input at once: one card with a line between each part, and no gaps. */
+export const WaitingForRepliesWithUsageLimit: Story = {
+  args: { ...WaitingForReplies.args, accountUsage: UsageLimitReached.args?.accountUsage },
 };
 
 /** The plan of the turn that runs: the block is open and the running step shimmers. */
@@ -1919,7 +2233,7 @@ function agentExchangeMessage(
   direction: "incoming" | "outgoing",
   otherAgentId: string,
   time: string,
-  expectsReply = true,
+  options: { body?: string; replyTo?: string; expectsReply?: boolean } = {},
 ): RendererAgentMessage {
   const timestamp = `2026-08-19T${time}:00.000Z`;
   const sourceAgentId = direction === "outgoing" ? "chief" : otherAgentId;
@@ -1927,7 +2241,7 @@ function agentExchangeMessage(
   return {
     id,
     author: "agent",
-    body: "",
+    body: options.body ?? "",
     time,
     createdAt: timestamp,
     kind: "exchange",
@@ -1936,7 +2250,7 @@ function agentExchangeMessage(
       messageId: id,
       senderAgentId: sourceAgentId,
       recipientAgentIds: [targetAgentId],
-      replyToMessageId: null,
+      replyToMessageId: options.replyTo ?? null,
       deliveries: [],
     },
     actionMarker: {
@@ -1947,13 +2261,13 @@ function agentExchangeMessage(
       status: "completed",
       timestamp,
       messageId: id,
-      replyToMessageId: null,
-      expectsReply,
+      replyToMessageId: options.replyTo ?? null,
+      expectsReply: options.expectsReply ?? true,
     },
   };
 }
 
-/* Consecutive messages with other agents show as one row in the chat. */
+/* Consecutive messages with other agents show as one row in the chat. Each message opens its text under its marker. */
 export const AgentMessageGroupInChat: Story = {
   name: "Agent message group in chat",
   args: {
@@ -1966,11 +2280,25 @@ export const AgentMessageGroupInChat: Story = {
         createdAt: "2026-08-19T09:00:00.000Z",
         kind: "text",
       },
-      agentExchangeMessage("group-1", "outgoing", "research", "09:01"),
-      agentExchangeMessage("group-2", "outgoing", "sales", "09:01"),
-      agentExchangeMessage("group-3", "incoming", "research", "09:03"),
-      agentExchangeMessage("group-4", "incoming", "sales", "09:04"),
-      agentExchangeMessage("group-5", "outgoing", "research", "09:05", false),
+      agentExchangeMessage("group-1", "outgoing", "research", "09:01", {
+        body: "Which launch sources are still not confirmed?",
+      }),
+      agentExchangeMessage("group-2", "outgoing", "sales", "09:01", {
+        body: "How many accounts are ready for the launch email?",
+      }),
+      agentExchangeMessage("group-3", "incoming", "research", "09:03", {
+        body: "Two sources are left: the pricing page archive and the analyst note from June.",
+        replyTo: "group-1",
+      }),
+      agentExchangeMessage("group-4", "incoming", "sales", "09:04", {
+        body: "14 accounts are ready. Three more wait for a contact name.",
+        replyTo: "group-2",
+      }),
+      agentExchangeMessage("group-5", "outgoing", "research", "09:05", {
+        body: "Thanks. I will tell the user that two sources are still open.",
+        replyTo: "group-3",
+        expectsReply: false,
+      }),
       {
         id: "group-agent",
         author: "agent",

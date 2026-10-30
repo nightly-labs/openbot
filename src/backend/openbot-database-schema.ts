@@ -6,13 +6,20 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { AGENT_MEMORY_SELECTION_SCHEMA_SQL, migrateAgentMemorySelection } from "./agent-memory-selection";
 import { AGENT_TASK_SCHEMA_SQL } from "./agent-tasks/agent-task-schema";
+import { AGENT_THREAD_MIGRATION_SQL, AGENT_THREAD_SCHEMA_SQL } from "./agent-threads/agent-thread-schema";
 import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
+import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
-import { MESSAGING_MEMORY_SCHEMA_SQL, MESSAGING_SCHEMA_SQL } from "./messaging/messaging-schema";
+import {
+  MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
+  MESSAGING_MEMORY_SCHEMA_SQL,
+  MESSAGING_SCHEMA_SQL,
+} from "./messaging/messaging-schema";
 import { ROUTINE_FLOW_SCHEMA_SQL } from "./routine-flows/routine-flow-schema";
 import { ROUTINE_RESULT_SCHEMA_SQL } from "./routine-results/routine-result-schema";
+import { WORKFLOW_SCHEMA_SQL } from "./workflows/workflow-schema";
 
 const BASELINE_SCHEMA_VERSION = 8;
 
@@ -589,11 +596,14 @@ const LATEST_SCHEMA_SQL =
   AGENT_WAIT_SCHEMA_SQL +
   MESSAGING_MEMORY_SCHEMA_SQL +
   ROUTINE_RESULT_SCHEMA_SQL +
-  AGENT_TASK_SCHEMA_SQL +
   V40_THREAD_MESSAGE_ORDER_INDEX_SQL +
   V41_ATTACHMENT_OWNER_INDEX_SQL +
   V42_ROUTINE_FLOW_SWEEP_INDEX_SQL +
-  V43_THREAD_EVENT_TYPE_INDEX_SQL;
+  V43_THREAD_EVENT_TYPE_INDEX_SQL +
+  MESSAGING_ALLOWED_ROLES_SCHEMA_SQL +
+  BROWSER_PROFILE_SCHEMA_SQL +
+  WORKFLOW_SCHEMA_SQL +
+  AGENT_THREAD_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -838,6 +848,31 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Only creates an index, so no foreign-key pause and no vacuum.
     up: (db) => db.exec(V43_THREAD_EVENT_TYPE_INDEX_SQL),
   },
+  {
+    version: 44,
+    // Only creates a table, so no foreign-key pause and no vacuum. No connection has a role list yet, so
+    // everyone can still mention OpenBot, which is what they could before.
+    up: (db) => db.exec(MESSAGING_ALLOWED_ROLES_SCHEMA_SQL),
+  },
+  {
+    version: 45,
+    // Only creates a table, so no foreign-key pause and no vacuum. No agent names a profile yet, so
+    // every tab keeps the session it had.
+    up: (db) => db.exec(BROWSER_PROFILE_SCHEMA_SQL),
+  },
+  {
+    version: 46,
+    // Only creates tables, so no foreign-key pause and no vacuum. No one has a workflow yet, and agents,
+    // routines and routine flows stay as they were.
+    up: (db) => db.exec(WORKFLOW_SCHEMA_SQL),
+  },
+  {
+    version: 47,
+    // Copies every task into the side-thread table and drops the task table. No table is rebuilt and the
+    // dropped table is a leaf, so no foreign-key pause; few rows, so no vacuum. Mailbox records keep their
+    // task ids: the thread keeps the task id as `legacy_task_id`.
+    up: (db) => db.exec(AGENT_THREAD_MIGRATION_SQL),
+  },
 ];
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
@@ -855,11 +890,18 @@ export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrati
   validateAppliedVersions(appliedVersions);
   const currentVersion = latestAppliedVersion(appliedVersions);
   const pending = MIGRATIONS.filter((migration) => migration.version > currentVersion);
+  // A database can hold broken references from before this upgrade. A migration that does not touch them must not
+  // stop on them, and deleting them would lose rows, so each migration is checked only for the ones it adds.
+  let violations: Map<string, number> | undefined;
 
   for (const migration of pending) {
     try {
-      runMigration(db, migration, appliedAt);
+      // Read inside the try, so that a failed read names the migration that it stops, as a failed check did before.
+      violations ??= readOldForeignKeyViolations(db);
+      violations = runMigration(db, migration, appliedAt, violations);
     } catch (error) {
+      // The startup log keeps only the message, so the cause is logged here.
+      logger.error(`OpenBot database migration to version ${migration.version} failed.`, toLogValue(error));
       throw new Error(`OpenBot database migration to version ${migration.version} failed.`, {
         cause: error,
       });
@@ -951,7 +993,7 @@ function createLatestDatabase(db: DatabaseSync, appliedAt: string): void {
     db.exec(LATEST_SCHEMA_SQL);
     const insertMigration = db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)");
     for (const migration of MIGRATIONS) insertMigration.run(migration.version, appliedAt);
-    assertForeignKeys(db);
+    assertForeignKeys(db, new Map());
     db.exec("COMMIT");
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");
@@ -998,14 +1040,20 @@ function latestAppliedVersion(versions: number[]): number {
   return baselineAndLater.at(-1) ?? BASELINE_SCHEMA_VERSION - 1;
 }
 
-function runMigration(db: DatabaseSync, migration: OpenBotMigration, appliedAt: string): void {
+function runMigration(
+  db: DatabaseSync,
+  migration: OpenBotMigration,
+  appliedAt: string,
+  violationsBefore: ReadonlyMap<string, number>,
+): Map<string, number> {
   if (migration.disableForeignKeys) db.exec("PRAGMA foreign_keys = OFF");
   try {
     db.exec("BEGIN IMMEDIATE");
     migration.up(db, appliedAt);
     db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)").run(migration.version, appliedAt);
-    assertForeignKeys(db);
+    const violations = assertForeignKeys(db, violationsBefore);
     db.exec("COMMIT");
+    return violations;
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
@@ -1014,11 +1062,41 @@ function runMigration(db: DatabaseSync, migration: OpenBotMigration, appliedAt: 
   }
 }
 
-function assertForeignKeys(db: DatabaseSync): void {
-  const violations = db.prepare("PRAGMA foreign_key_check").all();
-  if (violations.length > 0) {
-    throw new Error(`OpenBot database migration produced ${violations.length} foreign-key violation(s).`);
+function assertForeignKeys(db: DatabaseSync, before: ReadonlyMap<string, number>): Map<string, number> {
+  const violations = readForeignKeyViolations(db);
+  const added = [...violations]
+    .map(([reference, count]) => [reference, count - (before.get(reference) ?? 0)] as const)
+    .filter(([, count]) => count > 0);
+  if (added.length > 0) {
+    const total = added.reduce((sum, [, count]) => sum + count, 0);
+    const references = added.map(([reference]) => reference).join(", ");
+    throw new Error(`OpenBot database migration produced ${total} foreign-key violation(s) in ${references}.`);
   }
+  return violations;
+}
+
+/**
+ * Counts the broken references per child and parent table. A rebuild gives the rows new rowids and the table new
+ * foreign-key ids, so only the table names identify a violation from one migration to the next.
+ */
+function readForeignKeyViolations(db: DatabaseSync): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of db.prepare("PRAGMA foreign_key_check").all()) {
+    // Every row counts, also one of an unexpected shape, so that the check cannot miss a violation.
+    const reference = isDynamicRecord(row) ? `${String(row.table)} -> ${String(row.parent)}` : "unknown";
+    counts.set(reference, (counts.get(reference) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function readOldForeignKeyViolations(db: DatabaseSync): Map<string, number> {
+  const violations = readForeignKeyViolations(db);
+  if (violations.size > 0) {
+    logger.warn("The OpenBot database has foreign-key violations from before this upgrade. They stay as they are.", {
+      violations: Object.fromEntries(violations),
+    });
+  }
+  return violations;
 }
 
 function assertQuickCheck(db: DatabaseSync): void {

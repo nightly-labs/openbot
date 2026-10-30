@@ -1,5 +1,14 @@
 import { Typography } from "heroui-native";
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  memo,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { TextStyle } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -88,7 +97,7 @@ function useRevealSlot(enabled: boolean) {
   return { phase: enabled ? phase : "done", onDone };
 }
 
-function RevealedWord({
+const RevealedWord = memo(function RevealedWord({
   enabled,
   end,
   onSettled,
@@ -106,7 +115,7 @@ function RevealedWord({
       </Typography>
     );
   return <FadingWord {...props} onDone={onDone} />;
-}
+});
 
 export function StreamingBlock({ children, enabled }: PropsWithChildren<{ enabled: boolean }>) {
   const { phase, onDone } = useRevealSlot(enabled);
@@ -128,7 +137,7 @@ export function StreamingBlock({ children, enabled }: PropsWithChildren<{ enable
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-export function StreamingTailText({
+export const StreamingTailText = memo(function StreamingTailText({
   body,
   enabled,
   type,
@@ -160,4 +169,4 @@ export function StreamingTailText({
       ))}
     </>
   );
-}
+});

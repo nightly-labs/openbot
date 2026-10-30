@@ -7,18 +7,59 @@ import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
 import TextSelect from "lucide-react-native/icons/square-dashed-text";
-import { useState } from "react";
-import { View } from "react-native";
+import { type PropsWithChildren, useMemo, useState } from "react";
+import { type AccessibilityState, Pressable, View } from "react-native";
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useCopyMessage } from "./use-copy-message";
+import { useHistoryShown } from "./use-history-shown";
 
 const PICKER_IN = FadeIn.duration(160).reduceMotion(ReduceMotion.System);
 const PICKER_OUT = FadeOut.duration(120).reduceMotion(ReduceMotion.System);
 const ICON_SIZE = 18;
+const PRESSED = { transform: [{ scale: 0.94 }] };
+
+/**
+ * A button of the row under a message, with the size and look of a small ghost HeroUI `Button`. It
+ * is a plain pressable: each message in the chat has four of these, and each HeroUI button mounts an
+ * animated pressable with about nine shared values and four animated styles, which made the chat
+ * lag while it scrolled. The press shows at once, without an animation.
+ */
+function ActionButton({
+  accessibilityLabel,
+  accessibilityState,
+  onPress,
+  selected = false,
+  label = false,
+  children,
+}: PropsWithChildren<{
+  accessibilityLabel: string;
+  accessibilityState?: AccessibilityState;
+  onPress: () => void;
+  /** Drawn as a pressed HeroUI `secondary` button. */
+  selected?: boolean;
+  /** An emoji, not an icon: the button takes the width of its content. */
+  label?: boolean;
+}>) {
+  // An icon draws only once the chat shows its history. The button keeps its size without it, so
+  // the row does not move, and a chat that opens does not wait for the icons of every row.
+  const historyShown = useHistoryShown();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityState}
+      onPress={onPress}
+      className={`h-10 items-center justify-center rounded-full active:bg-default-hover/30 ${label ? "px-2" : "w-10"} ${selected ? "bg-default" : ""}`}
+      style={({ pressed }) => (pressed ? PRESSED : undefined)}
+    >
+      {historyShown || label ? children : null}
+    </Pressable>
+  );
+}
 
 /**
  * The row under a message: its reactions, Copy, React, Reply, Select text and the time. A phone has
@@ -80,7 +121,10 @@ export function ChatMessageActions({
       showFailureAlert(error, "turn", t("mobile.chat.message.reactionFailed"), t("mobile.chat.copyFailedMessage"));
     });
   };
-  const time = createdAt ? format.date(new Date(createdAt), { timeStyle: "short" }) : null;
+  const time = useMemo(
+    () => (createdAt ? format.date(new Date(createdAt), { timeStyle: "short" }) : null),
+    [createdAt, format],
+  );
 
   return (
     // The space under the row sets each message apart from the next one. Markers and activity rows
@@ -93,16 +137,14 @@ export function ChatMessageActions({
       >
         {shown.map((reaction) =>
           reaction.actor.kind === "user" && onReact ? (
-            <Button
+            <ActionButton
               key="user"
-              variant="ghost"
-              size="sm"
-              className="min-w-0 px-2"
+              label
               accessibilityLabel={t("mobile.chat.message.removeReaction", { emoji: reaction.emoji })}
               onPress={() => react(null)}
             >
               <Typography>{reaction.emoji}</Typography>
-            </Button>
+            </ActionButton>
           ) : (
             <View
               key={reaction.actor.kind === "agent" ? `agent:${reaction.actor.agentId}` : "user"}
@@ -123,21 +165,15 @@ export function ChatMessageActions({
           ),
         )}
         {copyText ? (
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
+          <ActionButton
             accessibilityLabel={copied ? t("mobile.chat.message.copied") : t("mobile.chat.message.copy")}
             onPress={() => void copy()}
           >
             {copied ? <Check size={ICON_SIZE} color={muted} /> : <Copy size={ICON_SIZE} color={muted} />}
-          </Button>
+          </ActionButton>
         ) : null}
         {onReact ? (
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
+          <ActionButton
             accessibilityLabel={t("mobile.chat.message.addReaction")}
             accessibilityState={{ expanded: pickerOpen }}
             onPress={() => {
@@ -147,13 +183,10 @@ export function ChatMessageActions({
             }}
           >
             <SmilePlus size={ICON_SIZE} color={muted} />
-          </Button>
+          </ActionButton>
         ) : null}
         {onReply ? (
-          <Button
-            isIconOnly
-            variant="ghost"
-            size="sm"
+          <ActionButton
             accessibilityLabel={t("mobile.chat.message.reply")}
             onPress={() => {
               void haptics.selection();
@@ -161,14 +194,12 @@ export function ChatMessageActions({
             }}
           >
             <Reply size={ICON_SIZE} color={muted} />
-          </Button>
+          </ActionButton>
         ) : null}
         {onSelectText ? (
-          <Button
-            isIconOnly
+          <ActionButton
             // Drawn as pressed while the text is selected: a second tap ends the selection.
-            variant={selecting ? "secondary" : "ghost"}
-            size="sm"
+            selected={selecting}
             accessibilityLabel={t("mobile.chat.message.selectText")}
             accessibilityState={{ selected: selecting }}
             onPress={() => {
@@ -177,7 +208,7 @@ export function ChatMessageActions({
             }}
           >
             <TextSelect size={ICON_SIZE} color={selecting ? String(foregroundColor) : muted} />
-          </Button>
+          </ActionButton>
         ) : null}
         {time ? (
           <Typography.Paragraph type="body-xs" className="px-1 text-muted">

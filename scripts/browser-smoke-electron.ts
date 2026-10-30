@@ -1,12 +1,22 @@
+import assert from "node:assert/strict";
 import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { BrowserBounds } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
-import { app, BrowserWindow, clipboard, type WebContents, webContents } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  type DownloadItem,
+  type Event as ElectronEvent,
+  type WebContents,
+  type WebContentsConsoleMessageEventParams,
+  webContents,
+} from "electron";
 import { BrowserUploads } from "../src/backend/agent/browser-uploads";
 import { attachmentCall } from "../src/backend/attachment-effects";
 import { BrowserHost } from "../src/backend/browser-host";
@@ -14,9 +24,17 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolResult, getString } from "../src/backend/protocol";
 import { runSecretHandoffScenario } from "./browser-secret-smoke";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 let cachedPageVersion = 1;
 let slowDocumentVersion = 0;
+// `/slow-document?action` stays open until the smoke releases it, so the navigation that the timed
+// click starts is still pending when the click reaches its deadline.
+let actionNavigationRequests = 0;
+let releaseActionNavigation = (): void => {};
+const actionNavigationReleased = new Promise<void>((resolve) => {
+  releaseActionNavigation = resolve;
+});
 let browserToolCall = 0;
 // The user agent each `/headers` hit carried, keyed by `?source=`. A subframe request that
 // bypasses the session identity shows up here under its own source with the raw build string.
@@ -325,10 +343,33 @@ const server = createServer((request, response) => {
     const version = slowDocumentVersion;
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.write("<!doctype html><main>loading</main>");
-    setTimeout(
-      () => response.end(`<script>document.querySelector('main').textContent='ready:${version}'</script>`),
-      250,
+    const finish = () => response.end(`<script>document.querySelector('main').textContent='ready:${version}'</script>`);
+    if (url.search === "?action") {
+      actionNavigationRequests += 1;
+      void actionNavigationReleased.then(finish);
+    } else setTimeout(finish, 250);
+    return;
+  }
+  // The page starts a second main-frame navigation while the first load is still open, as a sign-in
+  // or consent redirect does. `loadURL` then rejects inside Electron's `did-start-navigation` event.
+  // The slow image keeps the first load open until the redirect starts.
+  if (url.pathname === "/redirect-start") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<!doctype html><script>setTimeout(() => location.replace('/redirect-end${url.search}'), 0)</script><img src="/redirect-image">`,
     );
+    return;
+  }
+  if (url.pathname === "/redirect-image") {
+    setTimeout(() => response.end(), 300);
+    return;
+  }
+  if (url.pathname === "/redirect-end") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    if (url.search === "?slow") {
+      response.write("<!doctype html><main>loading</main>");
+      setTimeout(() => response.end("<script>document.querySelector('main').textContent='redirected'</script>"), 200);
+    } else response.end("<!doctype html><main>redirected</main>");
     return;
   }
   if (url.pathname === "/v2") {
@@ -336,6 +377,7 @@ const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
       <label>Mode <select aria-label="Mode" oninput="this.dataset.inputTrusted=String(event.isTrusted)" onchange="this.dataset.changeTrusted=String(event.isTrusted)"><option value="a">Alpha</option><option value="b">Beta</option><option value="">Any mode</option></select></label>
+      <span id="sort-host"></span>
       <label><input type="checkbox" aria-label="Agree" />Agree</label>
       <label><input type="radio" name="choice" aria-label="Primary choice" checked />Primary</label>
       <label><input type="radio" name="choice" aria-label="Secondary choice" />Secondary</label>
@@ -345,10 +387,15 @@ const server = createServer((request, response) => {
       <button aria-label="Accessible override" onclick="document.querySelector('output').textContent='visible-text:' + event.isTrusted">Unique action text</button>
       <span style="position:relative;display:inline-block"><button aria-label="Covered">Covered</button><span style="position:absolute;inset:0;z-index:2" aria-hidden="true"></span></span>
       <span style="position:relative;display:inline-block"><button style="width:200px" aria-label="Partially covered" onclick="document.querySelector('output').textContent='partial:' + event.isTrusted">Partially covered</button><span style="position:absolute;left:70px;right:70px;top:0;bottom:0;z-index:2" aria-hidden="true"></span></span>
+      <style>.pseudo-option{position:relative;display:inline-block;width:160px;height:28px}.pseudo-option input{position:absolute;left:8px;top:6px;margin:0}.pseudo-option::after{content:'';position:absolute;inset:0}</style>
+      <label class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by card" />Card</label>
+      <span class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by transfer" /></span>
       <span hidden data-hidden-wait>hidden wait sentinel</span>
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
       <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
+      <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
+      <button aria-label="No chooser">No chooser</button>
       <canvas width="40" height="20" style="display:block;width:80px;height:40px" onclick="document.querySelector('output').textContent='canvas:' + event.isTrusted"></canvas>
       <iframe title="Same origin frame" src="/same-frame"></iframe>
       <iframe title="Cross origin frame" src="http://localhost:${port}/frame?frame_token=frame-secret"></iframe>
@@ -359,6 +406,16 @@ const server = createServer((request, response) => {
         root.innerHTML = '<button aria-label="Shadow action">Shadow action</button>';
         root.querySelector('button').onclick = event => { const trusted = event.isTrusted; fetch('/settle').then(() => { root.querySelector('button').textContent = 'Shadow settled:5:' + trusted; }); };
         document.addEventListener('keydown', event => { if (event.ctrlKey && event.key.toLowerCase() === 'k') document.querySelector('output').textContent = 'shortcut:' + event.isTrusted; });
+        // Like a React list sort: each change renders a new select, which drops the focus.
+        const renderSort = index => {
+          const select = document.createElement('select');
+          select.setAttribute('aria-label', 'Sort');
+          for (const label of ['Name (A to Z)', 'Name (Z to A)', 'Price (low to high)', 'Price (high to low)']) select.add(new Option(label, label));
+          select.selectedIndex = index;
+          select.onchange = event => { window.sortChanges = [...(window.sortChanges ?? []), select.selectedIndex + ':' + event.isTrusted]; renderSort(select.selectedIndex); };
+          document.querySelector('#sort-host').replaceChildren(select);
+        };
+        renderSort(0);
         console.error('v2 diagnostic marker'); fetch('/diagnostic-error?access_token=diagnostic-secret').catch(() => {});
       </script>`);
     return;
@@ -386,12 +443,14 @@ const SCENARIOS = [
   "background",
   "focus",
   "controls",
+  "typing-focus",
   "tool-boundary",
   "evaluation",
   "wait-deadlines",
   "live-view",
   "secret-handoff",
   "popups",
+  "redirect-navigation",
 ];
 
 void main().catch((error) => {
@@ -409,6 +468,7 @@ async function main(): Promise<void> {
   const whatsappLive = process.argv.includes("--whatsapp-live");
   const canvaLive = process.argv.includes("--canva-live");
   const framerLive = process.argv.includes("--framer-live");
+  const amazonLive = process.argv.includes("--amazon-live");
   const configuredRoot = argumentValue("--smoke-root=");
   const persistencePhase = argumentValue("--persistence-phase=");
   const persistenceOrigin = argumentValue("--persistence-origin=");
@@ -469,12 +529,17 @@ async function main(): Promise<void> {
           if (whatsappLive) await runWhatsAppLiveProbe(browser);
           if (canvaLive) await runCanvaLiveProbe(browser);
           if (framerLive) await runFramerLiveProbe(browser, { x: 0, y: 0, width: 800, height: 600 });
+          if (amazonLive) await runAmazonLiveProbe(browser);
         } else if (scenario === "popups") {
           await runPopupScenario(browser, origin);
         } else if (scenario === "secret-handoff") {
           await runSecretHandoffScenario(browser, origin);
         } else if (scenario === "tool-boundary") {
           await runToolBoundaryScenario(browser, origin);
+        } else if (scenario === "redirect-navigation") {
+          await runRedirectNavigationScenario(browser, origin);
+        } else if (scenario === "typing-focus") {
+          await runTypingFocusScenario(browser, origin);
         } else {
           const { tab, contents } = await openTabWithContents(browser, `${origin}/v2`, "smoke-thread", "smoke-bot");
           try {
@@ -502,6 +567,7 @@ async function main(): Promise<void> {
       }
       return;
     }
+    await runTypingFocusScenario(browser, origin);
     const documentChangedTabs: string[] = [];
     const retainedDocumentChanges: Array<{ tabId: string; documentIds: ReadonlySet<string> }> = [];
     browser.onDocumentChanged((tabId, documentIds) => {
@@ -528,7 +594,10 @@ async function main(): Promise<void> {
     const openingTab = runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot", true));
     window.webContents.focus();
     const tab = await openingTab;
-    await waitFor(async () => webContents.getFocusedWebContents()?.getURL() === `${origin}/`);
+    await waitFor(
+      async () => webContents.getFocusedWebContents()?.getURL() === `${origin}/`,
+      "the focused local tab to open",
+    );
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 760, height: 560 } }));
     const resizedFillViewport = browser.listTabs().find((candidate) => candidate.id === tab.id)?.environment?.viewport;
     if (resizedFillViewport?.width !== 760 || resizedFillViewport?.height !== 560) {
@@ -560,6 +629,7 @@ async function main(): Promise<void> {
     process.stdout.write("BrowserHost: snapshot and actions passed.\n");
 
     await runDoubleClickScenario(browser, origin);
+    await runRedirectNavigationScenario(browser, origin);
     const v2Tab = await runCauseEffect(browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot"));
     const v2Contents = webContents
       .getAllWebContents()
@@ -586,6 +656,25 @@ async function main(): Promise<void> {
     if (!v2SnapshotResult.contentItems.some((item) => item.type === "inputImage")) {
       throw new Error("Adaptive snapshot did not include an image for canvas/iframe content.");
     }
+    // A screenshot just before shows the same page, so the next adaptive snapshot sends no image.
+    if (!(await callBrowserTool(browser, "screenshot", { tabId: v2Tab.id })).success) {
+      throw new Error("V2 screenshot failed.");
+    }
+    for (const attempt of ["after a screenshot", "after a snapshot that sent no image"]) {
+      const repeated = await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id, image: "auto" });
+      const repeatedImage = toolTextPayload(repeated)?.image;
+      if (
+        repeated.contentItems.some((item) => item.type === "inputImage") ||
+        !isDynamicRecord(repeatedImage) ||
+        repeatedImage.included !== false
+      ) {
+        throw new Error(`Adaptive snapshot ${attempt} sent the same image again.`);
+      }
+    }
+    const requestedImage = await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id, image: "always" });
+    if (!requestedImage.contentItems.some((item) => item.type === "inputImage")) {
+      throw new Error("A requested snapshot image was skipped.");
+    }
     const v2Elements = v2Snapshot.elements.filter(isDynamicRecord);
     if (!v2Elements.some((element) => element.name === "Shadow action")) {
       throw new Error("V2 snapshot did not pierce shadow DOM.");
@@ -598,6 +687,7 @@ async function main(): Promise<void> {
     }
     const sameOriginClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Same-origin action", exact: true },
     });
     if (!sameOriginClick.success || !String(toolTextPayload(sameOriginClick)?.text).includes("Same-origin:true")) {
@@ -735,6 +825,7 @@ async function main(): Promise<void> {
     await v2Contents.executeJavaScript(`document.querySelector('[data-rejected-candidate-noise]').remove()`, true);
     const shadowClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Shadow action", exact: true },
       timeoutMs: 30_000,
     });
@@ -743,6 +834,7 @@ async function main(): Promise<void> {
     }
     const frameClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Frame action", exact: true },
       timeoutMs: 30_000,
     });
@@ -808,10 +900,12 @@ async function main(): Promise<void> {
       })()`,
       true,
     );
-    await waitFor(async () =>
-      retainedDocumentChanges
-        .slice(retainedChangesBeforeNavigation)
-        .some((change) => change.tabId === v2Tab.id && change.documentIds.has(lateFrameDocumentId)),
+    await waitFor(
+      async () =>
+        retainedDocumentChanges
+          .slice(retainedChangesBeforeNavigation)
+          .some((change) => change.tabId === v2Tab.id && change.documentIds.has(lateFrameDocumentId)),
+      "the late frame document change",
     );
     await v2Contents.executeJavaScript("document.querySelector('[data-many-oopifs]').remove(); true", true);
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -837,6 +931,7 @@ async function main(): Promise<void> {
     }
     const frameTyped = await callBrowserTool(browser, "type", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "textbox", name: "Frame field", exact: true },
       text: "iframe input",
       submit: true,
@@ -847,17 +942,19 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`V2 iframe text input used the wrong CDP session: ${toolError(frameTyped)}`);
     }
+    // The model already has the result of its own action, so the text leaves out a plain success.
     const frameTypedActions = toolTextPayload(frameTyped)?.actions;
     if (
       !Array.isArray(frameTypedActions) ||
-      !frameTypedActions.some(
-        (entry) => isDynamicRecord(entry) && entry.action === "type" && entry.outcome === "success",
+      frameTypedActions.some(
+        (entry) => isDynamicRecord(entry) && entry.action === "type" && entry.outcome === "success" && !entry.detail,
       )
     ) {
-      throw new Error("V2 action snapshot omitted the action that produced it.");
+      throw new Error(`V2 action snapshot repeated a plain success: ${JSON.stringify(frameTypedActions)}`);
     }
     const framePressed = await callBrowserTool(browser, "press", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "css", selector: 'input[aria-label="Frame field"]' },
       key: "Enter",
     });
@@ -867,6 +964,7 @@ async function main(): Promise<void> {
     const documentChangesBeforeFrameNavigation = documentChangedTabs.length;
     const scheduledFrameNavigation = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Schedule frame navigation", exact: true },
     });
     const scheduledFrameSnapshot = toolTextPayload(scheduledFrameNavigation);
@@ -878,7 +976,10 @@ async function main(): Promise<void> {
     if (!scheduledFrameNavigation.success || !staleFrameTarget || !isNumber(staleFrameRevision)) {
       throw new Error(`V2 iframe navigation setup failed: ${toolError(scheduledFrameNavigation)}`);
     }
-    await waitFor(async () => documentChangedTabs.slice(documentChangesBeforeFrameNavigation).includes(v2Tab.id));
+    await waitFor(
+      async () => documentChangedTabs.slice(documentChangesBeforeFrameNavigation).includes(v2Tab.id),
+      "the frame navigation document change",
+    );
     const staleFrameClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
       target: { kind: "ref", ref: String(staleFrameTarget.ref), revision: staleFrameRevision },
@@ -947,6 +1048,7 @@ async function main(): Promise<void> {
       async () =>
         (await blockedContents.executeJavaScript("document.querySelector('output').textContent", true)) ===
         "frame ready",
+      "the blocking frame to report ready",
     );
     // Wedge the frame: from here on it answers nothing, so the bounded wait
     // below must give up on it and the close after that must not hang behind
@@ -962,6 +1064,7 @@ async function main(): Promise<void> {
       async () =>
         (await blockedContents.executeJavaScript("document.querySelector('output').textContent", true)) ===
         "frame spinning",
+      "the blocking frame to start spinning",
     );
     // One bounded wait proves a frame that answers nothing is given up on. The
     // close after it proves the timeout cancelled the command instead of
@@ -989,13 +1092,21 @@ async function main(): Promise<void> {
       .getAllWebContents()
       .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenOrigin));
     if (!frozenContents) throw new Error("Environment timeout fixture web contents were not available.");
-    const rendererStarted = new Promise<void>((resolve) => {
-      frozenContents.once("console-message", () => resolve());
+    // Wait for this exact message. An unpackaged Electron also logs its security warning to the
+    // console after the page load, so the first message can arrive before the loop starts. The
+    // environment change then succeeds and only the snapshot after it meets the stopped renderer.
+    const rendererStopped = new Promise<void>((resolve) => {
+      const onConsoleMessage = (details: ElectronEvent<WebContentsConsoleMessageEventParams>): void => {
+        if (details.message !== "environment renderer stopped") return;
+        frozenContents.off("console-message", onConsoleMessage);
+        resolve();
+      };
+      frozenContents.on("console-message", onConsoleMessage);
     });
     void frozenContents
       .executeJavaScript("console.info('environment renderer stopped'); while (true) {}", true)
       .catch(() => undefined);
-    await rendererStarted;
+    await rendererStopped;
     const frozenEnvironment = await Promise.race([
       callBrowserTool(browser, "set_environment", { tabId: frozenTab.id, colorScheme: "dark" }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20_000)),
@@ -1128,6 +1239,7 @@ async function main(): Promise<void> {
     await v2Contents.executeJavaScript("document.querySelector('[data-semantic-scan-limit]').remove(); true", true);
     const visibleTextTarget = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "text", text: "Unique action text", exact: true },
     });
     if (!visibleTextTarget.success || !String(toolTextPayload(visibleTextTarget)?.text).includes("visible-text:true")) {
@@ -1166,6 +1278,7 @@ async function main(): Promise<void> {
     }
     const partiallyCovered = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Partially covered", exact: true },
     });
     if (!partiallyCovered.success || !String(toolTextPayload(partiallyCovered)?.text).includes("partial:true")) {
@@ -1177,6 +1290,7 @@ async function main(): Promise<void> {
     );
     const freshTarget = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
+      snapshot: true,
       target: { kind: "role", role: "button", name: "Fresh target", exact: true },
     });
     if (!freshTarget.success || !String(toolTextPayload(freshTarget)?.text).includes("fresh:true")) {
@@ -1187,6 +1301,7 @@ async function main(): Promise<void> {
       true,
     );
     if (!isDynamicRecord(point)) throw new Error("V2 canvas coordinates were not serializable.");
+    const beforeStatusAction = await runCauseEffect(browser.snapshot(v2Tab.id));
     const canvasClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
       target: { kind: "point", x: point.x, y: point.y },
@@ -1195,6 +1310,27 @@ async function main(): Promise<void> {
     const canvasValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
     if (canvasValue !== "canvas:true") {
       throw new Error("V2 canvas coordinate click was not trusted.");
+    }
+    // An input action returns a short status, so the refs of the snapshot before it still work.
+    const canvasStatus = toolTextPayload(canvasClick);
+    if (
+      !canvasStatus ||
+      "elements" in canvasStatus ||
+      "text" in canvasStatus ||
+      canvasStatus.revision !== beforeStatusAction.revision ||
+      canvasStatus.url !== v2Contents.getURL()
+    ) {
+      throw new Error(`V2 input action did not return a status: ${JSON.stringify(canvasStatus)}`);
+    }
+    const statusTarget = beforeStatusAction.elements.find((element) => element.name === "Fresh target");
+    if (!statusTarget) throw new Error("V2 action status fixture was not available.");
+    const reusedRefClick = await callBrowserTool(browser, "click", {
+      tabId: v2Tab.id,
+      target: { kind: "ref", ref: statusTarget.ref, revision: beforeStatusAction.revision },
+    });
+    const reusedRefValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (!reusedRefClick.success || reusedRefValue !== "fresh:true") {
+      throw new Error(`V2 ref from before a status action did not work: ${toolError(reusedRefClick)}`);
     }
     const offViewportClick = await callBrowserTool(browser, "click", {
       tabId: v2Tab.id,
@@ -1300,6 +1436,26 @@ async function main(): Promise<void> {
       paths: [uploadPath],
     });
     if (!uploaded.success) throw new Error(`V2 upload failed: ${toolError(uploaded)}`);
+    // GitHub's comment box makes its file input only on click: the upload answers that file chooser.
+    const chooserUpload = await callBrowserTool(browser, "upload_files", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "button", name: "Attach files", exact: true },
+      paths: [uploadPath],
+    });
+    if (!chooserUpload.success) throw new Error(`V2 file chooser upload failed: ${toolError(chooserUpload)}`);
+    const chooserOutput = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (chooserOutput !== "chooser:v2-upload.txt") {
+      throw new Error(`V2 file chooser upload did not reach the page: ${String(chooserOutput)}`);
+    }
+    const noChooser = await callBrowserTool(browser, "upload_files", {
+      tabId: v2Tab.id,
+      target: { kind: "role", role: "button", name: "No chooser", exact: true },
+      paths: [uploadPath],
+      timeoutMs: 1_000,
+    });
+    if (noChooser.success || !toolError(noChooser).includes("did not open a file chooser")) {
+      throw new Error(`V2 upload to a target without a file chooser did not fail: ${toolError(noChooser)}`);
+    }
     const frameUploadInputIds: string[] = [];
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const frameUpload = await callBrowserTool(
@@ -1317,7 +1473,7 @@ async function main(): Promise<void> {
     if (frameUploadInputIds.length !== 2 || frameUploadInputIds[0] !== frameUploadInputIds[1]) {
       throw new Error("V2 frame upload input identity changed between CDP sessions.");
     }
-    await runStagedUploadScenario(browser, v2Tab.id, uploadPath, join(temporaryRoot, "missing-upload.txt"));
+    await runStagedUploadScenario(browser, v2Tab.id, v2Contents, uploadPath, join(temporaryRoot, "missing-upload.txt"));
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 220, height: 560 } }));
     const narrowFillEnvironment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
@@ -1344,6 +1500,16 @@ async function main(): Promise<void> {
       );
     }
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+    // An earlier snapshot already delivered the page-load diagnostics; this one must carry a new entry.
+    const errorsBeforeEnvironment =
+      browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0;
+    await v2Contents.executeJavaScript("fetch('/diagnostic-error?access_token=diagnostic-secret'); true", true);
+    await waitFor(
+      async () =>
+        (browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0) >
+        errorsBeforeEnvironment,
+      "the environment diagnostic error",
+    );
     const environment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
       preset: "mobile",
@@ -1381,6 +1547,20 @@ async function main(): Promise<void> {
     ) {
       throw new Error("V2 snapshot metadata exposed URL credentials.");
     }
+    const repeatedSnapshot = toolTextPayload(await callBrowserTool(browser, "snapshot", { tabId: v2Tab.id }));
+    const delivered = new Set(
+      [
+        ...environmentSnapshot.diagnostics,
+        ...(Array.isArray(environmentSnapshot.actions) ? environmentSnapshot.actions : []),
+      ].map((entry) => JSON.stringify(entry)),
+    );
+    const repeated = [
+      ...(Array.isArray(repeatedSnapshot?.diagnostics) ? repeatedSnapshot.diagnostics : []),
+      ...(Array.isArray(repeatedSnapshot?.actions) ? repeatedSnapshot.actions : []),
+    ].filter((entry) => delivered.has(JSON.stringify(entry)));
+    if (repeated.length > 0) {
+      throw new Error(`V2 snapshot repeated delivered history: ${JSON.stringify(repeated)}`);
+    }
     const changesBeforeDiagnosticError = changedEventCount;
     const errorsBeforeDiagnosticError =
       browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0;
@@ -1389,7 +1569,7 @@ async function main(): Promise<void> {
       const currentErrors =
         browser.listTabs().find((candidate) => candidate.id === v2Tab.id)?.diagnosticErrorCount ?? 0;
       return changedEventCount > changesBeforeDiagnosticError && currentErrors > errorsBeforeDiagnosticError;
-    });
+    }, "the diagnostic error count to change");
     const oversizedEnvironment = await callBrowserTool(browser, "set_environment", {
       tabId: v2Tab.id,
       preset: "custom",
@@ -1492,27 +1672,42 @@ async function main(): Promise<void> {
       `(() => { const button = document.createElement('button'); button.setAttribute('aria-label', 'Slow action navigation'); button.onclick = () => { location.href = ${JSON.stringify(`${origin}/slow-document?action`)}; }; document.body.append(button); return true; })()`,
       true,
     );
-    const timedActionNavigation = await callBrowserTool(browser, "click", {
-      tabId: actionNavigationTab.id,
-      target: { kind: "role", role: "button", name: "Slow action navigation", exact: true },
-      timeoutMs: 100,
-    });
-    const timedActionPayload = toolTextPayload(timedActionNavigation);
-    if (
-      !timedActionNavigation.success ||
-      !Array.isArray(timedActionPayload?.actions) ||
-      !timedActionPayload.actions.some(
-        (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
-      )
-    ) {
-      throw new Error("V2 action-triggered navigation did not accurately report a dispatched timed action.");
-    }
-    const snapshotAfterTimedAction = await callBrowserTool(browser, "snapshot", { tabId: actionNavigationTab.id });
-    if (
-      !snapshotAfterTimedAction.success ||
-      browser.listTabs().find((candidate) => candidate.id === actionNavigationTab.id)?.loading === true
-    ) {
-      throw new Error("V2 action-triggered navigation escaped tab serialization.");
+    // The tab was just opened, so it may have no presented frame yet, and Chromium would drop the click.
+    await waitForPresentedFrame(actionNavigationContents);
+    try {
+      // The server holds the navigation open until the release below, so the click reaches its
+      // deadline while the navigation is pending. The limit only has to fit the dispatch: 100 ms
+      // did not always fit the highlight and the dispatch on a loaded runner.
+      const timedActionNavigation = await callBrowserTool(browser, "click", {
+        tabId: actionNavigationTab.id,
+        snapshot: true,
+        target: { kind: "role", role: "button", name: "Slow action navigation", exact: true },
+        timeoutMs: 5_000,
+      });
+      const timedActionPayload = toolTextPayload(timedActionNavigation);
+      if (
+        !timedActionNavigation.success ||
+        !Array.isArray(timedActionPayload?.actions) ||
+        !timedActionPayload.actions.some(
+          (entry) => isDynamicRecord(entry) && String(entry.detail).includes("Action completed"),
+        )
+      ) {
+        throw new Error(
+          `V2 action-triggered navigation did not accurately report a dispatched timed action: ${timedActionNavigation.success ? JSON.stringify(timedActionPayload?.actions) : toolError(timedActionNavigation)}`,
+        );
+      }
+      if (actionNavigationRequests === 0) {
+        throw new Error("V2 timed action reported a dispatch, but the server received no navigation request.");
+      }
+      const snapshotAfterTimedAction = await callBrowserTool(browser, "snapshot", { tabId: actionNavigationTab.id });
+      if (
+        !snapshotAfterTimedAction.success ||
+        browser.listTabs().find((candidate) => candidate.id === actionNavigationTab.id)?.loading === true
+      ) {
+        throw new Error("V2 action-triggered navigation escaped tab serialization.");
+      }
+    } finally {
+      releaseActionNavigation();
     }
     await runCauseEffect(browser.close(actionNavigationTab.id));
     const { tab: waitTab, contents: waitContents } = await openTabWithContents(
@@ -1579,6 +1774,34 @@ async function main(): Promise<void> {
       throw new Error(`V2 reload snapshot did not wait for the new document: ${toolError(reloaded)}`);
     }
     if (!waitContents.isAudioMuted()) unmutedTabs.push("tab after navigation and reload");
+    // A status action reads no snapshot. When it navigates, the refs of the old document still go.
+    await waitContents.executeJavaScript(
+      `document.body.append(Object.assign(document.createElement('a'), { href: ${JSON.stringify(`${origin}/?status-navigation`)}, textContent: 'Status navigation' })); true`,
+      true,
+    );
+    const beforeStatusNavigation = await runCauseEffect(browser.snapshot(waitTab.id));
+    const statusNavigationLink = beforeStatusNavigation.elements.find(
+      (element) => element.name === "Status navigation",
+    );
+    if (!statusNavigationLink) throw new Error("V2 status navigation fixture was not available.");
+    const statusNavigationTarget = {
+      kind: "ref",
+      ref: statusNavigationLink.ref,
+      revision: beforeStatusNavigation.revision,
+    } as const;
+    const statusNavigation = await callBrowserTool(browser, "click", {
+      tabId: waitTab.id,
+      target: statusNavigationTarget,
+    });
+    if (!statusNavigation.success) throw new Error(`V2 status navigation click failed: ${toolError(statusNavigation)}`);
+    await waitFor(async () => waitContents.getURL().includes("status-navigation"), "the status navigation");
+    const staleStatusRef = await callBrowserTool(browser, "click", {
+      tabId: waitTab.id,
+      target: statusNavigationTarget,
+    });
+    if (staleStatusRef.success || !toolError(staleStatusRef).includes("Stale browser reference")) {
+      throw new Error("V2 navigation after a status action left an old reference valid.");
+    }
     const { tab: boundedTab, contents: boundedContents } = await openTabWithContents(
       browser,
       origin,
@@ -1694,30 +1917,35 @@ async function main(): Promise<void> {
       throw new Error("A failed navigation leaked a browser tab.");
     }
 
-    const downloadPage = await runCauseEffect(browser.open(origin, "smoke-thread"));
+    const { tab: downloadPage, contents: downloadContents } = await openTabWithContents(
+      browser,
+      origin,
+      "smoke-thread",
+    );
+    // The tab was just opened, so it may have no presented frame yet, and Chromium would drop the click.
+    await waitForPresentedFrame(downloadContents);
     const downloadSnapshot = await runCauseEffect(browser.snapshot(downloadPage.id));
     const download = downloadSnapshot.elements.find((element) => element.name === "Download");
     if (!download) throw new Error("Download link is missing.");
+    const firstDownload = nextDownloadDone(downloadContents, "the first browser download");
     await runCauseEffect(
       browser.act(downloadPage.id, downloadSnapshot.revision, {
         type: "click",
         ref: download.ref,
       }),
     );
-    const downloadPath = join(downloadsRoot, "openbot-smoke.txt");
-    await waitFor(async () => (await readFile(downloadPath, "utf8")) === "local download");
+    await expectDownloadedFile(await firstDownload, join(downloadsRoot, "openbot-smoke.txt"), "first");
     const nextDownloadSnapshot = await runCauseEffect(browser.snapshot(downloadPage.id));
     const nextDownload = nextDownloadSnapshot.elements.find((element) => element.name === "Download");
     if (!nextDownload) throw new Error("Download link disappeared.");
+    const secondDownload = nextDownloadDone(downloadContents, "the second browser download");
     await runCauseEffect(
       browser.act(downloadPage.id, nextDownloadSnapshot.revision, {
         type: "click",
         ref: nextDownload.ref,
       }),
     );
-    await waitFor(
-      async () => (await readFile(join(downloadsRoot, "openbot-smoke (2).txt"), "utf8")) === "local download",
-    );
+    await expectDownloadedFile(await secondDownload, join(downloadsRoot, "openbot-smoke (2).txt"), "second");
     process.stdout.write("BrowserHost: download passed.\n");
 
     const toolResult = await runCauseEffect(
@@ -1850,6 +2078,251 @@ async function main(): Promise<void> {
   }
 }
 
+async function runTypingFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const { tab, contents } = await openTabWithContents(
+    browser,
+    `${origin}/blocking-frame?typing-focus`,
+    "smoke-thread",
+    "smoke-bot",
+  );
+  const cases: Array<{ name: string; safe: boolean; toolSuccess: boolean; state: string; error: string }> = [];
+  try {
+    await waitForKeyInput(browser, tab.id, contents);
+    for (const surface of [
+      "ordinary",
+      "shadow",
+      "closed shadow",
+      "same-origin frame",
+      "cross-origin frame",
+      "closed-shadow cross-origin frame",
+      "contenteditable",
+    ]) {
+      const inFrame = surface.endsWith("frame");
+      const frameUrl = `${surface.includes("cross-origin frame") ? origin.replace("127.0.0.1", "localhost") : origin}/frame?typing-focus`;
+      if (inFrame) {
+        await contents.executeJavaScript(
+          `new Promise(resolve => {
+            document.body.innerHTML = '';
+            const frame = document.createElement('iframe');
+            frame.src = ${JSON.stringify(frameUrl)};
+            frame.onload = resolve;
+            ${
+              surface === "closed-shadow cross-origin frame"
+                ? `const host = document.createElement('div');
+                   document.body.append(host);
+                   host.attachShadow({mode:'closed'}).append(frame);`
+                : "document.body.append(frame);"
+            }
+          }).then(() => true)`,
+          true,
+        );
+      } else {
+        await contents.executeJavaScript("document.body.innerHTML = ''; true", true);
+      }
+      const frame = inFrame
+        ? contents.mainFrame.framesInSubtree.find((candidate) => candidate.url === frameUrl)
+        : contents.mainFrame;
+      assert(frame, `Typing focus frame is missing: ${surface}`);
+      const names = [
+        "normal append",
+        "normal replace submit",
+        "redirected focus append",
+        "redirected focus replace",
+        "redirected input",
+        "replaced target",
+      ];
+      if (surface === "same-origin frame") names.push("frame focus transfer", "sibling frame focus transfer");
+      if (surface === "cross-origin frame") names.push("frame focus transfer");
+      if (surface === "ordinary")
+        names.push(
+          "readonly",
+          "empty replacement",
+          "empty submit redirected focus",
+          "formatted input",
+          "End redirected focus",
+          "replaced focus target",
+        );
+      for (const name of names) {
+        const frameTransfer = name.endsWith("frame focus transfer");
+        const siblingTransfer = name === "sibling frame focus transfer";
+        const redirectFocus = name.includes("redirected focus") && name !== "End redirected focus";
+        const redirectInput = name === "redirected input" || name === "replaced target" || frameTransfer;
+        const replace = [
+          "normal replace submit",
+          "redirected focus replace",
+          "empty replacement",
+          "readonly",
+          "formatted input",
+        ].includes(name);
+        const empty = name.startsWith("empty");
+        const submit = name !== "normal append" && name !== "empty replacement" && name !== "readonly";
+        const changedBeforeInput = redirectFocus || name === "End redirected focus" || name === "replaced focus target";
+        const expectedSuccess = !changedBeforeInput && !redirectInput;
+        await frame.executeJavaScript(
+          `(() => {
+            document.body.innerHTML = '<div id="typing-root"></div>';
+            const host = document.querySelector('#typing-root');
+            const root = ${!inFrame && surface.includes("shadow") ? `host.attachShadow({mode:'${surface === "closed shadow" ? "closed" : "open"}'})` : "host"};
+            root.innerHTML = ${JSON.stringify(
+              surface === "contenteditable"
+                ? '<div id="intended" contenteditable="true" role="textbox" aria-label="Intended field">alpha</div><input id="other" aria-label="Other field" value="beta">'
+                : '<input id="intended" aria-label="Intended field" value="alpha"><input id="other" aria-label="Other field" value="beta">',
+            )};
+            globalThis.typingRoot = root;
+            globalThis.inputEvents = [];
+            globalThis.keyEvents = [];
+            const intended = root.querySelector('#intended');
+            const other = root.querySelector('#other');
+            for (const field of [intended, other]) field.oninput = event => {
+              globalThis.inputEvents.push({field: field.id, trusted: event.isTrusted});
+            };
+            root.addEventListener('keydown', event => {
+              globalThis.keyEvents.push({field: event.composedPath()[0].id, key: event.key, trusted: event.isTrusted});
+              if (event.key === 'Enter') event.preventDefault();
+            });
+            ${redirectFocus ? "intended.onfocus = () => other.focus();" : ""}
+            ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
+            ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
+            ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
+            ${
+              frameTransfer
+                ? surface === "cross-origin frame"
+                  ? // The page in the other process takes focus while this handler still runs.
+                    `intended.addEventListener('input', () => {
+                      parent.postMessage('move-typing-focus', '*');
+                      for (const end = Date.now() + 500; Date.now() < end;);
+                    });`
+                  : `intended.addEventListener('input', () => parent.moveTypingFocus());`
+                : ""
+            }
+            ${name === "readonly" ? "intended.readOnly = true;" : ""}
+            ${name === "formatted input" ? "intended.addEventListener('input', () => { intended.value = intended.value.toLowerCase(); });" : ""}
+            ${name === "End redirected focus" ? "intended.type = 'email'; intended.onkeydown = event => { if (event.key === 'End') other.focus(); };" : ""}
+            return true;
+          })()`,
+          true,
+        );
+        if (frameTransfer) {
+          await contents.executeJavaScript(
+            `(() => {
+              document.querySelector('#outside')?.remove();
+              document.querySelector('#typing-sibling')?.remove();
+              let doc = document;
+              ${
+                siblingTransfer
+                  ? `const sibling = document.createElement('iframe');
+                     sibling.id = 'typing-sibling'; document.body.append(sibling);
+                     doc = sibling.contentDocument;`
+                  : ""
+              }
+              const outside = doc.createElement('input');
+              outside.id = 'outside'; outside.value = 'gamma';
+              globalThis.outsideEvents = []; globalThis.outsideKeys = [];
+              outside.oninput = event => globalThis.outsideEvents.push(event.isTrusted);
+              outside.onkeydown = event => { globalThis.outsideKeys.push(event.key); event.preventDefault(); };
+              doc.body.prepend(outside);
+              globalThis.moveTypingFocus = () => outside.focus();
+              globalThis.onmessage = event => { if (event.data === 'move-typing-focus') outside.focus(); };
+              return true;
+            })()`,
+            true,
+          );
+        }
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        const target = snapshot.elements.find((element) => element.name === "Intended field");
+        assert(target || surface === "closed shadow", `Typing focus target is missing: ${surface}: ${name}`);
+        if (surface === "closed-shadow cross-origin frame")
+          assert(
+            target?.frame && new URL(target.frame.url).hostname === "localhost",
+            "Closed-root owner lost its cross-process frame ref.",
+          );
+        const result = await callBrowserTool(browser, "type", {
+          tabId: tab.id,
+          target: target
+            ? { kind: "ref", ref: target.ref, revision: snapshot.revision }
+            : { kind: "role", role: "textbox", name: "Intended field", exact: true },
+          text: empty ? "" : "X",
+          mode: replace ? "replace" : "append",
+          submit,
+        });
+        const state = await frame.executeJavaScript(
+          `JSON.stringify({
+            intended: globalThis.typingRoot.querySelector('#intended').value ?? globalThis.typingRoot.querySelector('#intended').textContent,
+            other: globalThis.typingRoot.querySelector('#other').value,
+            events: globalThis.inputEvents,
+            keys: globalThis.keyEvents,
+            locallyFocused: document.activeElement === globalThis.typingRoot.querySelector('#intended'),
+          })`,
+        );
+        assert(isString(state));
+        const observed = JSON.parse(state);
+        const outside = frameTransfer
+          ? await contents.executeJavaScript(`(() => {
+              const doc = ${siblingTransfer ? "document.querySelector('#typing-sibling').contentDocument" : "document"};
+              return {
+                value: doc.querySelector('#outside').value,
+                focused: doc.activeElement === doc.querySelector('#outside'),
+                events: globalThis.outsideEvents,
+                keys: globalThis.outsideKeys,
+              };
+            })()`)
+          : null;
+        const expectedValue =
+          changedBeforeInput || name === "readonly"
+            ? "alpha"
+            : empty
+              ? ""
+              : name === "formatted input"
+                ? "x"
+                : replace
+                  ? "X"
+                  : "alphaX";
+        const expectedKeys = name === "End redirected focus" ? ["End"] : expectedSuccess && submit ? ["Enter"] : [];
+        const expectedInputs = changedBeforeInput || name === "readonly" ? 0 : 1;
+        // The error tells the agent whether the text is already in the field.
+        const expectedError = expectedSuccess ? "" : changedBeforeInput ? "Nothing was typed" : "Enter was not sent";
+        const safe =
+          result.success === expectedSuccess &&
+          (result.success || toolError(result).includes(expectedError)) &&
+          observed.other === "beta" &&
+          observed.intended === expectedValue &&
+          observed.events.length === expectedInputs &&
+          observed.events.every((event: DynamicRecord) => event.field === "intended" && event.trusted === true) &&
+          JSON.stringify(observed.keys.map((event: DynamicRecord) => event.key)) === JSON.stringify(expectedKeys) &&
+          observed.keys.every((event: DynamicRecord) => event.field === "intended" && event.trusted === true) &&
+          (!frameTransfer ||
+            (outside.focused === true &&
+              outside.value === "gamma" &&
+              outside.events.length === 0 &&
+              outside.keys.length === 0));
+        cases.push({
+          name: `${surface}: ${name}`,
+          safe,
+          toolSuccess: result.success,
+          state: frameTransfer ? JSON.stringify({ frame: observed, outside }) : state,
+          error: result.success ? "" : toolError(result),
+        });
+      }
+    }
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(
+      ".openbot-build/browser-typing-focus.json",
+      JSON.stringify(
+        { status: cases.every((item) => item.safe) ? "passed" : "issues_found", versions: process.versions, cases },
+        null,
+        2,
+      ),
+    );
+    assert(
+      cases.every((item) => item.safe),
+      // CI keeps no report file, so the message carries the failed cases.
+      JSON.stringify(cases.filter((item) => !item.safe)),
+    );
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+  }
+}
+
 async function runFocusScenario(browser: BrowserHost, origin: string): Promise<void> {
   const focusSentinel = new BrowserWindow({
     show: false,
@@ -1861,7 +2334,7 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
   focusSentinel.show();
   focusSentinel.focus();
   focusSentinel.webContents.focus();
-  await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents);
+  await waitFor(async () => webContents.getFocusedWebContents() === focusSentinel.webContents, "focus sentinel focus");
   let focusLosses = 0;
   focusSentinel.webContents.on("blur", () => {
     focusLosses += 1;
@@ -1926,6 +2399,63 @@ async function runFocusScenario(browser: BrowserHost, origin: string): Promise<v
   if (focusLosses !== 0) throw new Error(`Background browser actions interrupted typing ${focusLosses} times.`);
   await runCauseEffect(browser.close(backgroundTab.id));
   focusSentinel.destroy();
+}
+
+/**
+ * A page that redirects while it loads made `loadURL` reject inside Electron's `did-start-navigation`
+ * event, and the tab then called `webContents.stop()` before that event returned. Chromium stops the
+ * process when a navigation is cancelled while it starts. The process must survive and end on the
+ * redirected page, and each navigation must succeed.
+ */
+async function runRedirectNavigationScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const tab = await runCauseEffect(browser.open(origin, "smoke-thread", "smoke-bot"));
+  const outcomes: { via: string; url: string; success: boolean; finalUrl?: string; error?: string }[] = [];
+  try {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      for (const url of [`${origin}/redirect-start`, `${origin}/redirect-start?slow`]) {
+        const result = await callBrowserTool(browser, "navigate", { tabId: tab.id, url, timeoutMs: 5_000 });
+        outcomes.push({
+          via: "tool",
+          url,
+          success: result.success,
+          ...(result.success ? {} : { error: toolError(result) }),
+        });
+        const exit = await Effect.runPromiseExit(browser.loadUrl(tab.id, url));
+        outcomes.push({
+          via: "loadUrl",
+          url,
+          success: exit._tag === "Success",
+          ...(exit._tag === "Success" ? {} : { error: String(exit.cause) }),
+        });
+        const opened = await Effect.runPromiseExit(browser.open(url, "smoke-thread", "smoke-bot"));
+        outcomes.push({
+          via: "open",
+          url,
+          success: opened._tag === "Success" && opened.value.url.includes("/redirect-end"),
+          ...(opened._tag === "Success" ? { finalUrl: opened.value.url } : { error: String(opened.cause) }),
+        });
+        if (opened._tag === "Success") await runCauseEffect(browser.close(opened.value.id));
+      }
+    }
+    await waitFor(
+      async () =>
+        browser
+          .listTabs()
+          .find((candidate) => candidate.id === tab.id)
+          ?.url.includes("/redirect-end") === true,
+      "redirected tab URL",
+    );
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+  }
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-redirect-navigation-report.json",
+    JSON.stringify({ processAlive: true, attempts: outcomes.length, outcomes }, null, 2),
+  );
+  const failed = outcomes.filter((outcome) => !outcome.success);
+  if (failed.length > 0) throw new Error(`${failed.length} redirecting navigations failed: ${failed[0]?.error}`);
+  process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {
@@ -2009,6 +2539,7 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
   const actionTimeoutStarted = Date.now();
   const boundedAction = await callBrowserTool(browser, "click", {
     tabId: tabId,
+    snapshot: true,
     target: { kind: "point", x: boundedActionPoint.x, y: boundedActionPoint.y },
     timeoutMs: 250,
   });
@@ -2035,6 +2566,45 @@ async function runWaitDeadlines(browser: BrowserHost, tabId: string, v2Contents:
     "clearInterval(globalThis.__openbotNoise); delete globalThis.__openbotNoise; true",
     true,
   );
+  // A click that reached the page and then stopped its renderer. The timeout must say the input
+  // arrived, so the agent checks the page instead of repeating the click. A separate site keeps the
+  // stopped renderer away from the `/v2` tab.
+  const address = server.address();
+  if (!address || isString(address)) throw new Error("Local server address was not available.");
+  const frozenClickOrigin = `http://frozen-click.localhost:${address.port}`;
+  const frozenClickTab = await runCauseEffect(
+    browser.open(`${frozenClickOrigin}/spinning-frame`, "smoke-thread", "smoke-bot"),
+  );
+  const frozenClickContents = webContents
+    .getAllWebContents()
+    .find((contents) => !contents.isDestroyed() && contents.getURL().startsWith(frozenClickOrigin));
+  if (!frozenClickContents) throw new Error("Frozen click fixture web contents were not available.");
+  let frozenClicks = 0;
+  frozenClickContents.on("console-message", (details: ElectronEvent<WebContentsConsoleMessageEventParams>) => {
+    if (details.message === "frozen click ran") frozenClicks += 1;
+  });
+  await frozenClickContents.executeJavaScript(
+    "document.querySelector('button').onclick = () => { console.info('frozen click ran'); while (true) {} }; true",
+    true,
+  );
+  const frozenClick = await callBrowserTool(browser, "click", {
+    tabId: frozenClickTab.id,
+    target: { kind: "role", role: "button", name: "Blocked frame button", exact: true },
+    timeoutMs: 1_000,
+  });
+  await waitFor(async () => frozenClicks > 0, "the frozen click to reach the page");
+  if (
+    frozenClick.success ||
+    !toolError(frozenClick).includes("timed out after its input reached the page") ||
+    frozenClicks !== 1
+  ) {
+    throw new Error(`V2 click timeout did not report input that reached the page: ${JSON.stringify(frozenClick)}`);
+  }
+  const frozenClickClosed = await Promise.race([
+    runCauseEffect(browser.close(frozenClickTab.id)).then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000)),
+  ]);
+  if (!frozenClickClosed) throw new Error("V2 frozen click timeout left the tab queue blocked.");
 }
 
 /**
@@ -2069,10 +2639,12 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     true,
   );
   const frames: Array<{ sequence: number; at: number }> = [];
+  let frameWaiter: { count: number; resolve: () => void } | null = null;
   const stopView = await runCauseEffect(
     browser.startView(tabId, (frame) => {
       if (frame.image.byteLength === 0) throw new Error("A live view frame carried no image.");
       frames.push({ sequence: frame.sequence, at: Date.now() });
+      if (frameWaiter && frames.length >= frameWaiter.count) frameWaiter.resolve();
     }),
   );
   try {
@@ -2130,6 +2702,50 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
     await runLiveViewClipboard(browser, tabId, contents);
+
+    // An upload through a file chooser turns the Page domain on and off. The view must not stop.
+    await contents.executeJavaScript(
+      `(() => {
+      const button = document.createElement('button');
+      button.textContent = 'Live view attach';
+      button.style.cssText = 'position:fixed;left:250px;top:150px;width:200px;height:60px;z-index:2147483647';
+      button.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.click();
+      });
+      document.body.append(button);
+    })()`,
+      true,
+    );
+    const uploadRoot = await mkdtemp(join(tmpdir(), "openbot-live-view-upload-"));
+    try {
+      const uploadPath = join(uploadRoot, "live-view-upload.txt");
+      await writeFile(uploadPath, "live view upload");
+      const uploaded = await callBrowserTool(browser, "upload_files", {
+        tabId,
+        target: { kind: "role", role: "button", name: "Live view attach", exact: true },
+        paths: [uploadPath],
+      });
+      if (!uploaded.success) throw new Error(`A file chooser upload failed in live view: ${toolError(uploaded)}`);
+    } finally {
+      await rm(uploadRoot, { recursive: true, force: true });
+    }
+    const moreFrames = new Promise<void>((resolve) => {
+      frameWaiter = { count: frames.length + 5, resolve };
+    });
+    let stalled: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        moreFrames,
+        new Promise<never>((_resolve, reject) => {
+          stalled = setTimeout(() => reject(new Error("The live view stopped after a file chooser upload.")), 5_000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(stalled);
+      frameWaiter = null;
+    }
   } finally {
     await Effect.runPromise(stopView());
   }
@@ -2384,6 +3000,45 @@ async function waitForMouseInput(browser: BrowserHost, tabId: string, contents: 
   if (!landed) throw new Error("The view never delivered a native mouse event to the page.");
 }
 
+/**
+ * Wait until the view actually delivers a key event to the page. Under a virtual display the first
+ * key events after a tab opens can be dropped with no error, so the first typing-focus cases lost
+ * Enter and failed at random in CI. As with {@link waitForMouseInput}, the probe is thrown away.
+ */
+async function waitForKeyInput(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('input');
+    probe.id = 'smoke-key-probe';
+    probe.setAttribute('aria-label', 'Key probe');
+    probe.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.isTrusted) probe.dataset.entered = 'true';
+      event.preventDefault();
+    });
+    document.body.prepend(probe);
+  })()`,
+    true,
+  );
+  const deadline = Date.now() + 60_000;
+  let landed = false;
+  while (!landed && Date.now() < deadline) {
+    await callBrowserTool(browser, "type", {
+      tabId,
+      target: { kind: "role", role: "textbox", name: "Key probe", exact: true },
+      text: "x",
+      mode: "replace",
+      submit: true,
+    });
+    landed =
+      (await contents.executeJavaScript(
+        "document.getElementById('smoke-key-probe').dataset.entered === 'true'",
+        true,
+      )) === true;
+  }
+  await contents.executeJavaScript("document.getElementById('smoke-key-probe').remove()", true);
+  if (!landed) throw new Error("The view never delivered a native key event to the page.");
+}
+
 async function runDoubleClickScenario(browser: BrowserHost, origin: string): Promise<void> {
   const doubleUrl = `${origin}/blocking-frame?double-click`;
   const doubleTab = await runCauseEffect(browser.open(doubleUrl, "smoke-thread", "smoke-bot"));
@@ -2449,6 +3104,14 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
   }
 }
 
+/** The pixel size of the PNG image in a tool result. */
+function imageSize(result: DynamicToolResult): { width: number; height: number } | null {
+  const image = result.contentItems.find((item) => item.type === "inputImage");
+  if (!result.success || !image || image.type !== "inputImage") return null;
+  const png = Buffer.from(image.imageUrl.replace(/^data:image\/png;base64,/u, ""), "base64");
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 async function runControlActions(browser: BrowserHost, tabId: string, v2Contents: WebContents): Promise<void> {
   const selected = await callBrowserTool(browser, "select_option", {
     tabId: tabId,
@@ -2467,6 +3130,46 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
     selectionValue.changeTrusted !== "true"
   ) {
     throw new Error("V2 select did not use trusted native input.");
+  }
+  // The second option with the same initial needs a second key, and the first key's change replaced
+  // the select that had the focus.
+  const sorted = await callBrowserTool(browser, "select_option", {
+    tabId: tabId,
+    target: { kind: "role", role: "combobox", name: "Sort", exact: true },
+    values: ["Price (high to low)"],
+  });
+  const sortValue = await v2Contents.executeJavaScript(
+    `({ value: document.querySelector('[aria-label="Sort"]').value, changes: window.sortChanges })`,
+    true,
+  );
+  if (
+    !sorted.success ||
+    !isDynamicRecord(sortValue) ||
+    sortValue.value !== "Price (high to low)" ||
+    JSON.stringify(sortValue.changes) !== JSON.stringify(["2:true", "3:true"])
+  ) {
+    throw new Error(
+      `V2 select did not follow a select that the page replaced: ${toolError(sorted)} ${JSON.stringify(sortValue)}`,
+    );
+  }
+  // A screenshot with a ref holds only that element, so it is smaller than the page.
+  const sortRef = (await runCauseEffect(browser.snapshot(tabId))).elements.find(
+    (element) => element.name === "Sort",
+  )?.ref;
+  if (!sortRef) throw new Error("V2 snapshot did not expose the Sort select.");
+  const pageShot = await callBrowserTool(browser, "screenshot", { tabId });
+  const elementShot = await callBrowserTool(browser, "screenshot", { tabId, ref: sortRef });
+  const pageSize = imageSize(pageShot);
+  const elementSize = imageSize(elementShot);
+  if (
+    !pageSize ||
+    !elementSize ||
+    elementSize.width >= pageSize.width / 2 ||
+    elementSize.height >= pageSize.height / 2
+  ) {
+    throw new Error(
+      `V2 element screenshot was not clipped: ${toolError(elementShot)} ${JSON.stringify({ pageSize, elementSize })}`,
+    );
   }
   // An option whose value is the empty string is how a page spells "no selection", and the value is
   // the only way to address it -- its label is shared with Alpha's initial, so typeahead alone lands
@@ -2546,6 +3249,25 @@ async function runControlActions(browser: BrowserHost, tabId: string, v2Contents
   );
   if (editableValue !== "editable text appended") {
     throw new Error("V2 contenteditable target did not receive text.");
+  }
+  // A styled label's ::after covers its radio, as on Stripe Checkout. The label activates the radio,
+  // so the click goes through. The same layer on an element that is not a label still blocks it.
+  const pseudoLabel = await callBrowserTool(browser, "click", {
+    tabId: tabId,
+    target: { kind: "role", role: "radio", name: "Pay by card", exact: true },
+  });
+  if (!pseudoLabel.success) throw new Error(`V2 click through a label ::after failed: ${toolError(pseudoLabel)}`);
+  const pseudoChecked = await v2Contents.executeJavaScript(
+    `document.querySelector('[aria-label="Pay by card"]').checked`,
+    true,
+  );
+  if (pseudoChecked !== true) throw new Error("V2 click through a label ::after did not select the radio.");
+  const pseudoBlocked = await callBrowserTool(browser, "click", {
+    tabId: tabId,
+    target: { kind: "role", role: "radio", name: "Pay by transfer", exact: true },
+  });
+  if (pseudoBlocked.success || !toolError(pseudoBlocked).includes("covered by")) {
+    throw new Error("V2 hit testing ignored a ::after layer that is not a label.");
   }
 }
 
@@ -2661,8 +3383,10 @@ async function runKeyboardScenario(browser: BrowserHost, origin: string, tempora
     })()`,
       true,
     );
-    await waitFor(async () =>
-      retainedDocumentChanges.slice(changesBeforeTriggerNavigation).some((change) => change.tabId === keysTab.id),
+    await waitFor(
+      async () =>
+        retainedDocumentChanges.slice(changesBeforeTriggerNavigation).some((change) => change.tabId === keysTab.id),
+      "the trigger navigation document change",
     );
     const retainedShadowFrame = retainedDocumentChanges
       .slice(changesBeforeTriggerNavigation)
@@ -2774,6 +3498,7 @@ async function runCanvasGridScenario(browser: BrowserHost, origin: string): Prom
 async function runStagedUploadScenario(
   browser: BrowserHost,
   tabId: string,
+  contents: WebContents,
   uploadPath: string,
   missingPath: string,
 ): Promise<void> {
@@ -2811,6 +3536,16 @@ async function runStagedUploadScenario(
     if (missing.success) throw new Error("V2 staged upload reported success for a missing file.");
     const staged = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
     if (!staged.success) throw new Error(`V2 staged upload failed: ${toolError(staged)}`);
+    await contents.executeJavaScript("document.querySelector('output').textContent = 'staged chooser pending'", true);
+    const stagedChooser = await upload({ kind: "role", role: "button", name: "Attach files", exact: true }, [
+      uploadPath,
+    ]);
+    if (!stagedChooser.success) throw new Error(`V2 staged file chooser upload failed: ${toolError(stagedChooser)}`);
+    // The staged copy keeps the file name, so the page names the file the agent chose.
+    const stagedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
+    if (stagedOutput !== `chooser:${basename(uploadPath)}`) {
+      throw new Error(`V2 staged file chooser upload did not reach the page: ${String(stagedOutput)}`);
+    }
   } finally {
     await runCauseEffect(uploads.dispose());
   }
@@ -2828,16 +3563,17 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   }
   const evaluatedMutation = await v2Contents.executeJavaScript("document.body.dataset.evaluated", true);
   if (evaluatedMutation !== "true") throw new Error("V2 page evaluation did not run in the main-frame page context.");
-  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
-  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "success")) {
-    throw new Error("V2 page evaluation was not recorded in browser action history.");
-  }
   const thrownEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
     expression: "(() => { throw new Error('evaluation-smoke-error'); })()",
   });
   if (thrownEvaluation.success || !toolError(thrownEvaluation).includes("evaluation-smoke-error")) {
     throw new Error("V2 page evaluation did not return a page exception.");
+  }
+  // A snapshot leaves out a plain success, so the failed evaluation shows the history records evaluations.
+  const evaluationSnapshot = await runCauseEffect(browser.snapshot(tabId));
+  if (!evaluationSnapshot.actions.some((action) => action.action === "evaluate" && action.outcome === "error")) {
+    throw new Error("V2 page evaluation was not recorded in browser action history.");
   }
   const leakyEvaluation = await callBrowserTool(browser, "evaluate", {
     tabId: tabId,
@@ -2881,6 +3617,46 @@ async function runEvaluationScenario(browser: BrowserHost, tabId: string, v2Cont
   });
   if (!evaluationAfterFailure.success || toolTextPayload(evaluationAfterFailure)?.queueRecovered !== true) {
     throw new Error(`V2 page evaluation left the action queue unusable: ${toolError(evaluationAfterFailure)}`);
+  }
+  await runWedgedFrameEvaluation(browser, new URL(v2Contents.getURL()).origin);
+}
+
+/**
+ * An evaluation waits for the page to become quiet in every frame. A frame that does not answer, such
+ * as an ad frame whose timers do not run (#3139), must not hold the result until the deadline. The
+ * frame host is a site of its own, so the spinning renderer is not the one of another fixture.
+ */
+async function runWedgedFrameEvaluation(browser: BrowserHost, origin: string): Promise<void> {
+  const { port } = new URL(origin);
+  const { tab, contents } = await openTabWithContents(browser, `${origin}/blocking-frame`, "smoke-thread", "smoke-bot");
+  try {
+    const frameStatus = async (status: string) =>
+      (await contents.executeJavaScript("document.querySelector('output').textContent", true)) === status;
+    await contents.executeJavaScript(
+      `(() => {
+        const frame = document.createElement('iframe');
+        frame.src = 'http://evaluate-spin.localhost:${port}/spinning-frame';
+        document.body.appendChild(frame);
+        return true;
+      })()`,
+      true,
+    );
+    await waitFor(() => frameStatus("frame ready"), "the evaluation frame to report ready");
+    await contents.executeJavaScript(
+      "document.querySelector('iframe').contentWindow.postMessage('spin', '*'); true",
+      true,
+    );
+    await waitFor(() => frameStatus("frame spinning"), "the evaluation frame to start spinning");
+    const evaluated = await callBrowserTool(browser, "evaluate", {
+      tabId: tab.id,
+      expression: "1 + 1",
+      timeoutMs: 5_000,
+    });
+    if (!evaluated.success || toolError(evaluated) !== "2") {
+      throw new Error(`V2 page evaluation waited on a frame that does not answer: ${toolError(evaluated)}`);
+    }
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
   }
 }
 
@@ -3210,7 +3986,7 @@ function toolTextPayload(result: DynamicToolResult): DynamicRecord | undefined {
   if (item?.type !== "inputText") return undefined;
   let value: unknown;
   try {
-    value = JSON.parse(item.text);
+    value = parseBrowserToolText(item.text);
   } catch {
     return undefined;
   }
@@ -3264,7 +4040,9 @@ async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promis
       (brand) => getString(brand, "brand") === "Chromium" && getString(brand, "version") === chromiumMajorVersion,
     ) ||
     /Electron|OpenBot/u.test(clientHintBrands) ||
-    !clientHintBrands.includes(`"Chromium";v="${chromiumMajorVersion}"`)
+    // Cloudflare rejects a header that differs from the brands the page reads, GREASE brand and order included.
+    clientHintBrands !==
+      navigatorBrands.map((brand) => `"${getString(brand, "brand")}";v="${getString(brand, "version")}"`).join(", ")
   ) {
     throw new Error(`Browser identity headers are invalid: ${headerSnapshot.text}`);
   }
@@ -3304,6 +4082,50 @@ async function runIdentityFrameProbe(browser: BrowserHost, origin: string): Prom
   } finally {
     await runCauseEffect(browser.close(frameTab.id));
   }
+}
+
+/** Amazon product pages load a 1x1 ad frame whose timers do not run. Evaluation must still return (#3139). */
+async function runAmazonLiveProbe(browser: BrowserHost): Promise<void> {
+  const { tab, contents } = await openTabWithContents(
+    browser,
+    "https://www.amazon.com.br/s?k=disco+de+vinil",
+    "smoke-thread",
+    "smoke-bot",
+  );
+  try {
+    const product = "a[href*=\\'/dp/\\']";
+    await waitForLive(
+      async () => (await contents.executeJavaScript(`!!document.querySelector('${product}')`, true)) === true,
+      "an Amazon product link",
+    );
+    const productUrl = await contents.executeJavaScript(`document.querySelector('${product}').href`, true);
+    if (!isString(productUrl)) throw new Error("Amazon did not list a product.");
+    await runCauseEffect(browser.loadUrl(tab.id, productUrl));
+    await waitForLive(
+      async () => contents.mainFrame.framesInSubtree.some((frame) => frame.url.includes("amazon-adsystem.com")),
+      "the Amazon ad frame",
+    );
+    const evaluated = await callBrowserTool(browser, "evaluate", {
+      tabId: tab.id,
+      expression: "1 + 1",
+      timeoutMs: 5_000,
+    });
+    if (!evaluated.success || toolError(evaluated) !== "2") {
+      throw new Error(`Amazon product evaluation did not return its value: ${toolError(evaluated)}`);
+    }
+    process.stdout.write("BrowserHost: Amazon product evaluation passed.\n");
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+  }
+}
+
+async function waitForLive(check: () => Promise<boolean>, waitedFor: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (await check().catch(() => false)) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Timed out waiting for ${waitedFor}.`);
 }
 
 async function runGoogleLiveProbe(browser: BrowserHost): Promise<void> {
@@ -3563,13 +4385,54 @@ async function expectFailure(operation: () => Promise<unknown>): Promise<void> {
   throw new Error("Expected operation to fail.");
 }
 
-async function waitFor(check: () => Promise<boolean>, waitedFor = "a browser download"): Promise<void> {
+interface FinishedDownload {
+  state: "completed" | "cancelled" | "interrupted";
+  path: string;
+}
+
+/**
+ * Resolves when the next download that `contents` starts is done. Call it before the click: the
+ * session emits `will-download` as the response arrives. The host's own listener runs first and
+ * sets the save path, so the item reports the path the host chose.
+ */
+function nextDownloadDone(contents: WebContents, step: string): Promise<FinishedDownload> {
+  const { session } = contents;
+  return new Promise((resolve, reject) => {
+    const started = (_event: ElectronEvent, item: DownloadItem, source: WebContents) => {
+      if (source !== contents) return;
+      session.off("will-download", started);
+      item.once("done", (_doneEvent, state) => {
+        clearTimeout(timer);
+        resolve({ state, path: item.getSavePath() });
+      });
+    };
+    // The limit only turns a dropped click into a failure; a download that starts ends at once.
+    const timer = setTimeout(() => {
+      session.off("will-download", started);
+      reject(new Error(`Timed out waiting for ${step}.`));
+    }, 30_000);
+    session.on("will-download", started);
+  });
+}
+
+async function expectDownloadedFile(download: FinishedDownload, expectedPath: string, step: string): Promise<void> {
+  if (download.state !== "completed" || download.path !== expectedPath) {
+    throw new Error(
+      `The ${step} browser download ended ${download.state} at ${download.path}, not at ${expectedPath}.`,
+    );
+  }
+  if ((await readFile(expectedPath, "utf8")) !== "local download") {
+    throw new Error(`The ${step} browser download saved the wrong content.`);
+  }
+}
+
+async function waitFor(check: () => Promise<boolean>, waitedFor: string): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
     try {
       if (await check()) return;
     } catch {
-      // The download may not exist yet.
+      // The checked state may not exist yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

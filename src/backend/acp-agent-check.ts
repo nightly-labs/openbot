@@ -7,9 +7,11 @@ import {
 } from "./provider-client-effects";
 // "Check agent": one trial start of a custom agent, before the user saves it.
 //
-// Only `initialize` is sent. `session/new` is not: it can make an agent write in its folder, start
-// MCP servers, or sign in. The process starts in an empty temporary folder, in a process group of
-// its own on POSIX, and the whole group is stopped when the check ends, however it ends.
+// `initialize` is sent first. When the caller asks for models, one `session/new` follows, with no
+// MCP servers, to read the models that the session lists; the agent saves nothing for OpenBot to
+// keep, and a failure there gives no models but does not fail the check. The process starts in an
+// empty temporary folder, in a process group of its own on POSIX, and the whole group is stopped
+// when the check ends, however it ends.
 
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -22,11 +24,14 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { OPENBOT_ACP_CLIENT_CAPABILITIES, OPENBOT_ACP_CLIENT_INFO } from "./acp-client";
+import { type AcpModel, modelsFromSessionSetup } from "./acp-configuration";
 import { cliSpawnTarget } from "./cli";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 import { TimeoutError } from "./with-timeout";
 
 const AGENT_CHECK_TIMEOUT_MS = 20_000;
+/** How long the model list may add to a check that has already passed. */
+const MODEL_LIST_TIMEOUT_MS = 10_000;
 const STOP_GRACE_MS = 2_000;
 const DETAIL_LIMIT = 300;
 const OPENBOT_ACP_PROTOCOL_VERSION = 1;
@@ -42,6 +47,8 @@ export interface AgentCheckTarget {
    */
   path?: string | null;
   timeoutMs?: number;
+  /** Opens one session to read the models. An install check leaves it out: it needs only an answer. */
+  listModels?: boolean;
 }
 
 /**
@@ -116,7 +123,16 @@ export const checkAcpAgent = Effect.fn("AcpAgent.check")((target: AgentCheckTarg
               ),
             );
           }
-          return checkResult(initialization, target.executable);
+          const models = target.listModels
+            ? yield* providerCall(() => connection.newSession({ cwd: folder, mcpServers: [] })).pipe(
+                Effect.raceFirst(Deferred.await(ended)),
+                Effect.timeout(MODEL_LIST_TIMEOUT_MS),
+                Effect.map((session) => modelNames(modelsFromSessionSetup(session))),
+                // An agent that lists its models only after sign-in still passed the check.
+                Effect.orElseSucceed(() => []),
+              )
+            : [];
+          return checkResult(initialization, target.executable, models);
         }).pipe(
           Effect.mapError((error) => providerFailure(checkError(error.cause, lastStderr, redact))),
           Effect.ensuring(Effect.suspend(() => (child ? stopGroup(child) : Effect.void)).pipe(Effect.orDie)),
@@ -144,7 +160,7 @@ function checkError(error: unknown, lastStderr: string | null, redact: (text: st
   return new Error(`${sourceText(key)}${detail}`);
 }
 
-function checkResult(initialization: InitializeResponse, executable: string): CustomAgentCheckResult {
+function checkResult(initialization: InitializeResponse, executable: string, models: string[]): CustomAgentCheckResult {
   const info = initialization.agentInfo;
   const agentName = (info?.title || info?.name || basename(executable)).slice(0, INPUT_LIMITS.agentName);
   const version = info?.version ? info.version.slice(0, 160) : null;
@@ -153,7 +169,19 @@ function checkResult(initialization: InitializeResponse, executable: string): Cu
     version,
     protocolVersion: initialization.protocolVersion,
     capabilities: capabilityNames(initialization.agentCapabilities).slice(0, CUSTOM_AGENT_LIMITS.capabilities),
+    models,
   };
+}
+
+/** One name per model, in the agent's order, within the IPC limits. */
+function modelNames(models: readonly AcpModel[]): string[] {
+  const names = new Set<string>();
+  for (const model of models) {
+    const name = (model.name.trim() || model.id).slice(0, INPUT_LIMITS.modelName);
+    if (name) names.add(name);
+    if (names.size >= CUSTOM_AGENT_LIMITS.checkModels) break;
+  }
+  return [...names];
 }
 
 /**

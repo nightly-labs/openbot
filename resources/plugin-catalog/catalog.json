@@ -6,103 +6,181 @@
       "slug": "aave",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "a48d147397385f04079d1fc94ecba212010e73196a84a74c01fe1e336fe8d188"
+      "detailSha256": "720bef40809f071eb0b0a1e3b3283e758165726e4c9b516febaa634d5e883fb0"
     },
     {
       "slug": "canva",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "f3650d9ba3101c75fb8fea0685a3515d1c0d93c8a6798dc1046672b3c655c127"
+      "detailSha256": "c3cb9682531e3e4cb1cf0ff4ae522c4e8d0d11b0b5f8450efcb14e352a5c0afb"
     },
     {
       "slug": "linear",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "6f99c0a2123c5e8d898d7c2d8c80b40f3390f9532c845959f3310a8af56bcd8b"
+      "detailSha256": "87aab86daff02a34bf784170934b315ae6f6cd83429578974e951f968a6c2e69"
     },
     {
       "slug": "notion",
       "version": "1.0.0",
       "featured": true,
-      "detailSha256": "8b66d2a108340a79e398bedc19efc7dad2914b0addf17c76ee9fc50b72b09c1b"
+      "detailSha256": "c78679c0e1546502426d7135ef12267dbc5e85fcf4d553a8b8323bb67bac451c"
+    },
+    {
+      "slug": "obsidian",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "6de19cbe3dd53024bec166eb460aad9ced3fd7a9ada004c0fcee8a9acd9354f0"
+    },
+    {
+      "slug": "atlassian",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "87a4c753d7d0e0803eee7543c94dd816579985accc83c0e2ef0faf93167a42f2"
+    },
+    {
+      "slug": "todoist",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "5ead5bab31fb150bf62410b0f4f59106c1e0aa6b00c8449bd8a0d0557cfd48c5"
+    },
+    {
+      "slug": "trello",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "f85666d6f360a29f8cb29be4c7fd992e1c0d018b5b1a0f5c59cadddefa6883b8"
     },
     {
       "slug": "cobrain",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "039484cf64fa35ef8f5ef9a04630166337d1f63b840f4c7552c2612c22edac20"
+      "detailSha256": "223912ea4e10146bc8518f7d6cfa45cd19f52de7f76cee37e11c9e8c3be2dde5"
     },
     {
       "slug": "figma",
       "version": "1.1.0",
       "featured": true,
-      "detailSha256": "e28db6313e77ca00d6173b94c1bc2ed47735896aa770414a3fb7891543ef26f3"
+      "detailSha256": "e8143210a083f8e60e8c90d65eb7d022f052bf1c4f44be42ef593e8767c46577"
     },
     {
       "slug": "paper",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "featured": false,
-      "detailSha256": "cfc59276d82b8b54ae133336032b611613b5f8c0e93672f8f07009d126c39464"
+      "detailSha256": "d15a140eec6ab0a0a6e79e354ccaba88d035435112bdb7a044528b2a4c7a1548"
+    },
+    {
+      "slug": "apple-apps",
+      "version": "1.1.0",
+      "featured": false,
+      "detailSha256": "ee3aa4ba4d11b38bea38f703959868cfb6bb5cf4ac5d3ef7a998e4a40a345984"
     },
     {
       "slug": "sentry",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "4fc370192c4c20834039fbdce4c5deb76f1553690136488aed99df5d9acdd191"
+      "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
     },
     {
       "slug": "vercel",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "7e5ead435028c8e74d1e4bf84e7e61bc4216de8d0636a862d160e48391589253"
+      "detailSha256": "e062af925d46646c040b44094cfa619e011f1e6d07d02dc994b68ad35a87ff15"
+    },
+    {
+      "slug": "cloudflare",
+      "version": "1.0.1",
+      "featured": false,
+      "detailSha256": "87d5ae7c3854194458d0bce21df9e0636313b7d2484bae30543653631a3bdddb"
+    },
+    {
+      "slug": "supabase",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "ff403bfa7b3d486420e72b30d2f85b42092570a2ec7a61240ed1f73f316cc2f8"
+    },
+    {
+      "slug": "neon",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "9506e513be5f5cb029bd2df95af8d1f9acc7eb6a7b92dba9d32b9bbfa11f0944"
+    },
+    {
+      "slug": "prisma",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "3f59e2b3f266a72782d56dd6f7b27b7ebbfeb1edb5823766b5cedfdb6a4cf75a"
+    },
+    {
+      "slug": "netlify",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "45de8c7034470431121185d60752738dd8b3113fe9b651d57f8a03e11c9ae79f"
+    },
+    {
+      "slug": "railway",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "44cf37509ab2f1876483484322af0de3f2aa27b0caafb8df5e29cbd7332084db"
+    },
+    {
+      "slug": "render",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b9371c8854d1fb2391afd2171d455957b7d73d5b45fb09b4ef9cd8d3fd8446ee"
     },
     {
       "slug": "context7",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "33225f2fdbeac0dfcdf94dcf080948805daf500e2cc0f722f7e0eabc653edb2a"
+      "detailSha256": "9aeb4286430c461f0a63e6d8de39ce4a98cbf25a29bc7113fc558d8fa6b45a27"
+    },
+    {
+      "slug": "huggingface",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "9d2fcadba352f1d1ba914609732c4dfb193004903356384ef83250174cfade45"
     },
     {
       "slug": "stripe",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "e930034039d0630f4ac64deed7c08b282a601ff68821a81a95483b0a95fd16c2"
+      "detailSha256": "1f73a94236d3a0be9a31ee48b56eaa2a2dca91e9e1a5fb476e38aa13f67b5846"
     },
     {
       "slug": "posthog",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "a4127ec0a7415dccbd2e57aa928e6ed3b6acc0913f1c02ea03bd10206333f173"
+      "detailSha256": "0f046745727ede2b63de200dd5618a4b2dd0896111ade094d4136582be2aee1d"
     },
     {
       "slug": "airtable",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "featured": false,
-      "detailSha256": "e6a379f48703481c51f9457d670c278c33b106db5337d18658c190eeae127913"
+      "detailSha256": "1856b983cfd5276b398b388d6de9a6430e3885727db3f571fba8a69a9fb8bcc6"
     },
     {
       "slug": "firecrawl",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "b287c44111eaf0d4e4fddfe90f766502485b6de917d9529af376b1d1cede7573"
+      "detailSha256": "c82e20182383885515660dd72b85ec638d4ad7143f4fd04a5f950440c875ecbb"
     },
     {
       "slug": "brave-search",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "91612bd0105499cf7b30377dc9f9295ac199fa482599e2d4e21abeaa8ea61d29"
+      "detailSha256": "d4e710c7adb02deeeeed5eaf6aae25fc328f1e1f9ea8302ac926705c3492c4aa"
     },
     {
       "slug": "resend",
       "version": "1.0.0",
       "featured": false,
-      "detailSha256": "06a649d220a6858a9856ff36661fe20c47219216235507778924b1c3e7c4b5ca"
+      "detailSha256": "9bd3408ca7d9f8bc7169e8cb2515e3e6302007cbb38db7a777972f87b0563d24"
     },
     {
       "slug": "composio",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "f3833ad73221b264a3611761dadaadfd978832c8431106ce92e6a7a45ee9b49c"
+      "detailSha256": "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f"
     }
   ]
 }

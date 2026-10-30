@@ -18,14 +18,22 @@ const preview: Preview = {
       description: "Interface language",
       toolbar: { icon: "globe", items: [...TRANSLATED_LOCALES], dynamicTitle: true },
     },
+    // The palette of tokens-light.css or the dark base, as the app's root attribute selects it.
+    colorScheme: {
+      description: "Color scheme",
+      toolbar: { icon: "contrast", items: ["dark", "light"], dynamicTitle: true },
+    },
   },
-  initialGlobals: { locale: "en" },
+  initialGlobals: { locale: "en", colorScheme: "dark" },
   decorators: [
-    (Story, context) => (
-      <StaticI18nProvider locale={isTranslatedLocale(context.globals.locale) ? context.globals.locale : "en"}>
-        <Story />
-      </StaticI18nProvider>
-    ),
+    (Story, context) => {
+      document.documentElement.dataset.openbotColorScheme = context.globals.colorScheme === "light" ? "light" : "dark";
+      return (
+        <StaticI18nProvider locale={isTranslatedLocale(context.globals.locale) ? context.globals.locale : "en"}>
+          <Story />
+        </StaticI18nProvider>
+      );
+    },
   ],
   parameters: {
     layout: "fullscreen",

@@ -2,15 +2,16 @@ import type { BillingPlanId } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Button, Chip, Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import CreditCard from "lucide-react-native/icons/credit-card";
 import Monitor from "lucide-react-native/icons/monitor";
 import Ticket from "lucide-react-native/icons/ticket";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { View } from "react-native";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
@@ -32,6 +33,11 @@ const PLAN_TEXT = {
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
 
+/** Where the user opened the plans. Another value is not sent. */
+function plansEntryPoint(value: unknown): "drawer" | "onboarding" | undefined {
+  return value === "drawer" || value === "onboarding" ? value : undefined;
+}
+
 interface PlansData {
   plans: HostedServerCatalogPlan[];
   list: HostedServerList;
@@ -44,6 +50,14 @@ interface PlansData {
  */
 export function HostedServerPlansScreen() {
   const { t, errorMessage } = useText();
+  const { entryPoint } = useLocalSearchParams<{ entryPoint?: string }>();
+  // The sheet opens and closes once. Its inner pages do not close it.
+  useEffect(() => {
+    const scope = mobileAnalytics.scope();
+    const entry_point = plansEntryPoint(entryPoint);
+    scope.track("hosted_server_plans_action", { action: "viewed", entry_point });
+    return () => scope.track("hosted_server_plans_action", { action: "closed", entry_point });
+  }, [entryPoint]);
   const { session } = useMobileSession();
   const queryScope = useQueryScope();
   const { servers } = useMobileWorkspace();
@@ -283,6 +297,7 @@ function OwnedServerRow({ server, listed }: { server: HostedServerSummary; liste
         inSetup
           ? () => {
               rememberHostedServer(server);
+              mobileAnalytics.track("hosted_server_plans_action", { action: "setup_opened" });
               router.push({ pathname: "/hosted-server/setup", params: { serverId: server.serverId } });
             }
           : undefined
@@ -328,6 +343,11 @@ function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: bo
         {current ? (
           <Chip size="sm" variant="soft" color="accent">
             <Chip.Label>{t("mobile.server.hosted.currentPlan")}</Chip.Label>
+          </Chip>
+        ) : null}
+        {plan.soldOut && !current ? (
+          <Chip size="sm" variant="soft">
+            <Chip.Label>{t("mobile.server.hosted.soldOut")}</Chip.Label>
           </Chip>
         ) : null}
       </View>

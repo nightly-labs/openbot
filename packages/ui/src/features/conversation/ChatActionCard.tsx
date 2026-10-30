@@ -13,7 +13,7 @@ export interface ChatActionCardAction {
  * made from the card, so assistive technology reads them when they appear.
  */
 export type ChatActionCardStatus =
-  | { kind: "note"; text: string; action?: ChatActionCardAction }
+  | { kind: "note"; text: string; action?: ChatActionCardAction | undefined }
   | { kind: "busy"; text: string }
   | { kind: "done"; text: string }
   | { kind: "error"; text: string };
@@ -27,10 +27,10 @@ export interface ChatActionCardProps {
   /** The subject no longer exists: the title is struck through and Open is hidden. */
   removed?: boolean;
   /** Opens the subject, such as the routine in its settings. */
-  onOpen?: () => void;
+  onOpen?: (() => void) | undefined;
   /** The accessible name of Open, for example "Open routine Morning brief". */
   openLabel?: string;
-  status?: ChatActionCardStatus;
+  status?: ChatActionCardStatus | undefined;
   /** The class of one variant, for its own rules. */
   class?: string;
   /** The variant content between the header and the footer. */
@@ -86,7 +86,7 @@ export function ChatActionCard(props: ChatActionCardProps) {
   );
 }
 
-function ChatActionCardFooter(props: { status?: ChatActionCardStatus }) {
+function ChatActionCardFooter(props: { status?: ChatActionCardStatus | undefined }) {
   const kind = () => props.status?.kind;
   const text = () => props.status?.text;
   const action = () => {

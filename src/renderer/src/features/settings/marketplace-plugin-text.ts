@@ -1,5 +1,9 @@
+import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
 import { type AppTextKey, type AppTranslate, translateFor } from "@openbot/i18n";
-import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
+import type {
+  MarketplacePluginDetail,
+  MarketplacePluginServer,
+} from "@openbot/ui/features/settings/marketplace-plugins";
 
 /** The keys of one catalog listing's text. Apps and prompts go by their catalog id. */
 interface PluginTextKeys {
@@ -65,6 +69,18 @@ const PLUGIN_TEXT = {
       "prompt-update-doc": "marketplace.plugin.notion.prompt.updateDoc",
     },
   },
+  cobrain: {
+    tagline: "marketplace.plugin.cobrain.tagline",
+    description: "marketplace.plugin.cobrain.description",
+    apps: {
+      "app-cobrain-mcp": "marketplace.plugin.cobrain.app",
+    },
+    prompts: {
+      "prompt-start-session": "marketplace.plugin.cobrain.prompt.startSession",
+      "prompt-search-decision": "marketplace.plugin.cobrain.prompt.searchDecision",
+      "prompt-save-note": "marketplace.plugin.cobrain.prompt.saveNote",
+    },
+  },
   figma: {
     tagline: "marketplace.plugin.figma.tagline",
     description: "marketplace.plugin.figma.description",
@@ -89,6 +105,18 @@ const PLUGIN_TEXT = {
       "prompt-tokens": "marketplace.plugin.paper.prompt.tokens",
     },
   },
+  "apple-apps": {
+    tagline: "marketplace.plugin.appleApps.tagline",
+    description: "marketplace.plugin.appleApps.description",
+    apps: {
+      "app-apple-apps-mcp": "marketplace.plugin.appleApps.app",
+    },
+    prompts: {
+      "prompt-unread": "marketplace.plugin.appleApps.prompt.unread",
+      "prompt-today": "marketplace.plugin.appleApps.prompt.today",
+      "prompt-schedule": "marketplace.plugin.appleApps.prompt.schedule",
+    },
+  },
   sentry: {
     tagline: "marketplace.plugin.sentry.tagline",
     description: "marketplace.plugin.sentry.description",
@@ -111,6 +139,30 @@ const PLUGIN_TEXT = {
       "prompt-failed-build": "marketplace.plugin.vercel.prompt.failedBuild",
       "prompt-recent-deployments": "marketplace.plugin.vercel.prompt.recentDeployments",
       "prompt-runtime-errors": "marketplace.plugin.vercel.prompt.runtimeErrors",
+    },
+  },
+  cloudflare: {
+    tagline: "marketplace.plugin.cloudflare.tagline",
+    description: "marketplace.plugin.cloudflare.description",
+    apps: {
+      "app-cloudflare-mcp": "marketplace.plugin.cloudflare.app",
+    },
+    prompts: {
+      "prompt-workers": "marketplace.plugin.cloudflare.prompt.workers",
+      "prompt-errors": "marketplace.plugin.cloudflare.prompt.errors",
+      "prompt-dns": "marketplace.plugin.cloudflare.prompt.dns",
+    },
+  },
+  supabase: {
+    tagline: "marketplace.plugin.supabase.tagline",
+    description: "marketplace.plugin.supabase.description",
+    apps: {
+      "app-supabase-mcp": "marketplace.plugin.supabase.app",
+    },
+    prompts: {
+      "prompt-projects": "marketplace.plugin.supabase.prompt.projects",
+      "prompt-tables": "marketplace.plugin.supabase.prompt.tables",
+      "prompt-errors": "marketplace.plugin.supabase.prompt.errors",
     },
   },
   context7: {
@@ -185,6 +237,18 @@ const PLUGIN_TEXT = {
       "prompt-compare": "marketplace.plugin.braveSearch.prompt.compare",
     },
   },
+  obsidian: {
+    tagline: "marketplace.plugin.obsidian.tagline",
+    description: "marketplace.plugin.obsidian.description",
+    apps: {
+      "app-obsidian-mcp": "marketplace.plugin.obsidian.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.obsidian.prompt.recall",
+      "prompt-save": "marketplace.plugin.obsidian.prompt.save",
+      "prompt-log": "marketplace.plugin.obsidian.prompt.log",
+    },
+  },
   resend: {
     tagline: "marketplace.plugin.resend.tagline",
     description: "marketplace.plugin.resend.description",
@@ -209,7 +273,131 @@ const PLUGIN_TEXT = {
       "prompt-apps": "marketplace.plugin.composio.prompt.apps",
     },
   },
+  neon: {
+    tagline: "marketplace.plugin.neon.tagline",
+    description: "marketplace.plugin.neon.description",
+    apps: {
+      "app-neon-mcp": "marketplace.plugin.neon.app",
+    },
+    prompts: {
+      "prompt-projects": "marketplace.plugin.neon.prompt.projects",
+      "prompt-slow-queries": "marketplace.plugin.neon.prompt.slowQueries",
+      "prompt-migration": "marketplace.plugin.neon.prompt.migration",
+    },
+  },
+  prisma: {
+    tagline: "marketplace.plugin.prisma.tagline",
+    description: "marketplace.plugin.prisma.description",
+    apps: {
+      "app-prisma-mcp": "marketplace.plugin.prisma.app",
+    },
+    prompts: {
+      "prompt-databases": "marketplace.plugin.prisma.prompt.databases",
+      "prompt-backups": "marketplace.plugin.prisma.prompt.backups",
+      "prompt-logs": "marketplace.plugin.prisma.prompt.logs",
+    },
+  },
+  netlify: {
+    tagline: "marketplace.plugin.netlify.tagline",
+    description: "marketplace.plugin.netlify.description",
+    apps: {
+      "app-netlify-mcp": "marketplace.plugin.netlify.app",
+    },
+    prompts: {
+      "prompt-latest-deploy": "marketplace.plugin.netlify.prompt.latestDeploy",
+      "prompt-errors": "marketplace.plugin.netlify.prompt.errors",
+      "prompt-deploy": "marketplace.plugin.netlify.prompt.deploy",
+    },
+  },
+  railway: {
+    tagline: "marketplace.plugin.railway.tagline",
+    description: "marketplace.plugin.railway.description",
+    apps: {
+      "app-railway-mcp": "marketplace.plugin.railway.app",
+    },
+    prompts: {
+      "prompt-projects": "marketplace.plugin.railway.prompt.projects",
+      "prompt-crash": "marketplace.plugin.railway.prompt.crash",
+      "prompt-redeploy": "marketplace.plugin.railway.prompt.redeploy",
+    },
+  },
+  render: {
+    tagline: "marketplace.plugin.render.tagline",
+    description: "marketplace.plugin.render.description",
+    apps: {
+      "app-render-mcp": "marketplace.plugin.render.app",
+    },
+    prompts: {
+      "prompt-services": "marketplace.plugin.render.prompt.services",
+      "prompt-logs": "marketplace.plugin.render.prompt.logs",
+      "prompt-deploy": "marketplace.plugin.render.prompt.deploy",
+    },
+  },
+  atlassian: {
+    tagline: "marketplace.plugin.atlassian.tagline",
+    description: "marketplace.plugin.atlassian.description",
+    apps: {
+      "app-atlassian-mcp": "marketplace.plugin.atlassian.app",
+    },
+    prompts: {
+      "prompt-assigned": "marketplace.plugin.atlassian.prompt.assigned",
+      "prompt-release-page": "marketplace.plugin.atlassian.prompt.releasePage",
+      "prompt-new-item": "marketplace.plugin.atlassian.prompt.newItem",
+    },
+  },
+  todoist: {
+    tagline: "marketplace.plugin.todoist.tagline",
+    description: "marketplace.plugin.todoist.description",
+    apps: {
+      "app-todoist-mcp": "marketplace.plugin.todoist.app",
+    },
+    prompts: {
+      "prompt-today": "marketplace.plugin.todoist.prompt.today",
+      "prompt-capture": "marketplace.plugin.todoist.prompt.capture",
+      "prompt-overdue": "marketplace.plugin.todoist.prompt.overdue",
+    },
+  },
+  trello: {
+    tagline: "marketplace.plugin.trello.tagline",
+    description: "marketplace.plugin.trello.description",
+    apps: {
+      "app-trello-mcp": "marketplace.plugin.trello.app",
+    },
+    prompts: {
+      "prompt-my-cards": "marketplace.plugin.trello.prompt.myCards",
+      "prompt-board": "marketplace.plugin.trello.prompt.board",
+      "prompt-new-cards": "marketplace.plugin.trello.prompt.newCards",
+    },
+  },
+  huggingface: {
+    tagline: "marketplace.plugin.huggingface.tagline",
+    description: "marketplace.plugin.huggingface.description",
+    apps: {
+      "app-huggingface-mcp": "marketplace.plugin.huggingface.app",
+    },
+    prompts: {
+      "prompt-models": "marketplace.plugin.huggingface.prompt.models",
+      "prompt-papers": "marketplace.plugin.huggingface.prompt.papers",
+      "prompt-dataset": "marketplace.plugin.huggingface.prompt.dataset",
+    },
+  },
 } as const satisfies Record<string, PluginTextKeys>;
+
+/**
+ * The keys of the connect form text, by its catalog English: the field labels and hints, and the
+ * label of the page that gives a key. Text that is not here shows as the catalog has it.
+ */
+const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
+  "API key": "marketplace.auth.apiKey",
+  "Personal API key": "marketplace.auth.personalApiKey",
+  "MCP URL": "marketplace.auth.mcpUrl",
+  "Get a key": "mcp.connect.getKey",
+  "Create a key": "marketplace.auth.createKey",
+  "The URL of an MCP server in your Composio account": "marketplace.plugin.composio.hint.url",
+  "Find it in your Composio account, in Settings > Sessions & API Key.": "marketplace.plugin.composio.hint.apiKey",
+  'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
+    "marketplace.plugin.obsidian.hint.apiKey",
+};
 
 const english = translateFor("en");
 
@@ -226,19 +414,53 @@ function catalogText(t: AppTranslate, key: AppTextKey | undefined, text: string)
   return key && english(key) === text ? t(key) : text;
 }
 
-/** A catalog listing with its tagline, description, app descriptions and prompts in the reader's language. */
+/** Connect form text in the reader's language, if the text is a catalog text that has a key. */
+function authText(t: AppTranslate, text: string): string {
+  return catalogText(t, Object.hasOwn(AUTH_TEXT, text) ? AUTH_TEXT[text] : undefined, text);
+}
+
+/** A way into a server, with its labels, hints and key page label in the reader's language. */
+function localizedFlow(flow: McpConnectFlow, t: AppTranslate): McpConnectFlow {
+  const label = authText(t, flow.label);
+  if (flow.kind === "link") return { ...flow, label };
+  const docs = flow.docsLabel === undefined ? {} : { docsLabel: authText(t, flow.docsLabel) };
+  if (flow.kind === "local") return { ...flow, label, ...docs };
+  return {
+    ...flow,
+    label,
+    ...docs,
+    fields: flow.fields.map((field) => ({
+      ...field,
+      label: authText(t, field.label),
+      ...(field.hint === undefined ? {} : { hint: authText(t, field.hint) }),
+    })),
+  };
+}
+
+/** The server of an app, with its connect form text in the reader's language. */
+function localizedServer(server: MarketplacePluginServer, t: AppTranslate): MarketplacePluginServer {
+  return server.auth ? { ...server, auth: server.auth.map((flow) => localizedFlow(flow, t)) } : server;
+}
+
+/**
+ * A catalog listing with its tagline, description, app descriptions, prompts and connect form text
+ * in the reader's language.
+ */
 export function localizedPlugin(plugin: MarketplacePluginDetail, t: AppTranslate): MarketplacePluginDetail {
   const table: Readonly<Record<string, PluginTextKeys | undefined>> = PLUGIN_TEXT;
   const keys = Object.hasOwn(table, plugin.slug) ? table[plugin.slug] : undefined;
-  if (!keys) return plugin;
   return {
     ...plugin,
-    tagline: catalogText(t, keys.tagline, plugin.tagline),
-    description: catalogText(t, keys.description, plugin.description),
-    apps: plugin.apps.map((app) => ({ ...app, description: catalogText(t, own(keys.apps, app.id), app.description) })),
+    tagline: catalogText(t, keys?.tagline, plugin.tagline),
+    description: catalogText(t, keys?.description, plugin.description),
+    apps: plugin.apps.map((app) => ({
+      ...app,
+      description: catalogText(t, keys && own(keys.apps, app.id), app.description),
+      server: localizedServer(app.server, t),
+    })),
     prompts: plugin.prompts.map((prompt) => ({
       ...prompt,
-      text: catalogText(t, own(keys.prompts, prompt.id), prompt.text),
+      text: catalogText(t, keys && own(keys.prompts, prompt.id), prompt.text),
     })),
   };
 }

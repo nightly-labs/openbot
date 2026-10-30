@@ -7,7 +7,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 // and nothing main answers or pushes reaches the renderer undecoded.
 
 const bridge = vi.hoisted(() => {
-  vi.stubGlobal("window", { addEventListener: () => {} });
+  // The main window: the preload reads its URL for the server of a chat window.
+  vi.stubGlobal("window", { addEventListener: () => {}, location: { search: "" } });
   const api: { current: OpenBotDesktopApi | null } = { current: null };
   return {
     api,

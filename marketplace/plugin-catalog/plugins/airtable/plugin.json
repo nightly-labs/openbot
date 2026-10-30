@@ -4,9 +4,9 @@
   "tagline": "Bases and records",
   "description": "Airtable lets agents list bases, read and update records, and summarize table contents. An API key from the account page is passed to the local server as one environment variable.",
   "category": "data-analytics",
-  "creatorName": "airtable.com",
-  "iconUrl": "https://airtable.com/favicon.ico",
-  "version": "1.0.0",
+  "creatorName": "Airtable",
+  "iconUrl": "https://static.airtable.com/images/favicon/baymax/apple-touch-icon.png",
+  "version": "1.0.1",
   "prompts": [
     { "id": "prompt-bases", "text": "What bases do I have access to?" },
     { "id": "prompt-records", "text": "Summarize the launch tracker table." },
@@ -17,7 +17,7 @@
       "id": "app-airtable-mcp",
       "name": "Airtable",
       "description": "Base listing and record access, over a local MCP server with an Airtable API key.",
-      "iconUrl": "https://airtable.com/favicon.ico",
+      "iconUrl": "https://static.airtable.com/images/favicon/baymax/apple-touch-icon.png",
       "server": {
         "name": "airtable",
         "transport": "stdio",

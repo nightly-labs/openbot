@@ -1,4 +1,4 @@
-import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
+import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
 import { useEffect, useState } from "react";
 import { AppState, type ColorValue } from "react-native";
 import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
@@ -32,7 +32,12 @@ half4 main(float2 position) {
 }
 `;
 
-const EFFECT = Skia.RuntimeEffect.Make(SOURCE);
+// Compiled on first use, not when the chat loads this module.
+let effect: SkRuntimeEffect | null | undefined;
+function canvasEffect(): SkRuntimeEffect | null {
+  if (effect === undefined) effect = Skia.RuntimeEffect.Make(SOURCE);
+  return effect;
+}
 
 function rgb(color: ColorValue): number[] {
   return Array.from(Skia.Color(String(color))).slice(0, 3);
@@ -78,11 +83,12 @@ export function ImageGenerationCanvas({
     base: baseColor,
     accent: accentColor,
   }));
-  if (!EFFECT) return null;
+  const shader = canvasEffect();
+  if (!shader) return null;
   return (
     <Canvas style={{ position: "absolute", inset: 0 }} pointerEvents="none">
       <Fill>
-        <Shader source={EFFECT} uniforms={uniforms} />
+        <Shader source={shader} uniforms={uniforms} />
       </Fill>
     </Canvas>
   );

@@ -1,4 +1,4 @@
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Semaphore } from "effect";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 
 // Remote attachments that this computer already downloaded, held in memory for a short time.
@@ -11,6 +11,11 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 const REMOTE_ATTACHMENT_CACHE_BYTES = 64 * 1024 * 1024;
 const REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES = 16 * 1024 * 1024;
 const REMOTE_ATTACHMENT_CACHE_TTL_MS = 10 * 60_000;
+// Previews that download at the same time from one server. The host answers a download only after its
+// last byte, and all transfers share one ordered data channel. Eight gallery images that started
+// together showed nothing until all of them arrived. Two images of 1.5 MB also stay under the channel's
+// 4 MB send buffer, where the host stops and sends again from the last acknowledgement.
+const REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER = 2;
 
 export interface RemoteAttachment {
   bytes: Uint8Array;
@@ -31,6 +36,7 @@ export class RemoteAttachmentCache {
     string,
     { serverId: string; request: Deferred.Deferred<RemoteAttachment, RemoteWorkflowError> }
   >();
+  readonly #downloads = new Map<string, Semaphore.Semaphore>();
   // A download that started before `forget` or `clear` must not store its result after it.
   readonly #generations = new Map<string, number>();
   #epoch = 0;
@@ -46,6 +52,8 @@ export class RemoteAttachmentCache {
     serverId: string,
     attachmentId: string,
     download: () => Effect.Effect<RemoteAttachment, RemoteWorkflowError>,
+    // A file that the user opens or saves can be 100 MB, so it must not take a preview's place.
+    preview = false,
   ) {
     this.#removeExpired();
     const key = JSON.stringify([serverId, attachmentId]);
@@ -61,7 +69,8 @@ export class RemoteAttachmentCache {
     const generation = this.#generation(serverId);
     const request = Deferred.makeUnsafe<RemoteAttachment, RemoteWorkflowError>();
     this.#pending.set(key, { serverId, request });
-    return yield* download().pipe(
+    const transfer = preview ? this.#downloadPermits(serverId).withPermit(download()) : download();
+    return yield* transfer.pipe(
       Effect.tap((attachment) =>
         Effect.sync(() => {
           if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment);
@@ -87,6 +96,16 @@ export class RemoteAttachmentCache {
     this.#entries.clear();
     this.#pending.clear();
     this.#bytes = 0;
+  }
+
+  // Kept after `forget` and `clear`: a download that still runs holds a permit of its server.
+  #downloadPermits(serverId: string): Semaphore.Semaphore {
+    let permits = this.#downloads.get(serverId);
+    if (!permits) {
+      permits = Semaphore.makeUnsafe(REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER);
+      this.#downloads.set(serverId, permits);
+    }
+    return permits;
   }
 
   #generation(serverId: string): string {

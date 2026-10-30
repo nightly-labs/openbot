@@ -17,7 +17,8 @@ function blockText(source: string): string {
   const parts: string[] = [];
   let fence: { marker: string; math: boolean; lines: string[] } | null = null;
   for (const line of source.replace(/\r\n?/gu, "\n").split("\n")) {
-    const opening = /^\s{0,3}(`{3,}|~{3,})\s*([\w-]*)/u.exec(line);
+    // A backtick fence has no backtick after its marker, so "```npm install``` first" is a code span.
+    const opening = /^\s{0,3}(`{3,}(?!.*`)|~{3,})\s*([\w-]*)/u.exec(line);
     if (!fence && opening?.[1]) {
       fence = { marker: opening[1], math: opening[2] === "math", lines: [] };
       continue;
@@ -100,10 +101,10 @@ function inlineText(source: string): string {
 function inlineMarks(text: string): string {
   return text
     .replace(/<br\s*\/?>/giu, " ")
+    .replace(/<(https?:\/\/[^>]+)>/gu, "$1")
     .replace(/<\/?[A-Za-z][^>]*>/gu, "")
     .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/<(https?:\/\/[^>]+)>/gu, "$1")
     .replace(/__(?=\S)(.+?)(?<=\S)__/gu, "**$1**");
 }
 
@@ -136,10 +137,11 @@ function truncateMarkdown(text: string, limit: number): string {
     if (run) {
       const end = text.indexOf(run, index + run.length);
       if (end > 0) {
-        const content = text.slice(index + run.length, end);
+        // Count code points, as `visibleLength` does, so a cut never splits an emoji.
+        const content = Array.from(text.slice(index + run.length, end));
         const room = limit - 1 - visible;
         if (content.length > room) {
-          return `${text.slice(0, index + run.length)}${content.slice(0, room)}${run}…${closing(marks)}`;
+          return `${text.slice(0, index + run.length)}${content.slice(0, room).join("")}${run}…${closing(marks)}`;
         }
         visible += content.length;
         index = end + run.length;

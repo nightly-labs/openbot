@@ -1,0 +1,33 @@
+{
+  "slug": "todoist",
+  "name": "Todoist",
+  "tagline": "Tasks, projects and reminders",
+  "description": "Todoist lets agents find tasks by date, text, label or filter, add and reschedule tasks, and manage projects, sections, labels, comments and reminders. Each user signs in to their own Todoist account through the browser. Agents get read and write access: they can change, complete and delete tasks, projects and other items.",
+  "category": "productivity",
+  "creatorName": "Doist",
+  "iconUrl": "https://www.todoist.com/static/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-today", "text": "Which Todoist tasks are due today?" },
+    { "id": "prompt-capture", "text": "Add these action items to my Todoist Inbox." },
+    { "id": "prompt-overdue", "text": "Move my overdue Todoist tasks to tomorrow." }
+  ],
+  "apps": [
+    {
+      "id": "app-todoist-mcp",
+      "name": "Todoist",
+      "description": "Tasks, projects, and reminders, over Todoist's MCP server with browser sign-in.",
+      "iconUrl": "https://www.todoist.com/static/apple-touch-icon.png",
+      "server": {
+        "name": "todoist",
+        "transport": "http",
+        "url": "https://ai.todoist.net/mcp",
+        "auth": [{ "id": "todoist-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.todoist.com",
+  "privacyPolicyUrl": "https://www.todoist.com/privacy",
+  "termsUrl": "https://www.todoist.com/terms-of-service",
+  "skills": []
+}

@@ -1,16 +1,5 @@
 import type { HostTimezoneSettings, OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@openbot/ui";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle, SearchSelect } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
@@ -20,6 +9,31 @@ export type HostTimezoneCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getTimezon
 export interface ServerTimezoneOptions {
   /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostTimezoneCalls;
+}
+
+// The formatters for all zones take about 60 ms to make, so the names stay for the session.
+const zoneNameCache = new Map<string, string>();
+
+/** The names of a zone in the interface language and in English, such as "Eastern Time". */
+function zoneNames(locale: string, zone: string): string {
+  const key = `${locale} ${zone}`;
+  let names = zoneNameCache.get(key);
+  if (names === undefined) {
+    names = [...new Set([locale, "en"])]
+      .map((language) => {
+        try {
+          return new Intl.DateTimeFormat(language, { timeZone: zone, timeZoneName: "longGeneric" })
+            .formatToParts()
+            .find((part) => part.type === "timeZoneName")?.value;
+        } catch {
+          // A zone that this runtime does not know, kept from an earlier choice.
+          return undefined;
+        }
+      })
+      .join(" ");
+    zoneNameCache.set(key, names);
+  }
+  return names;
 }
 
 /** The option for `null`. No IANA zone has this name, and the host refuses it as a zone. */
@@ -37,7 +51,7 @@ export function ServerTimezoneSetting(
     run: (key: string, action: () => Promise<void>) => Promise<boolean>;
   },
 ) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, locale } = useText();
   const calls = (): HostTimezoneCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostTimezoneSettings | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
@@ -73,6 +87,9 @@ export function ServerTimezoneSetting(
     zone === AUTOMATIC
       ? t("server.settings.timezoneAutomatic", { zone: settings()?.systemTimezone ?? "" })
       : zone.replaceAll("_", " ");
+  /** What the search reads: the zone, its label, and its name, such as "Eastern Time". */
+  const searchText = (zone: string) =>
+    zone === AUTOMATIC ? label(zone) : `${zone} ${label(zone)} ${zoneNames(locale(), zone)}`;
 
   function choose(zone: string | null): void {
     const current = settings();
@@ -94,19 +111,18 @@ export function ServerTimezoneSetting(
       <Show when={settings()}>
         {(current) => (
           <ItemActions>
-            <Select<string>
+            <SearchSelect<string>
               options={zones()}
               value={current().timezone ?? AUTOMATIC}
+              label={label}
+              optionTextValue={searchText}
               disabled={props.disabled}
               placement="bottom-end"
+              mount={props.menuMount}
+              size="sm"
+              aria-labelledby="server-settings-timezone-label"
               onChange={choose}
-              itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
-            >
-              <SelectTrigger size="sm" aria-labelledby="server-settings-timezone-label">
-                <SelectValue<string>>{(state) => label(state.selectedOption())}</SelectValue>
-              </SelectTrigger>
-              <SelectContent mount={props.menuMount} />
-            </Select>
+            />
           </ItemActions>
         )}
       </Show>

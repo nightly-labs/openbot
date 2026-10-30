@@ -46,7 +46,7 @@ export function SupportSettingsScreen() {
     setSaving(true);
     const file = new File(Paths.cache, `openbot-support-log-${new Date().toISOString().replace(/[:.]/gu, "-")}.txt`);
     try {
-      file.write(supportLogFileText());
+      file.writeSync(supportLogFileText());
       await Sharing.shareAsync(file.uri, {
         mimeType: "text/plain",
         UTI: "public.plain-text",
@@ -71,10 +71,10 @@ export function SupportSettingsScreen() {
     <SettingsContent>
       <SettingsSection title={t("mobile.settings.support.help")} footer={t("mobile.settings.support.helpFooter")}>
         <SettingsRow onPress={() => open(ISSUES_URL)}>
-          <Typography.Paragraph type="body-sm">{t("mobile.settings.support.issues")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.support.issues")}</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow onPress={() => open(SUPPORT_X_URL)} supportingText={SUPPORT_X_HANDLE}>
-          <Typography.Paragraph type="body-sm">{t("mobile.settings.support.message")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.support.message")}</Typography.Paragraph>
         </SettingsRow>
         {linkError ? <SettingsNote>{linkError}</SettingsNote> : null}
       </SettingsSection>
@@ -85,12 +85,10 @@ export function SupportSettingsScreen() {
           disclosure={false}
           supportingText={t("mobile.settings.support.events", { count: entries.length })}
         >
-          <Typography.Paragraph type="body-sm">{t("mobile.settings.support.save")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.support.save")}</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow onPress={clear} disabled={entries.length === 0} disclosure={false}>
-          <Typography.Paragraph type="body-sm" className="text-danger-text">
-            {t("mobile.settings.support.clear")}
-          </Typography.Paragraph>
+          <Typography.Paragraph className="text-danger-text">{t("mobile.settings.support.clear")}</Typography.Paragraph>
         </SettingsRow>
         {saveError ? <SettingsNote>{saveError}</SettingsNote> : null}
       </SettingsSection>

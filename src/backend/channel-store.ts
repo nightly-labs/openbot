@@ -9,6 +9,7 @@ import {
   type ChannelPage,
   type ChannelSummary,
   type ChannelTask,
+  type ChannelThread,
   decodeChannel,
   isChannelMessage,
   isChannelTask,
@@ -78,11 +79,17 @@ interface ChannelChange {
 
 /**
  * Owns durable channel records. Every change and its retry receipt commit together.
- *
- * Deprecated: channels are archived at start. The next release removes this store and its tables.
  */
 export class ChannelStore {
+  /** By channel: how many times a message changed in place after it was complete, in this process. */
+  readonly #completedMessageChanges = new Map<string, number>();
+
   constructor(readonly database: OpenBotDatabase) {}
+
+  /** A packet built before this count changed can show a message as it was before. */
+  completedMessageChanges(channelId: string): number {
+    return this.#completedMessageChanges.get(channelId) ?? 0;
+  }
 
   get(channelId: string): Channel {
     const row = databaseRow(
@@ -97,12 +104,13 @@ export class ChannelStore {
   /**
    * Only the ids, in one query. Placing channels in the sidebar layout needs the set of ids that
    * exist - archived ones included, so an archived channel keeps its section - and the scheduler
-   * works by id as well. `list` would read every message of every channel to answer either.
+   * works by id as well. `list` would read every message of every channel to answer either. The order
+   * is the order of `list`: the layout places the channels it has no order for in it, as the sidebar does.
    */
   ids(): string[] {
-    return databaseRows(this.database.connection.prepare("SELECT channel_id FROM projection_channels").all()).map(
-      (row) => requiredStringColumn(row, "channel_id"),
-    );
+    return databaseRows(
+      this.database.connection.prepare("SELECT channel_id FROM projection_channels ORDER BY rowid").all(),
+    ).map((row) => requiredStringColumn(row, "channel_id"));
   }
 
   /**
@@ -128,7 +136,8 @@ export class ChannelStore {
   list(memberId: string, signedOutMessagesAreTheirs = false): ChannelSummary[] {
     // The sidebar is rebuilt on every `channels-changed`, and a streaming reply emits those while
     // it arrives. One query returns every summary: the previous per-channel latest-message, unread,
-    // and task queries made this O(channels x queries) per stream frame.
+    // and task queries made this O(channels x queries) per stream frame. A member's thinking is not
+    // unread, as in an agent chat: it folds into the steps of the member's answer.
     const excludedId = signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId;
     const rows = databaseRows(
       this.database.connection
@@ -137,6 +146,7 @@ export class ChannelStore {
             (SELECT m.message_json FROM projection_channel_messages AS m
               WHERE m.channel_id = c.channel_id
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
               ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
             (SELECT COUNT(*) FROM projection_channel_messages AS m
               WHERE m.channel_id = c.channel_id
@@ -146,14 +156,35 @@ export class ChannelStore {
                 AND json_extract(m.message_json, '$.author.id') IS NOT ?
                 AND json_extract(m.message_json, '$.author.id') IS NOT ?
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
-                AND json_extract(t.task_json, '$.state') = 'running') AS running
+                AND json_extract(t.task_json, '$.state') = 'running') AS running,
+            (SELECT COUNT(*) FROM projection_channel_tasks AS t
+              WHERE t.channel_id = c.channel_id
+                AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
         .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
     );
+    const threads = new Map<string, ChannelThread[]>();
+    for (const row of databaseRows(
+      this.database.connection
+        .prepare(
+          "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id",
+        )
+        .all(),
+    )) {
+      const channelId = requiredStringColumn(row, "channel_id");
+      const thread = {
+        agentId: requiredStringColumn(row, "agent_id"),
+        threadId: requiredStringColumn(row, "thread_id"),
+      };
+      threads.set(channelId, [...(threads.get(channelId) ?? []), thread]);
+    }
     return rows.map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
       const latestJson = row.latest_json;
@@ -169,9 +200,21 @@ export class ChannelStore {
         ...channel,
         unreadCount: Number(row.unread ?? 0),
         activeTasks: Number(row.running ?? 0),
+        openTasks: Number(row.open ?? 0),
         lastMessage: latest
-          ? { authorName: latest.author.name, text: previewText(latest), at: latest.message.createdAt }
+          ? {
+              authorName: latest.author.name,
+              author: { kind: latest.author.kind, id: latest.author.id },
+              status: latest.message.status,
+              text: previewText(latest),
+              at: latest.message.createdAt,
+            }
           : null,
+        // A former member keeps its thread, but its prompts are no longer the channel's. The members
+        // are at most 100, which is the bound of channel-attention-v1.
+        threads: (threads.get(channel.id) ?? []).filter((thread) =>
+          channel.members.some((item) => item.agentId === thread.agentId),
+        ),
       };
     });
   }
@@ -238,9 +281,9 @@ export class ChannelStore {
   /**
    * Does any channel hold an assignment in one of these states?
    *
-   * `mayDrain` asks this on every normal queue check, and it only needs a yes or a no. Walking the
-   * channel list to reach it parses every stored message of every channel to build summaries that
-   * nothing there reads, so the question is answered by one query over the assignment rows.
+   * Walking the channel list to answer this parses every stored message of every channel to build
+   * summaries that nothing here reads, so the question is answered by one query over the
+   * assignment rows.
    */
   hasAssignmentInState(states: readonly ChannelAssignment["state"][]): boolean {
     if (!states.length) return false;
@@ -254,21 +297,32 @@ export class ChannelStore {
     );
   }
 
+  /** `hasAssignmentInState` for the assignments of one agent. `mayDrain` asks this on every queue check. */
+  hasAgentAssignmentInState(agentId: string, states: readonly ChannelAssignment["state"][]): boolean {
+    if (!states.length) return false;
+    const placeholders = states.map(() => "?").join(", ");
+    return (
+      this.database.connection
+        .prepare(
+          `SELECT 1 FROM projection_channel_assignments
+            WHERE json_extract(assignment_json, '$.agentId') = ?
+              AND json_extract(assignment_json, '$.state') IN (${placeholders}) LIMIT 1`,
+        )
+        .get(agentId, ...states) !== undefined
+    );
+  }
+
   /**
-   * The assignment that reserves the host right now, with the channel it belongs to.
+   * The assignment of this agent that holds its queue right now, with the channel it belongs to.
    *
-   * `hasAssignmentInState` answers the drain question with a yes or a no; the queue the user reads
-   * has to name the cause as well. The same reason keeps this to one query: reaching a channel
-   * through `list` parses every stored message of every channel. States are tried in the order
-   * given, so a running assignment is reported before one that is only queued.
-   *
-   * `preferredAgentId` is the agent whose queue asks. Two agents can hold assignments at the same
-   * time when neither task reserves the host, and the work of that agent itself is the answer its
-   * own chat needs: it is working, not waiting for somebody else.
+   * `hasAgentAssignmentInState` answers the drain question with a yes or a no; the queue the user
+   * reads has to name the cause as well. The same reason keeps this to one query: reaching a
+   * channel through `list` parses every stored message of every channel. States are tried in the
+   * order given, so a running assignment is reported before one that is only queued.
    */
-  reservingAssignment(
+  agentAssignment(
+    agentId: string,
     states: readonly ChannelAssignment["state"][],
-    preferredAgentId?: string,
   ): { assignment: ChannelAssignment; channel: Channel } | null {
     if (!states.length) return null;
     const placeholders = states.map(() => "?").join(", ");
@@ -279,13 +333,13 @@ export class ChannelStore {
           `SELECT assignments.assignment_json AS assignment_json, channels.channel_json AS channel_json
              FROM projection_channel_assignments AS assignments
              JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
-            WHERE json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
-            ORDER BY CASE WHEN json_extract(assignments.assignment_json, '$.agentId') = ? THEN 0 ELSE 1 END,
-                     CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
+            WHERE json_extract(assignments.assignment_json, '$.agentId') = ?
+              AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+            ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
                      assignments.rowid
             LIMIT 1`,
         )
-        .get(...states, preferredAgentId ?? "", ...states),
+        .get(agentId, ...states, ...states),
     );
     if (!row) return null;
     return {
@@ -361,7 +415,9 @@ export class ChannelStore {
     for (const message of change.messages) {
       const existing = databaseRow(
         db
-          .prepare("SELECT sequence FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?")
+          .prepare(
+            "SELECT sequence, json_extract(message_json, '$.message.status') AS status FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?",
+          )
           .get(change.channel.id, message.id),
       );
       const last = databaseRow(
@@ -379,10 +435,19 @@ export class ChannelStore {
       db.prepare(
         "INSERT INTO projection_channel_messages VALUES (?, ?, ?, ?) ON CONFLICT(channel_id, message_id) DO UPDATE SET message_json = excluded.message_json",
       ).run(change.channel.id, message.id, assigned, JSON.stringify({ ...message, sequence: assigned }));
-      if (existing)
+      if (existing) {
+        // A streaming message changes on each part of its text; a packet already leaves it unread.
+        if (existing.status !== "streaming")
+          this.#completedMessageChanges.set(change.channel.id, this.completedMessageChanges(change.channel.id) + 1);
         db.prepare(
           "UPDATE projection_channel_summaries SET version = version + 1, through_sequence = 0, text = '' WHERE channel_id = ? AND through_sequence >= ?",
         ).run(change.channel.id, assigned);
+        // A member read this message before it changed, as when a correction supersedes a result. A
+        // packet with only later messages would not show the change, so the next one is complete.
+        db.prepare(
+          "UPDATE projection_channel_contexts SET through_sequence = 0, summary_version = 0 WHERE channel_id = ? AND through_sequence >= ?",
+        ).run(change.channel.id, assigned);
+      }
     }
     for (const task of change.tasks)
       db.prepare(
@@ -457,6 +522,15 @@ export class ChannelStore {
       this.database.connection
         .prepare("SELECT thread_id FROM projection_channel_contexts WHERE channel_id = ? ORDER BY agent_id")
         .all(channelId),
+    ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** The execution threads of one agent, one for each channel it works in. */
+  contextThreadsForAgent(agentId: string): string[] {
+    return databaseRows(
+      this.database.connection
+        .prepare("SELECT thread_id FROM projection_channel_contexts WHERE agent_id = ? ORDER BY channel_id")
+        .all(agentId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
   }
 
@@ -544,8 +618,24 @@ export class ChannelStore {
     throughSequence: number,
     summaryVersion: number,
   ): void {
+    const current = databaseRow(
+      this.database.connection
+        .prepare(
+          "SELECT session_id, through_sequence, summary_version FROM projection_channel_contexts WHERE channel_id = ? AND agent_id = ?",
+        )
+        .get(channelId, agentId),
+    );
+    if (
+      current &&
+      current.session_id === sessionId &&
+      current.through_sequence === throughSequence &&
+      current.summary_version === summaryVersion
+    )
+      return;
+    // Each change has its own operation: after a compaction reset, the cursor can come back to a value
+    // that an earlier operation set, and a key made from the values would skip it as a repeat.
     this.database.dispatch(
-      `channel-context-accepted:${channelId}:${agentId}:${sessionId}:${throughSequence}:${summaryVersion}`,
+      `channel-context-accepted:${randomUUID()}`,
       [
         {
           aggregateType: "channel",
@@ -560,6 +650,29 @@ export class ChannelStore {
         ).run(sessionId, throughSequence, summaryVersion, channelId, agentId);
       },
     );
+  }
+
+  /**
+   * The provider compacted this session, so its summary can leave out channel messages that it
+   * read. A cursor at zero makes the next packet complete. It is the acceptance event, not a new
+   * event type, so an earlier version still rebuilds the channel.
+   */
+  resetContextsForSession(sessionId: string): void {
+    const rows = databaseRows(
+      this.database.connection
+        .prepare(
+          "SELECT channel_id, agent_id FROM projection_channel_contexts WHERE session_id = ? AND through_sequence > 0",
+        )
+        .all(sessionId),
+    );
+    for (const row of rows)
+      this.acceptContext(
+        requiredStringColumn(row, "channel_id"),
+        requiredStringColumn(row, "agent_id"),
+        sessionId,
+        0,
+        0,
+      );
   }
 
   summary(channelId: string): ChannelHistorySummary {

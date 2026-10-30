@@ -303,14 +303,16 @@ export function channelRoutingConversationEvent(message: ConversationMessage): C
 export const CONTEXT_RESET_ITEM_TYPE = "context-reset";
 
 /**
- * The item types of the markers that show a switch of model for a plan's usage limit: one when the
- * agent leaves its model, one when it goes back. The text is a readable sentence that names the
- * model, as for the context reset.
+ * The item types of the markers that show a switch of model for a plan's usage limit or a provider
+ * error: one when the agent leaves its model, one when it goes back. The text is a readable sentence
+ * that names the model, as for the context reset.
  */
 export const MODEL_SWITCH_ITEM_TYPE_PREFIX = "model-switch:";
 export const MODEL_SWITCH_ITEM_TYPES = {
   "usage-limit": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}usage-limit`,
   "usage-limit-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}usage-limit-ended`,
+  "provider-error": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error`,
+  "provider-error-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error-ended`,
 } as const;
 export type ModelSwitchReason = keyof typeof MODEL_SWITCH_ITEM_TYPES;
 
@@ -318,7 +320,55 @@ export function modelSwitchReason(message: ConversationMessage): ModelSwitchReas
   if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["usage-limit"]) return "usage-limit";
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["usage-limit-ended"]) return "usage-limit-ended";
+  if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error"]) return "provider-error";
+  if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]) return "provider-error-ended";
   return null;
+}
+
+/**
+ * The item type of the note that a member agent changed its channel at a person's request: a
+ * member, the instructions or a routine. The text is a readable sentence that names the agent, the
+ * change and the person, as for the model switch.
+ */
+export const CHANNEL_CHANGE_ITEM_TYPE = "channel-change";
+
+export function isChannelChangeMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === CHANNEL_CHANGE_ITEM_TYPE
+  );
+}
+
+/**
+ * The item type of the note that an agent added, changed or deleted a Vault item. The text is a
+ * readable sentence that names the item, never a secret.
+ */
+export const VAULT_CHANGE_ITEM_TYPE = "vault-change";
+
+export function isVaultChangeMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === VAULT_CHANGE_ITEM_TYPE
+  );
+}
+
+/**
+ * The item type of the note that a turn ended with open steps in the agent's plan, and that the agent
+ * continues by itself. The text says which automatic continuation this is.
+ */
+export const PLAN_CONTINUATION_ITEM_TYPE = "plan-continuation";
+
+export function isPlanContinuationMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === PLAN_CONTINUATION_ITEM_TYPE
+  );
 }
 
 /**

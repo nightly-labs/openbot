@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/voice";
 export const messages = {
   "error.voice.downloadFailed": "Das Sprachmodell konnte nicht heruntergeladen werden. Versuche es erneut.",
   "error.voice.downloadStopped": "Der Download des Sprachmodells wurde gestoppt.",
+  "error.voice.removeBusy": "Warte, bis die Sprachtranskription endet, und entferne das Modell dann.",
+  "error.voice.removeFailed": "Das Sprachmodell konnte nicht entfernt werden. Versuche es erneut.",
   "error.voice.runtimeUnavailable": "Lokale Sprachtranskription ist auf dieser Plattform nicht verfügbar.",
   "error.voice.busy": "Eine Sprachtranskription läuft bereits.",
   "error.voice.modelUnavailable": "Das Sprachmodell ist nicht verfügbar.",
@@ -21,4 +23,9 @@ export const messages = {
   "error.voice.cloud.streamEnded": "Die Diktat-Übertragung wurde beendet. Nimm erneut auf.",
   "error.voice.cloud.tooLong": "Die Aufnahme ist zu lang.",
   "error.voice.cloud.keySaveFailed": "Der ElevenLabs-API-Schlüssel konnte nicht gespeichert werden.",
+  "error.voice.speech.runtimeUnavailable": "Lokale Sprachausgabe ist auf dieser Plattform nicht verfügbar.",
+  "error.voice.speech.modelRequired": "Lade das Sprachausgabemodell unter Einstellungen → Diktat herunter.",
+  "error.voice.speech.timedOut": "Das Vorlesen der Antwort hat zu lange gedauert.",
+  "error.voice.speech.failed": "OpenBot konnte die Antwort nicht vorlesen.",
+  "error.voice.recordingNotKept": "OpenBot konnte die Sprachaufnahme nicht speichern.",
 } as const satisfies PartialTranslation<typeof source>;

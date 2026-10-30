@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BackHandler } from "react-native";
 import { Easing, ReduceMotion, type SharedValue, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
 import type { DictationPhase } from "../model/voice-dictation";
 import { useVoiceDictation } from "./use-voice-dictation";
@@ -81,6 +83,8 @@ export function useVoiceMode({
   });
   const presence = useSharedValue(0);
   const split = useSharedValue(0);
+  // The start of the voice mode and its listening sessions, for analytics.
+  const conversation = useRef({ openedAt: 0, turns: 0 });
 
   const dictation = useVoiceDictation({
     enabled,
@@ -112,6 +116,13 @@ export function useVoiceMode({
       if (stageRef.current === "closed" || exitRef.current) return;
       exitRef.current = outcome;
       setExit(outcome);
+      mobileAnalytics.track("voice_conversation_action", {
+        action: "end",
+        server_kind: "remote",
+        result: "succeeded",
+        duration_ms: performance.now() - conversation.current.openedAt,
+        turn_count: conversation.current.turns,
+      });
       // The side buttons go back into the circle first, then the circle opens into the composer.
       split.set(timing(0, MERGE_MS));
       presence.set(
@@ -131,6 +142,8 @@ export function useVoiceMode({
 
   const open = useCallback(() => {
     if (stageRef.current !== "closed" || !start("")) return;
+    conversation.current = { openedAt: performance.now(), turns: 1 };
+    mobileAnalytics.track("voice_conversation_action", { action: "start", server_kind: "remote", result: "succeeded" });
     transcriptRef.current = "";
     setTranscript("");
     moveTo("listening");
@@ -148,6 +161,17 @@ export function useVoiceMode({
       showReview();
     } else leave("cancel");
   }, [stage, phase, leave, moveTo, showReview]);
+
+  // The user speaks hands-free, and a screen lock puts the app in the
+  // background, which ends the session. Keep the screen on while listening.
+  const keepAwakeTag = useId();
+  useEffect(() => {
+    if (stage !== "listening") return;
+    activateKeepAwakeAsync(keepAwakeTag).catch(() => {});
+    return () => {
+      deactivateKeepAwake(keepAwakeTag).catch(() => {});
+    };
+  }, [stage, keepAwakeTag]);
 
   const stop = useCallback(() => {
     if (stageRef.current !== "listening" || exitRef.current) return;
@@ -171,6 +195,7 @@ export function useVoiceMode({
     void finishing.current.then(() => {
       if (stageRef.current !== "review" || exitRef.current || !sendRef.current.enabled) return;
       if (!start(transcriptRef.current)) return;
+      conversation.current.turns += 1;
       moveTo("listening");
       split.set(timing(0, MERGE_MS));
     });

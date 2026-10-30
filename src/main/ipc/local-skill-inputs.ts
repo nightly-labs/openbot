@@ -18,6 +18,9 @@ export const parseCreateLocalSkill = (input: unknown): CreateLocalSkillInput =>
   createSkillSchema.extend({ agentId }).parse(input);
 export const parseReviseLocalSkill = (input: unknown): ReviseLocalSkillInput =>
   reviseSkillSchema.extend({ agentId }).parse(input);
-export const parseReadLocalSkill = (input: unknown): LocalSkillRevisionInput => readSkillSchema.parse(input);
+export const parseReadLocalSkill = (input: unknown): LocalSkillRevisionInput => {
+  const { skillId, revision } = readSkillSchema.parse(input);
+  return revision === undefined ? { skillId } : { skillId, revision };
+};
 export const parseInstallLocalSkill = (input: unknown): InstallLocalSkillInput =>
   installLocalSkillSchema.extend({ agentId }).parse(input);

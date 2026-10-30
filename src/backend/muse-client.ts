@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
+import { toNamespacedPath } from "node:path";
 import {
   type Connection,
   type SendUserTurnOptions,
@@ -10,20 +11,21 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Effect, Exit, Option, Schema, Scope } from "effect";
+import { Effect, Exit, Fiber, Option, Schema, Scope } from "effect";
 import { secretElicitationField } from "./agent/prompts";
 import { type AgentClient, type AgentProvider, type DiagnosticOrigin, RequestTimeoutError } from "./agent-client";
-import { type AgentCliInfo, cliSpawnTarget } from "./cli";
+import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   acpMcpServers,
   agentMcpServers,
   computerUseParam,
-  type McpAuthorizationSource,
   type McpDropReporter,
+  type McpEndpointSource,
   type McpServerSource,
   type McpToolRuntimeSource,
+  mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
@@ -72,7 +74,7 @@ export interface MuseProviderOptions {
   mcpServers?: McpServerSource;
   reportMcpDrops?: McpDropReporter;
   mcpToolRuntimes?: McpToolRuntimeSource;
-  mcpAuthorization?: McpAuthorizationSource;
+  mcpEndpoint?: McpEndpointSource;
   readAccount?: () => Effect.Effect<
     { authenticated: boolean; email?: string | null; planType?: string | null },
     ProviderClientOperationError
@@ -99,6 +101,8 @@ interface MuseThread {
   id: string;
   cwd: string;
   instructions: string;
+  /** The instructions that the session already has, or null when the next turn must carry them. */
+  instructionsSent: string | null;
   roots: string[];
   mcp: LocalMcpSession;
   turn: MuseTurn | null;
@@ -127,7 +131,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   readonly #scope = Scope.makeUnsafe();
   #running = false;
   #host: SpawnedMspConnection | null = null;
-  #starting: Promise<SpawnedMspConnection> | null = null;
+  /** The one launch that every caller waits for. It is not interrupted when a caller is. */
+  #starting: Fiber.Fiber<SpawnedMspConnection, ProviderClientOperationError> | null = null;
   #handshake: ReturnType<typeof spawnMspConnection> | null = null;
   #events: Promise<void> = Promise.resolve();
   #stopping = false;
@@ -275,7 +280,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       case "thread/start":
         return yield* this.#openOwnedThread(params, false);
       case "thread/resume":
-        return child ? { thread: { id: getString(params, "threadId") } } : yield* this.#openOwnedThread(params, true);
+        // A held session only takes the caller's instructions, such as new memories.
+        return child ? yield* child.#openThread(params, true) : yield* this.#openOwnedThread(params, true);
       case "thread/read": {
         const id = yield* providerSync(() => requiredString(params, "threadId"));
         const turns: Array<{ id: string; status?: string; items: ThreadItem[] }> = [];
@@ -325,62 +331,82 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (this.#options.profileGeneration)
       return yield* providerFailure(new Error(sourceText("error.provider.museProfileUnsupported")));
     if (this.#host) return this.#host;
-    if (!this.#starting) this.#starting = this.#launch();
-    return yield* providerCall(() => this.#starting).pipe(
-      Effect.flatMap((host) =>
-        host
-          ? Effect.succeed(host)
-          : Effect.fail(providerFailure(new Error(sourceText("error.provider.museNotStarted")))),
+    // The fork starts on the next tick, so `#starting` is set before a failed launch resets it.
+    if (!this.#starting) this.#starting = yield* Effect.forkDetach(this.#launch());
+    const host = yield* Fiber.join(this.#starting);
+    if (!host) return yield* providerFailure(new Error(sourceText("error.provider.museNotStarted")));
+    return host;
+  });
+
+  readonly #launch = Effect.fn("MuseAgentClient.launch")(function* (
+    this: MuseAgentClient,
+  ): Effect.fn.Return<SpawnedMspConnection, ProviderClientOperationError> {
+    const handshake = yield* providerSync(() => {
+      const base = cliSpawnTarget(
+        this.#cli.executable,
+        this.#options.profileGeneration
+          ? ["serve", "--disable-shell", "--disable-write", "-c", "hooks={}", "-c", "managed_hooks_path=null"]
+          : ["serve", "--trust-workspace", "--disable-sandbox"],
+      );
+      const target = this.#options.confine?.(base) ?? base;
+      if (target.windowsVerbatimArguments) throw new Error(sourceText("error.provider.museNativeWindows"));
+      const environment: NodeJS.ProcessEnv = {
+        ...(this.#options.env ?? process.env),
+        ...cliPathEnvironment(this.#cli),
+        ...this.#options.extraEnv?.(),
+        MUSE_NO_AUTO_UPDATE: "1",
+      };
+      for (const key of Object.keys(environment)) if (key.toUpperCase() === "META_API_KEY") delete environment[key];
+      const apiKey = this.#options.apiKey();
+      if (apiKey) {
+        environment.META_API_KEY = apiKey;
+        this.#secrets.add(apiKey);
+      }
+      return (this.#options.spawn ?? spawnMspConnection)({
+        command: target.command,
+        args: target.args,
+        env: environment,
+        shutdownTimeoutMs: 10_000,
+        onStderr: (chunk) => this.#diagnostics.push(chunk),
+      });
+    });
+    this.#handshake = handshake;
+    return yield* this.#connect(handshake).pipe(
+      // A close failure replaces the launch failure, and the failed launch then stays cached.
+      Effect.catch((error) =>
+        providerCall(() => handshake.close()).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              this.#starting = null;
+            }),
+          ),
+          Effect.andThen(Effect.fail(error)),
+        ),
       ),
     );
   });
 
-  async #launch(): Promise<SpawnedMspConnection> {
-    const base = cliSpawnTarget(
-      this.#cli.executable,
-      this.#options.profileGeneration
-        ? ["serve", "--disable-shell", "--disable-write", "-c", "hooks={}", "-c", "managed_hooks_path=null"]
-        : ["serve", "--trust-workspace", "--disable-sandbox"],
+  readonly #connect = Effect.fn("MuseAgentClient.connect")(function* (
+    this: MuseAgentClient,
+    handshake: ReturnType<typeof spawnMspConnection>,
+  ): Effect.fn.Return<SpawnedMspConnection, ProviderClientOperationError> {
+    const host = yield* providerCall(() =>
+      handshake.initialize({
+        clientInfo: { name: "openbot", version: "1" },
+        capabilities: { requestedCapabilities: ["sessionMcp"] },
+      }),
+    ).pipe(
+      Effect.timeoutOrElse({
+        duration: this.#options.requestTimeoutMs ?? 30_000,
+        orElse: () => Effect.fail(providerFailure(new Error(sourceText("error.provider.museStartTimeout")))),
+      }),
     );
-    const target = this.#options.confine?.(base) ?? base;
-    if (target.windowsVerbatimArguments) throw new Error(sourceText("error.provider.museNativeWindows"));
-    const environment: NodeJS.ProcessEnv = {
-      ...(this.#options.env ?? process.env),
-      ...this.#options.extraEnv?.(),
-      MUSE_NO_AUTO_UPDATE: "1",
-    };
-    for (const key of Object.keys(environment)) if (key.toUpperCase() === "META_API_KEY") delete environment[key];
-    const apiKey = this.#options.apiKey();
-    if (apiKey) {
-      environment.META_API_KEY = apiKey;
-      this.#secrets.add(apiKey);
-    }
-    const handshake = (this.#options.spawn ?? spawnMspConnection)({
-      command: target.command,
-      args: target.args,
-      env: environment,
-      shutdownTimeoutMs: 10_000,
-      onStderr: (chunk) => this.#diagnostics.push(chunk),
-    });
-    this.#handshake = handshake;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const host = await Promise.race([
-        handshake.initialize({
-          clientInfo: { name: "openbot", version: "1" },
-          capabilities: { requestedCapabilities: ["sessionMcp"] },
-        }),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error(sourceText("error.provider.museStartTimeout"))),
-            this.#options.requestTimeoutMs ?? 30_000,
-          );
-        }),
-      ]);
-      if (this.#stopping) throw new Error(sourceText("error.provider.museStartStopped"));
-      if (host.initializeResult.schema.version !== 1) throw new Error(sourceText("error.provider.museProtocolVersion"));
-      if (host.initializeResult.sessionDurability === "ephemeral")
-        throw new Error(sourceText("error.provider.museHistoryRequired"));
+    if (this.#stopping) return yield* providerFailure(new Error(sourceText("error.provider.museStartStopped")));
+    if (host.initializeResult.schema.version !== 1)
+      return yield* providerFailure(new Error(sourceText("error.provider.museProtocolVersion")));
+    if (host.initializeResult.sessionDurability === "ephemeral")
+      return yield* providerFailure(new Error(sourceText("error.provider.museHistoryRequired")));
+    return yield* providerSync(() => {
       this.#host = host;
       host.connection.onServerRequest(async (request) => {
         if (request.method === "approval/request" || request.method === "userInput/request") return {};
@@ -400,14 +426,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         if (!this.#stopping) this.#fail(new Error("Muse connection closed."));
       });
       return host;
-    } catch (error) {
-      await handshake.close();
-      this.#starting = null;
-      throw error;
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
+    });
+  });
 
   #redactionValues(): string[] {
     const key = this.#options.apiKey();
@@ -465,7 +485,12 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   ): Effect.fn.Return<{ thread: { id: string } }, ProviderClientOperationError> {
     const host = yield* this.#ensureHost();
     const id = resume ? yield* providerSync(() => requiredString(params, "threadId")) : host.connection.mintCommandId();
-    if (this.#threads.has(id)) return { thread: { id } };
+    const held = this.#threads.get(id);
+    if (held) {
+      // The next turn carries changed instructions.
+      held.instructions = getString(params, "developerInstructions") ?? held.instructions;
+      return { thread: { id } };
+    }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
     const tools = this.#options.profileGeneration ? [] : getArray(params, "dynamicTools").filter(isNamespace);
     const bridge = yield* this.#bridge
@@ -492,7 +517,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
           computerUseParam(params),
         ),
         this.#options.mcpToolRuntimes?.(),
-        this.#options.mcpAuthorization,
+        this.#options.mcpEndpoint,
+        mcpAgentParam(params),
       ).pipe(toProviderClientOperationError);
       for (const secret of mcpSecretValues(resolved.map((server) => server.config))) this.#secrets.add(secret);
       const handoff = acpMcpServers(resolved);
@@ -523,6 +549,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         id,
         cwd,
         instructions: getString(params, "developerInstructions") ?? "",
+        instructionsSent: null,
         roots: getArray(params, "runtimeWorkspaceRoots").filter(isString),
         mcp: bridge,
         turn: null,
@@ -595,7 +622,12 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (model && model !== "default")
       yield* this.#command("session/setModel", { sessionId: thread.id, model: { modelId: model, providerId: "meta" } });
     const input = compact ? [] : yield* musePrompt(params);
-    if (thread.instructions) input.unshift({ type: "text", text: thread.instructions });
+    // The session keeps the instructions in its context until a compaction replaces them.
+    if (!compact && thread.instructions && thread.instructionsSent !== thread.instructions) {
+      input.unshift({ type: "text", text: thread.instructions });
+      thread.instructionsSent = thread.instructions;
+    }
+    const workspaceRoots = compact ? [] : yield* museWorkspaceRoots([thread.cwd, ...thread.roots]);
     const id = host.connection.mintCommandId();
     thread.turn = { id, compact, items: new Map(), deltaPending: new Map() };
     this.#emit("turn/started", { threadId: thread.id, turn: { id, status: "inProgress" } });
@@ -608,7 +640,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
           ? {}
           : {
               input,
-              workspaceRoots: [...new Set([thread.cwd, ...thread.roots])],
+              workspaceRoots,
               ifBusy: "queue",
               ...(effort ? { reasoningEffort: effort } : {}),
             }),
@@ -696,6 +728,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const turn = thread.turn;
     if (!turn) return;
     thread.turn = null;
+    // The session may not have kept the input of a turn that failed.
+    if (status === "failed" && !turn.compact) thread.instructionsSent = null;
     for (const controller of thread.approvals.values()) controller.abort();
     thread.approvals.clear();
     this.#emit("turn/completed", { threadId: thread.id, turn: { id: turn.id, status } });
@@ -799,6 +833,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (method === "item/started" || method === "item/updated" || method === "item/completed") {
       const event = yield* this.#decode(Schema.Struct({ item: MuseItem }), params);
       this.#publish(thread, event.item);
+      if (event.item.kind === "compaction" && event.item.status === "completed") thread.instructionsSent = null;
       if (thread.turn?.compact && event.item.kind === "compaction" && event.item.status !== "inProgress")
         this.#finish(
           thread,
@@ -1042,6 +1077,14 @@ const musePrompt = Effect.fn("MuseAgentClient.prompt")(function* (params: unknow
   }
   if (!input.length) return yield* providerFailure(new Error(sourceText("error.provider.museEmptyInput")));
   return input;
+});
+/**
+ * Muse accepts only canonical roots: the real path, in the verbatim `\\?\` form on Windows (#3356).
+ * A root that does not resolve is sent as written, and Muse rejects it as before.
+ */
+const museWorkspaceRoots = Effect.fn("MuseAgentClient.workspaceRoots")(function* (paths: string[]) {
+  const roots = yield* Effect.forEach(paths, (path) => Effect.promise(() => realpath(path).catch(() => path)));
+  return [...new Set(roots.map((root) => toNamespacedPath(root)))];
 });
 function isNamespace(value: unknown): value is DynamicToolNamespace {
   return (

@@ -4,14 +4,19 @@ import type { messages as source } from "../en/customProvider";
 export const messages = {
   "customProvider.registry.title": "Registre ACP",
   "customProvider.registry.description":
-    "Installez des agents sur cet hôte. « Désinstaller » conserve les réglages, les identifiants et les conversations de l’agent.",
+    "Installez des agents sur ce serveur. « Désinstaller » conserve les réglages, les identifiants et les conversations de l’agent.",
   "customProvider.registry.search": "Rechercher dans le registre",
   "customProvider.registry.empty": "Aucun agent ne correspond à cette recherche.",
   "customProvider.registry.agentId": "ID de l’agent personnalisé",
   "customProvider.registry.install": "Installer",
   "customProvider.registry.update": "Mettre à jour",
   "customProvider.registry.remove": "Désinstaller",
-  "customProvider.registry.failed": "L’opération sur le registre a échoué.",
+  "customProvider.registry.searchFailed": "Impossible de rechercher dans le registre. Réessayez.",
+  "customProvider.registry.statusFailed": "Impossible de vérifier la progression de l’installation. OpenBot réessaie.",
+  "customProvider.registry.installFailed": "Impossible d’installer l’agent. Réessayez.",
+  "customProvider.registry.updateFailed": "Impossible de mettre à jour l’agent. Réessayez.",
+  "customProvider.registry.removeFailed": "Impossible de désinstaller l’agent. Réessayez.",
+  "customProvider.registry.cancelFailed": "Impossible d’annuler l’installation. Réessayez.",
   "customProvider.error.providerIdRequired": "Saisissez un ID de fournisseur.",
   "customProvider.error.providerIdPattern":
     "Utilisez des lettres minuscules, des chiffres, des tirets ou des traits de soulignement, en commençant par une lettre ou un chiffre.",
@@ -28,6 +33,7 @@ export const messages = {
   "customProvider.error.modelIdDuplicate": "Ce fournisseur liste déjà {id}.",
   "customProvider.error.modelIdInvalid":
     "Cet ID de modèle n’est pas utilisable. Supprimez les espaces, les guillemets et les autres signes de ponctuation.",
+  "customProvider.error.contextWindowInvalid": "Saisissez un nombre entier de jetons entre {min} et {max}.",
   "customProvider.error.headerNameRequired": "Saisissez un nom d’en-tête.",
   "customProvider.error.headerNameInvalid": "Utilisez un nom d’en-tête HTTP valide.",
   "customProvider.error.headerDuplicate": "Ce fournisseur définit déjà {name}.",
@@ -40,19 +46,18 @@ export const messages = {
   "customProvider.error.baseUrlCredential": "Mettez l’identifiant dans un en-tête, pas dans l’URL.",
 
   "customProvider.saved.restarted": "Enregistré. OpenBot charge les modèles.",
-  "customProvider.saved.skippedBusy":
-    "Enregistré. OpenCode lit la liste quand la tâche en cours s’arrête. Appuyez alors sur Se connecter.",
-  "customProvider.saved.notRunning": "Enregistré. OpenCode lit la liste à son prochain démarrage.",
+  "customProvider.saved.skippedBusy": "Enregistré. Le fournisseur lit la liste quand la tâche en cours s’arrête.",
+  "customProvider.saved.notRunning": "Enregistré. Le fournisseur lit la liste à son prochain démarrage.",
   "customProvider.removed.restarted": "Supprimé. OpenBot charge les modèles.",
-  "customProvider.removed.skippedBusy":
-    "Supprimé. OpenCode lit la liste quand la tâche en cours s’arrête. Appuyez alors sur Se connecter.",
-  "customProvider.removed.notRunning": "Supprimé. OpenCode lit la liste à son prochain démarrage.",
+  "customProvider.removed.skippedBusy": "Supprimé. Le fournisseur lit la liste quand la tâche en cours s’arrête.",
+  "customProvider.removed.notRunning": "Supprimé. Le fournisseur lit la liste à son prochain démarrage.",
   "customProvider.saveFailed": "OpenBot n’a pas pu enregistrer ce point de terminaison.",
   "customProvider.removeFailed": "OpenBot n’a pas pu supprimer {name}.",
   "customProvider.saveUnavailable": "Cette version ne peut pas enregistrer de point de terminaison.",
   "customProvider.removeUnavailable": "Cette version ne peut pas supprimer de point de terminaison.",
 
   "customProvider.form.title": "Ajouter un fournisseur personnalisé",
+  "customProvider.form.editTitle": "Modifier un fournisseur personnalisé",
   "customProvider.form.description": "Décrivez un point de terminaison compatible OpenAI et les modèles qu’il propose.",
   "customProvider.form.heading": "Fournisseur personnalisé",
   "customProvider.form.subtitle": "Tout point de terminaison compatible OpenAI.",
@@ -61,20 +66,24 @@ export const messages = {
   "customProvider.field.displayName": "Nom d’affichage",
   "customProvider.field.displayNamePlaceholder": "Mon fournisseur",
   "customProvider.field.baseUrl": "URL de base",
+  "customProvider.field.harness": "S’exécute avec",
+  "customProvider.field.harnessHint": "Le fournisseur qui envoie les requêtes à ce point de terminaison.",
   "customProvider.field.apiKey": "Clé API",
   "customProvider.field.apiKeyHint": "Facultatif. Laissez vide si vous gérez l’authentification avec des en-têtes.",
-  "customProvider.field.apiKeyKeptHint":
-    "Une clé est enregistrée. Laissez ce champ vide pour la conserver, ainsi que les en-têtes enregistrés.",
+  "customProvider.field.apiKeyKeptHint": "Une clé est enregistrée. Laissez ce champ vide pour la conserver.",
   "customProvider.models": "Modèles",
   "customProvider.model.id": "ID du modèle {number}",
   "customProvider.model.name": "Nom d’affichage du modèle {number}",
   "customProvider.model.namePlaceholder": "Nom d’affichage",
+  "customProvider.model.contextWindow": "Fenêtre de contexte du modèle {number}",
+  "customProvider.model.contextWindowPlaceholder": "Jetons",
   "customProvider.model.remove": "Supprimer le modèle {number}",
   "customProvider.model.add": "Ajouter un modèle",
   "customProvider.headers": "En-têtes",
   "customProvider.header.name": "Nom de l’en-tête {number}",
   "customProvider.header.value": "Valeur de l’en-tête {number}",
   "customProvider.header.valuePlaceholder": "valeur",
+  "customProvider.header.keptPlaceholder": "Enregistrée. Laissez vide pour la conserver.",
   "customProvider.header.remove": "Supprimer l’en-tête {number}",
   "customProvider.header.add": "Ajouter un en-tête",
   "customProvider.submit": "Envoyer",
@@ -93,7 +102,7 @@ export const messages = {
   "customProvider.preset.description":
     "Choisissez un serveur de modèles local, un point de terminaison ou un agent ACP.",
   "customProvider.preset.heading": "Ajout personnalisé",
-  "customProvider.preset.subtitle": "Des modèles pour OpenCode, ou un agent à part entière.",
+  "customProvider.preset.subtitle": "Des modèles pour OpenCode ou Pi, ou un agent à part entière.",
   "customProvider.preset.models": "Modèles",
   "customProvider.preset.agents": "Agents",
   "customProvider.preset.ollama": "Ollama",
@@ -154,6 +163,9 @@ export const messages = {
   "customProvider.acp.args": "Arguments",
   "customProvider.acp.argsHint":
     "Séparez les arguments par des espaces. Mettez entre guillemets un argument qui contient des espaces.",
+  "customProvider.acp.usagePrompt": "Commande d’utilisation",
+  "customProvider.acp.usagePromptHint":
+    "OpenBot l’envoie au plus toutes les 5 minutes et affiche la dernière réponse. Utilisez une commande à laquelle l’agent répond lui-même, comme /usage.",
   "customProvider.acp.env": "Variables d’environnement",
   "customProvider.acp.env.name": "Nom de la variable {number}",
   "customProvider.acp.env.value": "Valeur de la variable {number}",
@@ -166,6 +178,10 @@ export const messages = {
   "customProvider.acp.checkOk": "{name} a répondu",
   "customProvider.acp.checkOkVersion": "{name} {version} a répondu",
   "customProvider.acp.checkProtocol": "ACP version {version}",
+  "customProvider.acp.checkModels": {
+    one: "{count} modèle : {models}",
+    other: "{count} modèles : {models}",
+  },
   "customProvider.acp.checkFailed": "L’agent n’a pas répondu",
   "customProvider.acp.trustTitle": "Cette commande s’exécute sur votre ordinateur",
   "customProvider.acp.trustDescription":
@@ -182,6 +198,7 @@ export const messages = {
   "customProvider.acp.error.envDuplicate": "Cet agent définit déjà {name}.",
   "customProvider.acp.error.envValueRequired": "Saisissez une valeur pour cette variable.",
   "customProvider.acp.error.envValueLength": "La valeur doit faire moins de {max} caractères.",
+  "customProvider.acp.error.usagePromptInvalid": "Utilisez une ligne de {max} caractères au maximum.",
   "customProvider.acp.error.agentIdPattern":
     "Utilisez des lettres minuscules, des chiffres ou des tirets, en commençant par une lettre ou un chiffre. Utilisez au plus 40 caractères.",
 
@@ -215,6 +232,8 @@ export const messages = {
   "customProvider.list.empty": "Aucun point de terminaison personnalisé pour l’instant.",
   "customProvider.list.label": "Points de terminaison personnalisés",
   "customProvider.list.apiKeySaved": "Clé API enregistrée",
+  "customProvider.list.runsOn": "S’exécute avec {name}",
+  "customProvider.list.editLabel": "Modifier {name}",
   "customProvider.list.deleteLabel": "Supprimer {name}",
   "customProvider.list.confirmTitle": "Supprimer {name} ?",
   "customProvider.list.confirmDescription":

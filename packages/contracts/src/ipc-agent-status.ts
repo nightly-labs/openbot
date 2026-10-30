@@ -1,4 +1,4 @@
-import type { AgentProviderId } from "./agent-providers";
+import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isFiniteNumber, isNullableBoundedString } from "./ipc-bounded-values";
 import type { McpSignInRelayPage } from "./ipc-mcp-servers";
@@ -33,6 +33,11 @@ export interface AgentProviderStatus {
    */
   id: AgentProviderId;
   /**
+   * The host's name for the provider. Only a Team API v8 host sends it, so a client that does not
+   * know `id` can still show the provider. The local status omits it.
+   */
+  displayName?: string;
+  /**
    * One of `AgentProviderState`, but treated as an open string at the trust boundary: a remote
    * server one release ahead may send a member we do not know yet.
    */
@@ -41,6 +46,12 @@ export interface AgentProviderStatus {
   message: string | null;
   email?: string | null;
   connectionState?: "connecting";
+  /**
+   * Sent with `connectionState`: true while a sign-in waits for the user, false while OpenBot checks
+   * the provider again after a key change, a restart or an update, when no browser page opens. A
+   * status without it, such as a joined server's, does not say.
+   */
+  signInPending?: boolean;
   checkError?: string | null;
   /**
    * Who owns the CLI binary in use. `system` is an install the user made and can update themselves,
@@ -51,6 +62,12 @@ export interface AgentProviderStatus {
   cliSource?: "system" | "managed";
   /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
   restartPending?: boolean;
+  /**
+   * A saved API key serves the provider's turns in place of the plan sign-in, so the plan's usage
+   * does not apply. Gemini: its saved key comes before the Google account. Codex: its own login is
+   * an OpenAI API key. Local only: released Team API adapters omit it.
+   */
+  apiKeyInUse?: boolean;
   /**
    * The last failure of the provider, redacted, kept after its toast is gone and cleared by the next
    * good model list. Only the computer that runs the provider sends it; the Team API does not.
@@ -112,14 +129,17 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     isDynamicRecord(value) &&
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.state, INPUT_LIMITS.identifier) &&
+    (value.displayName === undefined || isBoundedString(value.displayName, 80)) &&
     isNullableBoundedString(value.version, 160) &&
     isNullableBoundedString(value.message, INPUT_LIMITS.messageText) &&
     (value.email === undefined || isNullableBoundedString(value.email, INPUT_LIMITS.email)) &&
     (value.connectionState === undefined || isBoundedString(value.connectionState, INPUT_LIMITS.identifier)) &&
+    (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
+    (value.apiKeyInUse === undefined || typeof value.apiKeyInUse === "boolean") &&
     (value.lastError === undefined || isNullableBoundedString(value.lastError, INPUT_LIMITS.messageText)) &&
     (value.lastErrorAt === undefined || isFiniteNumber(value.lastErrorAt)) &&
     (value.accounts === undefined ||
@@ -142,6 +162,9 @@ export type AgentAuthState =
   | { kind: "cline"; email: string | null }
   | { kind: "pi"; email: string | null }
   | { kind: "muse"; email: string | null }
+  | { kind: "inception"; email: string | null }
+  | { kind: "deepseek"; email: string | null }
+  | { kind: "openrouter"; email: string | null }
   | { kind: "acp"; email: string | null };
 
 export interface AccountUsageWindow {
@@ -162,12 +185,32 @@ function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
   );
 }
 
+/** A quota that the provider names and that limits only some of its models, such as Gemini 4 Argon. */
+export interface AccountUsageGroup {
+  /** The provider's name for the group, such as "Gemini Models". */
+  name: string;
+  /** The model names that the provider lists for the group, such as "Gemini Flash". */
+  models: string[];
+  primary: AccountUsageWindow | null;
+  secondary: AccountUsageWindow | null;
+}
+
 export interface AccountUsageLimit {
   id: string;
   /** The provider account the reading is for. Absent for the provider's own sign-in. */
   accountId?: string;
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
+  /**
+   * Antigravity only: each quota group of the plan. `primary` and `secondary` are then the group of
+   * the model that was read, or the "Gemini Models" group. The Team API does not send this field.
+   */
+  groups?: AccountUsageGroup[];
+  /**
+   * The provider whose plan quota this reading also counts: Grok for Cursor on a merged plan. The
+   * rail then shows the ring of that provider alone. The Team API does not send this field.
+   */
+  sharedQuotaWith?: AgentProviderId;
 }
 
 export interface AccountUsage {
@@ -184,8 +227,28 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
         isBoundedString(limit.id, INPUT_LIMITS.identifier) &&
         (limit.accountId === undefined || isProviderAccountId(limit.accountId)) &&
         (limit.primary === null || isAccountUsageWindow(limit.primary)) &&
-        (limit.secondary === null || isAccountUsageWindow(limit.secondary)),
+        (limit.secondary === null || isAccountUsageWindow(limit.secondary)) &&
+        (limit.groups === undefined ||
+          (Array.isArray(limit.groups) &&
+            limit.groups.length <= MAX_USAGE_GROUPS &&
+            limit.groups.every(isAccountUsageGroup))) &&
+        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)),
     )
+  );
+}
+
+/** The most groups in one reading, and the most models in one group. */
+export const MAX_USAGE_GROUPS = 16;
+
+function isAccountUsageGroup(value: unknown): value is AccountUsageGroup {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.name, INPUT_LIMITS.identifier) &&
+    Array.isArray(value.models) &&
+    value.models.length <= MAX_USAGE_GROUPS &&
+    value.models.every((model) => isBoundedString(model, INPUT_LIMITS.identifier)) &&
+    (value.primary === null || isAccountUsageWindow(value.primary)) &&
+    (value.secondary === null || isAccountUsageWindow(value.secondary))
   );
 }
 
@@ -198,7 +261,7 @@ export interface AgentStatus {
    * status would stop every update from it.
    */
   auth: AgentAuthState;
-  providers?: AgentProviderStatus[];
+  providers?: AgentProviderStatus[] | undefined;
   capabilities: {
     chat: CapabilityState;
     browser: CapabilityState;
@@ -249,6 +312,30 @@ export interface RemoveProviderAccountInput {
   provider: AgentProviderId;
   accountId: string;
 }
+
+/** Spends one usage reset credit of a provider account, which restores its spent limits now. */
+export interface ResetProviderUsageInput {
+  provider: AgentProviderId;
+  accountId: string;
+}
+
+/**
+ * The usage reset credits that a provider gave one account, as its last usage reading counted them.
+ * Codex gives them; an account of another provider has none.
+ */
+export interface ProviderUsageResets {
+  provider: AgentProviderId;
+  /** `DEFAULT_PROVIDER_ACCOUNT_ID` for the provider's own sign-in. */
+  accountId: string;
+  available: number;
+}
+
+/**
+ * What the provider did with a reset. `nothingToReset` and `alreadyRedeemed` spend no new credit;
+ * `noCredit` means the account had none left.
+ */
+export const PROVIDER_USAGE_RESET_OUTCOMES = ["reset", "nothingToReset", "noCredit", "alreadyRedeemed"] as const;
+export type ProviderUsageResetOutcome = (typeof PROVIDER_USAGE_RESET_OUTCOMES)[number];
 
 /**
  * The accounts of a joined server's host (`provider-accounts-v1`). The host's released status and

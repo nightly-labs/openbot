@@ -18,14 +18,16 @@ import Radio from "lucide-react-native/icons/radio";
 import Server from "lucide-react-native/icons/server";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Sparkles from "lucide-react-native/icons/sparkles";
+import Trash2 from "lucide-react-native/icons/trash";
 import UserRound from "lucide-react-native/icons/user-round";
 import UsersRound from "lucide-react-native/icons/users-round";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import { type ReactNode, useContext, useMemo } from "react";
 import { Pressable, View } from "react-native";
-
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
+import { openChatFromPane, useChatListPane } from "@/features/agents/components/chat-list-pane-context";
+import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import {
   type MobileSearchResult,
   type MobileSearchSettingId,
@@ -36,6 +38,7 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { typeScale } from "@/shared/lib/type-scale";
 
 const AVATAR_SIZE = 44;
 
@@ -47,7 +50,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     const key = start;
     start += part.text.length;
     return part.match ? (
-      <Typography.Paragraph key={key} type="body-xs" weight="medium" className="text-foreground">
+      <Typography.Paragraph key={key} className="font-medium text-foreground" style={typeScale.preview}>
         {part.text}
       </Typography.Paragraph>
     ) : (
@@ -86,17 +89,17 @@ function SearchRow({
       {leading}
       <View className="min-w-0 flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
-          <Typography.Paragraph className="min-w-0 flex-1" weight="semibold" numberOfLines={1}>
+          <Typography.Paragraph className="font-semibold min-w-0 flex-1" numberOfLines={1} style={typeScale.rowTitle}>
             {title}
           </Typography.Paragraph>
           {trailing ? (
-            <Typography.Paragraph type="body-xs" className="text-muted">
+            <Typography.Paragraph className="text-muted" style={typeScale.caption}>
               {trailing}
             </Typography.Paragraph>
           ) : null}
         </View>
         {detail ? (
-          <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={detailLines}>
+          <Typography.Paragraph className="text-text-secondary" numberOfLines={detailLines} style={typeScale.preview}>
             <Highlighted text={detail} query={query} />
           </Typography.Paragraph>
         ) : null}
@@ -139,6 +142,7 @@ const SETTING_ICON = {
   liveActivities: Radio,
   privacy: ShieldCheck,
   hiddenChats: EyeOff,
+  deletedChannels: Trash2,
   support: LifeBuoy,
   about: Info,
   serverOptions: Server,
@@ -170,6 +174,8 @@ function openSetting(id: MobileSearchSettingId, serverId: string) {
       return router.push("/settings/privacy");
     case "hiddenChats":
       return router.push("/settings/hidden-chats");
+    case "deletedChannels":
+      return router.push({ pathname: "/deleted-chats", params: { serverId } });
     case "support":
       return router.push("/settings/support");
     case "about":
@@ -192,28 +198,35 @@ function fileIcon(file: Extract<MobileSearchResult, { kind: "file" }>["file"]): 
 
 /**
  * One search result. A press closes the search and opens what the result names: the chat, the
- * message or the file in its chat, or the routine.
+ * channel, the message or the file in its chat, or the routine.
  */
 export function MobileSearchResultRow({
   result,
   query,
   serverId,
+  agents,
   onLeave,
 }: {
   result: MobileSearchResult;
   query: string;
   serverId: string;
-  /** Runs before a result closes the search to open what it names. */
+  /** The agents of the server, by ID, for the member avatars of a channel. */
+  agents: ReadonlyMap<string, MobileAgent>;
+  /** Runs before a result opens what it names, and closes the search. */
   onLeave: () => void;
 }) {
   const { t, format } = useText();
   const gate = useContext(ChatNavigationGateContext);
-  // Close the sheet and open the chat in one routing queue run. A chat opened through its home row
-  // zooms back into the row when it closes. A chat opened at a message slides in.
+  const pane = useChatListPane();
+  // A chat opened through its home row zooms back into the row when it closes. A chat opened at a
+  // message slides in. In the chat list pane, the chat takes the place of the open one.
   const openChat = (agentId: string, messageId?: string) => {
     onLeave();
-    router.back();
-    if (messageId) router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
+    if (pane)
+      openChatFromPane(pane, messageId ? undefined : agentId, () =>
+        router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } }),
+      );
+    else if (messageId) router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
     else if (!gate?.openFromHome(agentId)) router.push({ pathname: "/chat/[agentId]", params: { agentId } });
   };
   const snippet = useMemo(
@@ -232,6 +245,26 @@ export function MobileSearchResultRow({
           trailing={agent.updatedLabel}
           query={query}
           onPress={() => openChat(agent.id)}
+        />
+      );
+    }
+    case "channel": {
+      const { channel } = result;
+      const last = channel.lastMessage;
+      return (
+        <SearchRow
+          leading={<ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} />}
+          title={channel.name}
+          detail={last ? t("mobile.search.authorText", { author: last.authorName, text: last.text }) : channel.title}
+          trailing={formatUpdatedAt(last?.at ?? null, format)}
+          query={query}
+          onPress={() => {
+            onLeave();
+            const open = () =>
+              router.push({ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } });
+            if (pane) openChatFromPane(pane, channel.id, open);
+            else if (!gate?.openFromHome(channel.id)) open();
+          }}
         />
       );
     }
@@ -279,7 +312,6 @@ export function MobileSearchResultRow({
           query={query}
           onPress={() => {
             onLeave();
-            router.back();
             openSetting(setting.id, serverId);
           }}
         />
@@ -296,11 +328,16 @@ export function MobileSearchResultRow({
           query={query}
           onPress={() => {
             onLeave();
-            router.back();
-            router.push({
-              pathname: "/agent-info/[agentId]/routine",
-              params: { agentId: owner.agent.id, serverId: owner.agent.serverId, recordId: routine.id },
-            });
+            if (owner.kind === "agent")
+              router.push({
+                pathname: "/agent-info/[agentId]/routine",
+                params: { agentId: owner.agent.id, serverId: owner.agent.serverId, recordId: routine.id },
+              });
+            else
+              router.push({
+                pathname: "/channel-info/[channelId]/routine",
+                params: { channelId: owner.channel.id, serverId, recordId: routine.id },
+              });
           }}
         />
       );

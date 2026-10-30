@@ -121,7 +121,7 @@ async function openFixture(root: string): Promise<Fixture> {
     const waits = new AgentWaits({
       store: new AgentWaitStore({ database }),
       mailbox,
-      hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true },
+      hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
     });
     const scheduler = new RoutineScheduler({
       store,

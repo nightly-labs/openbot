@@ -6,13 +6,16 @@ import {
   type BillingInterval,
   type BillingPlanId,
   isOpenBillingStatus,
+  memberLimitForPlan,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
+  HOSTED_SERVER_ENTRY_POINTS,
   type HostedServerActivityReport,
   type HostedServerCatalog,
   type HostedServerCheckout,
   type HostedServerClaim,
+  type HostedServerEntryPoint,
   type HostedServerError,
   type HostedServerLifecycleInput,
   type HostedServerList,
@@ -22,10 +25,12 @@ import {
   type HostedServerSummary,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
+import { type LicenseOrder, parseLicenseOrder } from "@openbot/contracts/license";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RouteHostState } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Result, Schema } from "effect";
+import { SOLD_OUT_PLANS } from "../lib/pricing-page";
 import { type AccountAnalytics, type AccountAnalyticsEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { getServerEntitlement } from "./billing-entitlement";
 import { BillingError, type BillingReturnTarget, type BillingService, type SubscriptionSync } from "./billing-service";
@@ -91,10 +96,31 @@ const RESIZE_AFTER_NO_USE_MS = 7 * 60_000;
 const LEASE_TTL_SECONDS = 2 * 60 * 60;
 const LEASE_EXTEND_BEFORE_MS = 60 * 60_000;
 /**
+ * boat can keep a stopped machine in memory and continue it at a resume, with no boot. Then `/run` keeps
+ * the flag of the pre-stop hook (`scripts/hosting/openbot-boat-pre-stop`), the condition of
+ * `openbot.service` fails, and OpenBot does not start. This command removes the flag and starts OpenBot.
+ * With no flag it does nothing, so it does not change a machine that boat started with a boot.
+ */
+const HELD_RESUME_START_COMMAND =
+  "if [ -e /run/openbot-pre-stop ]; then sudo -n rm -f /run/openbot-pre-stop && sudo -n systemctl start --no-block openbot.service && echo started; fi";
+const HELD_RESUME_START_TIMEOUT_SECONDS = 10;
+/**
  * The cron starts an idle server this long before its next routine run: one cron interval (5 minutes)
  * and the time that the server takes to start. A server does not stop for no use in this time.
  */
 const SCHEDULE_WAKE_BEFORE_MS = 10 * 60_000;
+/**
+ * boat deletes the disk of a sandbox 14 days after its stop, and each stop saves a new disk. The cron
+ * starts an idle server with no use for this long, and the idle stop saves its disk again.
+ */
+const RETENTION_WAKE_AFTER_MS = 10 * 24 * 60 * 60_000;
+const RETENTION_DISK_KEPT_MS = 14 * 24 * 60 * 60_000;
+/**
+ * The test and production Workers share one boat account: 200 starts each day and 100 active
+ * sandboxes. One start in each 10 minutes of cron time (at most 144 each day for each Worker, with a
+ * cron each 5 minutes or each minute) leaves them to clients.
+ */
+const RETENTION_WAKE_EVERY_MINUTES = 10;
 /** A server can report a routine run at most this far ahead. A later run is reported when it comes nearer. */
 const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 /**
@@ -154,7 +180,8 @@ function hostedValidate<A>(operation: () => A): Effect.Effect<A, HostedFailure> 
  * (`stopped`). An idle server starts again on the next use; a stopped one only on renewal.
  */
 type DesiredState = "running" | "idle" | "stopped" | "deleted";
-type WakeReason = "create" | "message" | "restart" | "schedule";
+/** `last_wake_reason` stores `retention` as `schedule`: its D1 check has no other value. */
+type WakeReason = "create" | "message" | "restart" | "schedule" | "retention";
 
 interface HostedServerRow {
   server_id: string;
@@ -210,12 +237,16 @@ export interface HostedServerServiceOptions {
   analytics?: AccountAnalytics;
   /** The developer key that the request sent. It lets the account create servers when it is the Worker's key. */
   developerKey?: string | null;
+  /** Keeps the Worker alive until work after the reply ends (`waitUntil`). */
+  schedule?: (work: Effect.Effect<void>) => void;
 }
 
 /** Where Stripe sends the user back after Checkout. */
 export interface CheckoutReturn {
   target: BillingReturnTarget;
   origin: string;
+  /** Where the journey started in the app. Only analytics reads it. */
+  entryPoint?: HostedServerEntryPoint;
 }
 
 export interface HostedServerTickResult {
@@ -228,6 +259,7 @@ export interface HostedServerTickResult {
   resized: number;
   idle: number;
   scheduled: number;
+  retained: number;
   failed: number;
 }
 
@@ -240,6 +272,7 @@ class HostedServerDependencies extends Context.Service<
     now: () => number;
     removeHost: ((ownerUserId: string, hostId: string) => Effect.Effect<void, RemoteFailure>) | null;
     analytics: AccountAnalytics;
+    schedule: (work: Effect.Effect<void>) => void;
   }
 >()("auth-api/HostedServerService/Dependencies") {}
 
@@ -289,6 +322,7 @@ export class HostedServerService {
       now: this.#now,
       removeHost,
       analytics: this.#analytics,
+      schedule: options.schedule ?? ((work) => void Effect.runFork(work)),
     });
   }
 
@@ -342,17 +376,29 @@ export class HostedServerService {
   /**
    * Adds a server that waits for payment, and returns its Stripe Checkout page. The sandbox is made only
    * when Stripe confirms the payment. The same Idempotency-Key returns the same server with a new page.
+   * A license order adds the license at the bundle price to the same page, so one payment buys both.
    */
 
   readonly create = Effect.fn("HostedServerService.create")(
     function* (
       this: HostedServerService,
       user: AuthUser,
-      input: { name: unknown; plan: unknown; interval: unknown; currency: unknown },
+      input: {
+        name: unknown;
+        plan: unknown;
+        interval: unknown;
+        currency: unknown;
+        entryPoint?: unknown;
+        license?: unknown;
+      },
       idempotencyKeyHeader: string | null,
-      returnTo: CheckoutReturn,
+      checkoutReturn: CheckoutReturn,
     ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
       const dependencies = yield* HostedServerDependencies;
+      // An older client sends no entry point, and an unknown one is left out. It never fails the request.
+      const returnTo: CheckoutReturn = isOneOf(HOSTED_SERVER_ENTRY_POINTS, input.entryPoint)
+        ? { ...checkoutReturn, entryPoint: input.entryPoint }
+        : checkoutReturn;
       const { billing } = yield* hostedValidate(() => this.#requireAvailable(user));
       const idempotencyKey = idempotencyKeyHeader?.trim() ?? "";
       if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u.test(idempotencyKey)) {
@@ -366,6 +412,15 @@ export class HostedServerService {
       if (!isOneOf(BILLING_PLAN_IDS, input.plan)) return yield* invalid("plan");
       if (!isOneOf(BILLING_INTERVALS, input.interval)) return yield* invalid("interval");
       if (!isOneOf(BILLING_CURRENCIES, input.currency)) return yield* invalid("currency");
+      const license = input.license === undefined ? undefined : parseLicenseOrder(input.license);
+      // A Starter server has one member, so it takes only the Starter license. A Team license has no more
+      // users than the plan has members.
+      if (
+        license === null ||
+        (license &&
+          ((input.plan === "starter" && license.tier !== "starter") || license.users > memberLimitForPlan(input.plan)))
+      )
+        return yield* invalid("license");
       const size = HOSTED_PLAN_SIZE[input.plan];
       const previous = yield* hostedCall(() =>
         dependencies.database
@@ -373,7 +428,8 @@ export class HostedServerService {
           .bind(user.id, idempotencyKey)
           .first<HostedServerRow>(),
       );
-      if (previous) return yield* this.#checkout(previous, user, billing, returnTo);
+      if (previous) return yield* this.#checkout(previous, user, billing, returnTo, license);
+      if (SOLD_OUT_PLANS.has(input.plan)) return yield* planSoldOut();
       const unpaid = yield* hostedCall(() =>
         dependencies.database
           .prepare(
@@ -390,7 +446,7 @@ export class HostedServerService {
       );
       if (unpaid) {
         const choice = { plan: input.plan, interval: input.interval, currency: input.currency };
-        return yield* this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo);
+        return yield* this.#reuseUnpaid(unpaid, choice, idempotencyKey, user, billing, returnTo, license);
       }
       const count = yield* hostedCall(() =>
         dependencies.database
@@ -414,8 +470,8 @@ export class HostedServerService {
           .prepare(
             `INSERT INTO hosted_servers(
            server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,
-           idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'awaiting_payment', ?, ?, ?)
+           idempotency_key, legacy_member_limits, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'running', 'awaiting_payment', ?, 0, ?, ?)
          ON CONFLICT(owner_user_id, idempotency_key) DO NOTHING`,
           )
           .bind(serverId, user.id, name, size, input.plan, input.interval, input.currency, idempotencyKey, now, now)
@@ -430,9 +486,9 @@ export class HostedServerService {
         );
         if (!concurrent)
           return yield* new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
-        return yield* this.#checkout(concurrent, user, billing, returnTo);
+        return yield* this.#checkout(concurrent, user, billing, returnTo, license);
       }
-      return yield* this.#checkout(yield* this.#requireRow(serverId), user, billing, returnTo);
+      return yield* this.#checkout(yield* this.#requireRow(serverId), user, billing, returnTo, license);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -457,7 +513,16 @@ export class HostedServerService {
           .first<HostedServerRow>(),
       );
       if (!row) return yield* notFound();
-      return yield* this.#checkout(row, user, billing, returnTo);
+      // A second page for a server that still waits for its first payment continues the same purchase,
+      // with the license of the page that it closes.
+      const resumed = row.observed_state === "awaiting_payment" && row.desired_state === "running";
+      return yield* this.#checkout(
+        row,
+        user,
+        billing,
+        resumed ? { ...returnTo, entryPoint: "checkout_resume" } : returnTo,
+        resumed ? "previous" : undefined,
+      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1061,6 +1126,7 @@ export class HostedServerService {
         resized: 0,
         idle: 0,
         scheduled: 0,
+        retained: 0,
         failed: 0,
       };
       yield* hostedCall(() =>
@@ -1200,6 +1266,25 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       result.scheduled = yield* run(scheduled.results, (row) => this.#wakeForSchedule(row, now));
+      // An idle server starts before boat deletes its disk. The stop comes after the last use, so the
+      // disk is never older than the last use. A disk older than 14 days is gone: boat refuses its resume
+      // with a 409, which `#resume` reads as a start in progress. The oldest change goes first, so a
+      // start that failed goes after the others.
+      if (new Date(now).getUTCMinutes() % RETENTION_WAKE_EVERY_MINUTES === 0) {
+        const expiring = yield* hostedCall(() =>
+          dependencies.database
+            .prepare(
+              `SELECT ${ROW_COLUMNS} FROM hosted_servers
+           WHERE desired_state = 'idle' AND observed_state = 'stopped' AND provider_sandbox_id IS NOT NULL
+             AND last_active_at > ? AND last_active_at <= ?
+             AND (deletion_scheduled_at IS NULL OR deletion_scheduled_at > ?)
+           ORDER BY updated_at LIMIT 1`,
+            )
+            .bind(now - RETENTION_DISK_KEPT_MS, now - RETENTION_WAKE_AFTER_MS, now)
+            .all<HostedServerRow>(),
+        );
+        result.retained = yield* run(expiring.results, (row) => this.#wakeForRetention(row, now));
+      }
       // A server that must stop and still runs: the first stop did not happen.
       const unstopped = yield* hostedCall(() =>
         dependencies.database
@@ -1286,13 +1371,18 @@ export class HostedServerService {
     (operation, _now?: number) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A Checkout page for a server that waits for payment, or none when the server needs no page. */
+  /**
+   * A Checkout page for a server that waits for payment, or none when the server needs no page. A license
+   * order adds a second line to the page. The row does not keep the order: `previous` reads it from the
+   * page that closes, so a later page sells the same license.
+   */
   readonly #checkout = Effect.fn("HostedServerService.checkout")(function* (
     this: HostedServerService,
     row: HostedServerRow,
     user: AuthUser,
     billing: HostedServerBilling,
     returnTo: CheckoutReturn,
+    order?: LicenseOrder | "previous",
   ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     // A scheduled deletion must be withdrawn before a replacement plan can be purchased.
@@ -1312,9 +1402,13 @@ export class HostedServerService {
     }
     const previous = row.checkout_session_id;
     // Only one page can be open, so a user cannot pay twice for one server.
-    if (previous && (yield* billing.closeCheckout(previous).pipe(Effect.mapError(hostedFailure))) === "paid") {
+    const closed = previous ? yield* billing.closeCheckout(previous).pipe(Effect.mapError(hostedFailure)) : null;
+    if (closed?.status === "paid") {
       return { server: summary(yield* this.#requireRow(row.server_id)), checkoutUrl: null };
     }
+    // A server that has had no plan cannot buy a sold-out plan. A server whose plan ended can renew it.
+    if (awaiting && SOLD_OUT_PLANS.has(row.plan)) return yield* planSoldOut();
+    const license = order === "previous" ? closed?.license : order;
     const session = yield* billing
       .createCheckout({
         user: { id: user.id, email: user.email },
@@ -1324,6 +1418,8 @@ export class HostedServerService {
         currency: row.currency,
         target: returnTo.target,
         origin: returnTo.origin,
+        ...(returnTo.entryPoint ? { entryPoint: returnTo.entryPoint } : {}),
+        ...(license ? { license } : {}),
       })
       .pipe(Effect.mapError(hostedFailure));
     // A new plan choice changes the key of an unpaid server, so a page for the plan before it is not stored.
@@ -1359,10 +1455,11 @@ export class HostedServerService {
     user: AuthUser,
     billing: HostedServerBilling,
     returnTo: CheckoutReturn,
+    license?: LicenseOrder,
   ): Effect.fn.Return<HostedServerCheckout, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     const previous = row.checkout_session_id;
-    if (previous && (yield* billing.closeCheckout(previous).pipe(Effect.mapError(hostedFailure))) === "paid") {
+    if (previous && (yield* billing.closeCheckout(previous).pipe(Effect.mapError(hostedFailure))).status === "paid") {
       // A retry of this request then returns the same server, and does not add a second one.
       yield* hostedCall(() =>
         dependencies.database
@@ -1397,7 +1494,7 @@ export class HostedServerService {
     // A second request changed the server first, or changed it again before its page was made.
     if (updated.meta.changes !== 1 || claimed.idempotency_key !== idempotencyKey)
       return yield* new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
-    return yield* this.#checkout(claimed, user, billing, returnTo);
+    return yield* this.#checkout(claimed, user, billing, returnTo, license);
   });
 
   /**
@@ -1675,7 +1772,7 @@ export class HostedServerService {
     if (
       checkoutId &&
       dependencies.billing &&
-      (yield* dependencies.billing.closeCheckout(checkoutId).pipe(Effect.mapError(hostedFailure))) === "paid"
+      (yield* dependencies.billing.closeCheckout(checkoutId).pipe(Effect.mapError(hostedFailure))).status === "paid"
     ) {
       return false;
     }
@@ -1880,7 +1977,57 @@ export class HostedServerService {
         .run(),
     );
     if (started.meta.changes !== 1) return;
-    yield* this.#wake(yield* this.#requireRow(row.server_id), "schedule");
+    yield* this.#wakeFromCron(row, "schedule");
+  });
+
+  /** The start counts as use, so with no client the idle stop comes after 15 minutes and saves the disk. */
+  readonly #wakeForRetention = Effect.fn("HostedServerService.wakeForRetention")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    now: number,
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const started = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE hosted_servers SET desired_state = 'running', last_active_at = ?, updated_at = ?
+         WHERE server_id = ? AND desired_state = 'idle' AND observed_state = 'stopped' AND last_active_at = ?`,
+        )
+        .bind(now, now, row.server_id, row.last_active_at)
+        .run(),
+    );
+    if (started.meta.changes !== 1) return;
+    yield* this.#wakeFromCron(row, "retention");
+  });
+
+  /**
+   * Starts an idle server for the cron. No client comes to start it again, and no cron path starts a
+   * server in `error`. After a refused start (a boat fault, or a 4xx such as `billing_required`) the
+   * server sleeps with its last use, so the retention wake tries again before boat deletes the disk.
+   * A 409 or 429 leaves the server `waking`, not `error`. A 404 keeps the error: the sandbox is gone.
+   */
+  readonly #wakeFromCron = Effect.fn("HostedServerService.wakeFromCron")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    reason: "schedule" | "retention",
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const woken = yield* Effect.result(this.#wake(yield* this.#requireRow(row.server_id), reason));
+    if (Result.isSuccess(woken)) return;
+    const error = woken.failure;
+    if (!(error instanceof BoatApiError && error.status === 404)) {
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET desired_state = 'idle', observed_state = 'stopped', observed_error = NULL,
+             last_active_at = ?, updated_at = ?
+           WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'error'`,
+          )
+          .bind(row.last_active_at, dependencies.now(), row.server_id)
+          .run(),
+      );
+    }
+    return yield* error;
   });
 
   /** Moves the boat stop time of a server in use, so boat does not stop it. */
@@ -1962,7 +2109,7 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     return yield* Effect.gen({ self: this }, function* () {
       return dependencies.billing
-        ? yield* dependencies.billing.closeCheckout(sessionId).pipe(Effect.mapError(hostedFailure))
+        ? (yield* dependencies.billing.closeCheckout(sessionId).pipe(Effect.mapError(hostedFailure))).status
         : null;
     }).pipe(
       Effect.catch((error) =>
@@ -2053,7 +2200,7 @@ export class HostedServerService {
         .bind(
           rateLimited ? row.observed_error : null,
           rateLimited ? 1 : 0,
-          reason,
+          reason === "retention" ? "schedule" : reason,
           rateLimited ? row.provider_event_at : now,
           now,
           now + LEASE_TTL_SECONDS * 1000,
@@ -2166,6 +2313,8 @@ export class HostedServerService {
       );
       this.#track(row, { name: "hosted_server_action", action: "resized", plan: row.plan, size });
     }
+    // After the reply: the client gives the wake request 15 seconds, and the resume can use all of them.
+    if (operationResult2.success) dependencies.schedule(startAfterHeldResume(boat, row.server_id, sandboxId));
   });
 
   readonly #observe = Effect.fn("HostedServerService.observe")(function* (
@@ -2481,6 +2630,27 @@ function rateLimitRetryAt(row: HostedServerRow): number {
   return row.updated_at + Math.min(RATE_LIMIT_RETRY_MAX_MS, Math.max(RATE_LIMIT_RETRY_MIN_MS, waited));
 }
 
+/** A failure does not change the wake. OpenBot then stays stopped until the next stop and resume. */
+const startAfterHeldResume = Effect.fn("HostedServerService.startAfterHeldResume")(function* (
+  boat: BoatClient,
+  serverId: string,
+  sandboxId: string,
+) {
+  const result = yield* Effect.result(
+    boat.runCommand(sandboxId, HELD_RESUME_START_COMMAND, HELD_RESUME_START_TIMEOUT_SECONDS),
+  );
+  if (Result.isFailure(result)) {
+    console.warn("Hosted server start after a held resume failed.", {
+      serverId,
+      error: safeErrorCode(result.failure),
+    });
+  } else if (result.success.exitCode !== 0) {
+    console.warn("Hosted server start after a held resume failed.", { serverId, exitCode: result.success.exitCode });
+  } else if (result.success.stdout.trim() === "started") {
+    console.info("Hosted server started after a held resume.", { serverId });
+  }
+});
+
 function safeErrorCode(error: unknown): string {
   if (error instanceof BoatApiError) return `${error.status}:${error.code}`;
   if (error instanceof HostedServerServiceError || error instanceof BillingError) return error.code;
@@ -2511,6 +2681,10 @@ function notFound(): HostedServerServiceError {
 
 function invalidClaim(): HostedServerServiceError {
   return new HostedServerServiceError(401, "hosted_claim_invalid", "The server claim is invalid or used.");
+}
+
+function planSoldOut(): HostedServerServiceError {
+  return new HostedServerServiceError(409, "plan_sold_out", sourceText("error.billing.planSoldOut"));
 }
 
 function lifecycleFailure() {

@@ -1,7 +1,7 @@
 import { getPublicKeyAsync, hashes, signAsync, verifyAsync } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
-import { base64ToBytes, bytesToBase64 } from "./base64";
+import { base64ToBytes, base64UrlToBytes, bytesToBase64 } from "./base64";
 
 class Ed25519Error extends Schema.TaggedError<Ed25519Error>()("Ed25519Error", { message: Schema.String }) {}
 
@@ -51,6 +51,14 @@ export const verifyEd25519Pem = Effect.fn("Ed25519.verify")(function* (
     catch: cryptoError,
   });
 });
+
+/** The `HostKeySignatureCheck` of clients that have no `node:crypto`. */
+export function verifyEd25519Base64Url(signature: string, message: Uint8Array, publicKeyPem: string) {
+  return Effect.try({ try: () => base64UrlToBytes(signature), catch: cryptoError }).pipe(
+    Effect.flatMap((bytes) => verifyEd25519Pem(bytes, message, publicKeyPem)),
+    Effect.orElseSucceed(() => false),
+  );
+}
 
 function encodePublicKeyPem(publicKey: Uint8Array): string {
   if (publicKey.length !== ED25519_PUBLIC_KEY_BYTES) throw new Error("The Ed25519 public key is invalid.");

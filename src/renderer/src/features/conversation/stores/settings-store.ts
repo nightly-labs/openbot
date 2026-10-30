@@ -1,3 +1,4 @@
+import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentModelId, AgentProviderId, AgentReasoningEffort, UpdateAgentInput } from "@openbot/contracts/ipc";
 import type {
   AgentRuntimeSettings,
@@ -96,9 +97,10 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     if (saved) {
       const activeAgent = deps.props.agent;
       if (activeAgent?.id === agentId) {
-        deps.setSettingsProvider(activeAgent.provider);
-        deps.setSettingsModel(activeAgent.model);
-        deps.setSettingsReasoning(activeAgent.reasoningEffort);
+        const runtime = activeAgent.pendingRuntime ?? activeAgent;
+        if (isKnownAgentProvider(runtime.provider)) deps.setSettingsProvider(runtime.provider);
+        deps.setSettingsModel(runtime.model);
+        deps.setSettingsReasoning(runtime.reasoningEffort);
       }
       return true;
     }
@@ -110,9 +112,10 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       reasoningEffort: deps.settingsReasoning(),
     };
     if (activeAgent?.id !== agentId || !runtimeSettingsEqual(currentSettings, settings)) return false;
-    deps.setSettingsProvider(activeAgent.provider);
-    deps.setSettingsModel(activeAgent.model);
-    deps.setSettingsReasoning(activeAgent.reasoningEffort);
+    const runtime = activeAgent.pendingRuntime ?? activeAgent;
+    if (isKnownAgentProvider(runtime.provider)) deps.setSettingsProvider(runtime.provider);
+    deps.setSettingsModel(runtime.model);
+    deps.setSettingsReasoning(runtime.reasoningEffort);
     if (errorMessage) deps.setComposerError(errorMessage, target);
     return false;
   }

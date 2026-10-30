@@ -1,10 +1,16 @@
-import type { AgentModelOption, AgentProviderId, CustomProviderSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  ClientAgentModelOption,
+  CustomProviderHarness,
+  CustomProviderSummary,
+} from "@openbot/contracts/ipc";
 import {
   agentProviderName,
   CUSTOM_AGENT_DEFAULT_MODEL,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isAgentProvider,
-  isCustomProviderModelId,
   isFreeOpencodeModel,
+  isKnownAgentProvider,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "../text";
@@ -46,7 +52,6 @@ const KNOWN_PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
   "github-copilot": "GitHub Copilot",
   openai: "OpenAI",
-  openrouter: "OpenRouter",
 };
 
 function providerLabel(id: string): string {
@@ -66,13 +71,32 @@ function groupLabel(service: string): string {
   return `${service.slice(0, separator)} · ${providerLabel(service.slice(separator + 1))}`;
 }
 
+/**
+ * The lab of an OpenRouter model: its id starts `<lab>/`. Most names start `<Lab>: `, which gives the
+ * heading for the lab's other models too.
+ */
+function openRouterLab(id: string): string {
+  return id.split("/", 1)[0] ?? "";
+}
+
+function openRouterLabNames(options: readonly ClientAgentModelOption[]): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const model of options) {
+    if (model.provider !== "openrouter") continue;
+    const separator = model.name.indexOf(": ");
+    const lab = openRouterLab(model.id);
+    if (separator > 0 && !names.has(lab)) names.set(lab, model.name.slice(0, separator));
+  }
+  return names;
+}
+
 /** Free tier first; id says nothing about locality. */
 function modelTier(model: PickerModel): 0 | 1 {
   return model.free ? 0 : 1;
 }
 
 /** OpenCode exposes reasoning variants as model IDs. Keep those IDs at the selection boundary. */
-export function pickerModels(options: AgentModelOption[]): PickerModel[] {
+export function pickerModels(options: ClientAgentModelOption[]): PickerModel[] {
   const { t } = currentText();
   const byId = new Map(options.map((model) => [model.id, model]));
   const variants = new Map<string, { id: string; name: string }[]>();
@@ -88,9 +112,12 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
     variants.set(base.id, [...(variants.get(base.id) ?? []), { id: model.id, name }]);
     variantIds.add(model.id);
   }
+  const labNames = openRouterLabNames(options);
+  // A model of a provider that this build does not know has no tab here; the picker shows it alone.
   return options
     .filter((model) => !variantIds.has(model.id))
-    .map((model) => {
+    .flatMap((model) => {
+      if (!isKnownAgentProvider(model.provider)) return [];
       // A custom agent that lists no models has one, named for the agent alone.
       if (
         model.provider === "acp" &&
@@ -121,6 +148,12 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         const inner = name.indexOf("/");
         if (inner >= 0 && (!provider || name.slice(0, inner) === provider)) name = name.slice(inner + 1);
       }
+      // OpenRouter serves hundreds of models, so its tab has one group per lab.
+      if (model.provider === "openrouter") {
+        const lab = openRouterLab(model.id);
+        service = labNames.get(lab) ?? providerLabel(lab);
+        if (name.startsWith(`${service}: `)) name = name.slice(service.length + 2);
+      }
       name = name.replace(/^[\s:–—-]+/, "") || model.id;
       return {
         id: model.id,
@@ -128,7 +161,9 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         name,
         service,
         // Free-tier label only; shared with catalog order so badge and default agree.
-        free: model.provider === "opencode" && isFreeOpencodeModel(model.id, name),
+        free:
+          (model.provider === "opencode" && isFreeOpencodeModel(model.id, name)) ||
+          (model.provider === "openrouter" && model.id.endsWith(":free")),
         variants: variants.has(model.id)
           ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
           : [],
@@ -156,11 +191,27 @@ export function groupPickerModels(models: PickerModel[], search: string): Picker
     .map(([, group]) => group);
 }
 
-export function customProviderIds(providers: readonly CustomProviderSummary[]): ReadonlySet<string> {
-  return new Set(providers.map((provider) => provider.id));
+/** Each saved endpoint id, with the provider that runs it. */
+export function customProviderIds(
+  providers: readonly CustomProviderSummary[],
+): ReadonlyMap<string, CustomProviderHarness> {
+  return new Map(providers.map((provider) => [provider.id, provider.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS]));
 }
 
-/** A model of the Custom tab: a custom endpoint's, which OpenCode serves, or a custom agent's. */
-export function isCustomModel(model: AgentModelOption, customIds: ReadonlySet<string>): boolean {
-  return model.provider === "acp" || (model.provider === "opencode" && isCustomProviderModelId(model.id, customIds));
+/** A model of a custom endpoint, from the provider that runs that endpoint. */
+export function isCustomEndpointModel(
+  provider: ClientAgentModelOption["provider"],
+  modelId: string | null | undefined,
+  customIds: ReadonlyMap<string, CustomProviderHarness>,
+): boolean {
+  const separator = modelId?.indexOf("/") ?? -1;
+  return Boolean(modelId) && separator > 0 && customIds.get(modelId?.slice(0, separator) ?? "") === provider;
+}
+
+/** A model of the Custom tab: a custom endpoint's, which OpenCode or Pi serves, or a custom agent's. */
+export function isCustomModel(
+  model: ClientAgentModelOption,
+  customIds: ReadonlyMap<string, CustomProviderHarness>,
+): boolean {
+  return model.provider === "acp" || isCustomEndpointModel(model.provider, model.id, customIds);
 }

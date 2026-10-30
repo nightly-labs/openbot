@@ -8,6 +8,7 @@ import {
   toast as sonnerToast,
   useSonner,
 } from "solid-sonner";
+import { documentColorScheme } from "./document-color-scheme";
 import { ErrorReference } from "./error-reference";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
 import { currentText } from "./text";
@@ -150,7 +151,7 @@ export function Toaster(props: ToasterProps): JSX.Element {
       <Sonner
         {...sonnerProps}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
-        theme={props.theme ?? "dark"}
+        theme={props.theme ?? documentColorScheme()}
         position={props.position ?? "top-right"}
         // A toast past the visible count stays hidden even when hover expands the stack, so an update
         // offer would wait behind another. Six providers can offer an update at once.

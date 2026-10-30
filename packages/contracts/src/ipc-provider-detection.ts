@@ -63,8 +63,9 @@ export interface DetectedModelServer {
 
 /**
  * The model list of one endpoint that the user types. `savedProviderId` names the endpoint that the
- * user edits: main then uses its stored key and headers for a blank key and no headers, but only for
- * the same origin, so an edited address can never receive the old credentials.
+ * user edits: main then uses its stored key for a blank key, and the stored value of a header whose
+ * value is empty, but only for the same origin, so an edited address can never receive the old
+ * credentials.
  */
 export interface DiscoverModelsInput {
   baseUrl: string;

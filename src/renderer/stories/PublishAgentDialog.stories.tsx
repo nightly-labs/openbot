@@ -12,6 +12,7 @@ const args: Parameters<typeof PublishAgentDialog>[0] = {
   onPublish: fn(async () => undefined),
   onUnpublish: fn(async () => undefined),
   onCopyLink: fn(async () => undefined),
+  onOpenLink: fn(),
 };
 
 const meta = {

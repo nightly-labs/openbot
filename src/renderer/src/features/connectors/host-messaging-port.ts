@@ -2,10 +2,21 @@ import type { MessagingDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { MessagingApi } from "./messaging-connector";
 
-/** The `connectors-v1` messaging requests to a joined server: main's, or the browser client's. */
+/**
+ * The `connectors-v1` messaging requests to a joined server: main's, or the browser client's. The
+ * Discord access requests need `discord-access-v1`.
+ */
 export type HostMessagingApi = Pick<
   MessagingDesktopApi,
-  "hostOverview" | "hostConnect" | "hostDisconnect" | "hostReconnect" | "hostSetEnabled" | "hostAddOrchestrator"
+  | "hostOverview"
+  | "hostConnect"
+  | "hostDisconnect"
+  | "hostReconnect"
+  | "hostSetEnabled"
+  | "hostAddOrchestrator"
+  | "hostGetDiscordAccess"
+  | "hostListDiscordRoles"
+  | "hostSetDiscordAccess"
 >;
 
 /**
@@ -39,5 +50,9 @@ export function hostMessagingApi(
           id,
         ),
       ),
+    discordAccess: (workspaceId) => call((api, id) => api.hostGetDiscordAccess({ workspaceId }, id)),
+    discordRoles: (workspaceId) => call((api, id) => api.hostListDiscordRoles({ workspaceId }, id)),
+    setDiscordAccess: (workspaceId, allowedRoles) =>
+      call((api, id) => api.hostSetDiscordAccess({ workspaceId, allowedRoles }, id)),
   };
 }

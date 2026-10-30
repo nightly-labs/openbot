@@ -27,6 +27,7 @@ export function WorkspaceAgentSetup() {
     modelOptions,
     agentStatus,
     serverSetupChoice,
+    developmentCreation,
   } = useAgents();
   const { createAgent } = useAgentActions();
   const { setupState } = useSetup();
@@ -48,6 +49,12 @@ export function WorkspaceAgentSetup() {
   const localProviderDownloads = createMemo(
     () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
   );
+  /** Providers are managed on this computer, or on a joined host by its owner or an admin. */
+  const manageProviders = createMemo(() => activeServer()?.kind === "local" || providerAdminServerId() !== undefined);
+  const openProviderSettings = (trigger: HTMLElement) => {
+    const server = activeServer();
+    if (server) openServerSettings(server.id, trigger, "providers");
+  };
   /**
    * A remote host without the capability drops the pair in its frozen projection and starts the
    * agent on its own default, so the form offers no choice there: the backend default stands.
@@ -59,7 +66,8 @@ export function WorkspaceAgentSetup() {
    * The draft opens on the hard-coded default, which would bypass the saved setup choice and fail
    * outright after onboarding with a provider the default does not cover. Resolve it from the
    * saved choice and the live catalog until the user picks a model themselves. A joined server's
-   * provider step chose for that server, so its choice comes first.
+   * provider step chose for that server, so its choice comes first. A chosen reasoning level
+   * also stops it, so the development default's level does not replace the user's.
    */
   const [modelTouched, setModelTouched] = createSignal(false);
   createEffect(
@@ -67,14 +75,26 @@ export function WorkspaceAgentSetup() {
       touched: modelTouched(),
       setup: serverSetupChoice() ?? setupState(),
       options: modelOptions(),
+      status: agentStatus(),
+      development: developmentCreation(),
       draft: agentSetupDraft(),
     }),
-    ({ touched, setup, options, draft }) => {
+    ({ touched, setup, options, status, development, draft }) => {
       if (touched) return;
-      const resolved = resolveCreationModel(setup, options);
+      const resolved = resolveCreationModel(setup, options, status, development);
       if (!resolved) return;
-      if (draft.provider === resolved.provider && draft.model === resolved.model) return;
-      setAgentSetupDraft({ ...draft, provider: resolved.provider, model: resolved.model });
+      if (
+        draft.provider === resolved.provider &&
+        draft.model === resolved.model &&
+        draft.reasoningEffort === resolved.reasoningEffort
+      )
+        return;
+      setAgentSetupDraft({
+        ...draft,
+        provider: resolved.provider,
+        model: resolved.model,
+        reasoningEffort: resolved.reasoningEffort,
+      });
     },
   );
 
@@ -94,17 +114,16 @@ export function WorkspaceAgentSetup() {
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
-      onAddCustomProvider={
-        activeServer()?.kind === "local" || providerAdminServerId() !== undefined
-          ? (trigger: HTMLElement) => {
-              const server = activeServer();
-              if (server) openServerSettings(server.id, trigger, "providers");
-            }
-          : undefined
-      }
+      onAddCustomProvider={manageProviders() ? openProviderSettings : undefined}
+      onManageProviders={manageProviders() ? openProviderSettings : undefined}
       onChange={(next) => {
         const current = agentSetupDraft();
-        if (next.provider !== current.provider || next.model !== current.model) setModelTouched(true);
+        if (
+          next.provider !== current.provider ||
+          next.model !== current.model ||
+          next.reasoningEffort !== current.reasoningEffort
+        )
+          setModelTouched(true);
         setAgentSetupDraft(next);
       }}
       onSubmit={createAgent}

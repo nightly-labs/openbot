@@ -1,3 +1,4 @@
+import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import { OpenPanel, type TrackHandlerPayload } from "@openpanel/react-native";
 import * as Application from "expo-application";
 import { Platform } from "react-native";
@@ -8,7 +9,7 @@ import { mobileReportQueue } from "./failure-reports";
 const metadata = {
   surface: "mobile",
   environment: "production",
-  event_schema_version: 2,
+  event_schema_version: ANALYTICS_GENERATIONS.mobile,
   platform: Platform.OS,
   app_version: Application.nativeApplicationVersion ?? "unknown",
   build_number: Application.nativeBuildVersion ?? "unknown",

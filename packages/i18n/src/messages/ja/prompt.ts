@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "キャンセル中…",
   "prompt.browser.pageFallback": "ブラウザーのページ",
   "prompt.browser.hostFallback": "ブラウザー",
+  "prompt.browser.signInBlocked.label": "サインインがブロックされました",
+  "prompt.browser.signInBlocked.title": "{host} が {server} からのサインインをブロックしました",
+  "prompt.browser.signInBlocked.cancelledTitle": "{host} へのサインインはキャンセルされました",
+  "prompt.browser.signInBlocked.body":
+    "このコンピュータでサインインしてください。OpenBot は {host} のサインインだけを {server} に送信し、{name} が続行します。",
+  "prompt.browser.signInBlocked.cancelledBody": "サインインはキャンセルされました。",
+  "prompt.browser.signInBlocked.waiting": "サインインを待っています",
+  "prompt.browser.signInBlocked.waitingButton": "サインインを待っています…",
+  "prompt.browser.signInBlocked.page": "{server} の {host}",
   "prompt.inputRequiredAnnouncement": "入力が必要です。{question}",
 } as const satisfies PartialTranslation<typeof source>;

@@ -9,19 +9,24 @@
 //     `publicKey`, that key wins over whatever the directory advertises now. Otherwise the
 //     advertised key is accepted only when it agrees with the stored fingerprint, or when there is
 //     no stored fingerprint to disagree with. This is what makes an account-service compromise
-//     insufficient to silently re-key a host the user already trusts. It holds for an entry the
+//     insufficient to silently re-key a host the user already trusts. The one exception is a
+//     signed handover chain from the pinned key to the advertised one (`followedHostKeyHandovers`):
+//     the account service relays it but has no key that can sign it. It holds for an entry the
 //     store could not decode as well -- those are absent from `servers`, so `preservedIdentities`
 //     carries their key and fingerprint here. Reading an entry and honouring its pin are separate
 //     questions, and the second one has to answer yes either way.
 //   - **The directory owns the list.** A stored WebRTC host missing from the directory is dropped,
 //     and so is every non-WebRTC server unless `keepOtherTransports` is set. That flag is on only
 //     in development builds, which is why a released build treats the account directory as the
-//     complete answer rather than a set of additions.
+//     complete answer rather than a set of additions. The one exception is a local server of this
+//     computer (`local-servers/`): the account service never knows it.
 //
 // Order is preserved deliberately: surviving stored servers keep their positions, and hosts the
 // user has not seen before are appended in directory order. The user drags this list.
 
+import { verify } from "node:crypto";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
+import { followHostKeyHandovers, type HostKeySignatureCheck } from "@openbot/team-client/host-key-handover";
 import { Effect } from "effect";
 import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
@@ -78,15 +83,55 @@ export interface WebRtcHostReconciliationInput {
   readonly username: string;
   /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
+  /** The local servers of this computer. The account directory never lists them, and they stay. */
+  readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
+  /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
+  readonly followedHandovers?: ReadonlySet<string>;
 }
+
+/** The handover signature check of main, with `node:crypto` rather than the team client's verifier. */
+export const verifyHostKeySignature: HostKeySignatureCheck = (signature, message, publicKeyPem) =>
+  Effect.try({
+    try: () => verify(null, message, publicKeyPem, Buffer.from(signature, "base64url")),
+    catch: () => false,
+  }).pipe(Effect.orElseSucceed(() => false));
+
+/**
+ * The listed hosts whose advertised key differs from the pinned one, and a handover chain signed by
+ * each key in turn leads from the pinned key to the advertised one. Only these may replace a pin.
+ */
+export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedHostKeyHandovers")(function* (
+  input: Pick<WebRtcHostReconciliationInput, "hosts" | "servers" | "preservedIdentities">,
+) {
+  const followed = new Set<string>();
+  for (const host of input.hosts) {
+    const advertised = host.devicePublicKey;
+    if (!advertised || host.keyHandovers.length === 0) continue;
+    const existing = pinnedIdentity(input, host.hostId);
+    const trustedFingerprint = existing?.publicKey ? fingerprint(existing.publicKey) : pinnedFingerprint(existing);
+    if (!trustedFingerprint || trustedFingerprint === fingerprint(advertised)) continue;
+    if (
+      yield* followHostKeyHandovers({
+        hostId: host.hostId,
+        trustedFingerprint,
+        advertisedPublicKey: advertised,
+        handovers: host.keyHandovers,
+        verify: verifyHostKeySignature,
+      })
+    )
+      followed.add(host.hostId);
+  }
+  return followed;
+});
 
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {
   const pinnedKeys: HostKeyPin[] = [];
   const listed = input.hosts
     .filter((host) => host.hostId !== input.localHostId && !input.isHiddenHost(host.hostId))
     .map<StoredRemoteServer>((host) => {
-      const existing = pinnedIdentity(input, host.hostId);
+      const handedOver = input.followedHandovers?.has(host.hostId) === true;
+      const existing = handedOver ? undefined : pinnedIdentity(input, host.hostId);
       const publicKey = resolveHostKey(existing, host.devicePublicKey);
       if (publicKey) pinnedKeys.push({ hostId: host.hostId, publicKey });
       return {
@@ -115,7 +160,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
       // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
       // below would put one id in the list twice, and every lookup by id then answers whichever
       // copy it reached first.
-      if (input.keepOtherTransports && !listedById.has(server.id)) return [{ ...server }];
+      if ((input.keepOtherTransports || input.isThisComputer?.(server.id)) && !listedById.has(server.id))
+        return [{ ...server }];
       // The entry goes, so whatever it opened has to go with it, and nothing else here says so:
       // `removedHostIds` reports WebRTC ids, and a replaced id is still in `servers`, so a caller
       // diffing the two lists sees this host as kept.
@@ -151,7 +197,10 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
  * read. A preserved entry is trusted for identity alone: it is on disk, so the user put it there,
  * and no field the reader rejected is consulted here.
  */
-function pinnedIdentity(input: WebRtcHostReconciliationInput, hostId: string): PinnedIdentity | undefined {
+function pinnedIdentity(
+  input: Pick<WebRtcHostReconciliationInput, "servers" | "preservedIdentities">,
+  hostId: string,
+): PinnedIdentity | undefined {
   const stored = input.servers.find((server) => server.id === hostId);
   if (stored) {
     return stored.transport === "webrtc-v2"

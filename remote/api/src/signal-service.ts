@@ -34,7 +34,7 @@ import {
   type WebhookDeliveryStatus,
 } from "./protocol";
 import { runTelegramCall, type SignalTelegram, type TelegramAnswer, telegramFailure } from "./telegram";
-import { RemoteTokenError, type TelegramChatLink } from "./tokens";
+import { RemoteTokenError, type RemoteTokenUnavailableError, type TelegramChatLink } from "./tokens";
 
 /** The workspaces a verified route ticket names, each with the time it was linked to the host. */
 interface SlackRoute {
@@ -57,8 +57,8 @@ interface TelegramRoute {
 
 export interface RemoteTokenProvider {
   verifyTicket(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
-  verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError>;
-  validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenError>;
+  verifyResumeToken(token: string): Effect.Effect<RemoteTicketClaims, RemoteTokenError | RemoteTokenUnavailableError>;
+  validateClaims(claims: RemoteTicketClaims): Effect.Effect<boolean, RemoteTokenUnavailableError>;
   issueResumeToken(claims: RemoteTicketClaims): Effect.Effect<string, RemoteTokenError>;
   iceServers(claims: RemoteTicketClaims): IceServer[];
   /** Without a route verifier, no ingress socket connects. */
@@ -137,6 +137,7 @@ interface ActiveConnection {
 export interface SignalMetrics {
   acceptedConnections: number;
   authenticationFailures: number;
+  authenticationUnavailable: number;
   protocolFailures: number;
   relayedMessages: number;
   activeSockets: number;
@@ -340,6 +341,7 @@ export class SignalService {
   readonly #metrics: SignalMetrics = {
     acceptedConnections: 0,
     authenticationFailures: 0,
+    authenticationUnavailable: 0,
     protocolFailures: 0,
     relayedMessages: 0,
     activeSockets: 0,
@@ -1142,6 +1144,7 @@ export class SignalService {
           }).pipe(Effect.result);
           let claims: RemoteTicketClaims;
           if (Result.isFailure(initial)) {
+            if (initial.failure._tag === "RemoteTokenUnavailableError") return yield* initial.failure;
             usedInitialTicket = false;
             claims = yield* tokens.verifyResumeToken(message.token);
           } else claims = initial.success;
@@ -1212,17 +1215,23 @@ export class SignalService {
           }
           // Finish signing before admission. No quota slot is held while signing waits or fails.
           const resumeToken = yield* tokens.issueResumeToken(claims);
-          if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) {
-            return yield* new RemoteTokenError({ message: "Revoked ticket." });
-          }
-          if (claims.role !== "host" && this.#revokedSessions.has(claims.sessionId))
-            return yield* new RemoteTokenError({ message: "Ended session." });
+          if (this.#isRevoked(claims))
+            return yield* new RemoteTokenError({ message: "Revoked ticket or ended session." });
           this.#pruneReplayCache();
           if (usedInitialTicket && this.#usedTicketIds.has(claims.jti))
             return yield* new RemoteTokenError({ message: "Ticket was already used." });
           return { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken };
         }).pipe(Effect.result);
         if (Result.isFailure(authentication)) {
+          // After a restart every resume asks the account service. When it does not answer, the
+          // session can still be active: close without an error frame, so that the peer keeps its
+          // data channels and connects again after its backoff.
+          const failure = authentication.failure;
+          if (failure._tag === "RemoteTokenUnavailableError" && !this.#isRevoked(failure)) {
+            this.#metrics.authenticationUnavailable += 1;
+            socket.close(1013, "The account service is unavailable.");
+            return;
+          }
           this.#metrics.authenticationFailures += 1;
           this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
           return;
@@ -1669,6 +1678,11 @@ export class SignalService {
 
   #send(socket: SignalSocket, message: SignalServerMessage): void {
     socket.send(encodeSignalServerMessage(message));
+  }
+
+  #isRevoked(claims: { hostId: string; sessionId: string; role: string; authEpoch: number }): boolean {
+    if ((this.#revokedEpochs.get(claims.hostId) ?? 0) > claims.authEpoch) return true;
+    return claims.role !== "host" && this.#revokedSessions.has(claims.sessionId);
   }
 
   #fail(socket: SignalSocket, code: SignalErrorCode, message: string, closeCode?: number): void {

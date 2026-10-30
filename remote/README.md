@@ -62,14 +62,22 @@ malformed value, Discord is off: Signal logs one line without the value, keeps n
 connection, and `POST /v1/discord/api` answers 503. The remote sessions and the Slack route keep
 running.
 
+Signal asks for the privileged Message Content intent, so that OpenBot gets the text of the message
+a person replies to and of the conversation history. Turn on **Message Content Intent** in the
+Developer Portal. When Discord refuses the intent (close code 4014), Signal logs one line and connects
+without it. `DISCORD_MESSAGE_CONTENT=false` stops Signal asking for it.
+
 Signal keeps the bot's Gateway connection with the intents `Guilds`, `GuildMessages` and
-`DirectMessages`, and no privileged intent. Discord then gives the bot the text of a message only
-when the message mentions the bot. From the Gateway, Signal reads:
+`DirectMessages`, plus `MessageContent` unless `DISCORD_MESSAGE_CONTENT` is `false`. Without the
+Message Content intent, Discord gives the bot the text of a message only when the message mentions
+the bot. With it, Discord sends the text of every message in the channels the bot can see; Signal
+still passes on only the messages that mention the bot. From the Gateway, Signal reads:
 
 - the names of the guilds, channels and threads, and which guild each channel is in;
 - each guild message that mentions the bot and that a person wrote. Signal passes the message ID,
-  channel, author, text without the bot's mention, the replied message, the Discord CDN addresses of
-  the attachments and the time to the `ingress` socket of the host that the guild is linked to;
+  channel, author, the author's role IDs, text without the bot's mention, the replied message (with
+  its author, text and time when a person wrote it and Discord gave its text), the Discord CDN
+  addresses of the attachments and the time to the `ingress` socket of the host that the guild is linked to;
 - each press of an OpenBot button. Signal acknowledges it to Discord at once and passes it on;
 - the removal of the bot from a guild, which ends that guild's connection on the host.
 
@@ -84,7 +92,7 @@ account service which links are current until every older ticket has expired.
 
 A socket with a Discord route gets a `discord-session` token and the list of the guilds routed to it. The host sends it as the
 bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
-reaction, read the messages after one message, read a member or channel name, answer a button press,
+reaction, read the messages after one message, read a member or channel name, list the guild's roles, answer a button press,
 and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
 is routed to that socket, and only in a channel of that guild. No post can ping anyone. The token is
 valid while the socket is open.
@@ -187,8 +195,10 @@ bun run remote:check
 
 Updating Signal may close the WebSocket. An active WebRTC connection stays up. `remote:update` puts coturn
 into drain and waits for the allocations to finish. A single coturn instance is no protection against machine
-failure. Forcing a coturn restart ends active relay sessions. The client performs an ICE restart and resumes
-a file transfer from the last acknowledged offset once the service is back.
+failure; see the standby host in
+[the deployment procedure](../docs/remote-session-deployment.md#standby-signal). Forcing a coturn restart ends
+active relay sessions. The client performs an ICE restart and resumes a file transfer from the last
+acknowledged offset once the service is back.
 
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
 Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device

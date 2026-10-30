@@ -5,7 +5,16 @@
  */
 
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
-import { type AgentAccess, isAgentAccess } from "./ipc-agents";
+import { isAgentTaskLimit } from "./ipc-agent-tasks";
+import {
+  type AgentAccess,
+  type AgentBackupModels,
+  type AgentModelChoice,
+  type AgentUsageLimitReturn,
+  isAgentAccess,
+  isAgentBackupModels,
+  isAgentUsageLimitReturn,
+} from "./ipc-agents";
 import { isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
@@ -154,6 +163,79 @@ export function parseUpdateAgentHostSettingsInput(value: unknown): UpdateAgentHo
   if (value.allowAutomation !== undefined) input.allowAutomation = value.allowAutomation;
   if (value.busyMessageMode !== undefined) input.busyMessageMode = value.busyMessageMode;
   return input;
+}
+
+/**
+ * The backup models of one agent. The local window reads them from the agent summary; an owner or
+ * admin of a joined server reads them here. Null: the agent asks in the chat, with no saved order.
+ */
+export interface AgentBackupModelSettings {
+  backupModels: AgentBackupModels | null;
+  /** The model that the agent left for a usage limit, or null. Read only. */
+  usageLimitReturn: AgentUsageLimitReturn | null;
+}
+
+export interface UpdateAgentBackupModelsInput {
+  agentId: string;
+  backupModels: AgentBackupModels | null;
+}
+
+function copyModelChoice({ provider, model, providerAccountId }: AgentModelChoice): AgentModelChoice {
+  return { provider, model, ...(providerAccountId === undefined ? {} : { providerAccountId }) };
+}
+
+/**
+ * Refuses a provider that this OpenBot does not know, so the client hides the setting instead of
+ * saving an order without it. Copies only the known fields.
+ */
+function decodeBackupModels(value: unknown): AgentBackupModels | null {
+  if (value === null) return null;
+  if (!isAgentBackupModels(value)) throw new Error("Invalid backup models.");
+  return { automatic: value.automatic, order: value.order.map(copyModelChoice) };
+}
+
+export function decodeAgentBackupModelSettings(value: unknown): AgentBackupModelSettings {
+  if (!isDynamicRecord(value)) throw new Error("Invalid backup models.");
+  const back = value.usageLimitReturn;
+  if (back !== null && !isAgentUsageLimitReturn(back)) throw new Error("Invalid backup models.");
+  return {
+    backupModels: decodeBackupModels(value.backupModels),
+    usageLimitReturn: back && { ...copyModelChoice(back), reasoningEffort: back.reasoningEffort },
+  };
+}
+
+export function parseUpdateAgentBackupModelsInput(value: unknown): UpdateAgentBackupModelsInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId)) throw new Error("Invalid backup models.");
+  return { agentId: value.agentId, backupModels: decodeBackupModels(value.backupModels) };
+}
+
+/**
+ * How many tasks of one agent run a turn at the same time. The local window reads it from the agent
+ * summary; an owner or admin of a joined server reads it here. Null: the default,
+ * `AGENT_TASK_LIMIT_DEFAULT`.
+ */
+export interface AgentTaskLimitSettings {
+  taskLimit: number | null;
+}
+
+export interface UpdateAgentTaskLimitInput {
+  agentId: string;
+  taskLimit: number | null;
+}
+
+function decodeTaskLimit(value: unknown): number | null {
+  if (value !== null && !isAgentTaskLimit(value)) throw new Error("Invalid task limit.");
+  return value;
+}
+
+export function decodeAgentTaskLimitSettings(value: unknown): AgentTaskLimitSettings {
+  if (!isDynamicRecord(value)) throw new Error("Invalid task limit.");
+  return { taskLimit: decodeTaskLimit(value.taskLimit) };
+}
+
+export function parseUpdateAgentTaskLimitInput(value: unknown): UpdateAgentTaskLimitInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId)) throw new Error("Invalid task limit.");
+  return { agentId: value.agentId, taskLimit: decodeTaskLimit(value.taskLimit) };
 }
 
 /** The agent a host added from a marketplace listing or a shared template. The agent list has the rest. */

@@ -2,7 +2,7 @@ import { createAgentTemplateShareUrl, isAgentTemplateId, isAgentTemplateShareOri
 import { isAvatarMimeType, isValidAvatarImage } from "./avatar-images";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
-import type { AgentSummary, AvatarImageInput } from "./ipc-agents";
+import type { AvatarImageInput, ClientAgentSummary } from "./ipc-agents";
 import type { MarketplaceAgentRoutine, MarketplaceAgentSkill } from "./ipc-marketplace-agents";
 import { isReleasedRoutineSchedule } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
@@ -70,7 +70,7 @@ export interface InstallAgentTemplateInput {
 }
 
 export interface InstallAgentTemplateResult {
-  agent: AgentSummary;
+  agent: ClientAgentSummary;
 }
 
 /** The share card: the 1.91:1 image X and other sites show for a link. */

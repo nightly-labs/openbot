@@ -214,7 +214,7 @@ download() {
 install_hosting() {
   local source=$1 user file unit changed=0
   user=$(<"$INSTALL/hosted/service-user")
-  [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] || fail "The service user is not valid."
+  [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || fail "The service user is not valid."
   for file in "${HOSTED_FILES[@]}"; do
     install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
     mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"

@@ -8,6 +8,7 @@ export interface ConversationPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "readAgentSessionSettings"
+    | "listAgentNotificationLevels"
     | "askSideQuestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
@@ -17,6 +18,7 @@ export interface ConversationPort {
     | "listRoutines"
     | "listTables"
     | "markConversationRead"
+    | "markConversationUnread"
     | "readConversationPage"
     | "releaseFilePreview"
     | "searchConversationMessages"
@@ -24,7 +26,13 @@ export interface ConversationPort {
   >;
   browser: Pick<
     OpenBotDesktopApi["browser"],
-    "capturePreview" | "onLiveViewEvent" | "sendLiveViewInput" | "startLiveView" | "stopLiveView"
+    | "capturePreview"
+    | "finishLocalSignIn"
+    | "onLiveViewEvent"
+    | "openLocalSignIn"
+    | "sendLiveViewInput"
+    | "startLiveView"
+    | "stopLiveView"
   >;
   servers: Pick<
     OpenBotDesktopApi["servers"],
@@ -37,6 +45,7 @@ export interface ConversationPort {
     | "setDirectTyping"
   >;
   storage: Pick<OpenBotDesktopApi["storage"], "openLocation">;
+  browserDock: Pick<OpenBotDesktopApi["browserDock"], "publishPresentation" | "onAction" | "onShown">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

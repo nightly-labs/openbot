@@ -301,6 +301,8 @@ function DayBars(props: { days: readonly StatusDay[]; name: string; range: Range
     const index = hover();
     return index === null ? undefined : props.days[index];
   };
+  /** The hovered bar's centre as a fraction of the row. The tooltip shifts by the same fraction of its own width, so it stays inside the row. */
+  const tooltipAt = () => ((hover() ?? 0) + 0.5) / props.days.length;
 
   return (
     <div
@@ -324,7 +326,7 @@ function DayBars(props: { days: readonly StatusDay[]; name: string; range: Range
           <div
             class="status-tooltip"
             aria-hidden="true"
-            style={{ left: `${(((hover() ?? 0) + 0.5) / props.days.length) * 100}%` }}
+            style={{ left: `${tooltipAt() * 100}%`, "--status-tooltip-at": String(tooltipAt()) }}
           >
             <p class="status-tooltip-date">{formatLongDay(day().date)}</p>
             <Show when={day().incidents.length > 0} fallback={<p class="status-muted">{dayText(day())}</p>}>

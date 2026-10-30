@@ -12,7 +12,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Cause, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import { normalizeResource } from "../backend/mcp-oauth-provider";
@@ -93,11 +93,11 @@ export class McpHostSignIns {
   }
 
   signOut(input: SignOutMcpServerInput) {
-    return this.#dependencies.service.signOutMcpServer(input);
+    return this.#dependencies.service.signOutMcpServer(input).pipe(Effect.map(onWire));
   }
 
   list(): McpSignInState[] {
-    return this.#dependencies.service.listMcpSignIns();
+    return onWire(this.#dependencies.service.listMcpSignIns());
   }
 
   /** The sign-in app of one row (`mcp-sign-in-app-v1`). The next `start` uses it. */
@@ -116,6 +116,11 @@ export class McpHostSignIns {
   close() {
     return this.#pages.close();
   }
+}
+
+/** The states as `mcp-sign-in-v1` states them: `signedIn` and nothing more. */
+function onWire(states: readonly McpSignInState[]): McpSignInState[] {
+  return states.map(({ mcpServerId, signedIn }) => ({ mcpServerId, signedIn }));
 }
 
 function signInKey(url: string): string {

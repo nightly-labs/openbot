@@ -58,6 +58,22 @@ export interface InboundMessage {
   /** The users the text mentions, without OpenBot, so the service can name them. */
   mentionedUserIds: string[];
   files: InboundFile[];
+  /**
+   * The author's role ids, for a platform with role lists (Discord). Null when the platform did not
+   * say: a connection with a role list then ignores the message.
+   */
+  authorRoleIds?: readonly string[] | null;
+  /** The message this one replies to, when a person wrote it and the platform gave its text or files. */
+  replyTo?: InboundQuote | null;
+}
+
+/** A replied-to message, given to the agent as context. Mentions are written as in `text`. */
+interface InboundQuote {
+  authorName: string;
+  text: string;
+  mentionedUserIds: string[];
+  /** ISO time. */
+  sentAt: string;
 }
 
 interface InboundActionBase {
@@ -99,8 +115,11 @@ export interface ConnectionIdentity {
 export interface ContextEntry {
   id: string;
   authorName: string;
+  /** Names the message's files too, when it has any. */
   text: string;
   sentAt: string;
+  /** The message's files, which the agent gets with the message that it answers. */
+  files?: InboundFile[];
 }
 
 /** A failure the connection cannot recover from alone. The user must act. */
@@ -134,13 +153,13 @@ export interface MessagingAdapter {
   ): Effect.Effect<void, MessagingAdapterError>;
   /**
    * Posts the agent's answer, in as many posts as the platform needs. The first part replaces
-   * `replaceMessageId` when it is given.
+   * `replaceMessageId` when it is given. Returns the id of the first post.
    */
   postAnswer(
     target: MessageTarget,
     markdown: string,
     replaceMessageId: string | null,
-  ): Effect.Effect<void, MessagingAdapterError>;
+  ): Effect.Effect<string, MessagingAdapterError>;
   /** Uploads files to the conversation, and returns the names it did not send. */
   upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
@@ -166,6 +185,8 @@ export interface MessagingAdapter {
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
   places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  /** The roles a person can have in this workspace, highest first, for a platform with role lists. */
+  roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;
   /** Joins every public place the platform lets OpenBot join without an invitation. */
   joinPublicPlaces?(): Effect.Effect<void, MessagingAdapterError>;

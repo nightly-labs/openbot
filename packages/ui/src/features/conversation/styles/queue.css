@@ -1,7 +1,3 @@
-.composer-wrap:has(.composer-attachment) .agent-queue-panel {
-  margin-bottom: 0;
-}
-
 .agent-queue-panel-list {
   /* Seven rows, then the list scrolls. */
   max-height: calc(7 * var(--queue-row-height) + 2 * var(--queue-row-gutter));
@@ -254,11 +250,6 @@
 }
 
 @media (max-width: 620px) {
-  .agent-queue-panel {
-    margin-right: 2px;
-    margin-left: 2px;
-  }
-
   .agent-queue-steer {
     width: 26px;
     padding: 0;

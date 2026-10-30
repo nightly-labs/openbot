@@ -15,10 +15,17 @@
   padding-inline: var(--openbot-space-1);
 }
 
-/* Keep the face beside the bubble, independent of the author name and footer height. */
+/* Keep the face beside the bubble, independent of the author name and footer height. The face is a
+   little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
+.message-entry-with-author,
+.message-author-gutter {
+  --message-author-face-size: var(--openbot-space-8);
+  --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
+}
+
 .message-entry-with-author {
   display: grid;
-  grid-template-columns: calc(var(--openbot-space-6) + var(--openbot-space-1)) minmax(0, 1fr);
+  grid-template-columns: var(--message-author-column) minmax(0, 1fr);
   column-gap: var(--openbot-space-2);
   row-gap: var(--openbot-space-1);
 }
@@ -37,12 +44,9 @@
   grid-row: 3;
 }
 
-.message-entry-with-author .ui-message-footer {
-  grid-column: 2;
-  grid-row: 4;
-}
-
 .message-author-avatar {
+  width: var(--message-author-column);
+  height: var(--message-author-column);
   grid-column: 1;
   grid-row: 2;
   align-self: end;
@@ -52,10 +56,10 @@
 }
 
 .message-author-avatar .agent-avatar {
-  --agent-avatar-optical-offset: -3px;
+  --agent-avatar-optical-offset: -4px;
 
-  width: var(--openbot-space-6);
-  height: var(--openbot-space-6);
+  width: var(--message-author-face-size);
+  height: var(--message-author-face-size);
 }
 
 .message-author-avatar-button {
@@ -74,8 +78,8 @@
  * with one agent draws no faces at all, so it never asks for the column.
  */
 .message-author-gutter {
-  width: 28px;
-  flex: 0 0 28px;
+  width: var(--message-author-column);
+  flex: 0 0 var(--message-author-column);
 }
 
 .message-author-name {
@@ -415,7 +419,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: var(--openbot-space-3);
   padding: 4px 0 8px 8px;
   opacity: 1;
   filter: blur(0);
@@ -488,6 +493,14 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+/* A wait for the provider is not work, so its label does not shine. */
+.agent-activity-entry[data-waiting="true"] .agent-activity-label {
+  animation: none;
+  background: none;
+  color: var(--openbot-text-secondary);
+  -webkit-text-fill-color: currentColor;
 }
 
 .agent-activity-elapsed {
@@ -808,7 +821,8 @@ button.chat-action-target:active,
 /* Markers without a target pill keep the same optical label-to-time rhythm. */
 .chat-action-marker-unavailable .chat-action-marker-label,
 .chat-action-marker-context-reset .chat-action-marker-label,
-.chat-action-marker-model-switch .chat-action-marker-label {
+.chat-action-marker-model-switch .chat-action-marker-label,
+.chat-action-marker-channel-change .chat-action-marker-label {
   padding-inline-end: var(--openbot-space-1-5);
 }
 
@@ -865,6 +879,13 @@ button.chat-action-target:active,
 .chat-action-marker-agent-message .chat-action-agent-menu-trigger:active {
   background: color-mix(in srgb, var(--chat-action-agent-color) 34%, transparent);
   color: var(--openbot-text-primary);
+}
+
+/* The open text of an agent message reads as a chat message under its centred marker. */
+.chat-action-message-text {
+  align-self: stretch;
+  margin-block: var(--openbot-space-2);
+  text-align: start;
 }
 
 .chat-action-target-status-in-progress .ui-marker-icon {
@@ -1374,24 +1395,41 @@ button.chat-action-target:active,
   }
 }
 
-/* A message the host has not stored yet. It reads as the user's own, a step quieter, until it is. */
-.message-entry-pending .message-shell {
-  opacity: 0.7;
-}
-
+/* A failed send, beside the time under the bubble. A send in flight leaves it empty. */
 .pending-send-status {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--openbot-space-1);
+  gap: 2px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
-.pending-send-status[data-state="failed"] .pending-send-label {
+.pending-send-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
   color: var(--openbot-danger-text);
 }
 
+.pending-send-label:not(:empty) {
+  margin-inline-end: var(--openbot-space-1);
+}
+
+.pending-send-label > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+}
+
 .pending-send-error {
-  margin-inline-start: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
   overflow-wrap: anywhere;
+}
+
+.pending-send-error::before {
+  content: "·";
+  margin-inline-end: var(--openbot-space-1);
 }

@@ -58,6 +58,8 @@ export interface ServerConnectionNoticeProps {
   hideDetails?: boolean;
   onRetry: () => void;
   onManage?: () => void;
+  /** The offer of a hosted server, for the user's own computer that is offline. */
+  upsell?: { onSeePlans: () => void } | null | undefined;
 }
 
 /** Connection feedback stays visible until the workspace can answer the user's actions. */
@@ -154,6 +156,18 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
       />
     </>
   );
+  const upsell = () => (
+    <Show when={props.upsell}>
+      {(offer) => (
+        <p class="hosted-upsell-offline">
+          <span>{t("server.upsell.offline")}</span>
+          <Button size="sm" variant="link" onClick={() => offer().onSeePlans()}>
+            {t("server.upsell.seePlans")}
+          </Button>
+        </p>
+      )}
+    </Show>
+  );
   return (
     <Show
       when={props.initial}
@@ -163,6 +177,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
             <p>{title()}</p>
             <p class="server-connection-detail">{detail()}</p>
             <ErrorReference reference={props.reference} />
+            {upsell()}
           </div>
           <div class="server-connection-actions">{actions()}</div>
         </section>
@@ -174,6 +189,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         detail={detail()}
         reference={props.reference ?? null}
         actions={actions()}
+        footer={upsell()}
       />
     </Show>
   );

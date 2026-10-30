@@ -1,7 +1,7 @@
 import { Separator, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { type ReactNode, useEffect, useRef } from "react";
-import { Keyboard, Platform, ScrollView, TextInput, View } from "react-native";
+import { Keyboard, Platform, ScrollView, type ScrollViewInstance, TextInput, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -16,6 +16,7 @@ import {
 } from "@/features/onboarding/components/onboarding-motion";
 import { STEP_TOP_GAP } from "@/features/onboarding/components/onboarding-parts";
 import { haptics } from "@/shared/lib/haptics";
+import { selectionColorProps } from "@/shared/lib/selection-color";
 
 const HEADER_HERO_SIZE = 56;
 // The replies come once the agent has finished "typing", one after another.
@@ -58,7 +59,8 @@ export function ConversationStep({
   onChange: (value: string) => void;
   label: string;
   placeholder: string;
-  maxLength: number;
+  /** Unset for a field that shows its own limit rather than cutting the text at it. */
+  maxLength?: number;
   /** The colour of the agent. */
   color: string;
   disabled: boolean;
@@ -70,7 +72,7 @@ export function ConversationStep({
   const insets = useSafeAreaInsets();
   // With the keyboard open, the ideas belong right above the field. While the field is in use, the
   // conversation keeps its end in view as the keyboard shrinks it, so the field never cuts them.
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<ScrollViewInstance>(null);
   const composing = useRef(false);
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   useEffect(() => {
@@ -98,6 +100,10 @@ export function ConversationStep({
         ref={scroller}
         onLayout={() => {
           if (composing.current) scroller.current?.scrollToEnd({ animated: false });
+        }}
+        // Text under the replies, such as an error, can come while the user writes. It stays in view.
+        onContentSizeChange={() => {
+          if (composing.current) scroller.current?.scrollToEnd({ animated: true });
         }}
         className="flex-1"
         contentContainerClassName="grow gap-4 px-6 pt-4 pb-4"
@@ -179,8 +185,7 @@ export function ConversationStep({
           placeholder={placeholder}
           placeholderTextColor={String(muted)}
           maxLength={maxLength}
-          cursorColor={color}
-          selectionColor={color}
+          {...selectionColorProps(color)}
           textAlignVertical="top"
           className="font-sans text-[17px]"
           style={{ color: String(foreground), maxHeight: 132, paddingVertical: 12 }}

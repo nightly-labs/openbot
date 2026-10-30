@@ -16,6 +16,7 @@ describe("development Auth API LAN access", () => {
       "/v1/me/profile",
       "/v1/me/avatar",
       "/v1/mobile/features?platform=ios&version=1.2.0",
+      "/v1/mobile/changelog?platform=ios&after=1.4.1",
       "/v1/avatars/user-id?v=photo-version",
       "/v1/mobile-auth/devices?includeDesktop=true",
       "/v1/mobile-auth/devices/session-id?includeDesktop=true",
@@ -46,6 +47,7 @@ describe("development Auth API LAN access", () => {
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/devices/session-id/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/me/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile/other")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile/changelog/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/avatars/user-id/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/agent-templates/mine")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/agent-templates/template-id/card")).toBe(false);
@@ -66,5 +68,34 @@ describe("development Auth API LAN access", () => {
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/hosting/servers/server-1/activity")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/hosting/servers/server-1")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/hosting/servers/server-1/restart/other")).toBe(false);
+  });
+
+  it("exposes the public Marketplace catalog to the phone and keeps account reads on loopback", () => {
+    for (const path of [
+      "/v1/skills/?sort=installs&limit=50",
+      "/v1/skills/skill-1",
+      "/v1/skills/skill-1/icon",
+      "/v1/marketplace/agents/?category=coding&limit=50",
+      "/v1/marketplace/agents/listing-1",
+      "/v1/marketplace/agents/listing-1/avatar",
+      "/plugins/icon/linear?app=linear",
+    ]) {
+      expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(true);
+    }
+    for (const path of [
+      "/v1/skills/mine",
+      "/v1/skills/admin/submissions",
+      "/v1/skills/skill-1/install",
+      "/v1/skills/skill-1/content",
+      "/v1/skills/skill-1/versions/version-1",
+      "/v1/marketplace/agents/mine",
+      "/v1/marketplace/agents/admin/submissions",
+      "/v1/marketplace/agents/listing-1/install",
+      "/v1/marketplace",
+      "/plugins/linear",
+      "/plugins/icon/linear/other",
+    ]) {
+      expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(false);
+    }
   });
 });

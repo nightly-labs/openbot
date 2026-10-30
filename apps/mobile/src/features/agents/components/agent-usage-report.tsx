@@ -3,6 +3,7 @@ import {
   type AnalyticsAgent,
   type AnalyticsProviderDay,
   agentProviderCliName,
+  analyticsTokens,
   isAgentProvider,
 } from "@openbot/contracts/ipc";
 import { usageSeries, usageTotalSeries } from "@openbot/team-client/usage-series";
@@ -56,7 +57,10 @@ export function AgentUsageReport({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const selectedIndex = result.daily.findIndex((day) => day.date === selectedDate);
   const selected = selectedIndex < 0 ? undefined : result.daily[selectedIndex];
-  const max = Math.max(0, ...result.daily.map((day) => day[metric] ?? 0));
+  const max = Math.max(
+    0,
+    ...result.daily.map((day) => (metric === "processedTokens" ? analyticsTokens(day) : (day.estimatedCostUsd ?? 0))),
+  );
   const dates = useMemo(() => result.daily.map((day) => day.date), [result]);
   const chart = useMemo(
     () => usageSeries(result.providerDaily ?? [], result.daily, metric === "estimatedCostUsd" ? "cost" : "tokens"),
@@ -82,6 +86,11 @@ export function AgentUsageReport({
       ? format.number(value, { notation: "compact", maximumFractionDigits: 1 })
       : format.currencyUsd(value, { maximumSignificantDigits: 2 });
   const totals = result.totals;
+  // The backend share and order are of processed tokens, cache reads included, so the rows take theirs again.
+  const share = (row: { processedTokens: number; cachedInput: number | null }) =>
+    analyticsTokens(totals) ? analyticsTokens(row) / analyticsTokens(totals) : 0;
+  const byTokens = <T extends { processedTokens: number; cachedInput: number | null }>(rows: readonly T[]) =>
+    [...rows].sort((a, b) => analyticsTokens(b) - analyticsTokens(a));
   const partial = totals.missingUsageTurns || totals.incompleteRecords || totals.unpricedRecords;
   return (
     <View className="gap-5">
@@ -91,10 +100,10 @@ export function AgentUsageReport({
       <View className="flex-row gap-3">
         <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
           <Typography type="body-xs" className="text-grouped-secondary">
-            {t("mobile.agent.usage.processedTokens")}
+            {t("mobile.agent.usage.tokensWithoutCacheReads")}
           </Typography>
-          <UsageValue value={number(totals.processedTokens)}>
-            <Typography className="text-2xl font-semibold">{number(totals.processedTokens)}</Typography>
+          <UsageValue value={number(analyticsTokens(totals))}>
+            <Typography className="text-2xl font-semibold">{number(analyticsTokens(totals))}</Typography>
           </UsageValue>
         </View>
         <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
@@ -131,7 +140,7 @@ export function AgentUsageReport({
             label={t(metric === "processedTokens" ? "mobile.agent.usage.chartTokens" : "mobile.agent.usage.chartCost")}
             value={
               selected
-                ? `${date(selected.date)}: ${metric === "processedTokens" ? t("mobile.agent.usage.tokenCount", { tokens: number(selected.processedTokens) }) : money(selected.estimatedCostUsd)}`
+                ? `${date(selected.date)}: ${metric === "processedTokens" ? t("mobile.agent.usage.tokenCount", { tokens: number(analyticsTokens(selected)) }) : money(selected.estimatedCostUsd)}`
                 : t("mobile.agent.usage.selectDay")
             }
           />
@@ -164,7 +173,7 @@ export function AgentUsageReport({
             {selected
               ? t("mobile.agent.usage.selectedDay", {
                   date: date(selected.date),
-                  tokens: number(selected.processedTokens),
+                  tokens: number(analyticsTokens(selected)),
                   cost: money(selected.estimatedCostUsd),
                   sessions: number(selected.sessions),
                 })
@@ -216,21 +225,21 @@ export function AgentUsageReport({
       {agents ? (
         <SettingsSection title={t("mobile.server.usage.agents")}>
           {agents.length ? (
-            agents.map((agent) => (
+            byTokens(agents).map((agent) => (
               <SettingsRow
                 key={agent.agentId}
                 onPress={onSelectAgent ? () => onSelectAgent(agent.agentId) : undefined}
                 supportingText={t("mobile.server.usage.agentLine", {
-                  tokens: number(agent.processedTokens),
+                  tokens: number(analyticsTokens(agent)),
                   cost: money(agent.estimatedCostUsd),
-                  percent: format.percent(agent.share, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                  percent: format.percent(share(agent), { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
                 })}
               >
                 <Typography numberOfLines={1}>{agent.name}</Typography>
                 <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
                   <UsageBar
                     className="h-full bg-accent"
-                    style={{ width: `${Math.min(100, Math.max(0, agent.share * 100))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, share(agent) * 100))}%` }}
                   />
                 </View>
               </SettingsRow>
@@ -246,25 +255,25 @@ export function AgentUsageReport({
       ) : null}
       <SettingsSection title={t("mobile.agent.usage.models")}>
         {result.models.length ? (
-          result.models.map((model) => (
+          byTokens(result.models).map((model) => (
             <View key={`${model.provider}:${model.model}`} className="gap-2 p-4">
               <Typography>{model.model || t("mobile.agent.usage.unknownModel")}</Typography>
               <Typography type="body-xs" className="text-grouped-secondary">
                 {t("mobile.agent.usage.modelLine", {
                   provider: providerName(model.provider),
-                  tokens: number(model.processedTokens),
+                  tokens: number(analyticsTokens(model)),
                   cost: money(model.estimatedCostUsd),
                 })}
               </Typography>
               <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
                 <UsageBar
                   className="h-full bg-accent"
-                  style={{ width: `${Math.min(100, Math.max(0, model.share * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, share(model) * 100))}%` }}
                 />
               </View>
               <Typography type="body-xs" className="text-grouped-secondary">
                 {t("mobile.agent.usage.share", {
-                  percent: format.percent(model.share, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                  percent: format.percent(share(model), { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
                 })}
               </Typography>
             </View>
@@ -289,6 +298,9 @@ export function AgentUsageReport({
         ) : null}
         <Typography type="body-xs" className="text-grouped-secondary">
           {t("mobile.agent.usage.costNote")}
+        </Typography>
+        <Typography type="body-xs" className="text-grouped-secondary">
+          {t("mobile.agent.usage.tokensNote")}
         </Typography>
         <Typography type="body-xs" className="text-grouped-secondary">
           {t("mobile.agent.usage.collection", {

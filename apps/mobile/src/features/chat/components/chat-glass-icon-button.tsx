@@ -1,6 +1,6 @@
-import { GlassView } from "expo-glass-effect";
+import { type GlassColorScheme, GlassView } from "expo-glass-effect";
 import type { PropsWithChildren } from "react";
-import { Pressable, type ViewStyle } from "react-native";
+import { type AccessibilityValue, Pressable, type ViewStyle } from "react-native";
 import Animated, { type CSSTransitionProperties, cubicBezier } from "react-native-reanimated";
 
 const FADE: CSSTransitionProperties = {
@@ -11,7 +11,10 @@ const FADE: CSSTransitionProperties = {
 
 interface ChatGlassButtonProps extends PropsWithChildren {
   accessibilityLabel: string;
+  accessibilityValue?: AccessibilityValue;
   className?: string;
+  /** The glass follows the system appearance unless a surface that is always dark asks for dark. */
+  colorScheme?: GlassColorScheme;
   disabled?: boolean;
   fallbackBackground: ViewStyle["backgroundColor"];
   height?: number;
@@ -28,8 +31,10 @@ interface ChatGlassButtonProps extends PropsWithChildren {
 /** The floating control above the composer: a glass capsule with an icon, a label, or both. */
 export function ChatGlassButton({
   accessibilityLabel,
+  accessibilityValue,
   children,
   className = "flex-1 flex-row items-center justify-center",
+  colorScheme,
   disabled = false,
   fallbackBackground,
   height = 48,
@@ -45,6 +50,7 @@ export function ChatGlassButton({
         animate: true,
         animationDuration: 0.2,
       }}
+      colorScheme={colorScheme}
       isInteractive={liquidGlassAvailable && !disabled && !hidden}
       pointerEvents={hidden ? "none" : "auto"}
       style={{
@@ -72,6 +78,7 @@ export function ChatGlassButton({
       )}
       <Pressable
         accessibilityLabel={accessibilityLabel}
+        accessibilityValue={accessibilityValue}
         accessibilityElementsHidden={hidden}
         importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
         accessibilityRole="button"
@@ -90,6 +97,55 @@ export function ChatGlassButton({
           <Animated.View style={{ opacity: hidden ? 0 : 1, ...FADE }}>{children}</Animated.View>
         )}
       </Pressable>
+    </GlassView>
+  );
+}
+
+/** Text on the same glass capsule as the buttons beside it, such as a position, with no action. */
+export function ChatGlassLabel({
+  children,
+  colorScheme,
+  fallbackBackground,
+  height = 48,
+  hidden,
+  liquidGlassAvailable,
+}: Pick<
+  ChatGlassButtonProps,
+  "children" | "colorScheme" | "fallbackBackground" | "height" | "hidden" | "liquidGlassAvailable"
+>) {
+  return (
+    <GlassView
+      glassEffectStyle={{
+        style: liquidGlassAvailable && !hidden ? "regular" : "none",
+        animate: true,
+        animationDuration: 0.2,
+      }}
+      colorScheme={colorScheme}
+      isInteractive={false}
+      pointerEvents="none"
+      style={{
+        backgroundColor: "transparent",
+        borderCurve: "continuous",
+        borderRadius: height / 2,
+        height,
+        justifyContent: "center",
+        overflow: "hidden",
+        paddingHorizontal: 16,
+      }}
+    >
+      {liquidGlassAvailable ? null : (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: fallbackBackground,
+            opacity: hidden ? 0 : 1,
+            ...FADE,
+          }}
+        />
+      )}
+      <Animated.View style={{ opacity: hidden ? 0 : 1, ...FADE }}>{children}</Animated.View>
     </GlassView>
   );
 }

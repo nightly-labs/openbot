@@ -112,6 +112,8 @@ export interface AppLoadingScreenProps {
   /** The code of the failure in `detail`, for a user to copy into a report. */
   reference?: string | null;
   actions?: JSX.Element;
+  /** Content under the actions, such as an offer that the wait makes useful. */
+  footer?: JSX.Element;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
@@ -261,6 +263,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
         {props.detail && <p class="server-connection-detail">{props.detail}</p>}
         <ErrorReference reference={props.reference} />
         {props.actions && <div class="server-connection-actions">{props.actions}</div>}
+        {props.footer}
       </div>
     </main>
   );

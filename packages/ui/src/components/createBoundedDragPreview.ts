@@ -1,14 +1,14 @@
 interface BoundedDragPreviewStart {
   bounds: HTMLElement;
   className: string;
-  createPreview?: (source: HTMLElement) => HTMLElement;
+  createPreview?: ((source: HTMLElement) => HTMLElement) | undefined;
   event: {
     clientX: number;
     clientY: number;
     dataTransfer: Pick<DataTransfer, "setDragImage"> | null;
   };
-  horizontal?: boolean;
-  previewSize?: { height: number; width: number };
+  horizontal?: boolean | undefined;
+  previewSize?: { height: number; width: number } | undefined;
   source: HTMLElement;
 }
 

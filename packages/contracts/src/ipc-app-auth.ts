@@ -1,6 +1,8 @@
 import type { ManagedProviderId, ManagedToolRuntimeId } from "./agent-providers";
 import type { AgentModelId } from "./ipc-agent-identity";
 import type { AgentProviderId } from "./ipc-agent-status";
+import { integerInRange, isFiniteNumber, isIdentifier } from "./ipc-bounded-values";
+import { isDynamicRecord, isString } from "./runtime-values";
 
 export type DesktopPlatform = "darwin" | "win32" | "linux";
 export type AppVariant = "production" | "dev" | "preview";
@@ -224,7 +226,7 @@ export type CentralAuthState =
       expiresAt: number;
       resendAvailableAt: number;
       developmentCode?: string;
-      issue?: CentralAuthIssue;
+      issue?: CentralAuthIssue | undefined;
     }
   | { status: "signed_in"; user: CentralAuthUser }
   | { status: "error"; issue: CentralAuthIssue };
@@ -236,6 +238,64 @@ export interface VerifyEmailCodeInput {
 }
 
 export type MacPermissionId = "screen-recording" | "accessibility";
+
+/**
+ * The Apple apps an MCP server may drive through AppleScript. macOS asks once for each, under
+ * Privacy & Security › Automation, and keeps the answer for OpenBot.
+ */
+export const MAC_AUTOMATION_TARGETS = [
+  "calendar",
+  "contacts",
+  "mail",
+  "notes",
+  "reminders",
+  "messages",
+  "safari",
+] as const;
+
+export type MacAutomationTarget = (typeof MAC_AUTOMATION_TARGETS)[number];
+
+export const MAC_AUTOMATION_STATUSES = ["granted", "denied", "failed"] as const;
+
+/**
+ * The answer for one app. `denied` is the user's refusal, now or earlier: macOS does not ask again,
+ * and only System Settings can change it. `failed` is anything else, such as an app that is not there.
+ */
+export interface MacAutomationResult {
+  target: MacAutomationTarget;
+  status: (typeof MAC_AUTOMATION_STATUSES)[number];
+}
+
+/**
+ * A program that an agent started and left running after its tool call, such as a dev server that
+ * `nohup ... &` started. The system adopted it, so no provider process of OpenBot holds it now.
+ */
+export interface BackgroundProcess {
+  /** The pid and the start time: a pid is reused. Stop takes it. */
+  id: string;
+  pid: number;
+  /** The command line with secrets redacted. */
+  command: string;
+  /** Milliseconds since the epoch. */
+  startedAt: number;
+  /** The TCP ports that the process or its children listen on. */
+  ports: number[];
+  /** The agent whose workspace holds the working folder of the process, or null when none does. */
+  agentId: string | null;
+}
+
+export function isBackgroundProcess(value: unknown): value is BackgroundProcess {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    integerInRange(value.pid, 1, Number.MAX_SAFE_INTEGER) &&
+    isString(value.command) &&
+    isFiniteNumber(value.startedAt) &&
+    Array.isArray(value.ports) &&
+    value.ports.every((port) => integerInRange(port, 1, 65_535)) &&
+    (value.agentId === null || isIdentifier(value.agentId))
+  );
+}
 
 /**
  * How far Computer Use is from working, as one value the panel switches on.
@@ -336,6 +396,15 @@ export interface ComputerUseCursorPoint {
   y: number;
 }
 
+/**
+ * One chat that is open in its own window as well as in the main window (#2964). The main window
+ * keeps the chat; closing the extra window closes only the window.
+ */
+export interface ChatWindowTarget {
+  serverId: string;
+  agentId: string;
+}
+
 export type ExternalDestination =
   | "opencode-install"
   | "opencode-auth"
@@ -344,9 +413,12 @@ export type ExternalDestination =
   | "feedback"
   | "message"
   // The release notes, the guides and the Discord community of OpenBot, from the Help menu of the window rail.
+  // The community card of the sidebar also opens Discord.
   | "changelog"
   | "guides"
   | "discord"
+  // The OpenBot account on X, from the community card of the sidebar.
+  | "x"
   // The x.ai marketplace listing of the Grok Bot agent that exports agents for OpenBot.
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.

@@ -3,6 +3,7 @@ import {
   agentPermissionLevel,
   agentPermissionUpdate,
   type ConversationMessage,
+  type ConversationSnapshot,
   type RespondToApprovalInput,
   type RespondToPromptInput,
 } from "@openbot/contracts/ipc";
@@ -10,6 +11,8 @@ import type { AgentMessage } from "@openbot/ui/data";
 import { createEffect, createMemo, createProjection, createSignal, mapArray } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import type { createRemoteAgentAdmin } from "../agents/remote-agent-admin";
+import { messagePromptRequestKey, promptRequestKey } from "../conversation/conversation-keys";
+import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import type { WebWorkspace } from "./web-client-context";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
@@ -26,6 +29,8 @@ export function createWebConversationView(options: {
   remoteAgentAdmin: Pick<ReturnType<typeof createRemoteAgentAdmin>, "settings" | "update">;
   /** True when the agent form or a channel covers the conversation. */
   hidden: () => boolean;
+  /** The open side thread's conversation, null when it has none, or undefined for the agent's own chat. */
+  thread: () => ConversationSnapshot | null | undefined;
 }) {
   const { workspace, remoteAgentAdmin } = options;
   const approval = createMemo(() =>
@@ -35,7 +40,8 @@ export function createWebConversationView(options: {
   );
   /**
    * "Always allow" moves an agent at Ask first to Full access, for an owner or admin whose host
-   * answered. The change is written on the host.
+   * answered. The change is written on the host. This card is answered first: the grant answers every
+   * card that still waits, so an answer sent after it would find this one gone.
    */
   const alwaysAllowApproval = createMemo(() => {
     const agent = workspace.selected();
@@ -43,9 +49,8 @@ export function createWebConversationView(options: {
     const settings = remoteAgentAdmin.settings();
     if (!agent || !item || !settings || agentPermissionLevel(settings) !== "ask") return undefined;
     return async () => {
-      await remoteAgentAdmin.update(agentPermissionUpdate(agent.id, "full"));
-      if (approval()?.requestId !== item.requestId) return false;
       await workspace.approve({ requestId: item.requestId, decision: "accept" });
+      await remoteAgentAdmin.update(agentPermissionUpdate(agent.id, "full"));
       return true;
     };
   });
@@ -63,9 +68,14 @@ export function createWebConversationView(options: {
     () => ({ agentId: workspace.state.selectedId, hidden: options.hidden() }),
     () => setAnsweredPrompt(undefined),
   );
+  /** The conversation whose question shows: the open side thread, or the agent's own chat. */
+  const promptPage = () => {
+    const thread = options.thread();
+    return thread === undefined ? workspace.conversation()?.page : thread;
+  };
   const prompt = createMemo<PromptEvent | undefined>(() => {
     if (workspace.state.status !== "online") return;
-    const page = workspace.conversation()?.page;
+    const page = promptPage();
     if (!page?.threadId) return;
     const pending = workspace.state.prompts.find(
       (item) =>
@@ -121,6 +131,14 @@ export function createWebConversationView(options: {
     [],
     { key: "id" },
   );
+  /** The interactive block of the waiting prompt's message, when the agent asked with one. */
+  const promptUiBlock = createMemo(() => {
+    const question = prompt();
+    const page = promptPage();
+    if (!question || !page) return undefined;
+    const requestKey = promptRequestKey(question.turnId, question.requestId);
+    return page.messages.findLast((message) => messagePromptRequestKey(message) === requestKey)?.uiBlock;
+  });
   /** The replied-to messages that are not on the loaded pages. The host sends them with each page. */
   const messageReferences = createMemo(() => {
     const page = workspace.conversation()?.page;
@@ -133,7 +151,10 @@ export function createWebConversationView(options: {
     );
   });
   const missingMessageReferences = () => workspace.conversation()?.missingReferences;
-  async function answerPrompt(answers: RespondToPromptInput["answers"]): Promise<boolean> {
+  async function answerPrompt(
+    answers: RespondToPromptInput["answers"],
+    options?: PromptAnswerOptions,
+  ): Promise<boolean> {
     const question = prompt();
     if (!question) return false;
     setAnsweredPrompt({ prompt: question, presented: false });
@@ -141,7 +162,9 @@ export function createWebConversationView(options: {
       await workspace.answer({ requestId: question.requestId, answers });
     } catch (error) {
       setAnsweredPrompt(undefined);
-      throw error;
+      if (!options?.onError) throw error;
+      options.onError(error);
+      return false;
     }
     return true;
   }
@@ -163,6 +186,7 @@ export function createWebConversationView(options: {
     approval,
     alwaysAllowApproval,
     prompt,
+    promptUiBlock,
     messages,
     messageReferences,
     missingMessageReferences,

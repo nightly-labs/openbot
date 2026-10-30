@@ -17,6 +17,7 @@ import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
+import { typeScale } from "@/shared/lib/type-scale";
 
 export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   id,
@@ -84,7 +85,7 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
       : []),
   ];
   return (
-    <View className="px-4 pt-5 pb-2">
+    <View className="pt-2.5 pr-3 pb-0.5 pl-5">
       <View className="flex-row items-center">
         <Pressable
           accessibilityRole="button"
@@ -94,9 +95,13 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
             void haptics.selection();
             onToggle(id);
           }}
-          className="min-h-12 flex-1 flex-row items-center gap-2"
+          className="min-h-8 flex-1 flex-row items-center gap-1"
+          hitSlop={{ top: 6, bottom: 6 }}
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >
+          <Typography.Paragraph className="font-medium shrink text-muted" numberOfLines={1} style={typeScale.caption}>
+            {name}
+          </Typography.Paragraph>
           <Animated.View
             style={{
               transform: [{ rotate: collapsed ? "0deg" : "90deg" }],
@@ -105,9 +110,8 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
               transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
             }}
           >
-            <ChevronRight size={16} color={muted} />
+            <ChevronRight size={14} color={muted} strokeWidth={2.2} />
           </Animated.View>
-          <Typography.Paragraph className="flex-1 text-muted">{name}</Typography.Paragraph>
         </Pressable>
         <MenuView
           actions={actions}
@@ -140,14 +144,15 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
             accessible
             accessibilityRole="button"
             accessibilityLabel={t("mobile.agent.section.options", { name })}
-            className="size-12 items-center justify-center"
+            className="size-8 items-center justify-center"
+            hitSlop={8}
           >
-            <Ellipsis size={20} color={muted} />
+            <Ellipsis size={18} color={muted} />
           </View>
         </MenuView>
       </View>
       {empty && !collapsed ? (
-        <Typography.Paragraph type="body-sm" className="text-muted">
+        <Typography.Paragraph className="pb-2 text-muted" style={typeScale.preview}>
           {t("mobile.agent.section.empty")}
         </Typography.Paragraph>
       ) : null}

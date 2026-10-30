@@ -93,35 +93,46 @@ function agentRoutineResults(agentId: string): RoutineResultsPort {
   };
 }
 
-export function agentRoutinesPort(agentId: string, automation = false, localHost = false): RoutinesPort {
+/** The host calls an agent's routines make. The desktop sends them through preload. */
+export type AgentRoutinesApi = Pick<
+  OpenBotDesktopApi["agent"],
+  "listRoutines" | "listRoutineRuns" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "onEvent"
+>;
+
+export function agentRoutinesPort(
+  agentId: string,
+  automation = false,
+  localHost = false,
+  api: AgentRoutinesApi = window.openbot.agent,
+): RoutinesPort {
   return {
     ownerId: agentId,
     ownerNoun: "agent",
     limitPolicy: localHost,
     missedPolicy: localHost,
     onceSchedule: localHost,
-    list: () => window.openbot.agent.listRoutines(agentId),
-    listRuns: (routineId, limit) => window.openbot.agent.listRoutineRuns({ agentId, routineId, limit }),
+    list: () => api.listRoutines(agentId),
+    listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule, limitPolicy, missedPolicy }) => {
       const policy = localHost
         ? { ...(limitPolicy ? { limitPolicy } : {}), ...(missedPolicy ? { missedPolicy } : {}) }
         : {};
       return (
         routineId
-          ? window.openbot.agent.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
-          : window.openbot.agent.createRoutine({ agentId, name, instruction, active, timezone, schedule, ...policy })
+          ? api.updateRoutine({ agentId, routineId, name, instruction, active, schedule, ...policy })
+          : api.createRoutine({ agentId, name, instruction, active, timezone, schedule, ...policy })
       ).then((routine) => ({ routine, secret: null }));
     },
-    remove: (routineId) => window.openbot.agent.deleteRoutine({ agentId, routineId }),
+    remove: (routineId) => api.deleteRoutine({ agentId, routineId }),
     test: async (routineId) => {
-      await window.openbot.agent.testRoutine({ agentId, routineId });
+      await api.testRoutine({ agentId, routineId });
     },
     ...(automation
       ? { runCommand: (routineId: string) => window.openbot.agent.automationRunCommand({ agentId, routineId }) }
       : {}),
     ...(localHost ? { results: agentRoutineResults(agentId) } : {}),
     subscribe: (reload) =>
-      window.openbot.agent.onEvent((event) => {
+      api.onEvent((event) => {
         if (event.type === "routines-changed" && event.agentId === agentId) reload();
       }),
   };

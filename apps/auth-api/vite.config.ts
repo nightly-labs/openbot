@@ -25,12 +25,20 @@ export default defineConfig(({ command }) => {
         "@openbot/renderer-web": rendererWebAlias,
       },
     },
+    // Vite removes license comments by default. The home page beam's license requires its notice
+    // in each copy, so the minifier moves `/*!` and `@license` comments to the end of each file.
+    esbuild: { legalComments: "eof" },
     build: {
       // A caption file has to stay a file. It is small enough for Vite to fold
       // into the bundle as a `data:` URL, and a text track fetched from one is
       // cross-origin to the page that asks for it, so the player drops it and the
       // video plays with no captions at all. Everything else keeps the default.
       assetsInlineLimit: (file) => (file.endsWith(".vtt") ? false : undefined),
+    },
+    environments: {
+      // Worker chunks import each other in cycles. Without strict order, a chunk can run before
+      // the chunk that defines its imports, and every request fails with a 500.
+      ssr: { build: { rolldownOptions: { output: { strictExecutionOrder: true } } } },
     },
     server: {
       host: readApiHost(process.env.OPENBOT_API_HOST),
@@ -49,6 +57,7 @@ export default defineConfig(({ command }) => {
         },
       }),
       lazyLanguageCatalogs(),
+      bloubServerBuild(),
       tanstackStart(),
       solidPlugin({ ssr: true }),
       // Lightning CSS currently reports valid named highlight selectors as
@@ -101,6 +110,25 @@ function lazyLanguageCatalogs(): Plugin {
       if (!importer || !EAGER_CATALOG_MODULES.has(source)) return null;
       if (!normalizePath(importer).startsWith(I18N_SOURCE)) return null;
       return `${I18N_SOURCE}lazy-catalogs.ts`;
+    },
+  };
+}
+
+const BLOUB_PACKAGE = "@norbert_bodziony/bloub";
+
+/**
+ * The Cloudflare plugin gives the Worker the `browser` export condition, which selects the DOM
+ * build of bloub. That build calls `template()` when it loads, and the Solid server runtime throws
+ * there, so every request failed with a 500. The Worker takes the server build instead.
+ */
+function bloubServerBuild(): Plugin {
+  const serverEntry = fileURLToPath(import.meta.resolve(BLOUB_PACKAGE));
+  return {
+    name: "openbot-bloub-server-build",
+    enforce: "pre",
+    applyToEnvironment: (environment) => environment.name === "ssr",
+    resolveId(source) {
+      return source === BLOUB_PACKAGE ? serverEntry : null;
     },
   };
 }

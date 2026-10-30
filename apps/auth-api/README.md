@@ -33,8 +33,8 @@ commands continue to use that file.
 
 ### Stripe sandbox
 
-`bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`)
-and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
+`bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
+the license Price (`openbot_license_month`) and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
 again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
 is charged at once, and a downgrade or a shorter interval starts at the next period.
 
@@ -53,10 +53,14 @@ also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, a
-deleted customer, a refund, a dispute, and the welcome email of a first plan. Each scenario uses a Stripe test clock and deletes it at the end. Start the Worker
+deleted customer, a refund, a dispute, and the welcome email of a first plan. The `license-*`
+scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
-`bun scripts/stripe-flows-e2e.ts --print-user-ids`, and `BOAT_API_KEY=e2e-invalid-key`, and forward
-the webhooks to it. A value in the shell overrides `.env.dev`; without the fake key, each paid
+`bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
+`BOAT_API_KEY=e2e-invalid-key`, and forward the webhooks to it. Without a template, hosting is off and
+each server scenario fails with `hosting_unavailable`. A value in the shell overrides `.env.dev`; without the fake key, each paid
 scenario creates a real boat VM. Then, from the
 repository root:
 
@@ -116,6 +120,22 @@ It draws only the images whose inputs changed and deletes images that no
 article uses. `content-art/manifest.json` records a hash of the inputs of each
 image. The build compares those hashes with the articles and fails when an image
 is missing, out of date, or belongs to no article.
+
+## Home page beam
+
+The home page beam is a SolidJS port of
+[LaserFlow from React Bits](https://reactbits.dev/animations/laser-flow). Its license lets the
+website use it, but does not let this public repository contain it. The port is in the private
+`nightly-labs/openbot-laser-flow` repository. Git ignores its path here, and a checkout without it
+builds a home page with no beam. To see the beam locally, clone it into that path:
+
+```bash
+git clone git@github.com:nightly-labs/openbot-laser-flow.git apps/auth-api/src/vendor/laser-flow
+```
+
+CI checks it out with the read-only deploy key in the `LASER_FLOW_DEPLOY_KEY` secret. Pull request
+previews from forks have no beam. A production deploy, from CI or from `bun run deploy`, stops
+before any change when the port is missing. Never copy the file into this repository.
 
 ## Email delivery
 
@@ -209,6 +229,13 @@ bun run api:deploy
 ```
 
 The service applies limits per email, per IP, per challenge, and per resend.
+
+A deploy replaces every file under `/assets/`. Before a production deploy, CI and `bun run api:deploy`
+run `scripts/keep-previous-assets.ts`. It copies the files of the builds that were live in the last
+24 hours from `https://openbot.run` into the new build, so a tab that is open during a deploy can
+still load code. The site keeps the list of these files in `/asset-history.json`. When the list or a
+file cannot be read, the deploy continues with fewer files, and such a tab reloads when it next loads
+code.
 
 ## Hosted sites
 

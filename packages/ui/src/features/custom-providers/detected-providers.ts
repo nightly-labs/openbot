@@ -3,11 +3,17 @@
 
 import {
   CUSTOM_PROVIDER_LIMITS,
+  type CustomProviderHarness,
   type CustomProviderRestart,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import type { AcpAgentCheck, CustomAcpAgentDraft } from "./custom-acp-agent-form";
-import type { CustomProviderDraft, CustomProviderEndpoint, DiscoveredModel } from "./custom-provider-form";
+import {
+  type CustomProviderDraft,
+  type CustomProviderEndpoint,
+  type DiscoveredModel,
+  savedHeaderDrafts,
+} from "./custom-provider-form";
 
 interface DetectedBase {
   /** The detection key that Hide stores: `models:<endpoint key>` or `agent:<command path>`. */
@@ -26,8 +32,12 @@ export type DetectedProvider =
       models: readonly DiscoveredModel[];
       /** For a saved endpoint: the models the user chose, which Edit opens with. */
       savedModels?: readonly DiscoveredModel[] | undefined;
-      /** For a saved endpoint: main holds a key or headers, which a blank key field keeps. */
+      /** For a saved endpoint: main holds a key, which a blank key field keeps. */
       keyStored?: boolean | undefined;
+      /** For a saved endpoint: the names of its saved headers, whose values an empty field keeps. */
+      savedHeaderNames?: readonly string[] | undefined;
+      /** For a saved endpoint: the provider that runs it, which Edit opens with. */
+      harness?: CustomProviderHarness | undefined;
     })
   | (DetectedBase & {
       kind: "agent";
@@ -37,6 +47,8 @@ export type DetectedProvider =
       version?: string | undefined;
       /** For a saved agent: the names of its values, which Edit keeps unless the user types new ones. */
       envNames?: readonly string[] | undefined;
+      /** For a saved agent: its usage prompt, which Edit keeps. */
+      usagePrompt?: string | null | undefined;
     });
 
 /** `found` can grow while `scanning` is true. */
@@ -85,14 +97,15 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
   const models = source
     .slice(0, CUSTOM_PROVIDER_LIMITS.models)
-    .map((model) => ({ id: model.id, name: model.name ?? "" }));
+    .map((model) => ({ id: model.id, name: model.name ?? "", contextWindow: model.contextWindow?.toString() ?? "" }));
   return {
     providerId: provider.id,
     displayName: provider.name,
     baseUrl: provider.baseUrl,
     apiKey: "",
     models: models.length > 0 ? models : [{ id: "", name: "" }],
-    headers: [{ name: "", value: "" }],
+    headers: savedHeaderDrafts(provider.added ? provider.savedHeaderNames : undefined),
+    ...(provider.added && provider.harness ? { harness: provider.harness } : {}),
   };
 }
 
@@ -105,5 +118,6 @@ export function detectedAgentDraft(provider: Extract<DetectedProvider, { kind: "
     command: provider.command,
     args: provider.args,
     env: names.length > 0 ? names.map((name) => ({ name, value: "", savedName: name })) : [{ name: "", value: "" }],
+    usagePrompt: (provider.added && provider.usagePrompt) || "",
   };
 }

@@ -1,10 +1,14 @@
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
-import { remoteHostFingerprint } from "./remote-directory";
+import { remoteHostFingerprint } from "./host-key-handover";
 
 const WorkspacePreferences = Schema.Struct({
   hidden: Schema.mutableKey(Schema.mutable(Schema.Array(Schema.String))),
   pinned: Schema.mutableKey(Schema.mutable(Schema.Array(Schema.String))),
+  pinnedChannels: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
+  hiddenChannels: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
+  /** The workflows that the mobile drawer shows under Workflows. An older app keeps reading the file. */
+  pinnedWorkflows: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
 });
 export type RemoteWorkspacePreferences = typeof WorkspacePreferences.Type;
 const StoredPreferences = Schema.Struct({ version: Schema.Literal(1), ...WorkspacePreferences.fields });
@@ -37,8 +41,13 @@ export function createWorkspacePreferences(
         () => new WorkspacePreferencesError({ message: sourceText("error.remote.preferencesUnreadable") }),
       ),
     );
-    // An older app also saved `pinnedChannels` and `hiddenChannels`. The decode drops them.
-    const preferences: RemoteWorkspacePreferences = { hidden: value.hidden, pinned: value.pinned };
+    const preferences: RemoteWorkspacePreferences = {
+      hidden: value.hidden,
+      pinned: value.pinned,
+      ...(value.pinnedChannels ? { pinnedChannels: value.pinnedChannels } : {}),
+      ...(value.hiddenChannels ? { hiddenChannels: value.hiddenChannels } : {}),
+      ...(value.pinnedWorkflows ? { pinnedWorkflows: value.pinnedWorkflows } : {}),
+    };
     cache.set(hostId, preferences);
     return preferences;
   });

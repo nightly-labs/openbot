@@ -1,10 +1,10 @@
 import { customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { AgentModelId, AgentModelOption, AgentProviderStatus, CreateAgentInput } from "@openbot/contracts/ipc";
 import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
-import { DEVELOPMENT_DEFAULT_PROVIDER, developmentStartingModel } from "./development-defaults";
 import { providerLabel } from "./thread-items";
 
 /** The provider and model setup or Settings recorded, `model` being `null` for the provider's default. */
@@ -101,16 +101,21 @@ export function creationModel(
   return { provider, model };
 }
 
+/** Whether the development defaults stand in for `preference`: a development build, and no choice beyond the built-in provider. */
+export function developmentDefaultsApply(preference: ProviderPreference, developmentDefaults: boolean): boolean {
+  return developmentDefaults && preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null;
+}
+
 /**
  * The provider and model a new agent starts on, or `null` when no provider lists a model it can use.
  *
  * `startingModel` answers for one provider; this one chooses the provider too, which is what a
- * development default needs: the model it names belongs to OpenCode, and a preferred provider of
- * Codex would never list it.
+ * development default needs: the models it names belong to Claude and OpenCode, and a preferred
+ * provider of Codex would never list them.
  *
  * That default stands in for the built-in one and nothing else. A preferred provider that is not
  * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
- * it is.
+ * it is. When no development default can run, Codex starts an agent only while it can run one.
  *
  * A preferred provider that lists nothing -- Grok, which has no built-in list, before its CLI
  * answers, or a CLI that answered with an empty catalog -- is not a reason to refuse the agent
@@ -124,20 +129,19 @@ export function startingChoice(
   preference: ProviderPreference,
   context: { developmentDefaults: boolean; providerAvailable: (provider: AgentProvider) => boolean },
 ): ModelChoice | null {
-  const developmentModel =
-    preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null
-      ? developmentStartingModel({
-          enabled: context.developmentDefaults,
-          models,
-          providerAvailable: context.providerAvailable,
-        })
-      : null;
-  if (developmentModel) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: developmentModel };
+  const developmentStart = developmentDefaultsApply(preference, context.developmentDefaults);
+  const development = developmentStartingModel({
+    enabled: developmentStart,
+    models,
+    providerAvailable: context.providerAvailable,
+  });
+  if (development) return development;
   // `PICKER_PROVIDERS` leaves out `acp`: a custom agent is a program the user added for a purpose,
   // so no agent moves to one unasked.
   const others = PICKER_PROVIDERS.filter((provider) => provider !== preference.provider);
   for (const provider of [preference.provider, ...others]) {
-    if (provider !== preference.provider && !context.providerAvailable(provider)) continue;
+    const chosen = provider === preference.provider && !developmentStart;
+    if (!chosen && !context.providerAvailable(provider)) continue;
     const model = startingModel(provider, models, preference);
     if (model) return { provider, model };
   }

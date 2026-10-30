@@ -14,7 +14,6 @@ export const messages = {
   "skill.emptyEnabled": "У этого агента нет включённых навыков.",
   "skill.emptyAssigned": "У этого агента пока нет назначенных навыков.",
   "skill.folderSkill": "OpenBot не устанавливал этот навык. Измените или удалите его здесь: {location}.",
-  "skill.localOnHost": "Этот локальный навык хранится на хосте. Откройте его сведения на том компьютере.",
   "skill.moreFor": "Ещё для {name}",
   "skill.update": "Обновить",
   "skill.updateName": "Обновить {name}",
@@ -69,4 +68,21 @@ export const messages = {
   "skill.preview.examplePrompt": "Помогите мне использовать этот навык.",
   "skill.preview.try": "Попробовать навык",
   "skill.preview.linkFailed": "Не удалось открыть ссылку.",
+
+  "skill.marketplace.changed": {
+    one: "Навык «{name}» изменён у {count} агента.",
+    few: "Навык «{name}» изменён у {count} агентов.",
+    many: "Навык «{name}» изменён у {count} агентов.",
+    other: "Навык «{name}» изменён у {count} агента.",
+  },
+  "skill.marketplace.updated": {
+    one: "Навык «{name}» обновлён у {count} агента.",
+    few: "Навык «{name}» обновлён у {count} агентов.",
+    many: "Навык «{name}» обновлён у {count} агентов.",
+    other: "Навык «{name}» обновлён у {count} агента.",
+  },
+  "skill.marketplace.undone": "Изменение навыка «{name}» отменено.",
+  "skill.marketplace.confirmAgents": "Агенты: {agents}.",
+  "skill.marketplace.limitReason": "У агента может быть не больше {limit} навыков.",
+  "skill.marketplace.cannotRemove": "OpenBot не может удалить встроенный навык или навык, который он не устанавливал.",
 } as const satisfies PartialTranslation<typeof source>;

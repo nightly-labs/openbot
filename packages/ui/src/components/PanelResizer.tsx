@@ -1,5 +1,6 @@
 import { isFunction } from "@openbot/contracts/runtime-values";
 import { createSignal, onSettled } from "solid-js";
+import { useText } from "../text";
 
 interface PanelResizerProps {
   label: string;
@@ -24,6 +25,7 @@ interface PanelResizerProps {
 }
 
 export function PanelResizer(props: PanelResizerProps) {
+  const { t } = useText();
   let cleanupDrag: (() => void) | undefined;
   let handle: HTMLHRElement | undefined;
   let parentResizeObserver: ResizeObserver | undefined;
@@ -166,7 +168,9 @@ export function PanelResizer(props: PanelResizerProps) {
       aria-valuemin={props.snap?.compactValue ?? props.min}
       aria-valuemax={maximum()}
       aria-valuenow={displayedValue()}
-      aria-valuetext={props.snap?.compact ? `Compact (${props.snap.compactValue}px)` : `${props.value}px`}
+      aria-valuetext={
+        props.snap?.compact ? t("sidebar.resizer.compactWidth", { width: props.snap.compactValue }) : `${props.value}px`
+      }
       onPointerDown={beginDrag}
       onKeyDown={handleKeyDown}
       onDblClick={(event) => {

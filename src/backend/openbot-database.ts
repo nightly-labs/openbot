@@ -192,6 +192,10 @@ export class OpenBotDatabase {
     return this.#conversations.readActiveTurnId(agentId, threadId);
   }
 
+  readRunningTurnIds(): Map<string, string[]> {
+    return this.#conversations.readRunningTurnIds();
+  }
+
   readConversationRevision(agentId: string, threadId: string | null): number {
     return this.#conversations.readConversationRevision(agentId, threadId);
   }
@@ -246,8 +250,9 @@ export class OpenBotDatabase {
     agentId?: string,
     cursor?: string,
     requestedLimit = 100,
+    includeSideThreads = false,
   ): ConversationSearchPage {
-    return this.#conversations.searchConversationMessages(query, agentId, cursor, requestedLimit);
+    return this.#conversations.searchConversationMessages(query, agentId, cursor, requestedLimit, includeSideThreads);
   }
 
   searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {

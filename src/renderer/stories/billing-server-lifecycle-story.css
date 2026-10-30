@@ -3,33 +3,7 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--openbot-space-3);
-  padding: var(--openbot-space-3) var(--openbot-space-6);
+  margin-top: var(--openbot-space-4);
+  padding-top: var(--openbot-space-3);
   border-top: 1px solid var(--openbot-border);
-}
-
-/* A phone-wide page: the heading and the open button above the panel, without the sections. */
-.billing-lifecycle-story-narrow {
-  width: min(390px, 100vw);
-}
-
-.billing-lifecycle-story-narrow .settings-page {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.billing-lifecycle-story-narrow .settings-page-nav {
-  border-right: 0;
-  border-bottom: 1px solid var(--openbot-border);
-  padding-bottom: var(--openbot-space-3);
-}
-
-.billing-lifecycle-story-narrow .settings-page-sections {
-  display: none;
-}
-
-@media (max-width: 700px) {
-  .billing-lifecycle-story-footer {
-    flex-wrap: wrap;
-    padding: var(--openbot-space-3) var(--openbot-space-4);
-  }
 }

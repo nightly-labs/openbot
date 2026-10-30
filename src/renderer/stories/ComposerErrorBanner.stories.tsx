@@ -45,8 +45,7 @@ export const ProviderError: Story = {
  */
 export const DroppedTransport: Story = {
   args: {
-    message:
-      "Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 61)",
+    message: "stream disconnected before completion: Connection refused (os error 61)",
   },
   render: (args) => (
     <ComposerStack>

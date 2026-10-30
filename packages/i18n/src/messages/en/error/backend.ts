@@ -7,6 +7,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
   "error.backend.webhookRouteUnavailable":
     "The public webhook route is not ready. Check the host connection and try again.",
+  "error.backend.webhookTestUnavailable":
+    "The host cannot take the test event now. Make sure it is signed in, then try again.",
+  "error.backend.webhookTestFailed": "The test event did not reach the routine. Try again.",
   // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",
@@ -41,6 +44,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelDeleteUnsupported": "Channel deletion is not supported by this server.",
   "error.backend.browserNavigateUnsupported":
     "This remote host does not support address-bar navigation in an existing tab.",
+  "error.backend.browserUserControlBusy": "This browser tab waits for a secret. Answer the secret request first.",
+  "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
+  "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
+  "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",
+  "error.backend.browserSignInReadFailed": "OpenBot could not read the sign-in from the window.",
+  "error.backend.browserStopUnsupported": "This remote host cannot stop a page load.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",
   "error.backend.browserUrlProtocol": "Only HTTP(S) browser URLs are allowed.",
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
@@ -53,8 +62,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
-  "error.backend.channelsRetired":
-    "Channels are no longer supported. Put agents in one sidebar section to make them work together.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
@@ -63,10 +70,17 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelRoutingTooLong":
     "This request exceeds the routing context limit. Select a member or send a shorter request.",
   "error.backend.channelTaskMemberRequired": "Choose a member for this task.",
+  "error.backend.channelTaskStopped": "Stopped. Continue or reassign this task.",
+  "error.backend.channelRoutingUnreadable": "The lead could not route this message. Reassign it to a member.",
+  "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
+  "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",
+  "error.backend.channelLeadFailed": "The channel lead could not route this message. Choose a member or try again.",
   "error.backend.channelRequestMemberRequired": "Choose a member for this request.",
   "error.backend.channelDeliveryNotCreated": "Channel delivery was not created.",
   "error.backend.channelAssignmentStopped": "This channel assignment has been stopped or replaced.",
   "error.backend.channelAssigneeUnavailable": "The assigned agent is unavailable.",
+  "error.backend.channelAssigneeRemoved": "The assigned member was removed.",
+  "error.backend.channelAssigneeReassign": "The assigned member is unavailable. Reassign this task.",
   "error.backend.channelAssignmentChanged": "This channel assignment has changed.",
   "error.backend.channelMemberRequired": "Select an available member of this channel.",
   "error.backend.memoryEssentialBudget":
@@ -119,6 +133,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
+  "error.backend.attachSvg":
+    "{name} is an SVG file and cannot be attached. Write its absolute path in your answer: the chat shows the image there.",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
@@ -171,11 +187,16 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
   "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marking a message unread is only available for agents on this computer.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
+  "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
+  "error.backend.mcpSignInClientRefused":
+    "The sign-in server did not accept OpenBot when it completed the sign-in. Sign in again: OpenBot registers with the server again.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
@@ -191,8 +212,15 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
+  "error.backend.mcpSignInMetadataUnreadable":
+    "OpenBot could not read the sign-in information of this server. Check the server address and try again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpOAuthProxyUnavailable":
+    "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
+  "error.backend.mcpOAuthSignInNeeded":
+    "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
@@ -206,6 +234,11 @@ export const messages = defineMessages("error.backend", {
   "error.backend.oauthTooManyRedirects": "The OAuth endpoint redirected too many times.",
   "error.backend.oauthRedirectOrigin":
     "The OAuth endpoint redirected to {origin}, so the credentials were not forwarded.",
+  "error.backend.oauthTimedOut": "No answer came from the OAuth endpoint {origin} in time.",
+  "error.backend.oauthResponseTooLarge": "The OAuth endpoint {origin} sent a response that is too large.",
+  "error.backend.oauthResponseUnreadable": "The response of the OAuth endpoint {origin} could not be read.",
+  "error.backend.mcpOAuthPrivateEndpoint":
+    "The OAuth endpoint {origin} is on a private network, but the MCP server is public, so the credentials were not sent.",
   "error.backend.sidebarSectionLimit": "A server can have up to {limit} sidebar sections.",
   "error.backend.sectionNameRequired": "Section name is required.",
   "error.backend.sectionNameTooLong": "Section name is too long.",
@@ -215,6 +248,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.directMessageSelf": "You cannot send a direct message to yourself.",
   "error.backend.readBoundaryUnavailable": "The read boundary is no longer available.",
   "error.backend.sharedFileOutside": "Shared file must be inside the shared directory.",
+  "error.backend.sharedPathIsFolder": "Shared path is a folder, not a file.",
   "error.backend.sharedPathNotFile": "Shared path is not a file.",
   "error.backend.workspaceFileOutside": "Workspace file must be inside the agent workspace.",
   "error.backend.workspacePathNotFile": "Workspace path is not a file.",
@@ -230,17 +264,31 @@ export const messages = defineMessages("error.backend", {
   "error.backend.useChannelTaskControlsWork": "Use the channel task controls for channel work.",
   "error.backend.steerTurnChanged": "The active turn changed before this message could be steered.",
   "error.backend.steerUnsupported": "This provider cannot steer a running turn. Your message stays in the queue.",
+  "error.backend.steerRoutineRun":
+    "A routine is running now. Your message stays in the queue and starts after the routine.",
   "error.backend.steerQueuedOnly": "Only queued messages can be steered.",
   "error.backend.promptInactive": "This prompt is no longer active.",
   "error.backend.promptAnswerMismatch": "A prompt answer does not match an active question.",
+  "error.backend.uiBlockAnswerInvalid": "This answer does not fit the agent's block.",
+  "error.backend.uiBlockActionNotAllowed": "Only the server owner or an admin can choose this action.",
   "error.backend.approvalInactive": "This approval is no longer active.",
+  "error.backend.approvalOwnerOnly": "Only the server owner can approve this action.",
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
+  "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
+  "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
+  "error.backend.apiKeySaving": "The API key is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
   "error.backend.browserUrlRequired": "A browser URL is required.",
   "error.backend.browserUrlTooLong": "The browser URL is too long.",
   "error.backend.browserTabLimit": "The browser can have up to {limit} open tabs.",
+  "error.backend.browserProfileMissing":
+    "The browser profile of this agent no longer exists. Choose another profile in the agent settings.",
+  "error.backend.browserProfileNotFound": "This browser profile no longer exists.",
+  "error.backend.browserProfileNameTaken": "A browser profile with this name already exists.",
+  "error.backend.browserSessionInUse": "A tab still uses this browser session. Try again.",
+  "error.backend.browserProfileLimit": "You can have up to {limit} browser profiles.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
@@ -261,6 +309,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserTypingFocusMoved":
+    "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
+  "error.backend.browserTypingSubmitSkipped":
+    "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",
@@ -275,6 +327,15 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskNotFound": "This task is not available.",
   "error.backend.taskClosed": "This task is closed. Open it again to send a message.",
   "error.backend.taskStillRunning": "This task still runs. Wait until it stops, then close it.",
+  // Side threads. Hosts before side threads send the task texts above, so those keys stay.
+  "error.backend.threadNotFound": "This thread is not available.",
+  "error.backend.threadStillRunning": "This thread still runs. Stop it, then try again.",
+  "error.backend.threadArchived": "This thread is archived. Restore it to send a message.",
+  "error.backend.threadTitleRequired": "Give the thread a short title.",
+  "error.backend.threadOpenLimitReached":
+    "This agent has {count} open threads. Archive a thread, then start or restore another one.",
+  "error.backend.threadRemoteUnsupported": "Threads are only available for agents on this computer.",
+  "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
   "error.backend.taskOwnChatOnly":

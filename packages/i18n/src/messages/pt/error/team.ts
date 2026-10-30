@@ -9,6 +9,7 @@ export const messages = {
   "error.team.identityCreateFailed": "Não foi possível criar a identidade da equipe.",
   "error.team.accountChangedDuringCreate": "A conta conectada mudou durante a criação deste servidor.",
   "error.team.notConfigured": "Este OpenBot não foi configurado.",
+  "error.team.keyRotationMissing": "Nenhuma alteração de chave do servidor está pendente.",
   "error.team.serverNotActive": "Este servidor não é mais o servidor ativo da conta conectada.",
   "error.team.logoInvalid": "Escolha uma imagem PNG, JPEG ou WebP válida de até 512 KB.",
   "error.team.ownerMembershipConflict":
@@ -28,6 +29,8 @@ export const messages = {
   "error.team.loginIncorrect": "O nome de usuário ou a senha estão incorretos.",
   "error.team.currentPasswordIncorrect": "A senha atual está incorreta.",
   "error.team.memberNotFound": "Membro da equipe não encontrado.",
+  "error.team.directMessageSelf": "Você não pode abrir uma mensagem direta com você mesmo.",
+  "error.team.directRecipientUnavailable": "Este membro da equipe está indisponível.",
   "error.team.ownerCannotChange": "A conta do proprietário não pode ser alterada.",
   "error.team.ownerCannotRemove": "A conta do proprietário não pode ser removida.",
   "error.team.serverNotConfigured": "O servidor da equipe não está configurado.",
@@ -59,14 +62,19 @@ export const messages = {
   "error.team.channelDeleteUnsupported": "Esta conexão não oferece suporte à exclusão de canais.",
   "error.team.membersCannotDeleteChannels": "Membros não podem excluir canais.",
   "error.team.membersCannotArchiveChannels": "Membros não podem arquivar canais.",
+  "error.team.membersCannotRestoreChannels": "Membros não podem restaurar canais.",
   "error.team.sharedDataUnsupported": "Esta conexão não oferece suporte a dados compartilhados.",
   "error.team.agentInstallUnsupported": "Esta conexão não oferece suporte à adição de agentes.",
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
+  "error.team.agentNotificationLevelsUnsupported":
+    "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
   "error.team.agentPublishUnsupported": "Esta conexão não oferece suporte à publicação de agentes.",
   "error.team.agentUpdateUnsupported": "Esta conexão não oferece suporte à atualização de agentes.",
   "error.team.contextResetUnsupported": "Esta conexão não oferece suporte ao início de um novo chat.",
+  "error.team.contextCompactUnsupported": "Esta conexão não permite compactar o contexto.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexão não oferece suporte à pesquisa de arquivos.",
+  "error.team.sideQuestionUnsupported": "Esta conexão não oferece suporte a perguntas à parte.",
   "error.team.routineFlowsUnsupported":
     "Este servidor não oferece suporte a fluxos de rotinas. Atualize o OpenBot no computador que o executa.",
   "error.team.routineCanvasTooLarge":
@@ -84,6 +92,11 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
+  "error.team.agentMemoryLimitUnsupported": "Esta conexão não oferece suporte ao limite de memórias dos agentes.",
+  "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
+  "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
+  "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
   "error.team.attachmentNotFound": "Anexo não encontrado.",
   "error.team.sharedFileTooLarge": "O arquivo compartilhado excede o limite de 100 MB.",
@@ -92,6 +105,9 @@ export const messages = {
   "error.team.browserSessionNotFound": "Sessão de visualização do navegador não encontrada.",
   "error.team.mcpUnsupported": "Esta conexão não oferece suporte a servidores MCP.",
   "error.team.storageUnsupported": "Esta conexão não oferece suporte a armazenamento.",
+  "error.team.machineResourcesUnsupported": "Esta conexão não oferece suporte ao uso da máquina.",
+  "error.team.machineAlertMemberInvalid":
+    "Só um proprietário ou administrador deste servidor pode receber alertas da máquina.",
   "error.team.hostedSitesUnsupported": "Esta conexão não oferece suporte a sites.",
   "error.team.hostedSitesUnregistered": "Este servidor não está registrado no OpenBot, por isso não tem sites.",
   "error.team.hostedSiteNotFound": "Site não encontrado.",
@@ -118,6 +134,8 @@ export const messages = {
     "Este servidor não pode retransmitir logins. Atualize o OpenBot no computador anfitrião.",
   "error.team.connectorsUnsupported":
     "As conexões deste servidor não podem ser gerenciadas daqui. Atualize o OpenBot no computador anfitrião.",
+  "error.team.discordAccessUnsupported":
+    "Este servidor não consegue definir funções do Discord. Atualize o OpenBot nele.",
   "error.team.connectorPageRefused": "O servidor enviou uma página que o OpenBot não abre.",
   "error.team.signInRelayUnknown": "Este login terminou ou não existe.",
   "error.team.signInRelayUsed": "Este login já foi enviado.",

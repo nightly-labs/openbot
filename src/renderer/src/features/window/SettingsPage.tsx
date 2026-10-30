@@ -2,75 +2,45 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, Input, Search } from "@openbot/ui";
 import { createSignal, For, flush, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { usePlatform } from "../../platform";
 import { useServerSettings } from "../servers/server-settings";
 import { useSettings } from "../settings/settings-context";
-import { navItem, type SettingsTab } from "../settings/settings-tabs";
+import {
+  dynamicIslandSettingsShown,
+  navItem,
+  navItems,
+  type SettingsTab,
+  settingsTabShown,
+} from "../settings/settings-tabs";
 import { ServerSettingsPageTitle, SettingsPageFrame } from "./SettingsPageFrame";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
-/** The row titles of each personal tab, in page order, with the description that the search also reads. */
-const SEARCH_ROWS: { tab: SettingsTab; titleKey: AppTextKey; descriptionKey: AppTextKey }[] = [
-  { tab: "general", titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
-  { tab: "general", titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
-  { tab: "general", titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
-  { tab: "general", titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
-  {
-    tab: "general",
-    titleKey: "settings.agentMemoryLimit.title",
-    descriptionKey: "settings.agentMemoryLimit.description",
-  },
-  { tab: "general", titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
-  { tab: "general", titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
-  {
-    tab: "general",
-    titleKey: "settings.keepRemoteSessions.title",
-    descriptionKey: "settings.keepRemoteSessions.description",
-  },
-  { tab: "general", titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description" },
-  {
-    tab: "general",
-    titleKey: "settings.restoreWorkspace.title",
-    descriptionKey: "settings.restoreWorkspace.description",
-  },
-  { tab: "general", titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
-  {
-    tab: "notifications",
-    titleKey: "settings.desktopNotifications.title",
-    descriptionKey: "settings.desktopNotifications.description",
-  },
-  {
-    tab: "notifications",
-    titleKey: "settings.notificationPreview.title",
-    descriptionKey: "settings.notificationPreview.description",
-  },
-  {
-    tab: "notifications",
-    titleKey: "settings.testNotification.title",
-    descriptionKey: "settings.testNotification.description",
-  },
-  { tab: "notifications", titleKey: "settings.taskSound.title", descriptionKey: "settings.taskSound.description" },
-  {
-    tab: "notifications",
-    titleKey: "settings.soundFeedback.title",
-    descriptionKey: "settings.soundFeedback.description",
-  },
-];
+/** A search entry: a tab, or a row of a tab. A row has an anchor; a tab has none and opens at the top. */
+type SearchRow = { tab: SettingsTab; titleKey: AppTextKey; descriptionKey?: AppTextKey; anchor?: AppTextKey };
+
+/** Each personal tab, then its rows, in the order of the tab list. */
+const SEARCH_ROWS: ReadonlyArray<SearchRow> = navItems.flatMap((item) => [
+  { tab: item.value, titleKey: item.titleKey, descriptionKey: item.descriptionKey },
+  ...item.rows.map((row) => ({ tab: item.value, ...row, anchor: row.titleKey })),
+]);
 
 /** A broad query shows a short list, not every row. */
 const SEARCH_LIMIT = 12;
 
-type SearchRow = (typeof SEARCH_ROWS)[number];
-
-/** The rows whose title or description holds the query. A title match comes first. */
-function rankRows(query: string, text: (key: AppTextKey) => string): SearchRow[] {
+/**
+ * The rows whose title or description holds the query. A title match comes first. `shown` tells
+ * which tabs the settings panel shows on this computer.
+ */
+function rankRows(query: string, text: (key: AppTextKey) => string, shown: (tab: SettingsTab) => boolean): SearchRow[] {
   const needle = query.toLocaleLowerCase();
   const score = (row: SearchRow) => {
     const title = text(row.titleKey).toLocaleLowerCase();
     if (title.startsWith(needle)) return 0;
     if (title.includes(needle)) return 1;
-    return text(row.descriptionKey).toLocaleLowerCase().includes(needle) ? 2 : 3;
+    return row.descriptionKey && text(row.descriptionKey).toLocaleLowerCase().includes(needle) ? 2 : 3;
   };
-  return SEARCH_ROWS.map((row) => ({ row, rank: score(row) }))
+  return SEARCH_ROWS.filter((row) => shown(row.tab))
+    .map((row) => ({ row, rank: score(row) }))
     .filter((entry) => entry.rank < 3)
     .sort((a, b) => a.rank - b.rank)
     .slice(0, SEARCH_LIMIT)
@@ -87,8 +57,11 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   const windowPage = useWindowPage();
   const settings = useSettings();
   const serverSettings = useServerSettings();
+  const platform = usePlatform();
   const [query, setQuery] = createSignal("");
-  const results = () => (query().trim() ? rankRows(query().trim(), (key) => i18n.t(key)) : null);
+  const tabShown = (tab: SettingsTab) =>
+    settingsTabShown(tab, dynamicIslandSettingsShown(platform.appInfo()?.platform, platform.chatWindow !== null));
+  const results = () => (query().trim() ? rankRows(query().trim(), (key) => i18n.t(key), tabShown) : null);
   /** What a screen reader hears while the user types a query. */
   const resultStatus = () => {
     const rows = results();
@@ -99,7 +72,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   };
   let content: HTMLElement | undefined;
 
-  /** Opens the tab of the row, then scrolls to the row, marks it and puts the focus on its control. */
+  /** Opens the tab of the result. For a row, it then scrolls to the row, marks it and puts the focus on its control. */
   const openResult = (row: SearchRow) => {
     setQuery("");
     // The modal applies a tab when the requested tab changes, so clear it first: a repeated tab opens again.
@@ -108,12 +81,14 @@ export function SettingsPage(props: { kind: SettingsKind }) {
     settings.openAppSettings(null, row.tab);
     flush();
     if (!content) return;
-    const title = i18n.t(row.titleKey);
     for (const marked of content.querySelectorAll("[data-search-match]")) marked.removeAttribute("data-search-match");
-    const label = [...content.querySelectorAll(".settings-modal-page .settings-modal-tab-panel *")].find(
-      (element) => element.childElementCount === 0 && element.textContent?.trim() === title,
+    if (!row.anchor) return;
+    // A row that the current state does not show has no anchor in the page; then only the tab opens.
+    const anchor = content.querySelector(
+      `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`,
     );
-    const target = label?.closest(".settings-modal-card > *") ?? label;
+    // A switch row puts the anchor on its switch, so the search marks the whole row of the card.
+    const target = anchor?.closest(".settings-modal-card > *") ?? anchor;
     if (!(target instanceof HTMLElement)) return;
     target.setAttribute("data-search-match", "");
     target.scrollIntoView({ block: "center" });
@@ -193,7 +168,10 @@ export function SettingsPage(props: { kind: SettingsKind }) {
                             <TabIcon aria-hidden="true" />
                             {i18n.t(tab.titleKey)}
                           </span>
-                          <span class="settings-page-result-title">{i18n.t(row.titleKey)}</span>
+                          {/* A tab result shows the tab description, as its title is already on the line above. */}
+                          <span class="settings-page-result-title">
+                            {i18n.t(row.anchor ? row.titleKey : tab.descriptionKey)}
+                          </span>
                         </Button>
                       </li>
                     );

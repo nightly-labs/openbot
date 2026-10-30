@@ -26,7 +26,7 @@ interface SettingsDialogShellProps {
    */
   floatingContent?: JSX.Element;
   onContentElement?: (element: HTMLElement) => void;
-  restoreFocusTarget?: HTMLElement | null;
+  restoreFocusTarget?: HTMLElement | null | undefined;
   /** Where the settings show, or nothing while their page is not on screen. The page has no close button. */
   page: SettingsPagePlacement | undefined;
 }

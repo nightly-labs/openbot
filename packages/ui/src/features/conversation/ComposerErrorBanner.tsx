@@ -11,10 +11,13 @@ import { ComposerNotice } from "./ComposerNotice";
  * stands for its chat until the user closes it or a send succeeds.
  *
  * Sign-in and usage notices have their own components. Dismissing a usage reading does not clear
- * a provider error here.
+ * a provider error here. `tone` is `warning` for an error that a model change fixes; it defaults to
+ * `danger`. `title` names the provider and model of the run that failed.
  */
 export function ComposerErrorBanner(props: {
   message: string;
+  title?: string | undefined;
+  tone?: "warning" | "danger";
   /** The code of the failure behind the message. */
   reference?: string | null | undefined;
   onShown?: () => void;
@@ -28,7 +31,8 @@ export function ComposerErrorBanner(props: {
   );
   return (
     <ComposerNotice
-      tone="danger"
+      tone={props.tone ?? "danger"}
+      title={props.title}
       body={props.message}
       reference={props.reference}
       conversationKey={props.conversationKey}

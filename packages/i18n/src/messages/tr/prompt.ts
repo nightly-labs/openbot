@@ -61,5 +61,14 @@ export const messages = {
   "prompt.browser.cancelling": "İptal ediliyor…",
   "prompt.browser.pageFallback": "Tarayıcı sayfası",
   "prompt.browser.hostFallback": "tarayıcı",
+  "prompt.browser.signInBlocked.label": "Oturum açma engellendi",
+  "prompt.browser.signInBlocked.title": "{host}, {server} üzerinden oturum açmayı engelledi",
+  "prompt.browser.signInBlocked.cancelledTitle": "{host} oturum açma işlemi iptal edildi",
+  "prompt.browser.signInBlocked.body":
+    "Bu bilgisayarda oturum açın. OpenBot {server} sunucusuna yalnızca {host} oturumunu gönderir ve {name} devam eder.",
+  "prompt.browser.signInBlocked.cancelledBody": "Oturum açma iptal edildi.",
+  "prompt.browser.signInBlocked.waiting": "Oturum açma bekleniyor",
+  "prompt.browser.signInBlocked.waitingButton": "Oturum açma bekleniyor…",
+  "prompt.browser.signInBlocked.page": "{server} üzerinde {host}",
   "prompt.inputRequiredAnnouncement": "Girdi gerekiyor. {question}",
 } as const satisfies PartialTranslation<typeof source>;

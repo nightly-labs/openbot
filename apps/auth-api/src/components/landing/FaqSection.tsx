@@ -1,9 +1,10 @@
 import { AppLogo } from "@openbot/brand";
 import { Link } from "@tanstack/solid-router";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { COMPARE_COLLECTION } from "../../lib/compare";
 import { LANDING_COMPARISON_LINKS } from "../../lib/landing-content";
 import { LANDING_FAQ } from "../../lib/landing-faq";
+import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { RivalMark } from "../compare/RivalMark";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { createLandingReveal } from "./createLandingReveal";
@@ -39,7 +40,19 @@ export function FaqSection() {
                       {entry.question}
                       <LandingIcon name="chevron-down" class="compare-faq-chevron" />
                     </summary>
-                    <p class="compare-faq-answer">{entry.answer}</p>
+                    <p class="compare-faq-answer">
+                      {entry.answer}
+                      <Show when={entry.link}>
+                        {(link) => (
+                          <>
+                            {" "}
+                            <a href={link().href} target="_blank" rel={EXTERNAL_LINK_REL}>
+                              {link().label}
+                            </a>
+                          </>
+                        )}
+                      </Show>
+                    </p>
                   </details>
                 )}
               </For>

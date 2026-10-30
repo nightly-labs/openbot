@@ -1,6 +1,8 @@
+import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
+import type { AnchoredEndSpaceConfig } from "@legendapp/list/react-native";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { markdownPlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useIsFocused } from "expo-router";
@@ -20,9 +22,9 @@ import X from "lucide-react-native/icons/x";
 import {
   type ComponentProps,
   createContext,
-  forwardRef,
   memo,
   type PropsWithChildren,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -32,15 +34,14 @@ import {
 } from "react";
 import {
   AccessibilityInfo,
-  type CellRendererProps,
-  FlatList,
   type GestureResponderEvent,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
+  type ViewInstance,
   type ViewStyle,
 } from "react-native";
-import { KeyboardChatScrollView, type KeyboardChatScrollViewProps } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
   FadeInDown,
@@ -49,7 +50,9 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
+import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
@@ -57,8 +60,10 @@ import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/component
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
+import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row";
 import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
-import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
+import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-chat-motion";
+import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import {
@@ -70,27 +75,31 @@ import {
   indexChatMessages,
   type RoutineMarkerEvent,
 } from "@/features/chat/model/chat-messages";
+import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
+import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { nativeTextSelection } from "../model/native-text-selection";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
-import { ChatAttachmentView } from "./chat-attachment";
+import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
+import { ChatImageGallery } from "./chat-image-gallery";
 import { ChatImageGeneration, imageGenerationStatus } from "./chat-image-generation";
+import { ChatImageViewerProvider, isViewableImage } from "./chat-image-viewer";
 import { ChatMessageActions } from "./chat-message-actions";
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
+import { HistoryShownContext } from "./use-history-shown";
 import { useReplyHaptics } from "./use-reply-haptics";
 
 /** The most movement and time of a touch that ends the selection: more is a scroll or a hold. */
@@ -101,47 +110,43 @@ const HANDLE_MARGIN = 24;
 
 /** A row of the list. Thinking steps show in the activity row instead. */
 type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }> | ExchangeGroup;
-const RowLayoutContext = createContext<{
-  id: string | null;
-  onTailStartLayout: ChatMotion["onTailStartLayout"];
-  /** The row of a message from search, until the chat opens at it. */
-  focusId: string | null;
-  onFocusLayout: (id: string, y: number) => void;
-} | null>(null);
-/** Rows above a message from search, so the reader sees what led to it. */
-const FOCUS_CONTEXT_ROWS = 2;
 const NO_ROWS: VisibleMessage[] = [];
+/**
+ * While the chat opens on Android, the list renders only the latest rows, which the reader sees
+ * first. The older rows come when the chat is in place, above the rows on screen.
+ */
+const OPENING_ROWS = 6;
+/** The opening rows reach back to the latest user message when it is this near the end. */
+const OPENING_ROWS_TO_USER = 12;
+const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
+/** The side padding of the list. */
+const LIST_PADDING = 16;
+/** A user's message is at most this part of the list width, as `max-w-[88%]` on its row. */
+const USER_BUBBLE_WIDTH = 0.88;
 
-function MessageCell({ children, item, onLayout, onFocusCapture, style }: CellRendererProps<VisibleMessage>) {
-  const rows = useContext(RowLayoutContext);
-  const nativeProps = { style, onFocusCapture };
-  return (
-    <View
-      {...nativeProps}
-      onLayout={(event) => {
-        onLayout?.(event);
-        if (item.id === rows?.id) rows.onTailStartLayout(item.id, event);
-        if (item.id === rows?.focusId) rows.onFocusLayout(item.id, event.nativeEvent.layout.y);
-      }}
-    >
-      {children}
-    </View>
-  );
+/** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
+function rowKey(message: VisibleMessage): string {
+  return message.id;
 }
-
-const ChatScrollView = forwardRef<Animated.ScrollView, KeyboardChatScrollViewProps & { motion: ChatMotion }>(
-  function ChatScrollView({ motion, ...props }, ref) {
-    const setRef = useCallback(
-      (instance: Animated.ScrollView | null) => {
-        motion.setScrollRef(instance);
-        if (typeof ref === "function") ref(instance);
-        else if (ref) ref.current = instance;
-      },
-      [motion.setScrollRef, ref],
-    );
-    return <KeyboardChatScrollView {...props} ref={setRef} />;
-  },
-);
+/** The size of a user bubble, an agent reply and a marker line differ a lot, so each kind has its own average. */
+function rowType(message: VisibleMessage): string {
+  return message.kind === "message" ? message.author : message.kind;
+}
+// A typical row of a mixed chat: a short reply with its action row. It decides how many rows the
+// list prepares before it has measured any.
+const ESTIMATED_ROW_SIZE = 150;
+// The list renders one screen of rows above and below the visible rows, so a row has mounted and
+// has its size before it comes into view. Chat rows are tall: the default of 250 pixels often
+// prepares less than one row, and a quick scroll showed empty space and rows that grew in place.
+const DRAW_SCREENS = 1;
+// A scroll faster than about a screen per half second marks the list "light". A row that mounts then
+// keeps the space of its previews and media, and draws them when the list slows down. The
+// default threshold is three times faster, so an ordinary quick scroll rendered every row in full.
+const ADAPTIVE_RENDER = { enterVelocity: 1.5, exitVelocity: 0.5 };
+// Older messages that a page adds at the top, and rows that change size above the visible rows, do
+// not move the messages that the reader sees.
+const KEEP_VISIBLE_POSITION = { data: true, size: true };
+const FOLLOW_END = { animated: false, on: { dataChange: true, itemLayout: true, footerLayout: true, layout: true } };
 
 const STARTER_OPTIONS = [
   { id: "plan", label: "mobile.chat.starter.planLabel", detail: "mobile.chat.starter.planDetail" },
@@ -227,11 +232,13 @@ function ChatBubble({
 
 interface ChatMessageListProps {
   target: ChatTarget;
-  /** False while the chat opens on Android: the list has no rows until the chat is in place. */
+  /** False while the chat opens on Android: the list has only its latest rows until the chat is in place. */
   rowsShown: boolean;
   /** Something covers the list, such as the voice mode, so screen readers skip it. */
   accessibilityHidden?: boolean;
   activity?: MobileAgentActivity;
+  /** The activity of each member agent that works in a channel. An agent chat has only `activity`. */
+  activities?: MobileAgentActivity[];
   agents: MobileAgent[];
   motion: ChatMotion;
   sending: boolean;
@@ -242,7 +249,15 @@ interface ChatMessageListProps {
   online: boolean;
   appActive: boolean;
   activeTurnId: string | null;
+  /** The steps row of each finished turn, by the id of its first answer. */
+  turnSummaries?: ReadonlyMap<string, TurnStepsSummary>;
+  /** Opens the thinking of a turn. Absent where no sheet can show it, such as a channel. */
+  onOpenTurn?: (turnId: string) => void;
   questionForm?: QuestionPromptController;
+  /** Opens the form of an open question, in a channel where several agents can ask. */
+  onSelectQuestion?: (messageId: string) => void;
+  /** Rows under the activity, such as the tasks that the agent works on. */
+  activityAccessory?: ReactNode;
   /** The approvals that this chat's agents wait on, shown below the activity as on the desktop. */
   approvals?: readonly PendingApproval[];
   /** The browser requests that this chat's agents wait on. The phone shows them above the composer. */
@@ -311,9 +326,9 @@ interface MessageRowShared {
   userForeground: string;
   /** Unset when the user's messages do not use the agent color. */
   userBubbleStyle: ComponentProps<typeof Animated.View>["style"] | undefined;
+  /** The agent color for the controls of an attachment, unset with the same setting. */
+  attachmentTint: AttachmentTint | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
-  onUserLayout: ChatMotion["onUserLayout"];
-  arrivals: ReadonlySet<string>;
   /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
   animationActive: boolean;
   /** Arriving replies also play back word by word: motion and screen reader settings allow it. */
@@ -321,21 +336,23 @@ interface MessageRowShared {
   /** Replies animate as they arrive: Settings and reduced motion allow it. */
   textReveal: boolean;
   replySession: { progress: Map<string, number>; revealed: Set<string> };
-  /** Changes when a reply reveals its first word, so a waiting row renders its bubble. */
-  revealedCount: number;
   markRevealed: (id: string) => void;
   replyHaptics: ReturnType<typeof useReplyHaptics>;
   canReply: boolean;
   canReact: boolean;
   canSelectText: boolean;
+  canSelectQuestion: boolean;
+  /** The width inside the list padding. The iOS menu of a queued message does not limit its width. */
+  listWidth: number;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
+    selectQuestion: (messageId: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
     nativeSelection: (message: ChatBubbleMessage, selected: string) => void;
     /** The row of the selected message. A tap outside it ends the selection. */
-    selectionArea: (view: View | null) => void;
+    selectionArea: (view: ViewInstance | null) => void;
   };
 }
 
@@ -401,40 +418,47 @@ function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] 
 
 function playbackEligible(message: VisibleMessage) {
   return (
-    message.kind === "message" && message.author === "agent" && (message.streaming || message.status === "completed")
+    message.kind === "message" &&
+    message.author === "agent" &&
+    (message.streaming || message.status === "completed") &&
+    !message.superseded &&
+    (!message.speaker || message.speaker.kind === "agent")
   );
 }
 
-function playbackEnabled(message: VisibleMessage, shared: MessageRowShared) {
-  return playbackEligible(message) && shared.playbackActive && shared.arrivals.has(message.id);
+function playbackEnabled(message: VisibleMessage, shared: MessageRowShared, arriving: boolean) {
+  return playbackEligible(message) && shared.playbackActive && arriving;
 }
 
 // The activity row stands in for a reply until its first word is played back. Rendering the
 // padded bubble before then leaves an empty pill beside the row.
-function awaitingFirstWord(message: VisibleMessage, shared: MessageRowShared) {
+function awaitingFirstWord(message: VisibleMessage, shared: MessageRowShared, arriving: boolean, revealed: boolean) {
   return (
     message.kind === "message" &&
     message.body.trim().length > 0 &&
-    playbackEnabled(message, shared) &&
-    !shared.replySession.revealed.has(message.id) &&
+    playbackEnabled(message, shared, arriving) &&
+    !revealed &&
     (shared.replySession.progress.get(message.id) ?? 0) === 0
   );
 }
 
 const MessageRow = memo(function MessageRow({
   message,
-  isTailUser,
   isFirstUser,
   source,
   questionForm,
   upload,
   outbox,
   selecting = false,
+  arriving,
+  revealed,
   shared,
 }: {
   message: VisibleMessage;
-  isTailUser: boolean;
+  /** The first message of the chat, sent from this phone: it rises from the composer. */
   isFirstUser: boolean;
+  arriving: boolean;
+  revealed: boolean;
   /** The message this one replies to. */
   source?: ChatMessage;
   /** Set only on the row of the question it controls. */
@@ -457,7 +481,7 @@ const MessageRow = memo(function MessageRow({
     if (wasSelecting.current && !selecting) setSelectionGeneration((generation) => generation + 1);
     wasSelecting.current = selecting;
   }, [selecting]);
-  const waiting = awaitingFirstWord(message, shared);
+  const waiting = awaitingFirstWord(message, shared, arriving, revealed);
   // A message that the host does not have yet, or that still streams, has no host ID to act on:
   // it has no actions and no native selection.
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
@@ -480,15 +504,13 @@ const MessageRow = memo(function MessageRow({
     userForeground,
     userBubbleStyle,
     firstMessageStyle,
-    onUserLayout,
-    arrivals,
     replySession,
     markRevealed,
     replyHaptics,
     actions,
   } = shared;
   const eligible = playbackEligible(message);
-  const enabled = playbackEnabled(message, shared);
+  const enabled = playbackEnabled(message, shared, arriving);
   const complete = message.kind === "message" && message.status === "completed";
   const playback = useMemo(
     () =>
@@ -513,6 +535,8 @@ const MessageRow = memo(function MessageRow({
   );
   // Native text views select in place, so only the fallback covers the text with a field.
   const overlaySelecting = selecting && !nativeTextSelection;
+  // The author of a channel message: its agent, or a person.
+  const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   // Another person in an agent chat: a person's bubble in their own colour, seeded by the member id
   // as on desktop, so it does not read as the reader's own.
   const memberColor =
@@ -521,28 +545,38 @@ const MessageRow = memo(function MessageRow({
     message.kind === "message" && message.author === "user" && userBubbleStyle && !memberColor
       ? userForeground
       : foreground;
+  // A generation owns its first attachment, the image; any further files follow in order.
+  const files =
+    message.kind === "message"
+      ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
+      : [];
+  // Two or more images in an agent's reply show together, as on desktop.
+  const gallery =
+    message.kind === "message" && message.author === "agent" && !upload ? files.filter(isViewableImage) : [];
   const rendered =
     message.kind === "routine" ? (
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "exchange-group" ? (
-      <ChatExchangeGroup key={message.id} group={message} agentsById={agentsById} muted={muted} />
-    ) : message.kind === "exchange" ? (
-      <ChatExchangeMarker key={message.id} message={message} agentsById={agentsById} muted={muted} />
+      <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
+    ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
+      <ChatExchangeMarker key={message.id} message={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "plan" ? (
       <ChatPlan key={message.id} message={message} />
     ) : message.kind === "question" ? (
-      <ChatQuestionPrompt key={message.id} prompt={message.prompt} controller={questionForm} canSend={canSend} />
+      <ChatQuestionPrompt
+        key={message.id}
+        prompt={message.prompt}
+        controller={questionForm}
+        canSend={canSend}
+        onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}
+      />
     ) : (
       <Animated.View
         key={message.id}
         entering={
-          arrivals.has(message.id) && !isFirstUser
-            ? message.author === "user"
-              ? USER_MESSAGE_ENTRANCE
-              : undefined
-            : undefined
+          arriving && !isFirstUser ? (message.author === "user" ? USER_MESSAGE_ENTRANCE : undefined) : undefined
         }
         className={
           message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
@@ -554,6 +588,24 @@ const MessageRow = memo(function MessageRow({
             {message.sender.name.trim() || t("mobile.chat.speaker.memberFallback")}
           </Typography.Paragraph>
         ) : null}
+        {message.speaker && message.author !== "user" ? (
+          <View className="flex-row items-center gap-1 px-1">
+            {message.speaker.kind === "agent" ? (
+              <BloubAvatarThumbnail
+                agentId={speaker?.id}
+                serverId={speaker?.serverId}
+                seed={speaker?.avatarSeed ?? message.speaker.id}
+                hue={speaker?.avatarHue ?? null}
+                size={20}
+              />
+            ) : null}
+            <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
+              {message.superseded
+                ? t("mobile.chat.speaker.superseded", { name: message.speaker.name })
+                : message.speaker.name}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
         {message.imageGeneration ? (
           <ChatImageGeneration
             generation={message.imageGeneration}
@@ -562,16 +614,20 @@ const MessageRow = memo(function MessageRow({
             serverId={serverId}
           />
         ) : null}
-        {/* A generation owns its first attachment, the image; any further files follow in order. */}
-        {(message.imageGeneration ? message.attachments?.slice(1) : message.attachments)?.map((attachment, index) => (
-          <ChatAttachmentView
-            key={attachment.id}
-            attachment={attachment}
-            serverId={serverId}
-            alignment={message.author === "user" ? "right" : "left"}
-            upload={upload ? uploadProgressAt(index, upload.completed, upload.current) : undefined}
-          />
-        ))}
+        {gallery.length > 1 ? <ChatImageGallery attachments={gallery} serverId={serverId} /> : null}
+        {(gallery.length > 1 ? files.filter((attachment) => !isViewableImage(attachment)) : files).map(
+          (attachment, index) => (
+            <ChatAttachmentView
+              key={attachment.id}
+              attachment={attachment}
+              serverId={serverId}
+              alignment={message.author === "user" ? "right" : "left"}
+              upload={upload ? uploadProgressAt(index, upload.completed, upload.current) : undefined}
+              tint={shared.attachmentTint}
+              visual={message.visual}
+            />
+          ),
+        )}
         {upload && upload.completed < (message.attachments?.length ?? 0) ? (
           <Button variant="ghost" size="sm" className="self-end" isDisabled={upload.cancelling} onPress={upload.cancel}>
             <Button.Label>
@@ -619,7 +675,7 @@ const MessageRow = memo(function MessageRow({
                   selectable={message.author === "user"}
                   color={textColor}
                   playback={playback}
-                  animationEnabled={shared.animationActive && arrivals.has(message.id)}
+                  animationEnabled={shared.animationActive && arriving}
                   nativeSelection={nativeSelection}
                 />
               </View>
@@ -657,7 +713,6 @@ const MessageRow = memo(function MessageRow({
             ? "max-w-full self-end gap-1"
             : "max-w-[88%] self-end gap-1"
       }
-      onLayout={isTailUser ? onUserLayout : undefined}
     >
       {message.replyToMessageId ? (
         <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
@@ -681,7 +736,12 @@ const MessageRow = memo(function MessageRow({
           {rendered}
         </ChatMessageGesture>
       ) : outbox ? (
-        <OutboxMessageMenu status={outbox}>{rendered}</OutboxMessageMenu>
+        <OutboxMessageMenu
+          status={outbox}
+          maxWidth={message.attachments?.length ? shared.listWidth : shared.listWidth * USER_BUBBLE_WIDTH}
+        >
+          {rendered}
+        </OutboxMessageMenu>
       ) : (
         rendered
       )}
@@ -703,6 +763,87 @@ const MessageRow = memo(function MessageRow({
     </View>
   );
 });
+
+/**
+ * What the rows read besides their message. The list renders a row again only when its message
+ * changes, so the rows read the rest from this context and render again when it changes.
+ */
+interface RowContextValue {
+  shared: MessageRowShared;
+  arrivals: ReadonlySet<string>;
+  revealedIds: ReadonlySet<string>;
+  /** The rows after the latest user message, which hide while the first message rises. */
+  responseIds: ReadonlySet<string>;
+  responseVisible: boolean;
+  responseStyle: ComponentProps<typeof Animated.View>["style"];
+  firstUserId: string | null;
+  messagesById: ReadonlyMap<string, ChatMessage>;
+  promptController: QuestionPromptController | undefined;
+  upload: ChatUpload | null | undefined;
+  outboxStatuses: ReadonlyMap<string, OutboxRowStatus> | undefined;
+  selectingMessageId: string | null;
+  turnSummaries: ReadonlyMap<string, TurnStepsSummary> | undefined;
+  onOpenTurn: ((turnId: string) => void) | undefined;
+}
+
+const RowContext = createContext<RowContextValue | null>(null);
+
+function ChatRow({ message }: { message: VisibleMessage }) {
+  const row = useContext(RowContext);
+  if (!row) return null;
+  const response = row.responseIds.has(message.id);
+  const turn = row.turnSummaries?.get(message.id);
+  const openTurn = row.onOpenTurn;
+  return (
+    <Animated.View
+      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
+      accessibilityElementsHidden={response && !row.responseVisible}
+      importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
+    >
+      {turn && openTurn ? (
+        <ChatTurnStepsRow summary={turn} muted={row.shared.themeMuted} onPress={() => openTurn(turn.turnId)} />
+      ) : null}
+      <MessageRow
+        message={message}
+        isFirstUser={message.id === row.firstUserId}
+        source={
+          message.kind === "message" && message.replyToMessageId
+            ? row.messagesById.get(message.replyToMessageId)
+            : undefined
+        }
+        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+        upload={row.upload?.messageId === message.id ? row.upload : undefined}
+        outbox={row.outboxStatuses?.get(message.id)}
+        selecting={message.id === row.selectingMessageId}
+        arriving={row.arrivals.has(message.id)}
+        revealed={row.revealedIds.has(message.id)}
+        shared={row.shared}
+      />
+    </Animated.View>
+  );
+}
+
+function renderRow({ item }: { item: VisibleMessage }) {
+  return <ChatRow message={item} />;
+}
+
+/**
+ * The latest rows of the chat. They include the latest user message when it is near, so the list
+ * keeps the same space under that message when the older rows come.
+ */
+function openingRows(rows: VisibleMessage[]): VisibleMessage[] {
+  const start = Math.max(0, rows.length - OPENING_ROWS);
+  const user = rows.findLastIndex((message) => message.kind === "message" && message.author === "user");
+  const from = user >= 0 && user >= rows.length - OPENING_ROWS_TO_USER ? Math.min(start, user) : start;
+  return from === 0 ? rows : rows.slice(from);
+}
+
+/** Every image the chat can show itself in the loaded messages, in chat order. */
+function conversationImages(messages: readonly VisibleMessage[]): AttachmentSummary[] {
+  return messages.flatMap((message) =>
+    message.kind === "message" ? (message.attachments ?? []).filter(isViewableImage) : [],
+  );
+}
 
 /** The text that Copy puts on the clipboard: tags and file references show their names. */
 function messageCopyText(message: ChatBubbleMessage): string {
@@ -732,16 +873,45 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
   );
 }
 
+/** The motion state that only the screen reads. It changes while the reader scrolls. */
+const SCREEN_MOTION = new Set(["atLatest", "userScrolled"]);
+
+/** Whether the props or the motion state hold the same values, apart from the keys in `ignored`. */
+function sameValues<T extends Omit<ChatMessageListProps, "motion"> | ChatMotion>(
+  a: T,
+  b: T,
+  ignored?: ReadonlySet<string>,
+): boolean {
+  const before = new Map<string, unknown>(Object.entries(a));
+  const after = Object.entries(b);
+  return (
+    after.length === before.size &&
+    after.every(([key, value]) => ignored?.has(key) || (before.has(key) && Object.is(before.get(key), value)))
+  );
+}
+
+/**
+ * The list draws again when a prop changes, but not when only the motion state that the screen
+ * reads changes. Remove a key from `SCREEN_MOTION` before the list reads it.
+ */
+function sameListProps(previous: ChatMessageListProps, next: ChatMessageListProps): boolean {
+  const { motion: previousMotion, ...previousRest } = previous;
+  const { motion: nextMotion, ...nextRest } = next;
+  return sameValues(previousRest, nextRest) && sameValues(previousMotion, nextMotion, SCREEN_MOTION);
+}
+
 const NO_APPROVALS: readonly PendingApproval[] = [];
 const NO_BROWSER_REQUESTS: readonly BrowserTakeoverRequest[] = [];
+const NO_IDS: ReadonlySet<string> = new Set();
 
-export function ChatMessageList({
+export const ChatMessageList = memo(function ChatMessageList({
   upload,
   outboxStatuses,
   target,
   rowsShown,
   accessibilityHidden = false,
   activity,
+  activities,
   agents,
   motion,
   sending,
@@ -751,7 +921,11 @@ export function ChatMessageList({
   online,
   appActive,
   activeTurnId,
+  turnSummaries,
+  onOpenTurn,
   questionForm,
+  onSelectQuestion,
+  activityAccessory,
   approvals = NO_APPROVALS,
   browserRequests = NO_BROWSER_REQUESTS,
   serverName = "",
@@ -842,18 +1016,25 @@ export function ChatMessageList({
     () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
     [conversationKey],
   );
-  const [revealedCount, setRevealedCount] = useState(0);
+  const [revealedState, setRevealedState] = useState<{ session: typeof replySession; ids: ReadonlySet<string> }>({
+    session: replySession,
+    ids: NO_IDS,
+  });
+  const revealedIds = revealedState.session === replySession ? revealedState.ids : NO_IDS;
   const markRevealed = useCallback(
     (id: string) => {
       if (replySession.revealed.has(id)) return;
       replySession.revealed.add(id);
-      setRevealedCount((count) => count + 1);
+      setRevealedState({ session: replySession, ids: new Set(replySession.revealed) });
     },
     [replySession],
   );
   const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
   const agentColorMessages = useAgentColorMessages((state) => state.enabled);
-  const userBubbleColor = getBloubAvatarColor(target.avatarSeed, target.avatarHue);
+  const userBubbleColor = getBloubAvatarColor(
+    target.kind === "agent" ? target.avatarSeed : target.id,
+    target.kind === "agent" ? target.avatarHue : null,
+  );
   const appearance = useConnectionAppearance(!canSend);
   const red = Number.parseInt(userBubbleColor.slice(1, 3), 16);
   const green = Number.parseInt(userBubbleColor.slice(3, 5), 16);
@@ -872,57 +1053,71 @@ export function ChatMessageList({
     () => groupExchangeMarkers(messages.filter((message) => message.kind !== "thinking")),
     [messages],
   );
-  const tailIndex = visibleMessages.findLastIndex((message) => message.kind === "message" && message.author === "user");
-  const tailId = visibleMessages[tailIndex]?.id ?? null;
-  const generation = motion.latestGeneration;
-  const [boundary, setBoundary] = useState<ChatHistoryBoundary & { generation: number }>({
-    firstId: null,
-    headId: null,
-    generation,
-  });
-  // The latest messages after a window around a searched message start again at the recent rows.
-  const currentBoundary = boundary.generation === generation ? boundary : { firstId: null, headId: null };
-  const promptIndex = visibleMessages.findIndex((message) => message.id === questionForm?.messageId);
-  const focusIndex = focusMessageId ? chatRowIndex(visibleMessages, focusMessageId) : -1;
-  const historyStart = chatHistoryStart(visibleMessages, tailIndex, currentBoundary);
-  // A message from search starts the window just above its row, so the row renders at once while the
-  // list waits for it. A start further up can leave the row past the rows that the list renders.
-  const windowStart =
-    focusIndex >= 0
-      ? Math.max(0, focusIndex - FOCUS_CONTEXT_ROWS)
-      : promptIndex >= 0
-        ? Math.min(historyStart, promptIndex)
-        : historyStart;
-  const firstId = visibleMessages[windowStart]?.id ?? null;
-  const headId = visibleMessages[0]?.id ?? null;
-  if (boundary.firstId !== firstId || boundary.headId !== headId || boundary.generation !== generation)
-    setBoundary({ firstId, headId, generation });
-  const windowMessages = useMemo(() => visibleMessages.slice(windowStart), [visibleMessages, windowStart]);
-  const hasCachedOlder = windowStart > 0;
-  const canLoadOlder = hasCachedOlder || (online && hasOlder && !olderLoading);
-  const loadPrevious = () => {
-    if (hasCachedOlder) {
-      const first = visibleMessages[Math.max(0, windowStart - CHAT_HISTORY_BATCH)];
-      if (first) setBoundary({ firstId: first.id, headId, generation });
-    } else if (canLoadOlder) onLoadOlder();
-  };
-  // The chat opens at the row of a message from search after the row has its place in the list.
+  // Every image of the loaded messages, in chat order, for the viewer's carousel.
+  const images = useMemo(() => conversationImages(visibleMessages), [visibleMessages]);
+  // On Android the first commit of the chat has no rows, so the open animation starts at once. The
+  // latest rows render after it, while the chat slides in, so the list can take its place before
+  // the chat is in place. A chat that opens at a message from search waits for all of its rows.
+  const [openingShown, setOpeningShown] = useState(false);
+  useEffect(() => {
+    if (rowsShown || openingShown) return;
+    const frame = requestAnimationFrame(() => setOpeningShown(true));
+    return () => cancelAnimationFrame(frame);
+  }, [rowsShown, openingShown]);
+  const startsAtEnd = motion.startsAtEnd;
+  // The list renders only the rows in and near the view, so it gets every loaded message.
+  const rows = useMemo(
+    () => (rowsShown ? visibleMessages : openingShown && startsAtEnd ? openingRows(visibleMessages) : NO_ROWS),
+    [rowsShown, openingShown, startsAtEnd, visibleMessages],
+  );
+  const tailIndex = rows.findLastIndex((message) => message.kind === "message" && message.author === "user");
+  const focusIndex = focusMessageId ? chatRowIndex(rows, focusMessageId) : -1;
+  const canLoadOlder = online && hasOlder && !olderLoading;
+  useFoldScrollAnchor(motion.listRef);
+  // The chat opens at the row of a message from search after the list has its rows in place.
   const placedFocus = useRef<string | null>(null);
-  const focusId = historyState === "ready" && focusIndex >= 0 ? (visibleMessages[focusIndex]?.id ?? null) : null;
+  const focusId = historyState === "ready" && rowsShown && focusIndex >= 0 ? (rows[focusIndex]?.id ?? null) : null;
   const focusHandlers = useRef({ openAt: motion.openAt, onFocusPlaced });
   focusHandlers.current = { openAt: motion.openAt, onFocusPlaced };
-  const onFocusLayout = useCallback((id: string, y: number) => {
-    if (placedFocus.current === id) return;
-    placedFocus.current = id;
-    focusHandlers.current.openAt(y);
-    focusHandlers.current.onFocusPlaced?.();
-  }, []);
-  const selectionArea = useRef<View | null>(null);
-  const actionHandlers = useRef({ onReply, onReact, onSelectText, onSelectionChange, onNativeSelection });
-  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onNativeSelection };
+  useEffect(() => {
+    if (!focusId || !motion.listPlaced || placedFocus.current === focusId) return;
+    placedFocus.current = focusId;
+    // The search hold ends after the row is in view, so the chat does not move to the latest message first.
+    void focusHandlers.current.openAt(focusIndex).then(() => focusHandlers.current.onFocusPlaced?.());
+  }, [focusId, focusIndex, motion.listPlaced]);
+  const header = topInset + 84;
+  // The latest user message can always move to the top of the chat: the list adds blank space
+  // under it while the rows after it are shorter than the screen.
+  const anchoredEndSpace = useMemo<AnchoredEndSpaceConfig | undefined>(
+    () =>
+      tailIndex >= 0 ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady } : undefined,
+    [tailIndex, header, motion.onAnchorReady],
+  );
+  const sharedValues = useMemo(() => ({ scrollOffset: motion.scrollOffset }), [motion.scrollOffset]);
+  const screen = useWindowDimensions();
+  const columnWidth = useColumnWidth();
+  const insets = useSafeAreaInsets();
+  const estimatedListSize = useMemo(
+    () => ({ width: columnWidth, height: screen.height }),
+    [columnWidth, screen.height],
+  );
+  const onListReady = motion.onListReady;
+  const hasRows = rows.length > 0;
+  const onReady = useCallback(() => onListReady(hasRows), [onListReady, hasRows]);
+  const selectionArea = useRef<ViewInstance | null>(null);
+  const actionHandlers = useRef({
+    onReply,
+    onReact,
+    onSelectText,
+    onSelectionChange,
+    onNativeSelection,
+    onSelectQuestion,
+  });
+  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onNativeSelection, onSelectQuestion };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
+      selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
@@ -965,6 +1160,9 @@ export function ChatMessageList({
   const canReply = Boolean(onReply);
   const canReact = Boolean(onReact);
   const canSelectText = Boolean(onSelectText);
+  const canSelectQuestion = Boolean(onSelectQuestion);
+  // The rows keep clear of the side insets: the rail of iPhone Duo and the edges in landscape.
+  const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const shared = useMemo<MessageRowShared>(
     () => ({
       agents,
@@ -975,25 +1173,30 @@ export function ChatMessageList({
       themeMuted,
       foreground,
       userForeground,
-      userBubbleStyle: agentColorMessages ? userBubbleStyle : undefined,
+      // A channel has no one agent color for the reader's messages.
+      userBubbleStyle: target.kind === "agent" && agentColorMessages ? userBubbleStyle : undefined,
+      attachmentTint:
+        target.kind === "agent" && agentColorMessages
+          ? { color: userBubbleColor, foreground: userForeground }
+          : undefined,
       firstMessageStyle: motion.firstMessageStyle,
-      onUserLayout: motion.onUserLayout,
-      arrivals,
       animationActive,
       playbackActive: animationActive && textReveal && !screenReaderEnabled,
       textReveal,
       replySession,
-      revealedCount,
       markRevealed,
       replyHaptics,
       canReply,
       canReact,
       canSelectText,
+      canSelectQuestion,
+      listWidth,
       actions,
     }),
     [
       agents,
       agentsById,
+      target.kind,
       target.serverId,
       canSend,
       muted,
@@ -1001,90 +1204,78 @@ export function ChatMessageList({
       foreground,
       userForeground,
       userBubbleStyle,
+      userBubbleColor,
       agentColorMessages,
       motion.firstMessageStyle,
-      motion.onUserLayout,
       screenReaderEnabled,
-      arrivals,
       animationActive,
       textReveal,
       replySession,
-      revealedCount,
       markRevealed,
       replyHaptics,
       canReply,
       canReact,
       canSelectText,
+      canSelectQuestion,
+      listWidth,
       actions,
     ],
   );
-  const listRef = useRef<FlatList<VisibleMessage>>(null);
-  const rowLayout = useMemo(
-    () => ({
-      id: tailId,
-      onTailStartLayout: motion.onTailStartLayout,
-      focusId,
-      onFocusLayout,
-    }),
-    [tailId, motion.onTailStartLayout, focusId, onFocusLayout],
+  const pendingReveal = visibleMessages.some((message) =>
+    awaitingFirstWord(message, shared, arrivals.has(message.id), revealedIds.has(message.id)),
   );
-  const seekLatest = useCallback(() => {
-    if (motion.needsInitialPosition() && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
-  }, [motion.needsInitialPosition, visibleMessages.length]);
-  useEffect(() => {
-    if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
-  }, [tailId, motion.needsSendPosition, motion.atLatest]);
-  const pendingReveal = visibleMessages.some((message) => awaitingFirstWord(message, shared));
   const { responseStyle, responseVisible } = motion;
-  const firstRowIsHead = !hasOlder && !hasCachedOlder;
   // The prompt controller is a new object on each render. Without a prompt it is left out, so the
   // list does not render every row again.
   const promptController = questionForm?.messageId ? questionForm : undefined;
-  const renderItem = useCallback(
-    ({ item, index }: { item: VisibleMessage; index: number }) => {
-      const response = index + windowStart > tailIndex;
-      return (
-        <Animated.View
-          style={[{ paddingBottom: 10 }, response ? responseStyle : undefined]}
-          accessibilityElementsHidden={response && !responseVisible}
-          importantForAccessibility={response && !responseVisible ? "no-hide-descendants" : "auto"}
-        >
-          <MessageRow
-            message={item}
-            isTailUser={index + windowStart === tailIndex}
-            isFirstUser={index === 0 && firstRowIsHead}
-            source={
-              item.kind === "message" && item.replyToMessageId ? messagesById.get(item.replyToMessageId) : undefined
-            }
-            questionForm={item.id === promptController?.messageId ? promptController : undefined}
-            upload={upload?.messageId === item.id ? upload : undefined}
-            outbox={outboxStatuses?.get(item.id)}
-            selecting={item.id === selectingMessageId}
-            shared={shared}
-          />
-        </Animated.View>
-      );
-    },
-    [
-      windowStart,
-      tailIndex,
-      responseStyle,
+  const responseIds = useMemo(() => new Set(rows.slice(tailIndex + 1).map((row) => row.id)), [rows, tailIndex]);
+  // The opening rows do not start at the first message of the chat.
+  const firstUserId = rowsShown && tailIndex === 0 && !hasOlder ? (rows[0]?.id ?? null) : null;
+  const rowContext = useMemo<RowContextValue>(
+    () => ({
+      shared,
+      arrivals,
+      revealedIds,
+      responseIds,
       responseVisible,
-      firstRowIsHead,
+      responseStyle,
+      firstUserId,
       messagesById,
       promptController,
       upload,
       outboxStatuses,
       selectingMessageId,
+      turnSummaries,
+      onOpenTurn,
+    }),
+    [
       shared,
+      arrivals,
+      revealedIds,
+      responseIds,
+      responseVisible,
+      responseStyle,
+      firstUserId,
+      messagesById,
+      promptController,
+      upload,
+      outboxStatuses,
+      selectingMessageId,
+      turnSummaries,
+      onOpenTurn,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
       (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
     );
+    // In a channel, only the reply of this activity's agent counts.
     const replying = messages.some(
-      (message) => isStreamingReply(message) && message.kind === "message" && message.body.trim(),
+      (message) =>
+        isStreamingReply(message) &&
+        message.kind === "message" &&
+        message.body.trim() &&
+        (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
     );
     // One run of text, as desktop shows it: the row clamps the label, and blank lines would fill it.
     const thinkingDetail =
@@ -1095,13 +1286,20 @@ export function ChatMessageList({
       sending && !activity
         ? t("common.sending")
         : activity?.phase === "waiting"
-          ? messages.some(
-              (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
+          ? // The reason of the wait names it first. A channel has no active turn of its own.
+            activity.reason === "question" ||
+            messages.some(
+              (message) =>
+                message.kind === "question" &&
+                !message.prompt.resolution &&
+                message.turnId === (activity.turnId ?? activeTurnId),
             )
             ? t("mobile.chat.activity.waitingForAnswer")
-            : approvals.some((approval) => approval.agentId === (activity?.agentId ?? target.id))
+            : activity.reason === "approval" ||
+                approvals.some((approval) => approval.agentId === (activity.agentId ?? target.id))
               ? t("mobile.chat.activity.waitingForApproval")
-              : browserRequests.some((request) => request.agentId === (activity?.agentId ?? target.id))
+              : activity.reason === "takeover" ||
+                  browserRequests.some((request) => request.agentId === (activity.agentId ?? target.id))
                 ? t("mobile.chat.activity.waitingForBrowser")
                 : t("mobile.chat.activity.waitingOnDesktop")
           : thinkingDetail
@@ -1113,7 +1311,12 @@ export function ChatMessageList({
                 : replying
                   ? t("mobile.chat.activity.responding")
                   : t("mobile.chat.activity.thinking");
-    const activityAgent = activity?.agentId ? agentsById.get(activity.agentId) : target;
+    const activityAgent = activity?.agentId
+      ? agentsById.get(activity.agentId)
+      : target.kind === "agent"
+        ? target
+        : undefined;
+    const turnId = activity?.turnId ?? activeTurnId;
     // As on desktop, the conversation's own turn keeps the row: turn events can arrive late.
     if (!(activity || sending || awaitingTurn || activeTurnId || messages.some(isStreamingReply) || pendingReveal))
       return null;
@@ -1127,6 +1330,7 @@ export function ChatMessageList({
       mood: animateMessages ? agentActivityMood(activity) : "idle",
       online,
       animateAvatar: animateMessages,
+      onPress: onOpenTurn && turnId ? () => onOpenTurn(turnId) : undefined,
       shimmer:
         animateMessages &&
         motion.historyVisible &&
@@ -1135,7 +1339,9 @@ export function ChatMessageList({
         activity?.phase !== "waiting",
     };
   };
-  const activityRows = useActivityPresence([activity].flatMap((entry) => activitySpec(entry) ?? []));
+  const activityRows = useActivityPresence(
+    (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
+  );
 
   return (
     <Animated.View
@@ -1147,183 +1353,191 @@ export function ChatMessageList({
         !accessibilityHidden && (historyState !== "ready" || motion.historyVisible) ? "auto" : "no-hide-descendants"
       }
     >
-      <RowLayoutContext.Provider value={rowLayout}>
-        <FlatList
-          ref={listRef}
-          data={rowsShown ? windowMessages : NO_ROWS}
-          keyExtractor={(message) => message.id}
-          CellRendererComponent={MessageCell}
-          initialNumToRender={CHAT_HISTORY_BATCH}
-          maxToRenderPerBatch={8}
-          windowSize={7}
-          removeClippedSubviews={false}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          onStartReached={() => {
-            if (motion.historyVisible && canLoadOlder && (hasCachedOlder || !olderError)) loadPrevious();
-          }}
-          onStartReachedThreshold={0.5}
-          renderItem={renderItem}
-          renderScrollComponent={(props) => (
-            <ChatScrollView
-              {...props}
-              motion={motion}
-              automaticallyAdjustKeyboardInsets={false}
+      <ChatImageViewerProvider serverId={target.serverId} images={images}>
+        {/* The history hides only once it is ready: a loading list shows what it has. */}
+        <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
+          <RowContext value={rowContext}>
+            <KeyboardAwareLegendList
+              ref={motion.listRef}
+              data={rows}
+              // A new data set when the latest messages replace a window around a searched message.
+              dataKey={`${conversationKey}:${motion.latestGeneration}`}
+              keyExtractor={rowKey}
+              getItemType={rowType}
+              renderItem={renderRow}
+              // Rows hold their own state: reveal progress, selection, media and animated sizes. A row
+              // reused for another message would show the state of the message before it.
+              recycleItems={false}
+              estimatedItemSize={ESTIMATED_ROW_SIZE}
+              estimatedListSize={estimatedListSize}
+              drawDistance={Math.round(screen.height * DRAW_SCREENS)}
+              experimental_adaptiveRender={ADAPTIVE_RENDER}
+              // A reply can be many times taller than the estimate. Until the list has its size, the row
+              // is laid out but not drawn, so the reader never sees it cut by the next row.
+              experimental_hideItemsUntilMeasured
+              initialScrollAtEnd={motion.startsAtEnd}
+              anchoredEndSpace={anchoredEndSpace}
+              maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
+              maintainScrollAtEnd={motion.followsEnd ? FOLLOW_END : false}
+              sharedValues={sharedValues}
+              contentInsetEndAdjustment={motion.composerHeight}
+              keyboardOffset={keyboardOffset}
               keyboardLiftBehavior={motion.keyboardLiftBehavior}
-              offset={keyboardOffset}
               applyWorkaroundForContentInsetHitTestBug
-              blankSpace={motion.blankSpace}
-              extraContentPadding={motion.composerHeight}
-              onContentInsetChange={motion.onContentInsetChange}
-            />
-          )}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: topInset + 84 }}
-          contentInsetAdjustmentBehavior="never"
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          alwaysBounceVertical
-          onContentSizeChange={(width, height) => {
-            motion.onContentSizeChange(width, height);
-            seekLatest();
-          }}
-          onLayout={(event) => {
-            motion.onViewportLayout(event);
-            seekLatest();
-          }}
-          onScroll={motion.onScroll}
-          onScrollBeginDrag={motion.onScrollBeginDrag}
-          onScrollEndDrag={motion.onScrollEndDrag}
-          onMomentumScrollEnd={motion.onScrollEndDrag}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <>
-              {hasOlder || hasCachedOlder ? (
-                <View className="items-center pb-3">
-                  <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={loadPrevious}>
-                    <Button.Label>
-                      {!hasCachedOlder && olderLoading
-                        ? t("mobile.chat.history.loadingOlder")
-                        : !hasCachedOlder && olderError
-                          ? t("mobile.chat.history.retryOlder")
-                          : t("mobile.chat.history.loadOlder")}
-                    </Button.Label>
-                  </Button>
-                </View>
-              ) : null}
-              {historyState === "connecting" || historyState === "loading" ? (
-                <View
-                  className="flex-1"
-                  accessible
-                  accessibilityLabel={
-                    historyState === "connecting"
-                      ? t("mobile.chat.history.connecting")
-                      : t("mobile.chat.history.loading")
-                  }
-                  accessibilityState={{ busy: true }}
-                />
-              ) : historyState === "error" ? (
-                <View className="flex-1 items-center justify-center gap-2">
-                  <Typography.Paragraph align="center" className="text-text-secondary">
-                    {t("mobile.chat.history.loadFailed")}
-                  </Typography.Paragraph>
-                  <Button variant="tertiary" onPress={onRetryHistory}>
-                    <Button.Label>{t("common.tryAgain")}</Button.Label>
-                  </Button>
-                </View>
-              ) : null}
-            </>
-          }
-          ListFooterComponent={
-            <>
-              <Animated.View style={motion.responseStyle}>
-                {activityRows.map((spec) => (
-                  <ChatActivityRow
-                    key={spec.key}
-                    spec={spec}
-                    foreground={foreground ?? themeForeground}
-                    muted={muted ?? themeMuted}
-                  />
-                ))}
-              </Animated.View>
-              {onRespondApproval && approvals.length ? (
-                <View className="gap-3 pb-3">
-                  {approvals.map((approval) => (
-                    <ChatApprovalCard
-                      key={String(approval.requestId)}
-                      approval={approval}
-                      agentName={agentsById.get(approval.agentId)?.name ?? target.name}
-                      serverName={serverName}
-                      canAnswer={canSend}
-                      respond={(decision) => onRespondApproval(approval, decision)}
+              automaticallyAdjustKeyboardInsets={false}
+              onReady={onReady}
+              onStartReached={() => {
+                if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
+              }}
+              onStartReachedThreshold={0.5}
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                paddingLeft: insets.left + LIST_PADDING,
+                paddingRight: insets.right + LIST_PADDING,
+                paddingTop: header,
+              }}
+              contentInsetAdjustmentBehavior="never"
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              alwaysBounceVertical
+              onContentSizeChange={motion.onContentSizeChange}
+              onLayout={motion.onViewportLayout}
+              onScrollBeginDrag={motion.onScrollBeginDrag}
+              onScrollEndDrag={motion.onScrollEndDrag}
+              onMomentumScrollEnd={motion.onScrollEndDrag}
+              showsVerticalScrollIndicator={false}
+              ListHeaderComponent={
+                <>
+                  {hasOlder ? (
+                    <View className="items-center pb-3">
+                      <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
+                        <Button.Label>
+                          {olderLoading
+                            ? t("mobile.chat.history.loadingOlder")
+                            : olderError
+                              ? t("mobile.chat.history.retryOlder")
+                              : t("mobile.chat.history.loadOlder")}
+                        </Button.Label>
+                      </Button>
+                    </View>
+                  ) : null}
+                  {historyState === "connecting" || historyState === "loading" ? (
+                    <View
+                      className="flex-1"
+                      accessible
+                      accessibilityLabel={
+                        historyState === "connecting"
+                          ? t("mobile.chat.history.connecting")
+                          : t("mobile.chat.history.loading")
+                      }
+                      accessibilityState={{ busy: true }}
                     />
-                  ))}
-                </View>
-              ) : null}
-              {showStarter ? (
-                <View
-                  className="gap-4 rounded-[26px] p-4"
-                  style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
-                >
-                  <View className="flex-row items-start gap-3">
-                    <View className="min-w-0 flex-1 gap-1">
-                      <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
-                      <Typography.Paragraph className="text-text-secondary">
-                        {t("mobile.chat.starter.body")}
+                  ) : historyState === "error" ? (
+                    <View className="flex-1 items-center justify-center gap-2">
+                      <Typography.Paragraph align="center" className="text-text-secondary">
+                        {t("mobile.chat.history.loadFailed")}
+                      </Typography.Paragraph>
+                      <Button variant="tertiary" onPress={onRetryHistory}>
+                        <Button.Label>{t("common.tryAgain")}</Button.Label>
+                      </Button>
+                    </View>
+                  ) : null}
+                </>
+              }
+              ListFooterComponent={
+                <>
+                  <Animated.View style={motion.responseStyle}>
+                    {activityRows.map((spec) => (
+                      <ChatActivityRow
+                        key={spec.key}
+                        spec={spec}
+                        foreground={foreground ?? themeForeground}
+                        muted={muted ?? themeMuted}
+                      />
+                    ))}
+                  </Animated.View>
+                  {activityAccessory}
+                  {onRespondApproval && approvals.length ? (
+                    <View className="gap-3 pb-3">
+                      {approvals.map((approval) => (
+                        <ChatApprovalCard
+                          key={String(approval.requestId)}
+                          approval={approval}
+                          agentName={agentsById.get(approval.agentId)?.name ?? target.name}
+                          showAgentName={target.kind === "channel"}
+                          serverName={serverName}
+                          canAnswer={canSend}
+                          respond={(decision) => onRespondApproval(approval, decision)}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+                  {showStarter ? (
+                    <View
+                      className="gap-4 rounded-[26px] p-4"
+                      style={{ backgroundColor: fieldBackground, borderCurve: "continuous" }}
+                    >
+                      <View className="flex-row items-start gap-3">
+                        <View className="min-w-0 flex-1 gap-1">
+                          <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
+                          <Typography.Paragraph className="text-text-secondary">
+                            {t("mobile.chat.starter.body")}
+                          </Typography.Paragraph>
+                        </View>
+                        <Pressable
+                          accessibilityLabel={t("mobile.chat.starter.dismiss")}
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => {
+                            void haptics.selection();
+                            onDismissStarter();
+                          }}
+                        >
+                          <X color={String(muted)} size={21} strokeWidth={1.8} />
+                        </Pressable>
+                      </View>
+
+                      <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
+                        {STARTER_OPTIONS.map((option, index) => (
+                          <Pressable
+                            key={option.id}
+                            accessibilityRole="button"
+                            accessibilityState={{ disabled: !canSend }}
+                            disabled={!canSend}
+                            className="flex-row gap-3 px-3 py-3"
+                            style={({ pressed }) => ({
+                              borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
+                              borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
+                              opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
+                            })}
+                            onPress={() => onSelectStarter(t(option.label))}
+                          >
+                            <View className="size-7 items-center justify-center rounded-lg bg-control">
+                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                                {String.fromCharCode(65 + index)}
+                              </Typography.Paragraph>
+                            </View>
+                            <View className="min-w-0 flex-1">
+                              <Typography.Paragraph weight="medium">{t(option.label)}</Typography.Paragraph>
+                              <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                                {t(option.detail)}
+                              </Typography.Paragraph>
+                            </View>
+                          </Pressable>
+                        ))}
+                      </View>
+
+                      <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                        {t("mobile.chat.starter.orAnswer")}
                       </Typography.Paragraph>
                     </View>
-                    <Pressable
-                      accessibilityLabel={t("mobile.chat.starter.dismiss")}
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={() => {
-                        void haptics.selection();
-                        onDismissStarter();
-                      }}
-                    >
-                      <X color={String(muted)} size={21} strokeWidth={1.8} />
-                    </Pressable>
-                  </View>
-
-                  <View className="overflow-hidden rounded-[18px]" style={{ backgroundColor: raised }}>
-                    {STARTER_OPTIONS.map((option, index) => (
-                      <Pressable
-                        key={option.id}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: !canSend }}
-                        disabled={!canSend}
-                        className="flex-row gap-3 px-3 py-3"
-                        style={({ pressed }) => ({
-                          borderBottomColor: index < STARTER_OPTIONS.length - 1 ? String(muted) : "transparent",
-                          borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
-                          opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
-                        })}
-                        onPress={() => onSelectStarter(t(option.label))}
-                      >
-                        <View className="size-7 items-center justify-center rounded-lg bg-control">
-                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                            {String.fromCharCode(65 + index)}
-                          </Typography.Paragraph>
-                        </View>
-                        <View className="min-w-0 flex-1">
-                          <Typography.Paragraph weight="medium">{t(option.label)}</Typography.Paragraph>
-                          <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                            {t(option.detail)}
-                          </Typography.Paragraph>
-                        </View>
-                      </Pressable>
-                    ))}
-                  </View>
-
-                  <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                    {t("mobile.chat.starter.orAnswer")}
-                  </Typography.Paragraph>
-                </View>
-              ) : null}
-            </>
-          }
-        />
-      </RowLayoutContext.Provider>
+                  ) : null}
+                </>
+              }
+            />
+          </RowContext>
+        </HistoryShownContext>
+      </ChatImageViewerProvider>
     </Animated.View>
   );
-}
+}, sameListProps);

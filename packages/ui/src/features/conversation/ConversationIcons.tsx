@@ -164,6 +164,14 @@ export function BrowserForwardIcon() {
   );
 }
 
+export function BrowserStopIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">
+      <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke-linecap="round" />
+    </svg>
+  );
+}
+
 export function BrowserReloadIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 browser-toolbar-icon fill-none stroke-current">

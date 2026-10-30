@@ -1,10 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentMemorySelectionState, MemoryEntry, SetAgentMemoryInclusionInput } from "@openbot/contracts/ipc";
-import type { AppFormat, AppMessages, AppTextKey } from "@openbot/i18n";
-import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
+import type { AppFormat, AppMessages } from "@openbot/i18n";
+import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, toast, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { AGENT_DELETE_UNDO_MS } from "@openbot/ui/features/agents/AgentDeleteUndoToast";
+import { AgentMemoriesEmpty } from "@openbot/ui/features/conversation/AgentMemoriesEmpty";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import type { MemoriesPort } from "./memories-port";
 
@@ -21,16 +24,20 @@ const LIMIT_TEXT = {
   channel: "memory.limitChannel",
 } as const satisfies Record<MemoriesPort["ownerNoun"], keyof AppMessages>;
 
-const EMPTY_TEXT = {
-  agent: "memory.emptyAgent",
-  channel: "memory.emptyChannel",
-} as const satisfies Record<MemoriesPort["ownerNoun"], AppTextKey>;
-
 export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
   const { t, format, errorMessage } = useText();
   const [selection, setSelection] = createSignal<AgentMemorySelectionState | null>(null);
   const selectionById = createMemo(() => new Map(selection()?.selections.map((entry) => [entry.memoryId, entry])));
   const [memories, setMemories] = createSignal<MemoryEntry[]>([]);
+  // Memories that wait for the undo time to end. The modal hides them; the host still has them.
+  // A deleted id stays here: the host never gives the id again, so the set needs no cleanup.
+  // `hidden` is the source; the signal holds a copy, because a read after a write gives the old value.
+  const hidden = new Set<string>();
+  const [hiddenIds, setHiddenIds] = createSignal<ReadonlySet<string>>(new Set());
+  const visibleMemories = createMemo(() => {
+    const ids = hiddenIds();
+    return ids.size === 0 ? memories() : memories().filter((memory) => !ids.has(memory.id));
+  });
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [addOpen, setAddOpen] = createSignal(false);
@@ -47,11 +54,31 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
   onSettled(() => scrollFades.stop);
 
-  /** The cap the owner reached, or null. A remote host's cap is unknown here; it refuses on save. */
+  /**
+   * Deletes that wait for the undo time to end, by memory. When the modal goes away, each delete runs
+   * at once, against the owner it was made on.
+   */
+  const pendingDeletes = new Map<string, { commit: () => void; settle: () => boolean }>();
+  onCleanup(() => {
+    for (const pending of [...pendingDeletes.values()]) pending.commit();
+  });
+
+  /**
+   * The cap the owner reached, or null. A remote host's cap is unknown here; it refuses on save. A
+   * memory that waits for undo is still stored, so it still counts.
+   */
   const reachedLimit = () => {
     const limit = props.port.limit;
     return limit !== null && memories().length >= limit ? limit : null;
   };
+
+  /** Hides or shows a memory while its delete waits. */
+  function setHidden(memoryId: string, hide: boolean): void {
+    if (hide) hidden.add(memoryId);
+    else hidden.delete(memoryId);
+    setHiddenIds(new Set(hidden));
+    props.onCountChange(visibleCount(memories(), hidden));
+  }
 
   async function loadMemories(showLoading = true): Promise<void> {
     if (showLoading) setLoading(true);
@@ -60,7 +87,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       const [next, nextSelection] = await Promise.all([props.port.list(), props.port.selection?.read() ?? null]);
       setSelection(nextSelection);
       setMemories(next);
-      props.onCountChange(next.length);
+      props.onCountChange(visibleCount(next, hidden));
     } catch (caught) {
       setError(errorMessage(caught, t("memory.loadFailed")));
     } finally {
@@ -104,8 +131,9 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       analytics.track("memory_action", { action: "create", result: "succeeded" });
       operationSucceeded = true;
       setNewText("");
-      setAddOpen(false);
+      // The composer closes after the reload, so the empty state does not show again for a moment.
       await loadMemories(false);
+      setAddOpen(false);
     } catch (caught) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "create", result: "failed", failure_code: "create_failed" });
@@ -167,25 +195,58 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
     }
   }
 
-  async function deleteMemory(memory: MemoryEntry): Promise<void> {
+  /**
+   * The memory leaves the list at once, and a toast offers Undo. The host deletes the memory only when
+   * the time is over, so an undo has nothing to restore. If the app quits before then, the memory stays.
+   */
+  function deleteMemory(memory: MemoryEntry): void {
+    if (pendingDeletes.has(memory.id)) return;
+    const port = props.port;
     const analytics = desktopAnalytics.scope();
-    let operationSucceeded = false;
-    setSavingId(memory.id);
+    const toastId = `memory-delete-${port.ownerId}-${memory.id}`;
+    if (editingId() === memory.id) setEditingId(null);
     setError(null);
-    try {
-      await props.port.remove(memory.id);
-      analytics.track("memory_action", { action: "delete", result: "succeeded" });
-      operationSucceeded = true;
-      if (editingId() === memory.id) setEditingId(null);
-      await loadMemories(false);
-    } catch (caught) {
-      if (!operationSucceeded) {
-        analytics.track("memory_action", { action: "delete", result: "failed", failure_code: "delete_failed" });
-      }
-      setError(errorMessage(caught, t("memory.deleteFailed")));
-    } finally {
-      setSavingId(null);
+    setHidden(memory.id, true);
+
+    let settled = false;
+    /** Undo and delete each end the same wait, so only the first of them runs. */
+    function settle(): boolean {
+      if (settled) return false;
+      settled = true;
+      pendingDeletes.delete(memory.id);
+      // A cleanup can call this, and a write to the Toaster from there stops the reactive system.
+      queueMicrotask(() => toast.dismiss(toastId));
+      return true;
     }
+
+    function undo(): void {
+      if (settle()) setHidden(memory.id, false);
+    }
+
+    async function commit(): Promise<void> {
+      if (!settle()) return;
+      try {
+        await port.remove(memory.id);
+      } catch (caught) {
+        analytics.track("memory_action", { action: "delete", result: "failed", failure_code: "delete_failed" });
+        setHidden(memory.id, false);
+        const message = errorMessage(caught, t("memory.deleteFailed"));
+        setError(message);
+        actionToast.error(message);
+        return;
+      }
+      analytics.track("memory_action", { action: "delete", result: "succeeded" });
+      await loadMemories(false);
+    }
+
+    pendingDeletes.set(memory.id, { commit: () => void commit(), settle });
+    toast(t("memory.deleteUndo.title"), {
+      id: toastId,
+      duration: AGENT_DELETE_UNDO_MS,
+      action: { label: t("memory.deleteUndo.action"), onClick: undo },
+      onAutoClose: () => void commit(),
+      onDismiss: () => void commit(),
+    });
   }
 
   async function clearMemories(): Promise<void> {
@@ -197,6 +258,8 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       await props.port.clear();
       analytics.track("memory_action", { action: "clear", result: "succeeded" });
       operationSucceeded = true;
+      // The clear removed the memories that wait for their undo time too, so nothing is left to delete.
+      for (const pending of [...pendingDeletes.values()]) pending.settle();
       setClearConfirmation(false);
       setEditingId(null);
       await loadMemories(false);
@@ -272,7 +335,8 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
             </header>
 
             <div class="agent-memories-body">
-              <Show when={selection()}>
+              {/* The selection explains how memories reach the agent, so it waits for the first memory. */}
+              <Show when={visibleMemories().length > 0 ? selection() : null}>
                 {(state) => (
                   <div class="agent-memory-limit">
                     <p>{t("memory.inclusion.explanation")}</p>
@@ -342,15 +406,24 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
               <Show when={!loading()} fallback={<p class="agent-memory-state">{t("memory.loading")}</p>}>
                 <Show
-                  when={memories().length > 0}
-                  fallback={<p class="agent-memory-state">{t(EMPTY_TEXT[props.port.ownerNoun])}</p>}
+                  when={visibleMemories().length > 0}
+                  fallback={
+                    <Show when={!addOpen() && !error()}>
+                      <AgentMemoriesEmpty
+                        ownerNoun={props.port.ownerNoun}
+                        ownerLabel={props.port.ownerLabel}
+                        addDisabled={reachedLimit() !== null}
+                        onAdd={openAddComposer}
+                      />
+                    </Show>
+                  }
                 >
                   <ul
                     ref={scrollFades.bind}
                     class={["agent-memory-list", scrollFades.classes()]}
                     onScroll={scrollFades.measure}
                   >
-                    <For each={memories()} keyed={(memory) => memory.id}>
+                    <For each={visibleMemories()} keyed={(memory) => memory.id}>
                       {(memory) => (
                         <li class="agent-memory-row">
                           <Show
@@ -394,7 +467,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                                   class="agent-memory-delete-button"
                                   variant="destructive-ghost"
                                   disabled={savingId() === memory().id}
-                                  onClick={() => void deleteMemory(memory())}
+                                  onClick={() => deleteMemory(memory())}
                                 >
                                   <Trash2 />
                                 </IconButton>
@@ -403,69 +476,72 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                           >
                             <div class="agent-memory-editor">
                               <Show when={selectionById().get(memory().id)}>
-                                {(entry) => (
-                                  <>
-                                    <p class="agent-memory-meta">
-                                      {t(
-                                        entry().inclusion === "essential"
-                                          ? "memory.inclusion.essential"
-                                          : "memory.inclusion.searchable",
-                                      )}
-                                    </p>
-                                    <fieldset
-                                      class="agent-memory-inclusion-actions"
-                                      aria-label={t("memory.inclusion.label")}
-                                    >
-                                      <Button
-                                        size="sm"
-                                        variant={
-                                          entry().userControlled && entry().inclusion === "essential"
-                                            ? "secondary"
-                                            : "ghost"
-                                        }
-                                        aria-pressed={
-                                          entry().userControlled && entry().inclusion === "essential" ? "true" : "false"
-                                        }
-                                        disabled={savingId() !== null}
-                                        onClick={() => void changeInclusion(memory().id, "essential")}
+                                {(entry) => {
+                                  const currentInclusion = () =>
+                                    t(
+                                      entry().inclusion === "essential"
+                                        ? "memory.inclusion.essential"
+                                        : "memory.inclusion.searchable",
+                                    );
+                                  // The accessible name and the tooltip say the same: the choice and what applies now.
+                                  const automaticLabel = () =>
+                                    t("memory.inclusion.automaticCurrent", { current: currentInclusion() });
+                                  return (
+                                    <>
+                                      <p class="agent-memory-meta">{currentInclusion()}</p>
+                                      <fieldset
+                                        class="agent-memory-inclusion-actions"
+                                        aria-label={t("memory.inclusion.label")}
                                       >
-                                        {t("memory.inclusion.essential")}
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant={
-                                          entry().userControlled && entry().inclusion === "searchable"
-                                            ? "secondary"
-                                            : "ghost"
-                                        }
-                                        aria-pressed={
-                                          entry().userControlled && entry().inclusion === "searchable"
-                                            ? "true"
-                                            : "false"
-                                        }
-                                        disabled={savingId() !== null}
-                                        onClick={() => void changeInclusion(memory().id, "searchable")}
-                                      >
-                                        {t("memory.inclusion.searchable")}
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant={!entry().userControlled ? "secondary" : "ghost"}
-                                        aria-label={t("memory.inclusion.automatic")}
-                                        title={t(
-                                          entry().inclusion === "essential"
-                                            ? "memory.inclusion.essential"
-                                            : "memory.inclusion.searchable",
-                                        )}
-                                        aria-pressed={!entry().userControlled ? "true" : "false"}
-                                        disabled={savingId() !== null}
-                                        onClick={() => void changeInclusion(memory().id, "automatic")}
-                                      >
-                                        {t("memory.inclusion.automatic")}
-                                      </Button>
-                                    </fieldset>
-                                  </>
-                                )}
+                                        <Button
+                                          size="sm"
+                                          variant={
+                                            entry().userControlled && entry().inclusion === "essential"
+                                              ? "secondary"
+                                              : "ghost"
+                                          }
+                                          aria-pressed={
+                                            entry().userControlled && entry().inclusion === "essential"
+                                              ? "true"
+                                              : "false"
+                                          }
+                                          disabled={savingId() !== null}
+                                          onClick={() => void changeInclusion(memory().id, "essential")}
+                                        >
+                                          {t("memory.inclusion.essential")}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant={
+                                            entry().userControlled && entry().inclusion === "searchable"
+                                              ? "secondary"
+                                              : "ghost"
+                                          }
+                                          aria-pressed={
+                                            entry().userControlled && entry().inclusion === "searchable"
+                                              ? "true"
+                                              : "false"
+                                          }
+                                          disabled={savingId() !== null}
+                                          onClick={() => void changeInclusion(memory().id, "searchable")}
+                                        >
+                                          {t("memory.inclusion.searchable")}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant={!entry().userControlled ? "secondary" : "ghost"}
+                                          aria-label={automaticLabel()}
+                                          title={automaticLabel()}
+                                          aria-pressed={!entry().userControlled ? "true" : "false"}
+                                          disabled={savingId() !== null}
+                                          onClick={() => void changeInclusion(memory().id, "automatic")}
+                                        >
+                                          {t("memory.inclusion.automatic")}
+                                        </Button>
+                                      </fieldset>
+                                    </>
+                                  );
+                                }}
                               </Show>
                               <Textarea
                                 ref={(element) => (editingInput = element)}
@@ -505,7 +581,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                 </Show>
               </Show>
             </div>
-            <Show when={!loading() && memories().length > 0}>
+            <Show when={!loading() && visibleMemories().length > 0}>
               <footer class="agent-memories-footer">
                 <Button
                   ref={(element) => (confirmationTrigger = element)}
@@ -526,7 +602,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
         onCancel={cancelConfirmation}
         onConfirm={clearMemories}
         title={t("memory.clearTitle")}
-        description={t("memory.clearDescription", { total: memories().length, name: props.port.ownerLabel })}
+        description={t("memory.clearDescription", { total: visibleMemories().length, name: props.port.ownerLabel })}
         confirmLabel={t("memory.clearAll")}
         pending={savingId() === "clear"}
         error={error()}
@@ -534,6 +610,10 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       />
     </>
   );
+}
+
+function visibleCount(list: readonly MemoryEntry[], hidden: ReadonlySet<string>): number {
+  return list.filter((memory) => !hidden.has(memory.id)).length;
 }
 
 function formatMemoryDate(value: string, unknown: string, format: AppFormat): string {

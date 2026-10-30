@@ -1,22 +1,23 @@
+import type { PageErrorText } from "../transactional/page-text";
+import { TransactionalPage } from "../transactional/TransactionalPage";
 import { Button } from "../ui/button";
 
-export function PageError(props: { onRetry: () => void }) {
+export function PageError(props: { lang: string; text: PageErrorText; onRetry: () => void }) {
   return (
-    <main class="join-page">
-      <section class="join-card" aria-labelledby="page-error-title">
-        <h1 id="page-error-title">This page could not load</h1>
-        <p class="join-card-copy" role="alert">
-          Check your connection and reload the page. If it still does not load, go back to the home page.
-        </p>
-        <div class="join-card-actions">
-          <button class="landing-button landing-button-primary landing-button-lg" type="button" onClick={props.onRetry}>
-            Reload page
-          </button>
-          <Button href="/" variant="secondary" size="lg" icon="open">
-            Back to home
-          </Button>
-        </div>
-      </section>
-    </main>
+    <TransactionalPage titleId="page-error-title" lang={props.lang}>
+      <h1 id="page-error-title">{props.text.title}</h1>
+      <p class="join-card-copy" role="alert">
+        {props.text.body}
+      </p>
+      <div class="join-card-actions">
+        <Button as="button" type="button" variant="primary" size="lg" icon="arrow-right" onClick={props.onRetry}>
+          {props.text.reload}
+        </Button>
+        {/* A full page load: the router state after an error is not safe to reuse. */}
+        <Button href="/" variant="secondary" size="lg" icon="open">
+          {props.text.home}
+        </Button>
+      </div>
+    </TransactionalPage>
   );
 }

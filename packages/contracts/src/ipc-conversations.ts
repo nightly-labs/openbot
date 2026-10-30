@@ -3,6 +3,12 @@ import { isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage, type MessageReaction } from "./ipc-conversation-messages";
 import { isDynamicRecord, isNumber } from "./runtime-values";
 
+/**
+ * The most recent completed messages that main keeps and sends for one conversation, plus the
+ * active turn. A snapshot with fewer messages is the whole conversation.
+ */
+export const CONVERSATION_SNAPSHOT_MESSAGE_LIMIT = 100;
+
 export interface ConversationSnapshot {
   agentId: string;
   threadId: string | null;
@@ -63,7 +69,7 @@ export interface ConversationPageInfo {
   hasOlder: boolean;
   olderCursor: string | null;
   /**
-   * How many messages are older than the page, and the time of the oldest one. The chat's day rail
+   * How many messages are older than the page, and the time of the oldest one. The chat's scroll rail
    * draws the part that is not loaded from these. A host that does not send them leaves them out,
    * and the Team API never carries them.
    */
@@ -73,7 +79,7 @@ export interface ConversationPageInfo {
 
 export interface ReadConversationPageInput {
   agentId: string;
-  anchor?: ConversationPageAnchor;
+  anchor?: ConversationPageAnchor | undefined;
   limit?: number;
 }
 
@@ -110,11 +116,18 @@ export interface SearchConversationMessagesInput {
   agentId?: string;
   cursor?: string;
   limit?: number;
+  /**
+   * Also search the open side threads. Only this computer's server reads it: the Team API search
+   * returns the agents' own chats.
+   */
+  includeSideThreads?: boolean;
 }
 
 export interface ConversationSearchResult {
   agentId: string;
   message: ConversationMessage;
+  /** The side thread that has the message. A message of the agent's own chat has none. */
+  taskId?: string;
 }
 
 export interface ConversationSearchPage {
@@ -148,6 +161,12 @@ export interface MarkConversationReadInput {
   throughMessageId: string | null;
 }
 
+/** Marks `fromMessageId` and the messages after it unread, for this computer's reader. */
+export interface MarkConversationUnreadInput {
+  agentId: string;
+  fromMessageId: string;
+}
+
 export interface SendMessageInput {
   agentId: string;
   text: string;
@@ -160,6 +179,11 @@ export interface SendMessageInput {
   clientMessageId?: string;
   /** The open task of this agent that takes the message. Without it, the agent's own chat takes it. */
   taskId?: string;
+  /**
+   * An audio draft of what the user said, when the text came from a voice turn. The host keeps it with
+   * the message for replay and never gives it to the agent.
+   */
+  voiceRecordingDraftId?: string;
 }
 
 export interface SetMessageReactionInput {

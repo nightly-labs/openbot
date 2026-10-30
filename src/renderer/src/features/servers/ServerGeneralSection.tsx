@@ -1,10 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AvatarImageInput, ServerNotificationLevel } from "@openbot/contracts/ipc";
-import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
+import type { AvatarImageInput } from "@openbot/contracts/ipc";
 import {
-  Badge,
   Button,
-  CopyButton,
+  ConfirmDialog,
   Image,
   ImageRemoveButton,
   Input,
@@ -14,26 +12,18 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   SettingsSection,
-  SwitchField,
   Text,
 } from "@openbot/ui";
 import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
-import {
-  SERVER_NOTIFICATION_LEVEL_LABELS,
-  serverMuteDescription,
-} from "@openbot/ui/features/servers/ServerActionItems";
 import { ServerLogo } from "@openbot/ui/features/servers/ServerLogo";
 import { useText } from "@openbot/ui/text";
-import { truncateMiddle } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
+import { actionToast } from "../../action-toast";
+import { ServerMemoryLimitSetting } from "./ServerMemoryLimitSetting";
+import { ServerMemoryReviewSetting } from "./ServerMemoryReviewSetting";
 import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -62,35 +52,38 @@ interface ServerIdentityDraft {
  * field re-renders only what read that field.
  */
 interface GeneralPanels {
-  offerRemoteDesktopSetup: boolean;
   confirmLeave: boolean;
+  confirmRotateKey: boolean;
   identity: ServerIdentityDraft;
 }
 
 interface ServerGeneralSection {
   Panel: () => JSX.Element;
   LeaveDialog: () => JSX.Element;
+  RotateKeyDialog: () => JSX.Element;
   /** True while the user edits the identity, so the server's own name and logo do not replace the draft. */
   editing: Accessor<boolean>;
   identityDirty: Accessor<boolean>;
   resetIdentity(): void;
   saveIdentity(): Promise<void>;
+  /**
+   * Saves a valid name or logo that the user did not save, and says whether nothing failed. Members
+   * calls it before it publishes an unnamed server, so that the server does not get a generated name.
+   */
+  saveIdentityDraft(): Promise<boolean>;
   /** Shows the name and logo the server holds now, while the user does not edit them. */
   syncFromServer(name: string, logoUrl: string | null): void;
   /** Forgets the draft state of the previous server when the dialog shows another one. */
   resetForServer(): void;
 }
 
-/** The General section: server identity, access, notifications, and leaving a joined server. */
-export function createServerGeneralSection(
-  host: ServerSettingsSectionHost,
-  options: { onSetUpDesktop: () => void },
-): ServerGeneralSection {
-  const { t, format, errorMessage } = useText();
-  const { props, local, configured, published, actionsAvailable, busy, run } = host;
+/** The General section: server identity, agent settings, and leaving a joined server. */
+export function createServerGeneralSection(host: ServerSettingsSectionHost): ServerGeneralSection {
+  const { t, errorMessage } = useText();
+  const { props, local, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<GeneralPanels>({
-    offerRemoteDesktopSetup: false,
     confirmLeave: false,
+    confirmRotateKey: false,
     identity: {
       editing: false,
       logo: undefined,
@@ -109,7 +102,8 @@ export function createServerGeneralSection(
   /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
   const canSetTimezone = () => serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable();
-  const address = () => (local() ? props.hostStatus?.apiUrl : props.server.apiUrl);
+  const canSetMemoryLimit = () => serverCanAdminister(props.server, "agent-memory-limit-v1") && actionsAvailable();
+  const canSetMemoryReview = () => serverCanAdminister(props.server, "memory-review-v1") && actionsAvailable();
   const trimmedName = () => panels.identity.name.trim();
   const nameError = () => {
     if (!canEditIdentity()) return null;
@@ -124,26 +118,13 @@ export function createServerGeneralSection(
   const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
   /** The owner removes the server from the account instead. The host does not need to be online. */
   const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
+  /** The key handover goes through the account service, so the server must be published. */
+  const canRotateKey = () => Boolean(props.onRotateHostKey) && local() && published();
   const identityDirty = () =>
     canEditIdentity() &&
     (trimmedName() !== panels.identity.savedName ||
       panels.identity.logo !== undefined ||
       panels.identity.logoUrl !== panels.identity.savedLogoUrl);
-
-  async function setPublished(value: boolean): Promise<void> {
-    const serverId = props.server.id;
-    const succeeded = await run("publish", () => props.onSetPublished(value));
-    if (!succeeded || props.server.id !== serverId) return;
-    setPanels((state) => {
-      state.offerRemoteDesktopSetup = value && local() && props.platform === "darwin";
-    });
-  }
-
-  function dismissRemoteDesktopSetup(): void {
-    setPanels((state) => {
-      state.offerRemoteDesktopSetup = false;
-    });
-  }
 
   async function chooseLogo(file: File | undefined): Promise<void> {
     if (!file) return;
@@ -235,6 +216,12 @@ export function createServerGeneralSection(
     });
   }
 
+  async function saveIdentityDraft(): Promise<boolean> {
+    if (!identityDirty() || nameError()) return true;
+    await saveIdentity();
+    return !identityDirty();
+  }
+
   function syncFromServer(name: string, logoUrl: string | null): void {
     setPanels((state) => {
       state.identity.savedName = name;
@@ -249,18 +236,12 @@ export function createServerGeneralSection(
 
   function resetForServer(): void {
     setPanels((state) => {
-      state.offerRemoteDesktopSetup = false;
       state.confirmLeave = false;
+      state.confirmRotateKey = false;
       state.identity.editing = false;
       state.identity.nameTouched = false;
       state.identity.nameShaking = false;
     });
-  }
-
-  function accessDescription() {
-    if (!local()) return published() ? t("server.settings.remoteOnline") : t("server.settings.remoteOffline");
-    if (!configured()) return t("server.settings.saveIdentityFirst");
-    return published() ? t("server.settings.reachable") : t("server.settings.notReachable");
   }
 
   function Panel() {
@@ -272,7 +253,7 @@ export function createServerGeneralSection(
             hidden
             type="file"
             aria-label={t("server.settings.logo")}
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/gif,image/webp"
             disabled={!canEditIdentity()}
             onChange={(event) => {
               void chooseLogo(event.currentTarget.files?.[0]);
@@ -404,135 +385,73 @@ export function createServerGeneralSection(
             </Item>
           </ItemGroup>
         </SettingsSection>
-        <SettingsSection title={t("server.settings.access")}>
-          <ItemGroup class="settings-modal-card">
-            <SwitchField
-              class="server-settings-publish-setting"
-              size="default"
-              checked={published()}
-              disabled={!local() || !configured() || Boolean(busy())}
-              onChange={(value) => void setPublished(value)}
-              label={local() ? t("server.settings.publish") : t("server.settings.published")}
-              description={accessDescription()}
-            />
-            <Item class="server-settings-address-setting">
-              <ItemContent>
-                <ItemTitle>{t("server.settings.address")}</ItemTitle>
-                <ItemDescription>{t("server.settings.addressDescription")}</ItemDescription>
-              </ItemContent>
-              <Show
-                when={address()}
-                fallback={
-                  <Badge variant="secondary" size="md" shape="pill">
-                    {t("server.settings.private")}
-                  </Badge>
-                }
-              >
-                {(serverAddress) => (
-                  <CopyButton
-                    value={serverAddress()}
-                    label={truncateMiddle(serverAddress(), 31)}
-                    copiedLabel={t("common.copied")}
-                    aria-label={t("server.settings.copyAddress")}
-                    title={serverAddress()}
-                    onCopyError={host.showCopyError}
-                    class="server-settings-address-control"
+        <Show
+          when={
+            (canSetTimezone() && props.hostTimezone) ||
+            (canSetMemoryLimit() && props.hostMemoryLimit) ||
+            (canSetMemoryReview() && props.memoryReview)
+          }
+        >
+          <SettingsSection title={t("server.settings.agents")}>
+            <ItemGroup class="settings-modal-card">
+              <Show when={canSetTimezone() && props.hostTimezone}>
+                {(options) => (
+                  <ServerTimezoneSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
                   />
                 )}
               </Show>
-            </Item>
-          </ItemGroup>
-        </SettingsSection>
-        <Show when={canSetTimezone() && props.hostTimezone}>
-          {(options) => (
-            <SettingsSection title={t("server.settings.agents")}>
-              <ItemGroup class="settings-modal-card">
-                <ServerTimezoneSetting
-                  {...options()}
-                  serverId={props.server.id}
-                  disabled={Boolean(busy())}
-                  menuMount={host.menuMount()}
-                  run={run}
-                />
-              </ItemGroup>
-            </SettingsSection>
-          )}
+              <Show when={canSetMemoryLimit() && props.hostMemoryLimit}>
+                {(options) => (
+                  <ServerMemoryLimitSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={canSetMemoryReview() && props.memoryReview}>
+                {(options) => (
+                  <ServerMemoryReviewSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+            </ItemGroup>
+          </SettingsSection>
         </Show>
-        <Show when={panels.offerRemoteDesktopSetup}>
-          <ItemGroup class="settings-modal-card">
-            <Item>
-              <ItemContent>
-                <ItemTitle>{t("server.settings.setUpDesktopTitle")}</ItemTitle>
-                <ItemDescription>{t("server.settings.setUpDesktopDescription")}</ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Button size="sm" variant="ghost" onClick={dismissRemoteDesktopSetup}>
-                  {t("server.settings.later")}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    dismissRemoteDesktopSetup();
-                    options.onSetUpDesktop();
-                  }}
-                >
-                  {t("server.settings.setUp")}
-                </Button>
-              </ItemActions>
-            </Item>
-          </ItemGroup>
-        </Show>
-        <Show when={props.onSetMuted && props.onSetNotificationLevel}>
-          <SettingsSection title={t("server.settings.notifications")}>
+        <Show when={canRotateKey()}>
+          <SettingsSection title={t("server.settings.hostKeyTitle")}>
             <ItemGroup class="settings-modal-card">
-              <SwitchField
-                class="server-settings-mute-setting"
-                size="default"
-                checked={props.server.notificationsMuted}
-                disabled={Boolean(busy())}
-                onChange={(value) => void run("mute", () => props.onSetMuted?.(value) ?? Promise.resolve())}
-                label={t("server.settings.muteNotifications")}
-                description={
-                  props.server.notificationsMutedUntil === null
-                    ? t("server.settings.muteDescription")
-                    : t("server.settings.mutedUntilDescription", {
-                        until: serverMuteDescription(props.server, t, format),
-                      })
-                }
-              />
               <Item>
                 <ItemContent>
-                  <ItemTitle id="server-settings-notification-level-label">
-                    {t("server.settings.notifyAbout")}
-                  </ItemTitle>
-                  <ItemDescription>{t("server.settings.notifyAboutDescription")}</ItemDescription>
+                  <ItemTitle>{t("server.settings.hostKeyRotate")}</ItemTitle>
+                  <ItemDescription>{t("server.settings.hostKeyDescription")}</ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <Select<ServerNotificationLevel>
-                    options={[...SERVER_NOTIFICATION_LEVELS]}
-                    value={props.server.notificationLevel}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
                     disabled={Boolean(busy())}
-                    placement="bottom-end"
-                    onChange={(level) => {
-                      if (level)
-                        void run(
-                          "notification-level",
-                          () => props.onSetNotificationLevel?.(level) ?? Promise.resolve(),
-                        );
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>
-                        {t(SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue])}
-                      </SelectItem>
-                    )}
+                    onClick={() =>
+                      setPanels((state) => {
+                        state.confirmRotateKey = true;
+                      })
+                    }
                   >
-                    <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
-                      <SelectValue<ServerNotificationLevel>>
-                        {(state) => t(SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()])}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent mount={host.menuMount()} />
-                  </Select>
+                    {t("server.settings.hostKeyRotateAction")}
+                  </Button>
                 </ItemActions>
               </Item>
             </ItemGroup>
@@ -615,13 +534,43 @@ export function createServerGeneralSection(
     );
   }
 
+  function RotateKeyDialog() {
+    const close = () =>
+      setPanels((state) => {
+        state.confirmRotateKey = false;
+      });
+    return (
+      <Show when={panels.confirmRotateKey && canRotateKey()}>
+        <ConfirmDialog
+          open
+          tone="default"
+          initialFocus="cancel"
+          pending={busy() === "rotate-host-key"}
+          title={t("server.settings.hostKeyConfirmTitle")}
+          description={t("server.settings.hostKeyConfirmDescription")}
+          confirmLabel={t("server.settings.hostKeyRotateAction")}
+          onCancel={close}
+          onConfirm={async () => {
+            await run("rotate-host-key", async () => {
+              await props.onRotateHostKey?.();
+              close();
+              actionToast.success(t("server.settings.hostKeyRotated"));
+            });
+          }}
+        />
+      </Show>
+    );
+  }
+
   return {
     Panel,
     LeaveDialog,
+    RotateKeyDialog,
     editing: () => panels.identity.editing,
     identityDirty,
     resetIdentity,
     saveIdentity,
+    saveIdentityDraft,
     syncFromServer,
     resetForServer,
   };

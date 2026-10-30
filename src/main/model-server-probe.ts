@@ -11,6 +11,7 @@ import { PROVIDER_DETECTION_LIMITS } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
+import { readLimitedBody } from "../backend/limited-body";
 
 /** A model list is a small JSON object. A larger body is not a model list. */
 const MODEL_LIST_BODY_LIMIT = 1024 * 1024;
@@ -132,36 +133,12 @@ export class ModelServerProbe extends Context.Service<
 }
 
 const readLimited = Effect.fn("ModelServerProbe.readLimited")(function* (response: Response, host: string) {
-  const tooLarge = () => new ModelListTooLarge({ message: sourceText("error.provider.discoveryTooLarge", { host }) });
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MODEL_LIST_BODY_LIMIT) return yield* tooLarge();
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  return yield* Effect.acquireUseRelease(
-    Effect.succeed(reader),
-    (body) =>
-      Effect.gen(function* () {
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        for (;;) {
-          const chunk = yield* Effect.tryPromise({
-            try: () => body.read(),
-            catch: () =>
-              new ModelServerUnavailable({ message: sourceText("error.provider.discoveryUnreachable", { host }) }),
-          });
-          if (chunk.done) break;
-          size += chunk.value.byteLength;
-          if (size > MODEL_LIST_BODY_LIMIT) return yield* tooLarge();
-          chunks.push(chunk.value);
-        }
-        return Buffer.concat(chunks).toString("utf8");
-      }),
-    // Cancel and release the body on success, failure, and interruption. Cleanup cannot expose a URL.
-    (body) =>
-      Effect.promise(() => body.cancel().catch(() => undefined)).pipe(
-        Effect.ensuring(Effect.sync(() => body.releaseLock())),
-      ),
+  const body = yield* readLimitedBody(response, MODEL_LIST_BODY_LIMIT, (reason) =>
+    reason === "too-large"
+      ? new ModelListTooLarge({ message: sourceText("error.provider.discoveryTooLarge", { host }) })
+      : new ModelServerUnavailable({ message: sourceText("error.provider.discoveryUnreachable", { host }) }),
   );
+  return body.toString("utf8");
 });
 
 /** Skip unusable entries, deduplicate ids, and stop at the public limit. */

@@ -1,8 +1,10 @@
-import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
+import { CHAT_VISUAL_ITEM_TYPE_PREFIX, chatVisualReply } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
+  ChannelMessage,
+  ChannelRoutingConversationEvent,
   ConversationMessage,
   ConversationMessageSender,
   ConversationQuestionPrompt,
@@ -14,6 +16,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  channelRoutingConversationEvent,
   isContextResetMarker,
   parseConversationPlanText,
   routineConversationEvent,
@@ -26,6 +30,17 @@ export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStat
 export type ChatPlanStepState = "pending" | "active" | "done";
 
 export type ChatMessage =
+  | {
+      id: string;
+      kind: "channel-routing";
+      event:
+        | ChannelRoutingConversationEvent
+        | {
+            action: ChannelRoutingConversationEvent["action"];
+            agentId: null;
+            agentName: string;
+          };
+    }
   | {
       id: string;
       kind: "exchange";
@@ -42,13 +57,17 @@ export type ChatMessage =
       id: string;
       kind: "message";
       author: "agent" | "user";
+      speaker?: ChannelMessage["author"];
       /** Another person who wrote this message in an agent chat. The reader's own messages have none. */
       sender?: ConversationMessageSender;
+      superseded?: boolean;
       body: string;
       streaming: boolean;
       status?: ConversationMessage["status"];
       replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
+      /** A visual reply: its one attachment is an HTML page that the chat shows, at this height. */
+      visual?: { height?: number };
       /** An image the agent is generating or generated. Its first attachment is the image. */
       imageGeneration?: ImageGenerationInfo;
       /** Why the turn of a failed user message stopped, as the host reported it. */
@@ -374,6 +393,7 @@ export function projectChatMessages(
           streaming: message.status === "streaming",
           status: message.status,
           attachments: message.attachments,
+          ...visualReply(message),
           imageGeneration: message.imageGeneration,
           replyToMessageId: message.replyToMessageId,
           createdAt: message.createdAt,
@@ -467,6 +487,12 @@ export function withFailureReasons(messages: ChatMessage[], deliveries: readonly
   });
 }
 
+function visualReply(message: Parameters<typeof chatVisualReply>[0]): { visual?: { height?: number } } {
+  const visual = chatVisualReply(message);
+  if (!visual) return {};
+  return { visual: visual.height === undefined ? {} : { height: visual.height } };
+}
+
 /** Like the host read state, a plan or a visual page is not a readable message. */
 export function latestReadableMessage(messages: ConversationMessage[]) {
   return messages.findLast(
@@ -474,7 +500,110 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
       Boolean(message.questionPrompt) ||
       (message.author !== "system" &&
         message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
+        message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
         !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
         (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
   );
+}
+
+const projectedChannelMessages = new WeakMap<
+  ChannelMessage,
+  { self: boolean; latest: boolean; message: ChatMessage | null }
+>();
+
+function projectChannelMessage(
+  entry: ChannelMessage,
+  self: boolean,
+  latestRuns: ReadonlySet<string>,
+): ChatMessage | null {
+  const routine = routineMarker(entry.message);
+  if (routine) {
+    if (routine.runId && !latestRuns.has(entry.message.id)) return null;
+    return {
+      id: entry.id,
+      kind: "routine",
+      event: routine.event,
+      label: routine.label,
+      routineName: routine.routineName,
+    };
+  }
+  if (entry.message.questionPrompt) {
+    return {
+      id: entry.id,
+      kind: "question",
+      turnId: entry.message.turnId,
+      prompt:
+        entry.superseded && !entry.message.questionPrompt.resolution
+          ? { ...entry.message.questionPrompt, resolution: { status: "expired" } }
+          : entry.message.questionPrompt,
+    };
+  }
+  const routing = channelRoutingConversationEvent(entry.message);
+  if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
+  // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.
+  if (
+    !entry.message.itemType &&
+    entry.author.kind === "agent" &&
+    entry.message.author === "system" &&
+    entry.message.status === "completed" &&
+    entry.taskId
+  ) {
+    const assigned = /^Assigned to (.+)\.$/.exec(entry.message.text);
+    const continued = /^Continuing existing work with (.+)\.$/.exec(entry.message.text);
+    const name = assigned?.[1] ?? continued?.[1];
+    if (name)
+      return {
+        id: entry.id,
+        kind: "channel-routing",
+        event: { action: assigned ? "assigned" : "continued", agentId: null, agentName: name },
+      };
+  }
+  // A plan card of channel work shows as in an agent chat.
+  const plan = entry.author.kind === "agent" ? projectPlan(entry.message) : null;
+  if (plan) return { ...plan, id: entry.id };
+  if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
+    return {
+      id: entry.id,
+      kind: "thinking",
+      turnId: entry.message.turnId,
+      steps: [{ id: entry.id, text: entry.message.text }],
+    };
+  }
+  return {
+    id: entry.id,
+    kind: "message",
+    author: self ? "user" : "agent",
+    speaker: entry.author,
+    superseded: entry.superseded,
+    body: entry.message.text,
+    streaming: entry.message.status === "streaming",
+    status: entry.message.status,
+    replyToMessageId: entry.message.replyToMessageId,
+    attachments: entry.message.attachments,
+    ...visualReply(entry.message),
+    imageGeneration: entry.message.imageGeneration,
+    createdAt: entry.message.createdAt,
+  };
+}
+
+/** Keep channel authors explicit: another human member is not the current user. */
+export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
+  const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
+  return messages
+    .filter(
+      (entry) =>
+        entry.message.questionPrompt ||
+        entry.message.imageGeneration ||
+        entry.message.text.trim() ||
+        entry.message.attachments?.length,
+    )
+    .flatMap((entry) => {
+      const self = entry.author.kind === "member" && entry.author.id === memberId;
+      const cached = projectedChannelMessages.get(entry);
+      const latest = latestRuns.has(entry.message.id);
+      if (cached && cached.self === self && cached.latest === latest) return cached.message ?? [];
+      const message = projectChannelMessage(entry, self, latestRuns);
+      projectedChannelMessages.set(entry, { self, latest, message });
+      return message ?? [];
+    });
 }

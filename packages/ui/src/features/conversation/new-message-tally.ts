@@ -67,7 +67,13 @@ export function tallyNewMessages(
 /** Rows the reader would call a new message. */
 export function countableTimelineMessage(message: AgentMessage): boolean {
   if (message.author === "you") return false;
-  if (message.kind === "thinking" || message.kind === "plan") return false;
+  if (
+    message.kind === "thinking" ||
+    message.kind === "plan" ||
+    message.kind === "subagents" ||
+    message.kind === "memory-changes"
+  )
+    return false;
   if (silentAgentAnswer(message)) return false;
   // A quiet routine run tells the user nothing new. Its answers show only when the reader opens the run.
   if (message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return false;

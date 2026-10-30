@@ -1,8 +1,9 @@
+import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
-import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { EVERYONE_MENTION, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
-import { Badge, Blocks, Listbox, Puzzle } from "@openbot/ui";
+import type { DraftAttachment } from "@openbot/contracts/ipc";
+import { Badge, Blocks, Listbox, Puzzle, UsersRound } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import { Dynamic, Portal } from "@solidjs/web";
 import {
@@ -17,13 +18,15 @@ import {
   untrack,
 } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
-import type { AgentProfile } from "../../data";
+import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual } from "./AttachmentReference";
 import {
   automaticMentionSpaceAtCaretBoundary,
+  type ComposerPasteResult,
+  type ComposerSelection,
   editorText,
   editorTextOffset,
   insertLineBreak,
@@ -31,9 +34,11 @@ import {
   mentionTokenAtCaretBoundary,
   placeCaretAtChildOffset,
   placeCaretAtEnd,
+  placeSerializedCaret,
   rangeFromTextOffsets,
   readEditorSelection,
   restoreEditorSelection,
+  serializedEditorSelection,
   serializeEditor,
 } from "./composer-dom";
 import { shouldRestoreComposerFocus } from "./composer-focus";
@@ -66,16 +71,18 @@ import { isSendShortcutKey, type SendShortcut } from "./send-shortcut";
 
 interface ComposerEditorProps {
   agentId: string | undefined;
-  agents: AgentProfile[];
-  skills?: InstalledSkill[];
+  agents: ComposerAgent[];
+  skills?: ComposerSkill[] | undefined;
   /** The host's MCP servers, offered by the same `$` the skills answer. */
-  mcpServers?: McpServerConfig[];
-  attachments?: DraftAttachment[];
+  mcpServers?: ComposerMcpServer[] | undefined;
+  attachments?: DraftAttachment[] | undefined;
   value: string;
   placeholder: string;
   ariaLabel: string;
   disabled: boolean;
-  focusRequest?: number;
+  /** `compact` is one short line, as in the floating composer over a browser page. */
+  size?: "default" | "compact";
+  focusRequest?: number | undefined;
   /** Raised by one to open the skill picker at the caret, as a typed `$` does. */
   skillPickerRequest?: number;
   /** A new id puts a quote chip for the text at the caret, or at the end when the caret is unknown. */
@@ -83,17 +90,38 @@ interface ComposerEditorProps {
   /** Opens the passage that a quote chip in the draft points to. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   /** The last skill list request failed, so an empty picker says so instead of "no skills". */
-  skillsLoadFailed?: boolean;
+  skillsLoadFailed?: boolean | undefined;
   onValueChange: (value: string) => void;
   onSubmit: () => void;
+  /** Tab sends the message into the agent's running turn. Absent, Tab moves the focus as usual. */
+  onSteer?: (() => void) | undefined;
   /**
    * Which chord sends the message. Enter keeps the current behavior; the platform modifier with
    * Enter sends and plain Enter adds a line. The renderer resolves the platform and passes it.
    */
-  sendShortcut?: SendShortcut;
-  onOpenAttachment?: (attachment: DraftAttachment) => void;
+  sendShortcut?: SendShortcut | undefined;
+  onOpenAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it. */
-  onPasteFiles?: (files: File[]) => void;
+  onPasteFiles?:
+    | ((files: File[], selection: ComposerSelection) => undefined | Promise<ComposerPasteResult | undefined>)
+    | undefined;
+  onPasteAttachments?: (
+    clipboard: DataTransfer,
+    selection: ComposerSelection,
+  ) => Promise<ComposerPasteResult | undefined> | undefined;
+  /**
+   * Writes a copy or cut that includes attachments. Other selections use the native copy. After a cut
+   * removed the selection, `remaining` is the value that stays, so the draft can let go of the files
+   * that the cut moved.
+   */
+  onCopyAttachments?: (
+    clipboard: DataTransfer,
+    text: string,
+    attachments: DraftAttachment[],
+    remaining: string | undefined,
+  ) => void;
+  /** Offers `@everyone` in the mention picker, which a channel reads as a message to each member. */
+  everyoneMention?: boolean | undefined;
   /** Told when the mention picker opens or closes, so the queue panel can give up the same space. */
   onPickerOpenChange?: (open: boolean) => void;
   /**
@@ -102,6 +130,8 @@ interface ComposerEditorProps {
    */
   dictation?: { text: string; final: boolean };
 }
+
+export type { ComposerPasteResult, ComposerSelection } from "./composer-dom";
 
 export interface QuoteRequest {
   id: number;
@@ -146,11 +176,14 @@ export function ComposerEditor(props: ComposerEditorProps) {
     { equals: (previous, next) => previous.mount === next.mount && previous.bottom === next.bottom },
   );
   const matchingAgents = createMemo(() => {
+    const others = props.agents.filter((agent) => agent.id !== props.agentId);
+    return rankAgentMentions(others, mention()?.query ?? "");
+  });
+  const matchesEveryone = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
-    return props.agents.filter(
-      (agent) =>
-        agent.id !== props.agentId &&
-        (!query || `${agent.name} ${agent.title} ${agent.description}`.toLocaleLowerCase().includes(query)),
+    if (!props.everyoneMention) return false;
+    return (
+      EVERYONE_MENTION.slice(1).startsWith(query) || t("composer.picker.everyone").toLocaleLowerCase().startsWith(query)
     );
   });
   const matchingAttachments = createMemo(() => {
@@ -199,6 +232,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (trigger !== "@") return [];
     return [
       ...matchingAgents().map((agent) => ({ type: "agent" as const, agent })),
+      ...(matchesEveryone() ? [{ type: "everyone" as const }] : []),
       ...matchingAttachments().map((attachment) => ({
         type: "attachment" as const,
         attachment,
@@ -301,6 +335,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       quoteRequest,
       disabled,
     }) => {
+      // An owner can set its counter back to 0 after this editor read it, for example when the chat that it
+      // leaves closes after the next one opens. The next request after that must focus this editor.
+      if (focusRequest < lastFocusRequest) lastFocusRequest = focusRequest;
       if (!editor || (isComposing && agentId === lastAgentId)) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills
@@ -349,8 +386,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
       lastMcpKey = mcpKey;
       if (focusRequested) {
         lastFocusRequest = focusRequest;
+        // Text that the user selected in the draft stays selected, for example when they click Reply on a message.
+        const draftSelection = contentChanged ? null : readEditorSelection(editor);
         editor.focus({ preventScroll: true });
-        placeCaretAtEnd(editor);
+        if (!draftSelection || draftSelection.anchor === draftSelection.focus) placeCaretAtEnd(editor);
         scheduleCaretScroll();
       }
       if (skillPickerRequest > lastSkillPickerRequest) {
@@ -560,11 +599,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const token =
       option.type === "agent"
         ? createMentionToken(option.agent)
-        : option.type === "skill"
-          ? createSkillToken(option.skill)
-          : option.type === "mcp"
-            ? createMcpToken(option.server)
-            : createAttachmentToken(option.attachment, attachmentTokenActions);
+        : option.type === "everyone"
+          ? document.createTextNode(EVERYONE_MENTION)
+          : option.type === "skill"
+            ? createSkillToken(option.skill)
+            : option.type === "mcp"
+              ? createMcpToken(option.server)
+              : createAttachmentToken(option.attachment, attachmentTokenActions);
     const trailingSpace = document.createTextNode(" ");
     range.insertNode(trailingSpace);
     range.insertNode(token);
@@ -709,6 +750,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
      */
     if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
     if (handleMentionPickerKeyDown(event)) return;
+    if (event.key === "Tab" && props.onSteer && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault();
+      props.onSteer();
+      return;
+    }
     if (event.key === "Backspace" && removeAutomaticMentionSpace()) {
       event.preventDefault();
       return;
@@ -780,6 +826,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
     const clipboard = event.clipboardData;
     if (!clipboard) return;
+    const selection = serializedEditorSelection(editor);
+    const pasted = props.onPasteAttachments?.(clipboard, selection);
+    if (pasted) {
+      event.stopPropagation();
+      finishPaste(pasted);
+      return;
+    }
     const files =
       clipboard.files.length > 0
         ? Array.from(clipboard.files)
@@ -788,7 +841,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
             return file ? [file] : [];
           });
     if (files.length > 0) {
-      props.onPasteFiles?.(files);
+      if (props.onPasteFiles) {
+        event.stopPropagation();
+        finishPaste(props.onPasteFiles(files, selection));
+      }
       return;
     }
 
@@ -800,8 +856,46 @@ export function ComposerEditor(props: ComposerEditorProps) {
     updateMention();
   }
 
+  function finishPaste(pasted: undefined | Promise<ComposerPasteResult | undefined>) {
+    if (!pasted) return;
+    const agentId = props.agentId;
+    const surface = editor;
+    void pasted.then((result) => {
+      if (!result) return;
+      onSettled(() => {
+        if (!surface?.isConnected || editor !== surface || props.agentId !== agentId || props.value !== result.value)
+          return;
+        if (surface.ownerDocument.activeElement !== surface) return;
+        placeSerializedCaret(surface, result.caret);
+        scheduleCaretScroll();
+      });
+    });
+  }
+
+  function handleCopy(event: ClipboardEvent, cut = false) {
+    if (!editor || !event.clipboardData || !props.onCopyAttachments) return;
+    const selection = serializedEditorSelection(editor);
+    if (selection.start === selection.end) return;
+    const value = serializeEditor(editor);
+    const text = value.slice(selection.start, selection.end);
+    const ids = attachmentReferenceIds(text);
+    const all = selection.start === 0 && selection.end === value.length;
+    const attachments = (props.attachments ?? []).filter((attachment) => all || ids.has(attachment.id));
+    // Without an attachment, the native copy keeps its rich text.
+    if (!attachments.length) return;
+    event.preventDefault();
+    let remaining: string | undefined;
+    if (cut && !props.disabled) {
+      insertPlainText(editor, "");
+      emitValue();
+      updateMention();
+      remaining = serializeEditor(editor);
+    }
+    props.onCopyAttachments(event.clipboardData, text, attachments, remaining);
+  }
+
   return (
-    <div class="composer-editor-root" data-dictating={dictating() ? "" : undefined}>
+    <div class="composer-editor-root" data-size={props.size ?? "default"} data-dictating={dictating() ? "" : undefined}>
       <Show when={!props.value && !dictating()}>
         <span class="composer-editor-placeholder" aria-hidden="true">
           {props.placeholder}
@@ -818,6 +912,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-label={props.ariaLabel}
         aria-disabled={props.disabled ? "true" : "false"}
         aria-multiline="true"
+        aria-keyshortcuts={props.onSteer ? "Tab" : undefined}
         spellcheck="true"
         data-cuelume-type=""
         onFocus={ensureEditorSelection}
@@ -836,6 +931,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
           setCompositionRevision((revision) => revision + 1);
         }}
         onPaste={handlePaste}
+        onCopy={(event) => handleCopy(event)}
+        onCut={(event) => handleCopy(event, true)}
         onBlur={() => {
           isComposing = false;
           // A menu can return the focus to the editor within this delay; keep the picker it opened.
@@ -886,7 +983,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
       </Show>
       <Show when={pickerOpen()}>
-        <Portal mount={pickerFrame().mount}>
+        <Portal mount={pickerFrame().mount ?? document.body}>
           <div
             class="mention-picker"
             style={{
@@ -951,6 +1048,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     >
                       {option.type === "agent" ? (
                         <AgentAvatar agent={option.agent} />
+                      ) : option.type === "everyone" ? (
+                        <span class="mention-picker-skill-icon" aria-hidden="true">
+                          <UsersRound />
+                        </span>
                       ) : option.type === "skill" ? (
                         <span class="mention-picker-skill-icon" aria-hidden="true">
                           <Puzzle />
@@ -962,11 +1063,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       ) : (
                         <AttachmentReferenceVisual name={option.attachment.name} />
                       )}
-                      <strong>{pickerOptionName(option)}</strong>
+                      <strong>{pickerOptionName(option, t)}</strong>
                       <Show when={option.type === "skill" && option.showSlug ? option.skill.slug : undefined}>
                         {(slug) => <span class="mention-picker-slug">{slug()}</span>}
                       </Show>
-                      <Show when={pickerOptionDescription(option, format)}>
+                      <Show when={pickerOptionDescription(option, t, format)}>
                         {(description) => <span class="mention-picker-description">{description()}</span>}
                       </Show>
                       <Badge class="mention-picker-badge" variant="ghost">

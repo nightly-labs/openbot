@@ -84,7 +84,7 @@
   flex: 1;
 }
 
-.composer-reply-preview span {
+.composer-reply-preview > div > span {
   display: block;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -92,14 +92,9 @@
   line-height: 14px;
 }
 
-.composer-reply-preview p {
-  overflow: hidden;
+.composer-reply-preview .message-reply-quote {
   margin: 1px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-sm);
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .composer-reply-preview > button {
@@ -341,6 +336,26 @@
   color: var(--openbot-text-secondary);
   animation: voice-morph-content-in var(--openbot-duration-slow) var(--openbot-ease-out) var(--openbot-duration-fast)
     both;
+}
+
+/* The last seconds before the time limit: the bar widens for the time left. */
+.voice-morph[data-countdown] {
+  --voice-bar-width: 188px;
+}
+
+.voice-recording-status[data-tone="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.voice-recording-remaining {
+  flex: 0 0 auto;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-recording-status[data-tone="warning"] .voice-recording-remaining {
+  color: var(--openbot-warning-text);
 }
 
 .voice-waveform {
@@ -649,6 +664,21 @@
   user-select: none;
 }
 
+/* The compact editor has the sizes of the compact composer. */
+.composer-editor-root[data-size="compact"],
+.composer-editor-root[data-size="compact"] .composer-editor-surface {
+  min-height: 28px;
+}
+
+.composer-editor-root[data-size="compact"] .composer-editor-surface {
+  padding: 4px 0;
+}
+
+.composer-editor-root[data-size="compact"] .composer-editor-placeholder {
+  top: 4px;
+  left: 0;
+}
+
 /* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
 .composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
@@ -662,6 +692,22 @@
   height: 24px;
   cursor: pointer;
   user-select: none;
+}
+
+.composer-file-reference-image {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  flex: none;
+  border-radius: var(--openbot-radius-sm);
+  object-fit: cover;
+}
+
+.composer-file-reference-size {
+  flex: none;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  font-variant-numeric: tabular-nums;
 }
 
 /*

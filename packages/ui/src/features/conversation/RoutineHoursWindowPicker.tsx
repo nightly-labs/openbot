@@ -15,10 +15,10 @@ interface RoutineHoursWindowPickerProps {
   window: RoutineHoursWindow;
   everyHours: number;
   /** The minute past the hour of a run through the whole day. */
-  minute?: number;
+  minute?: number | undefined;
   onChange: (window: RoutineHoursWindow) => void;
   onEveryHoursChange: (everyHours: number) => void;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** The popover closed, so the edit is complete. The start, end and repeat menus inside it do not end it. */
   onClose?: () => void;
 }

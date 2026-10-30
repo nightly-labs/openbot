@@ -1,10 +1,15 @@
 // Seeds one random marker into everything a user can type that analytics could read: a custom
 // agent's id, name, arguments and secret environment value, an agent's name and messages, a
 // routine's name and instruction, an MCP server's address, headers and command, and the address of
-// a browser page. It then runs agent turns, a failed turn, a routine run and site visits in a running
-// dev app, receives the analytics of main and the window on a local capture server, and checks that
+// a browser page, and a workflow's title and texts. It then runs agent turns, a failed turn, a
+// routine run, a workflow run and site visits in a running dev app, receives the analytics of main
+// and the window on a local capture server, and checks that
 // no request carries the marker, that the expected events arrived, and that turning analytics off
-// stops them. The turns run on a fake custom agent on this computer, so no model is used.
+// stops them. The turns run on a fake custom agent on this computer, so no model is used. The fake
+// agent reports token usage for each answered turn, and the script checks that the turn event carries
+// those counts, the same counts as the Usage report, that the model's own token event carries them,
+// that the turn says how it is paid for,
+// that a turn with no usage reports unknown, and that the failed turn's failure report arrives.
 //
 // Start the dev app with the capture server's address first, then run the script:
 //   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47321 bun run dev
@@ -42,9 +47,10 @@ const EVENT_TIMEOUT_MS = 60_000;
 
 // A custom agent that speaks the Agent Client Protocol on stdio. When a message asks it to fail, it
 // prints its secret token to stderr and in the error of the prompt, the way a CLI that refuses a
-// credential does.
+// credential does. An answered prompt reports ACP usage, which is cumulative for the session.
 const FAKE_AGENT = `#!/usr/bin/env node
 const NL = String.fromCharCode(10);
+const prompts = new Map();
 let buffer = "";
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 process.stdin.setEncoding("utf8");
@@ -78,7 +84,10 @@ function handle(message) {
       sessionUpdate: "agent_message_chunk",
       content: { type: "text", text: "Done with " + process.env.FAKE_TOKEN },
     } } });
-    write({ id: message.id, result: { stopReason: "end_turn" } });
+    const count = (prompts.get(message.params.sessionId) ?? 0) + 1;
+    prompts.set(message.params.sessionId, count);
+    const usage = { inputTokens: 1500 * count, cachedReadTokens: 1000 * count, cachedWriteTokens: 200 * count, outputTokens: 50 * count, totalTokens: 1550 * count };
+    write({ id: message.id, result: { stopReason: "end_turn", usage } });
     return;
   }
   write({ id: message.id, result: {} });
@@ -86,10 +95,13 @@ function handle(message) {
 setInterval(() => {}, 1000);
 `;
 
-/** The body that the OpenPanel SDK and the failure report transport post. */
+/**
+ * The body that the OpenPanel SDK and the failure report transport post. It comes from `JSON.parse`,
+ * so every value is JSON. `z.json()` in a record makes TypeScript 7.1 report TS5115.
+ */
 const openPanelBody = z.object({
   type: z.string(),
-  payload: z.object({ name: z.string().optional(), properties: z.record(z.string(), z.json()).optional() }),
+  payload: z.object({ name: z.string().optional(), properties: z.record(z.string(), z.unknown()).optional() }),
 });
 
 interface Captured {
@@ -262,6 +274,7 @@ try {
         command,
         args: [`--token=${marker}arg`],
         env: [{ name: "FAKE_TOKEN", value: `${marker}token` }],
+        usagePrompt: null,
       }),
     { id: customAgentId, command: fakeAgentPath, marker: MARKER },
   );
@@ -303,6 +316,54 @@ try {
   check("a custom agent's model is reported as its kind only", completed.properties.model === "custom", {
     model: completed.properties.model,
   });
+  // A custom ACP agent's payment is not known to the host, so it reports `unknown`, never a guess.
+  check("a turn reports how it is paid for", completed.properties.provider_auth === "unknown", {
+    provider_auth: completed.properties.provider_auth,
+  });
+  // The fake agent reports 1,500 input tokens, of which 1,000 are cache reads and 200 cache writes.
+  const expectedTokens = {
+    token_usage: "reported",
+    uncached_input_tokens: 300,
+    cached_input_tokens: 1000,
+    cache_write_tokens: 200,
+    output_tokens: 50,
+    total_tokens: 1550,
+  };
+  const tokenProperties = Object.fromEntries(
+    Object.keys(expectedTokens).map((key) => [key, completed.properties[key]]),
+  );
+  check(
+    "a turn reports the provider's token counts",
+    JSON.stringify(tokenProperties) === JSON.stringify(expectedTokens),
+    tokenProperties,
+  );
+  const usageReport = await page.evaluate(
+    async ({ agentId, server }) => {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+      return window.openbot.agent.getHostAnalytics({ startDate: today, endDate: today, timeZone, agentId }, server);
+    },
+    { agentId: agent.id, server: LOCAL_SERVER_ID },
+  );
+  const reportTokens = usageReport && {
+    uncached_input_tokens: usageReport.totals.uncachedInput,
+    cached_input_tokens: usageReport.totals.cachedInput,
+    cache_write_tokens: usageReport.totals.cacheCreation,
+    output_tokens: usageReport.totals.output,
+    total_tokens: usageReport.totals.processedTokens,
+  };
+  check(
+    "the turn's token counts match the Usage report",
+    reportTokens !== null && Object.entries(reportTokens).every(([key, value]) => tokenProperties[key] === value),
+    { event: tokenProperties, report: reportTokens },
+  );
+  const modelUsage = await waitForEvent("system_token_usage", (event) => event.properties.provider === "acp");
+  const modelTokens = Object.fromEntries(Object.keys(expectedTokens).map((key) => [key, modelUsage.properties[key]]));
+  check(
+    "the turn's model reports its own token counts",
+    modelUsage.properties.model === "custom" && JSON.stringify(modelTokens) === JSON.stringify(expectedTokens),
+    modelUsage.properties,
+  );
 
   const failing = await createAgent("Fails", "Now please fail, with");
   cleanup.push(() => page.evaluate((id) => window.openbot.agent.deleteAgent(id), failing.id));
@@ -311,6 +372,17 @@ try {
     (event) => event.properties.provider === "acp" && event.properties.status === "failed",
   );
   check("a failed turn is reported", true, failure.properties);
+  // Before the shared generation list, `safeReport` refused the host's generation, so no report arrived.
+  const report = await waitForEvent("system_operation_failed", (event) => event.properties.source === "host").catch(
+    () => null,
+  );
+  check("the failed turn's failure report arrives", report !== null, report?.properties);
+  check(
+    "a turn with no provider usage reports unknown, not 0",
+    failure.properties.token_usage === "unknown" &&
+      !Object.keys(failure.properties).some((key) => key.endsWith("_tokens")),
+    failure.properties,
+  );
 
   const routine = await page.evaluate(
     ({ agentId, marker }) =>
@@ -330,6 +402,47 @@ try {
   });
   const routineRun = await waitForEvent("system_routine_run");
   check("a routine run is reported", true, routineRun.properties);
+
+  // A prompt into a step of the answering agent: the run sends the agent the marker.
+  const workflow = await page.evaluate(
+    ({ agentId, marker, server }) =>
+      window.openbot.workflows.create(
+        {
+          title: `Workflow ${marker}`,
+          graph: {
+            nodes: [
+              { id: "prompt", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: `Say hello to ${marker}` } },
+              { id: "agent", kind: "agent", at: { x: 300, y: 0 }, fields: { agentId, task: `Greet ${marker}` } },
+            ],
+            edges: [{ id: "edge", from: "prompt", to: "agent", type: "text" }],
+            strokes: [],
+          },
+        },
+        server,
+      ),
+    { agentId: agent.id, marker: MARKER, server: LOCAL_SERVER_ID },
+  );
+  cleanup.push(() =>
+    page.evaluate(({ id, server }) => window.openbot.workflows.delete(id, server), {
+      id: workflow.summary.id,
+      server: LOCAL_SERVER_ID,
+    }),
+  );
+  await page.evaluate(
+    ({ workflowId, server }) =>
+      window.openbot.workflows.startRun({ workflowId, requestId: crypto.randomUUID() }, server),
+    { workflowId: workflow.summary.id, server: LOCAL_SERVER_ID },
+  );
+  const workflowRun = await waitForEvent("system_workflow_run");
+  check(
+    "a workflow run is reported with its outcome, source and step counts",
+    workflowRun.properties.status === "done" &&
+      workflowRun.properties.source === "manual" &&
+      workflowRun.properties.step_count === 2 &&
+      workflowRun.properties.agent_step_count === 1 &&
+      typeof workflowRun.properties.duration_ms === "number",
+    workflowRun.properties,
+  );
 
   const openTab = (url: string) => page.evaluate((address) => window.openbot.browser.open({ url: address }), url);
   const localTab = await openTab(`http://localhost:${localPage.port}/?token=${MARKER}local`);
@@ -385,8 +498,6 @@ try {
       {
         marker: MARKER,
         results,
-        // The host failure report queue drops every report today: `event_schema_version` 8 is not the 7
-        // that `safeReport` accepts for a desktop surface. Recorded so a fix shows here.
         failureReportsSent: analytics.filter((entry) => entry.name === "system_operation_failed").length,
         events: analytics.map((entry) => ({ name: entry.name, properties: entry.properties })),
       },

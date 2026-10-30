@@ -17,6 +17,7 @@ export const messages = {
   "update.provider.checking": "{name} güncellemeleri denetleniyor",
   "update.provider.available": "{name} güncellemesi mevcut",
   "update.provider.updating": "{name} güncelleniyor",
+  "update.provider.waiting": "{name} güncellemesi bekliyor",
   "update.provider.failed": "{name} güncellemesi başarısız oldu",
   "update.provider.settingUp": "Ayarlanıyor",
   "update.provider.failedRetry": "Güncelleme başarısız oldu. Tekrar deneyin.",
@@ -63,5 +64,6 @@ export const messages = {
   "update.whatsNew.empty.body":
     "Bu sürümde burada gösterilecek bir not yok. Tüm değişiklikler tam sürüm günlüğünde gösterilir.",
   "update.whatsNew.changelog": "Tam sürüm günlüğü",
+  "update.whatsNew.changelogFailed": "OpenBot sürüm günlüğünü açamadı.",
   "update.whatsNew.done": "Anladım",
 } as const satisfies PartialTranslation<typeof source>;

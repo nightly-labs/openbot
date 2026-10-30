@@ -1,0 +1,43 @@
+[
+  {
+    "unreadCount": 1,
+    "activeTasks": 0,
+    "lastMessage": {
+      "authorName": "Ada",
+      "text": "The release notes are ready.",
+      "at": "2026-10-21T10:00:00.000Z",
+      "author": {
+        "kind": "agent",
+        "id": "agent-1"
+      },
+      "status": "completed"
+    },
+    "name": "launch",
+    "title": "Launch",
+    "instructions": "",
+    "members": [
+      {
+        "agentId": "agent-1"
+      },
+      {
+        "agentId": "agent-2"
+      }
+    ],
+    "leadAgentId": "agent-1",
+    "id": "channel-1",
+    "archived": false,
+    "revision": 3,
+    "createdAt": "2026-10-20T09:00:00.000Z",
+    "openTasks": 0,
+    "threads": [
+      {
+        "agentId": "agent-1",
+        "threadId": "thread-1"
+      },
+      {
+        "agentId": "agent-2",
+        "threadId": "thread-2"
+      }
+    ]
+  }
+]

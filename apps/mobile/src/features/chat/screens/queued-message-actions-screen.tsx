@@ -6,7 +6,7 @@ import ArrowUpToLine from "lucide-react-native/icons/arrow-up-to-line";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
 import ExternalLink from "lucide-react-native/icons/external-link";
 import Pencil from "lucide-react-native/icons/pencil";
-import Trash2 from "lucide-react-native/icons/trash-2";
+import Trash2 from "lucide-react-native/icons/trash";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -29,7 +29,9 @@ export function QueuedMessageActionsScreen() {
   const foreground = useThemeColor("foreground");
   const danger = String(useCSSVariable("--openbot-danger-text"));
   const held = queue?.edit?.delivery ?? null;
-  const delivery = held?.id === deliveryId ? held : queue?.queued.find((item) => item.id === deliveryId);
+  // A teammate's answer is not the user's message: steer is its only action.
+  const reply = queue?.replies.find((item) => item.id === deliveryId);
+  const delivery = held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply);
 
   if (!queue || !delivery) {
     return (
@@ -71,13 +73,17 @@ export function QueuedMessageActionsScreen() {
       ) : null}
 
       <SettingsSection>
-        <SettingsRow
-          leading={<Pencil color={foreground} size={22} />}
-          disabled={locked || editedElsewhere || !queue.canEdit}
-          onPress={() => router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } })}
-        >
-          <Typography>{t("common.edit")}</Typography>
-        </SettingsRow>
+        {reply ? null : (
+          <SettingsRow
+            leading={<Pencil color={foreground} size={22} />}
+            disabled={locked || editedElsewhere || !queue.canEdit}
+            onPress={() =>
+              router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } })
+            }
+          >
+            <Typography>{t("common.edit")}</Typography>
+          </SettingsRow>
+        )}
         <SettingsRow
           leading={<CornerDownRight color={foreground} size={22} />}
           disclosure={false}
@@ -86,31 +92,35 @@ export function QueuedMessageActionsScreen() {
         >
           <Typography>{t("mobile.chat.queue.steer")}</Typography>
         </SettingsRow>
-        <SettingsRow
-          leading={<ArrowUpToLine color={foreground} size={22} />}
-          disclosure={false}
-          disabled={locked || editedElsewhere || delivery.position === 1}
-          onPress={() => finish(queue.moveFirst(delivery))}
-        >
-          <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
-        </SettingsRow>
+        {reply ? null : (
+          <SettingsRow
+            leading={<ArrowUpToLine color={foreground} size={22} />}
+            disclosure={false}
+            disabled={locked || editedElsewhere || delivery.position === 1}
+            onPress={() => finish(queue.moveFirst(delivery))}
+          >
+            <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
+          </SettingsRow>
+        )}
       </SettingsSection>
 
-      <SettingsSection>
-        <SettingsRow
-          leading={<Trash2 color={danger} size={22} />}
-          disclosure={false}
-          disabled={locked}
-          onPress={() =>
-            Alert.alert(t("mobile.chat.queue.deleteTitle"), t("mobile.chat.queue.deleteMessage"), [
-              { text: t("mobile.chat.queue.keep"), style: "cancel" },
-              { text: t("common.delete"), style: "destructive", onPress: () => finish(queue.remove(delivery)) },
-            ])
-          }
-        >
-          <Typography className="text-danger-text">{t("common.delete")}</Typography>
-        </SettingsRow>
-      </SettingsSection>
+      {reply ? null : (
+        <SettingsSection>
+          <SettingsRow
+            leading={<Trash2 color={danger} size={22} />}
+            disclosure={false}
+            disabled={locked}
+            onPress={() =>
+              Alert.alert(t("mobile.chat.queue.deleteTitle"), t("mobile.chat.queue.deleteMessage"), [
+                { text: t("mobile.chat.queue.keep"), style: "cancel" },
+                { text: t("common.delete"), style: "destructive", onPress: () => finish(queue.remove(delivery)) },
+              ])
+            }
+          >
+            <Typography className="text-danger-text">{t("common.delete")}</Typography>
+          </SettingsRow>
+        </SettingsSection>
+      )}
 
       {editedElsewhere ? <SettingsNote>{t("mobile.chat.queue.editedElsewhere")}</SettingsNote> : null}
       {queue.activeTurnId ? null : <SettingsNote>{t("mobile.chat.queue.steerNeedsTurn")}</SettingsNote>}

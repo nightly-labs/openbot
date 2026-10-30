@@ -22,9 +22,10 @@ import { type AgentSessionSettingsSnapshot, type AgentSessionSettingValue, isAge
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
-import { agentLaunchPath, assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
+import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AcpHistoryPersistence } from "./acp-client";
 import type { AgentClient, DiagnosticOrigin } from "./agent-client";
+import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import {
   type AppServerNotification,
@@ -51,6 +52,8 @@ export interface CustomAgentConfig {
   readonly command: string;
   readonly args: readonly string[];
   readonly env: readonly { readonly name: string; readonly value: string }[];
+  /** Sent in a private session to read the plan usage, or null for none. */
+  readonly usagePrompt: string | null;
 }
 
 /** The saved custom agents, read when a process starts. */
@@ -271,6 +274,23 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         cause: new Error(sourceText("error.provider.sessionSettingUnavailable")),
       });
     return yield* held.child.setSessionSetting(held.sessionId, configId, value);
+  });
+
+  /**
+   * Runs on the process that lists the agent's models, in its folder apart from every workspace, so
+   * the prompt never waits for a turn or opens a session where a thread works.
+   */
+  readonly readUsageText = Effect.fn("CustomAcp.readUsageText")(function* (
+    this: CustomAcpAgentsClient,
+    model: string,
+    prompt: string,
+  ): Effect.fn.Return<string | null, ProviderClientOperationError> {
+    if (!this.#running)
+      return yield* new ProviderClientOperationError({ cause: new Error("ACP client is not running.") });
+    const agentId = yield* customStep(() => this.#modelAgent({ model }));
+    const child = yield* this.#child(agentId, null).pipe(toProviderClientOperationError);
+    if (!child.readUsageText) return null;
+    return yield* child.readUsageText(model, prompt).pipe(toProviderClientOperationError);
   });
 
   readonly request = Effect.fn("CustomAcp.request")(

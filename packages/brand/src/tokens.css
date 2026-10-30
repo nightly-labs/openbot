@@ -7,13 +7,15 @@
  * two hundred tokens, and a token added for one surface was simply absent on the
  * other two. Keep this file the only declaration site.
  *
- * The values here are the base, always-dark palette. Mobile is the one surface
- * with a light theme; it layers tokens-native.css on top of this file.
+ * The values here are the base, dark palette. The desktop app and the web client
+ * layer tokens-light.css on top of this file for their light appearance; mobile
+ * layers tokens-native.css. Both change values only; neither declares a new token.
  */
 
 :root {
   --openbot-provider-current: currentcolor;
-  /* Main screen canvas and drawer, used by the native app. */
+  /* Main screen canvas and drawer, used by the native app. The desktop also uses the sidebar, the
+     sheet (its menus) and the grouped tokens, so tokens-light.css sets them too. */
   --openbot-bg-native-canvas: #141414;
   --openbot-bg-native-sidebar: #141414;
   /* Grouped sheet surfaces, used by the native app. */
@@ -22,9 +24,18 @@
   --openbot-text-grouped-secondary: #96969b;
   --openbot-border-grouped: #333335;
   --openbot-radius-grouped: 16px;
+  /* The milky chrome of the native app where it has no Liquid Glass: the search field and bar buttons. */
+  --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
+  --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
+  /* The fill of that chrome over a real blur, lighter than the solid glass. */
+  --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
 
   /* Neutral color system. Keep UI colors here, not in components. */
   --openbot-bg-canvas: #1a1a1a;
+  /* The window frame around the page card, darker than the card, so the card comes forward. */
+  --openbot-bg-frame: #0d0d0d;
+  /* A rail inside a menu, a step darker than the menu sheet. */
+  --openbot-bg-sheet-inset: #101010;
   --openbot-bg-canvas-clear: rgba(26, 26, 26, 0);
   --openbot-bg-sidebar: #1a1a1a;
   --openbot-marketplace-detail-bg: #111111;
@@ -40,8 +51,7 @@
   --openbot-dialog-ring: rgba(255, 255, 255, 0.1);
   --openbot-bg-glass: rgba(33, 33, 33, 0.76);
 
-  /* Landing-page glass surfaces. Public web only, but declared here so the
-     next person to reach for a translucent panel finds one already named. */
+  /* Translucent glass surfaces: the landing page, and the browser dock and previews of the desktop. */
   --openbot-glass-surface: rgba(255, 255, 255, 0.07);
   --openbot-glass-surface-hover: rgba(255, 255, 255, 0.11);
   --openbot-glass-border: rgba(255, 255, 255, 0.18);
@@ -82,7 +92,8 @@
   --openbot-border: rgba(255, 255, 255, 0.035);
   --openbot-border-strong: rgba(255, 255, 255, 0.045);
   --openbot-image-outline: rgba(255, 255, 255, 0.1);
-  --openbot-border-focus: rgba(0, 124, 247, 0.72);
+  /* Focus is neutral: a grey border or a thin grey ring, never blue and never a halo. */
+  --openbot-border-focus: var(--openbot-text-muted);
   --openbot-text-primary: #ffffff;
   --openbot-text-on-light: #141414;
   --openbot-surface-light: #f0f0f0;
@@ -92,6 +103,14 @@
   --openbot-action: #f0f0f0;
   --openbot-action-foreground: #141414;
   --openbot-qr-background: #ffffff;
+  /* Ink on paper that is always light, in both themes: a QR code, the onboarding drawing of a
+     computer, the profile image that is shared. The on-light tokens above turn dark in the light
+     theme, because there they are the inverted element; these never change. */
+  --openbot-paper: #f0f0f0;
+  --openbot-paper-text: #141414;
+  --openbot-paper-text-muted: rgba(20, 20, 20, 0.52);
+  --openbot-paper-text-dim: rgba(20, 20, 20, 0.36);
+  --openbot-paper-border: rgba(20, 20, 20, 0.14);
   --openbot-onboarding-desktop-mist: #dbe9ff;
   --openbot-onboarding-desktop-blue: #7eb4f2;
   --openbot-onboarding-desktop-indigo: #6f7de8;
@@ -197,6 +216,10 @@
      announcement is not an action. */
   --openbot-badge-new: #ff1e5e;
   --openbot-badge-new-soft: rgba(255, 30, 94, 0.16);
+  /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
+  --openbot-beam-teal: var(--openbot-file-teal);
+  --openbot-beam-blue: var(--openbot-accent-text);
+  --openbot-beam-pink: var(--openbot-file-pink);
   --openbot-approval-badge-soft: rgba(255, 148, 18, 0.18);
   /* One red. The palette carried four families - danger (#e47d75), danger-strong
      (#ff4058), settings-danger (#eb4145) and button-destructive (oklch, #ff6467) -
@@ -235,6 +258,7 @@
   --openbot-data-table-ring: rgba(255, 255, 255, 0.12);
   --openbot-shadow-popover-ambient: rgba(0, 0, 0, 0.1);
   --openbot-shadow-dialog: rgba(0, 0, 0, 0.48);
+  --openbot-shadow-menu: rgba(0, 0, 0, 0.45);
   --openbot-shadow-dynamic-island: rgba(0, 0, 0, 0.6);
   --openbot-shadow-ring: rgba(228, 228, 228, 0.04);
   --openbot-border-on-light: rgba(20, 20, 20, 0.14);
@@ -355,7 +379,7 @@
   --openbot-shadow-raised: 0 12px 32px var(--openbot-shadow-popover-ambient);
   --openbot-shadow-card: 0 0 0 transparent;
   --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
-  --openbot-focus-ring: 0 0 0 3px var(--openbot-accent-soft);
+  --openbot-focus-ring: 0 0 0 1px var(--openbot-border-focus);
   --openbot-layer-dropdown: 40;
   --openbot-layer-popover: 60;
   --openbot-layer-dialog: 100;
@@ -365,6 +389,9 @@
      and the surface opened last wins only by accident. */
   --openbot-layer-dialog-host: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover));
   --openbot-layer-toast: 120;
+  /* A tooltip names the control under the pointer. It shows above every other layer, also above
+     a dialog or a menu that holds the control. */
+  --openbot-layer-tooltip: 240;
 }
 
 /* Every surface that paints a provider - the picker mark, the update toast and its progress bar,

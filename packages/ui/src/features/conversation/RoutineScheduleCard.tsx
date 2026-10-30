@@ -12,18 +12,18 @@ export interface RoutineScheduleCardProps {
   action: "created" | "updated";
   schedule: RoutineScheduleDraft;
   /** Without it the card is read-only. */
-  onChange?: (schedule: RoutineScheduleDraft) => void;
+  onChange?: ((schedule: RoutineScheduleDraft) => void) | undefined;
   /** One edit on the row is complete. A card that saves each edit saves here. */
   onEditEnd?: () => void;
   state?: RoutineScheduleCardState;
-  errorText?: string;
+  errorText?: string | undefined;
   /** For example "Thu, Sep 25 at 8:20 AM". */
-  nextRunLabel?: string;
+  nextRunLabel?: string | undefined;
   /** For example "Warsaw time". Give it only when the routine zone is not the viewer's zone. */
-  timeZoneLabel?: string;
+  timeZoneLabel?: string | undefined;
   onOpenRoutine?: () => void;
   /** Moves to the newest card of this routine. Shown while the state is `superseded`. */
-  onShowLatest?: () => void;
+  onShowLatest?: (() => void) | undefined;
   today?: Date;
   /** The frequencies the menu offers. Defaults to all of them. */
   kinds?: RoutineDraftKindOption[];

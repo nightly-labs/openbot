@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/validation";
-import { Effect, Fiber, Option, Result, Schema } from "effect";
+import { Effect, Fiber, Result, Schema } from "effect";
 import {
   type ContactMessageEmailInput,
   type RenderedEmail,
@@ -95,6 +95,11 @@ export const EMAIL_CODE_DELIVERY_BUDGET_MS = 25_000;
 // `auth-service` answers 429 for this message instead of a permanent 502. Every delivery method
 // raises it, so the service stays free of provider detail.
 export const RATE_LIMITED_DELIVERY_ERROR = "email_delivery_rate_limited";
+/** The messages of a send that the server may have taken, so the recipient can still get it. */
+export const AMBIGUOUS_DELIVERY_ERRORS: ReadonlySet<string> = new Set([
+  "smtp_delivery_unknown",
+  "email_delivery_unknown",
+]);
 // A sender-limit refusal that arrives with a permanent 5xx reply. Namecheap Private Email answers
 // `554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60
 // minutes` when the hourly quota of the sending mailbox is spent, which is a temporary condition
@@ -235,7 +240,7 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
 ): Effect.fn.Return<void, SmtpFailure> {
   const startedAt = Date.now();
   const state: SmtpAttemptState = { submissionStarted: false, accepted: false, replyAt: {} };
-  const outcome: { error: SmtpFailure | null; closeConfirmed: boolean } = { error: null, closeConfirmed: false };
+  const outcome: { error: SmtpFailure | null } = { error: null };
   yield* Effect.acquireUseRelease(
     Effect.gen(function* () {
       const socket = yield* smtpValidate(() =>
@@ -252,7 +257,8 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
     }),
     ({ session }) =>
       Effect.gen(function* () {
-        // Observe the deadline without stopping the session before socket closure confirms its final state.
+        // Observe the deadline only. The release step stops the session, so `state` is final when the
+        // result is decided after it.
         const result = yield* Fiber.join(session).pipe(
           Effect.timeoutOrElse({
             duration: SMTP_TIMEOUT_MS,
@@ -266,10 +272,13 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
               : result.failure;
         }
       }),
+    // Stop the session before the close, so it cannot write again and `state` is final. A session that
+    // did not start the submission did not send the message, whether or not the close is confirmed, so
+    // a relay that stalls before `DATA` gets a new attempt instead of an unknown result.
     ({ socket, session }) =>
       Effect.gen(function* () {
-        outcome.closeConfirmed = yield* closeSmtpSocket(socket);
         yield* Fiber.interrupt(session);
+        yield* closeSmtpSocket(socket);
       }),
   );
   console.info("SMTP session timing:", {
@@ -279,18 +288,14 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   });
   if (state.accepted) return;
   if (outcome.error && !isRetryableSmtpError(outcome.error)) return yield* outcome.error;
-  if (state.submissionStarted || !outcome.closeConfirmed) return yield* new SmtpError("smtp_delivery_unknown");
+  if (state.submissionStarted) return yield* new SmtpError("smtp_delivery_unknown");
   if (outcome.error) return yield* outcome.error;
   return yield* new SmtpError("smtp_delivery_unknown");
 });
 
-/** True when the socket confirms its close before the deadline. */
-function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<boolean> {
-  return Effect.tryPromise(async () => socket.close()).pipe(
-    Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS),
-    Effect.map(Option.isSome),
-    Effect.orElseSucceed(() => false),
-  );
+/** Waits for the socket close until the deadline. */
+function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<void> {
+  return Effect.tryPromise(async () => socket.close()).pipe(Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS), Effect.ignore);
 }
 
 function normalizeSmtpError(error: unknown): SmtpFailure {

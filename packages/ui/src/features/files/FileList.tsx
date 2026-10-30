@@ -48,7 +48,7 @@ export interface FileListProps {
   label: string;
   files: readonly StoredFileRow[];
   /** Names the agent on each row. Leave it out where the list already belongs to one agent. */
-  agents?: readonly AgentProfile[];
+  agents?: readonly AgentProfile[] | undefined;
   /** Show the chat each file belongs to. Off in the chat's own panel. */
   showConversation?: boolean;
   /** Narrow layout for the chat side panel: filters scroll, rows drop the chat column. */
@@ -57,16 +57,16 @@ export interface FileListProps {
   groupByDay?: boolean;
   /** Level of the day headings: one below the nearest heading of the caller. Default 4. */
   groupHeadingLevel?: 3 | 4;
-  loading?: boolean;
-  error?: string | null;
-  onRetry?: () => void;
+  loading?: boolean | undefined;
+  error?: string | null | undefined;
+  onRetry?: (() => void) | undefined;
   initialQuery?: Partial<FileQuery>;
   /** The clock for day labels, so a story does not depend on the day it runs. */
-  now?: Date;
+  now?: Date | undefined;
   emptyTitle?: string;
   emptyDescription?: string;
   /** The viewer can delete files. A row also needs `deletable`. Off for a member of a remote server. */
-  canDelete?: boolean;
+  canDelete?: boolean | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }

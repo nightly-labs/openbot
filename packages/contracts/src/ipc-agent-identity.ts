@@ -1,8 +1,13 @@
-import { AGENT_PROVIDER_DESCRIPTORS, agentProviderDescriptor } from "./agent-providers";
+import {
+  AGENT_PROVIDER_DESCRIPTORS,
+  type AgentProviderRef,
+  agentProviderDescriptor,
+  isAgentProviderRef,
+} from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentProviderId, isAgentProvider } from "./ipc-agent-status";
 import { isBoundedString } from "./ipc-bounded-values";
-import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { type DynamicRecord, isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export type AgentModelId = string;
 
@@ -78,18 +83,33 @@ export interface AgentModelOption {
    * still holds `medium`, which is what clients that predate this field show and save.
    */
   reasoningEffortConfigurable?: boolean;
+  /**
+   * The provider's id for the fast service tier of this model, such as Codex `priority`. Absent when
+   * the model has no fast mode.
+   */
+  fastServiceTier?: string;
 }
 
 export function isAgentModelOption(value: unknown): value is AgentModelOption {
+  return isDynamicRecord(value) && isAgentProvider(value.provider) && hasAgentModelOptionFields(value);
+}
+
+/** A model that a client reads from a host. Its provider can be one that this OpenBot does not know. */
+export type ClientAgentModelOption = Omit<AgentModelOption, "provider"> & { provider: AgentProviderRef };
+
+export function isClientAgentModelOption(value: unknown): value is ClientAgentModelOption {
+  return isDynamicRecord(value) && isAgentProviderRef(value.provider) && hasAgentModelOptionFields(value);
+}
+
+function hasAgentModelOptionFields(value: DynamicRecord): boolean {
   return (
-    isDynamicRecord(value) &&
-    isAgentProvider(value.provider) &&
     isAgentModel(value.id) &&
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     isBoundedString(value.description, INPUT_LIMITS.agentDescription) &&
     isReasoningEffort(value.defaultReasoningEffort) &&
     Array.isArray(value.supportedReasoningEfforts) &&
     value.supportedReasoningEfforts.every(isReasoningEffort) &&
-    (value.reasoningEffortConfigurable === undefined || isBoolean(value.reasoningEffortConfigurable))
+    (value.reasoningEffortConfigurable === undefined || isBoolean(value.reasoningEffortConfigurable)) &&
+    (value.fastServiceTier === undefined || isBoundedString(value.fastServiceTier, INPUT_LIMITS.serviceTier))
   );
 }

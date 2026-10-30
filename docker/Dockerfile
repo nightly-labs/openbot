@@ -10,10 +10,7 @@
 ARG BASE=ubuntu:24.04@sha256:a853f94d226358a79c740cfc7bce0c289748f3fe3488d921d038ccd752c61b60
 
 FROM ${BASE} AS release
-# The AppImage runtime loads libz.so to unpack itself. Unpacked, the release needs no FUSE.
-RUN apt-get update \
-  && apt-get install --yes --no-install-recommends zlib1g-dev \
-  && rm -rf /var/lib/apt/lists/*
+# The static AppImage runtime unpacks itself with no system library. Unpacked, the release needs no FUSE.
 COPY OpenBot.AppImage /tmp/OpenBot.AppImage
 WORKDIR /tmp
 RUN chmod 0700 OpenBot.AppImage \

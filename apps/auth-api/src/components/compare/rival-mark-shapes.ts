@@ -9,6 +9,8 @@
 // Claude Cowork has no mark of its own: from September 2026 it rolls out inside
 // Claude, so it is the Claude mark. Devin is the mark from devin.ai, not the Cognition logo.
 // Instinct is the stick figure from instinct.com, redrawn with even strokes.
+// Paperclip is the paperclip from the favicon of its web app.
+// Viktor is the letter V from its avatar on viktor.com, without the gradient tile.
 // ChatGPT dots is the ring from chatgpt.com/features/dots, not the OpenAI logo.
 // Codex, Claude Code and Cursor use the marks that the provider logos draw: Codex has
 // no mark apart from the OpenAI blossom. Antigravity is the arch from the icon.svg that
@@ -29,7 +31,9 @@ export type RivalMarkName =
   | "instinct"
   | "manus"
   | "muse"
-  | "openclaw";
+  | "openclaw"
+  | "paperclip"
+  | "viktor";
 
 export interface RivalMarkShape {
   /** `[x, y, width, height]`, as an SVG `viewBox`. */
@@ -112,5 +116,19 @@ export const RIVAL_MARK_SHAPES: Record<RivalMarkName, RivalMarkShape> = {
   openclaw: {
     viewBox: [0, 0, 120, 120],
     path: "M60 10C65.7 10 70.8 10.9 75.4 12.5Q85.2 3.4 90.8 6.7Q92.1 7.5 91.3 8.8Q90.5 10.1 89.2 9.3Q85.8 7.2 78.5 13.7C92.1 19.6 100.4 31.8 103.6 44C115.8 41.7 119.6 50.8 115 60C112.3 65.5 108 66.5 103.9 64.6C100.2 81 87.6 95.8 75 100L75 110L65 110L65 100C60 102 55 100 55 100L55 110L45 110L45 100C32.4 95.8 19.8 81 16.1 64.6C12 66.5 7.7 65.5 5 60C0.4 50.8 4.2 41.7 16.4 44C19.6 31.8 27.9 19.6 41.5 13.7Q34.2 7.2 30.8 9.3Q29.5 10.1 28.7 8.8Q27.9 7.5 29.2 6.7Q34.8 3.4 44.6 12.5C49.2 10.9 54.3 10 60 10ZM51 35C51 31.7 48.3 29 45 29C41.7 29 39 31.7 39 35C39 38.3 41.7 41 45 41C48.3 41 51 38.3 51 35ZM81 35C81 31.7 78.3 29 75 29C71.7 29 69 31.7 69 35C69 38.3 71.7 41 75 41C78.3 41 81 38.3 81 35ZM78.5 34C78.5 35.4 77.4 36.5 76 36.5C74.6 36.5 73.5 35.4 73.5 34C73.5 32.6 74.6 31.5 76 31.5C77.4 31.5 78.5 32.6 78.5 34ZM48.5 34C48.5 35.4 47.4 36.5 46 36.5C44.6 36.5 43.5 35.4 43.5 34C43.5 32.6 44.6 31.5 46 31.5C47.4 31.5 48.5 32.6 48.5 34Z",
+  },
+  // ui/public/favicon.svg of paperclipai/paperclip: one stroke, 2 wide with round caps, on
+  // a 24 grid. Each line and each bend of the stroke is outlined as its own shape, all
+  // wound the same way, so the path fills nonzero to their union.
+  paperclip: {
+    viewBox: [0, 0, 24, 24],
+    path: "M15.286 5.3L6.872 13.886A1 1 0 0 0 6.886 15.3A1 1 0 0 0 8.3 15.286L16.714 6.7A1 1 0 0 0 16.7 5.286A1 1 0 0 0 15.286 5.3ZM6.879 13.879A3 3 0 0 0 6 16.001A3 3 0 0 0 6.879 18.122A3 3 0 0 0 9.001 19.001A3 3 0 0 0 11.122 18.122L9.708 16.708A1 1 0 0 1 9.001 17.001A1 1 0 0 1 8.293 16.708A1 1 0 0 1 8 16A1 1 0 0 1 8.293 15.293ZM11.129 18.115L19.543 9.529A1 1 0 0 0 19.529 8.115A1 1 0 0 0 18.115 8.129L9.701 16.715A1 1 0 0 0 9.715 18.129A1 1 0 0 0 11.129 18.115ZM19.536 9.536A5 5 0 0 0 21.001 6A5 5 0 0 0 19.536 2.465A5 5 0 0 0 16 1A5 5 0 0 0 12.465 2.465L13.879 3.879A3 3 0 0 1 16.001 3A3 3 0 0 1 18.122 3.879A3 3 0 0 1 19.001 6.001A3 3 0 0 1 18.122 8.122ZM12.458 2.472L4.079 11.023A1 1 0 0 0 4.093 12.437A1 1 0 0 0 5.507 12.423L13.886 3.872A1 1 0 0 0 13.872 2.458A1 1 0 0 0 12.458 2.472ZM4.092 11.01A7 7 0 0 0 2.001 15.972A7 7 0 0 0 4.051 20.95A7 7 0 0 0 9.029 23A7 7 0 0 0 13.991 20.909L12.565 19.507A5 5 0 0 1 9.021 21A5 5 0 0 1 5.465 19.536A5 5 0 0 1 4.001 15.98A5 5 0 0 1 5.494 12.436ZM13.992 20.908L22.371 12.357A1 1 0 0 0 22.357 10.943A1 1 0 0 0 20.943 10.957L12.564 19.508A1 1 0 0 0 12.578 20.922A1 1 0 0 0 13.992 20.908Z",
+    fillRule: "nonzero",
+  },
+  // viktor-avatar-color.svg from viktor.com/assets/brand/logos: the white V, without the
+  // gradient tile behind it, on a square around the letter.
+  viktor: {
+    viewBox: [27, 26, 106, 106],
+    path: "M36.875 28.4375H68.75C69.6876 28.4375 70.3124 29.0625 70.3124 30.0001V96.5626H75.7309C85.1059 96.5626 89.6876 91.5626 89.6876 81.5625V30.0001C89.6876 29.0625 90.3124 28.4375 91.25 28.4375H123.125C124.062 28.4375 124.688 29.0625 124.688 30.0001V90.625C124.688 112.812 102.5 130 73.125 130H36.875C35.9375 130 35.3125 129.375 35.3125 128.438V30.0001C35.3125 29.0625 35.9375 28.4375 36.875 28.4375Z",
   },
 };

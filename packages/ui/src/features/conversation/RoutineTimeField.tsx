@@ -20,7 +20,7 @@ interface RoutineTimeFieldProps {
   label: string;
   value: RoutineClock;
   onChange: (value: RoutineClock) => void;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   /** The popover closed, so the edit is complete. */
   onClose?: () => void;
 }

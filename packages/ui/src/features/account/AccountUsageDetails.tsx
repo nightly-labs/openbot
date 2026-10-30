@@ -5,6 +5,7 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
 import {
   type AccountUsageProviderRow,
+  type AccountUsageWindowRow,
   accountUsageRowKey,
   accountUsageRowLabel,
   formatUsageResetIn,
@@ -51,7 +52,7 @@ export function AccountUsageDetails(props: {
           onClick={props.onRefresh}
           disabled={props.refreshDisabled}
         >
-          <RefreshCw class={props.refreshActive ? "icon-spinning" : undefined} aria-hidden="true" />
+          <RefreshCw class={props.refreshActive ? "icon-spinning" : ""} aria-hidden="true" />
         </Button>
       </header>
       <Show when={props.loading && props.rows.length === 0}>
@@ -95,34 +96,7 @@ export function AccountUsageDetails(props: {
                   }
                 >
                   <strong class="account-usage-provider-name">{row().name}</strong>
-                  <span class="account-usage-windows">
-                    <For each={row().windows}>
-                      {(usageWindow) => (
-                        <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
-                          <span class="account-usage-window-label">{usageWindow.label}</span>
-                          <span class="account-usage-window-bar" aria-hidden="true">
-                            <span
-                              class="account-usage-window-fill"
-                              style={{ "inline-size": `${usageWindow.remainingPercent}%` }}
-                            />
-                          </span>
-                          <strong class="account-usage-window-remaining">
-                            {text.format.percent(usageWindow.remainingPercent / 100)}
-                          </strong>
-                          <span
-                            class="account-usage-window-reset"
-                            title={
-                              usageWindow.resetsAtLabel
-                                ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel })
-                                : undefined
-                            }
-                          >
-                            {formatUsageResetIn(usageWindow.resetsAt, now(), text)}
-                          </span>
-                        </span>
-                      )}
-                    </For>
-                  </span>
+                  <AccountUsageWindowList windows={row().windows} now={now()} />
                 </Show>
               </li>
             )}
@@ -131,5 +105,36 @@ export function AccountUsageDetails(props: {
       </Show>
       <Show when={props.error}>{(message) => <p class="account-usage-popover-error">{message()}</p>}</Show>
     </>
+  );
+}
+
+/** The limit windows of one account: a bar, the amount left and the time to the reset of each. */
+export function AccountUsageWindowList(props: { windows: readonly AccountUsageWindowRow[]; now: number }) {
+  const text = useText();
+  const { t } = text;
+  return (
+    <span class="account-usage-windows">
+      <For each={props.windows}>
+        {(usageWindow) => (
+          <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
+            <span class="account-usage-window-label">{usageWindow.label}</span>
+            <span class="account-usage-window-bar" aria-hidden="true">
+              <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
+            </span>
+            <strong class="account-usage-window-remaining">
+              {text.format.percent(usageWindow.remainingPercent / 100)}
+            </strong>
+            <span
+              class="account-usage-window-reset"
+              title={
+                usageWindow.resetsAtLabel ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel }) : undefined
+              }
+            >
+              {formatUsageResetIn(usageWindow.resetsAt, props.now, text)}
+            </span>
+          </span>
+        )}
+      </For>
+    </span>
   );
 }

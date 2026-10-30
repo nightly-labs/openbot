@@ -1,11 +1,11 @@
-// Drives MuseAgentClient and the installed SDK over real child stdio for issue #2346.
+// Drives MuseAgentClient and the installed SDK over real child stdio for issues #2346 and #3356.
 // bun scripts/muse-workspace-roots-e2e.ts --phase=before|after
-// Phase changes only the report folder. Both phases require unique workspace roots.
+// Phase changes only the report folder. Both phases require unique, canonical workspace roots.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, toNamespacedPath } from "node:path";
 import { EXPECTED_SCHEMA_FINGERPRINT } from "@muse-code/sdk";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MuseAgentClient } from "../src/backend/muse-client";
@@ -84,6 +84,13 @@ lines.on("line", (line) => {
   }
   if (new Set(p.workspaceRoots).size !== p.workspaceRoots.length) {
     return reject("duplicate workspaceRoots");
+  }
+  // As the Muse host: the real path, in the verbatim form on Windows.
+  const canonical = (root) => {
+    try { return path.toNamespacedPath(fs.realpathSync.native(root)); } catch { return null; }
+  };
+  if (!p.workspaceRoots.every((root) => canonical(root) === root)) {
+    return reject("expected a canonical path");
   }
   const turnId = p.commandId;
   completedItem = {
@@ -201,10 +208,18 @@ try {
   const shared = join(root, "shared");
   const home = join(root, "home");
   for (const directory of [cwd, shared, home]) await mkdir(directory);
+  // A junction needs no Windows privilege. Other platforms ignore the type.
+  const linkedCwd = join(root, "linked-workspace");
+  const linkedShared = join(root, "linked-shared");
+  await symlink(cwd, linkedCwd, "junction");
+  await symlink(shared, linkedShared, "junction");
+  const realCwd = toNamespacedPath(await realpath(cwd));
+  const realShared = toNamespacedPath(await realpath(shared));
 
   for (const scenario of [
-    { name: "control", roots: [], expected: [cwd] },
-    { name: "duplicate-input", roots: [cwd, shared, shared], expected: [cwd, shared] },
+    { name: "control", cwd, roots: [], expected: [realCwd] },
+    { name: "duplicate-input", cwd, roots: [cwd, shared, shared], expected: [realCwd, realShared] },
+    { name: "linked-roots", cwd: linkedCwd, roots: [linkedShared, shared], expected: [realCwd, realShared] },
   ]) {
     let threadId: string | null = null;
     for (const operation of ["thread/start", "thread/resume"]) {
@@ -236,7 +251,7 @@ try {
           runCauseEffect(
             client.request(
               operation,
-              { cwd, runtimeWorkspaceRoots: scenario.roots, ...(threadId ? { threadId } : {}) },
+              { cwd: scenario.cwd, runtimeWorkspaceRoots: scenario.roots, ...(threadId ? { threadId } : {}) },
               decodeThreadId,
             ),
           ),
@@ -290,9 +305,9 @@ try {
             result.requests.some((entry) => entry.event === "deadline"),
             false,
           );
-          assert.deepEqual(
-            result.requests.filter((entry) => entry.event === "rejected").map((entry) => entry.reason),
-            result.clientError ? ["duplicate workspaceRoots"] : [],
+          assert.equal(
+            result.requests.filter((entry) => entry.event === "rejected").length,
+            result.clientError ? 1 : 0,
           );
           // Keep the same success contract in before and after. A rejection is never a pass.
           assert.ok(!result.clientError, `Turn must be accepted. Client error: ${result.clientError}`);
@@ -328,7 +343,7 @@ try {
   }
   report.failureCount =
     report.failures.length + report.cases.reduce((count, result) => count + result.failures.length, 0);
-  report.passed = report.failureCount === 0 && report.cases.length === 4 && report.tempRemoved;
+  report.passed = report.failureCount === 0 && report.cases.length === 6 && report.tempRemoved;
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(

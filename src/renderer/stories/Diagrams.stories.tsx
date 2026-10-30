@@ -5,7 +5,6 @@
  * The app logic and the runtime that executes a run are not wired yet.
  */
 
-import type { ChannelSummary } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
 import { diagramRoutineSteps } from "@openbot/ui/features/diagrams/diagram-graph";
@@ -17,14 +16,9 @@ import type {
   DiagramRun,
   DiagramStepRun,
 } from "@openbot/ui/features/diagrams/diagram-model";
-import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
-import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
-import { createSignal, createStore, For, Match, onCleanup, Show, Switch, snapshot, untrack } from "solid-js";
+import { createStore, onCleanup, snapshot, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
-import { CHANNEL_STORY_ROWS, ChannelStoryComposer, ChannelTranscript } from "./channel-story-support";
-import { StoryAgentConversation } from "./conversation-story-support";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 function storyAgent(id: string): AgentProfile {
@@ -402,7 +396,7 @@ const newDiagram: Diagram = { ...succeededDiagram, id: "diagram-new", lastRuns: 
 const emptyDiagram: Diagram = {
   ...succeededDiagram,
   id: "diagram-empty",
-  name: "Untitled diagram",
+  name: "Chief",
   nodes: [],
   edges: [],
   lastRuns: [],
@@ -553,6 +547,7 @@ function InteractiveDiagram(props: {
   owner?: AgentProfile | undefined;
   assistant?: boolean;
   editable?: boolean;
+  onCreateRoutine?: () => void;
 }) {
   const [diagram, setDiagram] = createStore<Diagram>(structuredClone(untrack(() => props.diagram)));
   const [chat, setChat] = createStore({
@@ -658,6 +653,7 @@ function InteractiveDiagram(props: {
       now={NOW}
       agents={agents}
       editable={props.editable}
+      onCreateRoutine={props.onCreateRoutine}
       assistant={
         props.assistant === false
           ? undefined
@@ -781,151 +777,13 @@ function agentDiagram(agent: AgentProfile): Diagram {
   };
 }
 
-const storyChannels: ChannelSummary[] = [
-  {
-    id: "channel-leadership",
-    name: "leadership",
-    title: "Daily priorities",
-    instructions: "",
-    members: [{ agentId: "chief" }, { agentId: "research" }, { agentId: "sales" }],
-    leadAgentId: "chief",
-    archived: false,
-    revision: 1,
-    createdAt: "2026-09-01T09:00:00.000Z",
-    unreadCount: 2,
-    activeTasks: 0,
-    lastMessage: { at: STARTED, text: "Priorities for today are posted.", authorName: "Chief" },
-  },
-  {
-    id: "channel-launch",
-    name: "canvas-launch",
-    title: "",
-    instructions: "",
-    members: [{ agentId: "research" }, { agentId: "sales" }],
-    leadAgentId: null,
-    archived: false,
-    revision: 1,
-    createdAt: "2026-09-10T09:00:00.000Z",
-    unreadCount: 0,
-    activeTasks: 1,
-    lastMessage: { at: "2026-10-05T15:00:00.000Z", text: "Draft of the launch note", authorName: "Research" },
-  },
-];
-
-function sidebarArgs(): Parameters<typeof Sidebar>[0] {
-  return {
-    serverName: "Local",
-    onOpenServerSettings: fn(),
-    agents,
-    activeAgentId: "chief",
-    people: [],
-    directThreads: [],
-    activeDirectMemberId: null,
-    agentStates: {},
-    agentMoods: {},
-    layout: defaultSidebarLayout(),
-    collapsedSectionIds: [],
-    onMutateLayout: fn(async () => undefined),
-    onToggleSection: fn(),
-    pinnedItems: [],
-    peopleOrder: [],
-    onPin: fn(),
-    onUnpin: fn(),
-    onReorderPinned: fn(),
-    onReorderPeople: fn(),
-    onSelectAgent: fn(),
-    onSelectPerson: fn(),
-    onCreateAgent: fn(),
-    onEditAgent: fn(),
-    onDeleteAgent: async () => undefined,
-    compact: false,
-    onExpand: fn(),
-    onOpenSearch: fn(),
-    onOpenMarketplace: fn(),
-    channels: storyChannels,
-    onSelectChannel: fn(),
-    onCreateChannel: fn(),
-  };
-}
-
-function SidebarWithViews(props: { initialView: SidebarView }) {
-  const [view, setView] = createSignal<SidebarView>(untrack(() => props.initialView));
-  return (
-    <div style={{ width: "280px", height: "100vh" }}>
-      <Sidebar {...sidebarArgs()} view={view()} onViewChange={setView} />
-    </div>
-  );
-}
-
-/**
- * The sidebar is the same chat list in both views. On Agents the main area shows the open chat, as
- * it always has; on Routines it shows the open agent's canvas: all its routines, with tabs to pick one.
- */
-function WorkspaceStage() {
-  const [view, setView] = createSignal<SidebarView>("routines");
-  const [chat, setChat] = createSignal<{ kind: "agent" | "channel"; id: string }>({ kind: "agent", id: "sales" });
-  const openAgent = () => (chat().kind === "agent" ? agents.find((agent) => agent.id === chat().id) : undefined);
-  const openChannel = () =>
-    chat().kind === "channel" ? storyChannels.find((channel) => channel.id === chat().id) : undefined;
-  // A one-item list keyed by the open chat, so another chat's routines start from their first.
-  const routinesKey = () => (view() === "routines" ? [`${chat().kind}:${chat().id}`] : []);
-  return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      <div style={{ width: "280px", "flex-shrink": "0" }}>
-        <Sidebar
-          {...sidebarArgs()}
-          view={view()}
-          onViewChange={setView}
-          activeAgentId={openAgent()?.id ?? ""}
-          onSelectAgent={(id) => setChat({ kind: "agent", id })}
-          activeChannelId={openChannel()?.id ?? null}
-          onSelectChannel={(id) => setChat({ kind: "channel", id })}
-        />
-      </div>
-      <div style={{ display: "flex", flex: "1", "min-width": "0" }}>
-        <Switch>
-          <Match when={view() === "routines"}>
-            <For each={routinesKey()}>
-              {() => (
-                <Show
-                  when={openAgent()}
-                  fallback={<InteractiveDiagram diagram={{ ...emptyDiagram, name: openChannel()?.name ?? "" }} />}
-                >
-                  {(agent) => <InteractiveDiagram diagram={agentDiagram(agent())} owner={agent()} />}
-                </Show>
-              )}
-            </For>
-          </Match>
-          <Match when={openChannel()}>
-            {(channel) => (
-              <div class="conversation-story-frame">
-                <ChannelTranscript rows={CHANNEL_STORY_ROWS} workers={[]}>
-                  <ChannelStoryComposer channelName={channel().name} />
-                </ChannelTranscript>
-              </div>
-            )}
-          </Match>
-          <Match when={openAgent()}>{(agent) => <StoryAgentConversation agent={agent()} />}</Match>
-        </Switch>
-      </div>
-    </div>
-  );
-}
-
 const meta = {
   title: "Diagrams/Diagram",
-  render: () => <WorkspaceStage />,
   parameters: { layout: "fullscreen" },
 } satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-/**
- * The whole surface. On the Agents view the middle shows the open agent or channel chat; on the
- * Routines view it shows the open agent's routines on one canvas, with tabs to pick one.
- */
-export const Workspace: Story = {};
 
 /** Sales Outbound is started by three routines; the tabs over its canvas pick one. */
 export const AgentWithSeveralRoutines: Story = {
@@ -976,9 +834,19 @@ export const WebhookRoutine: Story = {
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
+/**
+ * An agent with no routine yet: a faint morning brief builds itself behind the pitch, one run
+ * passes through it, and it starts again. Under reduced motion it shows the finished run.
+ */
 export const Empty: Story = {
-  render: () => <InteractiveDiagram diagram={emptyDiagram} />,
+  render: () => <InteractiveDiagram diagram={emptyDiagram} owner={chief} onCreateRoutine={fn()} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
+};
+
+/** The same canvas in a narrow pane: a smaller title and a fainter diagram. */
+export const EmptyNarrow: Story = {
+  render: () => <InteractiveDiagram diagram={emptyDiagram} owner={chief} onCreateRoutine={fn()} />,
+  decorators: [(Story) => <div style={{ display: "flex", width: "640px", height: "100vh" }}>{Story()}</div>],
 };
 
 /** A viewer who cannot edit: the ports and tools are off, and there is no assistant. */
@@ -986,6 +854,3 @@ export const ReadOnly: Story = {
   render: () => <InteractiveDiagram diagram={succeededDiagram} editable={false} assistant={false} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
-
-export const SidebarAgentsView: Story = { render: () => <SidebarWithViews initialView="agents" /> };
-export const SidebarRoutinesView: Story = { render: () => <SidebarWithViews initialView="routines" /> };

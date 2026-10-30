@@ -2,11 +2,10 @@ import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { CONVERSATION_SNAPSHOT_MESSAGE_LIMIT, type ConversationSnapshot } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import {
   CONVERSATION_CACHE_BYTES_LIMIT,
-  CONVERSATION_CACHE_MESSAGE_LIMIT,
   CONVERSATION_CACHE_TOTAL_BYTES_LIMIT,
   ConversationRuntime,
 } from "../src/backend/agent/conversation-runtime";
@@ -229,7 +228,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
       limits: {
         perMessageBytes: PER_MESSAGE_BYTES_LIMIT,
         providerHistoryPageItems: PROVIDER_HISTORY_PAGE_SIZE,
-        cacheMessagesPerConversation: CONVERSATION_CACHE_MESSAGE_LIMIT,
+        cacheMessagesPerConversation: CONVERSATION_SNAPSHOT_MESSAGE_LIMIT,
         cacheBytesPerConversation: CONVERSATION_CACHE_BYTES_LIMIT,
         cacheBytesProcessWide: CONVERSATION_CACHE_TOTAL_BYTES_LIMIT,
       },
@@ -239,7 +238,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         everyPageWithinLimit: checkpoints.every((checkpoint) => checkpoint.maxPageItems <= PROVIDER_HISTORY_PAGE_SIZE),
         cacheWithinPerConversationLimit: checkpoints.every(
           (checkpoint) =>
-            checkpoint.cache.cachedMessageCount <= CONVERSATION_CACHE_MESSAGE_LIMIT &&
+            checkpoint.cache.cachedMessageCount <= CONVERSATION_SNAPSHOT_MESSAGE_LIMIT &&
             checkpoint.cache.cachedBytes <= CONVERSATION_CACHE_BYTES_LIMIT,
         ),
         cacheWithinProcessLimit: checkpoints.every(
@@ -341,7 +340,12 @@ function setLatestPersistedCache(
   agentId: string,
   threadId: string,
 ): CacheMeasurement {
-  const page = database.readConversationPage(agentId, threadId, { type: "latest" }, CONVERSATION_CACHE_MESSAGE_LIMIT);
+  const page = database.readConversationPage(
+    agentId,
+    threadId,
+    { type: "latest" },
+    CONVERSATION_SNAPSHOT_MESSAGE_LIMIT,
+  );
   const snapshot: ConversationSnapshot = {
     agentId,
     threadId,

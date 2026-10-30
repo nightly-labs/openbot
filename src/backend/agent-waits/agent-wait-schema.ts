@@ -2,8 +2,9 @@
 // this text is both the migration and the tail of the latest schema.
 //
 // An open wait is work an agent stopped before it was done, because it waits for something outside
-// the turn: a build, a deploy, the next routine run. The agent opens it with `openbot.await_event`
-// and closes it with `openbot.close_wait`; the user can cancel it. A closed or cancelled wait is
+// the turn: a build, a deploy, the next routine run. The agent opens it with `openbot.await_event`,
+// lists it with `openbot.list_waits` and closes it with `openbot.close_wait`; another local agent
+// can list and close it with `agentId`; the user can cancel it. A closed or cancelled wait is
 // deleted, so every row is an open wait.
 //
 // Agent ids carry no foreign key, as in every other table keyed by an agent: `hardDeleteAgent`

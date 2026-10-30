@@ -114,3 +114,18 @@ export function hitsRect(px: number, py: number, rect: Rect, scale: number, tx: 
   const cy = rect.y + rect.height / 2 + ty;
   return Math.abs(px - cx) <= (rect.width * scale) / 2 && Math.abs(py - cy) <= (rect.height * scale) / 2;
 }
+
+/** A release faster than this, in points per second, turns the page from any distance. */
+const PAGE_FLICK_VELOCITY = 400;
+
+/**
+ * Which way a released swipe turns the carousel: 1 to the next picture, -1 to the previous one,
+ * 0 to stay. A flick turns it at once; a slow drag must carry the page past half the step.
+ */
+export function pageTurn(offset: number, velocity: number, step: number) {
+  "worklet";
+  if (Math.abs(velocity) > PAGE_FLICK_VELOCITY && Math.sign(velocity) === Math.sign(offset))
+    return velocity < 0 ? 1 : -1;
+  if (Math.abs(offset) > step / 2) return offset < 0 ? 1 : -1;
+  return 0;
+}

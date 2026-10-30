@@ -27,7 +27,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result, Schema, Semaphore } from "effect";
+import { Cache, Effect, Exit, Result, Schema, Semaphore } from "effect";
 import { parse as parseYaml } from "yaml";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
@@ -35,11 +35,13 @@ import { causeHelpers } from "../backend/effect-boundary";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
-import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
-import { listFolderSkills } from "./skill-folder-discovery";
+import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
+import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
 import { archiveDirectory, inspectArchive, inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
+/** How long `listInstalled` keeps the newest catalog version of a skill. */
+const CATALOG_VERSION_LIFETIME = "60 seconds";
 const SKILL_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 interface Draft {
@@ -69,6 +71,18 @@ interface SkillsLock {
 export class SkillMarketplaceService {
   readonly #drafts = new Map<string, Draft>();
   readonly #writes = new Map<string, { gate: Semaphore.Semaphore; users: number }>();
+  /**
+   * The newest catalog version of each listed skill, for `listInstalled`. The Skills tab reads every
+   * agent at once and agents share skills, so one GET for each skill serves all agents for a short
+   * time. A read that starts while the GET of the same skill runs waits for that GET. A failed GET is
+   * not kept: the next read asks again, and this read keeps the installed version, as before.
+   */
+  readonly #catalogVersions = Effect.runSync(
+    Cache.makeWith((skillId: string) => this.get(skillId).pipe(Effect.map((detail) => detail.version)), {
+      capacity: 1_000,
+      timeToLive: (exit) => (Exit.isSuccess(exit) ? CATALOG_VERSION_LIFETIME : 0),
+    }),
+  );
 
   constructor(
     private readonly auth: CentralAuthManager,
@@ -167,8 +181,8 @@ export class SkillMarketplaceService {
       const installed: InstalledSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         let availableVersion = entry.version;
-        const detail = yield* Effect.result(this.get(entry.skillId));
-        if (Result.isSuccess(detail)) availableVersion = detail.success.version;
+        const newest = yield* Effect.result(this.#availableVersion(entry.skillId));
+        if (Result.isSuccess(newest)) availableVersion = newest.success;
         const state = yield* installedState(agent.workspacePath, entry);
         installed.push(
           toInstalledSkill(
@@ -182,6 +196,13 @@ export class SkillMarketplaceService {
       installed.push(...(yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)));
       return installed.sort((a, b) => a.name.localeCompare(b.name));
     });
+  }
+
+  /** A local skill is read from this computer each time; a catalog skill comes from the short cache. */
+  #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
+    return skillId.startsWith("local-skill-")
+      ? this.get(skillId).pipe(Effect.map((detail) => detail.version))
+      : Cache.get(this.#catalogVersions, skillId);
   }
 
   listInstalledForChatTags(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
@@ -204,6 +225,7 @@ export class SkillMarketplaceService {
           ),
         );
       }
+      installed.push(...(yield* listHomeFolderSkills(new Set(installed.map((skill) => skill.slug)))));
       return installed.sort((a, b) => a.name.localeCompare(b.name));
     });
   }
@@ -224,6 +246,9 @@ export class SkillMarketplaceService {
         : yield* this.auth
             .downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`)
             .pipe(toSkillMarketplaceFailure);
+      // The install read the newest version, so the next list does not show an older one as newest.
+      if (!input.skillId.startsWith("local-skill-"))
+        yield* Cache.set(this.#catalogVersions, input.skillId, detail.version);
       return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
     });
   }
@@ -285,7 +310,8 @@ export class SkillMarketplaceService {
         } else result.push({ kind: "marketplace", ...(yield* this.publishedReferenceEffect(agent, entry)) });
       }
       for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)) {
-        if (skill.problem || !skill.location) continue;
+        // A managed skill without its ownership marker is still OpenBot's: every install writes its own.
+        if (skill.problem || !skill.location || MANAGED_SKILL_SLUGS.has(skill.slug)) continue;
         result.push(yield* embeddedSkill(join(agent.workspacePath, skill.location, "SKILL.md"), skill.name));
       }
       // An install writes each skill to a folder named by its slug, so two skills with one slug would
@@ -441,7 +467,7 @@ export class SkillMarketplaceService {
             { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) },
             decodeInstalledReceipt,
           )
-          .pipe(toSkillMarketplaceFailure);
+          .pipe(Effect.catchTag("CentralAuthOperationError", () => Effect.void));
       yield* this.refreshAgentRuntime(agent.id).pipe(toSkillMarketplaceFailure);
       return toInstalledSkill(entry, detail.version, "installed", entry.description);
     });
@@ -885,6 +911,15 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
     if (!isSkillsLock(value)) throw new Error(sourceText("error.skill.lockInvalid"));
     return value;
   });
+});
+/** The folder of each installed pack and the folders of its skills. */
+export const readPackFolders = Effect.fn("SkillMarketplace.readPackFolders")(function* (workspace: string) {
+  const lock = yield* readLock(workspace);
+  return new Map(
+    Object.values(lock.skills).flatMap(
+      (entry): Array<[string, string[]]> => (entry.folders ? [[entry.slug, entry.folders]] : []),
+    ),
+  );
 });
 const writeLock = Effect.fn("SkillMarketplace.writeLock")((workspace: string, lock: SkillsLock) =>
   writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true }).pipe(

@@ -183,7 +183,6 @@
 .first-agent-fields .provider-model-trigger-field:focus-visible {
   border-color: var(--openbot-border-focus);
   outline: none;
-  box-shadow: var(--openbot-focus-ring);
 }
 
 .first-agent-submit-actions {

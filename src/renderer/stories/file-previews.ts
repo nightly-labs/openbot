@@ -65,10 +65,10 @@ const TEXT = `2026-09-13T09:12:04.118Z  info   provider.claude-code   session st
 2026-09-13T09:12:08.049Z  info   db.migrations          schema v14 is current; no migration ran
 `;
 
-const SOURCE = `import type { AgentSummary } from "./agents";
+const SOURCE = `import type { ClientAgentSummary } from "./agents";
 
 /** Team API v1-v3 call an agent a "bot". Translate on the wire only. */
-export function toWireAgent(agent: AgentSummary) {
+export function toWireAgent(agent: ClientAgentSummary) {
   return { botId: agent.id, name: agent.name, workspace: agent.workspacePath };
 }
 `;
@@ -150,6 +150,29 @@ const buildXlsx = (): Uint8Array =>
     ),
   });
 
+// Expected row 2: $1,234.50 | USD 1234.50 | Gain 12.5% | 2.50 kg | 1,234.50 | 12.5% | 1234.5 | % 1.00 | 2024-01-01 | 12:00 | -$1,234.50 | Total.
+const buildLiteralPrefixesXlsx = (): Uint8Array =>
+  zipSync({
+    "[Content_Types].xml": strToU8(
+      '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    ),
+    "_rels/.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    ),
+    "xl/workbook.xml": strToU8(
+      '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Literal prefixes" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    ),
+    "xl/styles.xml": strToU8(
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="11"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/><numFmt numFmtId="165" formatCode="&quot;USD &quot;0.00"/><numFmt numFmtId="166" formatCode="&quot;Gain &quot;0.0%"/><numFmt numFmtId="167" formatCode="0.00&quot; kg&quot;"/><numFmt numFmtId="168" formatCode="#,##0.00"/><numFmt numFmtId="169" formatCode="0.0%"/><numFmt numFmtId="170" formatCode="0.00E+00"/><numFmt numFmtId="171" formatCode="&quot;% &quot;0.00"/><numFmt numFmtId="172" formatCode="yyyy-mm-dd"/><numFmt numFmtId="173" formatCode="h:mm"/><numFmt numFmtId="174" formatCode="&quot;Total&quot;"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="12"><xf numFmtId="0"/><xf numFmtId="164" applyNumberFormat="1"/><xf numFmtId="165" applyNumberFormat="1"/><xf numFmtId="166" applyNumberFormat="1"/><xf numFmtId="167" applyNumberFormat="1"/><xf numFmtId="168" applyNumberFormat="1"/><xf numFmtId="169" applyNumberFormat="1"/><xf numFmtId="170" applyNumberFormat="1"/><xf numFmtId="171" applyNumberFormat="1"/><xf numFmtId="172" applyNumberFormat="1"/><xf numFmtId="173" applyNumberFormat="1"/><xf numFmtId="174" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+    ),
+    "xl/worksheets/sheet1.xml": strToU8(
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Dollar prefix</t></is></c><c r="B1" t="inlineStr"><is><t>Spaced prefix</t></is></c><c r="C1" t="inlineStr"><is><t>Prefix and percent</t></is></c><c r="D1" t="inlineStr"><is><t>Suffix</t></is></c><c r="E1" t="inlineStr"><is><t>Number</t></is></c><c r="F1" t="inlineStr"><is><t>Percentage</t></is></c><c r="G1" t="inlineStr"><is><t>Scientific fallback</t></is></c><c r="H1" t="inlineStr"><is><t>Quoted percent prefix</t></is></c><c r="I1" t="inlineStr"><is><t>Date</t></is></c><c r="J1" t="inlineStr"><is><t>Time</t></is></c><c r="K1" t="inlineStr"><is><t>Negative prefix</t></is></c><c r="L1" t="inlineStr"><is><t>Text only</t></is></c></row><row r="2"><c r="A2" s="1"><v>1234.5</v></c><c r="B2" s="2"><v>1234.5</v></c><c r="C2" s="3"><v>0.125</v></c><c r="D2" s="4"><v>2.5</v></c><c r="E2" s="5"><v>1234.5</v></c><c r="F2" s="6"><v>0.125</v></c><c r="G2" s="7"><v>1234.5</v></c><c r="H2" s="8"><v>1</v></c><c r="I2" s="9"><v>45292</v></c><c r="J2" s="10"><v>0.5</v></c><c r="K2" s="1"><v>-1234.5</v></c><c r="L2" s="11"><v>1234.5</v></c></row></sheetData></worksheet>',
+    ),
+  });
+
 export const MARKDOWN_PREVIEW = filePreview("RELEASE-NOTES.md", "text/markdown", "markdown", MARKDOWN);
 
 export const MARKDOWN_SHORT_PREVIEW = filePreview(
@@ -183,6 +206,16 @@ export const XLSX_PREVIEW: FilePreview = {
   mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   previewKind: "spreadsheet",
   bytes: buildXlsx(),
+};
+
+const literalPrefixesBytes = buildLiteralPrefixesXlsx();
+
+export const XLSX_LITERAL_PREFIXES_PREVIEW: FilePreview = {
+  name: "literal-prefixes.xlsx",
+  size: literalPrefixesBytes.byteLength,
+  mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  previewKind: "spreadsheet",
+  bytes: literalPrefixesBytes,
 };
 
 const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);

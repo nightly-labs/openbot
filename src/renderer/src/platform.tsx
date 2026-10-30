@@ -6,7 +6,7 @@ import { createSimpleContext } from "./simple-context";
 
 /**
  * What the renderer is running inside: which build and OS, whether the window
- * has focus, and the two flags fixed by how the app was mounted.
+ * has focus, and the flags fixed by how the app was mounted.
  *
  * The outermost domain, and deliberately ungated. Gating it on `appInfo` would
  * read well - everything below could treat the build as known - but it would
@@ -64,6 +64,8 @@ const Platform = createSimpleContext({
       appInfoLoadedFromHost: () => infoFromHost,
       landingPreview: props.landingPreview === true,
       peopleEnabled: props.peopleEnabled === true,
+      /** The one chat of a window that main opened for it, or null in the main window. */
+      chatWindow: props.chatWindow ?? null,
       /** The element the remote-desktop workspace makes inert while it is up. */
       appFrame: () => appFrame,
       setAppFrameElement: (element: HTMLDivElement) => {

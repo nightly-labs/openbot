@@ -378,6 +378,127 @@ index 459d60819480f18a86c3b292291761620c37ffad..4ab66e7b0e016c45fda73d55134eb77d
  	});
  	return {
  		isSelected,
+diff --git a/dist/dismissable-layer/DXLD03yU.js b/dist/dismissable-layer/DXLD03yU.js
+index fde40e74ee904abceeb2c1daa3ce86f8dd9e38c8..f8ae7e07bd35e976d4e2d3c54da7d666a1430974 100644
+--- a/dist/dismissable-layer/DXLD03yU.js
++++ b/dist/dismissable-layer/DXLD03yU.js
+@@ -1,6 +1,6 @@
+ import { n as layerStack } from "../layer-stack/DUp9FXTP.js";
+ import { createComponent, insert, ref, spread, template } from "@solidjs/web";
+-import { createContext, createEffect, createMemo, createSignal, omit, onSettled, useContext } from "solid-js";
++import { createContext, createEffect, createMemo, createSignal, omit, untrack, useContext } from "solid-js";
+ import { interactOutside } from "@solid-primitives/interaction";
+ import { createShortcut } from "@solid-primitives/keyboard";
+ //#region src/dismissable-layer/dismissable-layer-context.tsx
+@@ -54,22 +54,26 @@ function DismissableLayer(props) {
+ 			props.onDismiss();
+ 		}
+ 	}, { preventDefault: false });
+-	onSettled(() => {
+-		if (!ref$1()) return;
++	// OpenBot patch: register the layer when the ref is set. Under Solid 2.0.0-rc.18 a dialog's
++	// onSettled can run before its ref is set, so the layer was never added and Escape did nothing.
++	createEffect(() => ({
++		node: ref$1(),
++		dismiss: untrack(() => props.onDismiss)
++	}), ({ node, dismiss }) => {
++		if (!node) return;
+ 		layerStack.addLayer({
+-			node: ref$1(),
++			node,
+ 			isPointerBlocking: isPointerBlocking(),
+-			dismiss: props.onDismiss
++			dismiss
+ 		});
+-		const unregisterFromParentLayer = parentContext?.registerNestedLayer(ref$1());
++		const unregisterFromParentLayer = parentContext?.registerNestedLayer(node);
+ 		layerStack.assignPointerEventToLayers();
+-		layerStack.disableBodyPointerEvents(ref$1());
++		layerStack.disableBodyPointerEvents(node);
+ 		return () => {
+-			if (!ref$1()) return;
+-			layerStack.removeLayer(ref$1());
++			layerStack.removeLayer(node);
+ 			unregisterFromParentLayer?.();
+ 			layerStack.assignPointerEventToLayers();
+-			layerStack.restoreBodyPointerEvents(ref$1());
++			layerStack.restoreBodyPointerEvents(node);
+ 		};
+ 	});
+ 	createEffect(() => ({
+diff --git a/dist/dismissable-layer/RyRdwdaj.jsx b/dist/dismissable-layer/RyRdwdaj.jsx
+index 725bd171d1c95781d497718917d1dc3ebd363276..c9f9d4be2e4306c0dd1c8c2dc73875f5fbbfd53d 100644
+--- a/dist/dismissable-layer/RyRdwdaj.jsx
++++ b/dist/dismissable-layer/RyRdwdaj.jsx
+@@ -1,5 +1,5 @@
+ import { n as layerStack } from "../layer-stack/DUp9FXTP.jsx";
+-import { createContext, createEffect, createMemo, createSignal, omit, onSettled, useContext } from "solid-js";
++import { createContext, createEffect, createMemo, createSignal, omit, untrack, useContext } from "solid-js";
+ import { interactOutside } from "@solid-primitives/interaction";
+ import { createShortcut } from "@solid-primitives/keyboard";
+ //#region src/dismissable-layer/dismissable-layer-context.tsx
+@@ -52,22 +52,26 @@ function DismissableLayer(props) {
+ 			props.onDismiss();
+ 		}
+ 	}, { preventDefault: false });
+-	onSettled(() => {
+-		if (!ref()) return;
++	// OpenBot patch: register the layer when the ref is set. Under Solid 2.0.0-rc.18 a dialog's
++	// onSettled can run before its ref is set, so the layer was never added and Escape did nothing.
++	createEffect(() => ({
++		node: ref(),
++		dismiss: untrack(() => props.onDismiss)
++	}), ({ node, dismiss }) => {
++		if (!node) return;
+ 		layerStack.addLayer({
+-			node: ref(),
++			node,
+ 			isPointerBlocking: isPointerBlocking(),
+-			dismiss: props.onDismiss
++			dismiss
+ 		});
+-		const unregisterFromParentLayer = parentContext?.registerNestedLayer(ref());
++		const unregisterFromParentLayer = parentContext?.registerNestedLayer(node);
+ 		layerStack.assignPointerEventToLayers();
+-		layerStack.disableBodyPointerEvents(ref());
++		layerStack.disableBodyPointerEvents(node);
+ 		return () => {
+-			if (!ref()) return;
+-			layerStack.removeLayer(ref());
++			layerStack.removeLayer(node);
+ 			unregisterFromParentLayer?.();
+ 			layerStack.assignPointerEventToLayers();
+-			layerStack.restoreBodyPointerEvents(ref());
++			layerStack.restoreBodyPointerEvents(node);
+ 		};
+ 	});
+ 	createEffect(() => ({
+diff --git a/dist/dropdown-menu/BMbSJJfZ.js b/dist/dropdown-menu/BMbSJJfZ.js
+index 0f905b0a3446a618865e0a4d52e64d0fedced517..eb8f47d0efddb4b5a7342d98ef8cb59bbaf737dc 100644
+--- a/dist/dropdown-menu/BMbSJJfZ.js
++++ b/dist/dropdown-menu/BMbSJJfZ.js
+@@ -15,7 +15,7 @@ function DropdownMenuContent(props) {
+ 	let hasInteractedOutside = false;
+ 	const onCloseAutoFocus = (e) => {
+ 		props.onCloseAutoFocus?.(e);
+-		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
++		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
+ 		hasInteractedOutside = false;
+ 		e.preventDefault();
+ 	};
+diff --git a/dist/dropdown-menu/enw8HTeV.jsx b/dist/dropdown-menu/enw8HTeV.jsx
+index 1e4fe26c7a1a8e5d22a8468fe2f767725cc0a9f6..d99e70f802e536342cd63426945d2e9356c5f288 100644
+--- a/dist/dropdown-menu/enw8HTeV.jsx
++++ b/dist/dropdown-menu/enw8HTeV.jsx
+@@ -14,7 +14,7 @@ function DropdownMenuContent(props) {
+ 	let hasInteractedOutside = false;
+ 	const onCloseAutoFocus = (e) => {
+ 		props.onCloseAutoFocus?.(e);
+-		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
++		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
+ 		hasInteractedOutside = false;
+ 		e.preventDefault();
+ 	};
 diff --git a/dist/hidden-select-base/DZDStUWy.js b/dist/hidden-select-base/DZDStUWy.js
 index 1de7ae73fc0f9f87874450396bf6e1972f9910e5..6b581d1fddcfd705ac860d43a1fa727eb0e3a7f0 100644
 --- a/dist/hidden-select-base/DZDStUWy.js
@@ -662,7 +783,7 @@ index f74d54461295486ec063fd32d5dfe5489be7a339..5288fca45a4b39b2e56fcc402c3f7d9c
  	const dataset = createMemo(() => ({
  		"data-expanded": disclosureState.isOpen() ? "" : void 0,
 diff --git a/dist/slider/DP6fmlOK.jsx b/dist/slider/DP6fmlOK.jsx
-index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b9433bbb2be 100644
+index 99232b6df91ac600326db388fdd42a96e396c343..b0b6ea2c013e5d6e7eaa8d300c7ce071a094b45f 100644
 --- a/dist/slider/DP6fmlOK.jsx
 +++ b/dist/slider/DP6fmlOK.jsx
 @@ -9,7 +9,7 @@ import { t as FormControlErrorMessage } from "../form-control-error-message/B1cN
@@ -674,8 +795,17 @@ index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b94
  import { access } from "@solid-primitives/utils";
  import { callHandler, clamp, snapValueToStep, visuallyHiddenStyles } from "@kobalte/utils";
  import { createFormResetListener } from "@solid-primitives/form";
-@@ -115,7 +115,7 @@ function SliderThumb(props) {
- 		context.state.setThumbEditable(index(), !context.state.isDisabled());
+@@ -111,11 +111,14 @@ function SliderThumb(props) {
+ 		callHandler(e, mergedProps.onBlur);
+ 		context.state.setFocusedThumb(void 0);
+ 	};
+-	onSettled(() => {
+-		context.state.setThumbEditable(index(), !context.state.isDisabled());
++	// OpenBot patch: mark the thumb editable once it has an index. Under Solid 2.0.0-rc.18 its
++	// onSettled can run before the thumb joins the collection, so index() was -1, thumb 0 never became
++	// editable, and every key press and drag was ignored.
++	createEffect(() => index(), (thumbIndex) => {
++		if (thumbIndex >= 0) context.state.setThumbEditable(thumbIndex, !context.state.isDisabled());
  	});
  	return <ThumbContext value={{ index }}>
 -			<Polymorphic as="span" ref={[setRef, mergedProps.ref]} role="slider" id={fieldProps.id()} tabindex={context.state.isDisabled() ? void 0 : 0} style={combineStyle({
@@ -683,7 +813,7 @@ index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b94
  		display: value() === void 0 ? "none" : void 0,
  		position: "absolute",
  		[context.startEdge()]: `calc(${position() * 100}%)`,
-@@ -180,8 +180,8 @@ function createSliderState(props) {
+@@ -180,8 +183,8 @@ function createSliderState(props) {
  		defaultValue,
  		onChange: (values) => mergedProps.onChange?.(values)
  	});
@@ -694,7 +824,7 @@ index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b94
  	const [focusedIndex, setFocusedIndex] = createSignal(void 0);
  	const resetValues = () => {
  		setValues(defaultValue());
-@@ -311,7 +311,7 @@ function SliderRoot(props) {
+@@ -311,7 +314,7 @@ function SliderRoot(props) {
  		isDisabled: () => formControlContext.isDisabled() ?? false,
  		orientation: () => mergedProps.orientation,
  		step: () => mergedProps.step,
@@ -703,7 +833,7 @@ index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b94
  		onChange: mergedProps.onChange,
  		onChangeEnd: mergedProps.onChangeEnd
  	});
-@@ -436,7 +436,7 @@ function SliderRoot(props) {
+@@ -436,7 +439,7 @@ function SliderRoot(props) {
  	return <DomCollectionProvider>
  			<FormControlContext value={formControlContext}>
  				<SliderContext value={context}>
@@ -939,27 +1069,3 @@ index 2de0aa7c76c766b076336b82e1d916366eb2d517..98d5f56053478b18d1120a3bd40d6b3c
  	const { DomCollectionProvider } = createDomCollection({
  		items,
  		onItemsChange: setItems
-diff --git a/dist/dropdown-menu/BMbSJJfZ.js b/dist/dropdown-menu/BMbSJJfZ.js
---- a/dist/dropdown-menu/BMbSJJfZ.js
-+++ b/dist/dropdown-menu/BMbSJJfZ.js
-@@ -15,7 +15,7 @@
- 	let hasInteractedOutside = false;
- 	const onCloseAutoFocus = (e) => {
- 		props.onCloseAutoFocus?.(e);
--		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
-+		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
- 		hasInteractedOutside = false;
- 		e.preventDefault();
- 	};
-diff --git a/dist/dropdown-menu/enw8HTeV.jsx b/dist/dropdown-menu/enw8HTeV.jsx
---- a/dist/dropdown-menu/enw8HTeV.jsx
-+++ b/dist/dropdown-menu/enw8HTeV.jsx
-@@ -14,7 +14,7 @@
- 	let hasInteractedOutside = false;
- 	const onCloseAutoFocus = (e) => {
- 		props.onCloseAutoFocus?.(e);
--		if (!hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
-+		if (!e.defaultPrevented && !hasInteractedOutside) context.triggerRef()?.focus({ preventScroll: true });
- 		hasInteractedOutside = false;
- 		e.preventDefault();
- 	};

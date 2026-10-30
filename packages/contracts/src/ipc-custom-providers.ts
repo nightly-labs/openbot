@@ -1,13 +1,14 @@
-// A custom provider is an OpenAI-compatible endpoint the user names themselves. OpenBot serves it by
-// merging a `provider` entry into the OpenCode CLI's config, so the wire identity stays `opencode`
-// and no new `AgentProviderId` exists. What makes this file a contract rather than renderer state is
+// A custom provider is an OpenAI-compatible endpoint the user names themselves. OpenBot serves it
+// through the harness the user chooses: OpenCode, which reads a `provider` entry merged into its
+// config, or Pi, which reads an extension that registers the endpoint. The wire identity stays the
+// harness, `opencode` or `pi`, and no new `AgentProviderId` exists. What makes this file a contract rather than renderer state is
 // the API key: it travels renderer-to-main on `save` and must never come back, so both directions
 // need one agreed shape and the guard below is what enforces the asymmetry.
 
-import { AGENT_PROVIDERS } from "./agent-providers";
+import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString } from "./ipc-bounded-values";
-import { isDynamicRecord, isOneOf, isString } from "./runtime-values";
+import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /**
  * A custom provider is served by the OpenCode CLI, so its bounds are OpenCode's config shape rather
@@ -20,6 +21,12 @@ export const CUSTOM_PROVIDER_LIMITS = {
   baseUrl: 2_048,
   models: 64,
   headers: 32,
+  /**
+   * The context window of one model, in tokens. OpenCode's own prompt and tools take about 12K
+   * tokens, so a smaller window compacts on every turn.
+   */
+  contextWindowMin: 1_024,
+  contextWindowMax: 100_000_000,
 } as const;
 
 /** A `provider` key in OpenCode's config, so lowercase and free of separators. */
@@ -28,14 +35,44 @@ export const CUSTOM_PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 /** RFC 9110 field-name token characters. */
 export const CUSTOM_PROVIDER_HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
+/** The providers that can run a custom endpoint. The first one is the default and the released one. */
+export const CUSTOM_PROVIDER_HARNESSES = ["opencode", "pi"] as const satisfies readonly AgentProviderId[];
+export type CustomProviderHarness = (typeof CUSTOM_PROVIDER_HARNESSES)[number];
+export const DEFAULT_CUSTOM_PROVIDER_HARNESS: CustomProviderHarness = "opencode";
+
+export function isCustomProviderHarness(value: unknown): value is CustomProviderHarness {
+  return isOneOf(CUSTOM_PROVIDER_HARNESSES, value);
+}
+
 export interface CustomProviderModel {
   id: string;
   name: string;
+  /**
+   * The context window in tokens. Absent: OpenCode assumes its own default, 200K tokens in OpenCode
+   * 2.1.4. This computer only: a Team API list and save keep their released model fields.
+   */
+  contextWindow?: number;
+}
+
+/** A context window that OpenCode can use for a model. */
+export function isCustomProviderContextWindow(value: unknown): value is number {
+  return (
+    isNumber(value) &&
+    Number.isSafeInteger(value) &&
+    value >= CUSTOM_PROVIDER_LIMITS.contextWindowMin &&
+    value <= CUSTOM_PROVIDER_LIMITS.contextWindowMax
+  );
 }
 
 export interface CustomProviderHeader {
   name: string;
   value: string;
+}
+
+/** A header of an edit. `value: null` keeps the value that main holds for this name. */
+export interface CustomProviderHeaderInput {
+  name: string;
+  value: string | null;
 }
 
 /**
@@ -52,13 +89,17 @@ export interface SaveCustomProviderInput {
   apiKey: string | null;
   models: CustomProviderModel[];
   headers: CustomProviderHeader[];
+  /** The provider that runs the endpoint. Absent: OpenCode. This computer only, like `headerNames`. */
+  harness?: CustomProviderHarness;
 }
 
 /**
  * Renderer to main, on this computer only: the Team API has no edit route. The id names a saved
  * endpoint and does not change. A field that is absent keeps its stored value, so the form can send
- * a blank key and no headers without discarding the credentials that the user does not type again.
- * There is no way to clear a stored key here: remove the endpoint and add it again for that.
+ * a blank key without discarding the key that the user does not type again. `headers` replaces the
+ * saved list: a header with a `null` value keeps its saved value, and a saved header that is not in
+ * the list is removed. There is no way to clear a stored key here: remove the endpoint and add it
+ * again for that.
  */
 export interface UpdateCustomProviderInput {
   id: string;
@@ -66,7 +107,9 @@ export interface UpdateCustomProviderInput {
   baseUrl: string;
   models: CustomProviderModel[];
   apiKey?: string;
-  headers?: CustomProviderHeader[];
+  headers?: CustomProviderHeaderInput[];
+  /** Absent: the saved harness stays. */
+  harness?: CustomProviderHarness;
 }
 
 export interface DeleteCustomProviderInput {
@@ -80,11 +123,18 @@ export interface CustomProviderSummary {
   baseUrl: string;
   hasApiKey: boolean;
   /**
+   * The names of the saved headers, so Edit can show them. The values never come back. Absent in a
+   * Team API list, which keeps its released fields.
+   */
+  headerNames?: string[];
+  /**
    * The models the user listed for this endpoint, which is how the renderer names one before the
    * CLI has listed it: onboarding must record a custom model for a custom choice, and the endpoint
    * may have been saved in an earlier run. A model id and its label are not credentials.
    */
   models: CustomProviderModel[];
+  /** The provider that runs the endpoint. Absent in a Team API list, which keeps its released fields. */
+  harness?: CustomProviderHarness;
 }
 
 /**
@@ -136,9 +186,19 @@ export function isCustomProviderSummary(value: unknown): value is CustomProvider
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     isBoundedString(value.baseUrl, CUSTOM_PROVIDER_LIMITS.baseUrl) &&
     typeof value.hasApiKey === "boolean" &&
+    (value.headerNames === undefined || isHeaderNames(value.headerNames)) &&
+    (value.harness === undefined || isCustomProviderHarness(value.harness)) &&
     Array.isArray(value.models) &&
     value.models.length <= CUSTOM_PROVIDER_LIMITS.models &&
     value.models.every(isCustomProviderModel)
+  );
+}
+
+function isHeaderNames(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= CUSTOM_PROVIDER_LIMITS.headers &&
+    value.every((name) => isCustomProviderHeaderName(name) && name.length <= INPUT_LIMITS.identifier)
   );
 }
 
@@ -146,7 +206,8 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
-    isBoundedString(value.name, INPUT_LIMITS.modelName)
+    isBoundedString(value.name, INPUT_LIMITS.modelName) &&
+    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow))
   );
 }
 
@@ -175,6 +236,17 @@ export function composedCustomModelId(providerId: string, modelId: string): stri
 export function isCustomProviderModelId(modelId: string, providerIds: ReadonlySet<string>): boolean {
   const separator = modelId.indexOf("/");
   return separator > 0 && providerIds.has(modelId.slice(0, separator));
+}
+
+/** The custom provider that a model id names before its first `/`, as `composedCustomModelId` makes it. */
+export function customProviderOfModel<T extends { readonly id: string }>(
+  modelId: string | null | undefined,
+  providers: readonly T[],
+): T | undefined {
+  const separator = modelId?.indexOf("/") ?? -1;
+  if (!modelId || separator <= 0) return undefined;
+  const providerId = modelId.slice(0, separator);
+  return providers.find((provider) => provider.id === providerId);
 }
 
 /** A header name is compared case-insensitively, the way HTTP does. */

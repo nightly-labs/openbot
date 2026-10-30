@@ -27,7 +27,10 @@ export interface RoutineResultOutgoing {
   expiresAt: string;
 }
 
-/** A succeeded run whose routine has a destination, and no delivery yet. */
+/**
+ * A run with an answer (succeeded, or failed by its agent's report) whose routine has a destination,
+ * and no delivery yet.
+ */
 export interface RoutineResultPendingRun {
   runId: string;
   routineId: string;
@@ -119,7 +122,11 @@ export class RoutineResultStore {
     return this.destination(routineId);
   }
 
-  /** Succeeded runs that ended since `since`, after their routine got its destination, with no delivery. */
+  /**
+   * Runs with an answer that ended since `since`, after their routine got its destination, with no
+   * delivery: succeeded runs, and failed runs whose agent answered and reported the failure, so their
+   * queue delivery completed. A provider failure has no answer and sends nothing.
+   */
   runsWithoutDelivery(since: string): RoutineResultPendingRun[] {
     return databaseRows(
       this.#database.connection
@@ -127,7 +134,10 @@ export class RoutineResultStore {
           `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, destination.*
            FROM projection_routine_runs AS run
            JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
-           WHERE run.status = 'succeeded' AND run.updated_at >= ? AND run.updated_at >= destination.updated_at
+           WHERE (run.status = 'succeeded'
+               OR (run.status = 'failed' AND EXISTS (SELECT 1 FROM projection_deliveries AS queued
+                 WHERE queued.delivery_id = run.delivery_id AND queued.status = 'completed')))
+             AND run.updated_at >= ? AND run.updated_at >= destination.updated_at
              AND NOT EXISTS (SELECT 1 FROM routine_result_deliveries AS delivery WHERE delivery.run_id = run.run_id)
            ORDER BY run.updated_at, run.run_id`,
         )

@@ -14,9 +14,9 @@ export const messages = {
   "usage.chart.costDescription":
     "プロバイダー別の 1 日あたりの推定コスト (USD) です。正確な値は「日別データを表示」で確認できます。",
   "usage.chart.tokensDescription":
-    "プロバイダー別の 1 日あたりの処理済みトークンです。正確な値は「日別データを表示」で確認できます。",
+    "プロバイダー別の 1 日あたりのトークン (キャッシュ読み取りを除く) です。正確な値は「日別データを表示」で確認できます。",
   "usage.chart.costLabel": "プロバイダー別の 1 日あたりの推定コスト (USD)",
-  "usage.chart.tokensLabel": "プロバイダー別の 1 日あたりの処理済みトークン",
+  "usage.chart.tokensLabel": "プロバイダー別の 1 日あたりのトークン (キャッシュ読み取りを除く)",
   "usage.column.cost": "コスト",
   "usage.column.share": "割合",
   "usage.column.tokens": "トークン",
@@ -28,7 +28,7 @@ export const messages = {
   "usage.summary": "使用量の概要",
   "usage.sessions": { other: "{sessions} セッション" },
   "usage.costEstimate": "API 推定 · USD",
-  "usage.knownTokens": "既知の処理済みトークン",
+  "usage.knownTokens": "既知のトークン (キャッシュ読み取りを除く)",
   "usage.provider.shareOfCost": "既知のコストの {share}",
   "usage.provider.shareOfTokens": "既知のトークンの {share}",
   "usage.dailyTrend": "日別の推移",
@@ -36,7 +36,8 @@ export const messages = {
   "usage.dailyTokens": "日別のトークン",
   "usage.viewDailyData": "日別データを表示",
   "usage.totals.title": "合計",
-  "usage.totals.processedTokens": "処理済みトークン",
+  "usage.totals.tokens": "キャッシュ読み取りを除くトークン",
+  "usage.totals.processedTokens": "処理済みトークン (キャッシュ読み取りを含む)",
   "usage.totals.cachedInput": "キャッシュ済み入力",
   "usage.totals.uncachedInput": "キャッシュなし入力",
   "usage.totals.cacheCreation": "キャッシュ作成",
@@ -57,9 +58,12 @@ export const messages = {
   "usage.about.title": "この推定について",
   "usage.about.body":
     "API 相当のトークンコスト (USD) です。これは推定であり、サブスクリプションの請求額ではありません。ツールやメディアの個別の料金は計算されません。不明な価格や不完全な使用量は利用できないままです。割合は既知の金額のみを使います。一部のデータでは合計が実際より少なくなることがあります。",
+  "usage.about.tokens":
+    "トークン数にはキャッシュ読み取りを含みません。1 回のターンの各モデルリクエストはキャッシュされた会話を毎回読み直すため、キャッシュ読み取りは他のトークンの何倍にもなることがあります。合計では「キャッシュ済み入力」として表示します。",
   "usage.panel.label": "エージェントの使用量",
   "usage.panel.title": "使用量",
   "usage.panel.allAgents": "すべてのエージェント",
+  "usage.panel.workflows": "ワークフロー",
   "usage.panel.agents": "使用量のエージェント",
   "usage.panel.metric": "使用量の指標",
   "usage.panel.period": "使用量の期間",

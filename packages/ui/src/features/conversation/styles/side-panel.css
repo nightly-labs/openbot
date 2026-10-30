@@ -191,6 +191,8 @@
 
 @container style(--side-panel-tabs-compact: 1) {
   .side-panel-tab:not([data-selected]) {
+    width: auto;
+    min-width: 0;
     padding: 0 var(--openbot-space-1-5);
   }
 
@@ -282,4 +284,117 @@
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   color: var(--openbot-text-muted);
+}
+
+/* A thread tab: the state badge of the thread takes the icon slot at its own size, and the X shows
+ * over it on hover. A thread that needs the user wears the tint of its badge, as in the chat header. */
+.side-panel-tab-close:has(.agent-threads-state) {
+  width: auto;
+  min-width: var(--openbot-icon-md);
+  height: auto;
+  min-height: var(--openbot-icon-md);
+}
+
+.side-panel-tab:not(:hover, :focus-within) .side-panel-tab-icon:has(.agent-threads-state) {
+  opacity: 1;
+}
+
+.side-panel-tab-icon .agent-threads-state-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* A thread tab has the widths of a tab in the chat header, so a thread keeps its size when it moves
+ * between the two rows. Its title takes the free width of the tab and starts after the icon. */
+.side-panel-thread-tab {
+  flex: 0 1 auto;
+  width: 140px;
+  min-width: 96px;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.side-panel-thread-tab .side-panel-tab-select {
+  flex: 1;
+  text-align: start;
+}
+
+/* A thread tab that the pointer moves follows the pointer and wears the selection fill, so it covers
+ * the tabs that it passes. The dividers and the X hide until the drop. Over the chat, the tab goes
+ * back to its place, faded, and a copy follows the pointer. */
+.side-panel-tabs[data-dragging],
+.side-panel-tabs[data-dragging] .side-panel-tab-select {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.side-panel-tabs[data-dragging] > .side-panel-thread-tab[data-dragged=""] {
+  z-index: 2;
+  background-color: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+  transition: none;
+}
+
+.side-panel-tabs[data-dragging] > .side-panel-thread-tab[data-dragged="away"] {
+  opacity: 0.4;
+}
+
+.side-panel-tabs[data-dragging] > .side-panel-tab::before,
+.side-panel-tabs[data-dragging] .side-panel-tab-x {
+  opacity: 0;
+}
+
+.side-panel-tabs[data-dragging] .side-panel-tab-close {
+  background: transparent;
+}
+
+.side-panel-tabs[data-dragging] .side-panel-tab-icon {
+  opacity: 0.7;
+}
+
+.side-panel-tabs[data-dragging] .side-panel-tab-icon:has(.agent-threads-state) {
+  opacity: 1;
+}
+
+/* The copy of a thread tab that the pointer takes from one tab row to the other. */
+.thread-tab-ghost {
+  position: fixed;
+  z-index: 1000;
+  max-width: 140px;
+  white-space: nowrap;
+  border: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+.thread-tab-ghost .side-panel-tab-label {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+}
+
+/* Where a thread tab of the chat header goes when the pointer lets it go over the side panel. */
+.side-panel-drop {
+  position: absolute;
+  z-index: 17;
+  top: calc(var(--left-header-height, 38px) + var(--openbot-space-2));
+  right: var(--openbot-space-2);
+  bottom: var(--openbot-space-2);
+  display: grid;
+  width: calc(var(--side-panel-width, 380px) - 2 * var(--openbot-space-2));
+  place-items: start center;
+  padding-top: var(--openbot-space-6);
+  border: 1px dashed var(--openbot-text-secondary);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-panel-thread-tab {
+    transition: none;
+  }
 }

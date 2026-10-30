@@ -1,7 +1,7 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("connector", {
-  // Server settings > Connectors: the built-in GitHub connection of this computer.
+  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "Every agent on this computer can use your GitHub repositories, issues and pull requests, and gh and git.",
@@ -36,7 +36,6 @@ export const messages = defineMessages("connector", {
   "connector.github.statusConnected": "Connected",
   "connector.github.statusConnecting": "Connecting",
   "connector.github.statusExpired": "Expired",
-  "connector.github.statusNotSetUp": "Not set up",
   "connector.github.accountTitle": "Account",
   // {count} is the number of repositories in the list, such as 12.
   "connector.github.filterPlaceholder": { one: "Filter {count} repository", other: "Filter {count} repositories" },
@@ -77,25 +76,14 @@ export const messages = defineMessages("connector", {
   "connector.github.close": "Close",
   // The last section of an integration page, with the action that removes it.
   "connector.dangerZone": "Danger zone",
+  "connector.statusUnknown": "Unknown",
+  "connector.readFailed": "OpenBot could not read the state of this connection.",
 
-  // Server settings > Connectors: the list of integrations. Each row opens its page.
-  "connector.hub.onThisComputer": "On this computer",
-  "connector.hub.onHost": "On {host}",
-  "connector.hub.notSetUp": "Not set up",
-  "connector.hub.available": "Available",
-  "connector.hub.localOnly": "Your computer only",
-  // {name} is the name of an integration, such as Slack.
-  "connector.hub.open": "Open {name}",
-  "connector.hub.setUp": "Set up",
-  // {names} lists the agents, such as "Chief, Research".
-  "connector.hub.usedBy": "Used by {names}",
-
-  // Server settings > Connectors > Slack: a workspace installs the one OpenBot app, and the Slack
+  // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
   // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "People mention @OpenBot in Slack or send it a direct message. The Slack Orchestrator asks the right agent and answers.",
-  "connector.slack.statusNotSetUp": "Not set up",
   "connector.slack.statusConnected": "Connected",
   "connector.slack.statusAttention": "Needs attention",
   // {workspace} is the Slack workspace name.
@@ -109,13 +97,19 @@ export const messages = defineMessages("connector", {
   "connector.slack.connect": "Connect Slack",
   "connector.slack.addAgent": "Add agent",
   "connector.slack.actionFailed": "Slack did not accept the change",
-  "connector.slack.workspaceTitle": "Workspace",
+  "connector.slack.workspaceTitle": "Workspaces",
   "connector.slack.workspaceDescription": "People mention @OpenBot or send it a direct message.",
   "connector.slack.disconnectWorkspace": "Disconnect",
+  "connector.slack.disconnectAllTitle": "Disconnect Slack",
+  "connector.slack.disconnectAllSummary":
+    "Every workspace disconnects. People can no longer reach your agents through @OpenBot.",
+  "connector.slack.disconnectAllSummaryOrchestrator":
+    "Every workspace disconnects. The Slack Orchestrator and its conversations are deleted from OpenBot.",
   "connector.slack.missingScopes":
     "OpenBot does not have these permissions in Slack: {scopes}. Disconnect the workspace, then connect it again.",
   "connector.slack.retryAt": "Slack asked OpenBot to wait. It tries again at {time}.",
   "connector.slack.reconnect": "Reconnect",
+  "connector.slack.pause": "Pause",
   "connector.slack.resume": "Resume",
   // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}: {name}",
@@ -160,14 +154,24 @@ export const messages = defineMessages("connector", {
   "connector.slack.removeEffectDeleted": "The Slack Orchestrator and its conversations are deleted from OpenBot.",
   "connector.slack.keep": "Keep connected",
   "connector.slack.close": "Close",
+  "connector.slack.addWorkspace": "Add workspace",
+  // Shown when the page has the maximum number of workspaces.
+  "connector.slack.limitReached": {
+    one: "You can connect a maximum of {count} workspace.",
+    other: "You can connect a maximum of {count} workspaces.",
+  },
+  // {count} is the number of Slack workspaces: two or more.
+  "connector.slack.summaryMany": {
+    one: "{count} workspace · Slack Orchestrator answers",
+    other: "{count} workspaces · Slack Orchestrator answers",
+  },
 
-  // Server settings > Connectors > Discord: a Discord server (a guild) adds the one OpenBot bot, and
+  // Marketplace > Apps > Discord: a Discord server (a guild) adds the one OpenBot bot, and
   // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
   // "Discord server": "server" alone is an OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "People mention @OpenBot in a channel of a Discord server. The Discord Orchestrator asks the right agent and answers.",
-  "connector.discord.statusNotSetUp": "Not set up",
   "connector.discord.statusConnected": "Connected",
   "connector.discord.statusAttention": "Needs attention",
   // {workspace} is the Discord server name.
@@ -181,13 +185,19 @@ export const messages = defineMessages("connector", {
   "connector.discord.connect": "Connect Discord",
   "connector.discord.addAgent": "Add agent",
   "connector.discord.actionFailed": "Discord did not accept the change",
-  "connector.discord.workspaceTitle": "Discord server",
+  "connector.discord.workspaceTitle": "Discord servers",
   "connector.discord.workspaceDescription": "Mention @OpenBot in a channel. Reply to OpenBot to continue.",
   "connector.discord.disconnectWorkspace": "Disconnect",
+  "connector.discord.disconnectAllTitle": "Disconnect Discord",
+  "connector.discord.disconnectAllSummary":
+    "Every server disconnects. People can no longer reach your agents through @OpenBot.",
+  "connector.discord.disconnectAllSummaryOrchestrator":
+    "Every server disconnects. The Discord Orchestrator and its conversations are deleted from OpenBot.",
   "connector.discord.missingScopes":
     "OpenBot does not have these permissions in Discord: {scopes}. Disconnect the Discord server, then connect it again.",
   "connector.discord.retryAt": "Discord asked OpenBot to wait. It tries again at {time}.",
   "connector.discord.reconnect": "Reconnect",
+  "connector.discord.pause": "Pause",
   "connector.discord.resume": "Resume",
   // {action} is a button, such as Pause; {name} is the Discord server name.
   "connector.discord.rowAction": "{action}: {name}",
@@ -230,13 +240,41 @@ export const messages = defineMessages("connector", {
   "connector.discord.removeEffectDeleted": "The Discord Orchestrator and its conversations are deleted from OpenBot.",
   "connector.discord.keep": "Keep connected",
   "connector.discord.close": "Close",
+  "connector.discord.addWorkspace": "Add Discord server",
+  "connector.discord.limitReached": {
+    one: "You can connect a maximum of {count} Discord server.",
+    other: "You can connect a maximum of {count} Discord servers.",
+  },
+  // {count} is the number of Discord servers: two or more.
+  "connector.discord.summaryMany": {
+    one: "{count} Discord server · Discord Orchestrator answers",
+    other: "{count} Discord servers · Discord Orchestrator answers",
+  },
+  // Who can use OpenBot in one Discord server: the members with one of the chosen Discord roles.
+  "connector.discord.accessTitle": "Who can use OpenBot",
+  "connector.discord.accessDescription": "OpenBot answers only these people. It ignores mentions from others.",
+  "connector.discord.accessEveryone": "Everyone in the server",
+  "connector.discord.accessEveryoneDescription": "Anyone who can post in a channel that OpenBot sees can mention it.",
+  // {roles} is a list of Discord role names, such as "Admin and Moderator".
+  "connector.discord.accessRoles": "Members with {roles}",
+  "connector.discord.accessChoose": "Choose roles",
+  // {workspace} is the Discord server name.
+  "connector.discord.accessDialogTitle": "Who can use OpenBot in {workspace}?",
+  "connector.discord.accessDialogDescription": "With no role selected, everyone can mention OpenBot.",
+  "connector.discord.accessLoading": "Loading roles…",
+  "connector.discord.accessLoadFailed": "Discord roles did not load",
+  "connector.discord.accessNoRoles": "This server has no roles to pick.",
+  // {role} is the name of a Discord role that the server no longer has.
+  "connector.discord.accessRoleDeleted": "{role} (deleted)",
+  "connector.discord.accessSave": "Save",
+  // {host} is the joined server's name.
+  "connector.discord.accessHostUpdate": "Update OpenBot on {host} to choose roles.",
 
-  // Server settings > Connectors > Telegram: each chat adds the one OpenBot bot, and the Telegram
+  // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
   // Orchestrator agent receives the messages of all chats, asks the team and answers.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "Add the OpenBot bot to a Telegram group or open a direct chat with it. The Telegram Orchestrator asks the right agent and answers.",
-  "connector.telegram.statusNotSetUp": "Not set up",
   "connector.telegram.statusConnected": "Connected",
   "connector.telegram.statusAttention": "Needs attention",
   // {count} is the number of linked Telegram chats.
@@ -271,11 +309,14 @@ export const messages = defineMessages("connector", {
   "connector.telegram.resume": "Resume",
   "connector.telegram.reconnect": "Reconnect",
   "connector.telegram.disconnectChat": "Disconnect",
+  "connector.telegram.disconnectAllTitle": "Disconnect Telegram",
+  "connector.telegram.disconnectAllSummary":
+    "Every chat disconnects. People can no longer reach your agents through the OpenBot bot.",
+  "connector.telegram.disconnectAllSummaryOrchestrator":
+    "Every chat disconnects. The Telegram Orchestrator and its conversations are deleted from OpenBot.",
   // {action} is a button, such as Pause; {name} is the chat name.
   "connector.telegram.rowAction": "{action}: {name}",
-  "connector.telegram.linkTitle": "Link another chat",
-  "connector.telegram.linkDescription": "Telegram opens in your browser. The chat shows here when it is linked.",
-  "connector.telegram.linkWaiting": "Waiting for Telegram. Select the chat in Telegram.",
+  "connector.telegram.linkChat": "Link a chat",
   "connector.telegram.addToGroup": "Add to a group",
   "connector.telegram.openDirectChat": "Open a direct chat",
   "connector.telegram.orchestratorTitle": "Telegram Orchestrator",
@@ -339,11 +380,15 @@ export const messages = defineMessages("connector", {
     "In the 1Password app, open Settings > Developer and turn on “Integrate with 1Password CLI”.",
   "connector.onePassword.stepAppReady": "The 1Password app lets the CLI create the shared vault.",
   "connector.onePassword.openApp": "Open 1Password",
+  "connector.onePassword.openAppFailed": "OpenBot could not open 1Password.",
   "connector.onePassword.checkAgain": "Check again",
   "connector.onePassword.stepVaultTitle": "Create the shared vault",
   "connector.onePassword.stepVaultDescription":
     "OpenBot creates the vault “Shared with OpenBot” and a service account that can only read it. 1Password asks you to approve.",
-  "connector.onePassword.useToken": "Use a service account token instead",
+  // The last row of the setup steps: the other way to connect, without the CLI.
+  "connector.onePassword.useTokenDescription":
+    "Instead of these steps, paste a service account token from 1Password.com.",
+  "connector.onePassword.useTokenAction": "Use token",
   "connector.onePassword.tokenLabel": "Service account token",
   "connector.onePassword.tokenPlaceholder": "ops_…",
   "connector.onePassword.connectWithToken": "Connect",
@@ -365,7 +410,6 @@ export const messages = defineMessages("connector", {
   "connector.onePassword.actionFailed": "OpenBot could not change the 1Password connection.",
   "connector.onePassword.statusConnected": "Connected",
   "connector.onePassword.statusConnecting": "Connecting",
-  "connector.onePassword.statusNotSetUp": "Not set up",
   // The same page for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.onePassword.descriptionHost":
     "Share a dedicated 1Password vault with OpenBot on {host} through a service account, so agents on {host} can sign in to sites in its browser.",
@@ -384,7 +428,29 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.sessionKey": "Bitwarden session key",
   "connector.bitwarden.connect": "Connect Bitwarden",
   "connector.bitwarden.disconnect": "Disconnect Bitwarden",
+  "connector.bitwarden.disconnectAction": "Disconnect",
+  "connector.bitwarden.disconnectSummary":
+    "OpenBot forgets the session key. Agents can no longer fill logins from Bitwarden. Other Bitwarden clients stay unlocked.",
+  "connector.bitwarden.disconnectSummaryHost":
+    "{host} removes the API key and the master password. Agents on {host} can no longer fill logins from Bitwarden.",
   "connector.bitwarden.connected": "Connected",
-  "connector.bitwarden.disconnected": "Not connected",
   "connector.bitwarden.actionFailed": "OpenBot could not change the Bitwarden connection.",
+  "connector.bitwarden.descriptionHost": "Fill browser logins on {host} from Bitwarden or Vaultwarden.",
+  "connector.bitwarden.setupHost":
+    "{host} signs in with its own Bitwarden CLI. In your vault, create a folder named Shared with OpenBot and put only the logins that agents may use in it. In the web vault, open Settings › Security › Keys and view your API key. Enter the server address, client_id, client_secret and your master password below.",
+  "connector.bitwarden.scopeHost":
+    "All agents on {host} can use matching logins in Shared with OpenBot. OpenBot uses exact HTTPS origins. It does not use items that require a master password prompt or a custom URI match rule.",
+  "connector.bitwarden.sessionHost":
+    "{host} keeps the API key and the master password encrypted, so it can unlock again after a restart. This computer does not keep them. Disconnect removes them from {host}. {host} must reach the server address over HTTPS.",
+  "connector.bitwarden.serverUrl": "Server address",
+  "connector.bitwarden.folderTitle": "Shared folder",
+  "connector.bitwarden.folderDescription":
+    "Move a login into this folder in Bitwarden to let agents sign in with it. Remove it to stop.",
+  // The exact folder name that OpenBot looks for in the vault. Keep it in English.
+  "connector.bitwarden.folderName": "Shared with OpenBot",
+  "connector.bitwarden.folderKind": "Folder in Bitwarden",
+  "connector.bitwarden.clientId": "API key client_id",
+  "connector.bitwarden.clientSecret": "API key client_secret",
+  "connector.bitwarden.masterPassword": "Master password",
+  "connector.bitwarden.connecting": "Connecting",
 });

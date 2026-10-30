@@ -44,6 +44,17 @@
   gap: 6px;
 }
 
+/* The model change that waits for the running turn to end. */
+.conversation-model-pending {
+  flex: none;
+  gap: 4px;
+}
+
+.conversation-model-pending svg {
+  width: 12px;
+  height: 12px;
+}
+
 .provider-model-picker {
   position: relative;
   min-width: 0;
@@ -83,7 +94,7 @@
 .provider-model-trigger:focus-visible,
 .provider-model-rail-button:focus-visible,
 .provider-model-option:focus-visible {
-  outline: 1px solid var(--openbot-accent);
+  outline: 1px solid var(--openbot-border-focus);
   outline-offset: 1px;
 }
 
@@ -121,6 +132,59 @@
 .provider-model-trigger-effort::before {
   margin-right: var(--openbot-space-1-5);
   content: "·";
+}
+
+/* In the chat header the picker text has the size of the tab labels. When the thread tabs do not
+   fit, the picker gets smaller: first the effort closes, then the model name. Each part slides closed
+   and fades. The tooltip and the accessible name of the picker keep both. */
+.conversation-header .provider-model-trigger {
+  interpolate-size: allow-keywords;
+}
+
+.conversation-header .provider-model-trigger :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  transition:
+    width var(--openbot-duration-normal) var(--openbot-ease-out),
+    margin var(--openbot-duration-normal) var(--openbot-ease-out),
+    opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* A closed part also takes back the gap before it, so the picker has no blank space. When the thread
+   tabs become one button, the picker shows only its icon, so the button has room for the thread title. */
+.conversation-header[data-model-fit] .provider-model-trigger-effort,
+.conversation-header[data-model-fit="icon"] .provider-model-trigger-name,
+.conversation-header:where(:has(.agent-threads-header:not([data-mode="tabs"])))
+  .provider-model-trigger
+  :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  width: 0;
+  margin-left: calc(var(--openbot-space-1-5) * -1);
+  opacity: 0;
+}
+
+/* While the tabs measure a step, the picker shows it at once. */
+.conversation-header[data-model-measure]
+  .provider-model-trigger
+  :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-header .provider-model-trigger :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
+    transition: none;
+  }
+}
+
+/* The Fast chip gets its own room, so the model name keeps the width it has without it. */
+.provider-model-trigger:has(.provider-model-trigger-fast) {
+  max-width: 296px;
+}
+
+.provider-model-trigger-fast svg {
+  width: 12px;
+  height: 12px;
+  margin-right: var(--openbot-space-0-5);
+  stroke-width: var(--openbot-icon-stroke);
 }
 
 /* An email can be long: the account gives way before the model name does. */
@@ -258,10 +322,10 @@
 }
 
 .provider-model-popover {
-  --provider-model-rail-bg: color-mix(in srgb, var(--openbot-bg-notch) 22%, var(--ui-menu-bg));
+  --provider-model-rail-bg: var(--openbot-bg-sheet-inset);
   --provider-model-segment-radius: calc(var(--ui-menu-item-radius) - var(--openbot-space-0-5));
   position: relative;
-  z-index: 40;
+  z-index: var(--openbot-layer-dropdown);
   width: min(360px, calc(100vw - 24px));
   min-height: 226px;
   overflow: hidden;
@@ -319,7 +383,7 @@
 }
 
 .provider-model-rail-tooltip {
-  z-index: var(--openbot-layer-popover);
+  z-index: var(--openbot-layer-tooltip);
   display: flex;
   max-width: min(240px, calc(100vw - 16px));
   flex-direction: column;
@@ -831,8 +895,6 @@
   animation: browser-control-pulse 1.25s ease-in-out infinite;
 }
 
-.browser-tab-close:active,
-.browser-new-tab:active,
 .browser-toolbar-button:active:not(:disabled) {
   transform: scale(0.92);
   transition-duration: var(--openbot-duration-fast);

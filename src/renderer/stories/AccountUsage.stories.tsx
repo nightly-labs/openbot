@@ -9,6 +9,7 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 const nowSeconds = Math.floor(Date.now() / 1_000);
 const fiveHourReset = nowSeconds + 2 * 3_600 + 14 * 60;
 const weeklyReset = nowSeconds + 4 * 86_400 + 6 * 3_600;
+const monthlyReset = nowSeconds + 18 * 86_400;
 
 const mixedRows = accountUsageProviderRows({
   limits: [
@@ -26,6 +27,36 @@ const mixedRows = accountUsageProviderRows({
       id: "grok",
       primary: null,
       secondary: { usedPercent: 22, windowDurationMins: 10_080, resetsAt: weeklyReset },
+    },
+    {
+      id: "antigravity",
+      primary: null,
+      secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: weeklyReset },
+      groups: [
+        {
+          name: "Gemini Models",
+          models: ["Gemini Flash", "Gemini Pro"],
+          primary: null,
+          secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: weeklyReset },
+        },
+        {
+          name: "Gemini 4 Argon",
+          models: ["Gemini 4 Argon"],
+          primary: null,
+          secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: fiveHourReset },
+        },
+        {
+          name: "Claude and GPT models",
+          models: ["Claude Opus", "Claude Sonnet", "GPT-OSS"],
+          primary: null,
+          secondary: { usedPercent: 12, windowDurationMins: 10_080, resetsAt: weeklyReset },
+        },
+      ],
+    },
+    {
+      id: "cursor",
+      primary: { usedPercent: 37, windowDurationMins: 43_200, resetsAt: monthlyReset },
+      secondary: { usedPercent: 82, windowDurationMins: 43_200, resetsAt: monthlyReset },
     },
   ],
 });

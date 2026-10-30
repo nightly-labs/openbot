@@ -46,7 +46,8 @@ export interface PasswordVault {
   ): Effect.Effect<string | null, PasswordVaultError>;
 }
 
-function websiteUrl(value: string): URL | null {
+/** A saved website as a URL. A website with no `scheme://` is HTTPS, and `host:port` is a host. */
+export function websiteUrl(value: string): URL | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   try {

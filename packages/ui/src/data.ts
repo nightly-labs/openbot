@@ -1,19 +1,24 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import type {
   AgentAccess,
   AgentExchangeSummary,
   AgentModelId,
-  AgentProviderId,
   AgentReasoningEffort,
-  AgentSummary,
   AttachmentSummary,
   AvatarHue,
   ChannelRoutingConversationEvent,
+  ClientAgentSummary,
+  ConversationMemoryChange,
   ConversationMessageSender,
   ConversationPlan,
   ConversationQuestionPrompt,
   ConversationReaction,
+  ConversationSubagent,
+  ConversationTurnTrace,
   HostedSiteConversationEvent,
   ImageGenerationInfo,
+  InstalledSkill,
+  McpServerConfig,
   MessageReaction,
   ModelSwitchReason,
   QueueDeliveryStatus,
@@ -21,12 +26,22 @@ import type {
   RoutineRunConversationEvent,
   SkillConversationEvent,
 } from "@openbot/contracts/ipc";
+import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 
 /**
  * `error` is a message the renderer wrote itself, not one the provider sent: an action of the
  * user failed, and `status` names which one.
  */
-export type MessageKind = "text" | "thinking" | "exchange" | "question" | "action-marker" | "plan" | "error";
+export type MessageKind =
+  | "text"
+  | "thinking"
+  | "exchange"
+  | "question"
+  | "action-marker"
+  | "plan"
+  | "subagents"
+  | "memory-changes"
+  | "error";
 
 /** The plan of one turn. `stopped` is true when the turn was stopped or failed before it ended. */
 export interface AgentMessagePlan extends ConversationPlan {
@@ -62,6 +77,8 @@ export interface AgentMessageMarkerModel {
   replyToMessageId: string | null;
   /** The sender asked for no answer, so the marker names it as information rather than a request. */
   expectsReply: boolean;
+  /** Set when the chat has the text of the message: whether the text shows under the marker. */
+  expanded?: boolean;
 }
 
 export interface RoutineRunMarkerModel {
@@ -128,10 +145,17 @@ export type ChatActionMarkerModel =
   | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */
+  | { kind: "mcp-sign-in"; mcpServerId: string; timestamp: string }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */
   | { kind: "model-switch"; reason: ModelSwitchReason; text: string; timestamp: string }
+  /** A member agent changed the channel at a person's request. `text` is the host's note. */
+  | { kind: "channel-change"; text: string; timestamp: string }
+  | { kind: "vault-change"; text: string; timestamp: string }
+  /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
+  | { kind: "plan-continuation"; text: string; timestamp: string }
   | {
       kind: "unavailable";
       label: string;
@@ -152,38 +176,58 @@ export interface MessageReactionSummary {
 
 export interface AgentMessage {
   id: string;
-  turnId?: string;
+  turnId?: string | undefined;
   author: "you" | "agent";
   body: string;
   time: string;
   createdAt?: string;
   streaming?: boolean;
-  animate?: boolean;
-  itemType?: string;
+  animate?: boolean | undefined;
+  itemType?: string | undefined;
   kind?: MessageKind;
-  status?: string;
-  senderAgentId?: string;
+  status?: string | undefined;
+  senderAgentId?: string | undefined;
   /** The person who wrote a `you` message. Absent on the reader's own older messages. */
-  senderMember?: ConversationMessageSender;
-  replyToMessageId?: string | null;
-  attachments?: AttachmentSummary[];
-  imageGeneration?: ImageGenerationInfo;
-  questionPrompt?: ConversationQuestionPrompt;
+  senderMember?: ConversationMessageSender | undefined;
+  replyToMessageId?: string | null | undefined;
+  attachments?: AttachmentSummary[] | undefined;
+  /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
+  voiceRecording?: AttachmentSummary | undefined;
+  imageGeneration?: ImageGenerationInfo | undefined;
+  questionPrompt?: ConversationQuestionPrompt | undefined;
+  /** The interactive block an agent drew. A blocking block sits beside `questionPrompt`. */
+  uiBlock?: ConversationUiBlock;
   citations?: MessageCitation[];
-  exchange?: AgentExchangeSummary;
-  reaction?: MessageReaction | null;
+  exchange?: AgentExchangeSummary | undefined;
+  reaction?: MessageReaction | null | undefined;
   reactions?: ConversationReaction[];
   reactionSummary?: MessageReactionSummary;
-  routine?: {
-    routineId: string;
-    runId: string;
-    name: string;
-    scheduledFor: string;
-  };
-  actionMarker?: ChatActionMarkerModel;
+  routine?:
+    | {
+        routineId: string;
+        runId: string;
+        name: string;
+        scheduledFor: string;
+      }
+    | undefined;
+  actionMarker?: ChatActionMarkerModel | undefined;
   items?: string[];
   itemIds?: string[];
-  plan?: AgentMessagePlan;
+  /** When the host wrote each of `items`, to place them between a turn's progress lines. */
+  itemCreatedAt?: string[];
+  plan?: AgentMessagePlan | undefined;
+  /** The subagents that the agent started in this turn, on a `subagents` message. */
+  subagents?: ConversationSubagent[] | undefined;
+  /**
+   * The memory changes that the turn committed, on a `memory-changes` message. Absent from a host
+   * that sends only the text, such as a Team API host.
+   */
+  memoryChanges?: ConversationMemoryChange[] | undefined;
+  /**
+   * The real times of the turn's steps, with its tokens and cost, on the one message of a finished
+   * turn that holds them. Absent on an older turn and from a Team API host.
+   */
+  trace?: ConversationTurnTrace | undefined;
 }
 
 export interface AgentProfile {
@@ -192,33 +236,67 @@ export interface AgentProfile {
   title: string;
   description: string;
   notifications: boolean;
-  provider: AgentProviderId;
+  provider: AgentProviderRef;
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
   /** The provider account after the first. Absent for the provider's own sign-in. */
-  providerAccountId?: string;
+  providerAccountId?: string | undefined;
   /** Absent for an agent on a remote host, which does not share it; the host then decides. */
-  access?: AgentAccess;
+  access?: AgentAccess | undefined;
   /** Absent means on. Absent for an agent on a remote host too, which does not share it. */
-  computerUse?: boolean;
+  computerUse?: boolean | undefined;
   /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
-  allowAutomation?: boolean;
+  allowAutomation?: boolean | undefined;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  allowNewChat?: boolean | undefined;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  quickAcknowledgement?: boolean | undefined;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  ownBrowserSession?: boolean | undefined;
+  /** The named browser profile of the agent's tabs. Absent for the shared or the agent's own session. */
+  browserProfileId?: string | undefined;
+  /** Absent means off. Absent for an agent on a remote host too, which does not share it. */
+  fastMode?: boolean | undefined;
   /** Absent means the app default. Absent for an agent on a remote host too, which does not share it. */
-  busyMessageMode?: AgentSummary["busyMessageMode"];
+  busyMessageMode?: ClientAgentSummary["busyMessageMode"];
   /** Absent means the default task limit. Absent for an agent on a remote host too, which runs no tasks. */
-  taskLimit?: AgentSummary["taskLimit"];
+  taskLimit?: ClientAgentSummary["taskLimit"];
   /** Absent means ask before a switch at a usage limit. Absent for an agent on a remote host too. */
-  backupModels?: AgentSummary["backupModels"];
+  backupModels?: ClientAgentSummary["backupModels"];
+  /** The folders the user gave the agent besides its workspace. Absent for none, and on a remote host. */
+  additionalFolders?: ClientAgentSummary["additionalFolders"];
+  /** The folders in them that the agent must not change. Absent for none, and on a remote host. */
+  excludedFolders?: ClientAgentSummary["excludedFolders"];
   /** Set while the agent works on a backup model for a usage limit: the model it goes back to. */
-  usageLimitReturn?: AgentSummary["usageLimitReturn"];
+  usageLimitReturn?: ClientAgentSummary["usageLimitReturn"];
+  /** Set while a turn or task still runs on the previous provider. The next turn uses this runtime. */
+  pendingRuntime?: ClientAgentSummary["pendingRuntime"];
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
   avatarUrl: string | null;
-  marketplaceSource?: AgentSummary["marketplaceSource"];
+  marketplaceSource?: NonNullable<ClientAgentSummary["marketplaceSource"]>;
   updatedAt?: string | null;
   time: string;
   preview: string;
 }
+
+/** The agent fields that the composer, the queue, rich text and the browser dock read. */
+export type ComposerAgent = Pick<
+  AgentProfile,
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
+>;
+
+/** The skill fields that the composer, the queue and rich text read. */
+export type ComposerSkill = Pick<
+  InstalledSkill,
+  "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description"
+>;
+
+/** The MCP server fields that the composer reads. It never reads the environment or the headers. */
+export type ComposerMcpServer = Pick<
+  McpServerConfig,
+  "id" | "name" | "enabled" | "transport" | "command" | "args" | "url"
+>;

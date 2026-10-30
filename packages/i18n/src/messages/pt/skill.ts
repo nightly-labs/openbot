@@ -15,8 +15,6 @@ export const messages = {
   "skill.emptyEnabled": "Este agente não tem habilidades ativadas.",
   "skill.emptyAssigned": "Este agente ainda não tem habilidades atribuídas.",
   "skill.folderSkill": "O OpenBot não instalou esta habilidade. Edite ou remova em {location}.",
-  "skill.localOnHost":
-    "Esta habilidade local está armazenada no computador anfitrião. Abra os detalhes naquele computador.",
   "skill.moreFor": "Mais para {name}",
   "skill.update": "Atualizar",
   "skill.updateName": "Atualizar {name}",
@@ -65,4 +63,17 @@ export const messages = {
   "skill.preview.examplePrompt": "Ajude-me a usar esta habilidade.",
   "skill.preview.try": "Experimentar habilidade",
   "skill.preview.linkFailed": "Não foi possível abrir o link.",
+
+  "skill.marketplace.changed": {
+    one: "{name} alterada em {count} agente.",
+    other: "{name} alterada em {count} agentes.",
+  },
+  "skill.marketplace.updated": {
+    one: "{name} atualizada em {count} agente.",
+    other: "{name} atualizada em {count} agentes.",
+  },
+  "skill.marketplace.undone": "A alteração em {name} foi desfeita.",
+  "skill.marketplace.confirmAgents": "Agentes: {agents}.",
+  "skill.marketplace.limitReason": "Um agente pode ter até {limit} habilidades.",
+  "skill.marketplace.cannotRemove": "O OpenBot não pode remover uma habilidade integrada nem uma que ele não instalou.",
 } as const satisfies PartialTranslation<typeof source>;

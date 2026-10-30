@@ -16,7 +16,7 @@ import {
   type RoutineRunFields,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
-import type { EventRoutine, RoutineWebhookTriggerInput } from "@openbot/contracts/ipc-events";
+import type { RoutineWebhookTriggerInput, WebhookTestResult } from "@openbot/contracts/ipc-events";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -32,10 +32,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
+  SwitchField,
   Text,
   Textarea,
   toast,
+  Webhook,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
@@ -50,7 +51,6 @@ import { RoutineWebhookTrigger } from "@openbot/ui/features/conversation/Routine
 import {
   ROUTINE_EVERY_DAY,
   type RoutineScheduleDraft,
-  routineDraftSummary,
   switchDraftKind,
 } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import {
@@ -62,16 +62,19 @@ import {
   routineScheduleFromDraft,
   routineScheduleToDraft,
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
-import { type RoutineText, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
+import { HostedUpsellRoutinesNotice, hostedUpsellRoutineCreated } from "../servers/hosted-server-upsell-controller";
+import { isEventRoutine, routineListSummary, routineScheduleOf } from "./routine-summary";
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
-  routineId: string;
+  /** Null starts a new routine. */
+  routineId: string | null;
   routineName: string;
   nonce: number;
 }
@@ -79,6 +82,7 @@ export interface RoutineSelectionRequest {
 type PendingRoutineExit =
   | "list"
   | "close"
+  | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
   | { kind: "conversation-message"; messageId: string };
 
@@ -120,11 +124,11 @@ interface AgentRoutinesSettingsProps {
   /** Names the owner and owns every call. A channel passes `channelRoutinesPort` here. */
   port: RoutinesPort;
   onCountChange: (count: number) => void;
-  onBack?: () => void;
-  onClose?: () => void;
-  selectionRequest?: RoutineSelectionRequest | null;
-  onSelectionRequestHandled?: (nonce: number) => void;
-  onOpenRun?: (messageId: string) => void;
+  onBack?: (() => void) | undefined;
+  onClose?: (() => void) | undefined;
+  selectionRequest?: RoutineSelectionRequest | null | undefined;
+  onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
+  onOpenRun?: ((messageId: string) => void) | undefined;
 }
 
 export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
@@ -148,7 +152,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [dirty, setDirty] = createSignal(false);
   const [testing, setTesting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  // Set by a Save of a draft with a missing field, so the fields say what is missing.
+  const [showErrors, setShowErrors] = createSignal(false);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
+  const [deleting, setDeleting] = createSignal(false);
+  // The list rows whose Pause or Resume waits for the host.
+  const [togglingIds, setTogglingIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pendingExit, setPendingExit] = createSignal<PendingRoutineExit | null>(null);
   const scrollFades = createScrollFades();
   let draftRevision = 0;
@@ -272,7 +281,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       lastSelectionRequestNonce = request.nonce;
       props.onSelectionRequestHandled?.(request.nonce);
       if (!loaded) return;
-      requestRoutineSelection(request, currentRoutines.find((routine) => routine.id === request.routineId) ?? null);
+      // The editor state is read once, when the request arrives; a later edit must not run it again.
+      untrack(() => {
+        if (request.routineId === null) {
+          requestExit("new");
+          return;
+        }
+        requestRoutineSelection(request, currentRoutines.find((routine) => routine.id === request.routineId) ?? null);
+      });
     },
   );
 
@@ -331,6 +347,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       destination: undefined,
     });
     resetWebhookState();
+    setShowErrors(false);
     resetResults();
     void loadRuns(routine.id);
     void loadResults(routine.id);
@@ -359,6 +376,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       destination: undefined,
     });
     resetWebhookState();
+    setShowErrors(false);
     resetResults();
     void loadResultOptions();
   }
@@ -379,6 +397,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     setConfirmDelete(false);
     setPendingExit(null);
     resetWebhookState();
+    setShowErrors(false);
     resetResults();
   }
 
@@ -424,6 +443,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       props.onClose?.();
       return;
     }
+    if (target === "new") {
+      createDraft();
+      return;
+    }
     if (target.kind === "conversation-message") {
       props.onOpenRun?.(target.messageId);
       return;
@@ -456,7 +479,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   async function saveDraft(): Promise<void> {
     const current = draft();
-    if (!current || !dirty() || !validDraft(current) || saving()) return;
+    if (!current || !dirty() || saving()) return;
+    if (!validDraft(current)) {
+      setShowErrors(true);
+      return;
+    }
     const savingRevision = draftRevision;
     setSaving(true);
     setError(null);
@@ -495,6 +522,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         });
       }
       trackRoutineAction(analytics, action, current, startedAt, "succeeded");
+      if (action === "create" && saved.active) {
+        hostedUpsellRoutineCreated({ id: saved.id, name: saved.name, agentId: null });
+      }
     } catch (caught) {
       trackRoutineAction(analytics, action, current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.saveFailed")));
@@ -537,6 +567,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   }
 
   async function deleteRoutine(): Promise<void> {
+    if (deleting()) return;
     const current = draft();
     if (!current?.id) {
       closeEditor();
@@ -544,6 +575,8 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
     const startedAt = performance.now();
     const analytics = desktopAnalytics.scope();
+    setDeleting(true);
+    setError(null);
     try {
       await props.port.remove(current.id);
       setRoutines((items) => {
@@ -556,6 +589,46 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     } catch (caught) {
       trackRoutineAction(analytics, "delete", current, startedAt, "failed");
       setError(errorMessage(caught, t("routine.settings.deleteFailed")));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  /**
+   * Pauses or resumes a routine from the list. It saves the routine as the editor does, with only
+   * `active` changed, so the host keeps every other field.
+   */
+  async function setRoutineActive(routine: RoutineEditorRecord, active: boolean): Promise<void> {
+    if (togglingIds().has(routine.id)) return;
+    setTogglingIds((current) => new Set(current).add(routine.id));
+    const schedule = routineScheduleOf(routine);
+    const tracked = { triggerKind: routineTriggerKind(routine), schedule };
+    const startedAt = performance.now();
+    const analytics = desktopAnalytics.scope();
+    try {
+      const { routine: saved } = await props.port.save({
+        routineId: routine.id,
+        name: routine.name,
+        instruction: routine.instruction,
+        active,
+        timezone: routine.timezone,
+        schedule,
+        trigger: webhookTriggerOf(routine) ?? { kind: "schedule", schedule },
+        ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+        ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+      });
+      setRoutines((items) => items.map((item) => (item.id === saved.id ? saved : item)));
+      trackRoutineAction(analytics, "update", tracked, startedAt, "succeeded");
+    } catch (caught) {
+      trackRoutineAction(analytics, "update", tracked, startedAt, "failed");
+      const fallback = active ? t("routine.settings.resumeFailed") : t("routine.settings.pauseFailed");
+      actionToast.error(errorMessage(caught, fallback));
+    } finally {
+      setTogglingIds((current) => {
+        const next = new Set(current);
+        next.delete(routine.id);
+        return next;
+      });
     }
   }
 
@@ -579,20 +652,19 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   }
 
   /**
-   * The menu that changes the trigger. A host without events keeps the schedule chips only. It reads
-   * the draft through `current` in its props, so a draft change does not make a new menu.
+   * The menu that changes the schedule frequency. A host without events keeps the schedule chips only.
+   * It reads the draft through `current` in its props, so a draft change does not make a new menu.
    */
   function triggerMenu(current: () => RoutineDraft): JSX.Element {
     if (!props.port.events) return undefined;
     return (
       <RoutineTriggerMenu
-        value={current().triggerKind === "webhook" ? "webhook" : current().scheduleDraft.kind}
+        value={current().scheduleDraft.kind}
         kinds={scheduleKinds()}
         onSelect={(choice) =>
-          changeDraft((value) => {
-            if (choice === "webhook") return { ...value, triggerKind: "webhook" };
-            return reopened(withSchedule(value, switchDraftKind(value.scheduleDraft, choice, new Date())));
-          })
+          changeDraft((value) =>
+            reopened(withSchedule(value, switchDraftKind(value.scheduleDraft, choice, new Date()))),
+          )
         }
       />
     );
@@ -600,6 +672,23 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   function scheduleKinds() {
     return props.port.onceSchedule ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS;
+  }
+
+  /**
+   * Sends one signed test event to the saved routine, then shows its run. Undefined when the host
+   * cannot send one; the card shows the step disabled until the routine is saved.
+   */
+  function sendTestEvent(): (() => Promise<WebhookTestResult>) | undefined {
+    const events = props.port.events;
+    const send = events?.api.sendTestEvent;
+    if (!events || !send) return undefined;
+    return async () => {
+      const id = draft()?.id;
+      if (!id) throw new Error(t("routine.webhook.testFailed"));
+      const result = await send({ id, owner: events.owner });
+      if (draft()?.id === id) await loadRuns(id);
+      return result;
+    };
   }
 
   async function regenerateSecret(): Promise<void> {
@@ -694,47 +783,68 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   when={routines().length > 0}
                   fallback={<p class="agent-routines-empty">{t("routine.settings.empty")}</p>}
                 >
+                  <HostedUpsellRoutinesNotice count={routines().filter((routine) => routine.active).length} />
                   <div class="agent-routines-list">
                     <For each={routines()}>
                       {(routine) => (
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          class="agent-routine-row"
-                          onClick={() => openRoutine(routine)}
-                        >
-                          <span
-                            class={
-                              routine.active ? "agent-routine-status-icon-active" : "agent-routine-status-icon-paused"
-                            }
+                        <div class="agent-routine-list-item">
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            class="agent-routine-row"
+                            onClick={() => openRoutine(routine)}
                           >
-                            <Show
-                              when={routine.active}
-                              fallback={
-                                <Show when={routineCompleted(routine)} fallback={<CirclePause aria-hidden="true" />}>
-                                  <CircleCheck aria-hidden="true" />
-                                </Show>
+                            <span
+                              class={
+                                routine.active ? "agent-routine-status-icon-active" : "agent-routine-status-icon-paused"
                               }
                             >
                               <Show
-                                when={routineTriggerKind(routine) === "webhook"}
-                                fallback={<Clock3 aria-hidden="true" />}
+                                when={routine.active}
+                                fallback={
+                                  <Show when={routineCompleted(routine)} fallback={<CirclePause aria-hidden="true" />}>
+                                    <CircleCheck aria-hidden="true" />
+                                  </Show>
+                                }
                               >
-                                <Link aria-hidden="true" />
+                                <Show
+                                  when={routineTriggerKind(routine) === "webhook"}
+                                  fallback={<Clock3 aria-hidden="true" />}
+                                >
+                                  <Link aria-hidden="true" />
+                                </Show>
                               </Show>
-                            </Show>
-                          </span>
-                          <span>
-                            <strong>{routine.name}</strong>
-                            <small>
-                              {routine.active
-                                ? routineListSummary(routine, text)
-                                : routineCompleted(routine)
-                                  ? t("routine.settings.completed", { schedule: routineListSummary(routine, text) })
-                                  : t("routine.settings.paused")}
-                            </small>
-                          </span>
-                        </Button>
+                            </span>
+                            <span>
+                              <strong>{routine.name}</strong>
+                              <small>
+                                {routine.active
+                                  ? routineListSummary(routine, text)
+                                  : routineCompleted(routine)
+                                    ? t("routine.settings.completed", { schedule: routineListSummary(routine, text) })
+                                    : t("routine.settings.paused")}
+                              </small>
+                            </span>
+                          </Button>
+                          {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}
+                          <Show when={!routineCompleted(routine)}>
+                            <Button
+                              variant="ghost"
+                              type="button"
+                              size="sm"
+                              class="agent-routine-row-action"
+                              aria-label={
+                                routine.active
+                                  ? t("routine.settings.pauseNamed", { name: routine.name })
+                                  : t("routine.settings.resumeNamed", { name: routine.name })
+                              }
+                              loading={togglingIds().has(routine.id)}
+                              onClick={() => void setRoutineActive(routine, !routine.active)}
+                            >
+                              {routine.active ? t("routine.settings.pause") : t("routine.settings.resume")}
+                            </Button>
+                          </Show>
+                        </div>
                       )}
                     </For>
                   </div>
@@ -746,26 +856,34 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           {(current) => (
             <div class="agent-routine-editor">
               <div class="agent-routine-editor-actions">
-                <div class="agent-routine-active-toggle">
-                  <Switch
-                    id="routine-active"
-                    aria-label={t("routine.settings.activeToggle")}
-                    checked={current().active}
-                    onChange={(active) => changeDraft((value) => ({ ...value, active }))}
-                  />
-                  <label for="routine-active">
-                    {current().active ? t("routine.settings.active") : t("routine.settings.paused")}
-                  </label>
-                </div>
+                <SwitchField
+                  class="agent-routine-active-toggle"
+                  label={current().active ? t("routine.settings.active") : t("routine.settings.paused")}
+                  checked={current().active}
+                  onChange={(active) => changeDraft((value) => ({ ...value, active }))}
+                />
                 <div class="agent-routine-action-buttons">
                   <Show
                     when={!confirmDelete()}
                     fallback={
                       <>
-                        <Button variant="destructive" type="button" size="sm" onClick={() => void deleteRoutine()}>
+                        <Button
+                          variant="destructive"
+                          type="button"
+                          size="sm"
+                          loading={deleting()}
+                          loadingLabel={t("routine.settings.deleting")}
+                          onClick={() => void deleteRoutine()}
+                        >
                           {t("routine.settings.deleteNow")}
                         </Button>
-                        <Button variant="secondary" type="button" size="sm" onClick={() => setConfirmDelete(false)}>
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          size="sm"
+                          disabled={deleting()}
+                          onClick={() => setConfirmDelete(false)}
+                        >
                           {t("common.cancel")}
                         </Button>
                       </>
@@ -787,7 +905,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                             type="button"
                             size="sm"
                             class="agent-routine-test"
-                            disabled={!current().id || testing() || !validDraft(current())}
+                            disabled={!current().id || !validDraft(current())}
                             loading={testing()}
                             loadingLabel={t("routine.settings.starting")}
                             onClick={() => void testRun()}
@@ -800,7 +918,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={saving() || !validDraft(current())}
                         loading={saving()}
                         loadingLabel={t("common.saving")}
                         onClick={() => void saveDraft()}
@@ -818,11 +935,56 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   value={current().name}
                   placeholder={t("routine.settings.namePlaceholder")}
                   maxlength={INPUT_LIMITS.routineName}
+                  invalid={showErrors() && !current().name.trim()}
+                  aria-describedby={showErrors() && !current().name.trim() ? "agent-routine-name-error" : undefined}
                   onValueChange={(name) => changeDraft((value) => ({ ...value, name }))}
                 />
+                <Show when={showErrors() && !current().name.trim()}>
+                  <Text
+                    as="p"
+                    id="agent-routine-name-error"
+                    variant="caption"
+                    tone="danger"
+                    class="agent-routine-field-error"
+                  >
+                    {t("routine.settings.nameRequired")}
+                  </Text>
+                </Show>
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
+                {/* A host with events offers both triggers, so the choice is always in view. */}
+                <Show when={props.port.events}>
+                  <fieldset class="agent-routine-trigger-kind">
+                    <legend class="sr-only">{t("routine.trigger.kind")}</legend>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={current().triggerKind === "schedule" ? "secondary" : "ghost"}
+                      aria-pressed={current().triggerKind === "schedule" ? "true" : "false"}
+                      onClick={() => {
+                        if (current().triggerKind !== "schedule")
+                          changeDraft((value) => ({ ...value, triggerKind: "schedule" }));
+                      }}
+                    >
+                      <Clock3 class="agent-routine-trigger-kind-icon" aria-hidden="true" />
+                      {t("routine.trigger.groupSchedule")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={current().triggerKind === "webhook" ? "secondary" : "ghost"}
+                      aria-pressed={current().triggerKind === "webhook" ? "true" : "false"}
+                      onClick={() => {
+                        if (current().triggerKind !== "webhook")
+                          changeDraft((value) => ({ ...value, triggerKind: "webhook" }));
+                      }}
+                    >
+                      <Webhook class="agent-routine-trigger-kind-icon" aria-hidden="true" />
+                      {t("routine.settings.triggerWebhook")}
+                    </Button>
+                  </fieldset>
+                </Show>
                 <Show
                   when={current().triggerKind === "schedule"}
                   fallback={
@@ -837,7 +999,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       secret={webhook.secret}
                       onSecretDismiss={resetWebhookState}
                       onRegenerateSecret={regenerateSecret}
-                      menu={triggerMenu(current)}
+                      onSave={() => void saveDraft()}
+                      saving={saving()}
+                      onSendTest={sendTestEvent()}
                     />
                   }
                 >
@@ -853,6 +1017,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 <span id="agent-routine-instruction-label">{t("routine.settings.instruction")}</span>
                 <Textarea
                   aria-labelledby="agent-routine-instruction-label"
+                  invalid={showErrors() && !current().instruction.trim()}
                   value={current().instruction}
                   placeholder={
                     props.port.ownerNoun === "channel"
@@ -860,9 +1025,27 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                       : t("routine.settings.instructionPlaceholderAgent")
                   }
                   maxlength={INPUT_LIMITS.routineInstruction}
-                  aria-describedby={props.port.ownerNoun === "channel" ? undefined : "agent-routine-no-update-hint"}
+                  aria-describedby={
+                    [
+                      showErrors() && !current().instruction.trim() ? "agent-routine-instruction-error" : "",
+                      props.port.ownerNoun === "channel" ? "" : "agent-routine-no-update-hint",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                   onValueChange={(instruction) => changeDraft((value) => ({ ...value, instruction }))}
                 />
+                <Show when={showErrors() && !current().instruction.trim()}>
+                  <Text
+                    as="p"
+                    id="agent-routine-instruction-error"
+                    variant="caption"
+                    tone="danger"
+                    class="agent-routine-field-error"
+                  >
+                    {t("routine.settings.instructionRequired")}
+                  </Text>
+                </Show>
                 {/* A scheduled run of an agent routine that answers only the marker posts nothing. */}
                 <Show when={props.port.ownerNoun !== "channel"}>
                   <Text id="agent-routine-no-update-hint" variant="caption" tone="muted">
@@ -961,23 +1144,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   );
 }
 
-/**
- * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
- * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
- */
-function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
-  if (isEventRoutine(routine) && routine.trigger.kind === "webhook") {
-    const eventType = routine.trigger.eventType;
-    return eventType
-      ? text.t("routine.settings.webhookSummary", { eventType })
-      : text.t("routine.settings.webhookSummaryAny");
-  }
-  const schedule = routineScheduleOf(routine);
-  const draft = routineScheduleToDraft(schedule);
-  if (draft.kind === "custom") return routineScheduleSummary(schedule, false, text);
-  return routineDraftSummary(draft, text);
-}
-
 function routineCompleted(routine: RoutineEditorRecord): boolean {
   if (routineTriggerKind(routine) === "webhook") return false;
   return routineOnceCompleted({
@@ -1004,19 +1170,8 @@ function withSchedule(value: RoutineDraft, scheduleDraft: RoutineScheduleDraft):
   };
 }
 
-function isEventRoutine(routine: RoutineEditorRecord): routine is EventRoutine {
-  return "owner" in routine;
-}
-
 function routineTriggerKind(routine: RoutineEditorRecord): RoutineDraft["triggerKind"] {
   return isEventRoutine(routine) && routine.trigger.kind === "webhook" ? "webhook" : "schedule";
-}
-
-function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule {
-  if (isEventRoutine(routine)) {
-    return routine.trigger.kind === "schedule" ? routine.trigger.schedule : { kind: "daily", time: "09:00" };
-  }
-  return routine.trigger.schedule;
 }
 
 /** The trigger fields of a draft that opens `routine`. */

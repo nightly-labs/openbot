@@ -10,6 +10,8 @@ export interface TurnsPort {
     | "cancelQueuedMessage"
     | "cancelWait"
     | "clearContext"
+    | "compactContext"
+    | "compactTaskContext"
     | "interrupt"
     | "listQueue"
     | "listRoutines"

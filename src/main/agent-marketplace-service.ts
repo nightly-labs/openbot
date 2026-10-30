@@ -303,6 +303,7 @@ export class AgentMarketplaceService {
           return yield* new AgentMarketplaceFailure({ cause: error });
         }
       }
+      // The agent is saved at this point. A failed install-count receipt does not make the install fail.
       if (!existing) {
         yield* this.auth
           .requestAuthorized(
@@ -314,7 +315,7 @@ export class AgentMarketplaceService {
             },
             decodeInstallReceipt,
           )
-          .pipe(toAgentMarketplaceFailure);
+          .pipe(Effect.catchTag("CentralAuthOperationError", () => Effect.void));
       }
       return { agent: agent };
     });

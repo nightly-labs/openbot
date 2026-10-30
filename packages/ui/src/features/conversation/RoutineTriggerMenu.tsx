@@ -1,11 +1,8 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { AlarmClock, buttonVariants, Check, ChevronsUpDown, DropdownMenu, Webhook } from "@openbot/ui";
+import { AlarmClock, buttonVariants, Check, ChevronsUpDown, DropdownMenu } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import type { RoutineDraftKind, RoutineDraftKindOption } from "./routine-schedule-draft";
-
-/** What starts a routine: a schedule frequency, or a request to its webhook. */
-type RoutineTriggerChoice = RoutineDraftKind | "webhook";
 
 const KIND_DESCRIPTIONS = {
   once: "routine.trigger.onceDescription",
@@ -18,15 +15,15 @@ const KIND_DESCRIPTIONS = {
 } as const satisfies Record<RoutineDraftKind, AppTextKey>;
 
 interface RoutineTriggerMenuProps {
-  value: RoutineTriggerChoice;
+  value: RoutineDraftKind;
   /** The schedule frequencies the menu offers. */
   kinds: RoutineDraftKindOption[];
-  onSelect: (choice: RoutineTriggerChoice) => void;
+  onSelect: (choice: RoutineDraftKind) => void;
 }
 
 /**
- * The menu that changes the trigger. Each choice has an icon, a name and one line that tells
- * when the routine runs. Schedules come first; the webhook is in its own group.
+ * The menu that changes the schedule frequency. Each choice has an icon, a name and one line that
+ * tells when the routine runs. The switch above the schedule chooses between a schedule and a webhook.
  */
 export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
   const { t } = useText();
@@ -46,7 +43,7 @@ export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
           </span>
           <DropdownMenu.RadioGroup
             aria-label={t("routine.trigger.groupSchedule")}
-            value={props.value === "webhook" ? "" : props.value}
+            value={props.value}
             onChange={(value: string) => {
               const kind = props.kinds.find((option) => option.value === value);
               if (kind) props.onSelect(kind.value);
@@ -63,37 +60,17 @@ export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
               )}
             </For>
           </DropdownMenu.RadioGroup>
-          <DropdownMenu.Separator />
-          <span class="ui-menu-label" aria-hidden="true">
-            {t("routine.trigger.groupAdvanced")}
-          </span>
-          <DropdownMenu.RadioGroup
-            aria-label={t("routine.trigger.groupAdvanced")}
-            value={props.value === "webhook" ? "webhook" : ""}
-            onChange={(value: string) => {
-              if (value === "webhook") props.onSelect(value);
-            }}
-          >
-            <TriggerItem
-              value="webhook"
-              selected={props.value === "webhook"}
-              title={t("routine.settings.triggerWebhook")}
-              description={t("routine.trigger.webhookDescription")}
-            />
-          </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
 }
 
-function TriggerItem(props: { value: RoutineTriggerChoice; selected: boolean; title: string; description: string }) {
+function TriggerItem(props: { value: RoutineDraftKind; selected: boolean; title: string; description: string }) {
   return (
     <DropdownMenu.RadioItem value={props.value} class="routine-trigger-menu-item">
       <span class="routine-trigger-icon" aria-hidden="true">
-        <Show when={props.value === "webhook"} fallback={<AlarmClock />}>
-          <Webhook />
-        </Show>
+        <AlarmClock />
       </span>
       <span class="routine-trigger-menu-text">
         <span>{props.title}</span>

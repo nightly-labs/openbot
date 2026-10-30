@@ -1,7 +1,7 @@
 import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts/validation";
 import { Typography } from "heroui-native";
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Platform, StyleSheet, TextInput, View } from "react-native";
+import { Platform, StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import Animated, {
   FadeOut,
   Keyframe,
@@ -72,7 +72,7 @@ export function EmailCodeInput({
   reduced,
 }: EmailCodeInputProps) {
   const colors = useSignInColors();
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const [focused, setFocused] = useState(false);
   const shake = useShake(rejection, reduced);
   const scale = useSharedValue(1);

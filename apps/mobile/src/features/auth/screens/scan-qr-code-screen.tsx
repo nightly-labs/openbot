@@ -9,7 +9,7 @@ export function ScanQrCodeScreen() {
     <QrScanner
       onScan={async (data) =>
         finishSignIn(
-          await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem" }, () =>
+          await mobileAnalytics.operation("mobile_pairing_action", { action: "redeem", entry_point: "qr" }, () =>
             redeemMobileConnectUrl(data),
           ),
         )

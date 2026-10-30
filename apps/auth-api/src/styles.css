@@ -2,6 +2,8 @@
 @import "@fontsource-variable/inter/wght-italic.css";
 @import "tailwindcss";
 @import "@openbot/brand/tokens.css";
+/* Only the web client at /app sets the attribute that turns it on. The public pages stay dark. */
+@import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
 
 /* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
@@ -472,7 +474,8 @@ a {
   padding: 8px;
 }
 
-.site-panel[data-kind="plugins"] {
+.site-panel[data-kind="plugins"],
+.site-panel[data-kind="resources"] {
   width: 540px;
 }
 
@@ -610,7 +613,10 @@ a {
   border-radius: 10px;
   background: var(--site-panel-art);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  transition: transform var(--site-nav-duration, 340ms) var(--site-nav-ease, var(--openbot-ease-out));
+  /* A short ease and a layer of its own. With the menu's long settle, the browser painted the
+     mark again on each step of the last few tenths of a pixel, so the hover zoom stuttered. */
+  transition: transform var(--openbot-duration-slow) var(--openbot-ease-out);
+  will-change: transform;
 }
 
 .site-panel-plugin-mark {
@@ -632,6 +638,16 @@ a {
   width: 24px;
   height: 24px;
   border-radius: 6px;
+}
+
+.site-panel-resource-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.site-panel-resource-logo {
+  background: none;
+  box-shadow: none;
 }
 
 .site-panel-row-title {
@@ -697,6 +713,28 @@ a {
   display: none;
 }
 
+/* Just above the mobile header, the brand, the full menu and the buttons do not fit with the menu
+   at the true centre. The menu centres between them, and the triggers are tighter. */
+@media (min-width: 901px) and (max-width: 1040px) {
+  .landing-header {
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    padding-inline: 24px;
+  }
+
+  .site-nav {
+    justify-self: center;
+  }
+
+  .site-nav-trigger {
+    padding: 0 7px 0 10px;
+  }
+
+  .site-nav-link {
+    padding: 0 10px;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .site-nav-trigger:hover {
     color: var(--openbot-text-primary);
@@ -719,14 +757,6 @@ a {
 
   .site-panel-index:hover svg {
     transform: translateX(3px);
-  }
-}
-
-/* Just above the mobile header, the brand, the full menu and three buttons do
-   not fit in one row. The Discord community is also in the footer. */
-@media (min-width: 901px) and (max-width: 1040px) {
-  .site-header-actions > .site-header-community {
-    display: none;
   }
 }
 
@@ -973,21 +1003,12 @@ a {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.17 5 11.76 6.41 16.34 11H4v2h12.34l-4.58 4.59L13.17 19l7-7-7-7Z'/%3E%3C/svg%3E");
 }
 
-.join-page {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  padding: 96px 24px 48px;
-  background:
-    radial-gradient(circle at 50% 42%, var(--openbot-accent-strong), var(--openbot-transparent) 38%),
-    var(--openbot-bg-canvas);
+.landing-button[data-icon="copy"]::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 3h11a2 2 0 0 1 2 2v11h-2V5H8V3Zm-3 4h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm0 2v10h10V9H5Z'/%3E%3C/svg%3E");
 }
 
-.join-page-brand {
-  position: absolute;
-  top: 24px;
-  left: 24px;
+.landing-button[data-icon="check"]::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z'/%3E%3C/svg%3E");
 }
 
 .join-card {
@@ -1068,10 +1089,6 @@ a {
   justify-content: center;
 }
 
-.join-card-disabled {
-  opacity: 0.5;
-}
-
 .join-card-error {
   margin: 26px 0 0;
   color: var(--openbot-text-primary);
@@ -1089,15 +1106,6 @@ a {
 }
 
 @media (max-width: 520px) {
-  .join-page {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .join-page-brand {
-    left: 18px;
-  }
-
   .join-card-actions {
     grid-template-columns: 1fr;
   }
@@ -1142,6 +1150,44 @@ a {
     inset 0 1px 0 var(--openbot-glass-highlight),
     0 10px 30px -18px var(--openbot-glass-shadow);
   color: var(--openbot-text-primary);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+
+/* Frosted glass: the hero beam rises behind these buttons and the availability pill. */
+.site-header-actions > .landing-button-glass,
+.landing-availability {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* The hero beam falls through this button. The opaque fill gives the sharp edge, and a soft glow
+   of the beam colour hugs it. The beam canvas has fewer pixels than the screen, so the glow next
+   to the edge is drawn here. It shows once the beam front reaches the button. Any line or inner
+   tint shows as a second layer around the fill. */
+.landing-button[data-beam-source] {
+  position: relative;
+}
+
+.landing-button[data-beam-source]::after {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 8px 1px rgba(var(--landing-beam-rim, 164, 108, 245), 0.55);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.landing-button[data-beam-struck]::after {
+  opacity: 1;
 }
 
 .landing-button:focus-visible {
@@ -1175,6 +1221,34 @@ a {
   transform: translateX(-50%);
 }
 
+/* The beam falls from above the header and lands on the app preview. It covers the hero
+   from edge to edge of the screen, so the light that runs off the preview's corners is
+   not cut at the 1280px column. */
+.landing-beam {
+  position: absolute;
+  z-index: 0;
+  top: -76px;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  pointer-events: none;
+  transform: translateX(-50%);
+  mask-image: linear-gradient(var(--openbot-transparent), var(--openbot-mask-solid) 120px);
+}
+
+/* A beam that falls through a header button lights the top of the hero, so the top needs no fade. */
+.landing-beam[data-source] {
+  mask-image: none;
+}
+
+.landing-beam-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .landing-hero-copy {
   position: relative;
   z-index: 2;
@@ -1190,9 +1264,9 @@ a {
   gap: 8px;
   margin: 0 0 28px;
   padding: 4px 12px 4px 4px;
-  border: 1px solid var(--openbot-border-strong);
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-sidebar);
   color: var(--openbot-text-secondary);
   font-size: 11px;
   font-weight: 500;
@@ -1476,20 +1550,7 @@ a {
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-lg);
   background: var(--openbot-bg-sidebar);
-  box-shadow:
-    0 28px 90px -42px var(--openbot-mask-solid),
-    inset 0 1px var(--openbot-glass-highlight);
-}
-
-.landing-preview::before {
-  position: absolute;
-  z-index: -1;
-  inset: -42px -24px -30px;
-  background: radial-gradient(ellipse at 50% 48%, var(--openbot-accent-strong), var(--openbot-transparent) 68%);
-  content: "";
-  filter: blur(22px);
-  opacity: 0.82;
-  pointer-events: none;
+  box-shadow: inset 0 1px var(--openbot-glass-highlight);
 }
 
 .landing-preview-window-controls {
@@ -3616,6 +3677,11 @@ a {
     box-shadow:
       inset 0 1px 0 var(--openbot-glass-border),
       0 14px 36px -18px var(--openbot-glass-shadow);
+  }
+
+  .site-header-actions > .landing-button-glass:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06));
   }
 
   .landing-footer-cta:hover span {
@@ -7220,6 +7286,18 @@ a {
   font-size: 16px;
 }
 
+.landing-faq-body .compare-faq-answer a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.landing-faq-body .compare-faq-answer a:hover,
+.landing-faq-body .compare-faq-answer a:focus-visible {
+  color: var(--openbot-logo-production);
+}
+
 .compare-sources-note {
   max-width: 68ch;
   margin: 14px 0 0;
@@ -8518,6 +8596,49 @@ a {
   margin-top: clamp(32px, 4vw, 48px);
 }
 
+/* The uses are written text, so they take two columns at most and no icon above the title. */
+.provider-adds-grid.plugin-uses {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+/* No use is more important than the others, so the first card does not take the accent. */
+.plugin-uses .provider-add:first-child {
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-surface);
+}
+
+.plugin-uses .provider-add-title {
+  margin-top: 0;
+}
+
+.provider-steps.plugin-connect {
+  margin-top: 0;
+}
+
+/* The values a sign-in asks for, or the steps a local server needs, inside one step. */
+.plugin-connect-fields {
+  display: grid;
+  gap: 6px;
+  max-width: 68ch;
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.plugin-connect-field-label {
+  color: var(--openbot-text-primary);
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .provider-adds-grid.plugin-uses {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* A shared agent, as one card: the page a link on X opens. `--agent-share-accent` is the agent's
    avatar colour, set on the page, so every shared agent is tinted as itself. */
 /* Registered, so the tint fades in when the avatar colour arrives after hydration. */
@@ -8669,8 +8790,8 @@ a {
   font-size: 12px;
 }
 
-/* Clamped, the instructions read as one paragraph, so the ellipsis never lands on a blank line.
-   Opened, they keep their line breaks: they are what the agent will do. */
+/* Clamped, the instructions read as one paragraph of plain text, so the ellipsis never lands on a
+   blank line. Opened, they show their Markdown: they are what the agent will do. */
 .agent-share-description {
   display: -webkit-box;
   margin: 14px 0 0;
@@ -8683,11 +8804,93 @@ a {
   line-clamp: 3;
 }
 
-.agent-share-description[data-expanded] {
-  display: block;
+/* Headings and lists read from the left edge, so the opened instructions are not centered. The
+   site has no chat stylesheet, so the Markdown elements are styled here. */
+.agent-share-instructions {
+  width: 100%;
+  margin: 14px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.55;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.agent-share-instructions > :not(:first-child) {
+  margin-top: 12px;
+}
+
+.agent-share-instructions-text {
   white-space: pre-wrap;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
+}
+
+.agent-share-instructions .message-markdown-heading {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.agent-share-instructions .message-markdown-heading:is([data-level="1"], [data-level="2"]) {
+  font-size: 19px;
+}
+
+.agent-share-instructions * + .message-markdown-heading {
+  margin-top: 20px;
+}
+
+.agent-share-instructions :is(ul, ol) {
+  padding-left: 22px;
+}
+
+.agent-share-instructions ul {
+  list-style: disc;
+}
+
+.agent-share-instructions ul ul {
+  list-style: circle;
+}
+
+.agent-share-instructions ol {
+  list-style: decimal;
+}
+
+.agent-share-instructions li + li,
+.agent-share-instructions li > :is(ul, ol) {
+  margin-top: 4px;
+}
+
+.agent-share-instructions strong {
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+}
+
+.agent-share-instructions code {
+  font-family: var(--openbot-font-mono);
+  font-size: 0.9em;
+}
+
+.agent-share-instructions .message-link {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.agent-share-instructions .message-link-icon {
+  position: relative;
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.agent-share-instructions .message-link-icon :is(svg, img) {
+  position: absolute;
+  inset: 0;
+  width: 14px;
+  height: 14px;
 }
 
 .agent-share-more {
@@ -10756,23 +10959,11 @@ a {
 /* Hub ------------------------------------------------------------------- */
 
 .download-hub-hero {
-  padding: clamp(28px, 6vw, 88px) 0 clamp(48px, 6vw, 80px);
-}
-
-.download-hub-title {
-  margin: 0;
-  font-size: clamp(56px, 11vw, 164px);
-  font-weight: 500;
-  letter-spacing: -0.06em;
-  line-height: 0.88;
+  padding-bottom: clamp(48px, 6vw, 80px);
 }
 
 .download-hub-intro {
-  max-width: 48ch;
-  margin: clamp(24px, 3vw, 36px) 0 clamp(28px, 3.4vw, 40px);
-  color: var(--openbot-text-secondary);
-  font-size: clamp(17px, 1.5vw, 20px);
-  line-height: 1.5;
+  margin-bottom: clamp(28px, 3.4vw, 40px);
 }
 
 .download-hub-cards {
@@ -11086,6 +11277,13 @@ a {
   box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
+/* A value that the page filled in, such as the site on the report form. */
+.contact-field input[readonly] {
+  border-color: var(--contact-border);
+  background: transparent;
+  color: var(--openbot-text-secondary);
+}
+
 .contact-field [aria-invalid="true"] {
   border-color: var(--openbot-danger-border);
 }
@@ -11261,6 +11459,334 @@ a {
 
 @media (max-width: 640px) {
   .contact-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Shared agent page: the footer and the "no longer shared" state. */
+/* The page centres its card in a flex column; the footer spans the full width below it. */
+.agent-share-page > .landing-footer {
+  align-self: stretch;
+}
+
+.agent-share-gone-copy {
+  margin: 12px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.agent-share-gone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* ---------------------------------------------------------------------------
+   Transactional pages: join, Slack and Discord connect, billing return, site
+   report, and page error. The site header and footer frame one centred card
+   (`.join-card`). `components/transactional/TransactionalPage.tsx` owns it.
+   --------------------------------------------------------------------------- */
+
+.transactional-main {
+  min-height: min(78dvh, 820px);
+  display: grid;
+  place-items: center;
+  padding: clamp(32px, 6vw, 72px) 16px clamp(48px, 8vw, 96px);
+  background: radial-gradient(circle at 50% 42%, var(--openbot-accent-strong), var(--openbot-transparent) 38%);
+}
+
+/* A form reads from the start edge, and needs more width than a message. */
+.transactional-card[data-layout="form"] {
+  width: min(100%, 640px);
+  justify-items: stretch;
+  text-align: start;
+}
+
+.transactional-form-heading {
+  margin-bottom: 28px;
+}
+
+.transactional-form-heading .join-card-copy {
+  max-width: none;
+  margin-top: 12px;
+}
+
+/* A shared button that cannot act yet, for example before the join page reads its link. */
+.transactional-card .landing-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.transactional-card .landing-button:disabled:active {
+  transform: none;
+}
+
+.transactional-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transactional-provider-mark {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.transactional-notes {
+  display: grid;
+  gap: 6px;
+  margin: 24px 0 0;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  list-style: none;
+}
+
+/* The brand page --------------------------------------------------------- */
+.brand-hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding: clamp(32px, 4vw, 56px) 0 clamp(36px, 4.5vw, 56px);
+}
+
+.brand-hero-text {
+  min-width: 0;
+  max-width: 640px;
+}
+
+.brand-hero-title {
+  margin-top: 0;
+}
+
+.brand-hero-intro {
+  margin-top: 12px;
+}
+
+.brand-hero {
+  padding-top: clamp(20px, 3vw, 36px);
+}
+
+.brand-stage {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 21 / 8;
+  border-radius: var(--openbot-radius-modal);
+  background: var(--openbot-logo-production);
+}
+
+.brand-stage-logo {
+  width: auto;
+  height: 82%;
+}
+
+/* The panel is the face. The logo square shows only its eyes, and its color changes move to the panel. */
+.brand-stage .app-logo-background {
+  visibility: hidden;
+}
+
+.brand-stage:has(.app-logo[data-easter-egg="party"]) {
+  animation: brand-stage-party 1.2s cubic-bezier(0.77, 0, 0.175, 1) both;
+}
+
+@keyframes brand-stage-party {
+  0%,
+  100% {
+    background-color: var(--openbot-logo-production);
+  }
+
+  22% {
+    background-color: var(--openbot-logo-dev);
+  }
+
+  48% {
+    background-color: var(--openbot-logo-preview);
+  }
+
+  74% {
+    background-color: var(--openbot-logo-production);
+  }
+}
+
+/* The focus ring goes on the panel, not on the small logo square. */
+.brand-stage .app-logo[data-interactive="true"]:focus-visible {
+  box-shadow: none;
+}
+
+.brand-stage:has(.app-logo:focus-visible) {
+  outline: 2px solid var(--openbot-text-primary);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .brand-stage {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-stage:has(.app-logo[data-easter-egg]) {
+    animation: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand-stage {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* The header logo menu -------------------------------------------------- */
+
+/* The trigger wraps the header link and takes no grid cell of its own. */
+.site-logo-trigger {
+  display: contents;
+}
+
+/* The surface and rows match the header menu panels, without the drop shadow. */
+.site-logo-menu {
+  z-index: 60;
+  min-width: 236px;
+  border-radius: 14px;
+  background: rgba(22, 22, 22, 0.8);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(40px) saturate(180%);
+  padding: 6px;
+  outline: 0;
+}
+
+.site-logo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+  cursor: default;
+  outline: 0;
+}
+
+.site-logo-menu-item[data-highlighted] {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.site-logo-menu-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+}
+
+.site-logo-menu-separator {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Brand page logo cards --------------------------------------------------- */
+
+.brand-card-art[data-surface="dark"] {
+  background: var(--openbot-bg-frame);
+}
+
+.brand-card-art[data-surface="light"] {
+  background: var(--openbot-surface-light);
+}
+
+.brand-groups {
+  display: grid;
+  gap: clamp(40px, 5vw, 64px);
+}
+
+.brand-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 18px;
+}
+
+.brand-group-title {
+  margin: 0;
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.brand-space-toggle {
+  margin-bottom: 0;
+}
+
+.brand-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brand-cards[data-wide="true"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.brand-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-surface);
+}
+
+.brand-card-art {
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  padding: 12%;
+}
+
+.brand-card-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: 100%;
+}
+
+.brand-cards[data-wide="true"] .brand-card-image {
+  width: 100%;
+  height: auto;
+}
+
+.brand-card-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+
+.brand-card-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.brand-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .brand-cards,
+  .brand-cards[data-wide="true"] {
     grid-template-columns: minmax(0, 1fr);
   }
 }

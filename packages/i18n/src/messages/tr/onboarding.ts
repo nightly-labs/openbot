@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
+  "onboarding.readFailed.title": "OpenBot kurulumunuzu okuyamadı.",
+  "onboarding.readFailed.description":
+    "Yerel verileriniz değişmedi. Yeniden deneyin. Sorun devam ederse OpenBot'u yeniden kurun.",
+  "onboarding.readFailed.setUpAgain": "Yeniden kur",
   "onboarding.setup.saveFailed": "OpenBot yerel kurulumunuzu kaydedemedi.",
   "onboarding.setup.verifyFailed": "OpenBot bu daveti doğrulayamadı.",
   "onboarding.setup.connectFailed": "OpenBot bu ana makineye bağlanamadı.",
@@ -40,6 +44,9 @@ export const messages = {
   "onboarding.provider.googlePlan": "Google AI Pro veya Ultra planı",
   "onboarding.provider.cursorPlan": "Cursor planı veya API anahtarı",
   "onboarding.provider.clineAccount": "Cline hesabıyla ücretsiz modeller",
+  "onboarding.provider.inceptionKey": "Inception API anahtarıyla Mercury modelleri",
+  "onboarding.provider.deepseekKey": "DeepSeek API anahtarıyla DeepSeek modelleri",
+  "onboarding.provider.openrouterKey": "OpenRouter API anahtarıyla birçok model",
   "onboarding.provider.tryFree": "Ücretsiz deneyin",
   "onboarding.provider.noSignIn": "Oturum açmak gerekmez",
   "onboarding.provider.more": "Daha fazla sağlayıcı",

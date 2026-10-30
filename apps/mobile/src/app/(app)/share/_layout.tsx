@@ -1,7 +1,7 @@
 import { SheetPageStack } from "@/shared/components/sheet-page-stack";
 import { useText } from "@/shared/lib/text";
 
-export const unstable_settings = { initialRouteName: "index" };
+export const unstable_settings = { anchor: "index" };
 
 export default function ShareLayout() {
   const { t } = useText();

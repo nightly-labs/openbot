@@ -65,7 +65,12 @@ remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys
 docker inspect openbot-remote-remote-api-1 --format '{{.Image}} {{.State.Health.Status}}'
 curl --fail --silent --show-error https://signal.openbot.run/health/ready
 curl --fail --silent --show-error https://signal.openbot.run/health/live
+curl --fail --silent --show-error https://signal.openbot.run/health/turn
 ```
+
+`/health/turn` makes one real UDP allocation on the TURN server of `TURN_HOST` and frees it. It answers
+503 with `turn_full` when coturn refuses the allocation at its quota. The result stays cached for one
+minute. The status page probes it for "Connections".
 
 `/health/live` must show the release commit. Builds made before this field existed show no `commit`;
 builds made without `OPENBOT_SOURCE_COMMIT` show `unknown`.
@@ -74,8 +79,26 @@ Wait for Docker health to become `healthy`. Check the running source for `multip
 checksum. Keep the previous image until the device checks below pass. Do not print container environment
 variables, resume tokens, tickets, or raw connection logs.
 
+The capacity reporter (`capacity-report`) uses the Signal image and sends `signal_capacity`
+(ANALYTICS.md) every 5 minutes. It reads the coturn metrics on `127.0.0.1:9641` and the Signal metrics
+on `127.0.0.1:9642`. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` in the host
+`.env.production`, the server client of `apps/auth-api/.env.production`; without them it exits at start
+and stays stopped. Build and start it after `remote-api`, with the same `--build-arg`:
+
+```sh
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml build --build-arg "OPENBOT_SOURCE_COMMIT=$source_commit" capacity-report
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps capacity-report
+docker logs openbot-remote-capacity-report-1 2>&1 | tail -5
+```
+
+A failed sample writes only `Capacity report failed.` and its source (`turn`, `signal` or `openpanel`).
+
 Signal replacement closes signaling WebSockets. Existing WebRTC data channels should continue while
-signaling reconnects. The first resume after a restart checks the durable control plane. Coturn stays
+signaling reconnects. The first resume after a restart checks the durable control plane. When the
+account service does not answer, Signal closes the socket with 1013 and no error frame, and the peer
+connects again after its backoff; the session does not end. Coturn stays
 running, so the update does not deliberately end its relay allocations. Validate this with an active
 connection; health checks alone do not prove it.
 
@@ -88,6 +111,43 @@ remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys
 ```
 
 Rollback restores the old one-session limit. It does not reverse D1 migrations or revoke device sessions.
+
+## Standby Signal
+
+The ssh host `signal2` (`65.109.88.58`) runs a standby copy of Signal, coturn and Nginx in the
+Compose project `openbot-remote`, next to an IOTA validator. It gets no traffic: clients, hosts, the
+Worker, Slack, Telegram and routine webhooks all use `signal.openbot.run`, which points to
+`sui-alexandria`.
+
+- `signal2.openbot.run` and `turn2.openbot.run` point to the standby (DNS only). Check it with
+  `curl --fail https://signal2.openbot.run/health/ready`.
+- Its certificate covers `signal.openbot.run`, `turn2.openbot.run` and `signal2.openbot.run`
+  (`ACME_EXTRA_DOMAINS=signal2.openbot.run`).
+- Its `/opt/openbot/remote/.env.production` is a copy of the production file with these changes:
+  `TURN_DOMAIN=turn2.openbot.run`, `TURN_PUBLIC_IP=65.109.88.58`, `ACME_EXTRA_DOMAINS`,
+  `REMOTE_SIGNAL_PUBLIC_PORT=8091`, and empty `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and
+  `TELEGRAM_WEBHOOK_ORIGIN`. `REMOTE_SIGNAL_BIND_ADDRESS=127.0.0.1` comes from the production file;
+  Docker ports skip ufw, so do not change it. Do not copy the production file over it.
+- Discord is off on the standby. Two Signals with the bot token both open a Gateway, and each event
+  arrives twice. With an empty `TELEGRAM_WEBHOOK_ORIGIN`, the standby does not set the webhook, which
+  already names `signal.openbot.run`.
+
+- The IOTA node uses ports 8080 and 8081, so Signal listens on `127.0.0.1:8091`. Apache uses port 80.
+- Nginx uses `remote/nginx/signal.openbot.run.conf` with `signal2.openbot.run` added to `server_name`,
+  `proxy_pass` to port 8091, and no port 80 server. The reload units are the ones in `remote/nginx`.
+- The firewall (ufw) allows 443/tcp, 3478/tcp, 3478/udp and 5349/tcp, as on production. Neither
+  host opens the coturn relay range UDP 49152-65535 that `remote/README.md` lists.
+- Tags before `ACME_EXTRA_DOMAINS` lack it in `remote/acme/renew.sh` and `remote/compose.yaml`. For
+  such a tag, copy these two files from `main` into the release directory before the build.
+
+Failover: point the `signal.openbot.run` A record to `65.109.88.58`. Nothing else changes. Clients
+move when their DNS cache expires and resume as after a Signal restart. Signal sends `turn2` in its
+TURN credentials, so `turn.openbot.run` does not need a change. Discord stays off until failback.
+Failback: point the record back to `sui-alexandria`.
+
+After each Signal deployment, stage and build the same commit on the standby with the same commands,
+and start `remote-api` there. Send the two `curl` checks to `signal2.openbot.run`, not to
+`signal.openbot.run`, which reaches production.
 
 ## Required device validation — pending
 
