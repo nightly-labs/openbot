@@ -2667,6 +2667,10 @@ export async function createApplicationServices({
     path: analyticsPreferenceFile,
     account: centralAuth,
     setTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+    followed: (enabled) => {
+      for (const window of BrowserWindow.getAllWindows())
+        sendToRenderer(window, IPC_ENDPOINTS.app.analyticsPreference, { enabled });
+    },
   });
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.

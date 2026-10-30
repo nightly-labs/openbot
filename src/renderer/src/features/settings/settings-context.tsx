@@ -192,21 +192,6 @@ const Settings = createSimpleContext({
       },
     );
 
-    // Main follows the account's analytics answer when it changes. Read the preferences again, so
-    // the settings row and the tracker in this window show it.
-    let accountAnalytics: boolean | null | undefined;
-    createEffect(
-      () => {
-        const auth = centralAuth();
-        return auth.status === "signed_in" ? (auth.user.analyticsEnabled ?? null) : null;
-      },
-      (answer) => {
-        const changed = accountAnalytics !== undefined && answer !== accountAnalytics;
-        accountAnalytics = answer;
-        if (changed && answer !== null && !landingPreview) loadPreferences();
-      },
-    );
-
     let dynamicIslandSaveCount = 0;
 
     /**
@@ -469,6 +454,11 @@ const Settings = createSimpleContext({
       );
       // A remote owner or admin can change an agent's grant from a phone or the web client.
       const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
+      // Main follows the account's analytics answer from another device.
+      const unsubscribeAnalytics = settingsPort().onAnalyticsPreference(({ enabled }) => {
+        setAnalyticsPreferenceLoaded(enabled);
+        setGeneralSettings((current) => ({ ...current, productAnalytics: enabled }));
+      });
       // An admin of a joined server can change how many memories each agent of this computer keeps.
       const unsubscribeMemoryLimit = settingsPort().onAgentMemoryLimitPreference(({ limit }) => {
         agentMemoryLimitChanged = true;
@@ -498,6 +488,7 @@ const Settings = createSimpleContext({
         unsubscribe();
         unsubscribeUpdateSettings();
         unsubscribeApprovals();
+        unsubscribeAnalytics();
         unsubscribeMemoryLimit();
         unsubscribeUpdates();
       };

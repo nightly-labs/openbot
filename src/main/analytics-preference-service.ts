@@ -21,6 +21,8 @@ export interface AnalyticsPreferenceServiceOptions {
   path: string;
   account: AnalyticsAccount;
   setTrackingEnabled: (enabled: boolean) => void;
+  /** Tells the windows about an answer that this computer took from the account. */
+  followed: (enabled: boolean) => void;
 }
 
 /**
@@ -36,11 +38,13 @@ export class AnalyticsPreferenceService {
   readonly #path: string;
   readonly #account: AnalyticsAccount;
   readonly #setTrackingEnabled: (enabled: boolean) => void;
+  readonly #followed: (enabled: boolean) => void;
 
   constructor(options: AnalyticsPreferenceServiceOptions) {
     this.#path = options.path;
     this.#account = options.account;
     this.#setTrackingEnabled = options.setTrackingEnabled;
+    this.#followed = options.followed;
   }
 
   /** Waits for a write in progress, so a read after an account change gets the followed answer. */
@@ -82,8 +86,7 @@ export class AnalyticsPreferenceService {
     Effect.runFork(effect.pipe(Effect.catch((error) => Effect.sync(() => logger.warn(message, toLogValue(error))))));
   }
 
-  // Started before the renderer is told, so its next read waits for the followed answer. An unsent
-  // choice goes to the account outside the write permit, so reads and writes do not wait for it.
+  // An unsent choice goes to the account outside the write permit, so reads and writes do not wait for it.
   readonly #follow = Effect.fn("AnalyticsPreferences.followAccount")(function* (
     this: AnalyticsPreferenceService,
     user: CentralAuthUser,
@@ -95,7 +98,7 @@ export class AnalyticsPreferenceService {
         if (saved?.unsentAt != null) return true;
         if (account === null || account === saved?.enabled) return false;
         yield* writeAnalyticsPreference(this.#path, account);
-        this.#setTrackingEnabled(account);
+        this.#adopt(account);
         return false;
       }),
     );
@@ -142,6 +145,11 @@ export class AnalyticsPreferenceService {
   ) {
     const answer = account ?? enabled;
     yield* writeAnalyticsPreference(this.#path, answer);
-    if (answer !== enabled) this.#setTrackingEnabled(answer);
+    if (answer !== enabled) this.#adopt(answer);
   }).bind(this);
+
+  #adopt(enabled: boolean): void {
+    this.#setTrackingEnabled(enabled);
+    this.#followed(enabled);
+  }
 }

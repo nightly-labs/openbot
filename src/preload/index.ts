@@ -625,6 +625,7 @@ const openbotApi: OpenBotDesktopApi = {
     setupState: decodeAppSetupState,
     getAnalyticsPreference: decodeAnalyticsPreference,
     getAnalyticsDefault: decodeAnalyticsPreference,
+    analyticsPreference: decodeAnalyticsPreference,
     setAnalyticsPreference: decodeAnalyticsPreference,
     getApprovalAutomation: decodeApprovalAutomationPreference,
     approvalAutomation: decodeApprovalAutomationPreference,
