@@ -501,6 +501,12 @@ export const messages = {
     many: "До {count} участников",
     other: "До {count} участника",
   },
+  "settings.hostedServers.plan.sites": {
+    one: "До {count} размещённого сайта",
+    few: "До {count} размещённых сайтов",
+    many: "До {count} размещённых сайтов",
+    other: "До {count} размещённого сайта",
+  },
   "settings.hostedServers.plan.license.starter": "Коммерческая лицензия: {price} / мес.",
   "settings.hostedServers.plan.license.team": "Для работы нужна лицензия Team",
   "settings.hostedServers.plan.speed.base": "Базовая скорость",

@@ -493,6 +493,7 @@ export const messages = {
   "settings.hostedServers.plan.linux": "Linux-machine",
   "settings.hostedServers.plan.startsOnUse": "Start wanneer je hem gebruikt",
   "settings.hostedServers.plan.members": { one: "Tot {count} lid", other: "Tot {count} leden" },
+  "settings.hostedServers.plan.sites": { one: "Tot {count} gehoste site", other: "Tot {count} gehoste sites" },
   "settings.hostedServers.plan.speed.base": "Basissnelheid",
   "settings.hostedServers.plan.speed.faster": "{factor}× sneller",
   "settings.hostedServers.plan.starter.name": "Starter",

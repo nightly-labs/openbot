@@ -485,6 +485,7 @@ export const messages = {
     one: "Hasta {count} miembro",
     other: "Hasta {count} miembros",
   },
+  "settings.hostedServers.plan.sites": { one: "Hasta {count} sitio alojado", other: "Hasta {count} sitios alojados" },
   "settings.hostedServers.plan.license.starter": "Licencia comercial: {price} / mes",
   "settings.hostedServers.plan.license.team": "El trabajo necesita una licencia Team",
   "settings.hostedServers.plan.speed.base": "Velocidad base",

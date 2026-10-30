@@ -482,6 +482,7 @@ export const messages = {
   "settings.hostedServers.plan.startsOnUse": "使用时启动",
   // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "最多 {count} 名成员", other: "最多 {count} 名成员" },
+  "settings.hostedServers.plan.sites": { one: "最多 {count} 个托管站点", other: "最多 {count} 个托管站点" },
   // Work at a company needs a commercial license. With a Starter server, the 1-user license costs less.
   "settings.hostedServers.plan.license.starter": "商业许可证：{price} / 月",
   "settings.hostedServers.plan.license.team": "工作需要团队版许可证",

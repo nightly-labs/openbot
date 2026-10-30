@@ -375,7 +375,7 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, hostedServerIds, hostedServersLoaded } = useServers();
+  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -673,6 +673,21 @@ function ServerSettings() {
     );
   };
 
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(server: ServerSummary): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      (server.kind === "local" || server.role === "owner") &&
+      server.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    setServerSettingsOpen(false);
+    setAddServerOpen(true, "upsell");
+  }
+
   const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
     hostName:
       server.kind === "local"
@@ -776,6 +791,7 @@ function ServerSettings() {
                   api: appPort().hostedSites,
                   onOpenSite: (url) => void appPort().openUrl(url),
                   trackDelete: trackHostedSiteDelete,
+                  onSeePlans: canOfferServerPlans(server()) ? openServerPlans : undefined,
                 }
               : undefined
           }

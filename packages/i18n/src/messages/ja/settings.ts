@@ -471,6 +471,7 @@ export const messages = {
   "settings.hostedServers.plan.linux": "Linux マシン",
   "settings.hostedServers.plan.startsOnUse": "使うときに起動",
   "settings.hostedServers.plan.members": { other: "最大 {count} 人のメンバー" },
+  "settings.hostedServers.plan.sites": { other: "最大 {count} 件の公開サイト" },
   "settings.hostedServers.plan.license.starter": "商用ライセンス: {price} / 月",
   "settings.hostedServers.plan.license.team": "業務には Team ライセンスが必要です",
   "settings.hostedServers.plan.speed.base": "標準の速度",

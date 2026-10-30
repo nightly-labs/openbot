@@ -512,6 +512,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.startsOnUse": "Starts when you use it",
   // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "Up to {count} member", other: "Up to {count} members" },
+  // The most active hosted sites of the server. Agents publish static sites there.
+  "settings.hostedServers.plan.sites": { one: "Up to {count} hosted site", other: "Up to {count} hosted sites" },
   // Work at a company needs a commercial license. With a Starter server, the 1-user license costs less.
   "settings.hostedServers.plan.license.starter": "Commercial license: {price} / month",
   "settings.hostedServers.plan.license.team": "Work needs a Team license",

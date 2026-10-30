@@ -482,6 +482,7 @@ export const messages = {
   "settings.hostedServers.plan.linux": "Linux 머신",
   "settings.hostedServers.plan.startsOnUse": "사용할 때 시작돼요",
   "settings.hostedServers.plan.members": { other: "최대 {count}명" },
+  "settings.hostedServers.plan.sites": { other: "호스팅 사이트 최대 {count}개" },
   "settings.hostedServers.plan.license.starter": "상업용 라이선스: {price} / 월",
   "settings.hostedServers.plan.license.team": "업무용은 Team 라이선스 필요",
   "settings.hostedServers.plan.speed.base": "기본 속도",

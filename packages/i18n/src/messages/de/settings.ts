@@ -488,6 +488,10 @@ export const messages = {
     one: "Bis zu {count} Mitglied",
     other: "Bis zu {count} Mitglieder",
   },
+  "settings.hostedServers.plan.sites": {
+    one: "Bis zu {count} gehostete Website",
+    other: "Bis zu {count} gehostete Websites",
+  },
   "settings.hostedServers.plan.license.starter": "Kommerzielle Lizenz: {price} / Monat",
   "settings.hostedServers.plan.license.team": "Für die Arbeit ist eine Team-Lizenz nötig",
   "settings.hostedServers.plan.speed.base": "Basisgeschwindigkeit",

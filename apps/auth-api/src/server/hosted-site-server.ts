@@ -77,6 +77,44 @@ export const hostedSiteLimit = Effect.fn("HostedSites.limit")(function* (
   return siteLimitForPlan(entitlement?.plan ?? null);
 });
 
+/**
+ * Moves the owner's unlinked sites into a self-hosted server that has just registered, up to the free slots of
+ * its plan. A computer that publishes before it is a registered server puts its sites in the unlinked bucket,
+ * and the server's own list never showed them. Only sites created before the server first registered move, so
+ * a later site of another unregistered computer of the account stays unlinked. A hosted server never moves
+ * sites: it registers at its first start, so an unlinked site is from another computer. Active sites only: an
+ * upload in progress keeps the bucket it started in.
+ */
+export const adoptUnlinkedHostedSites = Effect.fn("HostedSites.adoptUnlinked")(function* (
+  database: D1Database,
+  userId: string,
+  serverId: string,
+  now: number,
+) {
+  const siteLimit = yield* hostedSiteLimit(database, serverId, now);
+  const result = yield* siteCall(() =>
+    database
+      .prepare(
+        `UPDATE hosted_sites SET server_id = ?
+         WHERE id IN (
+           SELECT s.id FROM hosted_sites s
+           WHERE s.user_id = ? AND s.server_id IS NULL AND s.status = 'active' AND s.expires_at > ?
+             AND s.created_at <= (SELECT h.created_at FROM remote_hosts h WHERE h.host_id = ? AND h.owner_user_id = ?)
+             AND NOT EXISTS (SELECT 1 FROM hosted_servers hs WHERE hs.server_id = ?)
+           ORDER BY s.updated_at DESC
+           LIMIT max(0, ? - (
+             SELECT COUNT(*) FROM hosted_sites x
+             WHERE x.user_id = ? AND x.server_id = ? AND x.status IN ('uploading', 'active', 'blocked')
+               AND (x.expires_at IS NULL OR x.expires_at > ?)
+           ))
+         )`,
+      )
+      .bind(serverId, userId, now, serverId, userId, serverId, siteLimit, userId, serverId, now)
+      .run(),
+  );
+  return result.meta.changes ?? 0;
+});
+
 function hostUnauthorized(): HostedSiteInputError {
   return new HostedSiteInputError(401, "host_unauthorized", "The server credential is invalid.");
 }

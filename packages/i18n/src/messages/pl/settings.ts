@@ -501,6 +501,12 @@ export const messages = {
     many: "Do {count} członków",
     other: "Do {count} członka",
   },
+  "settings.hostedServers.plan.sites": {
+    one: "Do {count} hostowanej witryny",
+    few: "Do {count} hostowanych witryn",
+    many: "Do {count} hostowanych witryn",
+    other: "Do {count} hostowanej witryny",
+  },
   "settings.hostedServers.plan.license.starter": "Licencja komercyjna: {price} / mies.",
   "settings.hostedServers.plan.license.team": "Praca wymaga licencji Team",
   "settings.hostedServers.plan.speed.base": "Prędkość bazowa",

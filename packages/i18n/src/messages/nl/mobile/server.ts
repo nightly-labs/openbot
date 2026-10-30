@@ -60,6 +60,7 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "Voor veel agents en zwaar browserwerk.",
   "mobile.server.hosted.members": { one: "Tot {count} lid", other: "Tot {count} leden" },
   "mobile.server.hosted.storage": { one: "{count} GB opslag", other: "{count} GB opslag" },
+  "mobile.server.hosted.sites": { one: "Tot {count} gehoste site", other: "Tot {count} gehoste sites" },
   "mobile.server.hosted.speedBase": "Basissnelheid",
   "mobile.server.hosted.speedFaster": "{factor}× sneller",
   "mobile.server.hosted.joinHint": "Gebruik een uitnodiging van een servereigenaar.",
@@ -67,7 +68,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "Je agents, altijd aan",
   "mobile.server.hosted.intro.description":
     "Een cloudserver voert je agents en routines uit als je computer uit staat. OpenBot zet hem op en houdt hem draaiende.",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "Op je computer",
   "mobile.server.hosted.computer.add": "Cloudserver toevoegen",
   "mobile.server.hosted.computer.addHint": "Open in OpenBot Instellingen → Gehoste servers en kies Server toevoegen.",

@@ -60,6 +60,10 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
   "mobile.server.hosted.members": { one: "{count} üyeye kadar", other: "{count} üyeye kadar" },
   "mobile.server.hosted.storage": { one: "{count} GB depolama", other: "{count} GB depolama" },
+  "mobile.server.hosted.sites": {
+    one: "{count} barındırılan siteye kadar",
+    other: "{count} barındırılan siteye kadar",
+  },
   "mobile.server.hosted.speedBase": "Temel hız",
   "mobile.server.hosted.speedFaster": "{factor} kat daha hızlı",
   "mobile.server.hosted.joinHint": "Bir sunucu sahibinden gelen daveti kullanın.",
@@ -67,7 +71,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "Ajanlarınız her zaman açık",
   "mobile.server.hosted.intro.description":
     "Bulut sunucusu, bilgisayarınız kapalıyken ajanlarınızı ve rutinlerinizi çalıştırır. OpenBot onu kurar ve çalışır durumda tutar.",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "Bilgisayarınızda",
   "mobile.server.hosted.computer.add": "Bulut sunucusu ekleyin",
   "mobile.server.hosted.computer.addHint":

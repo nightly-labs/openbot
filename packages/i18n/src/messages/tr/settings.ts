@@ -477,6 +477,10 @@ export const messages = {
     one: "{count} üyeye kadar",
     other: "{count} üyeye kadar",
   },
+  "settings.hostedServers.plan.sites": {
+    one: "{count} barındırılan siteye kadar",
+    other: "{count} barındırılan siteye kadar",
+  },
   "settings.hostedServers.plan.license.starter": "Ticari lisans: {price} / ay",
   "settings.hostedServers.plan.license.team": "İş için Team lisansı gerekir",
   "settings.hostedServers.plan.speed.base": "Temel hız",

@@ -22,20 +22,36 @@ interface SettingsHostedSitesTabProps {
   /** An owner or admin of the server. A member sees the sites, without Delete. */
   canDelete: boolean;
   onOpenSite: (url: string) => void;
+  /** Opens the server plans, which have more sites. Shown at the site limit; without it, there is no offer. */
+  onSeePlans?: (() => void) | undefined;
 }
 
 export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
   const { t, format } = useText();
   const formatDate = (value: string) => format.date(new Date(value), { dateStyle: "medium" });
+  /** The plans offer shows only when the server has no free site slot. */
+  function plansOffer() {
+    const limit = props.store.state.limit;
+    return limit !== null && props.store.state.used >= limit ? props.onSeePlans : undefined;
+  }
   return (
     <SettingsSection title={t("settings.hostedSites.title")}>
       <Show when={props.available} fallback={<Text tone="muted">{t("settings.hostedSites.unavailable")}</Text>}>
         <div class="hosted-sites-overview">
           <Show when={props.store.state.limit}>
             {(limit) => (
-              <span class="settings-modal-row-title">
-                {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit() })}
-              </span>
+              <div class="hosted-sites-usage">
+                <span class="settings-modal-row-title">
+                  {t("settings.hostedSites.usage", { used: props.store.state.used, count: limit() })}
+                </span>
+                <Show when={plansOffer()}>
+                  {(seePlans) => (
+                    <Button variant="outline" size="sm" onClick={() => seePlans()()}>
+                      {t("server.upsell.seePlans")}
+                    </Button>
+                  )}
+                </Show>
+              </div>
             )}
           </Show>
           <Text tone="muted" variant="caption">

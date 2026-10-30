@@ -233,6 +233,8 @@ export interface ServerHostedSitesOptions {
   onOpenSite: (url: string) => void;
   /** Called as a deletion starts. It returns the call that records the result. */
   trackDelete?: () => (result: HostedSiteDeleteResult) => void;
+  /** Opens the server plans when the server is at its site limit. Only for a user who can buy a plan. */
+  onSeePlans?: (() => void) | undefined;
 }
 
 export type ServerSettingsSection =
@@ -777,6 +779,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 available
                 canDelete={serverRoleCanAdminister(props.server)}
                 onOpenSite={sites().onOpenSite}
+                onSeePlans={sites().onSeePlans}
               />
             </Tabs.Content>
           )}

@@ -60,6 +60,7 @@ export const messages = {
   "mobile.server.hosted.plan.proSummary": "Para muitos agentes e uso intenso do navegador.",
   "mobile.server.hosted.members": { one: "Até {count} membro", other: "Até {count} membros" },
   "mobile.server.hosted.storage": { one: "{count} GB de armazenamento", other: "{count} GB de armazenamento" },
+  "mobile.server.hosted.sites": { one: "Até {count} site hospedado", other: "Até {count} sites hospedados" },
   "mobile.server.hosted.speedBase": "Velocidade básica",
   "mobile.server.hosted.speedFaster": "{factor}× mais rápido",
   "mobile.server.hosted.joinHint": "Use um convite do proprietário de um servidor.",
@@ -67,7 +68,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "Seus agentes sempre ativos",
   "mobile.server.hosted.intro.description":
     "Um servidor na nuvem executa seus agentes e rotinas quando o computador está desligado. O OpenBot configura e mantém o servidor funcionando.",
-  "mobile.server.hosted.planFacts": "{members} · {storage} · {speed}",
+  "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   "mobile.server.hosted.computer.title": "No seu computador",
   "mobile.server.hosted.computer.add": "Adicionar um servidor na nuvem",
   "mobile.server.hosted.computer.addHint":

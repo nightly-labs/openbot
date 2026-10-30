@@ -537,6 +537,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
   const [hostPage, setHostPage] = createSignal<{ view: HostPageView; trigger: HTMLElement | null } | null>(null);
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(): boolean {
+    return (
+      hostedServers.available() && hostedServers.loaded() && server()?.role === "owner" && server()?.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    serverSettings.setOpen(false);
+    hostedServers.openAddServer("upsell");
+  }
   /** Only the connected host answers, so another host is connected first, as for its settings. */
   async function openHostPage(serverId: string, view: HostPageView, trigger: HTMLElement | null) {
     if (server()?.id !== serverId) {
@@ -2214,7 +2224,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       // Every member lists; the host deletes only for an owner or admin.
                       hostedSites={
                         workspace.state.capabilities.includes(HOSTED_SITES_CAPABILITY)
-                          ? { api: hostedSiteCalls, onOpenSite: (url) => void openWebLink(url) }
+                          ? {
+                              api: hostedSiteCalls,
+                              onOpenSite: (url) => void openWebLink(url),
+                              onSeePlans: canOfferServerPlans() ? openServerPlans : undefined,
+                            }
                           : undefined
                       }
                       providers={providerSettings()}
