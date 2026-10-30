@@ -155,6 +155,12 @@ export const messages = {
     "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
   "agentSettings.notifications.title": "通知",
+  "agentSettings.notificationLevel.title": "自分への通知",
+  "agentSettings.notificationLevel.label": "このエージェントの自分への通知",
+  "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
+  "agentSettings.notificationLevel.note":
+    "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",
+  "agentSettings.notificationLevel.sharedOff": "このエージェントの通知は、すべてのメンバーに対してオフです。",
 
   "agentSettings.newChat.title": "新しいチャット",
   "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",

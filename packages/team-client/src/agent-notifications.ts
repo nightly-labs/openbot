@@ -132,6 +132,37 @@ export function agentEventRequestThread(event: AgentEvent): string | null {
   return null;
 }
 
+/** The agent of an event that can notify, or null for another event. */
+export function agentEventAgentId(event: AgentEvent): string | null {
+  switch (event.type) {
+    case "prompt":
+    case "turn-completed":
+      return event.agentId;
+    case "approval":
+      return event.approval.agentId;
+    case "browser-takeover-requested":
+      return event.request.agentId;
+    case "error":
+      return event.agentId ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The level for the events of one agent. The level that the user chose for the agent replaces the
+ * server level, in both directions. A server set to "nothing" stays quiet for every agent: on a phone
+ * it then has no registration that the host could send to, so the desktop and the web do the same.
+ */
+export function agentNotificationLevel(
+  serverLevel: ServerNotificationLevel,
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  agentId: string | null,
+): ServerNotificationLevel {
+  if (serverLevel === "nothing" || agentId === null) return serverLevel;
+  return agentLevels?.get(agentId) ?? serverLevel;
+}
+
 /**
  * What a server's agent event says to the user, or null when the server level or the agent's own
  * switch keeps it quiet. "needs-me" keeps only the events that wait for the user. `channel` is the

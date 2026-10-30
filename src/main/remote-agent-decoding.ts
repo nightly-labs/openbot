@@ -8,6 +8,7 @@ import {
   decodeProviderUsageResets,
   type HostProviderAccounts,
   isAgentHostSettings,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isAgentTask,
   isAgentTaskReadState,
@@ -54,6 +55,10 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
+export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
+  isAgentNotificationLevelsSnapshot,
+  "agent notification levels response",
+);
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");

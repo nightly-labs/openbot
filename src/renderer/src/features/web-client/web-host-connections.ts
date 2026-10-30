@@ -1,20 +1,26 @@
 import {
   type AgentEvent,
+  type AgentNotificationLevelsSnapshot,
   type ClientAgentSummary,
   isClientAgentSummary,
   type TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { createRemoteTeamPeer, RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
 import { createRemoteConnectionRecovery } from "@openbot/team-client/remote-recovery";
+import { listAgentNotificationLevels } from "@openbot/team-client/team-admin-requests";
+import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { referenceFrom } from "@openbot/user-errors";
+import { Effect } from "effect";
 import {
   type acquireWebHostLock,
   decodeWebHostTabMessage,
@@ -48,6 +54,8 @@ interface HostEntry {
   /** Session ends in progress. The peer starts some without waiting, for example after a protocol error. */
   endingSessions: Set<Promise<void>>;
   incompatible: boolean;
+  /** The capabilities of the host, or null until it has answered on this connection. */
+  capabilities: readonly string[] | null;
   /** The host's agents, for the name and the notification switch of an event's agent. */
   agents: ClientAgentSummary[];
   /** Counts `agents-changed` events, so a list read that started before one is dropped. */
@@ -86,6 +94,11 @@ export interface WebHostConnections {
   /** The state of the opened host, for the other tabs. */
   reportSelected(hostId: string, state: WebHostState): void;
   refresh(): void;
+  /**
+   * The user's own level for each agent of a host that this tab has not opened. A host without
+   * `agent-notification-levels-v1` has none. Rejects while the host has no connection.
+   */
+  agentNotificationLevels(hostId: string): Promise<AgentNotificationLevelsSnapshot>;
   dispose(): Promise<void>;
 }
 
@@ -144,6 +157,7 @@ export function createWebHostConnections(options: {
       connecting: null,
       endingSessions: new Set(),
       incompatible: false,
+      capabilities: null,
       agents: [],
       agentsRevision: 0,
     };
@@ -202,6 +216,7 @@ export function createWebHostConnections(options: {
     const recovery = createRemoteConnectionRecovery(
       async () => {
         entry.incompatible = false;
+        entry.capabilities = null;
         try {
           options.pinHostKey(host);
         } catch (error) {
@@ -234,7 +249,10 @@ export function createWebHostConnections(options: {
         if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
           entry.incompatible = true;
           recovery.suspend();
-        } else if (options.onNotice) void readAgents(entry);
+        } else {
+          entry.capabilities = support.capabilities;
+          if (options.onNotice) void readAgents(entry);
+        }
       },
       () => undefined,
       (status) => {
@@ -371,6 +389,23 @@ export function createWebHostConnections(options: {
     },
     refresh() {
       for (const entry of entries.values()) entry.recovery?.refresh();
+    },
+    async agentNotificationLevels(hostId) {
+      const entry = entries.get(hostId);
+      const peer = entry?.peer;
+      if (!entry?.capabilities || !peer)
+        throw new WebHostRequestError(currentText().t("webClient.error.connectionUnavailable"), null);
+      if (!entry.capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { agents: [] };
+      const request: TeamApiRequest = async (method, path, decode, body = {}) => {
+        const response = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body });
+        if (!response.ok || (response.status ?? 500) >= 400)
+          throw new WebHostRequestError(
+            response.error ?? currentText().t("webClient.error.requestIncomplete"),
+            response.status === undefined ? (response.reference ?? null) : referenceFrom("http", response.status),
+          );
+        return decode(response.body);
+      };
+      return runTeamEffect(listAgentNotificationLevels(request).pipe(Effect.mapError((error) => error.cause)));
     },
     async dispose() {
       disposed = true;

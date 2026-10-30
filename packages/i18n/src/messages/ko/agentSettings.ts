@@ -149,6 +149,12 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn":
     "{provider}은(는) 한 번에 한 턴씩 실행해요. 이 에이전트의 스레드는 서로를 기다려요.",
   "agentSettings.notifications.title": "알림",
+  "agentSettings.notificationLevel.title": "내 알림",
+  "agentSettings.notificationLevel.label": "이 에이전트의 내 알림",
+  "agentSettings.notificationLevel.server": "서버 기본값 ({level})",
+  "agentSettings.notificationLevel.note":
+    "이 설정은 나에게만 적용되며 내 모든 기기에 적용돼요. 서버가 음소거되었거나 '없음'으로 설정되면 이 에이전트도 알리지 않아요.",
+  "agentSettings.notificationLevel.sharedOff": "이 에이전트의 알림은 모든 멤버에게 꺼져 있어요.",
   "agentSettings.newChat.title": "새 채팅",
   "agentSettings.newChat.description": "에이전트가 이 채팅을 잊어요. 설정은 그대로 유지돼요.",
   "agentSettings.newChat.button": "시작",

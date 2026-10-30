@@ -343,6 +343,12 @@ export const messages = {
   "mobile.agent.notifications.footer": "Benachrichtigungen sind für jedes Mitglied dieses Servers gleich.",
   "mobile.agent.notifications.failed": "Benachrichtigungen konnten nicht geändert werden",
   "mobile.agent.notifications.failedBody": "Der Host konnte diese Änderung nicht speichern.",
+  "mobile.agent.notificationLevel.title": "Benachrichtige mich über",
+  "mobile.agent.notificationLevel.server": "Servereinstellung",
+  "mobile.agent.notificationLevel.footer":
+    "Der Schalter gilt für jedes Mitglied dieses Servers. Ist er aus, bekommt kein Mitglied Benachrichtigungen. „Benachrichtige mich über“ gilt nur für dich, auf allen deinen Geräten. „Nichts“ oder Stummschalten in den Benachrichtigungseinstellungen dieses Servers stoppt sie trotzdem.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Dieser Server kann keine eigene Benachrichtigungsstufe für einen Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "mobile.agent.newChat.title": "Neuer Chat",
   "mobile.agent.newChat.starting": "Neuer Chat wird gestartet…",
   "mobile.agent.newChat.footer": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",

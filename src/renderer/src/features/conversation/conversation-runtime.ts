@@ -1,10 +1,12 @@
 import type {
+  AgentNotificationLevelsSnapshot,
   AgentSessionSettings,
   AskSideQuestionInput,
   AttachmentSummary,
   FilePreview,
   OpenBotDesktopApi,
   ResetAgentSessionSettingInput,
+  SetAgentNotificationLevelInput,
   SetAgentSessionSettingInput,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
@@ -84,6 +86,11 @@ export interface ConversationRuntime {
   browserProfiles?: BrowserProfileCalls | undefined;
   /** The agent routine calls of a client without the desktop port. */
   routines?: AgentRoutinesApi | undefined;
+  /**
+   * The user's own notification level of each agent, for a client without the desktop port. Any member
+   * can call it. The caller asks only a server that serves `agent-notification-levels-v1`.
+   */
+  agentNotificationLevels?: AgentNotificationLevelCalls | undefined;
   /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
   admin?:
     | {
@@ -101,6 +108,12 @@ export interface ConversationRuntime {
           | undefined;
       }
     | undefined;
+}
+
+/** Reads and saves the user's own notification level of each agent on one server. */
+export interface AgentNotificationLevelCalls {
+  list(): Promise<AgentNotificationLevelsSnapshot>;
+  set(input: SetAgentNotificationLevelInput): Promise<AgentNotificationLevelsSnapshot>;
 }
 
 export function conversationRuntime(props: Pick<ConversationProps, "runtime">): ConversationRuntime {

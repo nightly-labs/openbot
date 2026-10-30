@@ -76,6 +76,11 @@ export const queryKeys = {
     provider: AgentProviderId | undefined,
     model: string | undefined,
   ) => [...queryKeys.agentInfo(scope, serverId, agentId), provider, model, "session-settings"],
+  /** The user's own notification level of each agent of a server. No host event changes it. */
+  agentNotificationLevels: (scope: QueryScope, serverId: string) => [
+    ...queryKeys.agentInfo(scope, serverId),
+    "notification-levels",
+  ],
   /** Under the server's agent records, so the host's agent events refresh it. */
   sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
   /** The settings of a channel. Its memory and routine events invalidate the part they change. */

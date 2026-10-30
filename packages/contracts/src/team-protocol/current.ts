@@ -12,6 +12,7 @@ import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "./agent-task-limit-v1";
@@ -140,6 +141,7 @@ export {
   AGENT_INSTALL_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_TASK_LIMIT_CAPABILITY,
@@ -335,6 +337,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_TASK_UI_BLOCKS_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -464,7 +467,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== VAULT_V2_CAPABILITY &&
     capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
-    capability !== MEMORY_REVIEW_CAPABILITY,
+    capability !== MEMORY_REVIEW_CAPABILITY &&
+    capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY,
 );
 // A v7 host does not know the v8 markers, so a client sends them only after it negotiates protocol 8.
 const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
@@ -540,6 +544,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== VAULT_V2_CAPABILITY &&
       capability !== AGENT_TASK_UI_BLOCKS_CAPABILITY &&
       capability !== TEAM_CONTEXT_USAGE_CAPABILITY &&
-      capability !== MEMORY_REVIEW_CAPABILITY,
+      capability !== MEMORY_REVIEW_CAPABILITY &&
+      capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   );
 }

@@ -34,7 +34,7 @@ import {
 } from "@/features/settings/model/push-notifications";
 import type { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
-import { pushEnvironment } from "@/shared/lib/push-environment";
+import { usePushEnvironment } from "@/shared/lib/push-environment";
 import { currentLocale, currentText } from "@/shared/lib/text";
 import { agentLiveActivity } from "./agent-live-activity";
 import type { AgentLiveActivityNative } from "./agent-live-activity.types";
@@ -104,6 +104,8 @@ export function useLiveActivity({
   }, []);
   const sync = useRef<LiveActivitySync<AgentLiveActivityProps> | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
+  /** The Apple environment of the activity token, from the profile that signed the app. */
+  const environment = usePushEnvironment();
   const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
   /** The phone secret. Each host gets its own secret and keys made from it. */
   const [secret, setSecret] = useState<Uint8Array | null>(null);
@@ -537,7 +539,7 @@ export function useLiveActivity({
     }
     // A host that restarts keeps registrations in memory only, so a new connection registers again.
     if (!pushServerOnline && registered.current) registered.current = { ...registered.current, key: "" };
-    if (!pushServerId || !pushServerOnline || !pushToken || !secret) return;
+    if (!pushServerId || !pushServerOnline || !pushToken || !secret || !environment) return;
     let cancelled = false;
     const serverAgents = agentsRef.current.filter((agent) => agent.serverId === pushServerId);
     void (async () => {
@@ -560,7 +562,7 @@ export function useLiveActivity({
       const registration: LiveActivityPushRegistration = {
         serverId: pushServerId,
         token: pushToken,
-        environment: pushEnvironment(),
+        environment,
         secret: encodeLiveActivityBytes(liveActivityHostKeys(secret, pushServerId).secret),
         locale: currentLocale(),
         away: !foreground,
@@ -595,6 +597,7 @@ export function useLiveActivity({
     pushServerOnline,
     pushToken,
     secret,
+    environment,
     foreground,
     photos,
     post,

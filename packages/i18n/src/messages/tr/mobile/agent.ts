@@ -346,6 +346,12 @@ export const messages = {
   "mobile.agent.notifications.footer": "Bildirimler bu sunucunun her üyesi için aynıdır.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",
   "mobile.agent.notifications.failedBody": "Ana makine bu değişikliği kaydedemedi.",
+  "mobile.agent.notificationLevel.title": "Şunun hakkında bildir",
+  "mobile.agent.notificationLevel.server": "Sunucu ayarı",
+  "mobile.agent.notificationLevel.footer":
+    "Anahtar bu sunucunun her üyesi için geçerlidir. Kapalıyken hiçbir üye bildirim almaz. “Şunun hakkında bildir” yalnızca senin içindir ve tüm cihazlarında geçerlidir. Bu sunucunun bildirim ayarlarındaki “Hiçbir şey” veya sessize alma yine de bildirimleri durdurur.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Bu sunucu bir ajan için kendi bildirim düzeyini saklayamıyor. OpenBot’u onu çalıştıran bilgisayarda güncelle.",
   "mobile.agent.newChat.title": "Yeni sohbet",
   "mobile.agent.newChat.starting": "Yeni sohbet başlatılıyor…",
   "mobile.agent.newChat.footer": "Ajan bu sohbeti unutur. Yapılandırması kalır.",

@@ -7,6 +7,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
   AgentEvent,
+  AgentNotificationLevelsSnapshot,
   AgentStatus,
   AttachmentSummary,
   AvatarImageInput,
@@ -35,6 +36,7 @@ import type {
   Routine,
   RoutineRun,
   SetAgentHiddenInput,
+  SetAgentNotificationLevelInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -66,6 +68,7 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
@@ -111,7 +114,13 @@ import {
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
-import { listHiddenAgents, setAgentHidden, setAgentProviderAccount } from "@openbot/team-client/team-admin-requests";
+import {
+  listAgentNotificationLevels,
+  listHiddenAgents,
+  setAgentHidden,
+  setAgentNotificationLevel,
+  setAgentProviderAccount,
+} from "@openbot/team-client/team-admin-requests";
 import {
   cancelQueuedMessage,
   deleteAgent,
@@ -247,6 +256,13 @@ export interface WebWorkspaceRuntime {
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
+  /**
+   * The user's own level for each agent of a host: the open host, or a host with a status connection.
+   * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
+   */
+  listAgentNotificationLevels?: (hostId: string) => Promise<AgentNotificationLevelsSnapshot>;
+  /** Sets the user's own level for one agent of the open host. Needs `agent-notification-levels-v1`. */
+  setAgentNotificationLevel?: (input: SetAgentNotificationLevelInput) => Promise<AgentNotificationLevelsSnapshot>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   /** The agent image as a data URL. The browser cannot open the host's `openbot-avatar:` URL. */
@@ -1052,6 +1068,19 @@ export function createWebWorkspaceRuntime(
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
+    async listAgentNotificationLevels(hostId) {
+      if (hostId !== lockedHostId) {
+        if (!hosts) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return hosts.agentNotificationLevels(hostId);
+      }
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { agents: [] };
+      return runTeamEffect(listAgentNotificationLevels(teamApi).pipe(Effect.mapError((error) => error.cause)));
+    },
+    async setAgentNotificationLevel(input) {
+      if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+        throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
+      return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
     async models() {
       return guardedListDecoder(
         isClientAgentModelOption,

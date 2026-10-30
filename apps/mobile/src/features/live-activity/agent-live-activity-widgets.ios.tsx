@@ -354,9 +354,15 @@ function savedStart(id: string): number | null {
   }
 }
 
-function toInstance(activity: LiveActivity, startedAt: number | null): LiveActivityInstance<AgentLiveActivityProps> {
+function toInstance(
+  activity: LiveActivity,
+  startedAt: number | null,
+  activeIds: () => ReadonlySet<string> | null,
+): LiveActivityInstance<AgentLiveActivityProps> {
   return {
     startedAt,
+    // When iOS cannot list the activities, the app keeps the one it has.
+    isActive: () => activeIds()?.has(activity.getId()) ?? true,
     update: (props, staleDate) => activity.update(props, staleDate),
     end: (dismissalPolicy) => activity.end(dismissalPolicy),
     watchPushToken(receive) {
@@ -388,18 +394,26 @@ export const agentLiveActivity: AgentLiveActivityLoader = () => {
     composeLayout({ dir, seal: "", tag: "", fallback: null }),
   );
   let layoutKeys = "";
+  /** The activities that iOS still shows and updates. It lists no ended or removed activity. */
+  const activeIds = (): ReadonlySet<string> | null => {
+    try {
+      return new Set(factory.getInstances().map((instance) => instance.getId()));
+    } catch {
+      return null;
+    }
+  };
   native = {
     starter: {
       start: (props, staleDate) => {
         const activity = new LiveActivity(factory.start(JSON.stringify(props), undefined, staleDate?.getTime()));
         const startedAt = Date.now();
         rememberStart(activity.getId(), startedAt);
-        return toInstance(activity, startedAt);
+        return toInstance(activity, startedAt, activeIds);
       },
       getInstances: () =>
         factory.getInstances().map((native) => {
           const activity = new LiveActivity(native);
-          return toInstance(activity, savedStart(activity.getId()));
+          return toInstance(activity, savedStart(activity.getId()), activeIds);
         }),
     },
     setSealKeys(keys, fallback) {

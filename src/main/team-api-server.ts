@@ -31,6 +31,7 @@ import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-re
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
@@ -196,6 +197,7 @@ import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentMemoryLimit } from "./team-api/route-agent-memory-limit";
+import { routeAgentNotificationLevels } from "./team-api/route-agent-notification-levels";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
 import { routeAgentTasks } from "./team-api/route-agent-tasks";
@@ -918,6 +920,15 @@ export class TeamApiServer {
       if ((await routeRoutineResults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentHidden(context, this.#options.hiddenAgents, hidden)) === "handled") return;
+      if (
+        (await routeAgentNotificationLevels(
+          context,
+          this.#options.agentNotificationLevels,
+          this.#options.agents,
+          hidden,
+        )) === "handled"
+      )
+        return;
       if ((await routeAgentTasks(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -1552,11 +1563,6 @@ export class TeamApiServer {
       }
     });
     client.once("close", () => {
-      // iOS can suspend a phone before it says that it goes away. Its closed connection says so.
-      if (sessionId) {
-        this.#options.liveActivityPush?.disconnected(sessionId);
-        this.#options.pushNotifications?.disconnected(sessionId);
-      }
       if (connection.typingTimer) clearTimeout(connection.typingTimer);
       if (connection.directTypingTimer) clearTimeout(connection.directTypingTimer);
       const directTypingRecipientId = connection.directTypingRecipientId;
@@ -1565,6 +1571,10 @@ export class TeamApiServer {
       // A client that closes, crashes or loses the network keeps its session, so its last socket gives back
       // the pages that the session controls. Otherwise the agent waits for a person who is not there.
       if (sessionId && ![...this.#eventClients.values()].some((other) => other.sessionId === sessionId)) {
+        // iOS can suspend a phone before it says that it goes away. Its last closed connection says so.
+        // Another open connection of the session is still the app on screen.
+        this.#options.liveActivityPush?.disconnected(sessionId);
+        this.#options.pushNotifications?.disconnected(sessionId);
         this.#options.browser.releaseUserControlHeldBy({ kind: "session", sessionId });
       }
       if (directTypingRecipientId && !this.#hasDirectTyping(connection.memberId, directTypingRecipientId)) {
@@ -2028,6 +2038,8 @@ export class TeamApiServer {
         if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
           return this.#options.pushNotifications !== undefined;
         if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
+        if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+          return this.#options.agentNotificationLevels !== undefined;
         return true;
       }),
     };

@@ -5,6 +5,7 @@ import type {
   HiddenAgentsSnapshot,
   McpSignInApp,
   McpSignInAppState,
+  ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
 import {
   type AccountUsage,
@@ -467,6 +468,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return agentStatus;
   };
   let agents = clone(options.agents ?? STORY_AGENT_SUMMARIES);
+  const agentNotificationLevels = new Map<string, ServerNotificationLevel>();
   // Two profiles, so the agent select and the manage dialog show a list. "Client B" has no agents.
   let browserProfiles: { id: string; name: string; hue: AvatarHue }[] = [
     { id: "0a1b2c3d4e5f60718293a4b5c6d7e8f9", name: "Client A", hue: 215 },
@@ -1799,6 +1801,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "hidden-agents-changed", agents: snapshot.agents });
         emitAgentEvent({ type: "agents-changed", agents });
         return snapshot;
+      },
+      // The levels of the preview user, kept for the session as a host keeps them for each member.
+      listAgentNotificationLevels: async () => ({
+        agents: [...agentNotificationLevels].map(([agentId, level]) => ({ agentId, level })),
+      }),
+      setAgentNotificationLevel: async ({ agentId, level }) => {
+        if (!agents.some((agent) => agent.id === agentId))
+          throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+        if (level === null) agentNotificationLevels.delete(agentId);
+        else agentNotificationLevels.set(agentId, level);
+        return { agents: [...agentNotificationLevels].map(([id, value]) => ({ agentId: id, level: value })) };
       },
       readAgentSessionSettings: async (agentId) => clone(previewSessionSettings(agentId)),
       setAgentSessionSetting: async ({ agentId, settingId, value }) => {

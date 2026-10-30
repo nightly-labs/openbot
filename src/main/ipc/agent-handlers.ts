@@ -1,5 +1,9 @@
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -37,6 +41,7 @@ import {
   parseResetAgentSessionSetting,
   parseSaveAgentProfile,
   parseSetAgentHiddenInput,
+  parseSetAgentNotificationLevelInput,
   parseSetAgentSessionSetting,
   remoteBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
@@ -69,12 +74,14 @@ import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
+import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "../agent-notification-level-store";
 import type { HostService } from "../host-service";
 import { type MessageLinkRelay, openHttpLink } from "../message-link-relay";
 import {
   decodeAccountUsageFromHost,
   decodeAgentAnalyticsFromHost,
   decodeAgentModelOptions,
+  decodeAgentNotificationLevelsFromHost,
   decodeAgentSessionSettingsFromHost,
   decodeAgentStatusFromHost,
   decodeAgentSummaries,
@@ -174,6 +181,8 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
 
 export interface AgentIpcDependencies {
   service: AgentService;
+  /** The levels that the owner of this computer chose for its agents. */
+  agentNotificationLevels: AgentNotificationLevelStore;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
   remoteServers: RemoteServerManager;
@@ -184,6 +193,7 @@ export interface AgentIpcDependencies {
 
 export function agentIpcHandlers({
   service,
+  agentNotificationLevels,
   sidebarLayout,
   host,
   remoteServers,
@@ -322,6 +332,39 @@ export function agentIpcHandlers({
               method: "POST",
               body: input,
             }),
+          );
+        },
+      }),
+      listAgentNotificationLevels: scopedQueryHandler({
+        local: () => agentNotificationLevels.snapshot(OWNER_NOTIFICATION_KEY),
+        // A server without `agent-notification-levels-v1` has no levels of agents, so the server level applies.
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return { agents: [] };
+          return runCauseEffect(
+            remoteServers.request(
+              serverId,
+              AGENT_NOTIFICATION_LEVELS_ROUTES.read,
+              decodeAgentNotificationLevelsFromHost,
+              { method: "POST", body: {} },
+            ),
+          );
+        },
+      }),
+      setAgentNotificationLevel: scopedHandler(parseSetAgentNotificationLevelInput, {
+        local: (input) => runCauseEffect(agentNotificationLevels.set(OWNER_NOTIFICATION_KEY, input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY))
+            throw new Error(sourceText("error.team.agentNotificationLevelsUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(
+              serverId,
+              AGENT_NOTIFICATION_LEVELS_ROUTES.set,
+              decodeAgentNotificationLevelsFromHost,
+              {
+                method: "POST",
+                body: { agentId: input.agentId, level: input.level },
+              },
+            ),
           );
         },
       }),

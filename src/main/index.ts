@@ -28,6 +28,7 @@ import {
   shell,
 } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
@@ -405,6 +406,7 @@ const {
   getFormat: () => createFormat(services?.language.locale ?? "en"),
   desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
   notificationPreviewEnabled: () => services?.notificationPreference.get().messagePreview ?? true,
+  ownAgentNotificationLevels: () => services?.agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY) ?? new Map(),
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
@@ -569,6 +571,7 @@ function registerIpcHandlers({
   agentDefaults,
   agentMemoryLimit,
   memoryReview,
+  agentNotificationLevels,
   agentAccess,
   teamStore,
   serverTimezone,
@@ -812,6 +815,7 @@ function registerIpcHandlers({
     }),
     ...agentIpcHandlers({
       service,
+      agentNotificationLevels,
       sidebarLayout,
       host,
       remoteServers,

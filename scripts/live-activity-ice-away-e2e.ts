@@ -28,6 +28,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/live-activity-ice-aw
 const STEP_DEADLINE_MS = 10_000;
 const SESSION = "fixture-session";
 const AGENT = "fixture-agent";
+const REPLY = { agentId: AGENT, kind: "reply" } as const;
 const logger = createOpenBotLogger("live-activity-ice-away-e2e");
 
 const events = new EventEmitter<{ event: [AgentEvent] }>();
@@ -154,14 +155,16 @@ try {
       },
     );
     // `showsEvent` is true only while the host counts the phone as away, which is when it pushes.
-    assert.equal(service.showsEvent(SESSION, null, null), false);
+    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
     assert.equal(pushes.length, 0);
     return { away: false, pushes: pushes.length };
   });
 
   await step("a failed path sends the host state at once", async () => {
     service.disconnected(SESSION);
-    assert.equal(service.showsEvent(SESSION, null, null), true);
+    // The island shows the work, so it does not show a reply or a question: the phone gets a notification.
+    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
+    assert.equal(service.showsEvent(SESSION, { agentId: AGENT, kind: "input" }, null, null), false);
     const mode = shownMode(await pushNumber(1));
     assert.equal(mode, "working");
     return { away: true, mode };
@@ -183,9 +186,9 @@ try {
 
   await step("a path that comes back stops the host pushes and drops a waiting alert", async () => {
     // An event alert waits for the event delay. The path comes back before it goes out.
-    assert.equal(service.showsEvent(SESSION, { sound: "default" }, null), true);
+    assert.equal(service.showsEvent(SESSION, REPLY, { sound: "default" }, null), true);
     service.reconnected(SESSION);
-    assert.equal(service.showsEvent(SESSION, null, null), false);
+    assert.equal(service.showsEvent(SESSION, REPLY, null, null), false);
     return { away: false };
   });
 

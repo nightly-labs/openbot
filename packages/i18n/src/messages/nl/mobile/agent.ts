@@ -336,6 +336,12 @@ export const messages = {
   "mobile.agent.notifications.footer": "Meldingen zijn hetzelfde voor elk lid van deze server.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",
   "mobile.agent.notifications.failedBody": "De host kan deze wijziging niet opslaan.",
+  "mobile.agent.notificationLevel.title": "Meld mij over",
+  "mobile.agent.notificationLevel.server": "Serverinstelling",
+  "mobile.agent.notificationLevel.footer":
+    "De schakelaar geldt voor elk lid van deze server. Staat hij uit, dan krijgt geen enkel lid meldingen. “Meld mij over” geldt alleen voor jou, op al je apparaten. “Niets” of dempen in de meldingsinstellingen van deze server stopt ze toch.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Deze server kan geen eigen meldingsniveau voor een agent bewaren. Werk OpenBot bij op de computer waarop hij draait.",
   "mobile.agent.newChat.title": "Nieuwe chat",
   "mobile.agent.newChat.starting": "Nieuwe chat starten…",
   "mobile.agent.newChat.footer": "De agent vergeet deze chat. Zijn instellingen blijven.",

@@ -420,6 +420,7 @@ try {
     getFormat: () => createFormat("en"),
     desktopNotificationsEnabled: () => true,
     notificationPreviewEnabled: () => false,
+    ownAgentNotificationLevels: () => new Map(),
   });
   const changed = () =>
     forwarders.forwardAgentEvent(LOCAL_SERVER_ID, {

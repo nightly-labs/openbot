@@ -295,6 +295,7 @@
     "test:team-session-revoke": "bun scripts/team-session-revoke-e2e.ts",
     "test:server-mute": "bun scripts/server-mute-e2e.ts",
     "test:desktop-notifications": "bun scripts/desktop-notifications-e2e.ts",
+    "test:push-notification-away": "bun scripts/push-notification-away-e2e.ts",
     "test:browser-sign-in": "bun scripts/browser-sign-in-e2e.ts",
     "test:routine-pause-resume": "bun scripts/routine-pause-resume-e2e.ts",
     "test:routine-timezone-move": "bun scripts/routine-timezone-move-e2e.ts",

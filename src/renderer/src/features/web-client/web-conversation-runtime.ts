@@ -184,6 +184,8 @@ export function createWebConversationRuntime(
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
   const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest) : undefined;
+  const listLevels = remote.listAgentNotificationLevels;
+  const setLevel = remote.setAgentNotificationLevel;
   return {
     agent: {
       ...messageLinks,
@@ -282,6 +284,9 @@ export function createWebConversationRuntime(
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
     },
+    // Any member keeps an own level for each agent. The panel asks only a host with the capability.
+    agentNotificationLevels:
+      listLevels && setLevel ? { list: () => listLevels(hostId()), set: (input) => setLevel(input) } : undefined,
     // Any member reads the tab labels; the panels offer the other calls to an owner or admin only.
     get browserProfiles() {
       return browserProfilesEnabled?.() === true ? browserProfiles : undefined;

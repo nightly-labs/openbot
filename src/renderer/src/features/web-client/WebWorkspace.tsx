@@ -595,6 +595,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             threadId,
           )
         : null,
+    readAgentLevels: workspace.runtime.listAgentNotificationLevels,
   });
   const [searchOpen, setSearchOpen] = createSignal(false);
   const communityCard = createCommunityCardVisibility();

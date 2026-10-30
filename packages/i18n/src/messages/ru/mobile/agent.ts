@@ -359,6 +359,12 @@ export const messages = {
   "mobile.agent.notifications.footer": "Уведомления одинаковы для всех участников этого сервера.",
   "mobile.agent.notifications.failed": "Не удалось изменить уведомления",
   "mobile.agent.notifications.failedBody": "Хосту не удалось сохранить это изменение.",
+  "mobile.agent.notificationLevel.title": "Уведомлять о",
+  "mobile.agent.notificationLevel.server": "Настройка сервера",
+  "mobile.agent.notificationLevel.footer":
+    "Переключатель действует для всех участников этого сервера. Когда он выключен, никто из участников не получает уведомления. «Уведомлять о» действует только для вас, на всех ваших устройствах. «Ничего» или режим без звука в настройках уведомлений этого сервера всё равно их останавливают.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Этот сервер не может хранить ваш уровень уведомлений для агента. Обновите OpenBot на компьютере, где он работает.",
   "mobile.agent.newChat.title": "Новый чат",
   "mobile.agent.newChat.starting": "Начинается новый чат…",
   "mobile.agent.newChat.footer": "Агент забудет этот чат. Настройки сохранятся.",

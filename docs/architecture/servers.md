@@ -445,6 +445,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `agent-notification-levels-v1` | Read and set the member's own notification level of each agent | none: each member, own levels only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
@@ -514,6 +515,18 @@ background memory reviews of the host's agents (`openbot-memory-review-v1.json`;
 other values. The agent service reads the value at each use, so a change applies from the next turn.
 Server settings → General → Agents → Memory review sets it for this computer
 (`hostAdmin.setMemoryReview`, local handler) and for a joined server.
+
+`agent-notification-levels-v1` reads and sets the notification level that the signed-in member chose for
+each agent (`all`, `needs-me` or `nothing`; `null` removes it). The host keeps the levels in
+`openbot-agent-notification-levels-v1.json`, by member ID; the owner's levels have the key `owner`, so
+the desktop app of the host computer and the owner's phones read the same levels. A member reads and
+sets only their own levels, and the read leaves out the agents that the member cannot see. No event
+carries a change: the desktop and the web client read the levels for each notification, and the
+mobile app reads them when its agent settings open. The level replaces the server level of each device
+for the events of that agent (`agentNotificationLevel` in `@openbot/team-client`), in both
+directions; a server muted or set to Nothing stays quiet for all agents. The shared switch of the
+agent (`notifications`) still turns notifications off for every member. The host applies the levels
+to phone notifications itself (`PushNotificationService`), so phones of every version follow them.
 
 `prompt-cache-ttl-v1` reads and sets how long Claude keeps the prompt cache of the host's agents
 (`openbot-prompt-cache-ttl-v1.json`; `5m` or `1h`, default `5m`). With `1h` the host starts each

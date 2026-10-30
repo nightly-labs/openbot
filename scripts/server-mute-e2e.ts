@@ -318,6 +318,7 @@ try {
       getFormat: () => createFormat("en"),
       desktopNotificationsEnabled: () => true,
       notificationPreviewEnabled: () => false,
+      ownAgentNotificationLevels: () => new Map(),
     }).forwardAgentEvent(LOCAL_SERVER_ID, {
       type: "turn-completed",
       agentId: setup.agentId,

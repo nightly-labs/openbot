@@ -33,7 +33,8 @@ message or a routine run (`error` with the code `delivery_start_failed`), or wai
 approval, or a step in the browser (`browser-takeover-requested`, also for a password or a code).
 The desktop and the web client notify about the same events (`agentEventCanNotify`), and all three
 decide as one: `notificationForAgentEvent` in `@openbot/team-client` applies the level of the server
-(`all`, or `needs-me` for the events that wait for the user), the switch of the agent, and the quiet
+(`all`, or `needs-me` for the events that wait for the user), or the member's own level of the agent
+(`agent-notification-levels-v1`, see [servers](servers.md)), the switch of the agent, and the quiet
 routine runs. The desktop and the web client close the notification of a request when an
 `agent-input-resolved` or `browser-takeover-resolved` event comes, also for an answer from another
 device. The title is the agent name. When the phone shows previews, the text is the
@@ -68,7 +69,13 @@ when nothing is left for that host or the user signs out. A level of
 "Nothing" and a mute with no end remove it too. `PushNotificationService` in `src/main` keeps the
 registrations in `openbot-push-notifications-v1.json` in the user data folder, readable only by the
 user, so a phone that does not connect after the host restarts still gets notifications. It sends
-only while the phone is away or its connection is closed. No event goes while the member uses a
+only while the phone is away or its connection is closed. iOS can suspend the app before it says
+that it goes away, and the host sees the lost path about 30 seconds later. So an event that comes
+while the phone looks on screen is kept in memory for 5 minutes (`HELD_EVENT_MS`). When the phone
+says that it is away, or its path fails, and does not come back within 3 seconds, the host sends
+each kept event that the member has not seen: a reply that is still unread in the agent's own chat,
+a failed turn that still shows as failed, or a request that nobody answered. A send that the
+account service, Apple or Google does not take goes again after 10 and 60 seconds. No event goes while the member uses a
 desktop app, which shows the event and asks for input, an approval, or a browser step itself: that
 computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), and
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
@@ -77,8 +84,10 @@ computer's server let the event through); or the member sent, answered, or typed
 seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
 can end at any time after the member leaves the computer. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
-restarted does not know it), the host sends no notification
-(`LiveActivityPushService.showsEvent`). With a sound (Settings > Notifications > Sound), the next
+restarted does not know it), and the next view of the activity shows the event, the host sends no
+notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while
+another agent works, or a failure while another agent waits, still notifies. An activity whose last
+update did not go out does not replace notifications. With a sound (Settings > Notifications > Sound), the next
 update of the activity alerts at once, so iOS lights up the screen, shows the activity, and plays
 that sound; with Play sound off, the activity updates silently. iOS does not tell the host when
 the user removes the activity, so until the app runs again such an event shows nowhere.

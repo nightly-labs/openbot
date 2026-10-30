@@ -17,8 +17,10 @@
 import { hostname } from "node:os";
 import {
   type AgentEvent,
+  agentNotificationLevelMap,
   type BrowserDisplayState,
   type ChannelSummary,
+  type ClientAgentSummary,
   decodeChannelSummaries,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
@@ -30,6 +32,10 @@ import {
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -37,6 +43,7 @@ import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
 import {
   type AgentNotificationChannel,
+  agentEventAgentId,
   agentEventCanNotify,
   agentEventRequestThread,
   notificationForAgentEvent,
@@ -56,13 +63,13 @@ import type { WorkflowNotice } from "../backend/workflows/workflows";
 import type { HostAnalytics } from "./analytics";
 import {
   closeRetainedNotification,
-  desktopShowsAgentEvent,
+  desktopAgentEventLevel,
   RETAINED_NOTIFICATION_LIMIT,
   showRetainedNotification,
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentSummaries } from "./remote-agent-decoding";
+import { decodeAgentNotificationLevelsFromHost, decodeAgentSummaries } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -73,7 +80,12 @@ export interface RendererForwarderDependencies {
   getAgentService: () => Pick<AgentService, "listAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
-  getRemoteServerManager: () => Pick<RemoteServerManager, "list" | "request" | "readAgentConversationPage"> | null;
+  getRemoteServerManager: () => Pick<
+    RemoteServerManager,
+    "list" | "request" | "readAgentConversationPage" | "supportsCapability"
+  > | null;
+  /** The level that the user chose for each agent of this computer's server. */
+  ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
   showMainWindow: (window: BrowserWindow) => void;
   /** The language every desktop notification is written in, read at the moment one is raised. */
   getTranslate: () => AppTranslate;
@@ -106,6 +118,7 @@ export function createRendererForwarders({
   getFormat,
   desktopNotificationsEnabled,
   notificationPreviewEnabled,
+  ownAgentNotificationLevels,
 }: RendererForwarderDependencies) {
   // The user looks at the app when the main window or one of its chat windows has focus.
   /** The main window and each chat window (#2964). A chat window does not outlive the main window. */
@@ -203,13 +216,8 @@ export function createRendererForwarders({
     // Only "all" notifies a reply. The agent lookup is skipped at the other levels, and while a
     // reply streams, when no reply is new.
     if (level() !== "all" || newChannelReplies(previous, next).length === 0) return;
-    const remoteManager = getRemoteServerManager();
-    const agents =
-      serverId === LOCAL_SERVER_ID
-        ? (getAgentService()?.listAgents() ?? [])
-        : remoteManager
-          ? await runCauseEffect(remoteManager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
-          : [];
+    const agentLookup = notificationAgents(serverId);
+    const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
     // The settings are read again: the user can change them while the lookup runs.
     const current = level();
     if (!current) return;
@@ -267,6 +275,54 @@ export function createRendererForwarders({
   }
 
   /**
+   * The last agent list that each remote server gave. The request can fail just after the event came,
+   * as when the connection drops, and the notification then names the agents of this list.
+   */
+  const remoteAgents = new Map<string, ClientAgentSummary[]>();
+
+  /** The agents of a server. The local list comes at once, so a local notification shows before the event returns. */
+  function notificationAgents(serverId: string): ClientAgentSummary[] | Promise<ClientAgentSummary[]> {
+    if (serverId === LOCAL_SERVER_ID) return getAgentService()?.listAgents() ?? [];
+    const remoteManager = getRemoteServerManager();
+    if (!remoteManager) return [];
+    return runCauseEffect(remoteManager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)).then(
+      (agents) => {
+        remoteAgents.set(serverId, agents);
+        return agents;
+      },
+      () => remoteAgents.get(serverId) ?? [],
+    );
+  }
+
+  /** The last levels that each remote server gave, for a request that fails as the agent list can. */
+  const remoteAgentLevels = new Map<string, ReadonlyMap<string, ServerNotificationLevel>>();
+
+  /**
+   * The level that the user chose for each agent of a server. The local levels come at once. A remote
+   * server gives the levels of this member, and a server without `agent-notification-levels-v1` has none.
+   */
+  function agentNotificationLevels(
+    serverId: string,
+  ): ReadonlyMap<string, ServerNotificationLevel> | Promise<ReadonlyMap<string, ServerNotificationLevel>> {
+    if (serverId === LOCAL_SERVER_ID) return ownAgentNotificationLevels();
+    const remoteManager = getRemoteServerManager();
+    if (!remoteManager?.supportsCapability(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) return new Map();
+    return runCauseEffect(
+      remoteManager.request(serverId, AGENT_NOTIFICATION_LEVELS_ROUTES.read, decodeAgentNotificationLevelsFromHost, {
+        method: "POST",
+        body: {},
+      }),
+    ).then(
+      (snapshot) => {
+        const levels = agentNotificationLevelMap(snapshot);
+        remoteAgentLevels.set(serverId, levels);
+        return levels;
+      },
+      () => remoteAgentLevels.get(serverId) ?? new Map(),
+    );
+  }
+
+  /**
    * The notifications that wait for an answer, by request. An answer on any device withdraws its
    * notification. A request whose notification is still being built has no notification yet, and an
    * answer that arrives then removes the entry, so the notification is not shown.
@@ -288,16 +344,19 @@ export function createRendererForwarders({
     if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
-    const notifyLevel = () => {
+    const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {
       const window = getMainWindow();
       const server = getRemoteServerManager()
         ?.list()
         .find((candidate) => candidate.id === serverId);
       if (!window || window.isDestroyed() || appFocused(window) || !server) return null;
-      return desktopShowsAgentEvent(event, server, desktopNotificationsEnabled()) ? server.notificationLevel : null;
+      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels);
     };
-    // The level also rules out an event before the remote agent lookup.
-    if (!notifyLevel() || !Notification.isSupported()) return;
+    // The level also rules out an event before the remote lookups. The level of an agent can let more
+    // through than the server level, so this first check uses the most open one.
+    const agentId = event.type === "usage-limit-reached" ? null : agentEventAgentId(event);
+    const mostOpen = agentId === null ? null : new Map([[agentId, "all" as const]]);
+    if (!notifyLevel(mostOpen) || !Notification.isSupported()) return;
     const requestKey = notificationRequestKey(serverId, event);
     if (!requestKey) return showAgentNotification(serverId, event, notifyLevel, null);
     // A shown notification of the same request stays until the new one replaces it.
@@ -313,25 +372,21 @@ export function createRendererForwarders({
   async function showAgentNotification(
     serverId: string,
     event: AgentEvent,
-    notifyLevel: () => ServerNotificationLevel | null,
+    notifyLevel: (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => ServerNotificationLevel | null,
     requestKey: string | null,
   ): Promise<void> {
-    const remoteManager = getRemoteServerManager();
     const preview = notificationPreviewEnabled();
     const answer =
       preview && event.type === "turn-completed" && event.status === "completed"
         ? turnAnswer(serverId, event.agentId, event.turnId)
         : null;
-    const agents =
-      serverId === LOCAL_SERVER_ID
-        ? (getAgentService()?.listAgents() ?? [])
-        : remoteManager
-          ? await runCauseEffect(remoteManager.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
-          : [];
+    const agentLookup = notificationAgents(serverId);
+    const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
     const reply = answer ? await answer : null;
     const lookup = eventChannel(serverId, event);
     const channel = lookup instanceof Promise ? await lookup : lookup;
-    const level = notifyLevel();
+    const levelLookup = agentNotificationLevels(serverId);
+    const level = notifyLevel(levelLookup instanceof Promise ? await levelLookup : levelLookup);
     const content = !level
       ? null
       : event.type === "usage-limit-reached"

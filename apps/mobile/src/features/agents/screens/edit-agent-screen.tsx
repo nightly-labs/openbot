@@ -21,7 +21,11 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
-import { AgentNewChatSection, AgentNotificationsRow } from "@/features/agents/components/agent-chat-settings";
+import {
+  AgentNewChatSection,
+  AgentNotificationLevelRow,
+  AgentNotificationsRow,
+} from "@/features/agents/components/agent-chat-settings";
 import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
@@ -109,6 +113,7 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
@@ -116,6 +121,8 @@ function AgentForm({
   const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const showNotifications = agent.notifications !== undefined;
+  // The user's own level shows beside the shared switch, on a host that keeps it for each member.
+  const showNotificationLevel = showNotifications && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
     Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
@@ -515,7 +522,13 @@ function AgentForm({
           {showPermissions || showNotifications || showAdvanced ? (
             <SettingsSection
               title={t("mobile.agent.groups.rules")}
-              footer={showNotifications ? t("mobile.agent.notifications.footer") : undefined}
+              footer={
+                showNotificationLevel
+                  ? t("mobile.agent.notificationLevel.footer")
+                  : showNotifications
+                    ? t("mobile.agent.notifications.footer")
+                    : undefined
+              }
             >
               {showPermissions ? (
                 <SettingsRow
@@ -531,6 +544,7 @@ function AgentForm({
                 </SettingsRow>
               ) : null}
               {showNotifications ? <AgentNotificationsRow agent={agent} available={available} /> : null}
+              {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} available={available} /> : null}
               {showAdvanced ? (
                 <SettingsRow
                   onPress={() =>

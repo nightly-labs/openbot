@@ -153,6 +153,12 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn":
     "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
   "agentSettings.notifications.title": "Bildirimler",
+  "agentSettings.notificationLevel.title": "Bana bildir",
+  "agentSettings.notificationLevel.label": "Bu ajan için bildirimleriniz",
+  "agentSettings.notificationLevel.server": "Sunucu varsayılanı ({level})",
+  "agentSettings.notificationLevel.note":
+    "Bu seçim yalnızca sizin için geçerlidir ve tüm cihazlarınızda uygulanır. Sunucu sessize alınmışsa veya “Hiçbir şey” seçiliyse bu ajan da sessiz kalır.",
+  "agentSettings.notificationLevel.sharedOff": "Bu ajanın bildirimleri tüm üyeler için kapalı.",
   "agentSettings.newChat.title": "Yeni sohbet",
   "agentSettings.newChat.description": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
   "agentSettings.newChat.button": "Başlat",

@@ -707,6 +707,12 @@ server can change it.
   choices. Only the user can read the file, and it is not in the diagnostics export or the data
   export. See [iPhone notifications](#iphone-notifications) and
   [Android notifications](#android-notifications).
+- `~/Library/Application Support/OpenBot/openbot-agent-notification-levels-v1.json` holds the
+  notification level that the owner and each member of this host chose for each agent ("All
+  activity", "Only when it needs me" or "Nothing"), by member ID and agent ID. Each member reads and
+  sets only their own levels, and the host applies them to the desktop notifications of this computer
+  and to the notifications that it sends to that member's phones. A removed member's levels are
+  deleted. It is never sent to the OpenBot account service.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. By default, all agents share one embedded browser profile, including cookies and website
@@ -1361,8 +1367,10 @@ an answer, an approval, or a step in the browser, while the app is not on screen
 send one while the member uses a desktop app. For this, it keeps in memory the time of the last
 send, answer or typing of each session, and on its own computer it reads whether the OpenBot window
 has focus and how long the computer has had no input. While the phone shows the Live Activity of
-that host, the host sends no notification. With Play sound on, the Live Activity update lights up
-the screen and plays the sound instead. For this, the phone gives each connected host, over the
+that host and the activity shows the event, the host sends no notification. With Play sound on, the
+Live Activity update lights up the screen and plays the sound instead. An event that comes while
+the app looks on screen stays in the memory of the host for at most 5 minutes, in case iOS suspended
+the app before it said that it went away, and then goes as a notification if you did not see it. For this, the phone gives each connected host, over the
 encrypted host connection, the Apple push token of the app (none when notifications are off and only
 the Live Activity plays the sound), the 32-byte secret for
 that host (the one of the Live Activity), its interface language, and the choices of the user: the

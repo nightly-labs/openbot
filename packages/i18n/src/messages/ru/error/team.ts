@@ -65,6 +65,8 @@ export const messages = {
   "error.team.sharedDataUnsupported": "Это подключение не поддерживает общие данные.",
   "error.team.agentInstallUnsupported": "Это подключение не поддерживает добавление агентов.",
   "error.team.agentHideUnsupported": "Это подключение не поддерживает скрытие агентов.",
+  "error.team.agentNotificationLevelsUnsupported":
+    "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.agentPublishUnsupported": "Это подключение не поддерживает публикацию агентов.",
   "error.team.agentUpdateUnsupported": "Это подключение не поддерживает обновление агентов.",
   "error.team.contextResetUnsupported": "Это подключение не поддерживает начало нового чата.",

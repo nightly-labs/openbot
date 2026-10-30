@@ -218,7 +218,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
     assert.equal(result.relayPushes, 0);
     assert.equal(events.listenerCount("event"), 1);
     service.disconnected("fixture-session");
-    assert.equal(service.showsEvent("fixture-session", null, null), true);
+    assert.equal(service.showsEvent("fixture-session", { agentId: "fixture-agent", kind: "reply" }, null, null), true);
     result.stage = "relay";
     const push = await received;
     result.relay = { event: push.event, sealedLength: push.sealed?.length ?? 0, priority: push.priority };
@@ -257,7 +257,12 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
         // dispose closes the send scope and clears the registration's retry/keepalive timer.
         await Effect.runPromise(service.dispose());
         result.cleanup.disposeCompleted = true;
-        result.cleanup.registrationRemoved = !service.showsEvent("fixture-session", null, null);
+        result.cleanup.registrationRemoved = !service.showsEvent(
+          "fixture-session",
+          { agentId: "fixture-agent", kind: "reply" },
+          null,
+          null,
+        );
       }
     } catch {
       result.passed = false;

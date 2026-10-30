@@ -156,6 +156,12 @@ export const messages = {
     "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
 
   "agentSettings.notifications.title": "Notifiche",
+  "agentSettings.notificationLevel.title": "Avvisami",
+  "agentSettings.notificationLevel.label": "Le tue notifiche per questo agente",
+  "agentSettings.notificationLevel.server": "Predefinita del server ({level})",
+  "agentSettings.notificationLevel.note":
+    "Questa scelta vale solo per te, su tutti i tuoi dispositivi. Se il server è silenziato o impostato su «Niente», anche questo agente resta in silenzio.",
+  "agentSettings.notificationLevel.sharedOff": "Le notifiche di questo agente sono disattivate per tutti i membri.",
 
   "agentSettings.newChat.title": "Nuova chat",
   "agentSettings.newChat.description": "L'agente dimentica questa chat. La sua configurazione resta.",

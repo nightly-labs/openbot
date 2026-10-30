@@ -1,4 +1,5 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MAX } from "@openbot/ui/components/SettingsPanel";
@@ -18,7 +19,7 @@ import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
-import { conversationRuntime } from "./conversation-runtime";
+import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
@@ -147,6 +148,26 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (props.runtime) return props.runtime.browserProfiles;
     const serverId = browserProfileServerId();
     return serverId === undefined ? undefined : desktopBrowserProfileCalls(serverId);
+  });
+  // Any member keeps an own level for each agent. The calls follow the server id, as above, and a
+  // new server gets new calls, so its panel does not show the levels of the server before.
+  const notificationLevelServerId = createMemo(() =>
+    props.server && serverSupportsCapability(props.server, AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+      ? props.server.id
+      : undefined,
+  );
+  const notificationLevelCalls = createMemo((): AgentNotificationLevelCalls | undefined => {
+    const serverId = notificationLevelServerId();
+    if (serverId === undefined) return undefined;
+    const remote = props.runtime;
+    if (remote) {
+      const calls = remote.agentNotificationLevels;
+      return calls ? { list: () => calls.list(), set: (input) => calls.set(input) } : undefined;
+    }
+    return {
+      list: () => conversationPort().agent.listAgentNotificationLevels(serverId),
+      set: (input) => conversationPort().agent.setAgentNotificationLevel(input, serverId),
+    };
   });
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   /** The panes this chat can open. The web client has no Files pane, and a chat without a thread has no files. */
@@ -489,6 +510,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 serverCanAdminister(props.server, BROWSER_PROFILES_CAPABILITY) ? browserProfileCalls() : undefined
               }
               onManageBrowserProfiles={props.onManageBrowserProfiles}
+              notificationLevelCalls={notificationLevelCalls()}
+              serverNotificationLevel={props.server?.notificationLevel}
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
               maxWidth={settingsMaxWidth}

@@ -32,6 +32,7 @@ import {
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
@@ -39,6 +40,10 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import {
+  AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NOTIFICATION_LEVELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -99,6 +104,7 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
+import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
@@ -591,6 +597,9 @@ const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-al
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real store of the levels that each member chose for each agent, on a temporary file.
+const agentLevelsFile = join(root, "agent-notification-levels.json");
+const agentLevels = new AgentNotificationLevelStore(agentLevelsFile);
 const readMachine = () =>
   Effect.sync(() => {
     record("machineMetrics");
@@ -782,6 +791,10 @@ try {
           record("resetProviderUsage", { provider, accountId });
           return "reset" as const;
         }),
+    },
+    agentNotificationLevels: {
+      snapshot: (memberId, hiddenIds) => agentLevels.snapshot(memberId, hiddenIds),
+      set: (memberId, input) => agentLevels.set(memberId, input),
     },
     hiddenAgents: {
       listHiddenAgents: () => hidden,
@@ -1691,6 +1704,89 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Agent notification levels (agent-notification-levels-v1) ----
+  {
+    const capabilities = [AGENT_NOTIFICATION_LEVELS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 7 });
+    check(
+      "the host advertises agent-notification-levels-v1",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, { token: bobToken, json: {} });
+    check(
+      "the agent notification level routes without the capability get 400 agentNotificationLevelsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentNotificationLevelsUnsupported")),
+      summary(unsupported),
+    );
+    const memberSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: "nothing" },
+      capabilities,
+    });
+    const memberRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    const adminRead = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "a member sets a level for an agent; it is the member's own, and another member does not see it",
+      memberSet.status === 200 &&
+        isDeepStrictEqual(memberSet.body, { agents: [{ agentId: "agent-ada", level: "nothing" }] }) &&
+        isDeepStrictEqual(memberRead.body, memberSet.body) &&
+        adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { agents: [] }),
+      [summary(memberSet), summary(memberRead), summary(adminRead)],
+    );
+    const missing = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-none", level: "all" },
+      capabilities,
+    });
+    const hiddenSet = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-pi", level: "all" },
+      capabilities,
+      protocol: 6,
+    });
+    const invalid = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: "loud" },
+      capabilities,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404, and a wrong level gets 400",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        invalid.status === 400,
+      [summary(missing), summary(hiddenSet), summary(invalid)],
+    );
+    // The file has one entry: the member that chose a level. A restart reads it.
+    const saved = JSON.parse(readFileSync(agentLevelsFile, "utf8"));
+    const memberKeys = isDynamicRecord(saved) && isDynamicRecord(saved.members) ? Object.keys(saved.members) : [];
+    const reloaded = new AgentNotificationLevelStore(agentLevelsFile);
+    await runCauseEffect(reloaded.load());
+    const reloadedLevels = memberKeys.map((key) => reloaded.snapshot(key));
+    const cleared = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+      token: bobToken,
+      json: { agentId: "agent-ada", level: null },
+      capabilities,
+    });
+    check(
+      "the host keeps the level after a restart, and a null level removes it",
+      memberKeys.length === 1 &&
+        isDeepStrictEqual(reloadedLevels, [{ agents: [{ agentId: "agent-ada", level: "nothing" }] }]) &&
+        cleared.status === 200 &&
+        isDeepStrictEqual(cleared.body, { agents: [] }),
+      [summary(cleared), reloadedLevels],
     );
   }
 

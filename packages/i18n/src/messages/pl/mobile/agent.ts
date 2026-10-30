@@ -357,6 +357,12 @@ export const messages = {
   "mobile.agent.notifications.footer": "Powiadomienia są takie same dla każdego członka tego serwera.",
   "mobile.agent.notifications.failed": "Nie udało się zmienić powiadomień",
   "mobile.agent.notifications.failedBody": "Host nie mógł zapisać tej zmiany.",
+  "mobile.agent.notificationLevel.title": "Powiadamiaj mnie o",
+  "mobile.agent.notificationLevel.server": "Ustawienie serwera",
+  "mobile.agent.notificationLevel.footer":
+    "Przełącznik dotyczy każdego członka tego serwera. Gdy jest wyłączony, żaden członek nie dostaje powiadomień. „Powiadamiaj mnie o” dotyczy tylko ciebie, na wszystkich twoich urządzeniach. „Nic” lub wyciszenie w ustawieniach powiadomień tego serwera nadal je zatrzymuje.",
+  "mobile.agent.notificationLevel.unsupported":
+    "Ten serwer nie może zapisać twojego poziomu powiadomień dla agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "mobile.agent.newChat.title": "Nowy czat",
   "mobile.agent.newChat.starting": "Rozpoczynanie nowego czatu…",
   "mobile.agent.newChat.footer": "Agent zapomni ten czat. Jego konfiguracja zostanie.",

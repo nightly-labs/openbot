@@ -551,6 +551,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   usePushNotifications({
     servers,
+    serversReady: serverDirectoryState === "ready",
     foreground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
