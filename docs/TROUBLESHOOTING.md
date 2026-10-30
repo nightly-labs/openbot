@@ -14,7 +14,8 @@ If the command is missing, install Codex using the official installer:
 curl -fsSL https://chatgpt.com/codex/install.sh | sh
 ```
 
-Then run `codex login`, sign in with ChatGPT, fully quit OpenBot, and open it again.
+Then run `codex login`, sign in with ChatGPT, fully quit OpenBot, and open it again. To use OpenAI
+API credits instead of a ChatGPT plan, run `printenv OPENAI_API_KEY | codex login --with-api-key`.
 
 You can use Claude instead. Verify and install Claude CLI:
 

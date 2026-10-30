@@ -656,8 +656,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...context.accountEnvironment,
       }),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
+    // `codex login --with-api-key` signs in with an OpenAI API key; its turns use API credits and it
+    // has no plan usage to read.
     validateAccount: (account) => {
-      if (account.type !== "chatgpt") {
+      if (account.type !== "chatgpt" && account.type !== "apiKey") {
         throw new Error(sourceText("error.provider.codexLoginRequired"));
       }
     },
