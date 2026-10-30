@@ -589,6 +589,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
+      ...this.#mcpAgentParam(agent, client),
       ...this.#instructions(
         agent,
         client,
@@ -780,7 +781,9 @@ export class ThreadLifecycle {
     ThreadOperationFailed
   > {
     if (client.provider !== "codex") return {};
-    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpEndpoint).pipe(toThreadOperationFailed);
+    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpEndpoint, agent.id).pipe(
+      toThreadOperationFailed,
+    );
     const { servers, dropped } = yield* threadStep(() => codexMcpServers(usable, own.transports));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = codexThreadMcpServers(own.disabled, servers);
@@ -994,6 +997,14 @@ export class ThreadLifecycle {
     return client.provider === "codex" || agentComputerUseEnabled(agent) ? {} : { computerUse: false };
   }
 
+  /**
+   * The agent, for Claude and the ACP clients, which read the servers themselves. Codex gets its
+   * servers from `codexConfigEffect` and takes the params as they are, so it is told nothing.
+   */
+  #mcpAgentParam(agent: AgentSummary, client: AgentClient): { openbotAgentId?: string } {
+    return client.provider === "codex" ? {} : { openbotAgentId: agent.id };
+  }
+
   private readonly hasCurrentToolsEffect = Effect.fn("ThreadLifecycle.hasCurrentTools")(function* (
     this: ThreadLifecycle,
     agent: AgentSummary,
@@ -1122,6 +1133,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
+      ...this.#mcpAgentParam(agent, client),
       ...this.#instructions(
         agent,
         client,

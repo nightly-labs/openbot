@@ -97,6 +97,7 @@ import {
   type McpEndpointSource,
   type McpServerSource,
   type McpToolRuntimeSource,
+  mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { PendingServerRequests } from "./pending-server-requests";
@@ -171,6 +172,8 @@ interface ThreadConfig {
   workspaceOnly: boolean;
   /** Folders in the roots where Workspace only denies all writes. */
   excludedFolders: string[];
+  /** The agent, so the MCP sign-in proxy can name it to a server. See `mcpAgentParam`. */
+  agentId: string | null;
 }
 
 interface ActiveTurn {
@@ -837,6 +840,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             agentMcpServers(this.#mcpServers(), config.computerUse),
             this.#mcpToolRuntimes?.(),
             this.#mcpEndpoint,
+            config.agentId,
           ).pipe(toProviderClientOperationError),
         );
     const stateDirectory = this.#stateDirectory;
@@ -2162,6 +2166,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
         : [],
+    agentId: mcpAgentParam(params),
   };
 }
 

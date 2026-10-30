@@ -336,6 +336,11 @@ export interface ProviderClientContext {
    */
   readonly mcpOAuthProxySettings?: McpOAuthProxySettingsStore;
   /**
+   * The OpenBot version that the OAuth proxy names to a server it signed in to. Optional: without it
+   * the proxy passes on the provider's own `clientInfo`.
+   */
+  readonly appVersion?: string;
+  /**
    * Whether this model may still be used. A removed endpoint stays in the running process, with the
    * credentials it started with, until that process restarts, and the restart waits for the work in
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.

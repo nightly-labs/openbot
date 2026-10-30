@@ -769,7 +769,10 @@ Network traffic can also occur when:
   removes it, OpenBot sends the tokens it deleted to that same service once, to revoke them.
   Agents reach a server that OpenBot signed in to through a local server on `127.0.0.1`, which adds
   the token to each call, so the token does not go to the agent's process.
-  Nothing about the user's agents, conversations or files is sent in those requests. The
+  That local server tells the MCP server that the client is OpenBot: it sends
+  `User-Agent: OpenBot/<version>` and, when a session starts, the client name `openbot`, the
+  OpenBot version and the title `<agent name> (OpenBot)`, so the server can show which agent made a
+  change. Nothing else about the user's agents, conversations or files is sent in those requests. The
   registration names OpenBot's logo at `openbot.run`; an authorization service that shows it on its
   sign-in page can make the browser load it from `openbot.run`;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it

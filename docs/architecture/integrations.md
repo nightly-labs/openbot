@@ -75,8 +75,9 @@ probe are not changed.
 
 | Part | Rule |
 | --- | --- |
-| Address | `http://127.0.0.1:<port>/mcp/<route>`. The route is a digest of the row id and its URL, so a changed URL is a new route. |
-| Bearer | An HMAC of the route with the proxy secret. A bearer opens one route only. It is compared with `timingSafeEqual` and registered for redaction. |
+| Address | `http://127.0.0.1:<port>/mcp/<route>/<agent>`. The route is a digest of the row id and its URL, so a changed URL is a new route. The agent segment is a digest of the agent id (`mcpOAuthProxyAgentKey`). `/mcp/<route>` with no agent segment stays valid: Codex sessions from before the segment hold it. |
+| Bearer | An HMAC of the route and the agent segment with the proxy secret. A bearer opens one route for one agent only. It is compared with `timingSafeEqual` and registered for redaction. |
+| Identity | The `clientInfo` of each `initialize` becomes `{ name: "openbot", title: "<agent name> (OpenBot)", version, websiteUrl }`; the name is read at each `initialize`, so a rename shows in the next session. With no known agent the title is `OpenBot`. `User-Agent` is `OpenBot/<version>` unless the row sets one. A body that is not JSON or is larger than 64 KiB goes through unchanged. |
 | Refused with 403 | A `Host` that is not `127.0.0.1:<port>` or `localhost:<port>`, an unknown path, a wrong bearer. |
 | Upstream | The row's URL and its headers, with the current token. The provider's `Authorization` and cookies are not sent. Only same-origin 307 and 308 redirects are followed, at most 3. |
 | Server answers 401 | One `McpOAuth.refreshAccessToken`, then one retry with the new token. |

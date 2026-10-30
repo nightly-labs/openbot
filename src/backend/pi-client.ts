@@ -21,6 +21,7 @@ import {
   type McpEndpointSource,
   type McpServerSource,
   type McpToolRuntimeSource,
+  mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { mcpSecretValues, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
@@ -459,6 +460,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           agentMcpServers(this.options.mcpServers?.() ?? [], computerUseParam(params)),
           this.options.mcpToolRuntimes?.(),
           this.options.mcpEndpoint,
+          mcpAgentParam(params),
         ).pipe(toProviderClientOperationError),
       );
       this.options.reportMcpDrops?.(this.provider, handoff.dropped);
