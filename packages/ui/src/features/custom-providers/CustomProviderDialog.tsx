@@ -1,12 +1,14 @@
 import { ProviderLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderHarness, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import type { CustomProviderHarness, ProviderRuntimeStatus, SaveCustomProviderInput } from "@openbot/contracts/ipc";
 import { agentProviderName, CUSTOM_PROVIDER_LIMITS, DEFAULT_CUSTOM_PROVIDER_HARNESS } from "@openbot/contracts/ipc";
 import {
   ArrowLeft,
   Button,
+  buttonVariants,
   Checkbox,
   Dialog,
+  Download,
   Field,
   Heading,
   IconButton,
@@ -62,6 +64,19 @@ const HEADER_NAME_PLACEHOLDER = "Header-Name";
 export interface CustomProviderHarnessChoice {
   id: CustomProviderHarness;
   ready: boolean;
+  /** The download of a provider that is not ready, when OpenBot downloads it. */
+  runtime?: ProviderRuntimeStatus | undefined;
+}
+
+/** Where the download of a provider that cannot run the endpoint yet is. */
+function harnessDownload(choice: CustomProviderHarnessChoice): ProviderRuntimeStatus["phase"] | null {
+  const phase = choice.ready ? null : choice.runtime?.phase;
+  return phase && phase !== "ready" ? phase : null;
+}
+
+/** A download that waits for the user: the first one, or one that failed. */
+function startsDownload(phase: ProviderRuntimeStatus["phase"] | null): boolean {
+  return phase === "not-downloaded" || phase === "download-error";
 }
 
 type ModelRow = CustomProviderDraft["models"][number];
@@ -106,6 +121,13 @@ interface CustomProviderDialogProps {
    * endpoint without one, and the host runs it on OpenCode.
    */
   harnesses?: readonly CustomProviderHarnessChoice[] | undefined;
+  /**
+   * Downloads a provider of "Runs on" that is not ready. Without it, the list shows only the
+   * providers that can run the endpoint now.
+   */
+  onDownloadHarness?: ((harness: CustomProviderHarness) => void) | undefined;
+  /** Why the last download of "Runs on" failed. The host's own alert is behind the dialog. */
+  harnessError?: string | undefined;
   /**
    * The last model list request. The host owns it because the request leaves the renderer. Without
    * `onDiscoverModels` the dialog has no find control and only the typed rows.
@@ -153,6 +175,20 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   /** The saved choice, or the first provider that can run the endpoint now. */
   const harness = (): CustomProviderHarness =>
     draft.harness ?? props.harnesses?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+  const choiceOf = (id: CustomProviderHarness): CustomProviderHarnessChoice =>
+    props.harnesses?.find((choice) => choice.id === id) ?? { id, ready: true };
+  /** The phase of the chosen provider's download while it runs, for the closed field. */
+  const downloading = (id: CustomProviderHarness): ProviderRuntimeStatus["phase"] | null => {
+    const phase = harnessDownload(choiceOf(id));
+    return phase === "downloading" || phase === "finishing" ? phase : null;
+  };
+  function downloadText(phase: ProviderRuntimeStatus["phase"], progress: number | null | undefined): string {
+    if (phase === "downloading")
+      return t("provider.picker.downloading", { percent: format.percent(Math.round(progress ?? 0) / 100) });
+    if (phase === "finishing") return t("provider.status.settingUp");
+    if (phase === "download-error") return t("common.retry");
+    return t("common.download");
+  }
 
   // The form itself scrolls, and its own box keeps the same size when a row is added, so the
   // helper's ResizeObserver never fires for new content. Remeasure on what changes the height.
@@ -398,31 +434,81 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     <Field
                       label={t("customProvider.field.harness")}
                       description={t("customProvider.field.harnessHint")}
+                      error={props.harnessError || undefined}
                     >
                       <Select<CustomProviderHarness>
-                        // Only the providers that can run the endpoint now, and the saved one, as the
-                        // default provider select does, so the list stays one control for any number.
+                        // The providers that can run the endpoint now, the saved one, and the ones to
+                        // download, as the default provider select does, so the list stays one control.
                         options={choices()
-                          .filter((choice) => choice.ready || choice.id === harness())
+                          .filter(
+                            (choice) =>
+                              choice.ready ||
+                              choice.id === harness() ||
+                              (props.onDownloadHarness && harnessDownload(choice)),
+                          )
                           .map((choice) => choice.id)}
                         value={harness()}
-                        onChange={(next) =>
-                          next &&
+                        onChange={(next) => {
+                          // A click on the chosen item clears the choice; on a failed download it retries.
+                          const chosen = next ?? harness();
                           setDraft((state) => {
-                            state.harness = next;
-                          })
-                        }
+                            state.harness = chosen;
+                          });
+                          if (startsDownload(harnessDownload(choiceOf(chosen)))) props.onDownloadHarness?.(chosen);
+                        }}
                         disabled={busy()}
                         placement="bottom-start"
                         itemComponent={(itemProps) => (
-                          <SelectItem item={itemProps.item}>
+                          <SelectItem
+                            item={itemProps.item}
+                            class="custom-provider-harness-item"
+                            data-action={harnessDownload(choiceOf(itemProps.item.rawValue)) ? "" : undefined}
+                          >
                             <HarnessLabel harness={itemProps.item.rawValue} />
+                            <Show when={harnessDownload(choiceOf(itemProps.item.rawValue))}>
+                              {(phase) => (
+                                <Show
+                                  when={startsDownload(phase())}
+                                  fallback={
+                                    <Text tone="muted" variant="caption" class="custom-provider-harness-action">
+                                      {downloadText(phase(), choiceOf(itemProps.item.rawValue).runtime?.progress)}
+                                    </Text>
+                                  }
+                                >
+                                  {/* The item is the control; the button shape shows what a choice of it does. */}
+                                  <span
+                                    class={buttonVariants({
+                                      variant: "default",
+                                      size: "xs",
+                                      class: "custom-provider-harness-action custom-provider-harness-button",
+                                    })}
+                                  >
+                                    <Show when={phase() === "not-downloaded"}>
+                                      <Download aria-hidden="true" />
+                                    </Show>
+                                    {downloadText(phase(), null)}
+                                  </span>
+                                </Show>
+                              )}
+                            </Show>
                           </SelectItem>
                         )}
                       >
                         <SelectTrigger size="sm" aria-label={t("customProvider.field.harness")}>
-                          <SelectValue<CustomProviderHarness>>
-                            {(state) => <HarnessLabel harness={state.selectedOption()} />}
+                          <SelectValue<CustomProviderHarness> class="custom-provider-harness-value">
+                            {(state) => (
+                              <>
+                                <HarnessLabel harness={state.selectedOption()} />
+                                <Show when={downloading(state.selectedOption())}>
+                                  {(phase) => (
+                                    <span class="custom-provider-harness-progress">
+                                      <Spinner size="sm" />
+                                      {downloadText(phase(), choiceOf(state.selectedOption()).runtime?.progress)}
+                                    </span>
+                                  )}
+                                </Show>
+                              </>
+                            )}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent mount={mount()} />

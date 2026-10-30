@@ -132,11 +132,13 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   /** Edit and "Runs on" are both of this computer: a joined server's host runs each endpoint on OpenCode. */
   const harnesses = () =>
     props.onUpdateCustomProvider
-      ? CUSTOM_PROVIDER_HARNESSES.map((id) => ({
-          id,
-          ready: servesCustomProvider(props.store.providerOptions().find((option) => option.id === id)),
-        }))
+      ? CUSTOM_PROVIDER_HARNESSES.map((id) => {
+          const option = props.store.providerOptions().find((item) => item.id === id);
+          return { id, ready: servesCustomProvider(option), runtime: option?.runtimeStatus };
+        })
       : undefined;
+  const downloadHarness = () =>
+    props.onDownloadProvider ? (id: AgentProviderId) => void downloadProvider(id) : undefined;
   /** The provider of the Custom choice: the one that runs the endpoint of its model. */
   const customProvider = (): AgentProviderId => {
     const model = defaultCustomModel() ?? firstEndpointModel();
@@ -331,6 +333,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           // Edit and the context window are both of this computer: the Team API has neither.
           contextWindows={Boolean(props.onUpdateCustomProvider)}
           harnesses={harnesses()}
+          onDownloadHarness={downloadHarness()}
+          harnessError={downloadError()}
           busy={host.state.saving}
           submitError={host.state.submitError}
           takenProviderIds={customProviders().map((provider) => provider.id)}
@@ -356,6 +360,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
               takenProviderIds={customProviders().map((provider) => provider.id)}
               takenAgentIds={props.takenAgentIds}
               harnesses={harnesses()}
+              onDownloadHarness={downloadHarness()}
+              harnessError={downloadError()}
               onClose={() => setPresetFor(null)}
               onSaved={host.showSaved}
             />
