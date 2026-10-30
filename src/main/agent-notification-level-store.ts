@@ -85,13 +85,15 @@ export class AgentNotificationLevelStore {
     key: string,
     { agentId, level }: SetAgentNotificationLevelInput,
   ) {
-    const current = this.#members[key] ?? NO_LEVELS;
-    const agents = { ...current.agents };
-    if (level === null) delete agents[agentId];
-    else agents[agentId] = level;
-    // The oldest choices go first. A person cannot see this many agents at once.
-    const kept = Object.fromEntries(Object.entries(agents).slice(-AGENT_NOTIFICATION_LEVEL_LIMIT));
-    yield* this.#write({ ...this.#members, [key]: { server: current.server, agents: kept } });
+    yield* this.#update((members) => {
+      const current = members[key] ?? NO_LEVELS;
+      const agents = { ...current.agents };
+      if (level === null) delete agents[agentId];
+      else agents[agentId] = level;
+      // The oldest choices go first. A person cannot see this many agents at once.
+      const kept = Object.fromEntries(Object.entries(agents).slice(-AGENT_NOTIFICATION_LEVEL_LIMIT));
+      return { ...members, [key]: { server: current.server, agents: kept } };
+    });
     this.#changed(key);
     return this.snapshot(key);
   });
@@ -101,8 +103,10 @@ export class AgentNotificationLevelStore {
     key: string,
     level: ServerNotificationLevel | null,
   ) {
-    const current = this.#members[key] ?? NO_LEVELS;
-    yield* this.#write({ ...this.#members, [key]: { server: level, agents: current.agents } });
+    yield* this.#update((members) => ({
+      ...members,
+      [key]: { server: level, agents: (members[key] ?? NO_LEVELS).agents },
+    }));
     this.#changed(key);
     return this.snapshot(key);
   });
@@ -112,29 +116,43 @@ export class AgentNotificationLevelStore {
     this: AgentNotificationLevelStore,
     key: string,
   ) {
-    if (!this.#members[key]) return;
-    const { [key]: _removed, ...rest } = this.#members;
-    yield* this.#write(rest);
+    yield* this.#update((members) => {
+      if (!members[key]) return null;
+      const { [key]: _removed, ...rest } = members;
+      return rest;
+    });
   });
 
   #changed(key: string): void {
     for (const listener of this.#listeners) listener(key);
   }
 
-  #write(members: Readonly<Record<string, MemberLevels>>): Effect.Effect<void, PreferenceFileFailure> {
-    // A person with no levels left has no entry.
-    const kept = Object.fromEntries(
-      Object.entries(members).filter(([, levels]) => levels.server !== null || Object.keys(levels.agents).length > 0),
-    );
+  /**
+   * Saves the result of `change`, or nothing when it gives `null`. The change reads the levels inside
+   * the write permit, so a change that starts while another one is saved builds on its result.
+   */
+  #update(
+    change: (members: Readonly<Record<string, MemberLevels>>) => Readonly<Record<string, MemberLevels>> | null,
+  ): Effect.Effect<void, PreferenceFileFailure> {
     return this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 2, members: kept }).pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
-              this.#members = kept;
-            }),
-          ),
-        ),
+        Effect.suspend(() => {
+          const members = change(this.#members);
+          if (!members) return Effect.void;
+          // A person with no levels left has no entry.
+          const kept = Object.fromEntries(
+            Object.entries(members).filter(
+              ([, levels]) => levels.server !== null || Object.keys(levels.agents).length > 0,
+            ),
+          );
+          return writePreferenceFile(this.#path, { version: 2, members: kept }).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                this.#members = kept;
+              }),
+            ),
+          );
+        }),
       ),
     );
   }

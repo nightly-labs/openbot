@@ -1879,6 +1879,60 @@ try {
       [summary(serverSet), summary(adminServerRead), summary(serverInvalid), keptServerLevels, summary(serverCleared)],
     );
 
+    // Changes that a member makes at the same time all stay, as two fast clicks or a desktop and a phone
+    // do: each one builds on the one saved before it.
+    const together = await Promise.all([
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId: "agent-ada", level: "nothing" },
+        capabilities,
+      }),
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId: "agent-oc", level: "all" },
+        capabilities,
+      }),
+      call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+        token: bobToken,
+        json: { level: "needs-me" },
+        capabilities,
+      }),
+    ]);
+    const afterTogether = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    const togetherAgents = isDynamicRecord(afterTogether.body)
+      ? list(afterTogether.body.agents).toSorted((left, right) =>
+          String(isDynamicRecord(left) ? left.agentId : "").localeCompare(
+            String(isDynamicRecord(right) ? right.agentId : ""),
+          ),
+        )
+      : [];
+    check(
+      "level changes that a member makes at the same time all stay",
+      together.every((reply) => reply.status === 200) &&
+        isDynamicRecord(afterTogether.body) &&
+        afterTogether.body.server === "needs-me" &&
+        isDeepStrictEqual(togetherAgents, [
+          { agentId: "agent-ada", level: "nothing" },
+          { agentId: "agent-oc", level: "all" },
+        ]),
+      [together.map(summary), summary(afterTogether)],
+    );
+    for (const agentId of ["agent-ada", "agent-oc"])
+      await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, {
+        token: bobToken,
+        json: { agentId, level: null },
+        capabilities,
+      });
+    await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, {
+      token: bobToken,
+      json: { level: null },
+      capabilities,
+    });
+
     // A change on one device reaches the other devices of the same member at once, and no other member.
     const openLevelsSocket = async (token: string) => {
       const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
