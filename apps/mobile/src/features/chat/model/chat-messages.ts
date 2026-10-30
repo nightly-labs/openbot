@@ -19,6 +19,7 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   channelRoutingConversationEvent,
   isContextResetMarker,
+  mcpSignInEvent,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -50,6 +51,8 @@ export type ChatMessage =
     }
   /** Where a new chat started: the agent does not see the messages above it. */
   | { id: string; kind: "context-reset" }
+  /** An MCP server that the agent saved and that waits for the person's sign-in, as the desktop card. */
+  | { id: string; kind: "mcp-sign-in"; mcpServerId: string }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
   | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: MobileTextKey; routineName: string }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
@@ -165,6 +168,7 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedSignIns = new WeakMap<ConversationMessage, ChatMessage>();
 
 const ROUTINE_RUN_LABELS = {
   queued: "mobile.chat.routine.invoked",
@@ -334,6 +338,18 @@ export function projectChatMessages(
       );
       continue;
     }
+    // The sign-in request is a system message too. Like desktop, it shows as a card.
+    const signIn = mcpSignInEvent(message);
+    if (signIn) {
+      result.push(
+        projectedMarker(projectedSignIns, message, () => ({
+          id: `mcp-sign-in:${message.id}`,
+          kind: "mcp-sign-in",
+          mcpServerId: signIn.mcpServerId,
+        })),
+      );
+      continue;
+    }
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;
@@ -439,7 +455,13 @@ export function groupExchangeMarkers<T extends ChatMessage>(messages: readonly T
  * message ID after its prefix, and a group row holds several markers. -1 when no row shows it.
  */
 export function chatRowIndex(rows: readonly (ChatMessage | ExchangeGroup)[], messageId: string): number {
-  const ids = new Set([messageId, `exchange:${messageId}`, `routine:${messageId}`, `context-reset:${messageId}`]);
+  const ids = new Set([
+    messageId,
+    `exchange:${messageId}`,
+    `routine:${messageId}`,
+    `context-reset:${messageId}`,
+    `mcp-sign-in:${messageId}`,
+  ]);
   return rows.findIndex((row) =>
     row.kind === "exchange-group" ? row.exchanges.some((marker) => ids.has(marker.id)) : ids.has(row.id),
   );
