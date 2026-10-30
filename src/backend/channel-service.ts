@@ -28,6 +28,7 @@ import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
 import {
+  assignmentText,
   ChannelHistory,
   type ChannelTextModel,
   type DeliveredChannelContext,
@@ -409,14 +410,25 @@ export class ChannelService {
       return result;
     }
     if (command.type === "archive" || command.type === "restore") {
-      const tasks =
-        command.type === "archive"
-          ? (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => !terminal(task))
+      const open = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => !terminal(task));
+      const tasks = command.type === "archive" ? open : [];
+      // The archive paused its work with no reason, so the restored channel would show no way to
+      // continue it. The restore gives each of those tasks the reason that a stop gives.
+      const restored =
+        command.type === "restore"
+          ? open
+              .filter((task) => task.state === "paused" && !task.error)
+              .map((task): ChannelTask => ({ ...task, error: sourceText("error.backend.channelTaskStopped") }))
           : [];
       const result = yield* channelSync(() =>
         this.store.update(
           { ...channel, archived: command.type === "archive" },
-          { tasks: tasks.map((task) => ({ ...task, state: "paused", revision: task.revision + 1 })) },
+          {
+            tasks: [
+              ...tasks.map((task): ChannelTask => ({ ...task, state: "paused", revision: task.revision + 1 })),
+              ...restored,
+            ],
+          },
           operationId,
         ),
       );
@@ -466,16 +478,34 @@ export class ChannelService {
         const eligible = this.eligibleMembers(current);
         const recipients = this.#recipients(eligible, text, command.recipientAgentId);
         const continues =
-          /^(?:also|instead|actually|please change|change that|correction|continue|yes|no|use that|make it)\b/iu.test(
+          /^(?:also|instead|actually|please change|change that|correction|continue|resume|go on|keep going|yes|no|use that|make it)\b/iu.test(
             text.trim(),
           );
         // Each recipient answers separately, so a request to several members starts new work; it
         // does not continue the one task that a reply names. When the open work is the tasks that
-        // several members own for one request, "continue" continues each one that the user stopped,
+        // several members own for one request, a follow-up continues each one that the user stopped,
         // or each of them when none is stopped. A member that still works is left as it is.
         const roots = open.filter((task) => task.parentTaskId === null);
-        const stoppedRoots = roots.filter((task) => task.state === "paused");
-        const openRoots = stoppedRoots.length ? stoppedRoots : roots;
+        const pausedRoots = roots.filter((task) => task.state === "paused");
+        const openRoots = pausedRoots.length ? pausedRoots : roots;
+        // "continue" names no task, and the user says it about the work that was stopped last. Other
+        // open work, such as a task that failed days ago, does not make it ambiguous: the request of
+        // the newest stopped task chooses, and every stopped task of that request continues. A task
+        // that the user stopped comes before one that failed, and a member named as the recipient
+        // continues its own stopped task before it takes over the task of another member.
+        const failedRoots = roots.filter((task) => task.state === "failed");
+        const stoppedRoots = pausedRoots.length ? pausedRoots : failedRoots;
+        const sequence = (task: ChannelTask) =>
+          messages.find((message) => message.id === task.sourceMessageIds[0])?.sequence ?? 0;
+        const newest = (tasks: ChannelTask[]) =>
+          tasks.reduce<ChannelTask | undefined>(
+            (found, task) => (!found || sequence(task) > sequence(found) ? task : found),
+            undefined,
+          );
+        const newestStopped = newest(stoppedRoots);
+        const stoppedRequest = newestStopped ? stoppedRoots.filter((task) => sameRequest(task, newestStopped)) : [];
+        const own = (tasks: ChannelTask[]) => newest(tasks.filter((task) => task.ownerAgentId === recipients[0]));
+        const recipientStopped = own(pausedRoots) ?? own(failedRoots);
         const continued: ChannelTask[] =
           recipients.length > 1
             ? []
@@ -483,14 +513,18 @@ export class ChannelService {
               ? allTasks.filter((task) => task.id === referenced.taskId)
               : !continues
                 ? []
-                : open.length === 1
-                  ? open
-                  : !referenced &&
-                      roots.length > 1 &&
-                      roots.every((task) => roots[0] && sameRequest(task, roots[0])) &&
-                      open.every((task) => roots.some((root) => root.id === task.rootTaskId))
-                    ? openRoots
-                    : [];
+                : !referenced && newestStopped && /^(?:continue|resume|go on|keep going)\b/iu.test(text.trim())
+                  ? recipients[0]
+                    ? [recipientStopped ?? newestStopped]
+                    : stoppedRequest
+                  : open.length === 1
+                    ? open
+                    : !referenced &&
+                        roots.length > 1 &&
+                        roots.every((task) => roots[0] && sameRequest(task, roots[0])) &&
+                        open.every((task) => roots.some((root) => root.id === task.rootTaskId))
+                      ? openRoots
+                      : [];
         const previous = continued[0];
         // A reply to a member is addressed to that member. The arm above only catches a reply that
         // carries a task; a plain progress note and the lead's own dispatch carry none, and those
@@ -502,7 +536,8 @@ export class ChannelService {
         const resumed = continued.map(
           (item, index): ChannelTask => ({
             ...item,
-            instruction: text,
+            // The task keeps the request it was made for. The new message is its request now, and the
+            // dispatch and the packet give it as a follow-up: "continue" alone is no assignment.
             dependencies: [],
             requestMessageId: id,
             sourceMessageIds: [...item.sourceMessageIds.slice(-30), id],
@@ -572,15 +607,21 @@ export class ChannelService {
             const before = continued[index];
             if (!before) return;
             // A failed steer starts the task again from a new delivery, and the other steers go on.
-            const steered = yield* this.#steerEffect(current.id, item, message).pipe(
-              Effect.catch((failure) =>
-                Effect.sync(() => {
-                  this.hooks.error(failure.cause);
-                  return false;
-                }),
-              ),
-            );
-            if (!steered) yield* this.interruptTasks(current.id, [before]);
+            // A stopped task is not steered: its turn can still be ending, and a correction that
+            // turn accepted ended with it, which stopped the resumed task again.
+            const stopped = before.state === "paused" || before.state === "failed";
+            const steered = stopped
+              ? false
+              : yield* this.#steerEffect(current.id, item, message).pipe(
+                  Effect.catch((failure) =>
+                    Effect.sync(() => {
+                      this.hooks.error(failure.cause);
+                      return false;
+                    }),
+                  ),
+                );
+            // A pump can start the resumed task before this runs, so only the older turn stops.
+            if (!steered) yield* this.interruptTasks(current.id, [item], { staleOnly: true });
           }),
         { concurrency: "unbounded", discard: true },
       );
@@ -634,7 +675,8 @@ export class ChannelService {
       (task): ChannelTask => ({
         ...task,
         state: command.type === "stop" ? "paused" : "queued",
-        error: null,
+        // The reason is what offers Continue and Reassign; a task that an archive paused has none.
+        error: command.type === "stop" ? sourceText("error.backend.channelTaskStopped") : null,
         revision: task.revision + 1,
         assignmentCount: command.type !== "stop" ? 0 : task.assignmentCount,
         ownerAgentId:
@@ -851,13 +893,38 @@ export class ChannelService {
    */
   #recipients(eligible: readonly string[], text: string, recipientAgentId: string | null | undefined): string[] {
     const address = leadingAddress(text);
+    const mentions = address.mentions.map((mention) => mention.id).filter((agentId) => eligible.includes(agentId));
     return [
       ...new Set([
         ...(recipientAgentId ? [recipientAgentId] : []),
-        ...address.mentions.map((mention) => mention.id).filter((agentId) => eligible.includes(agentId)),
+        ...(mentions.length || address.everyone ? mentions : this.#typedAddress(eligible, text)),
         ...(address.everyone ? eligible : []),
       ]),
     ];
+  }
+
+  /**
+   * A name typed after "@" without the mention picker: "@Chief push the branch". It has no tag, so
+   * the lead had to route it, and a routing answer that could not be read left the task with no
+   * member. Only an exact name of one eligible member is an address; the longest name wins, so
+   * "@Code Reviewer" is not "@Code".
+   */
+  #typedAddress(eligible: readonly string[], text: string): string[] {
+    const typed = text.trimStart();
+    if (!typed.startsWith("@")) return [];
+    const matches = this.hooks
+      .agents()
+      .filter((agent) => eligible.includes(agent.id) && agent.name.trim())
+      .filter((agent) => {
+        const name = agent.name.trim();
+        const after = typed.slice(1 + name.length);
+        return (
+          typed.slice(1, 1 + name.length).toLowerCase() === name.toLowerCase() && !/^[\p{L}\p{N}_'’-]/u.test(after)
+        );
+      });
+    const longest = Math.max(0, ...matches.map((agent) => agent.name.trim().length));
+    const named = matches.filter((agent) => agent.name.trim().length === longest);
+    return named.length === 1 && named[0] ? [named[0].id] : [];
   }
 
   private eligibleMembers(channel: Channel): string[] {
@@ -1014,14 +1081,25 @@ export class ChannelService {
           }
           channel = channelResult(yield* Effect.result(channelSync(() => this.store.get(channelId))));
           let decision: typeof RoutingDecision.Type;
+          let keys: string[] | null = null;
           try {
-            const decoded = decodeRoutingDecision(extractJsonObject(response));
+            const answer = extractJsonObject(response);
+            keys = Object.keys(answer);
+            const decoded = decodeRoutingDecision(answer);
             if (Result.isFailure(decoded))
               throw new StructuredOutputError("The provider returned a JSON object of the wrong shape.");
             decision = decoded.success;
           } catch (error) {
             if (!(error instanceof StructuredOutputError)) throw error;
-            throw new ChannelRoutingError(sourceText("error.backend.channelTaskMemberRequired"));
+            // The answer can quote the request, so the log gives only its size and the fields it had.
+            this.hooks.error(
+              new Error(
+                `${error.message} Routing answer: ${response.length} characters, fields ${
+                  keys ? JSON.stringify(keys.slice(0, 8).map((key) => key.slice(0, 40))) : "none"
+                }.`,
+              ),
+            );
+            throw new ChannelRoutingError(sourceText("error.backend.channelRoutingUnreadable"));
           }
           if ("taskId" in decision) {
             const existing = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
@@ -1057,8 +1135,8 @@ export class ChannelService {
                         ),
                       { ...task, state: "cancelled" },
                       {
+                        // The task keeps its instruction; the packet adds the new message as a follow-up.
                         ...existing,
-                        instruction: task.instruction,
                         requestMessageId: task.requestMessageId,
                         attachmentDraftIds: task.attachmentDraftIds,
                         sourceMessageIds: [...existing.sourceMessageIds.slice(-30), task.requestMessageId],
@@ -1120,9 +1198,13 @@ export class ChannelService {
               channelSync(() =>
                 this.store.update(channel, {
                   tasks: [task, ...siblings],
-                  messages: [task, ...siblings].map((item) =>
-                    this.dispatch(channelId, item.id, lead, "assigned", item.ownerAgentId ?? owner),
-                  ),
+                  // The lead that answers alone needs no receipt: its reply already shows who answers.
+                  messages:
+                    owner === lead.id && !siblings.length
+                      ? []
+                      : [task, ...siblings].map((item) =>
+                          this.dispatch(channelId, item.id, lead, "assigned", item.ownerAgentId ?? owner),
+                        ),
                 }),
               ),
             ),
@@ -1250,7 +1332,7 @@ export class ChannelService {
               .enqueue({
                 sender: { kind: "user" },
                 recipientAgentIds: [assignment.agentId],
-                text: task.instruction,
+                text: assignmentText(task, request),
                 draftIds: task.attachmentDraftIds,
                 sourcePaths,
                 channelId,
@@ -2125,7 +2207,9 @@ export class ChannelService {
             state === "failed"
               ? ((assignment.deliveryId ? this.mailbox.getDelivery(assignment.deliveryId)?.delivery.error : null) ??
                 "The agent could not complete this task.")
-              : null,
+              : state === "interrupted"
+                ? sourceText("error.backend.channelTaskStopped")
+                : null,
         });
       }
       if (task.parentTaskId) {
@@ -2459,7 +2543,12 @@ export class ChannelService {
     if (!steer || request.message.attachments?.length) return false;
     const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
       (item) =>
-        item.taskId === task.id && item.agentId === task.ownerAgentId && item.state === "running" && item.turnId,
+        item.taskId === task.id &&
+        item.agentId === task.ownerAgentId &&
+        item.state === "running" &&
+        item.turnId &&
+        // A turn of this revision already has the correction in its packet.
+        item.taskRevision < task.revision,
     );
     if (!assignment?.turnId) return false;
     const turnId = assignment.turnId;
@@ -2573,9 +2662,12 @@ export class ChannelService {
     this: ChannelService,
     channelId: string,
     tasks: ChannelTask[],
+    options: { staleOnly?: boolean } = {},
   ): Effect.fn.Return<void, ChannelOperationError> {
     for (let assignment of yield* channelSync(() => this.store.assignments(channelId))) {
-      if (!tasks.some((task) => task.id === assignment.taskId) || !activeAssignment(assignment)) continue;
+      const task = tasks.find((item) => item.id === assignment.taskId);
+      if (!task || !activeAssignment(assignment)) continue;
+      if (options.staleOnly && assignment.taskRevision >= task.revision) continue;
       if (assignment.pendingRevision !== null) {
         const pendingOutcome = assignment.pendingOutcome;
         assignment = { ...assignment, pendingRevision: null, pendingOutcome: null };

@@ -66,6 +66,8 @@ export const messages = {
   "error.backend.channelLeadRequired": "请选择可用的频道主责，或把该任务派给某个成员。",
   "error.backend.channelRoutingTooLong": "该请求超出路由上下文限制。请选择成员，或发送更短的请求。",
   "error.backend.channelTaskMemberRequired": "请为该任务选择一位成员。",
+  "error.backend.channelTaskStopped": "已停止。请继续或重新分派该任务。",
+  "error.backend.channelRoutingUnreadable": "负责人无法分派这条消息。请将其分派给一位成员。",
   "error.backend.channelRoutingFailed": "分派失败。请选择一位成员，或重试。",
   "error.backend.channelLeadTimedOut": "频道主责没有及时回答。请选择一位成员，或重试。",
   "error.backend.channelLeadFailed": "频道主责无法分派这条消息。请选择一位成员，或重试。",

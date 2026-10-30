@@ -70,6 +70,8 @@ export const messages = {
   "error.backend.channelRoutingTooLong":
     "Этот запрос превышает лимит контекста маршрутизации. Выберите участника или отправьте запрос короче.",
   "error.backend.channelTaskMemberRequired": "Выберите участника для этой задачи.",
+  "error.backend.channelTaskStopped": "Остановлено. Продолжите или переназначьте эту задачу.",
+  "error.backend.channelRoutingUnreadable": "Ведущий не смог распределить это сообщение. Назначьте его участнику.",
   "error.backend.channelRoutingFailed": "Не удалось выполнить маршрутизацию. Выберите участника или повторите попытку.",
   "error.backend.channelLeadTimedOut": "Ведущий канала не ответил вовремя. Выберите участника или повторите попытку.",
   "error.backend.channelLeadFailed":
