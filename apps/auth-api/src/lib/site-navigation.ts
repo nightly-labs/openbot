@@ -104,7 +104,7 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     kind: "resources",
     id: "resources",
     label: "Resources",
-    summary: "OpenBot is open source.",
+    summary: "The source code of OpenBot is open.",
     footer: { label: "Source code", href: OPENBOT_LINKS.repository },
     links: [
       { label: "Download", description: "macOS, Windows and Linux", icon: "download", to: "/download" },
