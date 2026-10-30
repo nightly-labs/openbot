@@ -250,6 +250,46 @@ function agentLiveActivityLayout(
         {actions(false)}
       </VStack>
     ),
+    // Apple Watch Smart Stack and CarPlay: the Lock Screen layout, with the agent photo beside the
+    // text, made to fit the small family. The watch draws the view to its card edges, so the view
+    // has its own margin. The text lines sit close, so the name, the text and the footer fit in the
+    // card height. A tap opens the activity, so the answers are not here.
+    bannerSmall: (
+      <VStack
+        alignment="leading"
+        spacing={6}
+        modifiers={[padding({ horizontal: 12, vertical: 10 }), widgetURL(props.tapUrl)]}
+      >
+        <HStack>
+          {/* The watch card is dark also when the phone is light, so white stays white, as in the island. */}
+          {status(waitSymbol ? tint : islandTint)}
+          <Spacer />
+          <Text modifiers={[font({ size: 12, weight: "medium" }), foregroundStyle(secondary)]}>{props.appName}</Text>
+        </HStack>
+        {agents.length > 0 ? (
+          agentList(2, 22)
+        ) : (
+          <HStack alignment="top" spacing={10}>
+            {avatar(40)}
+            <VStack alignment="leading" spacing={1}>
+              <Text modifiers={[font({ size: 15, weight: "semibold" }), lineLimit(1), privacySensitive()]}>
+                {props.title}
+              </Text>
+              <Text
+                markdownEnabled={!stale && props.detailMarkdown === true}
+                modifiers={[font({ size: 13 }), foregroundStyle(secondary), lineLimit(2), privacySensitive()]}
+              >
+                {detail}
+              </Text>
+              {props.footer && !stale ? (
+                <Text modifiers={[font({ size: 12 }), foregroundStyle(secondary), lineLimit(1)]}>{props.footer}</Text>
+              ) : null}
+            </VStack>
+            <Spacer />
+          </HStack>
+        )}
+      </VStack>
+    ),
     // The compact regions sit against the sides of the island. The padding keeps both off its rounded ends.
     compactLeading: (
       <HStack modifiers={[padding({ leading: 6 }), widgetURL(props.tapUrl)]}>

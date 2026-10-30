@@ -38,8 +38,10 @@ decide as one: `notificationForAgentEvent` in `@openbot/team-client` applies the
 routine runs. The desktop and the web client close the notification of a request when an
 `agent-input-resolved` or `browser-takeover-resolved` event comes, also for an answer from another
 device. The title is the agent name. When the phone shows previews, the text is the
-preview of a desktop notification: the start of the answer of that turn, the question, or the action
-to approve, with secrets redacted. Otherwise it is the fixed desktop text, such as "Finished working.".
+preview of a desktop notification: the lead of the answer of that turn, the question, or the action
+to approve, with secrets redacted. The lead (`messageSummary` in `packages/team-client`) is the first
+sentences of the message, without code blocks, tables, headings or mail headers, with tool names as
+words and redaction marks as `•••`. The Live Activity shows the same lead. Otherwise it is the fixed desktop text, such as "Finished working.".
 
 Channels are an exception. The desktop and the web client notify an agent reply in a channel from
 the channel list (`channelReplyNotifications`), because the channel service consumes the

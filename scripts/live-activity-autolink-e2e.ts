@@ -41,6 +41,7 @@ const SOURCES = [
   "packages/team-client/src/agent-message-text.ts",
   "packages/team-client/src/live-activity-props.ts",
   "packages/team-client/src/live-activity-text.ts",
+  "packages/team-client/src/message-summary.ts",
   "packages/team-client/src/live-activity-seal.ts",
   "apps/mobile/src/features/live-activity/model/live-activity-open.ts",
 ];

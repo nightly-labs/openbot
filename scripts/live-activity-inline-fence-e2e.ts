@@ -29,8 +29,11 @@ const CASES = [
     input: "```npm install``` first.\nThen restart the app.",
     expected: "```npm install``` first. Then restart the app.",
   },
-  { name: "backtick-fence", input: "```js\nconst x = 1;\n```\nDone.", expected: "`const x = 1;` Done." },
-  { name: "tilde-fence-info-backtick", input: "~~~ uses `tick`\nx\n~~~\nDone.", expected: "`x` Done." },
+  // The detail shows the lead of a reply, so a code block gives way to the prose after it.
+  { name: "backtick-fence", input: "```js\nconst x = 1;\n```\nDone.", expected: "Done." },
+  { name: "tilde-fence-info-backtick", input: "~~~ uses `tick`\nx\n~~~\nDone.", expected: "Done." },
+  // A reply with no prose shows its code.
+  { name: "backtick-fence-only", input: "```js\nconst x = 1;\n```", expected: "`const x = 1;`" },
 ];
 const SOURCES = [
   "scripts/live-activity-inline-fence-e2e.ts",
@@ -40,6 +43,7 @@ const SOURCES = [
   "packages/team-client/src/agent-message-text.ts",
   "packages/team-client/src/live-activity-props.ts",
   "packages/team-client/src/live-activity-text.ts",
+  "packages/team-client/src/message-summary.ts",
   "packages/team-client/src/live-activity-seal.ts",
   "apps/mobile/src/features/live-activity/model/live-activity-open.ts",
 ];

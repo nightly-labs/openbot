@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
+import { redactText } from "@openbot/logging";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import {
   type AgentLiveActivityProps,
@@ -259,6 +260,7 @@ export function useLiveActivity({
           })),
         // Only the host that the buttons answer can sign them too.
         actionKey: liveActivityHostKeys(phoneSecret, presentation.serverId).keys.action,
+        redact: redactText,
       });
       if (avatars.current.size !== keptAvatars.current) keepAvatars();
       const mode = props?.mode ?? null;

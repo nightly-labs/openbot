@@ -3,7 +3,7 @@ import type { AgentRuntimeSnapshot, DynamicIslandPresentation } from "@openbot/c
 import { LIVE_ACTIVITY_SEALED_LIMIT, type LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { LiveActivityPushRegistration } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { mobileTranslateFor, resolveLocale } from "@openbot/i18n/mobile";
-import { toLogValue } from "@openbot/logging";
+import { redactText, toLogValue } from "@openbot/logging";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import {
   type AgentLiveActivityProps,
@@ -347,6 +347,7 @@ export class LiveActivityPushService {
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
       actionKey: registration.keys.action,
+      redact: redactText,
     });
   }
 
