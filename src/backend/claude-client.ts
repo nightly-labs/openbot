@@ -1696,7 +1696,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (status === "failed" && error) {
       this.emit("notification", {
         method: "error",
-        params: { threadId: runtime.id, turnId: turn.id, message: String(error) },
+        params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error) },
       });
     }
     this.#emitSubagents(runtime, endClaudeSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
@@ -1962,6 +1962,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 }
 
 type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess">;
+
+/**
+ * The error of a Workspace only query when the CLI cannot make its sandbox (`failIfUnavailable`).
+ * It tells the user to set `sandbox.failIfUnavailable=false`, which OpenBot does not show and which
+ * would let commands run with no sandbox. Windows gets it on every turn: the Windows sandbox of
+ * Claude Code 2.1.309 is behind a feature gate (#4094).
+ */
+const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
+
+function claudeTurnError(error: unknown): string {
+  const text = String(error);
+  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
+  return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
+}
 
 /**
  * The npm wrapper for Claude Code ends with the real program, `"%dp0%\node_modules\…\claude.exe" %*`,
