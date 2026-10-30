@@ -3,6 +3,9 @@ import { TELEGRAM_BOT_ID_PATTERN } from "@openbot/contracts/signal-protocol/tele
 export interface RemoteApiConfig {
   host: string;
   port: number;
+  // The health and metrics server. Compose binds it to all addresses in the container and publishes it
+  // on the loopback address of the host only, for the capacity reporter.
+  healthHost: string;
   healthPort: number;
   tlsCertificatePath: string | null;
   tlsPrivateKeyPath: string | null;
@@ -148,6 +151,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
   return {
     host: environment.REMOTE_SIGNAL_HOST ?? "0.0.0.0",
     port: positiveInteger(environment.REMOTE_SIGNAL_PORT, tlsDisabled ? 8081 : 8443),
+    healthHost: environment.REMOTE_HEALTH_HOST ?? "127.0.0.1",
     healthPort: positiveInteger(environment.REMOTE_HEALTH_PORT, 8080),
     tlsCertificatePath: tlsDisabled ? null : required(environment.REMOTE_TLS_CERT_PATH, "REMOTE_TLS_CERT_PATH"),
     tlsPrivateKeyPath: tlsDisabled ? null : required(environment.REMOTE_TLS_KEY_PATH, "REMOTE_TLS_KEY_PATH"),

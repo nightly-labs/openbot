@@ -70,6 +70,22 @@ curl --fail --silent --show-error https://signal.openbot.run/health/live
 `/health/live` must show the release commit. Builds made before this field existed show no `commit`;
 builds made without `OPENBOT_SOURCE_COMMIT` show `unknown`.
 
+The capacity reporter (`capacity-report`) uses the Signal image and sends `signal_capacity`
+(ANALYTICS.md) every 5 minutes. It reads the coturn metrics on `127.0.0.1:9641` and the Signal metrics
+on `127.0.0.1:9642`. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` in the host
+`.env.production`, the server client of `apps/auth-api/.env.production`; without them it exits at start
+and stays stopped. Build and start it after `remote-api`, with the same `--build-arg`:
+
+```sh
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml build --build-arg "OPENBOT_SOURCE_COMMIT=$source_commit" capacity-report
+remote/bin/dotenvx run --overload -f remote/.env.production -fk remote/.env.keys -- \
+  docker compose -p openbot-remote -f remote/compose.yaml up -d --no-build --no-deps capacity-report
+docker logs openbot-remote-capacity-report-1 2>&1 | tail -5
+```
+
+A failed sample writes only `Capacity report failed.` and its source (`turn`, `signal` or `openpanel`).
+
 Wait for Docker health to become `healthy`. Check the running source for `multiplex` and record its
 checksum. Keep the previous image until the device checks below pass. Do not print container environment
 variables, resume tokens, tickets, or raw connection logs.
