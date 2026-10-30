@@ -13,6 +13,9 @@
   "observability": {
     "enabled": true
   },
+  // The Cloudflare Vite plugin emits and uploads Worker source maps unless this is false. The Worker
+  // bundles the web app, and its maps pass the 60 MiB upload limit, so every deploy fails.
+  "upload_source_maps": false,
   // The outbox, the hosted-site cleanup and the hosted server checks are retry paths: the request path
   // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
   // stops 15 to 20 minutes after its last use.
