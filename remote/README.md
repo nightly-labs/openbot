@@ -132,6 +132,21 @@ and posts a document to `/v1/telegram/uploads/<token>`. These tokens are signed,
 minutes, and an upload token works once. Signal does not store or log an update or a file, except
 for the sealed queue of a hosted server that sleeps.
 
+## Google token requests
+
+Google's MCP servers (Gmail, Drive, Docs, Sheets, Slides, Calendar) need a sign-in app with a client secret.
+OpenBot has one, and only Signal has its secret. `GOOGLE_OAUTH_CLIENTS` is a comma-separated list of
+`<client ID>:<client secret>`, because the production and development apps share Signal. A malformed
+value turns off only this route, which then answers 503.
+
+A host posts JSON to `/v1/google/oauth/token` with its remote host ticket as the bearer: a code
+exchange (`authorization_code`, with the PKCE verifier and a `http://127.0.0.1:<port>/mcp-auth`
+redirect) or a refresh (`refresh_token`). Signal checks the ticket, allows 30 requests a minute for
+each host, adds the client secret, and returns Google's status and body with `Cache-Control:
+no-store`. It does not store or log the request, the code, a token or Google's answer. The MCP
+traffic goes from the host to Google directly. `GOOGLE_OAUTH_TOKEN_URL` replaces Google's token
+endpoint for a test.
+
 ## Sleeping hosted servers
 
 All messaging platforms share one path (`src/ingress-queue.ts`). For an event whose route has no

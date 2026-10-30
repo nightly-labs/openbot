@@ -205,6 +205,10 @@ export const messages = {
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou esse login.",
   "error.backend.mcpSignInClientRefused":
     "O servidor de login não aceitou o OpenBot ao concluir o login. Entre de novo: o OpenBot se registra outra vez no servidor.",
+  "error.backend.googleSignInNeedsAccount":
+    "Primeiro, entre na sua conta OpenBot. O OpenBot precisa dela para concluir um login no Google.",
+  "error.backend.googleSignInUnavailable":
+    "O OpenBot não conseguiu concluir o login no Google. Tente de novo mais tarde.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
   "error.backend.mcpRegistrationRefused":
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",

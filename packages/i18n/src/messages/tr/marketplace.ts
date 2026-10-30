@@ -413,6 +413,58 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Bana hangi Trello kartları atanmış?",
   "marketplace.plugin.trello.prompt.board": "Trello panomda devam eden işleri özetle.",
   "marketplace.plugin.trello.prompt.newCards": "Bu yapılacak maddeleri Trello panoma kart olarak ekle.",
+  "marketplace.plugin.gmail.tagline": "E-posta arama, taslaklar ve etiketler",
+  "marketplace.plugin.gmail.description":
+    "Gmail ile ajanlar e-posta ileti dizilerini ve iletileri arayıp okur, taslak yazar, etiket ekler ve kaldırır, etiket oluşturur, e-postaları çöp kutusuna taşır ve geri alır, e-postaları spam olarak işaretler. Ajanlar e-posta gönderemez: bir taslak yazarlar, kullanıcı da bu taslağı Gmail'de kontrol edip gönderir. Ajanlar e-postaları kalıcı olarak silemez. Bu, Google'ın Gmail için resmî MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabına giriş yapar ve Google'ın onay ekranında erişime izin verir. OpenBot'un kendi Google giriş uygulaması olduğu için kullanıcının Google Cloud'da bir şey ayarlaması gerekmez. Başka bir kişiden gelen bir e-posta ajana yönelik talimatlar içerebilir, bu yüzden ajanın güvenilmeyen bir e-postayı okuduktan sonra ne yaptığını kontrol edin.",
+  "marketplace.plugin.gmail.app":
+    "E-posta arama, taslaklar, etiketler ve çöp kutusu, tarayıcıda giriş yapılan Google Gmail MCP sunucusu üzerinden.",
+  "marketplace.plugin.gmail.prompt.unread": "Bugünkü okunmamış e-postalarımı özetle.",
+  "marketplace.plugin.gmail.prompt.thread":
+    "Bu haftaki okunmamış bültenlere Bültenler etiketini ekle ve onları çöp kutusuna taşı.",
+  "marketplace.plugin.gmail.prompt.draft": "Yöneticimden gelen en son e-postaya bir yanıt taslağı yaz.",
+  "marketplace.plugin.googleDrive.tagline": "Dosya arama, okuma ve ekleme",
+  "marketplace.plugin.googleDrive.description":
+    "Google Drive ile ajanlar dosya arar, son dosyaları listeler, dosya içeriğini ve ayrıntılarını okur, bir dosyaya kimin erişimi olduğunu görür, dosya oluşturur ve kopyalar. Ajanlar kullanıcının açabildiği tüm dosyaları okuyabilir. Dosya oluşturabilir ve okuyabildikleri her dosyayı kopyalayabilirler. Google'ın Drive sunucusunda bir dosyayı değiştiren, taşıyan veya silen bir araç yoktur. Bu, Google'ın Google Drive için resmî MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabına giriş yapar ve Google'ın onay ekranında erişime izin verir. OpenBot'un kendi Google giriş uygulaması olduğu için kullanıcının Google Cloud'da bir şey ayarlaması gerekmez. Başka bir kişiden gelen bir dosya ajana yönelik talimatlar içerebilir, bu yüzden ajanın güvenilmeyen bir dosyayı okuduktan sonra ne yaptığını kontrol edin.",
+  "marketplace.plugin.googleDrive.app":
+    "Dosya arama, okuma ve dosya oluşturma, tarayıcıda giriş yapılan Google Drive MCP sunucusu üzerinden.",
+  "marketplace.plugin.googleDrive.prompt.find": "Google Drive'ımdaki pazarlama planını bul ve özetle.",
+  "marketplace.plugin.googleDrive.prompt.recent": "Google Drive'da en son kullandığım dosyaları listele.",
+  "marketplace.plugin.googleDrive.prompt.access":
+    "Google Drive'ımdaki bütçe dosyasının gelecek yıl için bir kopyasını oluştur.",
+  "marketplace.plugin.googleDocs.tagline": "Belgeleri okuma ve düzenleme",
+  "marketplace.plugin.googleDocs.description":
+    "Google Docs ile ajanlar belgeleri okur ve içeriklerini değiştirir. Ajanlar kullanıcının açabildiği tüm belgeleri okuyabilir ve kullanıcının düzenleyebildiği belgeleri düzenleyebilir. Bu, Google'ın Google Docs için resmî MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabına giriş yapar ve Google'ın onay ekranında erişime izin verir. OpenBot'un kendi Google giriş uygulaması olduğu için kullanıcının Google Cloud'da bir şey ayarlaması gerekmez. Başka bir kişiden gelen bir belge ajana yönelik talimatlar içerebilir, bu yüzden ajanın güvenilmeyen bir belgeyi okuduktan sonra ne yaptığını kontrol edin.",
+  "marketplace.plugin.googleDocs.app":
+    "Belge okuma ve düzenleme, tarayıcıda giriş yapılan Google Docs MCP sunucusu üzerinden.",
+  "marketplace.plugin.googleDocs.prompt.summarize": "Lansman planı belgemdeki açık soruları özetle.",
+  "marketplace.plugin.googleDocs.prompt.edit": "Toplantı notları belgemin en üstüne kısa bir özet ekle.",
+  "marketplace.plugin.googleDocs.prompt.review": "Proje teklifi belgemdeki anlaşılması zor cümleleri bul.",
+  "marketplace.plugin.googleSheets.tagline": "E-tabloları okuma ve güncelleme",
+  "marketplace.plugin.googleSheets.description":
+    "Google Sheets ile ajanlar e-tabloları ve hücre değerlerini okur, değer ve formül yazar, satır ve sütun ekler ve e-tabloları değiştirir. Ajanlar kullanıcının açabildiği tüm e-tabloları okuyabilir ve kullanıcının düzenleyebildiği e-tabloları değiştirebilir. Bu, Google'ın Google Sheets için resmî MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabına giriş yapar ve Google'ın onay ekranında erişime izin verir. OpenBot'un kendi Google giriş uygulaması olduğu için kullanıcının Google Cloud'da bir şey ayarlaması gerekmez. Başka bir kişiden gelen bir e-tablo ajana yönelik talimatlar içerebilir, bu yüzden ajanın güvenilmeyen bir e-tabloyu okuduktan sonra ne yaptığını kontrol edin.",
+  "marketplace.plugin.googleSheets.app":
+    "E-tablo değerleri, formüller ve güncellemeler, tarayıcıda giriş yapılan Google Sheets MCP sunucusu üzerinden.",
+  "marketplace.plugin.googleSheets.prompt.summarize": "Bütçe e-tablomdaki toplamları özetle.",
+  "marketplace.plugin.googleSheets.prompt.addRows": "Bu harcamaları harcamalar e-tabloma yeni satırlar olarak ekle.",
+  "marketplace.plugin.googleSheets.prompt.formula": "Satış e-tabloma her satırın toplamını gösteren bir sütun ekle.",
+  "marketplace.plugin.googleSlides.tagline": "Sunumları okuma ve düzenleme",
+  "marketplace.plugin.googleSlides.description":
+    "Google Slides, ajanların sunumları, slaytları ve slayt küçük resimlerini okumasını ve bir sunumun içeriğini değiştirmesini sağlar: slayt, metin, şekil ve görsel ekleyebilir, değiştirebilir ve silebilirler. Ajanlar, kullanıcının açabildiği tüm sunumları okuyabilir ve kullanıcının düzenleyebildiği sunumları düzenleyebilir. Google'ın Slides sunucusunda sunum oluşturan veya silen bir araç yoktur. Bu, Google'ın Google Slides için resmi MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabında oturum açar ve Google'ın izin sayfasında erişimi onaylar. OpenBot'un kendi Google oturum açma uygulaması vardır, bu yüzden kullanıcının Google Cloud'u ayarlaması gerekmez. Başka birinden gelen bir sunum ajan için talimatlar içerebilir, bu nedenle güvenilmeyen bir sunumu okuduktan sonra ajanın ne yaptığını kontrol edin.",
+  "marketplace.plugin.googleSlides.app":
+    "Google'ın Slides MCP sunucusuyla, tarayıcıda oturum açarak sunum okuma ve düzenleme.",
+  "marketplace.plugin.googleSlides.prompt.summary": "Üç aylık değerlendirme sunumumu slayt slayt özetle.",
+  "marketplace.plugin.googleSlides.prompt.agenda":
+    "Ekip toplantısı sunumumda başlık slaytından sonra bir gündem slaytı ekle.",
+  "marketplace.plugin.googleSlides.prompt.typos": "Ürün lansmanı sunumumdaki yazım hatalarını bul ve düzelt.",
+  "marketplace.plugin.googleCalendar.tagline": "Etkinlikler, takvimler ve boş zaman",
+  "marketplace.plugin.googleCalendar.description":
+    "Google Calendar ile ajanlar takvimleri listeler, etkinlikleri okuyup arar, kişilerin boş olduğu zamanları bulur, etkinlik oluşturur, değiştirir ve siler, davetlere yanıt verir. Bu, Google'ın Google Calendar için resmî MCP sunucusudur ve Developer Preview aşamasındadır. Her kullanıcı tarayıcıda kendi Google hesabına giriş yapar ve Google'ın onay ekranında erişime izin verir. OpenBot'un kendi Google giriş uygulaması olduğu için kullanıcının Google Cloud'da bir şey ayarlaması gerekmez. Başka bir kişiden gelen bir etkinlik ajana yönelik talimatlar içerebilir, bu yüzden ajanın güvenilmeyen bir etkinliği okuduktan sonra ne yaptığını kontrol edin.",
+  "marketplace.plugin.googleCalendar.app":
+    "Takvimler, etkinlikler ve boş zaman, tarayıcıda giriş yapılan Google Calendar MCP sunucusu üzerinden.",
+  "marketplace.plugin.googleCalendar.prompt.today": "Bugün Google Calendar'ımda neler var?",
+  "marketplace.plugin.googleCalendar.prompt.week": "Bu haftaki toplantılarımı özetle.",
+  "marketplace.plugin.googleCalendar.prompt.freeTime":
+    "Gelecek hafta boş bir saat bul ve takvimime Alex ile bir toplantı ekle.",
   "marketplace.plugin.huggingface.tagline": "Hub'daki modeller, veri kümeleri ve makaleler",
   "marketplace.plugin.huggingface.description":
     "Hugging Face, ajanların Hugging Face Hub'da modelleri, veri kümelerini, Spaces'i, koleksiyonları ve makaleleri aramasına, model kartlarını ve depo dosyalarını okumasına, veri kümelerini önizlemesine ve Hugging Face belgelerinde arama yapmasına olanak tanır. Herkese açık Hub verilerini kullanır ve hesap ya da anahtar gerektirmez. Araçlar yalnızca okur: ajanlar depo oluşturamaz ve iş (job) çalıştıramaz.",

@@ -358,6 +358,56 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "나에게 배정된 Trello 카드는 뭐야?",
   "marketplace.plugin.trello.prompt.board": "내 Trello 보드에서 진행 중인 작업을 요약해 줘.",
   "marketplace.plugin.trello.prompt.newCards": "이 실행 항목들을 내 Trello 보드에 카드로 추가해 줘.",
+  "marketplace.plugin.gmail.tagline": "이메일 검색, 초안, 라벨",
+  "marketplace.plugin.gmail.description":
+    "Gmail을 사용하면 에이전트가 이메일 스레드와 메일을 검색하고 읽으며, 초안을 작성하고, 라벨을 붙이거나 떼고, 라벨을 만들고, 이메일을 휴지통으로 옮기거나 되돌리고, 이메일을 스팸으로 표시할 수 있어요. 에이전트는 이메일을 보낼 수 없어요. 에이전트가 초안을 작성하면 사용자가 Gmail에서 확인하고 보내요. 에이전트는 이메일을 영구 삭제할 수 없어요. Google이 공식으로 제공하는 Gmail MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 이메일에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 이메일을 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+  "marketplace.plugin.gmail.app":
+    "이메일 검색, 초안, 라벨, 휴지통을 브라우저 로그인 방식의 Google Gmail MCP 서버로 제공해요.",
+  "marketplace.plugin.gmail.prompt.unread": "오늘 온 읽지 않은 이메일을 요약해 줘.",
+  "marketplace.plugin.gmail.prompt.thread":
+    "이번 주에 온 읽지 않은 뉴스레터에 뉴스레터 라벨을 붙이고 휴지통으로 옮겨 줘.",
+  "marketplace.plugin.gmail.prompt.draft": "내 매니저가 보낸 최신 이메일에 대한 답장 초안을 작성해 줘.",
+  "marketplace.plugin.googleDrive.tagline": "파일 검색, 읽기, 추가",
+  "marketplace.plugin.googleDrive.description":
+    "Google Drive를 사용하면 에이전트가 파일을 검색하고, 최근 파일 목록을 보고, 파일 내용과 세부 정보를 읽고, 파일에 액세스할 수 있는 사람을 확인하고, 파일을 만들고 복사할 수 있어요. 에이전트는 사용자가 열 수 있는 모든 파일을 읽을 수 있어요. 파일을 만들 수 있고, 읽을 수 있는 파일은 모두 복사할 수 있어요. Google의 Drive 서버에는 파일을 변경, 이동, 삭제하는 도구가 없어요. Google이 공식으로 제공하는 Google Drive MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 파일에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 파일을 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+  "marketplace.plugin.googleDrive.app":
+    "파일 검색, 읽기, 파일 생성을 브라우저 로그인 방식의 Google Drive MCP 서버로 제공해요.",
+  "marketplace.plugin.googleDrive.prompt.find": "내 Google Drive에서 마케팅 계획을 찾아서 요약해 줘.",
+  "marketplace.plugin.googleDrive.prompt.recent": "Google Drive에서 최근에 사용한 파일 목록을 보여 줘.",
+  "marketplace.plugin.googleDrive.prompt.access": "내 Google Drive에 있는 예산 파일을 내년용으로 복사해 줘.",
+  "marketplace.plugin.googleDocs.tagline": "문서 읽기와 편집",
+  "marketplace.plugin.googleDocs.description":
+    "Google Docs를 사용하면 에이전트가 문서를 읽고 내용을 변경할 수 있어요. 에이전트는 사용자가 열 수 있는 모든 문서를 읽고, 사용자가 편집할 수 있는 문서를 편집할 수 있어요. Google이 공식으로 제공하는 Google Docs MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 문서에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 문서를 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+  "marketplace.plugin.googleDocs.app": "문서 읽기와 편집을 브라우저 로그인 방식의 Google Docs MCP 서버로 제공해요.",
+  "marketplace.plugin.googleDocs.prompt.summarize": "출시 계획 문서에 있는 미해결 질문을 요약해 줘.",
+  "marketplace.plugin.googleDocs.prompt.edit": "회의록 문서 맨 위에 짧은 요약을 추가해 줘.",
+  "marketplace.plugin.googleDocs.prompt.review": "프로젝트 제안서 문서에서 불분명한 문장을 찾아 줘.",
+  "marketplace.plugin.googleSheets.tagline": "스프레드시트 읽기와 업데이트",
+  "marketplace.plugin.googleSheets.description":
+    "Google Sheets를 사용하면 에이전트가 스프레드시트와 셀 값을 읽고, 값과 수식을 쓰고, 행과 열을 추가하고, 스프레드시트를 변경할 수 있어요. 에이전트는 사용자가 열 수 있는 모든 스프레드시트를 읽고, 사용자가 편집할 수 있는 스프레드시트를 변경할 수 있어요. Google이 공식으로 제공하는 Google Sheets MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 스프레드시트에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 스프레드시트를 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+  "marketplace.plugin.googleSheets.app":
+    "스프레드시트 값, 수식, 업데이트를 브라우저 로그인 방식의 Google Sheets MCP 서버로 제공해요.",
+  "marketplace.plugin.googleSheets.prompt.summarize": "예산 스프레드시트의 합계를 요약해 줘.",
+  "marketplace.plugin.googleSheets.prompt.addRows": "이 경비들을 경비 스프레드시트에 새 행으로 추가해 줘.",
+  "marketplace.plugin.googleSheets.prompt.formula": "매출 스프레드시트에 각 행의 합계를 보여 주는 열을 추가해 줘.",
+  "marketplace.plugin.googleSlides.tagline": "프레젠테이션 읽기 및 편집",
+  "marketplace.plugin.googleSlides.description":
+    "Google Slides를 사용하면 에이전트가 프레젠테이션, 슬라이드, 슬라이드 미리보기 이미지를 읽고 프레젠테이션 내용을 바꿀 수 있어요. 슬라이드, 텍스트, 도형, 이미지를 추가, 변경, 삭제할 수 있어요. 에이전트는 사용자가 열 수 있는 모든 프레젠테이션을 읽고, 사용자가 편집할 수 있는 프레젠테이션을 편집할 수 있어요. Google의 Slides 서버에는 프레젠테이션을 만들거나 삭제하는 도구가 없어요. 이 서버는 Google의 공식 Google Slides MCP 서버이며 Developer Preview 단계예요. 각 사용자는 브라우저에서 자신의 Google 계정에 로그인하고 Google 동의 페이지에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람의 프레젠테이션에는 에이전트에 대한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 프레젠테이션을 읽은 뒤 에이전트가 무엇을 하는지 확인하세요.",
+  "marketplace.plugin.googleSlides.app":
+    "브라우저 로그인을 사용하는 Google Slides MCP 서버로 프레젠테이션을 읽고 편집해요.",
+  "marketplace.plugin.googleSlides.prompt.summary": "분기 검토 프레젠테이션을 슬라이드별로 요약해 줘.",
+  "marketplace.plugin.googleSlides.prompt.agenda":
+    "팀 회의 프레젠테이션의 제목 슬라이드 뒤에 안건 슬라이드를 추가해 줘.",
+  "marketplace.plugin.googleSlides.prompt.typos": "제품 출시 프레젠테이션에서 맞춤법 오류를 찾아서 고쳐 줘.",
+  "marketplace.plugin.googleCalendar.tagline": "일정, 캘린더, 빈 시간",
+  "marketplace.plugin.googleCalendar.description":
+    "Google Calendar를 사용하면 에이전트가 캘린더 목록을 보고, 일정을 읽고 검색하고, 사람들이 시간이 되는 때를 찾고, 일정을 만들고 변경하고 삭제하고, 초대에 응답할 수 있어요. Google이 공식으로 제공하는 Google Calendar MCP 서버이며 Developer Preview 단계예요. 사용자는 각자 브라우저에서 자신의 Google 계정으로 로그인하고 Google 동의 화면에서 액세스를 허용해요. OpenBot에는 자체 Google 로그인 앱이 있어서 사용자가 Google Cloud를 설정할 필요가 없어요. 다른 사람이 보낸 일정에 에이전트를 위한 지시가 들어 있을 수 있으니, 신뢰할 수 없는 일정을 읽은 뒤 에이전트가 하는 일을 확인하세요.",
+  "marketplace.plugin.googleCalendar.app":
+    "캘린더, 일정, 빈 시간을 브라우저 로그인 방식의 Google Calendar MCP 서버로 제공해요.",
+  "marketplace.plugin.googleCalendar.prompt.today": "오늘 내 Google Calendar에 뭐가 있어?",
+  "marketplace.plugin.googleCalendar.prompt.week": "이번 주 회의를 요약해 줘.",
+  "marketplace.plugin.googleCalendar.prompt.freeTime":
+    "다음 주에 빈 시간 한 시간을 찾아서 Alex와의 회의를 내 캘린더에 추가해 줘.",
   "marketplace.plugin.huggingface.tagline": "Hub의 모델, 데이터셋, 논문",
   "marketplace.plugin.huggingface.description":
     "Hugging Face를 사용하면 에이전트가 Hugging Face Hub에서 모델, 데이터셋, Spaces, 컬렉션, 논문을 검색하고, 모델 카드와 저장소 파일을 읽고, 데이터셋을 미리 보고, Hugging Face 문서를 검색할 수 있어요. 공개 Hub 데이터를 사용하므로 계정도 키도 필요 없어요. 도구는 읽기만 해요. 에이전트는 저장소를 만들거나 작업(Jobs)을 실행할 수 없어요.",
