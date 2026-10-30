@@ -395,7 +395,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   );
 }
 
-/** The text of a file, highlighted as code when its name gives a language that chat code blocks highlight. */
 /** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
 function HeaderButton(props: {
   label: string;
@@ -423,6 +422,7 @@ function HeaderButton(props: {
   );
 }
 
+/** The text of a file, highlighted as code when its name gives a language that chat code blocks highlight. */
 function FileSourceText(props: { name: string; text: string; wrap: boolean; selectionQuoteId?: string | undefined }) {
   const [tokens, setTokens] = createSignal<CodeToken[] | null>(null);
   let highlightRun = 0;
