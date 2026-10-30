@@ -169,6 +169,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
     ) => Effect.Effect<void, BrowserOperationError>,
     timeoutMs = 10_000,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
+    // A `run_script` step leaves the capture to the end of the run.
+    captureSnapshot = true,
   ) =>
     enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
       Effect.gen(function* () {
@@ -259,6 +261,7 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               : {}),
           });
           actionRecorded = true;
+          if (!captureSnapshot) return null;
           return (yield* readTabSnapshot(
             tab,
             tab.revision + 1,
@@ -307,7 +310,14 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
 );
 
 export const runTabEvaluation = Effect.fn("BrowserTab.evaluate")(
-  (tab: BrowserHostTab, requireEvaluable: () => void, expression: string, awaitPromise: boolean, timeoutMs: number) =>
+  (
+    tab: BrowserHostTab,
+    requireEvaluable: () => void,
+    expression: string,
+    awaitPromise: boolean,
+    timeoutMs: number,
+    undefinedAsNull: boolean,
+  ) =>
     enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
       Effect.gen(function* () {
         if (tab.secret)
@@ -323,6 +333,7 @@ export const runTabEvaluation = Effect.fn("BrowserTab.evaluate")(
             expression,
             awaitPromise,
             yield* browserSync(() => remainingTime(deadline, timeoutMessage)),
+            undefinedAsNull,
           ),
           yield* browserSync(() => remainingTime(deadline, timeoutMessage)),
           timeoutMessage,

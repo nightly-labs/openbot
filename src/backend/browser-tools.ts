@@ -105,6 +105,84 @@ const legacyActionSchema = z.discriminatedUnion("type", [
 
 const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout };
 
+// The fields of the tools that the `run_script` helpers also take as steps. A step names its tool
+// in `action` and acts on the tab of the call, so these fields leave out `tabId`.
+const navigateFields = {
+  url: requiredString(INPUT_LIMITS.browserUrl).optional(),
+  direction: z.enum(["back", "forward", "reload"]).optional(),
+  timeoutMs: timeout,
+};
+const clickFields = {
+  target: browserTargetSchema,
+  timeoutMs: timeout,
+  button: z.enum(["left", "middle", "right"]).optional(),
+  clickCount: z.number().int().min(1).max(2).optional(),
+  modifiers,
+};
+const typeFields = {
+  target: browserTargetSchema.optional(),
+  timeoutMs: timeout,
+  text: z.string().max(INPUT_LIMITS.browserActionText),
+  mode: z.enum(["replace", "append"]).optional(),
+  submit: z.boolean().optional(),
+};
+const pressFields = { key: requiredString(128), target: browserTargetSchema.optional(), timeoutMs: timeout };
+const hoverFields = { target: browserTargetSchema, timeoutMs: timeout };
+const scrollFields = {
+  target: browserTargetSchema.optional(),
+  deltaX: z.number().min(-100_000).max(100_000).optional(),
+  deltaY: z.number().min(-100_000).max(100_000).optional(),
+  timeoutMs: timeout,
+};
+const selectOptionFields = { ...hoverFields, values: z.array(z.string().max(1_000)).min(1).max(100) };
+const setCheckedFields = { ...hoverFields, checked: z.boolean() };
+const waitForFields = {
+  target: browserTargetSchema.optional(),
+  text: requiredString(2_000).optional(),
+  url: requiredString(INPUT_LIMITS.browserUrl).optional(),
+  state: z.enum(["load", "domcontentloaded", "dom-quiet"]).optional(),
+  timeoutMs: timeout,
+};
+const evaluateFields = {
+  expression: z
+    .string()
+    .min(1)
+    .max(64_000)
+    .refine((value) => value.trim().length > 0, {
+      message: "expression must not be blank",
+    }),
+  awaitPromise: z.boolean().optional(),
+  timeoutMs: timeout,
+};
+
+export const BROWSER_SCRIPT_MAX_STEPS = 200;
+export const BROWSER_SCRIPT_MAX_CHARS = 20_000;
+export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
+const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
+
+const browserStepSchema = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("navigate"), ...navigateFields }),
+  z.strictObject({ action: z.literal("click"), ...clickFields }),
+  z.strictObject({ action: z.literal("type"), ...typeFields }),
+  z.strictObject({ action: z.literal("press"), ...pressFields }),
+  z.strictObject({ action: z.literal("hover"), ...hoverFields }),
+  z.strictObject({ action: z.literal("scroll"), ...scrollFields }),
+  z.strictObject({ action: z.literal("select_option"), ...selectOptionFields }),
+  z.strictObject({ action: z.literal("set_checked"), ...setCheckedFields }),
+  z.strictObject({ action: z.literal("wait_for"), ...waitForFields }),
+  z.strictObject({ action: z.literal("evaluate"), ...evaluateFields }),
+  z.strictObject({ action: z.literal("snapshot") }),
+]);
+
+export type BrowserStep = z.infer<typeof browserStepSchema>;
+
+/** Steps from a `run_script` sandbox are untrusted values, so each one is decoded before it runs. */
+export function parseBrowserStep(value: unknown): BrowserStep {
+  const result = browserStepSchema.safeParse(value);
+  if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
+  return result.data;
+}
+
 const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
@@ -254,36 +332,19 @@ const BROWSER_TOOL_DEFINITIONS = [
     name: "navigate",
     description:
       "Navigate to an HTTP(S) URL, history entry, or reload, wait for the page to settle, and return a fresh snapshot.",
-    shape: {
-      tabId,
-      url: requiredString(INPUT_LIMITS.browserUrl).optional(),
-      direction: z.enum(["back", "forward", "reload"]).optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...navigateFields },
   }),
   browserTool({
     name: "click",
     description:
       "Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input and return a fresh snapshot.",
-    shape: {
-      ...targetAction,
-      button: z.enum(["left", "middle", "right"]).optional(),
-      clickCount: z.number().int().min(1).max(2).optional(),
-      modifiers,
-    },
+    shape: { tabId, ...clickFields },
   }),
   browserTool({
     name: "type",
     description:
       "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the snapshot's focus field says where those keystrokes will land. Mode applies only to an element target.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      timeoutMs: timeout,
-      text: z.string().max(INPUT_LIMITS.browserActionText),
-      mode: z.enum(["replace", "append"]).optional(),
-      submit: z.boolean().optional(),
-    },
+    shape: { tabId, ...typeFields },
   }),
   browserTool({
     name: "fill_fields",
@@ -309,33 +370,27 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "press",
     description: "Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P and return a fresh snapshot.",
-    shape: { tabId, key: requiredString(128), target: browserTargetSchema.optional(), timeoutMs: timeout },
+    shape: { tabId, ...pressFields },
   }),
   browserTool({
     name: "hover",
     description: "Hover a unique target with trusted CDP pointer input and return a fresh snapshot.",
-    shape: targetAction,
+    shape: { tabId, ...hoverFields },
   }),
   browserTool({
     name: "scroll",
     description: "Scroll the page or a target container by X/Y pixels and return a fresh snapshot.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      deltaX: z.number().min(-100_000).max(100_000).optional(),
-      deltaY: z.number().min(-100_000).max(100_000).optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...scrollFields },
   }),
   browserTool({
     name: "select_option",
     description: "Select one or more native select options by value or label and return a fresh snapshot.",
-    shape: { ...targetAction, values: z.array(z.string().max(1_000)).min(1).max(100) },
+    shape: { tabId, ...selectOptionFields },
   }),
   browserTool({
     name: "set_checked",
     description: "Set a checkbox or radio target to the requested checked state and return a fresh snapshot.",
-    shape: { ...targetAction, checked: z.boolean() },
+    shape: { tabId, ...setCheckedFields },
   }),
   browserTool({
     name: "drag",
@@ -355,31 +410,13 @@ const BROWSER_TOOL_DEFINITIONS = [
     name: "wait_for",
     description:
       "Wait for a URL, text, semantic target, load state, or DOM quiet condition, then return a fresh snapshot.",
-    shape: {
-      tabId,
-      target: browserTargetSchema.optional(),
-      text: requiredString(2_000).optional(),
-      url: requiredString(INPUT_LIMITS.browserUrl).optional(),
-      state: z.enum(["load", "domcontentloaded", "dom-quiet"]).optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...waitForFields },
   }),
   browserTool({
     name: "evaluate",
     description:
       "Evaluate JavaScript in the main frame's own page context, with the same access to page scripts, DOM and cookies as the page itself. Prefer snapshots and semantic actions; use this for inspection or unsupported interactions. Returns only a JSON-serializable value up to 64 KB.",
-    shape: {
-      tabId,
-      expression: z
-        .string()
-        .min(1)
-        .max(64_000)
-        .refine((value) => value.trim().length > 0, {
-          message: "expression must not be blank",
-        }),
-      awaitPromise: z.boolean().optional(),
-      timeoutMs: timeout,
-    },
+    shape: { tabId, ...evaluateFields },
   }),
   browserTool({
     name: "set_environment",
@@ -420,6 +457,17 @@ const BROWSER_TOOL_DEFINITIONS = [
     name: "screenshot",
     description: "Capture the visible page as a separate image content item.",
     shape: { tabId },
+  }),
+  browserTool({
+    name: "run_script",
+    description:
+      "Run a short JavaScript program that drives one tab and returns one final snapshot, not one per action. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, and for loops, such as paging until a condition holds. It runs in an isolated sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(condition, text, or page function), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+    shape: {
+      tabId,
+      script: requiredString(BROWSER_SCRIPT_MAX_CHARS),
+      finalSnapshot: z.boolean().optional(),
+      timeoutMs: z.number().int().min(1_000).max(BROWSER_SCRIPT_MAX_TIMEOUT_MS).optional(),
+    },
   }),
   browserTool({
     name: "close_tab",

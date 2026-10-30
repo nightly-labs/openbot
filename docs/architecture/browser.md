@@ -178,6 +178,49 @@ It includes actual runtime versions, completed cases, three warm-up pairs and tw
 serialized result bytes, and observed snapshot counts. Measurements include tool execution and loopback fixture
 confirmation. They do not measure provider tokens, model speed, or billable cost.
 
+### Run many steps in one call
+
+Each single action tool returns a full new snapshot. `openbot_browser.run_script` does many actions
+in one call and returns one final snapshot, so a long task sends fewer snapshots to the model.
+
+`run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
+`type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
+helper sends one step to the host. The script returns a JSON value of at most 64 KB.
+
+An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
+site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
+`run_steps` 130k. With both tools in the catalog, agents used both, at 198k. So the catalog has only
+`run_script` (`bun run bench:browser-tools`). With the shipped guidance and no hint in the prompt,
+agents used 216k until a browser search also returned `run_script` (see
+[Providers](providers.md)); then 149k.
+
+The script runs each step through the same code as the single tool, with its own tab queue slot.
+Before each step, the host checks the tab again: ownership, secret protection, takeover, and user
+control. The action steps skip only their per-step snapshot. `evaluate` keeps the scripted-origin
+record and the secret-document check. When a person takes control of the tab, the call stops and
+returns its partial results with status `user_control`. It does not wait for the release. The
+control event uses the released `click` action, so the Team API wire values do not change.
+
+An `evaluate` step returns `null` when the expression gives `undefined`, such as a click statement.
+The single `evaluate` tool still refuses that value. If the step failed after the click, the agent
+would click again. In a script, `waitFor` also takes a page function: the page polls it every
+100 ms until it returns a truthy value, in one `evaluate` step (at most 25 seconds). A script that
+fails without a final snapshot returns the tab's `url`, because the steps before the failure stay
+done and the agent must not start again from the wrong page.
+
+The script runs in a QuickJS WebAssembly sandbox (`src/backend/browser-script.ts`), not in
+`node:vm`, because the backend process holds the vault. The sandbox has no modules, network, files,
+timers, or process. Its limits are 64 MiB of memory, a 1 MiB stack, 200 steps, and a total deadline
+of `timeoutMs` (default 60 seconds, at most 120 seconds). An interrupt handler stops a script that
+loops without steps. Each script gets its own runtime, which the host disposes at the end. The
+backend bundle keeps the QuickJS packages external, so the WebAssembly file loads from
+`node_modules`.
+
+`bun run test:browser-steps` compiles its native fixture and drives a hidden Electron process with
+loopback pages, like the fill fields check. CI runs it in the `browser` job under `xvfb-run -a`.
+The report is `.openbot-build/browser-steps-e2e/report.json`.
+
 ### Browser sessions
 
 Each agent has one **browser profile**: the persistent partition that its new tabs open in. The agent

@@ -182,6 +182,9 @@ jobs:
       - name: Run the agent browser session E2E
         run: xvfb-run -a bun run test:browser-agent-session
 
+      - name: Run the browser steps E2E
+        run: xvfb-run -a bun run test:browser-steps
+
   tests-desktop:
     # ubuntu-latest gives 4 vCPUs, so vitest runs 3 workers and the job is
     # CPU-bound. The suite is split across shards that run as their own
