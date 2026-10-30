@@ -291,7 +291,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                   detail: String(error.cause),
                 });
               // The input can have changed the site already. A plain timeout invites a repeat.
-              if (dispatched && isTimeoutError(error.cause))
+              // Partial typing already says how many characters reached the page.
+              if (dispatched && isTimeoutError(error.cause) && !String(error.cause).includes("reached the page"))
                 return yield* browserFailure(
                   new Error(
                     `Browser ${action} timed out after its input reached the page. Check the page before you repeat the action.`,
