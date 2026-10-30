@@ -90,9 +90,12 @@ export function useServerActions() {
     return hostedServersAvailable() ? undefined : createLocal;
   }
 
-  /** Hides the server on this computer. When it is open, the first other server opens in its place. */
+  /**
+   * Hides the server on this computer. When it is open, another server opens in its place: the first
+   * online one, so that the hide does not wait for or fail on an offline server.
+   */
   async function hideLocal(serverId: string): Promise<void> {
-    const other = remoteServers()[0];
+    const other = remoteServers().find((server) => server.state === "online") ?? remoteServers()[0];
     if (!other) return;
     if (servers().some((server) => server.id === serverId && server.active)) {
       try {
