@@ -400,7 +400,11 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                       description={t("customProvider.field.harnessHint")}
                     >
                       <Select<CustomProviderHarness>
-                        options={choices().map((choice) => choice.id)}
+                        // Only the providers that can run the endpoint now, and the saved one, as the
+                        // default provider select does, so the list stays one control for any number.
+                        options={choices()
+                          .filter((choice) => choice.ready || choice.id === harness())
+                          .map((choice) => choice.id)}
                         value={harness()}
                         onChange={(next) =>
                           next &&
@@ -408,7 +412,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                             state.harness = next;
                           })
                         }
-                        optionDisabled={(id) => !choices().some((choice) => choice.id === id && choice.ready)}
                         disabled={busy()}
                         placement="bottom-start"
                         itemComponent={(itemProps) => (
