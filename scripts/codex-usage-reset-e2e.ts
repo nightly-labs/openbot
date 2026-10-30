@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, type AgentEvent, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -300,9 +300,10 @@ try {
 
   // The plan is spent and the reading names its reset an hour away, so the gate waits for it.
   const notices: number[] = [];
-  agents.on("event", (event) => {
+  const onEvent = (event: AgentEvent) => {
     if (event.type === "usage-limit-reached" && event.agentId === agent.id) notices.push(event.agentCount);
-  });
+  };
+  agents.on("event", onEvent);
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Exhaust the plan." }));
   const spentHold = await waitFor("the spent plan to hold the agent", () =>
     agents.getRuntimeSnapshot().usageLimits?.find((limit) => limit.agentId === agent.id && limit.resetsAt !== null),
@@ -326,6 +327,7 @@ try {
     );
   });
   assert.equal(notices.length, 1, "A refused try does not announce the limit again.");
+  assert.equal(turnInputs().length, turnsBefore + 1, "One message from the user tries one turn.");
   // The user signs Codex in to another account outside OpenBot. Nothing tells the gate, so only a
   // new message tries again, long before the old account's reset.
   writeFileSync(switchedFlag, "");
@@ -338,6 +340,7 @@ try {
     "A completed try ends the limit.",
   );
   assert.equal(consumed().length, 2, "A try spends no reset credit.");
+  agents.off("event", onEvent);
   report.cases.push({
     name: "a message from the user tries one turn before the reset",
     details: { spentHold, stillHeld, notices },

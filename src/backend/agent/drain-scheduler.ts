@@ -554,6 +554,8 @@ export class DrainScheduler {
           return;
         }
       }
+      // One message from the user lets one turn try a limit, so the other lanes stay held.
+      this.#usageLimits.tryStarted(agentId);
       yield* this.startDelivery(context, planNote ?? undefined);
     }).pipe(
       Effect.ensuring(

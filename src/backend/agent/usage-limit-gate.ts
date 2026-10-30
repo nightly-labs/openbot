@@ -110,8 +110,9 @@ export class UsageLimitGate {
   }
 
   /**
-   * The user sent this agent a message while a limit holds it, so the agent may start one turn. A
-   * refused turn queues its messages again and ends the try; a completed one ends the limit.
+   * The user sent this agent a message while a limit holds it, so the agent may start one turn. The
+   * try ends when that turn starts: a refused turn queues its messages again, and a completed one
+   * ends the limit.
    */
   retry(agentId: string): void {
     const agent = this.#agent(agentId);
@@ -127,6 +128,11 @@ export class UsageLimitGate {
       agent !== undefined &&
       this.#tries.get(agentId) === limitKey(providerForAgent(agent), accountOf(agent), agent.model)
     );
+  }
+
+  /** A turn of this agent starts, so a try that let it start ends. */
+  tryStarted(agentId: string): void {
+    this.#tries.delete(agentId);
   }
 
   /** Whether a limit holds this provider account and model. */
@@ -200,7 +206,6 @@ export class UsageLimitGate {
     resetsAt: number | null,
     model: string | null = null,
   ) {
-    this.#tries.delete(agentId);
     const agent = this.#agent(agentId);
     if (!agent) return;
     const provider = providerForAgent(agent);
