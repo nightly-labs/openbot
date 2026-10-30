@@ -219,6 +219,8 @@ export const messages = {
   "server.rail.restart": "서버 다시 시작",
   "server.rail.leave": "서버 나가기",
   "server.rail.delete": "서버 삭제",
+  "server.rail.hide": "서버 숨기기",
+  "server.rail.showLocal": "{name} 표시",
   "server.select.failedTitle": "서버를 선택할 수 없어요",
   "server.select.failedDescription": "서버를 전환할 수 없었어요. 다시 시도해 주세요.",
   "server.select.openAgentFailed": "{name}을(를) 열 수 없었어요. 사이드바에서 찾아 주세요.",

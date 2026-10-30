@@ -1,6 +1,6 @@
 import { canAdministerServer, type ServerNotificationLevel, type ServerSummary } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
-import { Bell, BellOff, ChevronRight, type ContextMenu, LogOut, RotateCcw, Trash2 } from "@openbot/ui";
+import { Bell, BellOff, ChevronRight, type ContextMenu, EyeOff, LogOut, RotateCcw, Trash2 } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -65,9 +65,12 @@ export interface ServerActionCallbacks {
    */
   onRestart?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
   canRestart?: ((serverId: string) => boolean) | undefined;
+  /** Hides the server on this computer from the list. The menu shows it only when `canHide` accepts the server. */
+  onHide?: ((serverId: string) => void) | undefined;
+  canHide?: ((serverId: string) => boolean) | undefined;
 }
 
-/** Mute, notification settings, server settings, restart, and leave or delete for one server. */
+/** Mute, notification settings, server settings, restart, leave or delete, and hide for one server. */
 export function ServerActionItems(
   props: ServerActionCallbacks & {
     menu: ServerActionMenu;
@@ -95,6 +98,8 @@ export function ServerActionItems(
     canAdministerServer(props.server.role) &&
     !(props.server.hostedSleep === "waking" && props.server.hostedStart?.step !== "openbot") &&
     (props.server.hosted === true || Boolean(props.canRestart?.(props.server.id)));
+  const canHide = () =>
+    Boolean(props.onHide) && props.server.kind === "local" && Boolean(props.canHide?.(props.server.id));
   // A component, so the JSX below can use it as a tag. The menu does not change after render.
   const Menu = props.menu;
   return (
@@ -155,8 +160,14 @@ export function ServerActionItems(
           <span>{t("server.rail.settings")}</span>
         </Menu.Item>
       </Show>
-      <Show when={canRestart() || canLeave() || canDelete() || canRemove()}>
+      <Show when={canRestart() || canLeave() || canDelete() || canRemove() || canHide()}>
         <Menu.Separator />
+        <Show when={canHide()}>
+          <Menu.Item onSelect={() => props.onHide?.(props.server.id)}>
+            <EyeOff class="agent-context-icon size-4" aria-hidden="true" />
+            <span>{t("server.rail.hide")}</span>
+          </Menu.Item>
+        </Show>
         <Show when={canRestart()}>
           <Menu.Item onSelect={() => props.onRestart?.(props.server.id, props.trigger())}>
             <RotateCcw class="agent-context-icon size-4" aria-hidden="true" />

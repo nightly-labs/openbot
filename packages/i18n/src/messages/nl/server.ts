@@ -208,6 +208,8 @@ export const messages = {
   "server.rail.restart": "Server herstarten",
   "server.rail.leave": "Server verlaten",
   "server.rail.delete": "Server wissen",
+  "server.rail.hide": "Server verbergen",
+  "server.rail.showLocal": "{name} tonen",
   "server.select.failedTitle": "Kan de server niet kiezen",
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",

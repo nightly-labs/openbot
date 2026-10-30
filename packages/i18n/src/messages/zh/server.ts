@@ -217,6 +217,8 @@ export const messages = {
   "server.rail.restart": "重启服务器",
   "server.rail.leave": "离开服务器",
   "server.rail.delete": "删除服务器",
+  "server.rail.hide": "隐藏服务器",
+  "server.rail.showLocal": "显示 {name}",
   "server.select.failedTitle": "无法选择该服务器",
   "server.select.failedDescription": "无法切换服务器，请重试。",
   "server.select.openAgentFailed": "无法打开 {name}，请在侧边栏中找到它。",

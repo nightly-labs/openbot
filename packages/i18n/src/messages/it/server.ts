@@ -196,6 +196,8 @@ export const messages = {
   "server.rail.restart": "Riavvia il server",
   "server.rail.leave": "Esci dal server",
   "server.rail.delete": "Elimina il server",
+  "server.rail.hide": "Nascondi il server",
+  "server.rail.showLocal": "Mostra {name}",
   "server.select.failedTitle": "Impossibile selezionare il server",
   "server.select.failedDescription": "Impossibile cambiare server. Riprova.",
   "server.select.openAgentFailed": "Impossibile aprire {name}. Trovalo nella barra laterale.",

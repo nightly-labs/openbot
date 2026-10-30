@@ -235,6 +235,10 @@ export const messages = defineMessages("server", {
   "server.rail.restart": "Restart server",
   "server.rail.leave": "Leave server",
   "server.rail.delete": "Delete server",
+  // Hides the server on this computer from the server list while the user has other servers.
+  "server.rail.hide": "Hide server",
+  // Brings the hidden server on this computer back to the server list. {name} is its name, "Local".
+  "server.rail.showLocal": "Show {name}",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",

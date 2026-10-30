@@ -207,6 +207,8 @@ export const messages = {
   "server.rail.restart": "Sunucuyu yeniden başlat",
   "server.rail.leave": "Sunucudan ayrıl",
   "server.rail.delete": "Sunucuyu sil",
+  "server.rail.hide": "Sunucuyu gizle",
+  "server.rail.showLocal": "{name} sunucusunu göster",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
