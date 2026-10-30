@@ -630,9 +630,11 @@ try {
       v8Rows.every((row) => typeof row.displayName === "string" && row.displayName.length > 0),
       "A v8 row has no displayName.",
     );
+    // Protocol 7 knows only these providers. The host leaves out the rows of later ones, such as OpenRouter.
+    const v7Providers = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline", "pi", "muse"];
     assert.deepEqual(
-      v8Rows.map((row) => row.id),
       v7Rows.map((row) => row.id),
+      v8Rows.map((row) => row.id).filter((id) => v7Providers.includes(String(id))),
       "v7 and v8 list different providers.",
     );
     return { providers: v8Rows.map((row) => `${String(row.id)}: ${String(row.displayName)}`) };
