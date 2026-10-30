@@ -26,7 +26,8 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import type { AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Scope, Semaphore } from "effect";
 import {
   AcpConfiguration,
@@ -88,6 +89,8 @@ import type {
   ReadProviderHistory,
 } from "./provider-history";
 import { TimeoutError } from "./with-timeout";
+
+const logger = createOpenBotLogger("acp-client");
 
 /** How long the second `session/load` waits after a failure that lists the sessions (OpenCode). */
 const RESTORE_LIST_RETRY_MS = 500;
@@ -1226,6 +1229,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (isAuthenticationError(error)) {
         const keyRefused = this.options.savedKeyRefusedMessage?.();
         if (keyRefused) return yield* providerFailure(new ProviderSignInError({ message: keyRefused }));
+        // The agent's own words, which the row does not show (#3796).
+        logger.warn("An ACP agent reported no sign-in.", {
+          provider: this.provider,
+          message: this.#redact(failureText(error)),
+        });
         this.#signedIn = false;
         return;
       }
@@ -3065,8 +3073,11 @@ function failureText(error: unknown): string {
  */
 const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be incomplete\.\s*$/u;
 
+/**
+ * A sign-out: ACP's `authRequired` code, or a failure that names the account, such as `401
+ * Unauthorized`. Text that only mentions a token or a login, such as a failed token refresh on a
+ * busy network, is not one: Cursor stayed signed in and OpenBot asked for a sign-in (#3796).
+ */
 function isAuthenticationError(error: unknown): boolean {
-  return /auth|login|credential|token|unauthori[sz]ed|api key/i.test(
-    error instanceof Error ? error.message : String(error),
-  );
+  return (error instanceof RequestError && error.code === -32000) || classifyUserError(error) === "auth";
 }
