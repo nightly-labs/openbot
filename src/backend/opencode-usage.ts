@@ -6,11 +6,11 @@
 // `{ usage: { rolling, weekly, monthly } }`, each with an integer `percent` and an ISO `resetsAt`.
 
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Schema } from "effect";
+import { openCodeDataDirectory } from "./process-confinement";
 import { type AccountRateLimitsReadResult, type AccountRateLimitWindowResult, getRecord, getString } from "./protocol";
 
 const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
@@ -60,13 +60,14 @@ export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (
 
 /**
  * The keys of the user's own OpenCode set-up, in the order the CLI uses them: the OpenCode Console
- * connection in OpenCode 2's database, then the `opencode-go` key in `auth.json`, which OpenCode
- * applies after `OPENCODE_API_KEY`, then that variable. A rejected key moves the read to the next
- * one. `OPENCODE_AUTH_CONTENT` replaces the local sign-in, the Console connection included.
+ * connection in OpenCode 2's database, then the Go key. The Go key is the `opencode-go` key in
+ * `auth.json`, which OpenCode applies after `OPENCODE_API_KEY`, or that variable when `auth.json` has
+ * none. A rejected Console key moves the read to the Go key. `OPENCODE_AUTH_CONTENT` replaces the
+ * local sign-in, the Console connection included.
  */
 const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
   const env = process.env;
-  const dataDirectory = join(env.XDG_DATA_HOME?.trim() || join(homedir(), ".local", "share"), "opencode");
+  const dataDirectory = openCodeDataDirectory(env);
   const inlineAuth = env.OPENCODE_AUTH_CONTENT;
   const authText =
     inlineAuth ||
@@ -93,8 +94,8 @@ function authFileGoKey(text: string): string | undefined {
  * self-hosted connection cannot fall through to another stored account. A NULL `active` predates the
  * flag. No database, a locked one, or an older schema gives no key.
  */
-const readConsoleKey = (databasePath: string) =>
-  Effect.try({
+const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
+  return yield* Effect.try({
     try: () => {
       const database = new DatabaseSync(databasePath, { readOnly: true });
       try {
@@ -120,6 +121,7 @@ const readConsoleKey = (databasePath: string) =>
     },
     catch: (cause) => new OpenCodeUsageFailed({ cause }),
   }).pipe(Effect.orElseSucceed(() => undefined));
+});
 
 /** The quota for one key, or null when the console rejects the key. */
 const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: string) {

@@ -406,8 +406,9 @@ sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the onl
 applies config `options.apiKey` last. With no saved key, it reads the CLI's own keys in the order
 T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
 self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
-(or `OPENCODE_DB`), then the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`, which
-also skips the database), then `OPENCODE_API_KEY` (#3548). A 401 or 403 tries the next key. The
+(or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
+Console key tries the Go key. The
 database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
 SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
