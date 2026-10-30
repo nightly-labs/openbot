@@ -357,6 +357,14 @@ const SIGNAL_RENEW_DELAY_MS = 8_000;
 const HOST_WAIT_RENEW_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 /**
+ * A Signal restart disconnects all peers at the same time, and each resume asks the account service.
+ * The first retry is spread over 0.5–4 s (before: 0.25–0.5 s). Later retries double up to 30 s.
+ */
+function signalRetryDelay(attempt: number): number {
+  if (attempt === 0) return 500 + Math.random() * 3_500;
+  return Math.min(30_000, 500 * 2 ** attempt) * (0.5 + Math.random() / 2);
+}
+/**
  * The host gets no answer to its ICE consent checks while the phone is suspended, and stops using a
  * path that did not answer for 30 s (RFC 7675). A longer absence needs an ICE restart.
  */
@@ -1705,9 +1713,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     const delay = Math.max(
       signalRetryAt - Date.now(),
       isPeerOnline(state) || canRecoverPeer(state) || state.waitingForHost
-        ? // A Signal restart disconnects all peers at the same time, and each resume asks the account
-          // service. The jitter spreads the first retry over 0.5–4 s, not 0.25–0.5 s.
-          Math.min(30_000, 4_000 * 2 ** state.reconnectAttempt++) * (0.125 + (Math.random() * 7) / 8)
+        ? signalRetryDelay(state.reconnectAttempt++)
         : 60_000,
     );
     diagnose(state, "signal-retry", `in ${delay} ms`);

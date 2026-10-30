@@ -738,7 +738,8 @@ try {
     return `closed with ${code} and an authentication_required error`;
   });
   // After a restart every peer connects again at once. Signal sends a limited number of checks to the
-  // account service at the same time, and each peer still gets ready.
+  // account service at the same time, and each peer still gets ready. The hellos use initial tickets,
+  // which Signal checks with the account service only in the first 3 minutes after its start.
   await check(
     `A burst of hellos sends at most ${RESUME_CHECK_CONCURRENCY} account service checks at a time`,
     async () => {
