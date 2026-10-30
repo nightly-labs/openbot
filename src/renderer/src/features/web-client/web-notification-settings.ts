@@ -111,18 +111,23 @@ export function createWebNotificationSettings(options: {
     const levels = entry.levels;
     if (!levels) return { status: "unsupported" };
     const own = agentNotificationLevelMap(levels);
+    // An agent turned off for everyone can turn on again only on the open host, so a level of its
+    // own on another host would save and stay silent. Such an agent does not show there.
+    const open = hostId === options.openHostId();
     return {
       status: "ready",
-      agents: entry.agents.map((agent) => ({
-        id: agent.id,
-        name: agent.name,
-        // Only the short title: a long description would change the height of the row.
-        detail: agent.title,
-        avatarSeed: agent.avatarSeed,
-        avatarHue: agent.avatarHue,
-        avatarUrl: agent.avatarUrl,
-        level: own.get(agent.id) ?? null,
-      })),
+      agents: entry.agents
+        .filter((agent) => agent.notifications || open)
+        .map((agent) => ({
+          id: agent.id,
+          name: agent.name,
+          // Only the short title: a long description would change the height of the row.
+          detail: agent.title,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          level: own.get(agent.id) ?? null,
+        })),
     };
   }
 
