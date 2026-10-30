@@ -70,7 +70,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.intro.title": "Your agents, always on",
   "mobile.server.hosted.intro.description":
     "A cloud server runs your agents and routines when your computer is off. OpenBot sets it up and keeps it running.",
-  // {members}, {storage} and {speed} are the texts of the three facts of a plan.
+  // {members}, {storage}, {sites} and {speed} are the texts of the four facts of a plan.
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
   // The steps on the desktop app. The names after "Settings" are the desktop Settings tabs and buttons.
   "mobile.server.hosted.computer.title": "On your computer",

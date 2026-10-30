@@ -65,6 +65,21 @@ export const resolveHostedSiteScope = Effect.fn("HostedSites.resolveScope")(func
   return { kind: "server", userId, serverId: hostId };
 });
 
+/**
+ * The SQL condition that the `hosted_sites` row `alias` holds a slot of its bucket. Bind `now` two times. A new
+ * site holds a slot only while its upload is live: the list does not show an abandoned upload, so no count may
+ * include one before the cleanup removes it. Every slot count uses this condition, so that the list, a new
+ * site, an activation and an adoption agree.
+ */
+export function holdsSiteSlotSql(alias: string): string {
+  return `${alias}.status IN ('uploading', 'active', 'blocked')
+    AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > ?)
+    AND (${alias}.status != 'uploading' OR EXISTS (
+      SELECT 1 FROM site_deployments d
+      WHERE d.site_id = ${alias}.id AND d.status IN ('uploading', 'activating') AND d.upload_expires_at > ?
+    ))`;
+}
+
 /** The active-site limit of a server's plan, or of the unlinked bucket. Plan limits read only the entitlement. */
 
 export const hostedSiteLimit = Effect.fn("HostedSites.limit")(function* (
@@ -104,12 +119,11 @@ export const adoptUnlinkedHostedSites = Effect.fn("HostedSites.adoptUnlinked")(f
            ORDER BY s.updated_at DESC
            LIMIT max(0, ? - (
              SELECT COUNT(*) FROM hosted_sites x
-             WHERE x.user_id = ? AND x.server_id = ? AND x.status IN ('uploading', 'active', 'blocked')
-               AND (x.expires_at IS NULL OR x.expires_at > ?)
+             WHERE x.user_id = ? AND x.server_id = ? AND ${holdsSiteSlotSql("x")}
            ))
          )`,
       )
-      .bind(serverId, userId, now, serverId, userId, serverId, siteLimit, userId, serverId, now)
+      .bind(serverId, userId, now, serverId, userId, serverId, siteLimit, userId, serverId, now, now)
       .run(),
   );
   return result.meta.changes ?? 0;
