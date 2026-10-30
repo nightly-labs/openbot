@@ -3112,7 +3112,10 @@ const HARNESS_ERROR_CHUNK = /^\s*API Error: [^\n]*The response above may be inco
  * A sign-out: ACP's `authRequired` code, or a failure that names the account, such as `401
  * Unauthorized`. Text that only mentions a token or a login, such as a failed token refresh on a
  * busy network, is not one: Cursor stayed signed in and OpenBot asked for a sign-in (#3796).
+ * Google's refusal of a saved key is one, so the row says that the key was refused (#1913).
  */
 function isAuthenticationError(error: unknown): boolean {
-  return (error instanceof RequestError && error.code === -32000) || classifyUserError(failureText(error)) === "auth";
+  if (error instanceof RequestError && error.code === -32000) return true;
+  const text = failureText(error);
+  return classifyUserError(text) === "auth" || /\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text);
 }
