@@ -32,6 +32,7 @@ const rowCallbacks = {
 };
 const onReply = fn();
 const onCopy = fn();
+const onMarkUnread = fn();
 
 /** A message row with the action row and the right-click menu, as the timeline draws it. */
 function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
@@ -90,7 +91,15 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean }) {
           {...actions}
         />
       }
-      menu={() => <MessageMenu message={message()} reactions={!props.channel} readAloud={readAloud()} {...actions} />}
+      menu={() => (
+        <MessageMenu
+          message={message()}
+          reactions={!props.channel}
+          readAloud={readAloud()}
+          onMarkUnread={own() || props.channel ? undefined : onMarkUnread}
+          {...actions}
+        />
+      )}
     />
   );
 }
@@ -103,7 +112,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Right-click a message, or press Shift+F10 in its action row. React opens a submenu. */
+/**
+ * Right-click a message, or press Shift+F10 in its action row. React opens a submenu. An agent
+ * message also has Mark unread.
+ */
 export const AgentChat: Story = {
   render: () => (
     <main class="foundation-story">

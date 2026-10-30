@@ -184,6 +184,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "대기를 깨우는 것은 내 루틴의 실행뿐인데, 루틴이 없어요. openbot.create_routine으로 루틴을 만든 후 대기를 여세요.",
   "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",

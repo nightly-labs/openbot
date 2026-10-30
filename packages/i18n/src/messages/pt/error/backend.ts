@@ -199,6 +199,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Somente uma execução de uma das suas rotinas desperta uma espera, e você não tem nenhuma rotina. Crie uma com openbot.create_routine e depois abra a espera.",
   "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",

@@ -161,6 +161,12 @@ export interface MarkConversationReadInput {
   throughMessageId: string | null;
 }
 
+/** Marks `fromMessageId` and the messages after it unread, for this computer's reader. */
+export interface MarkConversationUnreadInput {
+  agentId: string;
+  fromMessageId: string;
+}
+
 export interface SendMessageInput {
   agentId: string;
   text: string;

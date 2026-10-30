@@ -234,6 +234,7 @@ import type {
   ConversationSnapshot,
   ConversationWithReadState,
   MarkConversationReadInput,
+  MarkConversationUnreadInput,
   OpenMessageLinkInput,
   PasteMessageLinkInput,
   ReadConversationPageInput,
@@ -1392,6 +1393,10 @@ export const IPC_ENDPOINTS = {
     listConversationReads: scopedQuery<Record<string, ConversationReadState>>()("agent:list-conversation-reads"),
     markConversationRead: scopedRequest<MarkConversationReadInput, ConversationReadState>()(
       "agent:mark-conversation-read",
+    ),
+    // Local only: the Team API unread route marks the whole chat, not from one message.
+    markConversationUnread: scopedRequest<MarkConversationUnreadInput, ConversationReadState>()(
+      "agent:mark-conversation-unread",
     ),
     sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
     setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),

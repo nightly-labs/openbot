@@ -187,6 +187,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
   "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marking a message unread is only available for agents on this computer.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",

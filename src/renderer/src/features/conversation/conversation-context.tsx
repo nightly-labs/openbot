@@ -933,6 +933,34 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * Marks an agent message and the messages after it unread. The open chat stays open and moves its
+     * NEW line to that message; the next open of the chat marks it read again.
+     */
+    async function markAgentMessagesUnread(
+      agentId: string,
+      fromMessageId: string,
+      serverId = activeServerId(),
+    ): Promise<void> {
+      const requestKey = agentConversationKey(serverId, agentId);
+      const operation: Promise<void> = (conversationReadOperations.get(requestKey) ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(async () => {
+          const state = await conversationPort().agent.markConversationUnread({ agentId, fromMessageId }, serverId);
+          // A finished automatic read would otherwise apply its read state again.
+          autoReadAgentMessages.delete(requestKey);
+          if (scopeIsCurrent()) applyConversationReadState(agentId, state);
+        });
+      conversationReadOperations.set(requestKey, operation);
+      try {
+        await operation;
+      } catch (error) {
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+      } finally {
+        if (conversationReadOperations.get(requestKey) === operation) conversationReadOperations.delete(requestKey);
+      }
+    }
+
     /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
@@ -1013,6 +1041,7 @@ const Conversation = createSimpleContext({
       searchAgentMessages,
       sendMessage,
       markAgentMessagesRead,
+      markAgentMessagesUnread,
       markAllAgentMessagesRead,
       presentPromptResolution,
       // See `AppProviders`: a chat window sends no typing state.

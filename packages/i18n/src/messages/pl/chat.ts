@@ -435,6 +435,7 @@ export const messages = {
   "chat.menu.reply": "Odpowiedz",
   "chat.menu.copy": "Kopiuj wiadomość",
   "chat.menu.react": "Zareaguj",
+  "chat.menu.markUnread": "Oznacz jako nieprzeczytane",
   "chat.voice.play": "Odtwórz wiadomość głosową",
   "chat.voice.pause": "Wstrzymaj wiadomość głosową",
   "chat.voice.pauseReading": "Wstrzymaj czytanie",

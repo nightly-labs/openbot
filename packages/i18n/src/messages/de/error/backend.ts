@@ -209,6 +209,8 @@ export const messages = {
     "Nur eine Ausführung einer deiner Routinen weckt einen Wartevorgang, und du hast keine Routine. Erstelle eine mit openbot.create_routine und öffne dann den Wartevorgang.",
   "error.backend.agentWaitRemoteUnsupported":
     "Offene Wartevorgänge sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Eine Nachricht als ungelesen markieren ist nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.routineFlowHandoffFailed": "Die Routine konnte die Arbeit nicht an diesen Agenten übergeben.",
   "error.backend.mcpServerLimit": "OpenBot verwaltet bis zu {limit} MCP-Server.",
   "error.backend.mcpServerNameTaken": "Ein MCP-Server mit dem Namen {name} existiert bereits.",

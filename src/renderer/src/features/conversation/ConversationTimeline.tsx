@@ -205,6 +205,12 @@ export function ConversationTimeline() {
         toggleReadAloud({ serverId: props.server?.id ?? "local", agentId, messageId: message.id }, message.body),
     };
   };
+  /** An agent message in an agent chat can be marked unread, with the messages after it. */
+  const markUnreadAction = (message: AgentMessage) => {
+    const onMarkUnread = props.onMarkUnread;
+    if (channel || !onMarkUnread || message.author !== "agent" || message.streaming) return;
+    return () => void onMarkUnread(message.id);
+  };
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
   const spokenReplyIds = createMemo(() => {
     const ids = new Set<string>();
@@ -1288,6 +1294,7 @@ export function ConversationTimeline() {
                                       authorName={channel ? author().name : undefined}
                                       {...messageActions}
                                       readAloud={messageReadAloud()}
+                                      onMarkUnread={markUnreadAction(message() ?? initialMessage)}
                                     />
                                   )
                             }

@@ -200,6 +200,8 @@ export const messages = {
     "待機を再開できるのは自分のルーティンの実行だけですが、ルーティンがありません。openbot.create_routine でルーティンを作成してから、待機を開いてください。",
   "error.backend.agentWaitRemoteUnsupported":
     "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.markUnreadRemoteUnsupported":
+    "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",

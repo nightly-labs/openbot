@@ -160,10 +160,11 @@ export class ConversationReader {
     this: ConversationReader,
     agentId: string,
     memberId: string,
+    fromMessageId: string | null = null,
   ) {
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
-      const state = this.#reads.markUnreadForThread(memberId, agent.threadId);
+      const state = this.#reads.markUnreadForThread(memberId, agent.threadId, fromMessageId);
       this.#hooks.emit({
         type: "conversation-invalidated",
         agentId,

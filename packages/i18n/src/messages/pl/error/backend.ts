@@ -192,6 +192,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Oczekiwanie budzi tylko uruchomienie jednej z twoich rutyn, a nie masz żadnej rutyny. Utwórz ją za pomocą openbot.create_routine, a potem otwórz oczekiwanie.",
   "error.backend.agentWaitRemoteUnsupported": "Otwarte oczekiwania są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Oznaczanie wiadomości jako nieprzeczytanej jest dostępne tylko dla agentów na tym komputerze.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
