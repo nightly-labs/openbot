@@ -1921,7 +1921,8 @@ export class BrowserHost {
             ...result,
             ...(result.error === undefined ? {} : { error: redactText(result.error) }),
             ...(snapshotError === undefined ? {} : { snapshotError }),
-            ...(tab ? { url: currentTabUrl(tab) } : {}),
+            // A page can put a typed card value in its address, as in the tab list.
+            ...(tab ? { url: tab.engine.scrubText(currentTabUrl(tab)) } : {}),
             ...(snapshot ? { snapshot } : {}),
           }),
           success: result.status === "completed",
