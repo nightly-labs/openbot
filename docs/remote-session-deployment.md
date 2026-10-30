@@ -105,7 +105,8 @@ Worker, Slack, Telegram and routine webhooks all use `signal.openbot.run`, which
 - Its `/opt/openbot/remote/.env.production` is a copy of the production file with these changes:
   `TURN_DOMAIN=turn2.openbot.run`, `TURN_PUBLIC_IP=65.109.88.58`, `ACME_EXTRA_DOMAINS`,
   `REMOTE_SIGNAL_PUBLIC_PORT=8091`, and empty `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and
-  `TELEGRAM_WEBHOOK_ORIGIN`. Do not copy the production file over it.
+  `TELEGRAM_WEBHOOK_ORIGIN`. `REMOTE_SIGNAL_BIND_ADDRESS=127.0.0.1` comes from the production file;
+  Docker ports skip ufw, so do not change it. Do not copy the production file over it.
 - Discord is off on the standby. Two Signals with the bot token both open a Gateway, and each event
   arrives twice. With an empty `TELEGRAM_WEBHOOK_ORIGIN`, the standby does not set the webhook, which
   already names `signal.openbot.run`.
@@ -113,7 +114,8 @@ Worker, Slack, Telegram and routine webhooks all use `signal.openbot.run`, which
 - The IOTA node uses ports 8080 and 8081, so Signal listens on `127.0.0.1:8091`. Apache uses port 80.
 - Nginx uses `remote/nginx/signal.openbot.run.conf` with `signal2.openbot.run` added to `server_name`,
   `proxy_pass` to port 8091, and no port 80 server. The reload units are the ones in `remote/nginx`.
-- The firewall (ufw) allows 443/tcp, 3478/tcp, 3478/udp and 5349/tcp, as on production.
+- The firewall (ufw) allows 443/tcp, 3478/tcp, 3478/udp and 5349/tcp, as on production. Neither
+  host opens the coturn relay range UDP 49152-65535 that `remote/README.md` lists.
 - Tags before `ACME_EXTRA_DOMAINS` lack it in `remote/acme/renew.sh` and `remote/compose.yaml`. For
   such a tag, copy these two files from `main` into the release directory before the build.
 

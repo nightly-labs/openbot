@@ -130,7 +130,9 @@ Report the results of steps 1 to 3 and get approval. Then follow "Deployment pro
   For example, `POST /v1/webhooks/x` with `content-type: application/json` gives 401.
 
 Then deploy the same tag to the standby on the ssh host `signal2` (see "Standby Signal" in the
-deployment document), and check `https://signal2.openbot.run/health/live`.
+deployment document) with the same steps, `before-<tag>` image and rollback. Make the same Nginx
+change there. `https://signal2.openbot.run/health/ready` must succeed, and `/health/live` must show
+the tag commit.
 
 If a check fails, use the rollback commands of the deployment document with the `before-<tag>` image.
 Keep that image until the developer confirms the device checks of the deployment document.
