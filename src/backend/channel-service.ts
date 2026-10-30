@@ -1849,6 +1849,14 @@ export class ChannelService {
           );
         }
       }
+      // A stop in older versions gave no reason, so the task showed no way to continue it. An archive
+      // also pauses with no reason, so only a channel that is not archived gets the stop reason.
+      if (!archived.has(channelId)) {
+        const stopped = (yield* channelSync(() => this.store.tasks(channelId)))
+          .filter((task) => task.state === "paused" && !task.error)
+          .map((task): ChannelTask => ({ ...task, error: sourceText("error.backend.channelTaskStopped") }));
+        if (stopped.length) yield* channelSync(() => this.store.update(this.store.get(channelId), { tasks: stopped }));
+      }
       this.publish(channelId);
     }
     yield* this.wake();

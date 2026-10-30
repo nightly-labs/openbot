@@ -6,3 +6,4 @@
   copy the reply of a member that answered first.
 - Members no longer get notes such as "Result submitted to the shared chat." from other members, and a
   member now ends its turn when it posts its result.
+- Channel tasks that you stopped in an earlier version now show Continue and Reassign after the update.

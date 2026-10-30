@@ -262,7 +262,9 @@ keeps its own text and files: only its first dispatch converts the attachment dr
 dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants,
 interrupts active work, and sets the reason `channelTaskStopped`. The clients show Continue and
 Reassign for a paused task that has a reason. A turn that ends interrupted gets the same reason. An
-archive pauses work with no reason; a restore gives those tasks the stop reason. Reassign waits for the old assignment to finish stopping. Restart
+archive pauses work with no reason; a restore gives those tasks the stop reason. Startup gives the
+stop reason to a paused task with no reason in a channel that is not archived: older versions stopped
+with no reason. Reassign waits for the old assignment to finish stopping. Restart
 recovery checks accepted provider work before retrying. Unknown outcomes require attention.
 Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
 effects do not have an exactly-once guarantee.
