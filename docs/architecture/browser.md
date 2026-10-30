@@ -95,9 +95,10 @@ the `mp4-attachments` capability, because a host with only `media-attachments` r
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
 Targeted typing checks that the target still holds focus before the End key, the text, and the
 Enter key. A page focus or input handler that moves focus stops it with an error that says if the
-text is already in the field. Focus that leaves a frame clears the frame's active element, also
-across processes, so the check reads only the target. `bun run test:browser --scenario=typing-focus`
-covers it and writes `.openbot-build/browser-typing-focus.json`.
+text is already in the field. The check also reads each frame element that holds the target,
+because a frame in another process can keep its active element after the page takes focus.
+`bun run test:browser --scenario=typing-focus` covers it and writes
+`.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
 tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This

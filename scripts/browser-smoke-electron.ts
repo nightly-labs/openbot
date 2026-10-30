@@ -2006,18 +2006,6 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
         ? contents.mainFrame.framesInSubtree.find((candidate) => candidate.url === frameUrl)
         : contents.mainFrame;
       assert(frame, `Typing focus frame is missing: ${surface}`);
-      if (surface === "cross-origin frame") {
-        // Typing checks only the target. That needs a frame in another process to clear its active
-        // element when the page focuses an element outside the frame.
-        assert(frame.processId !== contents.mainFrame.processId, "The cross-origin frame shares the page process.");
-        await frame.executeJavaScript("document.body.innerHTML = '<input id=\"probe\">'; probe.focus(); true");
-        await contents.executeJavaScript(
-          "const probe = document.createElement('input'); probe.id = 'probe'; document.body.prepend(probe); probe.focus(); true",
-        );
-        const frameActive = await frame.executeJavaScript("document.activeElement?.id ?? ''");
-        await contents.executeJavaScript("document.querySelector('#probe').remove(); true");
-        assert(frameActive !== "probe", "The cross-origin frame kept its active element after the page took focus.");
-      }
       const names = [
         "normal append",
         "normal replace submit",
@@ -2027,6 +2015,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
         "replaced target",
       ];
       if (surface === "same-origin frame") names.push("frame focus transfer", "sibling frame focus transfer");
+      if (surface === "cross-origin frame") names.push("frame focus transfer");
       if (surface === "ordinary")
         names.push(
           "readonly",
@@ -2078,7 +2067,17 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
             ${name === "redirected input" ? "intended.addEventListener('input', () => other.focus());" : ""}
             ${name === "replaced target" ? "intended.addEventListener('input', () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); });" : ""}
             ${name === "replaced focus target" ? "intended.onfocus = () => { const replacement = intended.cloneNode(true); intended.replaceWith(replacement); replacement.focus(); };" : ""}
-            ${frameTransfer ? `intended.addEventListener('input', () => parent.moveTypingFocus());` : ""}
+            ${
+              frameTransfer
+                ? surface === "cross-origin frame"
+                  ? // The page in the other process takes focus while this handler still runs.
+                    `intended.addEventListener('input', () => {
+                      parent.postMessage('move-typing-focus', '*');
+                      for (const end = Date.now() + 500; Date.now() < end;);
+                    });`
+                  : `intended.addEventListener('input', () => parent.moveTypingFocus());`
+                : ""
+            }
             ${name === "readonly" ? "intended.readOnly = true;" : ""}
             ${name === "formatted input" ? "intended.addEventListener('input', () => { intended.value = intended.value.toLowerCase(); });" : ""}
             ${name === "End redirected focus" ? "intended.type = 'email'; intended.onkeydown = event => { if (event.key === 'End') other.focus(); };" : ""}
@@ -2106,6 +2105,7 @@ async function runTypingFocusScenario(browser: BrowserHost, origin: string): Pro
               outside.onkeydown = event => { globalThis.outsideKeys.push(event.key); event.preventDefault(); };
               doc.body.prepend(outside);
               globalThis.moveTypingFocus = () => outside.focus();
+              globalThis.onmessage = event => { if (event.data === 'move-typing-focus') outside.focus(); };
               return true;
             })()`,
             true,

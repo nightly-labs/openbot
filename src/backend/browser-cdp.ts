@@ -58,6 +58,7 @@ import {
   clamp,
   exceptionDescription,
   frameAutomationContextId,
+  frameIds,
   isFiniteNumber,
   isRecord,
   numberValue,
@@ -769,25 +770,31 @@ export class BrowserCdpEngine {
       Effect.gen({ self: this }, function* () {
         const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
         if (!resolved.backendNodeId) return yield* browserFailure(new Error("Typing requires an element target."));
-        const backendNodeId = resolved.backendNodeId;
+        const chain = yield* this.#focusChain(send, resolved.backendNodeId, resolved.sessionId);
         // Native input goes to whatever holds focus, and a page focus or input handler can move it.
-        // Focus that leaves a frame also clears the frame's own active element, so the target alone
-        // tells whether it still holds focus.
+        // A frame in another process can keep its own active element after the page takes focus, so
+        // each frame element on the way up must hold focus too.
         const checkFocus = (
           key: "error.backend.browserTypingFocusMoved" | "error.backend.browserTypingSubmitSkipped",
         ) =>
-          Effect.gen({ self: this }, function* () {
-            // A target that a handler removed may no longer resolve. The error must still say what
-            // was already typed.
-            const focused = yield* this.#callOnNode(
-              send,
-              backendNodeId,
-              HOLDS_FOCUS_FUNCTION,
-              [],
-              resolved.sessionId,
-            ).pipe(Effect.catch(() => Effect.succeed(false)));
-            if (focused !== true) return yield* browserFailure(new Error(sourceText(key)));
-          });
+          Effect.forEach(
+            chain,
+            (link) =>
+              Effect.gen({ self: this }, function* () {
+                // A target that a handler removed may no longer resolve. The error must still say what
+                // was already typed.
+                const focused = yield* this.#callOnNode(
+                  send,
+                  link.backendNodeId,
+                  HOLDS_FOCUS_FUNCTION,
+                  [],
+                  link.sessionId,
+                  link.contextId,
+                ).pipe(Effect.catch(() => Effect.succeed(false)));
+                if (focused !== true) return yield* browserFailure(new Error(sourceText(key)));
+              }),
+            { discard: true },
+          );
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
         yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, resolved.sessionId);
@@ -2083,6 +2090,63 @@ export class BrowserCdpEngine {
   });
 
   /**
+   * The node, then each frame element that holds its document, up to the page. The node keeps focus
+   * only while each of them holds focus in its own document. CDP names a frame's owner even inside a
+   * closed shadow root, and the parent of a frame in another process is in another session.
+   */
+  readonly #focusChain = Effect.fn("BrowserCdp.focusChain")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId: string | undefined,
+  ) {
+    const chain: Array<{ backendNodeId: number; sessionId: string | undefined; contextId: number }> = [];
+    let node = { backendNodeId, sessionId };
+    for (let depth = 0; depth <= MAX_FOCUSED_FRAME_DEPTH; depth += 1) {
+      const frames = frameIds(yield* send("Page.getFrameTree", {}, node.sessionId));
+      let frameId: string | undefined;
+      for (const id of frames) {
+        const contextId = yield* frameAutomationContextId(send, id, node.sessionId);
+        const own = yield* this.#callOnNode(
+          send,
+          node.backendNodeId,
+          "function() { return this.ownerDocument === document; }",
+          [],
+          node.sessionId,
+          contextId,
+        ).pipe(Effect.catch(() => Effect.succeed(false)));
+        if (own !== true) continue;
+        frameId = id;
+        chain.push({ ...node, contextId });
+        break;
+      }
+      if (!frameId) break;
+      // The page's own frame has no owner. The root frame of another session is owned in its parent.
+      if (frameId === frames[0] && node.sessionId === undefined) return chain;
+      const owners =
+        frameId === frames[0]
+          ? [undefined, ...[...this.#targetSessions.values()].map((target) => target.sessionId)].filter(
+              (candidate) => candidate !== node.sessionId,
+            )
+          : [node.sessionId];
+      let owner: typeof node | undefined;
+      for (const ownerSession of owners) {
+        const found = yield* send("DOM.getFrameOwner", { frameId }, ownerSession).pipe(
+          Effect.catch(() => Effect.succeed(undefined)),
+        );
+        const ownerId = numberValue(found?.backendNodeId);
+        if (ownerId) {
+          owner = { backendNodeId: ownerId, sessionId: ownerSession };
+          break;
+        }
+      }
+      if (!owner) break;
+      node = owner;
+    }
+    return yield* browserFailure(new Error(sourceText("error.backend.browserTypingFocusMoved")));
+  });
+
+  /**
    * Forgets the button a live view held. A view that closes during a drag sends no release, and the
    * next view's first move would otherwise drag. That move names no button, so the page ends its drag.
    */
@@ -2674,8 +2738,9 @@ export class BrowserCdpEngine {
     declaration: string,
     args: unknown[],
     sessionId?: string,
+    contextId?: number,
   ): Effect.fn.Return<unknown, BrowserOperationError> {
-    const executionContextId = yield* automationContextId(send, sessionId);
+    const executionContextId = contextId ?? (yield* automationContextId(send, sessionId));
     const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
     const objectId = stringValue(recordValue(resolved.object)?.objectId);
     if (!objectId) return yield* browserFailure(new Error("Element is no longer attached to the document."));
