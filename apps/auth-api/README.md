@@ -230,6 +230,13 @@ bun run api:deploy
 
 The service applies limits per email, per IP, per challenge, and per resend.
 
+A deploy replaces every file under `/assets/`. Before a production deploy, CI and `bun run api:deploy`
+run `scripts/keep-previous-assets.ts`. It copies the files of the builds that were live in the last
+24 hours from `https://openbot.run` into the new build, so a tab that is open during a deploy can
+still load code. The site keeps the list of these files in `/asset-history.json`. When the list or a
+file cannot be read, the deploy continues with fewer files, and such a tab reloads when it next loads
+code.
+
 ## Hosted sites
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token

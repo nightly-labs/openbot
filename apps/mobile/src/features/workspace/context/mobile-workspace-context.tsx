@@ -960,7 +960,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     },
     [recoveryCountdowns, wakeSelectedServer, connectionWaits],
   );
-  // The next retry of an offline server can be two minutes away, so a server starts when it is selected.
+  // The next retry of an offline server can be 30 seconds away, so a server starts when it is selected.
   useEffect(() => {
     if (!foreground || !activeServerId) return;
     if (serversRef.current.find((server) => server.id === activeServerId)?.state === "offline") {

@@ -941,6 +941,10 @@ jobs:
       - name: Build production Worker
         run: bun run api:build
 
+      # A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
+      - name: Keep the code files of earlier builds
+        run: bun apps/auth-api/scripts/keep-previous-assets.ts
+
       - name: Prepare runtime secrets
         id: runtime-secrets
         shell: bash
