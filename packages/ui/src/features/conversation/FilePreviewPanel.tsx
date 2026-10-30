@@ -21,6 +21,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 
 import { MediaFilePreview } from "./MediaFilePreview";
@@ -212,18 +213,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       <header class="file-preview-header">
         <Show when={props.onBack}>
           {(back) => (
-            <LabelTooltip content={t("preview.panel.back")}>
-              <LabelTooltipTrigger
-                as={Button}
-                variant="ghost"
-                type="button"
-                class="browser-toolbar-button"
-                aria-label={t("preview.panel.back")}
-                onClick={() => back()()}
-              >
-                <ArrowLeft class="browser-toolbar-icon" />
-              </LabelTooltipTrigger>
-            </LabelTooltip>
+            <HeaderButton label={t("preview.panel.back")} onClick={() => back()()}>
+              <ArrowLeft class="browser-toolbar-icon" />
+            </HeaderButton>
           )}
         </Show>
         <Show when={props.directory} fallback={<File class="file-preview-file-icon" />}>
@@ -231,49 +223,27 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         </Show>
         <h2 title={props.directory?.path ?? title()}>{title()}</h2>
         <Show when={previewKind() === "markdown"}>
-          <LabelTooltip content={t("preview.panel.rawMarkdown")}>
-            <LabelTooltipTrigger
-              as={Button}
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.rawMarkdown")}
-              aria-pressed={rawSource() ? "true" : "false"}
-              onClick={() => setRawSource((raw) => !raw)}
-            >
-              <Code class="browser-toolbar-icon" />
-            </LabelTooltipTrigger>
-          </LabelTooltip>
+          <HeaderButton
+            label={t("preview.panel.rawMarkdown")}
+            pressed={rawSource()}
+            onClick={() => setRawSource((raw) => !raw)}
+          >
+            <Code class="browser-toolbar-icon" />
+          </HeaderButton>
         </Show>
         <Show when={hasPage()}>
-          <LabelTooltip content={t("preview.panel.rawHtml")}>
-            <LabelTooltipTrigger
-              as={Button}
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.rawHtml")}
-              aria-pressed={rawSource() ? "true" : "false"}
-              onClick={() => setRawSource((raw) => !raw)}
-            >
-              <Code class="browser-toolbar-icon" />
-            </LabelTooltipTrigger>
-          </LabelTooltip>
+          <HeaderButton
+            label={t("preview.panel.rawHtml")}
+            pressed={rawSource()}
+            onClick={() => setRawSource((raw) => !raw)}
+          >
+            <Code class="browser-toolbar-icon" />
+          </HeaderButton>
         </Show>
         <Show when={showsSourceText()}>
-          <LabelTooltip content={t("preview.panel.wrapLines")}>
-            <LabelTooltipTrigger
-              as={Button}
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.wrapLines")}
-              aria-pressed={wrapLines() ? "true" : "false"}
-              onClick={toggleWrapLines}
-            >
-              <WrapText class="browser-toolbar-icon" />
-            </LabelTooltipTrigger>
-          </LabelTooltip>
+          <HeaderButton label={t("preview.panel.wrapLines")} pressed={wrapLines()} onClick={toggleWrapLines}>
+            <WrapText class="browser-toolbar-icon" />
+          </HeaderButton>
         </Show>
         <Show when={source()}>
           {(value) => (
@@ -289,64 +259,27 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           )}
         </Show>
         <Show when={file() && props.allowExternalOpen !== false}>
-          <LabelTooltip content={t("preview.panel.openExternally")}>
-            <LabelTooltipTrigger
-              as={Button}
-              variant="ghost"
-              type="button"
-              class="browser-toolbar-button"
-              aria-label={t("preview.panel.openExternally")}
-              onClick={props.onOpenExternally}
-            >
-              <ExternalLink class="browser-toolbar-icon" />
-            </LabelTooltipTrigger>
-          </LabelTooltip>
+          <HeaderButton label={t("preview.panel.openExternally")} onClick={props.onOpenExternally}>
+            <ExternalLink class="browser-toolbar-icon" />
+          </HeaderButton>
         </Show>
         <Show when={file() && props.onDownload}>
           {(download) => (
-            <LabelTooltip content={t("preview.panel.download")}>
-              <LabelTooltipTrigger
-                as={Button}
-                variant="ghost"
-                type="button"
-                class="browser-toolbar-button"
-                aria-label={t("preview.panel.download")}
-                onClick={() => download()()}
-              >
-                <Download class="browser-toolbar-icon" />
-              </LabelTooltipTrigger>
-            </LabelTooltip>
+            <HeaderButton label={t("preview.panel.download")} onClick={() => download()()}>
+              <Download class="browser-toolbar-icon" />
+            </HeaderButton>
           )}
         </Show>
         <Show when={file() && props.onReveal}>
           {(reveal) => (
-            <LabelTooltip content={t("preview.panel.reveal")}>
-              <LabelTooltipTrigger
-                as={Button}
-                variant="ghost"
-                type="button"
-                class="browser-toolbar-button"
-                aria-label={t("preview.panel.reveal")}
-                onClick={() => reveal()()}
-              >
-                <FolderOpen class="browser-toolbar-icon" />
-              </LabelTooltipTrigger>
-            </LabelTooltip>
+            <HeaderButton label={t("preview.panel.reveal")} onClick={() => reveal()()}>
+              <FolderOpen class="browser-toolbar-icon" />
+            </HeaderButton>
           )}
         </Show>
-        <LabelTooltip content={t("preview.panel.close")}>
-          <LabelTooltipTrigger
-            as={Button}
-            variant="ghost"
-            type="button"
-            class="browser-toolbar-button"
-            aria-label={t("preview.panel.close")}
-            data-cuelume-tap="close"
-            onClick={props.onClose}
-          >
-            <X class="browser-toolbar-icon" />
-          </LabelTooltipTrigger>
-        </LabelTooltip>
+        <HeaderButton label={t("preview.panel.close")} data-cuelume-tap="close" onClick={props.onClose}>
+          <X class="browser-toolbar-icon" />
+        </HeaderButton>
       </header>
       <div class="file-preview-content">
         <Show when={props.directory}>
@@ -463,6 +396,33 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 }
 
 /** The text of a file, highlighted as code when its name gives a language that chat code blocks highlight. */
+/** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
+function HeaderButton(props: {
+  label: string;
+  pressed?: boolean;
+  onClick: () => void;
+  "data-cuelume-tap"?: string;
+  children: JSX.Element;
+}) {
+  const pressed = () => (props.pressed === undefined ? undefined : String(props.pressed));
+  return (
+    <LabelTooltip content={props.label}>
+      <LabelTooltipTrigger
+        as={Button}
+        variant="ghost"
+        type="button"
+        class="browser-toolbar-button"
+        aria-label={props.label}
+        aria-pressed={pressed()}
+        data-cuelume-tap={props["data-cuelume-tap"]}
+        onClick={() => props.onClick()}
+      >
+        {props.children}
+      </LabelTooltipTrigger>
+    </LabelTooltip>
+  );
+}
+
 function FileSourceText(props: { name: string; text: string; wrap: boolean; selectionQuoteId?: string | undefined }) {
   const [tokens, setTokens] = createSignal<CodeToken[] | null>(null);
   let highlightRun = 0;
