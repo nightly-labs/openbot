@@ -47,6 +47,7 @@ import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
+import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
@@ -182,6 +183,7 @@ export function ConversationTimeline() {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     shownSubagentId,
     toggleSubagentPanel,
@@ -205,10 +207,10 @@ export function ConversationTimeline() {
         toggleReadAloud({ serverId: props.server?.id ?? "local", agentId, messageId: message.id }, message.body),
     };
   };
-  /** An agent message in an agent chat can be marked unread, with the messages after it. */
+  /** A message that counts as unread in an agent chat can be marked unread, with the messages after it. */
   const markUnreadAction = (message: AgentMessage) => {
     const onMarkUnread = props.onMarkUnread;
-    if (channel || !onMarkUnread || message.author !== "agent" || message.streaming) return;
+    if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
   };
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
@@ -760,6 +762,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -925,6 +928,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -976,6 +980,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1016,6 +1021,7 @@ export function ConversationTimeline() {
                     >
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1079,6 +1085,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1162,6 +1169,7 @@ export function ConversationTimeline() {
                     </Show>
                     <Show when={message()?.id === unreadBoundaryMessageId()}>
                       <UnreadMessagesDivider
+                        animateIn={unreadDividerArrives}
                         elementRef={(element) => {
                           setUnreadMessagesDividerElement(element);
                           scheduleUnreadDividerVisibilityUpdate();

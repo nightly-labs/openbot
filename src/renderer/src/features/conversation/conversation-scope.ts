@@ -1849,17 +1849,20 @@ export function createConversationViewScope(props: ConversationProps) {
     updateVirtualScrollMargin();
     scrollResizeObserver?.observe(element);
   };
-  // The NEW line animates in once for each place it marks, as after Mark unread. The virtualizer
-  // draws a row again when it scrolls back into view, and that draw shows the line at once.
-  let animatedUnreadBoundary: string | undefined;
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
+  };
+  // The NEW line animates in when it shows a place that the last line did not mark: a chat that
+  // opens at its unread messages, or Mark unread. The virtualizer draws a row again when it scrolls
+  // back into view, and that draw shows the line at once.
+  let animatedUnreadBoundary: string | undefined;
+  const unreadDividerArrives = (): boolean => {
     const boundary = untrack(
       () => `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${unreadBoundaryMessageId() ?? ""}`,
     );
-    if (boundary === animatedUnreadBoundary) return;
+    if (boundary === animatedUnreadBoundary) return false;
     animatedUnreadBoundary = boundary;
-    element.dataset.arrive = "";
+    return true;
   };
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
@@ -1923,6 +1926,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     activeBrowserControl,
     actingBrowserControl,
