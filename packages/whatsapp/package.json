@@ -1,0 +1,38 @@
+{
+  "name": "@openbot/whatsapp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./baileys": {
+      "types": "./vendor/baileys/types/index.d.ts",
+      "default": "./vendor/baileys/src/index.ts"
+    },
+    "./auth-store": "./src/auth-store.ts",
+    "./signal-repository": "./src/signal-repository.ts"
+  },
+  "scripts": {
+    "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json && bun ../../scripts/type-checker.ts --noEmit -p vendor/tsconfig.json",
+    "vendor:types": "bun scripts/build-vendor-types.ts"
+  },
+  "dependencies": {
+    "@cacheable/node-cache": "catalog:",
+    "@hapi/boom": "catalog:",
+    "@noble/curves": "catalog:",
+    "@noble/hashes": "catalog:",
+    "async-mutex": "catalog:",
+    "effect": "catalog:",
+    "long": "catalog:",
+    "lru-cache": "catalog:",
+    "music-metadata": "catalog:",
+    "p-queue": "catalog:",
+    "pino": "catalog:",
+    "protobufjs": "catalog:",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "8.18.2",
+    "typescript": "catalog:"
+  }
+}

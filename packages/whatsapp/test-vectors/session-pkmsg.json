@@ -1,0 +1,457 @@
+{
+  "description": "Pairwise session from a prekey bundle, produced by libsignal@6.0.0. Each party draws key pairs in order from its ratchetKeysInOrder list (Alice: baseKey is drawn first, then ratchetKeysInOrder[0] during session setup; later entries when a received message carries a new ratchet key; Bob: one entry each time a received message carries a new ratchet key). senderConsumedKeys / receiverConsumedKeys show which entry each step used. A sender implementation given the same keys must reproduce every ciphertext byte-for-byte; a receiver must decrypt each to expectedPlaintext. All hex. Keys with 05 prefix are 33-byte Signal public keys.",
+  "source": "libsignal@6.0.0 SessionBuilder.initOutgoing / SessionCipher.encrypt / decryptPreKeyWhisperMessage / decryptWhisperMessage",
+  "cases": [
+    {
+      "name": "with-one-time-prekey",
+      "alice": {
+        "identityPrivateKey": "de11f3ba7a2093b8f106fa9c837e66a642ec48d5d77eca390ffc78970bc56c1e",
+        "identityPublicKey": "05ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b33",
+        "registrationId": 12345,
+        "baseKey": {
+          "priv": "3cdcd3ded8322e95a36d08c5f6d070fd222a2a26c7c8582909e90c8935dc3965",
+          "pub": "058444870a6d7eee22cb6a5818de82aa7a00fb7ee203c163fc168754008eb81379"
+        },
+        "ratchetKeysInOrder": [
+          {
+            "priv": "a1f81878f6470fadc7c14c61e8ad24daddb23f41132dd5e684a036ebe8554f52",
+            "pub": "05cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a"
+          },
+          {
+            "priv": "995c3d3914ce29701b55a16fcb63d4d2b67ed9c1e9d5d951fa8bd4d1ca5e73f5",
+            "pub": "05fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126"
+          }
+        ]
+      },
+      "bob": {
+        "identityPrivateKey": "725c28d09a3165668fa41846d4ab4d5dfdfdf83eb3c81bc87014f371c2fb27a1",
+        "identityPublicKey": "05f44dc444faf7aa2c82761e1e871b57708538f418313c24b0165e0588690ef747",
+        "registrationId": 6789,
+        "signedPreKey": {
+          "id": 1,
+          "privateKey": "d1993e4e61ce19e497967dc54b2cacd943518085d7b1c3f1886652d83c1c64df",
+          "publicKey": "056ddd0625a79a149bbfb4eb743e0a9f637415764ffb240c01892aec209d0bf871",
+          "signature": "98d71e5a80aaa632bad189fd79cd4838ff664aae44f67b33c4f95a569036108c7949e06d31cca1037bb03f045d2fea96de37fa2bae5453d895e192305b4efc04"
+        },
+        "oneTimePreKey": {
+          "id": 42,
+          "privateKey": "27f27b63710f65a3c7d4303c3c5b5f6407258ad9a32c8f6d077145e29b528acf",
+          "publicKey": "0500665a0a3cea4f0344b79255f24af7bf8a1c71155bb02a61662901a376061435"
+        },
+        "ratchetKeysInOrder": [
+          {
+            "priv": "f75a385ca14ae59e90401143a7095de21089ef52ec577c6bc13e0373022ea7b4",
+            "pub": "05ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c"
+          },
+          {
+            "priv": "26363aea94771033a84d285cf45f6c2929bcb465f7df6080afe0ca42f0cd4192",
+            "pub": "058ba41ab5d2f534b5cfd568d95449de2c722d88f48f051b2541560215c48f2806"
+          }
+        ]
+      },
+      "bundleSeenByAlice": {
+        "identityKey": "05f44dc444faf7aa2c82761e1e871b57708538f418313c24b0165e0588690ef747",
+        "registrationId": 6789,
+        "signedPreKey": {
+          "id": 1,
+          "publicKey": "056ddd0625a79a149bbfb4eb743e0a9f637415764ffb240c01892aec209d0bf871",
+          "signature": "98d71e5a80aaa632bad189fd79cd4838ff664aae44f67b33c4f95a569036108c7949e06d31cca1037bb03f045d2fea96de37fa2bae5453d895e192305b4efc04"
+        },
+        "preKey": {
+          "id": 42,
+          "publicKey": "0500665a0a3cea4f0344b79255f24af7bf8a1c71155bb02a61662901a376061435"
+        }
+      },
+      "derived": {
+        "description": "Intermediate values for Alice's first message, recomputed independently and checked against the oracle output.",
+        "masterSecretInput": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3e17c6aad677862a6dc861dcc05222f5fe381780456b38cd64067a6b17fa081796d5381dbaea19c453f8a39ae10814d74ae0b6da9081c9ee8b984a614227516d94787983c1e4c98c1dbd219978b56a59955e72b6ad700934453d0f0111d47a20c3e7294f213853ba2faf0719053b37a4d48722491f4b925603605414baade257",
+        "dh1_IKa_SPKb": "3e17c6aad677862a6dc861dcc05222f5fe381780456b38cd64067a6b17fa0817",
+        "dh2_EKa_IKb": "96d5381dbaea19c453f8a39ae10814d74ae0b6da9081c9ee8b984a614227516d",
+        "dh3_EKa_SPKb": "94787983c1e4c98c1dbd219978b56a59955e72b6ad700934453d0f0111d47a20",
+        "dh4_EKa_OPKb": "c3e7294f213853ba2faf0719053b37a4d48722491f4b925603605414baade257",
+        "hkdfWhisperText_rootKey": "dcaddde718da78486521f9023d62699c810cecf73b618147ae773c2659e7e6fb",
+        "hkdfWhisperText_chainKey_unused": "f122ff3f349b8ef73cb8a92c6623f2e26deb535136c925e0b07eb4008c8de0a5",
+        "aliceSendingRatchet_dh": "4225c2ef3d3c9d49db2315a9be9abcabf6ad65352737e69ade0db2f6a608336e",
+        "rootKeyAfterAliceSendingRatchet": "510c582626b4bf4b8874c9ce2938295d456539d9a32a23c69733973463a8ee67",
+        "aliceSendingChainKey_index0": "c48b9cde82263254de8283b9ff2859944b1d4af35096d424721efe1b4ae3cfc4",
+        "message0": {
+          "messageKeySeed": "66c572721d2a7fa8e076ead04d9bfde2b606a0ebb4cbe3232e820d85adf75b89",
+          "cipherKey": "72404296ba5d5df1f472e0a888570b381b050f822fe8c79a941219aa8c560f5e",
+          "macKey": "e13f786166a96d845ac6cb5d67c354ad9cc06b3e8b6a6834b9a113fde60a7240",
+          "iv": "589edaaa68fcc3cfd1887b0316826b96",
+          "macInput": "05ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b3305f44dc444faf7aa2c82761e1e871b57708538f418313c24b0165e0588690ef747330a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10001800222006aa14d3e90fc290d68b66f4643861befcfb877d4bd87eb83b7facbcc3733004"
+        },
+        "aliceSendingChainKey_index1": "6cf04692523c07fcd6a0b6c508c233e47e8da27b542c77d901bbc12a65d84c1a"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "label": "Alice encrypts message 1 (pkmsg)",
+          "from": "alice",
+          "type": "pkmsg",
+          "plaintext": "48656c6c6f20426f622c206669727374206d6573736167652e",
+          "ciphertext": "33082a1221058444870a6d7eee22cb6a5818de82aa7a00fb7ee203c163fc168754008eb813791a2105ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b332252330a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10001800222006aa14d3e90fc290d68b66f4643861befcfb877d4bd87eb83b7facbcc3733004d5401dcad542488d28b9603001",
+          "senderConsumedKeys": [],
+          "pkmsg": {
+            "versionByte": "33",
+            "registrationId": 12345,
+            "preKeyId": 42,
+            "signedPreKeyId": 1,
+            "baseKey": "058444870a6d7eee22cb6a5818de82aa7a00fb7ee203c163fc168754008eb81379",
+            "identityKey": "05ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b33"
+          },
+          "msg": {
+            "bytes": "330a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10001800222006aa14d3e90fc290d68b66f4643861befcfb877d4bd87eb83b7facbcc3733004d5401dcad542488d",
+            "versionByte": "33",
+            "protobuf": "0a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10001800222006aa14d3e90fc290d68b66f4643861befcfb877d4bd87eb83b7facbcc3733004",
+            "mac": "d5401dcad542488d",
+            "ratchetKey": "05cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a",
+            "counter": 0,
+            "previousCounter": 0,
+            "ciphertext": "06aa14d3e90fc290d68b66f4643861befcfb877d4bd87eb83b7facbcc3733004"
+          }
+        },
+        {
+          "step": 2,
+          "label": "Alice encrypts message 2 (pkmsg, 16-byte plaintext => 32-byte ciphertext)",
+          "from": "alice",
+          "type": "pkmsg",
+          "plaintext": "30313233343536373839616263646566",
+          "ciphertext": "33082a1221058444870a6d7eee22cb6a5818de82aa7a00fb7ee203c163fc168754008eb813791a2105ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b332252330a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10011800222072bb230eb818f84e321f993368ab06323e6ce278656782c18f071f8f243f677fb8ab88f886e8674528b9603001",
+          "senderConsumedKeys": [],
+          "pkmsg": {
+            "versionByte": "33",
+            "registrationId": 12345,
+            "preKeyId": 42,
+            "signedPreKeyId": 1,
+            "baseKey": "058444870a6d7eee22cb6a5818de82aa7a00fb7ee203c163fc168754008eb81379",
+            "identityKey": "05ca641fcdaf68b132a680ef3e18d630bb045eb3de2c61ffac33a29051e8943b33"
+          },
+          "msg": {
+            "bytes": "330a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10011800222072bb230eb818f84e321f993368ab06323e6ce278656782c18f071f8f243f677fb8ab88f886e86745",
+            "versionByte": "33",
+            "protobuf": "0a2105cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a10011800222072bb230eb818f84e321f993368ab06323e6ce278656782c18f071f8f243f677f",
+            "mac": "b8ab88f886e86745",
+            "ratchetKey": "05cee1b0a82c957ad211ff9374b165902b46650a95981a29fe957c59419e419a0a",
+            "counter": 1,
+            "previousCounter": 0,
+            "ciphertext": "72bb230eb818f84e321f993368ab06323e6ce278656782c18f071f8f243f677f"
+          }
+        },
+        {
+          "step": 3,
+          "label": "Bob decrypts message 1: creates session, steps ratchet (consumes 1 key)",
+          "to": "bob",
+          "decryptStep": 1,
+          "expectedPlaintext": "48656c6c6f20426f622c206669727374206d6573736167652e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "f75a385ca14ae59e90401143a7095de21089ef52ec577c6bc13e0373022ea7b4",
+              "pub": "05ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c"
+            }
+          ]
+        },
+        {
+          "step": 4,
+          "label": "Bob decrypts message 2",
+          "to": "bob",
+          "decryptStep": 2,
+          "expectedPlaintext": "30313233343536373839616263646566",
+          "receiverConsumedKeys": []
+        },
+        {
+          "step": 5,
+          "label": "Bob encrypts reply (msg)",
+          "from": "bob",
+          "type": "msg",
+          "plaintext": "486920416c6963652c207265706c792e",
+          "ciphertext": "330a2105ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c100018002220ffe0b2775671b3bdb0245d188fa5eb76ae0b37e83119cd30c88da030933bd5b0752a963fc4e880da",
+          "senderConsumedKeys": [],
+          "msg": {
+            "bytes": "330a2105ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c100018002220ffe0b2775671b3bdb0245d188fa5eb76ae0b37e83119cd30c88da030933bd5b0752a963fc4e880da",
+            "versionByte": "33",
+            "protobuf": "0a2105ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c100018002220ffe0b2775671b3bdb0245d188fa5eb76ae0b37e83119cd30c88da030933bd5b0",
+            "mac": "752a963fc4e880da",
+            "ratchetKey": "05ad7b5df388b260eccd86f13d155bd79f7fb842def225ce74c4d01155113f492c",
+            "counter": 0,
+            "previousCounter": 0,
+            "ciphertext": "ffe0b2775671b3bdb0245d188fa5eb76ae0b37e83119cd30c88da030933bd5b0"
+          }
+        },
+        {
+          "step": 6,
+          "label": "Alice decrypts reply: steps ratchet (consumes 1 key), pending prekey cleared",
+          "to": "alice",
+          "decryptStep": 5,
+          "expectedPlaintext": "486920416c6963652c207265706c792e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "995c3d3914ce29701b55a16fcb63d4d2b67ed9c1e9d5d951fa8bd4d1ca5e73f5",
+              "pub": "05fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126"
+            }
+          ]
+        },
+        {
+          "step": 7,
+          "label": "Alice encrypts message 3 (msg, new ratchet key, previousCounter=1)",
+          "from": "alice",
+          "type": "msg",
+          "plaintext": "54686972642066726f6d20416c6963652c206e6f77206120706c61696e206d73672e",
+          "ciphertext": "330a2105fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126100018012230e1a51eefc21ba0d7b703830f6e4b3f65c49447f28eb736f685f814ad1bbfc33d38d544a7134c9d2d772ea3bc55c05aa82b92564a8c620d58",
+          "senderConsumedKeys": [],
+          "msg": {
+            "bytes": "330a2105fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126100018012230e1a51eefc21ba0d7b703830f6e4b3f65c49447f28eb736f685f814ad1bbfc33d38d544a7134c9d2d772ea3bc55c05aa82b92564a8c620d58",
+            "versionByte": "33",
+            "protobuf": "0a2105fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126100018012230e1a51eefc21ba0d7b703830f6e4b3f65c49447f28eb736f685f814ad1bbfc33d38d544a7134c9d2d772ea3bc55c05aa8",
+            "mac": "2b92564a8c620d58",
+            "ratchetKey": "05fad0c8fd36f3c9c68f90f8f1a9e1001075ef5fae58670d5c80b7b888ffc88126",
+            "counter": 0,
+            "previousCounter": 1,
+            "ciphertext": "e1a51eefc21ba0d7b703830f6e4b3f65c49447f28eb736f685f814ad1bbfc33d38d544a7134c9d2d772ea3bc55c05aa8"
+          }
+        },
+        {
+          "step": 8,
+          "label": "Bob decrypts message 3: steps ratchet (consumes 1 key)",
+          "to": "bob",
+          "decryptStep": 7,
+          "expectedPlaintext": "54686972642066726f6d20416c6963652c206e6f77206120706c61696e206d73672e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "26363aea94771033a84d285cf45f6c2929bcb465f7df6080afe0ca42f0cd4192",
+              "pub": "058ba41ab5d2f534b5cfd568d95449de2c722d88f48f051b2541560215c48f2806"
+            }
+          ]
+        },
+        {
+          "step": 9,
+          "label": "Bob decrypts message 1 again: must fail (key already used)",
+          "to": "bob",
+          "decryptStep": 1,
+          "expectError": true
+        }
+      ]
+    },
+    {
+      "name": "without-one-time-prekey",
+      "alice": {
+        "identityPrivateKey": "39c664ed2ad0d5c3061dc20df0a583b86ea5fed619f86ef2fd50978b8801f9e3",
+        "identityPublicKey": "059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a28",
+        "registrationId": 12345,
+        "baseKey": {
+          "priv": "b69cccf16623f2505f35b45fe3123b8e45dc55468566f076cd1b73d2d91ac411",
+          "pub": "05dec1b04583299055511a8cdfafdbc011af18e7e221df74560880c1a16dd35b50"
+        },
+        "ratchetKeysInOrder": [
+          {
+            "priv": "d2df78d1651545f75520f928fe41c42ae895a33eba9a32d911a84d858d215630",
+            "pub": "0567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18"
+          },
+          {
+            "priv": "54f784210a26d962d3f5a8ffaab8e439220a821dd97be2f72de44648cfb5f9bf",
+            "pub": "05b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d"
+          }
+        ]
+      },
+      "bob": {
+        "identityPrivateKey": "cea35c7baa429fbd1706761d247cf07e8450dea84fe97be537508c48f7eb0135",
+        "identityPublicKey": "05722be7348c13889e573f85505f34a98d206db08ba70b14c9b7e757bb12b39400",
+        "registrationId": 6789,
+        "signedPreKey": {
+          "id": 1,
+          "privateKey": "d54c162f5e7d5a2d0b3ba73b95a9662351974cdee9891409bd391ddf79de167e",
+          "publicKey": "059c8a9964354f18bcf51bcf452656d47ca586ffc85c2c657b4785aff8463f3e23",
+          "signature": "442a975287437a2c6b28f997a53abaeaf30346f1a8bb1dbafd9c6f165ac4a34307b45b0d9504a841ee8af0d58709d1084edb723df26ed5be020ce3be866d4186"
+        },
+        "oneTimePreKey": null,
+        "ratchetKeysInOrder": [
+          {
+            "priv": "d77b71b57fc162aab488e1e9d79f1208cc8abb2dd813e72bfc14e64a92982a6f",
+            "pub": "05724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d"
+          },
+          {
+            "priv": "09db6e9d2527e6bb00fa24fbb465bc88b930dec289ed53fda3160504decd9f32",
+            "pub": "0587bb2252b72a14470907c5d138ab4511440152492fcd06370444716d91d36259"
+          }
+        ]
+      },
+      "bundleSeenByAlice": {
+        "identityKey": "05722be7348c13889e573f85505f34a98d206db08ba70b14c9b7e757bb12b39400",
+        "registrationId": 6789,
+        "signedPreKey": {
+          "id": 1,
+          "publicKey": "059c8a9964354f18bcf51bcf452656d47ca586ffc85c2c657b4785aff8463f3e23",
+          "signature": "442a975287437a2c6b28f997a53abaeaf30346f1a8bb1dbafd9c6f165ac4a34307b45b0d9504a841ee8af0d58709d1084edb723df26ed5be020ce3be866d4186"
+        }
+      },
+      "derived": {
+        "description": "Intermediate values for Alice's first message, recomputed independently and checked against the oracle output.",
+        "masterSecretInput": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb46d2befbe4641c7d5bc8da3bca6b01f9ba24143f177815a304ebeb825f10b107b7e216cddc63c921654f96eaf8f72ebefd8e11040dd0581d299207d8ed06e59cf499d2f79cdd0f2c1e8dc485edd80043cd5288355f8a835f24fdd520706a76e",
+        "dh1_IKa_SPKb": "b46d2befbe4641c7d5bc8da3bca6b01f9ba24143f177815a304ebeb825f10b10",
+        "dh2_EKa_IKb": "7b7e216cddc63c921654f96eaf8f72ebefd8e11040dd0581d299207d8ed06e59",
+        "dh3_EKa_SPKb": "cf499d2f79cdd0f2c1e8dc485edd80043cd5288355f8a835f24fdd520706a76e",
+        "hkdfWhisperText_rootKey": "b42b9ae4b610b99014bec1b66b30fd8e961e57176749381bee9c504d4ec4c347",
+        "hkdfWhisperText_chainKey_unused": "3ca2ff7f63514c981c4808a88bd9103eff744ebbebbeca4b259e2199a7d14898",
+        "aliceSendingRatchet_dh": "f2a47221006285ad76367368c0293b538c3d3cda3be03981e0fec8fda79c8a6b",
+        "rootKeyAfterAliceSendingRatchet": "52843c68cc50335b2e448373eef106eaa98502e2ade66ef86f5d08b9a68453d6",
+        "aliceSendingChainKey_index0": "69762a2bdc8cf19a3fd796633828d2bd77b7b6e6c0052d387de240355dc0aa1c",
+        "message0": {
+          "messageKeySeed": "ff4e2d37a2d278ad48565da0b174d7ce4af520c83595b226e6e1e606ae3025c3",
+          "cipherKey": "d6fb2d44381a060c55edd2163ad7c487a834216bfbf7477302a48a2f7625095c",
+          "macKey": "d796695aceb83d62b70ead7d56485c23d172331641dfc9a8df795d9cb7b5d71d",
+          "iv": "1fc10ad1cf949e92feeda3a32df4f2e4",
+          "macInput": "059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a2805722be7348c13889e573f85505f34a98d206db08ba70b14c9b7e757bb12b39400330a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18100018002220ee320dea4c05a1e8d043e6f29f8de6e3884dee622d8acf511d6712f816c22831"
+        },
+        "aliceSendingChainKey_index1": "301728f98ebf20c5621a4eea42181a3828a6e41bb7f7c4625fd400570349f4a9"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "label": "Alice encrypts message 1 (pkmsg)",
+          "from": "alice",
+          "type": "pkmsg",
+          "plaintext": "48656c6c6f20426f622c206669727374206d6573736167652e",
+          "ciphertext": "33122105dec1b04583299055511a8cdfafdbc011af18e7e221df74560880c1a16dd35b501a21059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a282252330a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18100018002220ee320dea4c05a1e8d043e6f29f8de6e3884dee622d8acf511d6712f816c22831e48b05f78dad836e28b9603001",
+          "senderConsumedKeys": [],
+          "pkmsg": {
+            "versionByte": "33",
+            "registrationId": 12345,
+            "preKeyId": null,
+            "signedPreKeyId": 1,
+            "baseKey": "05dec1b04583299055511a8cdfafdbc011af18e7e221df74560880c1a16dd35b50",
+            "identityKey": "059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a28"
+          },
+          "msg": {
+            "bytes": "330a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18100018002220ee320dea4c05a1e8d043e6f29f8de6e3884dee622d8acf511d6712f816c22831e48b05f78dad836e",
+            "versionByte": "33",
+            "protobuf": "0a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18100018002220ee320dea4c05a1e8d043e6f29f8de6e3884dee622d8acf511d6712f816c22831",
+            "mac": "e48b05f78dad836e",
+            "ratchetKey": "0567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18",
+            "counter": 0,
+            "previousCounter": 0,
+            "ciphertext": "ee320dea4c05a1e8d043e6f29f8de6e3884dee622d8acf511d6712f816c22831"
+          }
+        },
+        {
+          "step": 2,
+          "label": "Alice encrypts message 2 (pkmsg, 16-byte plaintext => 32-byte ciphertext)",
+          "from": "alice",
+          "type": "pkmsg",
+          "plaintext": "30313233343536373839616263646566",
+          "ciphertext": "33122105dec1b04583299055511a8cdfafdbc011af18e7e221df74560880c1a16dd35b501a21059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a282252330a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b1810011800222015861cf08ae0f081412459d8f8f1f1d9a68a6bbf22e9f528a079b896ae70a567a3db2f70f004b9d628b9603001",
+          "senderConsumedKeys": [],
+          "pkmsg": {
+            "versionByte": "33",
+            "registrationId": 12345,
+            "preKeyId": null,
+            "signedPreKeyId": 1,
+            "baseKey": "05dec1b04583299055511a8cdfafdbc011af18e7e221df74560880c1a16dd35b50",
+            "identityKey": "059a94c6270f9c5e4e051765061b89e68213db5d8af0bb4b51a48a71d9c08a5a28"
+          },
+          "msg": {
+            "bytes": "330a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b1810011800222015861cf08ae0f081412459d8f8f1f1d9a68a6bbf22e9f528a079b896ae70a567a3db2f70f004b9d6",
+            "versionByte": "33",
+            "protobuf": "0a210567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b1810011800222015861cf08ae0f081412459d8f8f1f1d9a68a6bbf22e9f528a079b896ae70a567",
+            "mac": "a3db2f70f004b9d6",
+            "ratchetKey": "0567f45049b89820f27cabdf203fe8989dd31fc01267eb2f0d1286b901ef0f3b18",
+            "counter": 1,
+            "previousCounter": 0,
+            "ciphertext": "15861cf08ae0f081412459d8f8f1f1d9a68a6bbf22e9f528a079b896ae70a567"
+          }
+        },
+        {
+          "step": 3,
+          "label": "Bob decrypts message 1: creates session, steps ratchet (consumes 1 key)",
+          "to": "bob",
+          "decryptStep": 1,
+          "expectedPlaintext": "48656c6c6f20426f622c206669727374206d6573736167652e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "d77b71b57fc162aab488e1e9d79f1208cc8abb2dd813e72bfc14e64a92982a6f",
+              "pub": "05724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d"
+            }
+          ]
+        },
+        {
+          "step": 4,
+          "label": "Bob decrypts message 2",
+          "to": "bob",
+          "decryptStep": 2,
+          "expectedPlaintext": "30313233343536373839616263646566",
+          "receiverConsumedKeys": []
+        },
+        {
+          "step": 5,
+          "label": "Bob encrypts reply (msg)",
+          "from": "bob",
+          "type": "msg",
+          "plaintext": "486920416c6963652c207265706c792e",
+          "ciphertext": "330a2105724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d100018002220a3b84161bddff0e67f62f99762252ced6b9e04c487bc3faefad81b54a2e92bb87f8b87c0332686b1",
+          "senderConsumedKeys": [],
+          "msg": {
+            "bytes": "330a2105724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d100018002220a3b84161bddff0e67f62f99762252ced6b9e04c487bc3faefad81b54a2e92bb87f8b87c0332686b1",
+            "versionByte": "33",
+            "protobuf": "0a2105724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d100018002220a3b84161bddff0e67f62f99762252ced6b9e04c487bc3faefad81b54a2e92bb8",
+            "mac": "7f8b87c0332686b1",
+            "ratchetKey": "05724924621c97fa0946902b1e05adc8b3f9062cfd1385f6a5de25664c6a25182d",
+            "counter": 0,
+            "previousCounter": 0,
+            "ciphertext": "a3b84161bddff0e67f62f99762252ced6b9e04c487bc3faefad81b54a2e92bb8"
+          }
+        },
+        {
+          "step": 6,
+          "label": "Alice decrypts reply: steps ratchet (consumes 1 key), pending prekey cleared",
+          "to": "alice",
+          "decryptStep": 5,
+          "expectedPlaintext": "486920416c6963652c207265706c792e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "54f784210a26d962d3f5a8ffaab8e439220a821dd97be2f72de44648cfb5f9bf",
+              "pub": "05b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d"
+            }
+          ]
+        },
+        {
+          "step": 7,
+          "label": "Alice encrypts message 3 (msg, new ratchet key, previousCounter=1)",
+          "from": "alice",
+          "type": "msg",
+          "plaintext": "54686972642066726f6d20416c6963652c206e6f77206120706c61696e206d73672e",
+          "ciphertext": "330a2105b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d1000180122305b0b9eea8012c06dbde44259769c4e1ef338cda31c82ad211903f9d72042278918599177583cc28b78f0374f09f75a420127648aa7946622",
+          "senderConsumedKeys": [],
+          "msg": {
+            "bytes": "330a2105b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d1000180122305b0b9eea8012c06dbde44259769c4e1ef338cda31c82ad211903f9d72042278918599177583cc28b78f0374f09f75a420127648aa7946622",
+            "versionByte": "33",
+            "protobuf": "0a2105b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d1000180122305b0b9eea8012c06dbde44259769c4e1ef338cda31c82ad211903f9d72042278918599177583cc28b78f0374f09f75a42",
+            "mac": "0127648aa7946622",
+            "ratchetKey": "05b2d02a4f87cd74ae28215f8eaef5351e3ab07cab9e909c6264807b630bcf053d",
+            "counter": 0,
+            "previousCounter": 1,
+            "ciphertext": "5b0b9eea8012c06dbde44259769c4e1ef338cda31c82ad211903f9d72042278918599177583cc28b78f0374f09f75a42"
+          }
+        },
+        {
+          "step": 8,
+          "label": "Bob decrypts message 3: steps ratchet (consumes 1 key)",
+          "to": "bob",
+          "decryptStep": 7,
+          "expectedPlaintext": "54686972642066726f6d20416c6963652c206e6f77206120706c61696e206d73672e",
+          "receiverConsumedKeys": [
+            {
+              "priv": "09db6e9d2527e6bb00fa24fbb465bc88b930dec289ed53fda3160504decd9f32",
+              "pub": "0587bb2252b72a14470907c5d138ab4511440152492fcd06370444716d91d36259"
+            }
+          ]
+        },
+        {
+          "step": 9,
+          "label": "Bob decrypts message 1 again: must fail (key already used)",
+          "to": "bob",
+          "decryptStep": 1,
+          "expectError": true
+        }
+      ]
+    }
+  ]
+}
