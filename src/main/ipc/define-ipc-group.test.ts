@@ -9,8 +9,9 @@ import {
   type VoiceTranscriptionInput,
   type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
+import type { IpcMainInvokeEvent } from "electron";
 import { describe, expect, it, vi } from "vitest";
-import { handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
+import { eventPayloadHandler, handler, payloadHandler, registerIpcGroup } from "./define-ipc-group";
 import {
   parseSpeechInput,
   parseSpeechSettings,
@@ -62,7 +63,11 @@ function decodeNote(value: unknown): VoiceTranscriptionInput {
 
 // `voice` is the group under test because it has all three shapes: a request that takes nothing, a
 // request that takes a payload, and an event the main process only ever sends.
-function registerVoice(transcribe: (input: VoiceTranscriptionInput) => VoiceTranscriptionResult): void {
+// With `withEvent`, `transcribe` is bound with `eventPayloadHandler` and also gets the invoke event.
+function registerVoice(
+  transcribe: (input: VoiceTranscriptionInput, event?: IpcMainInvokeEvent) => VoiceTranscriptionResult,
+  withEvent = false,
+): void {
   registerIpcGroup("voice", {
     getModelStatus: handler(() => READY),
     getModelStatuses: handler(() => [READY]),
@@ -72,7 +77,9 @@ function registerVoice(transcribe: (input: VoiceTranscriptionInput) => VoiceTran
     removeModel: payloadHandler(parseVoiceModelRequest, () => READY),
     getSettings: handler(() => SETTINGS),
     setSettings: payloadHandler(parseVoiceSettings, (settings) => settings),
-    transcribe: payloadHandler(decodeNote, transcribe),
+    transcribe: withEvent
+      ? eventPayloadHandler(decodeNote, (event, input) => transcribe(input, event))
+      : payloadHandler(decodeNote, (input) => transcribe(input)),
     setApiKey: payloadHandler(parseVoiceApiKey, () => READY),
     startStream: handler(() => ({ streamId: "stream-1" })),
     appendStream: payloadHandler(parseVoiceStreamAudio, () => undefined),
@@ -117,5 +124,20 @@ describe("IPC group registration", () => {
       "Rejected IPC request from an untrusted renderer.",
     );
     expect(handled).toBe(0);
+  });
+
+  it("keeps an event-and-payload handler behind the sender check, and gives it the sender's event", () => {
+    const events: unknown[] = [];
+    registerVoice((_input, event) => {
+      events.push(event);
+      return { text: "" };
+    }, true);
+
+    expect(() => registrations.get("voice:transcribe")?.(UNTRUSTED_EVENT, "a note")).toThrow(
+      "Rejected IPC request from an untrusted renderer.",
+    );
+    expect(events).toEqual([]);
+    registrations.get("voice:transcribe")?.(TRUSTED_EVENT, "a note");
+    expect(events).toEqual([TRUSTED_EVENT]);
   });
 });

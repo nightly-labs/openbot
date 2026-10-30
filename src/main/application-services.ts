@@ -103,6 +103,7 @@ import {
   screen,
   shell,
   systemPreferences,
+  webContents,
 } from "electron";
 import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
 import { toMcpGatewayFailed } from "../backend/agent/mcp-gateway";
@@ -2759,11 +2760,9 @@ export async function createApplicationServices({
   // After the servers: the view it opens belongs to one of them, and it has to stop before they do.
   const browserView = new BrowserViewClient({
     servers: remoteServers,
-    // The main window and Picture in Picture can both draw the view; the one that started it uses the frames.
-    onEvent: (event) => {
-      for (const window of [windows.getMainWindow(), browserPictureInPicture.window]) {
-        if (window && !window.isDestroyed()) sendToRenderer(window, IPC_ENDPOINTS.browser.liveViewEvent, event);
-      }
+    onEvent: (event, owner) => {
+      const contents = webContents.fromId(owner);
+      sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));

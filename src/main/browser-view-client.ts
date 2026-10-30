@@ -2,7 +2,8 @@
 //
 // The renderer asks for a tab, not for a session: which host it is, whether that host is reachable
 // on the network or only through the WebRTC tunnel, and which session the frames belong to are all
-// answered here. Starting a second view replaces the first, because a user looks at one tab.
+// answered here. Starting a second view replaces the first, because a user looks at one tab. The
+// window that started a view is its owner: it alone gets the frames, and only it stops the view.
 
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
@@ -26,13 +27,15 @@ export interface BrowserViewClientOptions {
     RemoteServerManager,
     "activeServerId" | "supportsCapability" | "openBrowserViewStream" | "closeBrowserViewSession"
   >;
-  onEvent: (event: BrowserLiveViewEvent) => void;
+  /** `owner` is the id that `start` got, so the event goes to the window that started the view. */
+  onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
 }
 
 interface ActiveView {
   serverId: string;
   sessionId: string;
   tabId: string;
+  owner: number;
   socket: WebSocket;
 }
 
@@ -48,7 +51,7 @@ export class BrowserViewClient {
   }
 
   readonly start = Effect.fn("BrowserViewClient.start")(
-    function* (this: BrowserViewClient, tabId: string) {
+    function* (this: BrowserViewClient, tabId: string, owner: number) {
       const serverId = this.#options.servers.activeServerId;
       if (!serverId)
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.backend.browserViewRemoteOnly")) });
@@ -65,14 +68,14 @@ export class BrowserViewClient {
       }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
-      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, socket };
+      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket };
       this.#view = view;
       socket.addEventListener("message", (message) => {
         if (this.#view !== view) return;
         // Text is the answer to a copy. A host that sends something else is not answering one.
         if (typeof message.data === "string") {
           try {
-            this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId });
+            this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId }, owner);
           } catch {
             socket.close(1000, "Invalid browser view message");
           }
@@ -80,7 +83,7 @@ export class BrowserViewClient {
         }
         try {
           const frame = decodeBrowserViewFrame(new Uint8Array(message.data));
-          this.#options.onEvent({ type: "frame", tabId, ...frame });
+          this.#options.onEvent({ type: "frame", tabId, ...frame }, owner);
         } catch {
           socket.close(1000, "Invalid browser view frame");
         }
@@ -103,9 +106,11 @@ export class BrowserViewClient {
     (operation) => this.#queue(operation),
   ).bind(this);
 
-  readonly stop = Effect.fn("BrowserViewClient.stop")(() =>
+  /** With `owner`, stops the view only when that window started it: another window's view stays. */
+  readonly stop = Effect.fn("BrowserViewClient.stop")((owner?: number) =>
     this.#queue(
       Effect.gen({ self: this }, function* () {
+        if (owner !== undefined && this.#view?.owner !== owner) return;
         yield* this.#closeViewEffect();
         yield* Fiber.awaitAll([...this.#events]);
       }),
@@ -156,7 +161,7 @@ export class BrowserViewClient {
   ) {
     if (this.#view !== view) return;
     this.#view = null;
-    this.#options.onEvent({ type: "stopped", tabId: view.tabId, reason });
+    this.#options.onEvent({ type: "stopped", tabId: view.tabId, reason }, view.owner);
     yield* this.#releaseEffect(view);
   });
 

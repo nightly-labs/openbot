@@ -23,8 +23,6 @@ interface BrowserPictureInPictureOptions {
 /** A host's tab, which the window draws from the live view because it has no native view here. */
 export interface BrowserPictureInPictureLiveView {
   clipboard: boolean;
-  /** Stops the host's screencast when the window closes, as nobody looks at it after that. */
-  stop: () => void;
 }
 
 const HOVER_POLL_INTERVAL_MS = 150;
@@ -41,11 +39,6 @@ export class BrowserPictureInPicture {
 
   constructor(options: BrowserPictureInPictureOptions) {
     this.#options = options;
-  }
-
-  /** The open window, which receives the frames of a live view. */
-  get window(): BrowserWindow | null {
-    return this.#window && !this.#window.isDestroyed() ? this.#window : null;
   }
 
   readonly open = Effect.fn("BrowserPictureInPicture.open")(function* (
@@ -136,7 +129,6 @@ export class BrowserPictureInPicture {
     window.on("closed", () => {
       // A child view's contents outlive its window. A window that the system closes skips `#close`.
       if (!controlsView.webContents.isDestroyed()) controlsView.webContents.close();
-      liveView?.stop();
       if (this.#window !== window) return;
       this.#stopHoverTracking();
       this.#window = null;
