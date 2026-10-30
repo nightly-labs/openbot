@@ -103,7 +103,10 @@ const legacyActionSchema = z.discriminatedUnion("type", [
   z.object({ ...legacyActionFields, type: z.literal("reload") }),
 ]);
 
-const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout };
+/** Input tools return a short status. The model reads the page with `snapshot` when it needs to. */
+const ACTION_RESULT = "Returns a status; pass snapshot: true for a snapshot.";
+const actionSnapshot = z.boolean().optional();
+const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout, snapshot: actionSnapshot };
 
 const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
@@ -125,7 +128,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "snapshot",
     description:
-      "Read the current semantic page and obtain revision-bound element references. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more.",
+      'Read the current semantic page and obtain element refs. Refs stay valid until a navigation or the next snapshot. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more. Each element is a line: ref, role, "name", then <tag>, value=, description= and states when present. diagnostics and actions list only new entries, without successful requests and plain successful actions.',
     shape: { tabId, image },
   }),
   browserTool({
@@ -263,8 +266,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "click",
-    description:
-      "Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input and return a fresh snapshot.",
+    description: `Click a unique semantic, CSS, ref, or coordinate target using trusted CDP input. ${ACTION_RESULT}`,
     shape: {
       ...targetAction,
       button: z.enum(["left", "middle", "right"]).optional(),
@@ -274,8 +276,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "type",
-    description:
-      "Enter text in a unique target using trusted CDP input and return a fresh snapshot. Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the snapshot's focus field says where those keystrokes will land. Mode applies only to an element target.",
+    description: `Enter text in a unique target using trusted CDP input. ${ACTION_RESULT} Omit the target to send the text as keystrokes to whatever the page has focused, which is how an application that draws its own surface, such as a spreadsheet grid on a canvas, takes input: click or navigate to the cell first, then type. In that mode a tab character moves to the next column and a newline commits the row, so one call can fill a row or a column, and the focus field says where those keystrokes will land. Mode applies only to an element target.`,
     shape: {
       tabId,
       target: browserTargetSchema.optional(),
@@ -283,6 +284,7 @@ const BROWSER_TOOL_DEFINITIONS = [
       text: z.string().max(INPUT_LIMITS.browserActionText),
       mode: z.enum(["replace", "append"]).optional(),
       submit: z.boolean().optional(),
+      snapshot: actionSnapshot,
     },
   }),
   browserTool({
@@ -308,44 +310,56 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "press",
-    description: "Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P and return a fresh snapshot.",
-    shape: { tabId, key: requiredString(128), target: browserTargetSchema.optional(), timeoutMs: timeout },
+    description: `Press a key or shortcut such as Enter, Control+A, or Meta+Shift+P. ${ACTION_RESULT}`,
+    shape: {
+      tabId,
+      key: requiredString(128),
+      target: browserTargetSchema.optional(),
+      timeoutMs: timeout,
+      snapshot: actionSnapshot,
+    },
   }),
   browserTool({
     name: "hover",
-    description: "Hover a unique target with trusted CDP pointer input and return a fresh snapshot.",
+    description: `Hover a unique target with trusted CDP pointer input. ${ACTION_RESULT}`,
     shape: targetAction,
   }),
   browserTool({
     name: "scroll",
-    description: "Scroll the page or a target container by X/Y pixels and return a fresh snapshot.",
+    description: `Scroll the page or a target container by X/Y pixels. ${ACTION_RESULT}`,
     shape: {
       tabId,
       target: browserTargetSchema.optional(),
       deltaX: z.number().min(-100_000).max(100_000).optional(),
       deltaY: z.number().min(-100_000).max(100_000).optional(),
       timeoutMs: timeout,
+      snapshot: actionSnapshot,
     },
   }),
   browserTool({
     name: "select_option",
-    description: "Select one or more native select options by value or label and return a fresh snapshot.",
+    description: `Select one or more native select options by value or label. ${ACTION_RESULT}`,
     shape: { ...targetAction, values: z.array(z.string().max(1_000)).min(1).max(100) },
   }),
   browserTool({
     name: "set_checked",
-    description: "Set a checkbox or radio target to the requested checked state and return a fresh snapshot.",
+    description: `Set a checkbox or radio target to the requested checked state. ${ACTION_RESULT}`,
     shape: { ...targetAction, checked: z.boolean() },
   }),
   browserTool({
     name: "drag",
-    description: "Drag from one unique target to another with trusted CDP pointer input and return a fresh snapshot.",
-    shape: { tabId, source: browserTargetSchema, target: browserTargetSchema, timeoutMs: timeout },
+    description: `Drag from one unique target to another with trusted CDP pointer input. ${ACTION_RESULT}`,
+    shape: {
+      tabId,
+      source: browserTargetSchema,
+      target: browserTargetSchema,
+      timeoutMs: timeout,
+      snapshot: actionSnapshot,
+    },
   }),
   browserTool({
     name: "upload_files",
-    description:
-      "Set local files on a file input or the file chooser a clicked target opens, then return a fresh snapshot.",
+    description: `Set local files on a file input or the file chooser a clicked target opens. ${ACTION_RESULT}`,
     shape: {
       ...targetAction,
       paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).min(1).max(INPUT_LIMITS.attachments),
@@ -418,8 +432,9 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "screenshot",
-    description: "Capture the visible page as a separate image content item.",
-    shape: { tabId },
+    description:
+      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
+    shape: { tabId, ref: identifier.optional() },
   }),
   browserTool({
     name: "close_tab",

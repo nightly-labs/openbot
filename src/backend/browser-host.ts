@@ -5,8 +5,11 @@ import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentBrowserProfile,
+  BrowserActionHistoryEntry,
   BrowserBounds,
   BrowserControlState,
+  BrowserDiagnosticEntry,
+  BrowserElement,
   BrowserEnvironment,
   BrowserImageMode,
   BrowserJsonValue,
@@ -19,7 +22,7 @@ import type {
   BrowserViewTarget,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
-import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -109,11 +112,17 @@ import {
   storedTabSession,
 } from "./browser-state";
 import {
+  type ActionResultReader,
+  type BrowserFillFieldsResult,
   BrowserToolHold,
   BrowserUserControlHeld,
   boundEngineOperation,
   enqueueTabOperation,
+  hasCurrentImage,
   isTimeoutError,
+  markImageCurrent,
+  readActionSnapshot,
+  readActionStatus,
   readTabSnapshot,
   remainingTime,
   runTabAction,
@@ -1448,17 +1457,20 @@ export class BrowserHost {
   readonly screenshot = Effect.fn("BrowserHost.screenshot")(function* (
     this: BrowserHost,
     tabId: string,
+    target?: BrowserTarget,
   ): Effect.fn.Return<string, BrowserOperationError> {
     return yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser screenshot"));
         const image = yield* boundEngineOperation(
           tab,
-          tab.engine.screenshot(),
+          tab.engine.screenshot(target, Date.now() + 10_000),
           10_000,
           "Browser screenshot timed out.",
           keepQueueBlocked,
         );
+        // An element image does not show the full page, but it does not make an earlier one old.
+        if (!target || hasCurrentImage(tab)) markImageCurrent(tab);
         return boundedCaptureDataUrl(image);
       }),
     );
@@ -1696,8 +1708,22 @@ export class BrowserHost {
           Effect.gen({ self: this }, function* () {
             const result = yield* readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked);
             if (mode === "always") yield* browserSync(() => this.#requireNoFilledCard(tab, "A snapshot image"));
-            const includeImage = mode === "always" || (mode === "auto" && result.recommendImage && !tab.filledCard);
-            if (!includeImage) return { result, imageUrl: null };
+            const recommended = mode === "auto" && result.recommendImage && !tab.filledCard;
+            // A screenshot or snapshot image just before this one shows the same page.
+            const imageCurrent = hasCurrentImage(tab);
+            if (mode !== "always" && (!recommended || imageCurrent)) {
+              if (imageCurrent) markImageCurrent(tab);
+              if (recommended) {
+                result.snapshot.image = {
+                  included: false,
+                  reason:
+                    "The last image shows this page, and no action changed it since. Pass image: always for a new one.",
+                  width: result.snapshot.viewport.width,
+                  height: result.snapshot.viewport.height,
+                };
+              }
+              return { result, imageUrl: null };
+            }
             const image = yield* boundEngineOperation(
               tab,
               tab.engine.screenshot(),
@@ -1705,6 +1731,7 @@ export class BrowserHost {
               "Browser screenshot timed out.",
               keepQueueBlocked,
             );
+            markImageCurrent(tab);
             return { result, imageUrl: boundedCaptureDataUrl(image) };
           }),
         );
@@ -1718,7 +1745,7 @@ export class BrowserHost {
         const direction = args.direction;
         if (!url && !direction) return yield* browserFailure(new Error("navigate requires url or direction."));
         const timeoutMs = browserToolTimeout(args.timeoutMs);
-        return textResult(
+        return snapshotTextResult(
           yield* this.#runAction(
             tabId,
             "navigate",
@@ -1751,6 +1778,7 @@ export class BrowserHost {
                   );
                 }
               }),
+            readActionSnapshot,
             timeoutMs,
           ),
         );
@@ -1765,7 +1793,7 @@ export class BrowserHost {
           this.#requireToolTab(params, args.tabId),
         );
         return {
-          ...textResult(result),
+          ...snapshotTextResult(result),
           success: result.status === "completed",
         };
       }),
@@ -1808,7 +1836,7 @@ export class BrowserHost {
         if (!condition.target && !condition.text && !condition.url && !condition.state)
           return yield* browserFailure(new Error("wait_for requires a condition."));
         const timeoutMs = browserToolTimeout(args.timeoutMs);
-        return textResult(
+        return snapshotTextResult(
           yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
             Effect.gen({ self: this }, function* () {
               const timeoutMessage = "Browser wait condition timed out.";
@@ -1850,7 +1878,7 @@ export class BrowserHost {
       Effect.gen({ self: this }, function* () {
         const tabId = args.tabId;
         yield* browserSync(() => this.#requireToolTab(params, tabId));
-        return textResult(
+        return snapshotTextResult(
           yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
             Effect.gen({ self: this }, function* () {
               const environment = yield* browserSync(() =>
@@ -1893,12 +1921,16 @@ export class BrowserHost {
     act: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireToolTab(params, args.tabId));
-        return textResult(yield* this.act(args.tabId, args.revision, args.action));
+        return snapshotTextResult(yield* this.act(args.tabId, args.revision, args.action));
       }),
     screenshot: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireToolTab(params, args.tabId));
-        const imageUrl = yield* this.screenshot(args.tabId);
+        // A ref starts with the snapshot revision that made it.
+        const target: BrowserTarget | undefined = args.ref
+          ? { kind: "ref", ref: args.ref, revision: Number(args.ref.split(":", 1)[0]) }
+          : undefined;
+        const imageUrl = yield* this.screenshot(args.tabId, target);
         return { success: true, contentItems: [{ type: "inputImage", imageUrl }] };
       }),
     close_tab: ({ args }, params) =>
@@ -2044,12 +2076,13 @@ export class BrowserHost {
           if (outcome.approval)
             return yield* browserFailure(new Error("The card fill waits for the owner's approval."));
         }),
+      readActionSnapshot,
       browserToolTimeout(args.timeoutMs),
     ).pipe(Effect.catch((error) => (outcome.approval ? Effect.succeed(null) : Effect.fail(error))));
     if (outcome.approval) return { status: "approval" as const, ...outcome.approval };
     return {
       status: "filled" as const,
-      result: textResult({
+      result: snapshotTextResult({
         filled: result.filled,
         ...(result.unconfirmed.length > 0 ? { unconfirmed: result.unconfirmed } : {}),
         snapshot,
@@ -2065,16 +2098,19 @@ export class BrowserHost {
   ): Effect.fn.Return<DynamicToolResult, BrowserOperationError> {
     yield* browserSync(() => this.#requireToolTab(params, call.args.tabId));
     const action = yield* browserSync(() => browserInputAction(call, hooks));
-    return textResult(
-      yield* this.#runAction(
+    const run = <A>(readResult: ActionResultReader<A>) =>
+      this.#runAction(
         call.args.tabId,
         action.name,
         action.target,
         (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
+        readResult,
         browserToolTimeout(call.args.timeoutMs),
         call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
-      ),
-    );
+      );
+    return call.args.snapshot
+      ? snapshotTextResult(yield* run(readActionSnapshot))
+      : textResult(yield* run(readActionStatus));
   });
 
   readonly resolveUploadTarget = Effect.fn("BrowserHost.resolveUploadTarget")(function* (
@@ -2339,14 +2375,16 @@ export class BrowserHost {
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       if (!tab || tab.secret) return;
+      // The page or a navigation cancelled the request: it did not fail. Live pages cancel many.
+      const cancelled = details.error === "net::ERR_ABORTED";
       tab.diagnostics.add({
         kind: "network",
-        level: "error",
+        level: cancelled ? "info" : "error",
         message: `${details.method} ${details.error}`,
         ...diagnosticUrlField(details.url),
         method: details.method,
       });
-      this.#emitChanged();
+      if (!cancelled) this.#emitChanged();
     });
     target.setPermissionRequestHandler((_webContents, permission, callback) =>
       callback(isAllowedBrowserPermission(permission)),
@@ -2749,7 +2787,7 @@ export class BrowserHost {
   });
 
   #snapshotResult(result: SnapshotReadResult, mode: BrowserImageMode, imageUrl: string | null): DynamicToolResult {
-    if (!imageUrl) return textResult(result.snapshot);
+    if (!imageUrl) return snapshotTextResult(result.snapshot);
     result.snapshot.image = {
       included: true,
       reason: mode === "always" ? "requested" : result.imageReason,
@@ -2759,7 +2797,7 @@ export class BrowserHost {
     return {
       success: true,
       contentItems: [
-        { type: "inputText", text: JSON.stringify(result.snapshot) },
+        { type: "inputText", text: snapshotJson(result.snapshot) },
         { type: "inputImage", imageUrl },
       ],
     };
@@ -2895,7 +2933,7 @@ export class BrowserHost {
     return yield* enqueueTabOperation(tab, operation, allowProtected);
   });
 
-  readonly #runAction = Effect.fn("BrowserHost.runAction")(function* (
+  readonly #runAction = Effect.fn("BrowserHost.runAction")(function* <A>(
     this: BrowserHost,
     tabId: string,
     action: string,
@@ -2905,11 +2943,12 @@ export class BrowserHost {
       deadline: number,
       markDispatched: () => void,
     ) => Effect.Effect<void, BrowserOperationError>,
+    readResult: ActionResultReader<A>,
     timeoutMs?: number,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
-  ): Effect.fn.Return<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }, BrowserOperationError> {
+  ): Effect.fn.Return<A | ClosedTabResult, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
-    return yield* runTabAction(tab, action, target, operation, timeoutMs, onOperationStarted);
+    return yield* runTabAction(tab, action, target, operation, readResult, timeoutMs, onOperationStarted);
   });
 
   readonly #runEvaluation = Effect.fn("BrowserHost.runEvaluation")(function* (
@@ -3132,6 +3171,75 @@ function textResult(value: unknown): DynamicToolResult {
     success: true,
     contentItems: [{ type: "inputText", text: JSON.stringify(value) }],
   };
+}
+
+/** An action that closed its tab returns this in place of a snapshot. */
+type ClosedTabResult = { tabId: string; closed: true; openerTabId?: string };
+
+/** A tool result that is a snapshot, or a fill result that carries one. */
+type SnapshotToolPayload =
+  | BrowserSnapshot
+  | ClosedTabResult
+  | BrowserFillFieldsResult
+  | (Pick<BrowserCardFillResult, "filled"> &
+      Partial<Pick<BrowserCardFillResult, "unconfirmed">> & { snapshot: BrowserSnapshot | ClosedTabResult | null });
+
+function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {
+  return {
+    success: true,
+    contentItems: [{ type: "inputText", text: snapshotJson(value) }],
+  };
+}
+
+/**
+ * The model reads many snapshots in a task, so the model text is compact. Each element is one line,
+ * which leaves out the JSON keys and the empty defaults. The history leaves out what the model already
+ * knows: network requests that succeeded, and its own actions that succeeded with no detail. The
+ * snapshot tool description says so.
+ */
+function snapshotJson(value: SnapshotToolPayload): string {
+  return JSON.stringify(value, function (this: unknown, key, field: unknown) {
+    if (!Array.isArray(field) || !isDynamicRecord(this) || !Array.isArray(this.elements)) return field;
+    if (key === "elements") return field.map(elementLine);
+    if (key === "diagnostics")
+      return field.filter((entry: BrowserDiagnosticEntry) => entry.kind !== "network" || entry.level !== "info");
+    if (key === "actions")
+      return field.filter((entry: BrowserActionHistoryEntry) => entry.outcome !== "success" || entry.detail);
+    return field;
+  });
+}
+
+/** Tags that the role already implies. The line names a tag only when it adds to the role. */
+const ROLE_TAGS: Readonly<Record<string, readonly string[]>> = {
+  button: ["button"],
+  link: ["a"],
+  textbox: ["input", "textarea"],
+  searchbox: ["input"],
+  combobox: ["select", "input"],
+  checkbox: ["input"],
+  radio: ["input"],
+  slider: ["input"],
+  spinbutton: ["input"],
+  option: ["option"],
+  img: ["img"],
+};
+
+/**
+ * `ref [role] "name" [<tag>] [value="…"] [description="…"] [state:value…] [bounds=x,y,w,h]
+ * [frame=id frameUrl="…"]`. Text values are JSON strings; the other tokens have no spaces.
+ */
+function elementLine(element: BrowserElement): string {
+  const tokens = [element.ref];
+  if (element.role) tokens.push(element.role);
+  tokens.push(JSON.stringify(element.name));
+  if (!element.role || !ROLE_TAGS[element.role]?.includes(element.tag)) tokens.push(`<${element.tag}>`);
+  if (element.value !== null) tokens.push(`value=${JSON.stringify(element.value)}`);
+  if (element.description) tokens.push(`description=${JSON.stringify(element.description)}`);
+  tokens.push(...element.states);
+  const { bounds, frame } = element;
+  if (bounds) tokens.push(`bounds=${bounds.x},${bounds.y},${bounds.width},${bounds.height}`);
+  if (frame) tokens.push(`frame=${frame.id}`, `frameUrl=${JSON.stringify(frame.url)}`);
+  return tokens.join(" ");
 }
 
 function uniqueDownloadPath(root: string, name: string, reserved: Set<string>): string {

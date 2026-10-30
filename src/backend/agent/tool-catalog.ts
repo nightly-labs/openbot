@@ -150,7 +150,7 @@ export function namesInSearch(params: DynamicToolCallParams, names: readonly str
 }
 
 function toolGuidanceFor(entries: readonly (typeof BUILTIN_TOOL_CATALOG)[number][]): string[] {
-  return [...new Set(entries.map((entry) => toolGuidance(entry.namespace, entry.tool)))].filter(Boolean);
+  return [...new Set(entries.flatMap((entry) => toolGuidance(entry.namespace, entry.tool)))];
 }
 
 export function discoverTools(params: DynamicToolCallParams) {

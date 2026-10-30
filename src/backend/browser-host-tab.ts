@@ -56,6 +56,10 @@ export interface BrowserHostTab {
   ownerThreadId: string | null;
   ownerAgentId: string | null;
   revision: number;
+  /** The number of the queued operation that runs now or ran last. */
+  operations?: number;
+  /** The operation after which the agent has a full-page image that no later operation changed. */
+  imageOperation?: number;
   queue: Deferred.Deferred<void>;
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */

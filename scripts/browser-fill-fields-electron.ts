@@ -13,6 +13,7 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { BROWSER_DYNAMIC_TOOLS } from "../src/backend/browser-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
+import { parseBrowserToolText } from "./browser-snapshot-text";
 
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -36,7 +37,7 @@ const cases: string[] = [];
 const snapshotSchema = z.object({
   tabId: z.string(),
   revision: z.number(),
-  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string() })),
+  elements: z.array(z.object({ ref: z.string(), name: z.string(), tag: z.string().optional() })),
 });
 const outcomeSchema = z.object({
   tabId: z.string(),
@@ -138,7 +139,7 @@ async function main(): Promise<void> {
     const json = (result: DynamicToolResult) => {
       const text = result.contentItems.find((item) => item.type === "inputText");
       assert(text?.type === "inputText", "Missing fixture tool text.");
-      return z.json().parse(JSON.parse(text.text));
+      return z.json().parse(parseBrowserToolText(text.text));
     };
     const open = async (mode = "ordinary") => {
       const id = `form-${++sequence}`;
@@ -473,6 +474,7 @@ async function main(): Promise<void> {
               tabId: form.tab.id,
               target: { kind: "ref", ref, revision: current.revision },
               text: field.text,
+              snapshot: true,
             });
             assert(result.success, "Warm single fill failed.");
             bytes += Buffer.byteLength(JSON.stringify(result));
