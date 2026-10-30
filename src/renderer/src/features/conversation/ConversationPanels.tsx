@@ -119,6 +119,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     sideQuestion,
     setSideQuestionDraft,
     askSideQuestion,
+    installedSkills,
+    installedSkillsLoadFailed,
+    mcpServers,
     voiceConversationAvailable,
     panelSubagentId,
     shownPanelThreadId,
@@ -342,6 +345,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             agent={agent()}
             agents={props.agents}
             exchanges={sideQuestion().exchanges}
+            skills={installedSkills()}
+            skillsLoadFailed={installedSkillsLoadFailed()}
+            mcpServers={mcpServers()}
             error={sideQuestion().error}
             draft={sideQuestion().draft}
             focusRequest={sideQuestion().focusRequest}
