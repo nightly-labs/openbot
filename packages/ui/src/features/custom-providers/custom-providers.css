@@ -381,3 +381,10 @@ input.custom-acp-code {
   flex-wrap: wrap;
   margin-inline-start: auto;
 }
+
+/* "Runs on": the logo and the name of the provider that runs the endpoint. */
+.custom-provider-harness {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}

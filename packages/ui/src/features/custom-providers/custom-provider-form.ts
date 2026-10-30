@@ -3,7 +3,12 @@
 // from the contract; main rechecks on save, so a drifted copy would pass the form and fail save.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { CustomProviderSummary, SaveCustomProviderInput, UpdateCustomProviderInput } from "@openbot/contracts/ipc";
+import type {
+  CustomProviderHarness,
+  CustomProviderSummary,
+  SaveCustomProviderInput,
+  UpdateCustomProviderInput,
+} from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
   CUSTOM_PROVIDER_ID_PATTERN,
@@ -37,6 +42,8 @@ export interface CustomProviderDraft {
   apiKey: string;
   models: CustomModelDraft[];
   headers: CustomHeaderDraft[];
+  /** The provider that runs the endpoint. Absent: the form sends none, and main keeps OpenCode. */
+  harness?: CustomProviderHarness;
 }
 
 /** One message per field, plus one per repeatable row, indexed the way the form renders them. */
@@ -88,6 +95,7 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
           }))
         : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.headerNames),
+    ...(provider.harness ? { harness: provider.harness } : {}),
   };
 }
 
@@ -286,6 +294,7 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
     headers: draft.headers
       .filter((header) => !blankHeader(header))
       .map((header) => ({ name: header.name.trim(), value: header.value.trim() })),
+    ...(draft.harness ? { harness: draft.harness } : {}),
   };
 }
 
@@ -303,6 +312,7 @@ export function customProviderUpdate(value: SaveCustomProviderInput): UpdateCust
     models: value.models,
     ...(value.apiKey === null ? {} : { apiKey: value.apiKey }),
     headers: value.headers.map((header) => ({ name: header.name, value: header.value || null })),
+    ...(value.harness ? { harness: value.harness } : {}),
   };
 }
 

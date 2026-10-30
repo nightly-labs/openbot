@@ -83,6 +83,7 @@ function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | u
     ),
     keyStored: saved.hasApiKey,
     savedHeaderNames: saved.headerNames ?? [],
+    ...(saved.harness ? { harness: saved.harness } : {}),
   };
 }
 

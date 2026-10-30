@@ -8,7 +8,7 @@
 // This lives beside `provider-drivers.ts` rather than inside it because the driver table is a table:
 // the shape of one CLI's config is a concern of its own, and it is the half worth unit testing.
 
-import type { CustomProviderHeader, CustomProviderModel } from "@openbot/contracts/ipc";
+import type { CustomProviderHarness, CustomProviderHeader, CustomProviderModel } from "@openbot/contracts/ipc";
 
 /** One endpoint, as the main process stores it. Carries the secrets, so it never crosses IPC. */
 export interface CustomProviderConfig {
@@ -18,6 +18,8 @@ export interface CustomProviderConfig {
   readonly apiKey: string | null;
   readonly models: readonly CustomProviderModel[];
   readonly headers: readonly CustomProviderHeader[];
+  /** The provider that runs the endpoint. Absent: OpenCode, as before the choice existed. */
+  readonly harness?: CustomProviderHarness;
 }
 
 /**
@@ -28,6 +30,11 @@ export interface CustomProviderConfig {
  * captured array would pin whatever was stored when the driver was built.
  */
 export type CustomProviderSource = () => readonly CustomProviderConfig[];
+
+/** The endpoints that one harness runs, read at each call like the source. */
+export function customProvidersOn(source: CustomProviderSource, harness: CustomProviderHarness): CustomProviderSource {
+  return () => source().filter((provider) => (provider.harness ?? "opencode") === harness);
+}
 
 /** The options block OpenCode hands to its bundled OpenAI-compatible, OpenAI or Anthropic adapter. */
 interface OpenCodeProviderOptions {

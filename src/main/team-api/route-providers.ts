@@ -283,18 +283,23 @@ function isProvidersRoute(pathname: string): boolean {
 }
 
 /**
- * The `providers-v1` endpoint summary: the header names and the model context windows stay on this
- * computer, as they did.
+ * The `providers-v1` endpoint summary: the header names, the harness and the model context windows
+ * stay on this computer, as they did.
  */
-function wireCustomProvider({ headerNames: _headerNames, ...provider }: CustomProviderSummary): CustomProviderSummary {
+function wireCustomProvider({
+  headerNames: _headerNames,
+  harness: _harness,
+  ...provider
+}: CustomProviderSummary): CustomProviderSummary {
   return { ...provider, models: provider.models.map(wireCustomModel) };
 }
 
 /**
- * A `providers-v1` save names each model by its released fields only. A model field that the protocol
- * does not have is removed before the parse, so that it cannot refuse a save the host used to accept.
+ * A `providers-v1` save names the endpoint and each model by its released fields only. A field that
+ * the protocol does not have is removed before the parse, so that it cannot refuse a save the host
+ * used to accept, and a peer always saves an endpoint on OpenCode, as it did.
  */
-function releasedSaveBody(body: DynamicRecord): DynamicRecord {
+function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): DynamicRecord {
   if (!Array.isArray(body.models)) return body;
   return {
     ...body,

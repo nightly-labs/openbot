@@ -12,6 +12,7 @@ import type {
   AgentSummary,
   CapabilityState,
   CustomAgentUsage,
+  CustomProviderHarness,
   CustomProviderRestart,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
@@ -45,7 +46,7 @@ import { readCursorUsage } from "./../cursor-usage";
 import { causeHelpers } from "../effect-boundary";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { providerMcpServerName } from "./../mcp-provider-shapes";
-import { openCodeSignInMessage } from "./../opencode-config";
+import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
 import { readOpenCodeGoUsage } from "./../opencode-usage";
 import type { ProcessConfinement } from "../process-confinement";
 import {
@@ -1789,12 +1790,14 @@ export class ProviderRuntime implements ProviderPort {
    * caller keeps its own default.
    */
   #customProviderSignInMessage(provider: AgentProvider): string | null {
-    const count = provider === "opencode" ? this.#credentials.customProviders().length : 0;
+    const count =
+      provider === "opencode" ? customProvidersOn(this.#credentials.customProviders, "opencode")().length : 0;
     return count > 0 ? openCodeSignInMessage(count) : null;
   }
 
   /**
-   * Replaces the OpenCode process so a changed custom-provider config reaches it.
+   * Replaces the OpenCode or Pi process so a changed custom-provider config reaches it. The text
+   * below names OpenCode; Pi reads its endpoints at each spawn in the same way.
    *
    * `connectProvider` cannot do this: it returns early for a provider that is already connected, so
    * it never respawns a running OpenCode. This reuses the rest of that path unchanged - re-resolve
@@ -1811,20 +1814,21 @@ export class ProviderRuntime implements ProviderPort {
    * failure is, as an error state and a message on the provider's own status.
    */
 
-  readonly reloadOpenCodeConfig = Effect.fn("ProviderRuntime.reloadOpenCodeConfig")(function* (
+  readonly reloadCustomProviderConfig = Effect.fn("ProviderRuntime.reloadCustomProviderConfig")(function* (
     this: ProviderRuntime,
+    harness: CustomProviderHarness,
   ): Effect.fn.Return<CustomProviderRestart> {
-    this.#environmentReloadPending.delete("opencode");
-    if (!this.#clients.has("opencode")) return "not-running";
-    if (this.#hooks.isProviderBusy("opencode")) {
-      this.#environmentReloadPending.add("opencode");
+    this.#environmentReloadPending.delete(harness);
+    if (!this.#clients.has(harness)) return "not-running";
+    if (this.#hooks.isProviderBusy(harness)) {
+      this.#environmentReloadPending.add(harness);
       return "skipped-busy";
     }
     const result = yield* Effect.result(
-      this.#runProviderConnectionCommand("opencode", () => this.#reprobeProvider("opencode")),
+      this.#runProviderConnectionCommand(harness, () => this.#reprobeProvider(harness)),
     );
-    if (Result.isFailure(result) && this.#hooks.isProviderBusy("opencode")) {
-      this.#environmentReloadPending.add("opencode");
+    if (Result.isFailure(result) && this.#hooks.isProviderBusy(harness)) {
+      this.#environmentReloadPending.add(harness);
       return "skipped-busy";
     }
     return "restarted";
@@ -1832,7 +1836,7 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Restarts each running process that read the agent environment when it started, so the next
-   * turn gets the new one. The rules of `reloadOpenCodeConfig` apply, and a restart that a turn
+   * turn gets the new one. The rules of `reloadCustomProviderConfig` apply, and a restart that a turn
    * delays is applied by the idle check after the turn stops. A Workspace only process is replaced
    * at its next turn, because its key names the activation.
    */
@@ -1865,7 +1869,7 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Replaces the router of the custom agents, so a saved, changed or removed agent reaches it. The
-   * same rules as `reloadOpenCodeConfig` apply: a turn in progress wins, and it never throws. The
+   * same rules as `reloadCustomProviderConfig` apply: a turn in progress wins, and it never throws. The
    * first saved agent starts the provider; with the last one removed, the provider stops. A change
    * that a turn delays is applied by the idle check after the turn stops, as the saved message says.
    */
