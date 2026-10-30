@@ -1136,8 +1136,8 @@ export class ChannelService {
                         ),
                       { ...task, state: "cancelled" },
                       {
+                        // The task keeps its instruction; the packet adds the new message as a follow-up.
                         ...existing,
-                        instruction: task.instruction,
                         requestMessageId: task.requestMessageId,
                         attachmentDraftIds: task.attachmentDraftIds,
                         sourceMessageIds: [...existing.sourceMessageIds.slice(-30), task.requestMessageId],

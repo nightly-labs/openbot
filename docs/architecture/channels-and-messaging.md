@@ -163,6 +163,7 @@ their replies to that request, so each member gives its own view. This stays tru
 first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
 request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
+An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
 visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
 only itself adds none: its reply shows who answers. A routing answer that does not decode pauses the
