@@ -97,6 +97,7 @@ import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
@@ -939,7 +940,7 @@ try {
       "compatibility answers without protocol headers and names the supported range",
       compatibility.status === 200 &&
         field(compatibility.body, "protocol", "minimum") === 1 &&
-        field(compatibility.body, "protocol", "maximum") === 8,
+        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V9,
       summary(compatibility),
     );
     const noHeaders = await call("GET", TEAM_API_ROUTES.identity, { protocol: null });
@@ -956,12 +957,12 @@ try {
       badHeader.status === 400 && field(badHeader.body, "code") === "protocol_error",
       summary(badHeader),
     );
-    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: 9 });
+    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V9 + 1 });
     check(
       "a newer protocol gets 426 host_update_required with the client version",
       newer.status === 426 &&
         field(newer.body, "code") === "host_update_required" &&
-        field(newer.body, "client", "protocol") === 9,
+        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V9 + 1,
       summary(newer),
     );
     const zero = await call("GET", TEAM_API_ROUTES.identity, { protocol: 0 });
@@ -1751,12 +1752,26 @@ try {
   // ---- Agent notification levels (agent-notification-levels-v1) ----
   {
     const capabilities = [AGENT_NOTIFICATION_LEVELS_CAPABILITY];
-    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 7 });
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     check(
-      "the host advertises agent-notification-levels-v1",
-      list(field(compatibility.body, "capabilities")).includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY),
+      "the host advertises agent-notification-levels-v1 to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY) &&
+        list(field(compatibility.body, "capabilities")).includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY),
       summary(compatibility),
     );
+    // Protocols 7 and 8 read at most 128 capabilities, so their list leaves out the protocol 9 ones.
+    for (const protocol of [7, 8]) {
+      const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol });
+      const names = list(field(older.body, "capabilities"));
+      check(
+        `a protocol ${protocol} peer gets at most 128 capabilities and none of protocol 9`,
+        older.status === 200 &&
+          names.length <= 128 &&
+          !names.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY) &&
+          !names.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY),
+        `${names.length} capabilities`,
+      );
+    }
     const unsupported = await call("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, { token: bobToken, json: {} });
     check(
       "the agent notification level routes without the capability get 400 agentNotificationLevelsUnsupported",

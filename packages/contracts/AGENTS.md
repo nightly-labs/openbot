@@ -13,7 +13,8 @@ mock — so the cost of a change is paid by code you cannot edit.
   of each released wire format; no unit test reads them, so compare a codec change against them by
   hand. Do not serialize current IPC types across the boundary.
 - Use capabilities for additive, optional behaviour; a missing capability disables only its own
-  feature.
+  feature. Protocols 7 and 8 read at most 128 capabilities and their lists are full: a new one goes
+  in `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`. Check the list sizes of each protocol when you add one.
 - A required field, a removed field, or a semantic change needs a new protocol version. Never change
   the meaning of a released one.
 - A new value in an open field is not a protocol change. From protocol 8, provider ids and auth

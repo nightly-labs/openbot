@@ -4,6 +4,8 @@
 //
 // Each entry is its frozen adapter itself. An adapter reads only the options it declares, so V1 and V3
 // ignore `agentCreateModel`. A protocol older than V3 is served by the V1 adapter.
+
+import { TEAM_API_ROUTES } from "../team-api-routes";
 import {
   decodeTeamProtocolV1CurrentHttpRequest,
   decodeTeamProtocolV1CurrentHttpResponse,
@@ -52,6 +54,7 @@ import {
   encodeTeamProtocolV8CurrentHttpRequest,
   encodeTeamProtocolV8CurrentHttpResponse,
 } from "./v8-adapter";
+import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "./v9";
 
 export interface TeamHttpCodecOptions {
   preserveSemanticTags?: boolean;
@@ -132,6 +135,27 @@ const V8_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV8CurrentHttpResponse,
 };
 
+/** Protocol 9 is the protocol 8 wire. Only its compatibility response has up to 256 capabilities. */
+const V9_CODEC: TeamHttpCodec = {
+  ...V8_CODEC,
+  encodeResponse: (method, path, status, value, options) =>
+    isCompatibilityRead(method, path, status)
+      ? JSON.stringify(decodeTeamProtocolSupportV9(value))
+      : V8_CODEC.encodeResponse(method, path, status, value, options),
+  decodeResponse: (method, path, status, value) =>
+    isCompatibilityRead(method, path, status)
+      ? { ...decodeTeamProtocolSupportV9(value) }
+      : V8_CODEC.decodeResponse(method, path, status, value),
+};
+
+function isCompatibilityRead(method: string, path: string, status: number): boolean {
+  return (
+    method === "GET" &&
+    status === 200 &&
+    new URL(path, "http://openbot.invalid").pathname === TEAM_API_ROUTES.compatibility
+  );
+}
+
 const V6_CODEC: TeamHttpCodec = {
   encodeRequest: encodeTeamProtocolV6CurrentHttpRequest,
   decodeRequest: decodeTeamProtocolV6CurrentHttpRequest,
@@ -141,6 +165,7 @@ const V6_CODEC: TeamHttpCodec = {
 
 /** The HTTP adapter of a negotiated protocol. No protocol, or one older than V3, gets V1. */
 export function teamHttpCodec(protocol: number | undefined): TeamHttpCodec {
+  if (protocol === TEAM_PROTOCOL_V9) return V9_CODEC;
   if (protocol === TEAM_PROTOCOL_V8) return V8_CODEC;
   if (protocol === TEAM_PROTOCOL_V7) return V7_CODEC;
   if (protocol === TEAM_PROTOCOL_V6) return V6_CODEC;

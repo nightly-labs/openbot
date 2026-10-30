@@ -14,7 +14,7 @@ import {
   decodeTeamProtocolV2Json,
   decodeTeamProtocolV2RpcFrame,
   decodeTeamProtocolV8CurrentEvent,
-  decodeTeamProtocolV8WebRtcHttpResponse,
+  decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
   encodeTeamProtocolV8WebRtcHttpRequest,
   TEAM_PROTOCOL_V2_CHANNELS,
@@ -29,7 +29,7 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -1279,7 +1279,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
           const status = frame.result.status;
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
-            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV7Base(body))).protocol.maximum;
+            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({
@@ -1293,7 +1293,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
                   }),
                 )
               : yield* peerDecode(() =>
-                  decodeTeamProtocolV8WebRtcHttpResponse(pending.method, pending.path, status, body),
+                  decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
                 ),
           });
         }

@@ -108,6 +108,7 @@ import {
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   type TeamCurrentCapability,
+  teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
@@ -149,8 +150,9 @@ import { TEAM_CURSOR_CLINE_CAPABILITY } from "@openbot/contracts/team-protocol/v
 import { encodeTeamProtocolV6BaseCurrentEvent } from "@openbot/contracts/team-protocol/v6-base-adapter";
 import { TEAM_PI_MUSE_CAPABILITY } from "@openbot/contracts/team-protocol/v7";
 import { encodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-protocol/v7-base-adapter";
-import { TEAM_OPEN_PROVIDERS_CAPABILITY, TEAM_PROTOCOL_V8 } from "@openbot/contracts/team-protocol/v8";
+import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v8";
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
@@ -774,7 +776,7 @@ export class TeamApiServer {
       // a browser fetching the viewer sends neither protocol headers nor a bearer token. It is not a
       // route in the table; the gateway decides for itself which paths are its own.
       if (method === "GET" && url.pathname === TEAM_API_ROUTES.compatibility) {
-        return this.#json(response, 200, this.#protocolSupport(requestProtocol(request) >= 7));
+        return this.#json(response, 200, this.#protocolSupport(requestProtocol(request)));
       }
 
       if (this.#options.remoteScreen?.handlesHttp(url)) {
@@ -1975,106 +1977,118 @@ export class TeamApiServer {
     this.#publishPresence();
   }
 
-  #protocolSupport(expanded = false): TeamProtocolSupportV1 {
+  /**
+   * What this host serves, as a peer of `protocol` reads it. Protocol 7 and newer get the full list,
+   * older peers the legacy one. Below protocol 9 the list leaves out the protocol 9 capabilities, so it
+   * stays within the 128 that protocols 7 and 8 read.
+   */
+  #protocolSupport(protocol: number | null = null): TeamProtocolSupportV1 {
+    const expanded = protocol !== null && protocol >= 7;
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
-      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V8 },
-      capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
-        if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
-        if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
-          return this.#options.channels !== undefined;
-        // Advertised only when this host can serve it: a client that negotiated it gets a route,
-        // and one that did not never shows the panel.
-        if (capability === "remote-desktop-setup")
-          return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
-        if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
-        if (capability === MCP_SIGN_IN_CAPABILITY)
-          return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
-        if (capability === MCP_SIGN_IN_APP_CAPABILITY)
-          return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
-        if (capability === SIGN_IN_RELAY_CAPABILITY)
-          return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
-        if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
-          return (
-            this.#options.mcpServers !== undefined &&
-            this.#options.signInRelay !== undefined &&
-            this.#options.providerAccounts !== undefined
-          );
-        if (capability === CONNECTORS_CAPABILITY) return this.#options.connectors !== undefined;
-        if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
-        if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
-        if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
-        if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
-        if (capability === BROWSER_SECRET_VAULT_CAPABILITY) return this.#options.vault !== undefined;
-        if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;
-        if (capability === VAULT_V2_CAPABILITY) return this.#options.vault !== undefined;
-        if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
-        if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
-        if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
-        if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
-        if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
-        if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
-        if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
-        if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
-        if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
-        if (capability === ACP_REGISTRY_CAPABILITY) return this.#options.admin?.acpRegistry !== undefined;
-        if (capability === AGENT_SESSION_SETTINGS_CAPABILITY) return this.#options.admin?.sessionSettings !== undefined;
-        if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
-        if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
-        if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
-        if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
-        if (capability === AGENT_THREAD_READS_CAPABILITY) return this.#options.agentTasks !== undefined;
-        if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
-        if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
-        if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
-        if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
-        if (capability === BROWSER_PROFILES_CAPABILITY) return this.#options.browserProfiles !== undefined;
-        if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
-        if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
-        if (capability === SHARED_TABLES_CAPABILITY) return this.#options.admin?.sharedTables !== undefined;
-        if (capability === AGENT_INSTALL_CAPABILITY)
-          return (
-            this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
-          );
-        if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
-        if (capability === AGENT_PUBLISH_CAPABILITY) return this.#options.admin?.agentTemplates !== undefined;
-        if (
-          capability === PROVIDERS_ADMIN_CAPABILITY ||
-          capability === PROVIDERS_RUNTIMES_V2_CAPABILITY ||
-          capability === PROVIDERS_V4_CAPABILITY ||
-          capability === PROVIDERS_V5_CAPABILITY ||
-          capability === PROVIDERS_V8_CAPABILITY ||
-          capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY
-        )
-          return this.#options.admin?.providers !== undefined;
-        if (capability === CLAUDE_API_KEY_CAPABILITY) return this.#options.admin?.providers !== undefined;
-        if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
-        if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
-        if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
-        if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
-        if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
-        if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
-        if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
-        if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
-        if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
-        if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)
-          return this.#options.admin?.update !== undefined;
-        if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
-        if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
-        if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
-        if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
-        if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
-        if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
-        if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
-        if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
-        if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
-        if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
-          return this.#options.pushNotifications !== undefined;
-        if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
-        if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
-          return this.#options.agentNotificationLevels !== undefined;
-        return true;
-      }),
+      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 },
+      capabilities: teamCapabilitiesVisibleToProtocol(TEAM_CURRENT_CAPABILITIES, protocol ?? TEAM_PROTOCOL_V1).filter(
+        (capability) => {
+          if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
+          if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+            return this.#options.channels !== undefined;
+          // Advertised only when this host can serve it: a client that negotiated it gets a route,
+          // and one that did not never shows the panel.
+          if (capability === "remote-desktop-setup")
+            return (
+              this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined
+            );
+          if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+          if (capability === MCP_SIGN_IN_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
+          if (capability === MCP_SIGN_IN_APP_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
+          if (capability === SIGN_IN_RELAY_CAPABILITY)
+            return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
+          if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
+            return (
+              this.#options.mcpServers !== undefined &&
+              this.#options.signInRelay !== undefined &&
+              this.#options.providerAccounts !== undefined
+            );
+          if (capability === CONNECTORS_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
+          if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
+          if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === BROWSER_SECRET_VAULT_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === VAULT_V2_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
+          if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
+          if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
+          if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
+          if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
+          if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
+          if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
+          if (capability === ACP_REGISTRY_CAPABILITY) return this.#options.admin?.acpRegistry !== undefined;
+          if (capability === AGENT_SESSION_SETTINGS_CAPABILITY)
+            return this.#options.admin?.sessionSettings !== undefined;
+          if (capability === AGENT_HIDDEN_CAPABILITY) return this.#options.hiddenAgents !== undefined;
+          if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_READS_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_FILES_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === BROWSER_PROFILES_CAPABILITY) return this.#options.browserProfiles !== undefined;
+          if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
+          if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
+          if (capability === SHARED_TABLES_CAPABILITY) return this.#options.admin?.sharedTables !== undefined;
+          if (capability === AGENT_INSTALL_CAPABILITY)
+            return (
+              this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
+            );
+          if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
+          if (capability === AGENT_PUBLISH_CAPABILITY) return this.#options.admin?.agentTemplates !== undefined;
+          if (
+            capability === PROVIDERS_ADMIN_CAPABILITY ||
+            capability === PROVIDERS_RUNTIMES_V2_CAPABILITY ||
+            capability === PROVIDERS_V4_CAPABILITY ||
+            capability === PROVIDERS_V5_CAPABILITY ||
+            capability === PROVIDERS_V8_CAPABILITY ||
+            capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY
+          )
+            return this.#options.admin?.providers !== undefined;
+          if (capability === CLAUDE_API_KEY_CAPABILITY) return this.#options.admin?.providers !== undefined;
+          if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
+            return this.#options.admin?.providers?.pasteSignIn === true;
+          if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
+          if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
+          if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+          if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
+          if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
+          if (capability === PROMPT_CACHE_TTL_CAPABILITY) return this.#options.admin?.promptCacheTtl !== undefined;
+          if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
+          if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
+          if (capability === HOST_UPDATE_CAPABILITY || capability === HOST_MEMBER_UPDATE_CAPABILITY)
+            return this.#options.admin?.update !== undefined;
+          if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
+          if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
+          if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
+          if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
+          if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
+          if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
+          if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
+          if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
+          if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
+            return this.#options.pushNotifications !== undefined;
+          if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
+          if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
+            return this.#options.agentNotificationLevels !== undefined;
+          return true;
+        },
+      ),
     };
   }
 
@@ -2106,7 +2120,7 @@ export class TeamApiServer {
         body: { error: "Invalid Team API protocol headers.", code: "protocol_error", host },
       };
     }
-    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V8) return null;
+    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V9) return null;
     const clientIsOlder = protocol < TEAM_PROTOCOL_V1;
     return {
       status: 426,

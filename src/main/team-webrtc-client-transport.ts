@@ -19,12 +19,12 @@ import {
   type TeamProtocolV2RpcFrame,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV7Base } from "@openbot/contracts/team-protocol/v7-base";
 import {
   decodeTeamProtocolV8CurrentEvent,
-  decodeTeamProtocolV8WebRtcHttpResponse,
   encodeTeamProtocolV8WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v8-webrtc-adapter";
+import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolV9WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
 import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
@@ -537,7 +537,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelAttention: true,
                     agentTaskUiBlocks: true,
                   })
-                : decodeTeamProtocolV8WebRtcHttpResponse(method, path, status, envelope.body),
+                : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
               Effect.mapError(
                 () =>
@@ -551,7 +551,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
               ),
             );
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
-          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV7Base(body));
+          const support = yield* remoteDecode(() => decodeTeamProtocolSupportV9(body));
           this.#hostProtocols.set(hostId, support.protocol.maximum);
         }
         return { status: envelope.status, body, ...(file ? { file } : {}) };
