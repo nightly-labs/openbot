@@ -14,7 +14,8 @@ import type { DatabaseSync } from "node:sqlite";
 // `workflow_github_deliveries`: each event that GitHub sent to a trigger, once, and each time the host
 // was offline (`delivery_id` is then `offline:<from>`, and the item is null). It is also the queue: a
 // `waiting` row holds the run payload until the open run of its item ends; the payload is cleared when
-// the row starts or is skipped. The host keeps the newest 50 rows of each trigger.
+// the row starts or is skipped; `caused_by_bot` lets the loop guard count the run that the row starts.
+// The host keeps the newest 50 rows of each trigger.
 //
 // `workflow_github_actions`: one change that a GitHub output made, keyed by run, node and action, so a
 // retry does not make it a second time. `sending` is written before the call; a restart that finds it
@@ -57,9 +58,10 @@ export const WORKFLOW_GITHUB_SCHEMA_SQL = `
     title TEXT,
     received_at TEXT NOT NULL,
     outcome TEXT NOT NULL CHECK(outcome IN ('started', 'waiting', 'skipped')),
-    reason TEXT CHECK(reason IS NULL OR reason IN ('filter', 'self', 'chain', 'offline')),
+    reason TEXT CHECK(reason IS NULL OR reason IN ('filter', 'self', 'chain', 'offline', 'refused')),
     run_id TEXT,
     payload TEXT,
+    caused_by_bot INTEGER NOT NULL DEFAULT 0 CHECK(caused_by_bot IN (0, 1)),
     CHECK((repository IS NULL) = (number IS NULL) AND (number IS NULL) = (pull_request IS NULL)
       AND (number IS NULL) = (title IS NULL)),
     CHECK((outcome = 'skipped') = (reason IS NOT NULL)),

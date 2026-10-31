@@ -1,8 +1,10 @@
-import { Effect } from "effect";
+import type { GitHubDeliveryStatus } from "@openbot/contracts/signal-protocol/github-route";
+import { Effect, Result } from "effect";
+import type { WorkflowsHandle } from "../backend/workflows/workflows";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { GitHubRouteTicket, GitHubRouteTicketRepository } from "./central-auth-manager";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
-import type { GitHubIngressHandler, SignalIngress } from "./signal-ingress";
+import type { GitHubIngressDelivery, GitHubIngressHandler, SignalIngress } from "./signal-ingress";
 
 interface GitHubRelayAccount {
   issueGitHubRoute(
@@ -84,3 +86,25 @@ export class GitHubRelay {
     return issued.ticket;
   }).bind(this);
 }
+
+/**
+ * Gives one relayed GitHub event to the workflows. 202: a trigger saved it; 404: no trigger watches
+ * it; 400: the body is not JSON. A fault fails, and the ingress socket answers 503.
+ */
+export const receiveGitHubDelivery = Effect.fn("receiveGitHubDelivery")(function* (
+  workflows: Pick<WorkflowsHandle, "receiveGitHub">,
+  delivery: GitHubIngressDelivery,
+) {
+  const answer = (status: GitHubDeliveryStatus) => ({ status });
+  const body = yield* Effect.try({
+    try: (): unknown => JSON.parse(new TextDecoder().decode(delivery.body)),
+    catch: () => "invalid",
+  }).pipe(Effect.result);
+  if (Result.isFailure(body)) return answer(400);
+  const result = yield* workflows.receiveGitHub({
+    event: delivery.event,
+    deliveryId: delivery.deliveryId,
+    body: body.success,
+  });
+  return answer(result.kind === "saved" ? 202 : 404);
+});

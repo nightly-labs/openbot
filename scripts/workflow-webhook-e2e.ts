@@ -31,6 +31,7 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { WorkflowGitHubStore } = await import("../src/backend/workflows/workflow-github-store");
 const { WorkflowRunStore } = await import("../src/backend/workflows/workflow-run-store");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
@@ -107,6 +108,8 @@ try {
     createWorkflows({
       store: workflowStore,
       runs: new WorkflowRunStore({ database }),
+      github: new WorkflowGitHubStore({ database }),
+      githubApp: () => null,
       delivery: () => null,
       turnAnswer: () => null,
       sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),

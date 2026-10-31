@@ -93,8 +93,9 @@ export type WorkflowGitHubDeliveryOutcome = (typeof WORKFLOW_GITHUB_DELIVERY_OUT
  * - `self`: a step of this workflow caused it.
  * - `chain`: runs that the bot caused went on too long on one item.
  * - `offline`: the host was offline, so GitHub's events of that time are lost.
+ * - `refused`: the workflow cannot start, such as one with a node of a newer version.
  */
-export const WORKFLOW_GITHUB_SKIP_REASONS = ["filter", "self", "chain", "offline"] as const;
+export const WORKFLOW_GITHUB_SKIP_REASONS = ["filter", "self", "chain", "offline", "refused"] as const;
 export type WorkflowGitHubSkipReason = (typeof WORKFLOW_GITHUB_SKIP_REASONS)[number];
 
 /** One event that GitHub sent to a trigger, or a time when the host could not get them. */

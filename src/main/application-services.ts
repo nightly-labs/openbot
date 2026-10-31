@@ -15,6 +15,7 @@ import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
@@ -195,7 +196,7 @@ import {
 import { githubAppConfig } from "./github-connector-config";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
-import { GitHubRelay } from "./github-relay";
+import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { HermesImportService } from "./hermes-import-service";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
@@ -1852,6 +1853,10 @@ export async function createApplicationServices({
     createWorkflows({
       store: workflowStore,
       runs: new WorkflowRunStore({ database: store.database }),
+      github: new WorkflowGitHubStore({ database: store.database }),
+      githubApp: () => githubAppConfig()?.slug ?? null,
+      // The relay is made with the ingress socket, below; a graph changes only after start.
+      watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
@@ -2144,6 +2149,27 @@ export async function createApplicationServices({
   });
   const eventsRuntime = new HostEventsRuntime(events);
   signalIngress.handleWebhooks((input) => events.receive(input));
+  githubRelay.handle({
+    deliver: (delivery) => receiveGitHubDelivery(workflowRuntime, delivery),
+    offline: (from, to) =>
+      workflowRuntime
+        .githubOffline(new Date(from), new Date(to))
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("The time without GitHub events was not recorded.", { cause: String(failure.cause) }),
+            ),
+          ),
+        ),
+  });
+  await Effect.runPromise(
+    workflowRuntime.githubRepositories().pipe(
+      Effect.tap((repositories) => Effect.sync(() => githubRelay.setRepositories(repositories))),
+      Effect.catch((failure) =>
+        Effect.sync(() => logger.warn("The GitHub triggers were not read.", { cause: String(failure.cause) })),
+      ),
+    ),
+  );
   teardown.push(TEARDOWN_ORDER.hostEvents, "the event service", async () => {
     webhookRelay.stop();
     githubRelay.stop();

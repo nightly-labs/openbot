@@ -18,6 +18,7 @@ import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineTimer } from "../src/backend/routine-timer";
+import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
@@ -72,6 +73,8 @@ async function open() {
     createWorkflows({
       store,
       runs: new WorkflowRunStore({ database }),
+      github: new WorkflowGitHubStore({ database }),
+      githubApp: () => null,
       delivery: () => null,
       turnAnswer: () => null,
       sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
