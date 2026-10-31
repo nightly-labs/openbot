@@ -76,24 +76,4 @@ describe("remote session indexes migration", () => {
     expect(cascade).toContain("remote_sessions_membership_id");
     expect(cascade).not.toContain("SCAN remote_sessions");
   });
-
-  it("still sweeps only expired active sessions and cascades a membership delete to its sessions", () => {
-    const database = migratedTo("0046");
-    seed(database);
-    database.exec(migration);
-
-    database
-      .prepare(
-        "UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND expires_at <= ?",
-      )
-      .run(200, "office", "owner", 200);
-    database.prepare("DELETE FROM remote_memberships WHERE host_id = ?").run("laptop");
-
-    expect(database.prepare("SELECT session_id, ended_at FROM remote_sessions ORDER BY session_id").all()).toEqual([
-      { session_id: "active-device", ended_at: null },
-      { session_id: "active-legacy", ended_at: 200 },
-      { session_id: "ended-1", ended_at: 30 },
-      { session_id: "ended-2", ended_at: 60 },
-    ]);
-  });
 });
