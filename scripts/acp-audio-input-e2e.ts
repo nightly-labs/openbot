@@ -1,8 +1,8 @@
 // Runs the real ACP client against owned stdio agents. No account or model request is used.
 // bun scripts/acp-audio-input-e2e.ts
 // An agent that advertises audio input gets an attached MP3 as an audio block with unchanged bytes,
-// and the path as text. An agent with no audio input, a video, and audio over the 20 MB prompt
-// limit get the path only (#4210).
+// and the path as text. An agent with no audio input, a video, and audio over the 19 MB base64
+// prompt limit get the path only (#4210).
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -193,7 +193,7 @@ try {
     { name: "uppercase MP3 extension", agent: "audio", files: [["VOICE.MP3", 2048]], audio: ["VOICE.MP3"] },
     { name: "mp3 to an agent with no audio input", agent: "plain", files: [["voice.mp3", 4096]], audio: [] },
     { name: "mp4 video stays a path", agent: "audio", files: [["clip.mp4", 4096]], audio: [] },
-    { name: "mp3 over the prompt limit", agent: "audio", files: [["long.mp3", 20 * MB + 1]], audio: [] },
+    { name: "mp3 over the base64 prompt limit", agent: "audio", files: [["long.mp3", 15 * MB]], audio: [] },
     {
       name: "second mp3 over the prompt total",
       agent: "audio",

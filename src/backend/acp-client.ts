@@ -105,10 +105,11 @@ const SESSION_LIST_PAGES = 50;
 const ACP_HISTORY_REPLAY_QUEUE_LIMIT = 256;
 
 /**
- * The audio bytes one prompt sends inline to an agent that advertises audio input. Gemini takes
- * inline data up to about 20 MB a request. Audio over the limit reaches the agent as its path only.
+ * The base64 audio characters one prompt sends inline to an agent that advertises audio input.
+ * Gemini takes about 20 MB a request, text included, so 1 MB stays free for the prompt text.
+ * Audio over the limit reaches the agent as its path only.
  */
-const ACP_PROMPT_AUDIO_BYTES = 20 * 1024 * 1024;
+const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
 
 /**
  * How long a turn may send nothing, with no tool call open and no question to the user, before
@@ -2993,7 +2994,7 @@ function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
  */
 const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown, acceptsAudio: boolean) {
   const blocks: ContentBlock[] = [];
-  let audioBytes = 0;
+  let audioBase64Bytes = 0;
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
@@ -3003,10 +3004,10 @@ const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (p
       const mimeType = attachmentMimeTypeForName(path);
       if (!acceptsAudio || !mimeType.startsWith("audio/")) continue;
       const { size } = yield* providerCall(() => stat(path));
-      if (audioBytes + size > ACP_PROMPT_AUDIO_BYTES) continue;
-      const data = yield* providerCall(() => readFile(path));
-      audioBytes += data.byteLength;
-      blocks.push({ type: "audio", data: data.toString("base64"), mimeType });
+      if (audioBase64Bytes + Math.ceil(size / 3) * 4 > ACP_PROMPT_AUDIO_BASE64_BYTES) continue;
+      const data = (yield* providerCall(() => readFile(path))).toString("base64");
+      audioBase64Bytes += data.length;
+      blocks.push({ type: "audio", data, mimeType });
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;
