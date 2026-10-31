@@ -91,7 +91,11 @@ export function AppAccessGate() {
                   />
                 }
               >
-                <LanguageStep variant={platform.appInfo()?.variant ?? "production"} onDone={languageStep.complete} />
+                <LanguageStep
+                  variant={platform.appInfo()?.variant ?? "production"}
+                  reopened={languageStep.reopened()}
+                  onDone={languageStep.complete}
+                />
               </Show>
             </Loading>
           }
