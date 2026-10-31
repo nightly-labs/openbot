@@ -307,6 +307,7 @@ export function decodeAccountLoginCompletedResult(value: unknown): AccountLoginC
 export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLimitsReadResult {
   const record = decodeRecord(value, "rate limits response");
   const rateLimits = decodeRateLimit(record.rateLimits);
+  const tertiary = decodeRateLimitWindow(record.tertiary);
   const rateLimitsByLimitId = decodeRateLimitsById(record.rateLimitsByLimitId);
   const rateLimitResetCredits = decodeRateLimitResetCredits(record.rateLimitResetCredits);
   const groups = decodeRateLimitGroups(record.groups);
@@ -315,6 +316,7 @@ export function decodeAccountRateLimitsReadResult(value: unknown): AccountRateLi
     throw new Error("Invalid rate limit shared quota provider.");
   return {
     ...(rateLimits === undefined ? {} : { rateLimits }),
+    ...(tertiary ? { tertiary } : {}),
     ...(rateLimitsByLimitId === undefined ? {} : { rateLimitsByLimitId }),
     ...(groups === undefined ? {} : { groups }),
     ...(sharedQuotaWith === undefined ? {} : { sharedQuotaWith }),
