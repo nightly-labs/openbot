@@ -215,10 +215,9 @@ until it fails. Then do the same for `sui-alexandria` in a quiet hour, which als
 check that `dig signal.openbot.run` gives `65.109.88.58` within 3 minutes and that
 `openbot_remote_signal_entry` is 1 on `signal2`. To move the entry back, set the A record by hand.
 
-Known limits: a host that goes back to a released desktop keeps its stored home, so its clients go to
-the home and the host goes to the entry. They meet again after an empty `REMOTE_SIGNAL_HOMES` or a
-manual reset of `remote_hosts.signal_home`. The host status shows the home URL from its first ticket
-and does not change after a move.
+Known limits: the host status shows the home URL from its first ticket and does not change after a
+move. A host that goes back to a released desktop sends no `signalHome`; its ticket request removes the
+stored home, so its clients go to the entry with it.
 
 ## Required device validation — pending
 

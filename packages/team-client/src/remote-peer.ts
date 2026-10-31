@@ -341,6 +341,8 @@ interface PeerState {
   signalAnswered: boolean;
   /** When the peer got a ticket last while Signal said that the host is not connected. Null after `ready`. */
   hostWaitingSince: number | null;
+  /** The wait before the next of these checks. It doubles after each check that finds no move. */
+  hostWaitTicketMs: number;
   hostWaitTicketTimer: ReturnType<typeof setTimeout> | null;
   /** A request for a new ticket is in flight; see `followHost`. */
   ticketRequest: boolean;
@@ -375,10 +377,11 @@ const HOST_WAIT_RENEW_MS = 60_000;
 const FAILED_OPENS_BEFORE_NEW_TICKET = 2;
 /**
  * After Signal says this long that the host is not connected, the peer gets a new ticket for the same
- * reason. When the host has not moved, the next check comes with the `HOST_WAIT_RENEW_MS` renew: a host
- * can be offline for hours, and a check each 10 s would ask the account service six times as often.
+ * reason. A check runs only at a `HOST_WAIT_RENEW_MS` renew after the first one, and the wait doubles
+ * after each check that finds no move, up to `HOST_WAIT_TICKET_MAX_MS`: a host can be offline for hours.
  */
 const HOST_WAIT_TICKET_MS = 10_000;
+const HOST_WAIT_TICKET_MAX_MS = 5 * 60_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 /**
  * A Signal restart disconnects all peers at the same time, and each resume asks the account service.
@@ -699,7 +702,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
 
   /** Opens the next Signal socket, with a new ticket first when the host can be on another machine. */
   function reopenSignal(state: PeerState, actions: ActionsRef): void {
-    const hostWait = state.hostWaitingSince !== null && Date.now() - state.hostWaitingSince >= HOST_WAIT_TICKET_MS;
+    const hostWait = state.hostWaitingSince !== null && Date.now() - state.hostWaitingSince >= state.hostWaitTicketMs;
     // A ticket with no home is for the entry Signal, which DNS moves: a new ticket names the same URL.
     const failedHome = state.failedOpens >= FAILED_OPENS_BEFORE_NEW_TICKET && ticketNamesSignalHome(state.ticket);
     if (failedHome || hostWait) void runPeerEffect(followHost(state, actions)).catch(() => undefined);
@@ -718,7 +721,10 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       state.ticketRequest = true;
       state.failedOpens = 0;
       const waiting = state.hostWaitingSince !== null;
-      if (waiting) state.hostWaitingSince = Date.now();
+      if (waiting) {
+        state.hostWaitingSince = Date.now();
+        state.hostWaitTicketMs = Math.min(state.hostWaitTicketMs * 2, HOST_WAIT_TICKET_MAX_MS);
+      }
       const result = yield* RemotePeerIO.use((io) =>
         io.bootstrap(state.hostId, state.clientPublicKey, state.sessionId),
       ).pipe(
@@ -748,6 +754,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
             state.signalUrl = bootstrap.signalUrl;
             state.resumeToken = null;
             state.hostWaitingSince = null;
+            state.hostWaitTicketMs = HOST_WAIT_TICKET_MS;
             if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
             state.hostWaitTicketTimer = null;
             yield* notify(diagnosticCall(state, "signal-moved", waiting ? "host waiting" : "failed opens"));
@@ -928,6 +935,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         failedOpens: 0,
         signalAnswered: false,
         hostWaitingSince: null,
+        hostWaitTicketMs: HOST_WAIT_TICKET_MS,
         hostWaitTicketTimer: null,
         ticketRequest: false,
         signalReady: false,
@@ -1122,6 +1130,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         state.failedOpens = 0;
         state.signalAnswered = true;
         state.hostWaitingSince = null;
+        state.hostWaitTicketMs = HOST_WAIT_TICKET_MS;
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
         if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
         state.hostWaitTimer = null;

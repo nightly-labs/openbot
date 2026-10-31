@@ -130,7 +130,7 @@ try {
   resetDns(ADDRESS.a);
   const offResults = [
     await run({ ...bindings, SIGNAL_ENTRY_DNS_TOKEN: "" }),
-    await run({ ...bindings, SIGNAL_ENTRY_ZONE_ID: undefined }),
+    await run({ ...bindings, SIGNAL_ENTRY_ZONE_ID: "" }),
     await run({ ...bindings, REMOTE_SIGNAL_HOMES: `a=ws://localhost:${PORT.a}/v1/signal` }),
     await run({ ...bindings, REMOTE_SIGNAL_HOMES: "not a list" }),
   ];
