@@ -330,6 +330,28 @@ export const messages = {
     "Autoriser les scripts sur l’hôte à envoyer des messages, exécuter des routines, répondre aux questions et accepter ou refuser les demandes d’approbation",
   "mobile.agent.host.failed": "Impossible de modifier ce réglage.",
   "mobile.agent.host.unsupported": "Cet hôte ne permet pas de modifier ces réglages depuis un appareil distant.",
+  "mobile.agent.backupModels.title": "Modèles de secours",
+  "mobile.agent.backupModels.valueAsk": "Demander d’abord",
+  "mobile.agent.backupModels.valueAutomatic": "Automatique",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Quand {model} atteint sa limite d’utilisation avant que {name} commence à écrire, {name} vous demande quel modèle utiliser.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Quand {model} atteint sa limite d’utilisation ou échoue sur une erreur du fournisseur avant que {name} commence à écrire, {name} passe au premier modèle disponible dans l’ordre.",
+  "mobile.agent.backupModels.ask": "Demander avant de changer",
+  "mobile.agent.backupModels.order": "Ordre",
+  "mobile.agent.backupModels.empty": "Aucun ordre défini. {name} propose chaque modèle disponible.",
+  "mobile.agent.backupModels.add": "Ajouter un modèle de secours",
+  "mobile.agent.backupModels.search": "Rechercher des modèles",
+  "mobile.agent.backupModels.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.backupModels.readFailed": "Impossible de lire les modèles de secours.",
+  "mobile.agent.backupModels.moveUp": "Monter {model}",
+  "mobile.agent.backupModels.moveDown": "Descendre {model}",
+  "mobile.agent.backupModels.remove": "Retirer {model}",
+  "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
   "mobile.agent.busyMessage.footer":
     "Ce que devient un message envoyé pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",
@@ -339,6 +361,23 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Par défaut de l’hôte (Orienter)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
+  "mobile.agent.taskLimit.label": "Fils en parallèle",
+  "mobile.agent.taskLimit.footer": "Fils exécutés en même temps",
+  "mobile.agent.taskLimit.default": "Par défaut ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
+  "mobile.agent.browserProfile.label": "Profil de navigateur",
+  "mobile.agent.browserProfile.shared": "Partagé",
+  "mobile.agent.browserProfile.own": "Cet agent seulement",
+  "mobile.agent.browserProfile.missing": "Profil supprimé",
+  "mobile.agent.browserProfile.new": "Nouveau profil",
+  "mobile.agent.browserProfile.manage": "Gérer les profils",
+  "mobile.agent.browserProfile.footer":
+    "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur de l’agent.",
+  "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
+  "mobile.agent.planCard.footer":
+    "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
   "mobile.agent.notifications.failed": "Impossible de modifier les notifications",
@@ -361,6 +400,9 @@ export const messages = {
   "mobile.agent.newChat.failedBody": "L’hôte n’a pas pu commencer une nouvelle discussion.",
   "mobile.agent.newChat.unsupported":
     "Cet hôte ne peut pas commencer une nouvelle discussion depuis un appareil distant.",
+  "mobile.agent.agentNewChat.title": "L’agent démarre de nouvelles discussions",
+  "mobile.agent.agentNewChat.footer":
+    "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "mobile.agent.tables.title": "Tables",
   "mobile.agent.tables.loading": "Chargement des tables…",
   "mobile.agent.tables.reconnect": "Reconnectez-vous pour charger les tables.",

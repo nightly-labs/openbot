@@ -393,6 +393,46 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.route.browserProfiles": "ブラウザープロファイル",
+  "mobile.server.browserProfiles.unavailable":
+    "オンラインのサーバーのオーナーまたは管理者だけが、そのブラウザープロファイルを管理できます。",
+  "mobile.server.browserProfiles.unsupported":
+    "ここでブラウザープロファイルを管理するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.browserProfiles.loading": "ブラウザープロファイルを読み込み中…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot はブラウザープロファイルを読み込めませんでした。",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot はブラウザープロファイルを変更できませんでした。",
+  "mobile.server.browserProfiles.description":
+    "各プロファイルは、サーバーを実行するコンピューターに独自のサインイン、Cookie、サイトデータを保持します。同じプロファイルを使うエージェントはサインインを共有します。",
+  "mobile.server.browserProfiles.shared": "共有",
+  "mobile.server.browserProfiles.sharedHint": "名前付きプロファイルのないエージェントは共有プロファイルを使います。",
+  "mobile.server.browserProfiles.title": "プロファイル",
+  "mobile.server.browserProfiles.add": "プロファイルを追加",
+  "mobile.server.browserProfiles.addConfirm": "追加",
+  "mobile.server.browserProfiles.limit": "1 つのサーバーに作れるプロファイルは最大 {limit} 個です。",
+  "mobile.server.browserProfiles.agents": { other: "エージェント {count} 人" },
+  "mobile.server.browserProfiles.tabs": { other: "開いているタブ {count} 個" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "このプロファイルはサーバーにありません。",
+  "mobile.server.browserProfiles.new": "新しいプロファイル",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "追加すると、エージェントは新しいプロファイルを使います。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.name": "名前",
+  "mobile.server.browserProfiles.color": "色",
+  "mobile.server.browserProfiles.agentsTitle": "エージェント",
+  "mobile.server.browserProfiles.addAgents": "エージェントを追加",
+  "mobile.server.browserProfiles.agentsHint":
+    "タップすると、エージェントにこのプロファイルを割り当てるか、共有プロファイルに戻します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.server.browserProfiles.clear": "データを消去",
+  "mobile.server.browserProfiles.clearTitle": "{name} のデータを消去しますか?",
+  "mobile.server.browserProfiles.clearBody":
+    "このプロファイルですべてのサイトからサインアウトし、Cookie とサイトデータを削除します。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.clearHint":
+    "「データを消去」はすべてのサイトからサインアウトします。「削除」はエージェントを共有プロファイルにも移します。",
+  "mobile.server.browserProfiles.delete": "プロファイルを削除",
+  "mobile.server.browserProfiles.deleteTitle": "{name} を削除しますか?",
+  "mobile.server.browserProfiles.deleteBody":
+    "プロファイルのサインイン、Cookie、サイトデータを削除します。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.deleteAgents": "これらのエージェントは共有プロファイルに変わります: {agents}。",
   "mobile.server.route.connectors": "コネクター",
   "mobile.server.settings.connectors": "コネクター",
   "mobile.server.connectors.unavailable":

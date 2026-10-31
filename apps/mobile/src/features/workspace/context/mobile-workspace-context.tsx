@@ -12,12 +12,17 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
+import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
+import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
@@ -1774,6 +1779,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageVault: (serverId) => administers(serverId, VAULT_CAPABILITY),
       canImportVault: (serverId) => administers(serverId, VAULT_IMPORT_CAPABILITY),
       canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
+      canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
       // The same rule as the Updates section of the desktop Server Settings.
       serverUpdateAccess: (serverId) => {
         if (administers(serverId, HOST_UPDATE_CAPABILITY)) return "admin";
@@ -1806,6 +1812,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
       canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
       canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
+      canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),
+      canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
+      canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
+      canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
       canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
       canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
     };

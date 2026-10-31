@@ -75,6 +75,8 @@ export const messages = {
   "mobile.chat.question.privateAnswer": "비공개 답변",
   "mobile.chat.question.answerForm": "답변 양식",
   "mobile.chat.question.answersSent": "답변을 보냈어요",
+  "mobile.chat.question.autoAction": "{action} · {seconds}초",
+  "mobile.chat.question.autoAnswered": "{outcome} (제시간에 답변한 사람이 없었어요)",
   "mobile.chat.question.formCancelled": "양식이 취소됐어요",
   "mobile.chat.question.formExpired": "양식이 만료됐어요",
   "mobile.chat.question.form": "질문 양식",

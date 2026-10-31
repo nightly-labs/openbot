@@ -7,13 +7,35 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 export type QueryScope = readonly [apiUrl: string | null | undefined, userId: string | undefined, sessionScope: number];
 
 /** The agent records that a single-part key ends in. */
-type AgentRecordPart = "memories" | "memory-selection" | "routines" | "storage" | "admin" | "host" | "publish";
+type AgentRecordPart =
+  | "memories"
+  | "memory-selection"
+  | "routines"
+  | "storage"
+  | "admin"
+  | "host"
+  | "backup-models"
+  | "task-limit"
+  | "new-chat"
+  | "plan-card"
+  | "publish"
+  | "browser-profile";
 
 /**
  * The last parts of the agent records that are not in the agent summary. The host sends
  * `agents-changed` when one of them changes, so an open settings page reads them again.
  */
-export const AGENT_SETTINGS_PARTS: readonly string[] = ["admin", "host", "session-settings", "provider-accounts"];
+export const AGENT_SETTINGS_PARTS: readonly string[] = [
+  "admin",
+  "host",
+  "backup-models",
+  "task-limit",
+  "new-chat",
+  "plan-card",
+  "session-settings",
+  "provider-accounts",
+  "browser-profile",
+];
 
 /**
  * Every query key of the app. The host events invalidate them by prefix, so a key that a reader
@@ -108,6 +130,8 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
+  serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],

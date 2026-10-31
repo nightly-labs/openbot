@@ -42,10 +42,15 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -714,6 +719,11 @@ try {
               else if (input.backupModels) target.backupModels = input.backupModels;
               if (input.taskLimit === null) delete target.taskLimit;
               else if (input.taskLimit !== undefined) target.taskLimit = input.taskLimit;
+              if (input.allowNewChat === null) delete target.allowNewChat;
+              else if (input.allowNewChat !== undefined) target.allowNewChat = input.allowNewChat;
+              if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
+              else if (input.quickAcknowledgement !== undefined)
+                target.quickAcknowledgement = input.quickAcknowledgement;
               return target;
             }),
         },
@@ -1693,6 +1703,221 @@ try {
     });
     check(
       "an admin cannot read or set the task limit of an agent that the client protocol does not show",
+      errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Agent new chats (agent-new-chat-v1) ----
+  {
+    const newChatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_NEW_CHAT_CAPABILITY];
+    const writes = callsOf("updateAgent").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-new-chat-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const adminRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "an admin reads the host default for an agent without its own choice",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { allowNewChat: DEFAULT_AGENT_DEFAULTS.allowNewChat }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the new-chat routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", allowNewChat: true },
+      capabilities: newChatCapabilities,
+    });
+    const invalid = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", allowNewChat: null },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "a member cannot read or set new chats, a value that is not a boolean gets 400, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const results: boolean[] = [];
+    for (const allowNewChat of [true, false]) {
+      const adminSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+        token: adaToken,
+        json: { agentId: "agent-ada", allowNewChat },
+        capabilities: newChatCapabilities,
+      });
+      const readBack = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+        token: adaToken,
+        json: { agentId: "agent-ada" },
+        capabilities: newChatCapabilities,
+      });
+      results.push(
+        adminSet.status === 200 &&
+          isDeepStrictEqual(adminSet.body, { allowNewChat }) &&
+          isDeepStrictEqual(readBack.body, { allowNewChat }) &&
+          isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", allowNewChat }]),
+      );
+    }
+    check(
+      "an admin turns new chats on and off through the agent writer and reads each value back",
+      results.every(Boolean),
+      results,
+    );
+    const missing = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: newChatCapabilities,
+    });
+    const hiddenSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", allowNewChat: true },
+      capabilities: newChatCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(missing), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Plan card before long tasks (agent-plan-card-v1) ----
+  {
+    const planCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_PLAN_CARD_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-plan-card-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const adminRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin reads the host default plan card setting of an agent without its own",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { quickAcknowledgement: DEFAULT_AGENT_DEFAULTS.quickAcknowledgement }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the plan card routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    check(
+      "a member cannot read or set the plan card",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet)],
+    );
+    const notBoolean = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: null },
+      capabilities: planCapabilities,
+    });
+    check(
+      "the host refuses a plan card value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const adminOn = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    const readOn = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns on the plan card through the agent writer and reads it back",
+      adminOn.status === 200 &&
+        isDeepStrictEqual(adminOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(readOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", quickAcknowledgement: true }]),
+      [summary(adminOn), summary(readOn)],
+    );
+    const adminOff = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: false },
+      capabilities: planCapabilities,
+    });
+    const missing = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns off the plan card, and an unknown agent gets 404",
+      adminOff.status === 200 &&
+        isDeepStrictEqual(adminOff.body, { quickAcknowledgement: false }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(adminOff), summary(missing)],
+    );
+    const hiddenRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-pi" },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    const hiddenSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an admin cannot read or set the plan card of an agent that the client protocol does not show",
       errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,

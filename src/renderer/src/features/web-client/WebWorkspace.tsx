@@ -13,6 +13,7 @@ import {
   canAdministerServer,
   decodeAgentBackupModelSettings,
   decodeAgentHostSettings,
+  decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   type ServerConnectionState,
   type ServerSummary,
@@ -21,6 +22,7 @@ import type { PricingOrder } from "@openbot/contracts/license";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
@@ -783,6 +785,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           taskLimit,
         }),
+      getAgentPlanCard: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.settings, decodeAgentPlanCardSettings, { agentId }),
+      updateAgentPlanCard: ({ agentId, quickAcknowledgement }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, {
+          agentId,
+          quickAcknowledgement,
+        }),
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
           getAgentAdminSettings(hostRequest(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
@@ -804,6 +813,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
+    const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     return agent
       ? {
           ...agent,
@@ -813,6 +823,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(backupModels ? { backupModels } : {}),
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(typeof taskLimit === "number" ? { taskLimit } : {}),
+          ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
         }
       : agent;
   });
@@ -2675,6 +2686,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 agentAutoApproves={remoteAgentAdmin.autoApproves()}
                 remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                 remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
+                remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
                 remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
                 defaultBusyMessageMode={remoteAgentAdmin.defaultBusyMessageMode()}
                 onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}

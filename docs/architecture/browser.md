@@ -271,7 +271,10 @@ named profile has. "Only this agent" has no color, and the select offers it only
 already uses it, so the agent keeps its sign-ins. An owner or admin of a joined server uses the same
 operations through `browser-profiles-v1` (`route-browser-profiles.ts`); each member reads the labels of
 the tabs that they can see, and a private tab is hidden from a member. A host without the capability
-answers `agentSettingsUnsupported`, and the client shows no select, section or label for it.
+answers `agentSettingsUnsupported`, and the client shows no select, section or label for it. A host
+with `browser-profiles-events-v1` sends `browser-profiles-changed` after each change, so every open
+list and agent setting reads the profiles again. The phone shows the same operations in Server
+settings > Browser profiles and in Agent info > Advanced > Browser profile.
 
 ### Tab lifetime
 

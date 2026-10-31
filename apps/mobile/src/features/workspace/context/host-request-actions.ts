@@ -4,7 +4,11 @@ import {
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
   decodeAgentAdminSettings,
+  decodeAgentBackupModelSettings,
   decodeAgentHostSettings,
+  decodeAgentNewChatSettings,
+  decodeAgentPlanCardSettings,
+  decodeAgentTaskLimitSettings,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
@@ -27,6 +31,10 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import {
+  AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BACKUP_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -35,15 +43,25 @@ import {
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import {
+  AGENT_TASK_LIMIT_CAPABILITY,
+  AGENT_TASK_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -95,12 +113,16 @@ import {
   cancelSignInRelay,
   checkHostForUpdate,
   checkHostRelease,
+  clearHostBrowserData,
   completeSignInRelay,
+  createHostBrowserProfile,
   deleteEventRoutine,
+  deleteHostBrowserProfile,
   deleteHostedSite,
   deleteHostVaultItem,
   deleteSharedTable,
   getHostAgentAccess,
+  getHostAgentBrowserProfile,
   getHostAgentMemoryLimit,
   getHostReleaseStatus,
   getHostTimezone,
@@ -117,6 +139,7 @@ import {
   listEventActivity,
   listEventRoutines,
   listHiddenAgents,
+  listHostBrowserProfiles,
   listHostedSites,
   listHostVault,
   listMcpServers,
@@ -161,6 +184,8 @@ import {
   testMcpServer,
   uninstallAgentSkill,
   unpublishAgentTemplate,
+  updateHostAgentBrowserProfile,
+  updateHostBrowserProfile,
 } from "@openbot/team-client/team-admin-requests";
 import {
   type AgentMemoriesRequest,
@@ -263,6 +288,14 @@ type HostRequestActions = Pick<
   | "updateAgentAdminSettings"
   | "loadAgentHostSettings"
   | "updateAgentHostSettings"
+  | "loadAgentBackupModels"
+  | "updateAgentBackupModels"
+  | "loadAgentTaskLimit"
+  | "updateAgentTaskLimit"
+  | "loadAgentNewChat"
+  | "updateAgentNewChat"
+  | "loadAgentPlanCard"
+  | "updateAgentPlanCard"
   | "loadProviderAccounts"
   | "loadPlanLimits"
   | "setAgentProviderAccount"
@@ -289,6 +322,13 @@ type HostRequestActions = Pick<
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
+  | "loadBrowserProfiles"
+  | "createBrowserProfile"
+  | "updateBrowserProfile"
+  | "clearBrowserData"
+  | "deleteBrowserProfile"
+  | "loadAgentBrowserProfile"
+  | "updateAgentBrowserProfile"
   | "loadMessagingConnections"
   | "connectMessaging"
   | "completeMessagingInstall"
@@ -439,6 +479,8 @@ export function createHostRequestActions({
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
+  const browserProfilesAdmin = (serverId: string) =>
+    capabilityApi(serverId, BROWSER_PROFILES_CAPABILITY, "mobile.server.browserProfiles.unsupported");
   /** The OpenBot update of the host: the admin route set, or the member set that only checks and starts. */
   const updateApi = (serverId: string, access: ServerUpdateAccess) =>
     capabilityApi(
@@ -523,6 +565,19 @@ export function createHostRequestActions({
     deleteVaultItem: async (id, serverId) =>
       runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
+    loadBrowserProfiles: async (serverId) => runTeamRequest(listHostBrowserProfiles(browserProfilesAdmin(serverId))),
+    createBrowserProfile: async (name, serverId) =>
+      runTeamRequest(createHostBrowserProfile(browserProfilesAdmin(serverId), name)),
+    updateBrowserProfile: async (input, serverId) =>
+      runTeamRequest(updateHostBrowserProfile(browserProfilesAdmin(serverId), input)),
+    clearBrowserData: async (input, serverId) =>
+      runTeamRequest(clearHostBrowserData(browserProfilesAdmin(serverId), input)),
+    deleteBrowserProfile: async (profileId, serverId) =>
+      runTeamRequest(deleteHostBrowserProfile(browserProfilesAdmin(serverId), profileId)),
+    loadAgentBrowserProfile: async (agentId, serverId) =>
+      runTeamRequest(getHostAgentBrowserProfile(browserProfilesAdmin(serverId), agentId)),
+    updateAgentBrowserProfile: async (input, serverId) =>
+      runTeamRequest(updateHostAgentBrowserProfile(browserProfilesAdmin(serverId), input)),
     loadMessagingConnections: async (platform, serverId) =>
       runTeamRequest(messagingConnectorOverview(connectorsAdmin(serverId), { platform })),
     connectMessaging: async (input, serverId) =>
@@ -806,6 +861,53 @@ export function createHostRequestActions({
     updateAgentHostSettings: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_HOST_SETTINGS_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_HOST_SETTINGS_ROUTES.update, decodeAgentHostSettings, { ...input }, serverId);
+    },
+    loadAgentBackupModels: async (agentId, serverId) =>
+      has(serverId, AGENT_BACKUP_MODELS_CAPABILITY)
+        ? request("POST", AGENT_BACKUP_MODELS_ROUTES.settings, decodeAgentBackupModelSettings, { agentId }, serverId)
+        : null,
+    updateAgentBackupModels: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_BACKUP_MODELS_CAPABILITY, "mobile.agent.host.unsupported");
+      // The wire body copies each field, as the request takes JSON values and not the IPC interfaces.
+      const backupModels = input.backupModels && {
+        automatic: input.backupModels.automatic,
+        order: input.backupModels.order.map(({ provider, model, providerAccountId }) => ({
+          provider,
+          model,
+          ...(providerAccountId === undefined ? {} : { providerAccountId }),
+        })),
+      };
+      return request(
+        "POST",
+        AGENT_BACKUP_MODELS_ROUTES.update,
+        decodeAgentBackupModelSettings,
+        { agentId: input.agentId, backupModels },
+        serverId,
+      );
+    },
+    loadAgentTaskLimit: async (agentId, serverId) =>
+      has(serverId, AGENT_TASK_LIMIT_CAPABILITY)
+        ? request("POST", AGENT_TASK_LIMIT_ROUTES.settings, decodeAgentTaskLimitSettings, { agentId }, serverId)
+        : null,
+    updateAgentTaskLimit: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_TASK_LIMIT_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_TASK_LIMIT_ROUTES.update, decodeAgentTaskLimitSettings, { ...input }, serverId);
+    },
+    loadAgentNewChat: async (agentId, serverId) =>
+      has(serverId, AGENT_NEW_CHAT_CAPABILITY)
+        ? request("POST", AGENT_NEW_CHAT_ROUTES.settings, decodeAgentNewChatSettings, { agentId }, serverId)
+        : null,
+    updateAgentNewChat: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_NEW_CHAT_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_NEW_CHAT_ROUTES.update, decodeAgentNewChatSettings, { ...input }, serverId);
+    },
+    loadAgentPlanCard: async (agentId, serverId) =>
+      has(serverId, AGENT_PLAN_CARD_CAPABILITY)
+        ? request("POST", AGENT_PLAN_CARD_ROUTES.settings, decodeAgentPlanCardSettings, { agentId }, serverId)
+        : null,
+    updateAgentPlanCard: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
     },
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,
