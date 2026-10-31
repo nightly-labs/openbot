@@ -5,7 +5,11 @@
 // that is not OpenBot's is refused by "not a bot"; an echo of the workflow's own comment is skipped
 // (`self`); the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an
 // event of a repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close
-// times offline are one gap. No app, provider, account, Signal or network is started.
+// times offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output
+// posts once, and the event of that comment is skipped (`self`); a change that is done already is not
+// made again; "Agent chooses" gives the repository's own label; a restart while a comment is on its way
+// does not post it again, but sends a label again; "Run with last event" starts a run with the newest
+// matching item. No app, provider, account, Signal or network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
 // Writes .openbot-build/github-workflow-e2e/report.json and exits non-zero on a failure.
@@ -14,14 +18,21 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { WorkflowGitHubHistory, WorkflowGraph } from "@openbot/contracts/ipc";
+import type { WorkflowGitHubHistory, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import type { WorkflowGitHubApi, WorkflowGitHubChange } from "../src/backend/workflows/workflow-github-api";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowRunEnd,
+  type WorkflowsDependencies,
+  type WorkflowsHandle,
+} from "../src/backend/workflows/workflows";
 import { receiveGitHubDelivery } from "../src/main/github-relay";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/github-workflow-e2e");
@@ -31,6 +42,7 @@ interface Report {
   checks: string[];
   watched?: string[];
   history?: WorkflowGitHubHistory;
+  changes?: WorkflowGitHubChange[];
   passed: boolean;
   failure?: string;
 }
@@ -58,6 +70,35 @@ const graphOf = (repository: string, step: "approval" | "notify", filters = ""):
   strokes: [],
 });
 
+/** A GitHub trigger on comments of `repository`, then `steps` in a line. */
+const lineOf = (repository: string, steps: WorkflowNode[], filters = ""): WorkflowGraph => {
+  const nodes: WorkflowNode[] = [
+    {
+      id: "trigger",
+      kind: "trigger",
+      at: { x: 0, y: 0 },
+      fields: { trigger: "github", repository, event: "comment", filters },
+    },
+    ...steps,
+  ];
+  return {
+    nodes,
+    edges: nodes.slice(1).map((node, index) => ({
+      id: `edge-${index}`,
+      from: nodes[index]?.id ?? "",
+      to: node.id,
+      type: "text" as const,
+    })),
+    strokes: [],
+  };
+};
+const githubOutput = (fields: Record<string, string>): WorkflowNode => ({
+  id: "out",
+  kind: "output",
+  at: { x: 600, y: 0 },
+  fields: { target: "github", repository: "trigger", ...fields },
+});
+
 let commentId = 100;
 /** An `issue_comment` body as GitHub sends it, with only the fields that the host reads. */
 const comment = (repository: string, number: number, login: string, type: "User" | "Bot" = "User") => {
@@ -81,26 +122,76 @@ let service: WorkflowsHandle | null = null;
 try {
   await Effect.runPromise(database.initialize());
   const watched: string[][] = [];
-  const workflows = await Effect.runPromise(
-    createWorkflows({
-      store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
-      runs: new WorkflowRunStore({ database }),
-      github: new WorkflowGitHubStore({ database }),
-      githubApp: () => BOT,
-      watchGitHub: (repositories) => watched.push(repositories),
-      delivery: () => null,
-      turnAnswer: () => null,
-      sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
-      stopDelivery: () => Effect.void,
-      generateText: () => Effect.fail({ message: "No model step runs in this test." }),
-      notify: () => {},
-      connectionOn: () => false,
-      post: () => Effect.die(new Error("No output posts in this test.")),
-      changed: () => {},
-      rearm: () => {},
-      timezone: () => "UTC",
-    }),
-  );
+  // The fake GitHub API: each change is kept; the first change on `acme/slow` and `acme/slowlabel` gets no answer.
+  const changes: WorkflowGitHubChange[] = [];
+  report.changes = changes;
+  const changeWaiters: Array<() => void> = [];
+  const changeMade = () => new Promise<void>((resolve) => changeWaiters.push(resolve));
+  let createdId = 9_000;
+  const hung = new Set<string>();
+  const githubApi: WorkflowGitHubApi = {
+    change: (change) =>
+      Effect.suspend(() => {
+        changes.push(change);
+        for (const resolve of changeWaiters.splice(0)) resolve();
+        if (change.repository.startsWith("acme/slow") && !hung.has(change.repository)) {
+          hung.add(change.repository);
+          return Effect.never;
+        }
+        createdId += 1;
+        return Effect.succeed({
+          created: change.action === "comment" ? { kind: "comment" as const, id: createdId } : null,
+          url: null,
+        });
+      }),
+    options: () =>
+      Effect.succeed({
+        labels: [
+          { name: "Bug", color: "d73a4a" },
+          { name: "docs", color: "0075ca" },
+        ],
+        people: ["ana", "ben"],
+      }),
+    recentEvents: (repository) =>
+      Effect.succeed([
+        { event: "issue_comment", body: JSON.parse(comment(repository, 11, "dependabot[bot]", "Bot").body) },
+        { event: "issue_comment", body: JSON.parse(comment(repository, 12, "ana").body) },
+      ]),
+  };
+  const runEnds = new Map<string, (end: WorkflowRunEnd) => void>();
+  const ended = new Map<string, WorkflowRunEnd>();
+  /** The end of a run, when it comes. */
+  const runEnd = (runId: string) =>
+    new Promise<WorkflowRunEnd>((resolve) => {
+      const done = ended.get(runId);
+      if (done) resolve(done);
+      else runEnds.set(runId, resolve);
+    });
+  const dependencies: WorkflowsDependencies = {
+    store: new WorkflowStore({ database, nextDueAt: workflowScheduleDueAt(() => "UTC") }),
+    runs: new WorkflowRunStore({ database }),
+    github: new WorkflowGitHubStore({ database }),
+    githubApp: () => BOT,
+    watchGitHub: (repositories) => watched.push(repositories),
+    githubApi,
+    delivery: () => null,
+    turnAnswer: () => null,
+    sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
+    stopDelivery: () => Effect.void,
+    // "Agent chooses" asks once; the answer names a label in another case and one that the repository lacks.
+    generateText: () => Effect.succeed('{"labels": ["bug", "wontfix"]}'),
+    notify: () => {},
+    connectionOn: () => false,
+    post: () => Effect.die(new Error("No output posts in this test.")),
+    changed: () => {},
+    rearm: () => {},
+    timezone: () => "UTC",
+    runEnded: (end) => {
+      ended.set(end.runId, end);
+      runEnds.get(end.runId)?.(end);
+    },
+  };
+  let workflows = await Effect.runPromise(createWorkflows(dependencies));
   service = workflows;
   const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
   let deliveryNumber = 0;
@@ -201,6 +292,132 @@ try {
     "two close times offline are one gap",
     gaps.length === 1 && gaps[0]?.receivedAt === new Date(now + 90_000).toISOString(),
     gaps,
+  );
+
+  // GitHub outputs.
+  const outputStep = async (runId: string) =>
+    (await run(workflows.run(runId))).steps.find((step) => step.nodeId === "out");
+  const startedRun = async (workflowId: string, body: string) => {
+    const sent = await send(body);
+    const row = await delivery(workflowId, sent.deliveryId);
+    assert.ok(row?.runId, `no run: ${JSON.stringify(row)}`);
+    return row.runId;
+  };
+
+  const reply = await run(
+    workflows.create({ title: "Reply", graph: lineOf("acme/out", [githubOutput({ action: "comment" })]) }),
+  );
+  const replyRun = await startedRun(reply.summary.id, comment("acme/out", 5, "ana").body);
+  const replyEnd = await runEnd(replyRun);
+  const replyStep = await outputStep(replyRun);
+  const posted = changes.filter((change) => change.repository === "acme/out");
+  check(
+    "a comment output posts one comment on the run's issue",
+    replyEnd.status === "done" && posted.length === 1 && posted[0]?.number === 5 && replyStep?.output === "acme/out#5",
+    { replyEnd, posted, replyStep },
+  );
+  const ownComment = comment("acme/out", 5, `${BOT}[bot]`, "Bot");
+  const ownBody = JSON.parse(ownComment.body);
+  ownBody.comment.id = createdId;
+  const own = await send(JSON.stringify(ownBody));
+  const ownRow = await delivery(reply.summary.id, own.deliveryId);
+  check("the event of the output's own comment is skipped", ownRow?.reason === "self", ownRow);
+
+  const hold = await run(
+    workflows.create({
+      title: "Hold",
+      graph: lineOf("acme/hold", [
+        { id: "ask", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Go on?" } },
+        githubOutput({ action: "comment" }),
+      ]),
+    }),
+  );
+  const holdRun = await startedRun(hold.summary.id, comment("acme/hold", 6, "ana").body);
+  // A change that a run made before, as after a restart between GitHub's answer and the step's end.
+  const doneAt = new Date().toISOString();
+  database.connection
+    .prepare(
+      `INSERT INTO workflow_github_actions (action_key, workflow_id, run_id, step_id, repository, number, action, status,
+         object_id, created_at, updated_at)
+       VALUES (?, ?, ?, 'earlier', 'acme/hold', 6, 'comment', 'done', 'comment:1', ?, ?)`,
+    )
+    .run(`${holdRun}:out`, hold.summary.id, holdRun, doneAt, doneAt);
+  const holdApproval = (await run(workflows.run(holdRun))).steps.find((step) => step.status === "approval");
+  await run(workflows.decide({ stepId: holdApproval?.id ?? "", approved: true }));
+  const holdEnd = await runEnd(holdRun);
+  check(
+    "a change that is done already is not made again",
+    holdEnd.status === "done" && !changes.some((change) => change.repository === "acme/hold"),
+    { holdEnd, changes },
+  );
+
+  const label = await run(
+    workflows.create({
+      title: "Label",
+      graph: lineOf("acme/label", [githubOutput({ action: "label.add", labelsFrom: "agent" })]),
+    }),
+  );
+  const labelRun = await startedRun(label.summary.id, comment("acme/label", 7, "ana").body);
+  const labelEnd = await runEnd(labelRun);
+  const labelled = changes.find((change) => change.repository === "acme/label");
+  check(
+    '"Agent chooses" adds only the repository\'s own label, as the repository names it',
+    labelEnd.status === "done" && labelled?.labels.join() === "Bug",
+    { labelEnd, labelled },
+  );
+
+  const slow = await run(
+    workflows.create({ title: "Slow", graph: lineOf("acme/slow", [githubOutput({ action: "comment" })]) }),
+  );
+  const slowLabel = await run(
+    workflows.create({
+      title: "Slow label",
+      graph: lineOf("acme/slowlabel", [githubOutput({ action: "label.add", labels: "docs" })]),
+    }),
+  );
+  let slowCalled = changeMade();
+  const slowRun = await startedRun(slow.summary.id, comment("acme/slow", 8, "ana").body);
+  await slowCalled;
+  slowCalled = changeMade();
+  const slowLabelRun = await startedRun(slowLabel.summary.id, comment("acme/slowlabel", 8, "ana").body);
+  await slowCalled;
+  // The app stops while GitHub has the comment, and starts again.
+  await Effect.runPromise(workflows.close());
+  service = null;
+  workflows = await Effect.runPromise(createWorkflows(dependencies));
+  service = workflows;
+  await run(workflows.sweep());
+  const slowEnd = await runEnd(slowRun);
+  const slowStep = await outputStep(slowRun);
+  check(
+    "a restart does not post a comment that was on its way again",
+    slowEnd.status === "failed" &&
+      changes.filter((change) => change.repository === "acme/slow").length === 1 &&
+      slowStep?.error === sourceText("error.workflow.githubUncertain"),
+    { slowEnd, slowStep },
+  );
+  const slowLabelEnd = await runEnd(slowLabelRun);
+  check(
+    "a restart sends a label that was on its way again",
+    slowLabelEnd.status === "done" && changes.filter((change) => change.repository === "acme/slowlabel").length === 2,
+    { slowLabelEnd, changes },
+  );
+
+  const last = await run(
+    workflows.create({
+      title: "Last",
+      graph: lineOf("acme/last", [githubOutput({ action: "comment" })], "notBot"),
+    }),
+  );
+  const lastDetail = await run(
+    workflows.githubLastEvent({ workflowId: last.summary.id, nodeId: "trigger", requestId: "last-1" }),
+  );
+  const lastEnd = await runEnd(lastDetail.run.id);
+  const lastItem = dependencies.github.runItem(lastDetail.run.id);
+  check(
+    '"Run with last event" starts a run with the newest item that the filters let through',
+    lastEnd.status === "done" && lastItem?.number === 12,
+    { lastEnd, lastItem },
   );
 
   report.history = await history(queue.summary.id);

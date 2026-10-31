@@ -17,10 +17,12 @@ import type { DatabaseSync } from "node:sqlite";
 // the row starts or is skipped; `caused_by_bot` lets the loop guard count the run that the row starts.
 // The host keeps the newest 50 rows of each trigger.
 //
-// `workflow_github_actions`: one change that a GitHub output made, keyed by run, node and action, so a
-// retry does not make it a second time. `sending` is written before the call; a restart that finds it
-// does not call again. `object_id` is the comment, review or issue that GitHub made, which lets the
-// loop guard know an event that this workflow caused.
+// `workflow_github_actions`: one change that a GitHub output made, keyed by run and node (by step for a
+// step that runs alone, without a run), so a retry does not make it a second time. `sending` is written
+// before the call; a restart that finds it calls again only for a change that a second call does not
+// repeat, such as a label. `object_id` holds the keys of what the change made, one a line: the comment,
+// review or issue that GitHub made, or the labels, people and state it set. The loop guard reads them
+// to know an event that this workflow caused.
 export const V46_WORKFLOW_RUN_SOURCE_SQL = "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook')),";
 export const V49_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github')),";
@@ -76,7 +78,7 @@ export const WORKFLOW_GITHUB_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS workflow_github_actions (
     action_key TEXT PRIMARY KEY,
     workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,
-    run_id TEXT NOT NULL REFERENCES workflow_runs(run_id) ON DELETE CASCADE,
+    run_id TEXT REFERENCES workflow_runs(run_id) ON DELETE CASCADE,
     step_id TEXT NOT NULL,
     repository TEXT NOT NULL,
     number INTEGER CHECK(number IS NULL OR number >= 1),

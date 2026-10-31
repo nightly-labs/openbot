@@ -9,6 +9,7 @@ import {
   WORKFLOW_GITHUB_DELIVERY_OUTCOMES,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_GITHUB_SKIP_REASONS,
+  type WorkflowGitHubAction,
   type WorkflowGitHubDelivery,
   type WorkflowGitHubDeliveryOutcome,
   type WorkflowGitHubEvent,
@@ -67,6 +68,29 @@ export interface NewGitHubRun {
   item: WorkflowGitHubItem;
   causedByBot: boolean;
   startedAt: string;
+}
+
+const GITHUB_ACTION_STATUSES = ["sending", "done"] as const;
+
+/** One change of a GitHub output. `objectKeys` are the `githubObjectKey`s of what it changes. */
+export interface NewGitHubAction {
+  actionKey: string;
+  workflowId: string;
+  /** Null for a step that runs alone. */
+  runId: string | null;
+  stepId: string;
+  repository: string;
+  number: number | null;
+  action: WorkflowGitHubAction;
+  objectKeys: readonly string[];
+}
+
+export interface GitHubActionRecord {
+  stepId: string;
+  /** The item, or the issue that `issue.create` made. */
+  number: number | null;
+  status: (typeof GITHUB_ACTION_STATUSES)[number];
+  objectKeys: string[];
 }
 
 export class WorkflowGitHubStore {
@@ -241,24 +265,92 @@ export class WorkflowGitHubStore {
       db
         .prepare(
           `SELECT 1 AS found FROM workflow_github_actions
-           WHERE workflow_id = ? AND repository = ? AND number = ? AND status = 'sending' LIMIT 1`,
+           WHERE workflow_id = ? AND repository = ? AND number = ? AND status = 'sending' AND updated_at >= ? LIMIT 1`,
         )
-        .get(workflowId, item.repository, item.number),
+        .get(workflowId, item.repository, item.number, since.toISOString()),
     );
     if (sending) return true;
     if (!objectKey) return false;
-    // A new issue is an action without an item number; its key names the issue.
+    // `object_id` is one key a line. A new issue is an action without an item number; its key names the issue.
     return (
       databaseRow(
         db
           .prepare(
             `SELECT 1 AS found FROM workflow_github_actions
-             WHERE workflow_id = ? AND repository = ? AND object_id = ? AND (number IS NULL OR number = ?)
-               AND updated_at >= ? LIMIT 1`,
+             WHERE workflow_id = ? AND repository = ? AND (number IS NULL OR number = ?) AND updated_at >= ?
+               AND instr(char(10) || object_id || char(10), char(10) || ? || char(10)) > 0 LIMIT 1`,
           )
-          .get(workflowId, item.repository, objectKey, item.number, since.toISOString()),
+          .get(workflowId, item.repository, item.number, since.toISOString(), objectKey),
       ) !== null
     );
+  }
+
+  /** The item of a run that a GitHub event, or the newest item of a trigger, started. */
+  runItem(runId: string): WorkflowGitHubItem | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare("SELECT repository, number, pull_request, title FROM workflow_github_runs WHERE run_id = ?")
+        .get(runId),
+    );
+    return row ? toItem(row) : null;
+  }
+
+  /** The change that a GitHub output keeps under `actionKey`, or null when it made none. */
+  action(actionKey: string): GitHubActionRecord | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare("SELECT step_id, number, status, object_id FROM workflow_github_actions WHERE action_key = ?")
+        .get(actionKey),
+    );
+    if (!row) return null;
+    return {
+      stepId: requiredStringColumn(row, "step_id"),
+      number: optionalNumberColumn(row, "number"),
+      status: checkedColumn(row, "status", GITHUB_ACTION_STATUSES),
+      objectKeys: objectKeysOf(optionalStringColumn(row, "object_id")),
+    };
+  }
+
+  /**
+   * Writes `sending` before the call to GitHub, with the keys that the change is known to make. A step
+   * that runs again takes the row over.
+   */
+  startAction(action: NewGitHubAction, at: Date): void {
+    this.#database.connection
+      .prepare(
+        `INSERT INTO workflow_github_actions (action_key, workflow_id, run_id, step_id, repository, number, action, status,
+           object_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'sending', ?, ?, ?)
+         ON CONFLICT(action_key) DO UPDATE SET step_id = excluded.step_id, number = excluded.number,
+           status = 'sending', object_id = excluded.object_id, updated_at = excluded.updated_at`,
+      )
+      .run(
+        action.actionKey,
+        action.workflowId,
+        action.runId,
+        action.stepId,
+        action.repository,
+        action.number,
+        action.action,
+        objectIdOf(action.objectKeys),
+        at.toISOString(),
+        at.toISOString(),
+      );
+  }
+
+  /** The change is on GitHub. A new issue gives its number and key only now. */
+  finishAction(actionKey: string, number: number | null, objectKeys: readonly string[], at: Date): void {
+    this.#database.connection
+      .prepare(
+        `UPDATE workflow_github_actions SET status = 'done', number = coalesce(?, number), object_id = ?, updated_at = ?
+         WHERE action_key = ?`,
+      )
+      .run(number, objectIdOf(objectKeys), at.toISOString(), actionKey);
+  }
+
+  /** The change failed or stopped: no event of it can come, so the loop guard must not wait for one. */
+  dropAction(actionKey: string): void {
+    this.#database.connection.prepare("DELETE FROM workflow_github_actions WHERE action_key = ?").run(actionKey);
   }
 
   /** The oldest event of the item that waits, of any trigger of the workflow. */
@@ -398,4 +490,12 @@ function toDelivery(row: DynamicRecord): WorkflowGitHubDelivery {
     reason: row.reason === null ? null : checkedColumn(row, "reason", WORKFLOW_GITHUB_SKIP_REASONS),
     runId: optionalStringColumn(row, "run_id"),
   };
+}
+
+function objectIdOf(keys: readonly string[]): string | null {
+  return keys.length > 0 ? keys.join("\n") : null;
+}
+
+function objectKeysOf(value: string | null): string[] {
+  return value ? value.split("\n") : [];
 }

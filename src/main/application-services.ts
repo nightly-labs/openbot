@@ -197,6 +197,7 @@ import { githubAppConfig } from "./github-connector-config";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
+import { createGitHubRest } from "./github-rest";
 import { HermesImportService } from "./hermes-import-service";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
@@ -1857,6 +1858,10 @@ export async function createApplicationServices({
       githubApp: () => githubAppConfig()?.slug ?? null,
       // The relay is made with the ingress socket, below; a graph changes only after start.
       watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
+      githubApi: createGitHubRest({
+        fetch: (url, init) => fetch(url, init),
+        tokens: (repository) => githubConnector.repositoryTokens(repository),
+      }),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;

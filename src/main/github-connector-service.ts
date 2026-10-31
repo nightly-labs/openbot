@@ -415,6 +415,26 @@ export class GitHubConnectorService {
   ).bind(this);
 
   /**
+   * The tokens of a workflow's GitHub call to `owner/name`: the user token, and the app's token where the
+   * user can push. App tokens that are due are renewed first; a failure leaves the ones still valid.
+   * Null while the connection is not active.
+   */
+
+  readonly repositoryTokens = Effect.fn("GitHubConnector.repositoryTokens")(
+    function* (
+      this: GitHubConnectorService,
+      fullName: string,
+    ): Effect.fn.Return<{ user: string; bot: string | null } | null, GitHubOperationError, GitHubPlatform> {
+      const user = yield* this.accessToken();
+      if (!user) return null;
+      if (this.#botTokens.due()) yield* this.#renewBotTokens().pipe(Effect.catch(() => Effect.void));
+      const [owner = "", name = ""] = fullName.split("/");
+      return { user, bot: this.#botTokens.forRepository(owner, name) };
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
    * The bearer that agents send to the GitHub MCP server: the loopback server's own secret, or the
    * user token when that server did not start.
    */

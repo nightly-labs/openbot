@@ -34,4 +34,23 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.tooLargeToSend":
     "This workflow is too large to send to another computer. Open it on the computer that runs the server.",
   "error.workflow.webhookMissing": "This step is not a webhook trigger. Save the workflow, then try again.",
+  "error.workflow.githubActionMissing": "Choose what this output does on GitHub.",
+  "error.workflow.githubRepositoryMissing": "Choose a repository for this output.",
+  "error.workflow.githubItemMissing":
+    "This output has no issue or pull request. Start the run from a GitHub event, or put the number in its input.",
+  "error.workflow.githubPullRequestOnly": "This action works only on pull requests.",
+  "error.workflow.githubTextMissing": "This output has no text to send. Connect a step that writes it.",
+  "error.workflow.githubChoiceMissing": "Choose the labels or the person for this output.",
+  "error.workflow.githubChoseNothing": "The model chose no label or person of this repository.",
+  "error.workflow.githubNotConnected": "Connect GitHub on the computer that runs this workflow.",
+  "error.workflow.githubNoAccess":
+    "The OpenBot GitHub App cannot see this repository or item. Open GitHub and give it access.",
+  "error.workflow.githubNoWrite":
+    "The OpenBot GitHub App cannot change this repository. Open GitHub and give it access.",
+  "error.workflow.githubLocked": "This conversation is locked on GitHub.",
+  "error.workflow.githubRefused": "GitHub refused the change: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot could not reach GitHub. Run the step again.",
+  "error.workflow.githubUncertain":
+    "The change stopped on its way. It can be on GitHub. Look there before you run the step again.",
+  "error.workflow.githubNoEvent": "GitHub has no issue or pull request that this trigger starts on.",
 });
