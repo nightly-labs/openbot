@@ -17,7 +17,7 @@ description: "Turn an API or a repeated workflow into a tested local OpenBot ski
 2. **The docs.** Open them with `openbot_browser` (call `openbot_browser.list_tabs` first), or ask the user to
    paste the relevant page. You need: the base address, the auth method, the one or two endpoints for the
    job, paging, and rate limits.
-3. **The key.** If the API needs a key or token, check whether one is already saved. If not, call
+3. **The key.** If the API needs a key or token, check whether one is already saved with `list_api_keys`. If not, call
    `request_api_key` with the variable name that the script reads, such as `WEATHER_API_KEY`. Never ask for a
    key in chat. If the user pastes one, ask again with `request_api_key` and do not repeat the value.
 
@@ -25,7 +25,7 @@ description: "Turn an API or a repeated workflow into a tested local OpenBot ski
 
 1. Call `list_local_skills`. If a skill for this job exists, read it with `read_local_skill` and revise it.
 2. **Data shape first.** Make ONE real read-only request with the smallest input. Read the key from its
-   saved file in the same command: `TOKEN="$(cat '<path>')" curl -s -H "Authorization: Bearer $TOKEN" ...`.
+   saved file in the same command: `curl -s -H "Authorization: Bearer $(cat '<path>')" ...`.
    Never print the key. Record the field names, types, and one example value per field. Remove personal data
    from the example. Do not call an endpoint that writes, sends or charges to get a sample.
 3. Decide what the skill keeps: the inputs it takes, the fields it returns, and the output format.
