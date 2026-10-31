@@ -257,9 +257,16 @@ export function ConversationComposer() {
    * reports, so it can pass 100 slightly. A spent plan does not say whether paid credits remain.
    */
   const usageExhausted = createMemo(() => {
-    const provider = props.agent?.provider;
+    const agent = props.agent;
     // The usage of a provider that this build does not know has no notice.
-    if (!provider || !isKnownAgentProvider(provider)) return null;
+    if (!agent || !isKnownAgentProvider(agent.provider)) return null;
+    const provider = agent.provider;
+    // Codex can accept paid-credit turns after the plan is spent. Only a refused turn proves a limit.
+    if (
+      provider === "codex" &&
+      !props.usageLimited?.({ provider, model: agent.model, providerAccountId: agent.providerAccountId })
+    )
+      return null;
     for (const limit of props.accountUsage?.limits ?? []) {
       if (!agentUsageLimit(limit)) continue;
       // A provider that names quota groups limits each group apart: only the agent's model's group

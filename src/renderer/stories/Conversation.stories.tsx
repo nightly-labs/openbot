@@ -1328,10 +1328,11 @@ export const ProviderSignInRequired: Story = {
   },
 };
 
-/** The real composer with a spent plan window and a dismissible notice. */
+/** The real composer after Codex refused a turn, with a spent plan and a dismissible notice. */
 export const UsageLimitReached: Story = {
   name: "Usage limit reached",
   args: {
+    usageLimited: () => true,
     accountUsage: {
       limits: [
         {
@@ -1341,6 +1342,25 @@ export const UsageLimitReached: Story = {
         },
       ],
     },
+  },
+};
+
+/** A spent plan can coexist with paid credits: an accepted turn must not show a hard limit. */
+export const SpentPlanWithAcceptedTurn: Story = {
+  name: "Spent plan with accepted turn",
+  args: {
+    ...UsageLimitReached.args,
+    usageLimited: () => false,
+    activeTurnId: "paid-credit-turn",
+  },
+};
+
+/** A joined server reports no local usage gate; a plan reading alone is still not a refusal. */
+export const SpentPlanWithoutLocalGate: Story = {
+  name: "Spent plan without local gate",
+  args: {
+    ...UsageLimitReached.args,
+    usageLimited: undefined,
   },
 };
 
