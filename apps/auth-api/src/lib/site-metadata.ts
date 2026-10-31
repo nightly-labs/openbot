@@ -208,7 +208,14 @@ export function openBotRootHead(interLatinFont: string) {
   };
 }
 
-export function openBotHomeHead(application: OpenBotSoftwareApplication) {
+/** The home page's own social card. Other pages without a card of their own keep the site's card. */
+const OPENBOT_HOME_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/home.jpg",
+  alt: "Models come and go. Your team stays. OpenBot agents on a paper planet",
+};
+
+export function openBotHomeHead(application: OpenBotSoftwareApplication, siteUrl: string) {
+  const image = pageSocialImageMeta(OPENBOT_HOME_SOCIAL_IMAGE, siteUrl);
   return {
     meta: [
       { "script:ld+json": application },
@@ -220,13 +227,12 @@ export function openBotHomeHead(application: OpenBotSoftwareApplication) {
       { property: "og:url", content: OPENBOT_SITE_URL },
       { property: "og:title", content: OPENBOT_SITE_TITLE },
       { property: "og:description", content: OPENBOT_SITE_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: OPENBOT_SITE_TITLE },
       { name: "twitter:description", content: OPENBOT_SITE_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
       { "script:ld+json": LANDING_FAQ_STRUCTURED_DATA },
     ],
     links: [{ rel: "canonical", href: OPENBOT_SITE_URL }],
