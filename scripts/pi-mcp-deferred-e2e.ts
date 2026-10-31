@@ -2,7 +2,8 @@
 // to check which tools each request declares. A user's MCP server, such as computer use with 56
 // tools, must wait for Pi's `tool_search` and not be declared in each request. The OpenBot tools stay
 // declared. The fake model first answers with a `tool_search` call, so the second request must
-// declare the loaded tool, which Pi then keeps for the rest of the session.
+// declare the loaded tool, which Pi then keeps for the rest of the session. The system prompt names
+// the server, so the model knows what to search for, and it stays the same in each request.
 // `PI_CLI=<pi> bun scripts/pi-mcp-deferred-e2e.ts`. Writes .openbot-build/pi-mcp-deferred-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -40,13 +41,15 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
 
 interface ChatRequest {
   tools?: Array<{ function?: { name?: string } }>;
-  messages?: Array<{ role?: string }>;
+  messages?: Array<{ role?: string; content?: string | Array<{ text?: string }> }>;
 }
 
 interface Report {
   passed: boolean;
   piVersion?: string;
   requests: string[][];
+  /** The `<mcp_servers>` section of the system prompt in the first request. */
+  servers?: string;
   reply?: string;
   error?: string;
 }
@@ -54,6 +57,8 @@ interface Report {
 const report: Report = { passed: false, requests: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-pi-deferred-e2e-"));
 const clients: AgentClient[] = [];
+/** The system prompt of each request with tools. */
+const systems: string[] = [];
 
 async function body(request: IncomingMessage): Promise<ChatRequest> {
   const chunks: Buffer[] = [];
@@ -86,7 +91,17 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
     const parsed = await body(request);
     const names = (parsed.tools ?? []).flatMap((tool) => tool.function?.name ?? []).sort();
     // Pi also sends side requests with no tools, such as a session title. They are not turns.
-    if (names.length > 0) report.requests.push(names);
+    if (names.length > 0) {
+      report.requests.push(names);
+      systems.push(
+        (parsed.messages ?? [])
+          .filter((message) => message.role === "system")
+          .map(({ content }) =>
+            typeof content === "string" ? content : (content ?? []).map((part) => part.text).join(""),
+          )
+          .join(NL),
+      );
+    }
     response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     if (names.length > 0 && report.requests.length === 1) {
       const call = { index: 0, id: "call_1", type: "function", function: { name: "tool_search", arguments: "" } };
@@ -176,6 +191,10 @@ try {
   assert.ok(first.includes("tool_search"), `The first request has no tool_search: ${first.join(", ")}`);
   assert.ok(bridge(first).length > 0, `The first request declares no OpenBot tool: ${first.join(", ")}`);
   assert.equal(external(second).length, 1, `tool_search did not load the user's tool: ${second.join(", ")}`);
+  // The model finds the server by its name, and a fixed system prompt keeps the provider's cache.
+  report.servers = systems[0]?.match(/<mcp_servers>[\s\S]*?<\/mcp_servers>/u)?.[0];
+  assert.match(report.servers ?? "", /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
+  assert.equal(systems[1], systems[0], "The system prompt changed after tool_search.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
