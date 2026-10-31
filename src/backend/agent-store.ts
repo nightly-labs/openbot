@@ -422,6 +422,8 @@ export class AgentStore {
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
+      if (source.ownBrowserSession !== undefined) record.ownBrowserSession = source.ownBrowserSession;
+      if (source.browserProfileId !== undefined) record.browserProfileId = source.browserProfileId;
       record.avatarSeed = source.avatarSeed;
       record.avatarHue = source.avatarHue;
 
