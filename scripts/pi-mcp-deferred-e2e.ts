@@ -192,8 +192,8 @@ try {
   assert.ok(bridge(first).length > 0, `The first request declares no OpenBot tool: ${first.join(", ")}`);
   assert.equal(external(second).length, 1, `tool_search did not load the user's tool: ${second.join(", ")}`);
   // The model finds the server by its name, and a fixed system prompt keeps the provider's cache.
-  report.servers = systems[0]?.match(/<mcp_servers>[\s\S]*?<\/mcp_servers>/u)?.[0];
-  assert.match(report.servers ?? "", /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
+  report.servers = systems[0]?.match(/<mcp_servers>[\s\S]*?<\/mcp_servers>/u)?.[0] ?? "";
+  assert.match(report.servers, /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
   assert.equal(systems[1], systems[0], "The system prompt changed after tool_search.");
   report.passed = true;
 } catch (error) {
