@@ -20,13 +20,13 @@ import {
   collectionIndexUrl,
 } from "../lib/content-collection";
 import { DOWNLOAD_PAGE_ORDER, DOWNLOAD_PAGES_UPDATED_AT, downloadPageUrl } from "../lib/download-pages";
-import { readMarketplaceSitemapListings } from "../lib/marketplace";
 import { MARKETPLACE_APPS_ROUTE, MARKETPLACE_ROUTE, MARKETPLACE_SKILLS_ROUTE } from "../lib/marketplace-routes";
 import { PLUGINS_UPDATED_AT, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { PRICING_PAGE_UPDATED_AT, PRICING_ROUTE } from "../lib/pricing-page";
 import { PRIVACY_POLICY_ROUTE, PRIVACY_POLICY_UPDATED_AT } from "../lib/privacy-policy";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { TEAMS_PAGE_UPDATED_AT, TEAMS_ROUTE } from "../lib/teams-page";
+import { readMarketplaceSitemapListings } from "./marketplace-catalog";
 
 /**
  * The five characters XML reserves. `>` is only special after `]]`, but escaping

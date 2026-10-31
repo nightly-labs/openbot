@@ -1,11 +1,4 @@
-import {
-  isSkillCategory,
-  type MarketplaceAgentDetail,
-  type MarketplaceAgentRoutine,
-  type MarketplaceAgentSummary,
-  type MarketplaceSkillSummary,
-  type SkillCategory,
-} from "@openbot/contracts/ipc";
+import type { MarketplaceAgentDetail, MarketplaceAgentRoutine, MarketplaceSkillSummary } from "@openbot/contracts/ipc";
 import { isMarketplaceAgentId, isMarketplaceSkillSlug } from "@openbot/contracts/marketplace-links";
 import { createServerFn } from "@tanstack/solid-start";
 import { runApiEffect } from "../server/effect-runtime";
@@ -25,37 +18,6 @@ export interface MarketplaceAgentListing {
 
 export type MarketplaceSkillView = MarketplaceSkillSummary & { cardUrl: string | null };
 
-/* The Worker pages the catalog at most 50 at a time. Ten pages hold every listing the Marketplace has
-   today; a catalog that outgrows them needs search on the Worker, not more pages here. */
-const PAGE_LIMIT = 50;
-const MAX_PAGES = 10;
-
-interface CatalogPage<Item> {
-  items: Item[];
-  nextCursor: string | null;
-}
-
-async function readCatalog<Item>(
-  readPage: (cursor: string | undefined) => Promise<CatalogPage<Item>>,
-  done: (items: readonly Item[]) => boolean = () => false,
-): Promise<Item[]> {
-  const items: Item[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const result = await readPage(cursor);
-    items.push(...result.items);
-    if (result.nextCursor === null || done(items)) break;
-    cursor = result.nextCursor;
-  }
-  return items;
-}
-
-/* D1 stores a skill's category as text that the Worker checked when it took the submission. A value
-   this build does not know shows under Other, as no list leaves a skill out for it. */
-function skillCategory(value: string): SkillCategory {
-  return isSkillCategory(value) ? value : "other";
-}
-
 function isNotFoundError(error: unknown): boolean {
   return error instanceof Error && "status" in error && error.status === 404;
 }
@@ -65,32 +27,17 @@ function isNotFoundError(error: unknown): boolean {
  * browser bundle never holds `cloudflare:workers` (see `agent-templates.ts`).
  */
 
-async function readAgentCatalog(): Promise<MarketplaceAgentSummary[]> {
-  const { requestAgentMarketplace } = await import("../server/request-auth");
-  const marketplace = requestAgentMarketplace();
-  return readCatalog(async (cursor) => {
-    const page = await runApiEffect(marketplace.list({ cursor, limit: PAGE_LIMIT }));
-    return { items: page.agents, nextCursor: page.nextCursor };
-  });
-}
-
-async function readSkillCatalog(
-  done?: (items: readonly MarketplaceSkillSummary[]) => boolean,
-): Promise<MarketplaceSkillSummary[]> {
-  const { requestSkillMarketplace } = await import("../server/request-auth");
-  const marketplace = requestSkillMarketplace();
-  return readCatalog(async (cursor) => {
-    const page = await runApiEffect(marketplace.list({ cursor, limit: PAGE_LIMIT }));
-    const items = page.skills.map((skill) => ({ ...skill, category: skillCategory(skill.category) }));
-    return { items, nextCursor: page.nextCursor };
-  }, done);
-}
+const catalog = () => import("../server/marketplace-catalog");
 
 /** Every approved agent, featured first. A pending agent is in no list. */
-export const readMarketplaceAgents = createServerFn({ method: "GET" }).handler(() => readAgentCatalog());
+export const readMarketplaceAgents = createServerFn({ method: "GET" }).handler(async () =>
+  (await catalog()).readAgentCatalog(),
+);
 
 /** Every approved skill. */
-export const readMarketplaceSkills = createServerFn({ method: "GET" }).handler(() => readSkillCatalog());
+export const readMarketplaceSkills = createServerFn({ method: "GET" }).handler(async () =>
+  (await catalog()).readSkillCatalog(),
+);
 
 /**
  * One agent for its page: the approved version, or the version that waits for its first review when
@@ -115,8 +62,9 @@ export const readMarketplaceAgentListing = createServerFn({ method: "GET" })
     const wanted = new Set(detail.skills.map((skill) => skill.skillId));
     if (wanted.size === 0) return { agent, skills: [] };
     const found = (items: readonly MarketplaceSkillSummary[]) => items.filter((skill) => wanted.has(skill.id));
-    const catalog = await readSkillCatalog((items) => found(items).length >= wanted.size);
-    return { agent, skills: found(catalog) };
+    const { readSkillCatalog } = await catalog();
+    const skills = await readSkillCatalog((items) => found(items).length >= wanted.size);
+    return { agent, skills: found(skills) };
   });
 
 /** One approved skill for its page, without its instructions and files. Anything else is null. */
@@ -125,6 +73,7 @@ export const readMarketplaceSkill = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<MarketplaceSkillView | null> => {
     if (!isMarketplaceSkillSlug(data)) return null;
     const { requestSkillMarketplace } = await import("../server/request-auth");
+    const { skillCategory } = await catalog();
     try {
       const skill = await runApiEffect(requestSkillMarketplace().pageBySlug(data));
       return { ...skill, category: skillCategory(skill.category) };
@@ -133,12 +82,3 @@ export const readMarketplaceSkill = createServerFn({ method: "GET" })
       throw error;
     }
   });
-
-/** The approved agents and skills for the sitemap. A pending agent has no approved version, so it is never here. */
-export async function readMarketplaceSitemapListings(): Promise<{
-  agents: MarketplaceAgentSummary[];
-  skills: MarketplaceSkillSummary[];
-}> {
-  const [agents, skills] = await Promise.all([readAgentCatalog(), readSkillCatalog()]);
-  return { agents, skills };
-}
