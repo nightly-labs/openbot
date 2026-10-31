@@ -365,14 +365,13 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
       <View className="flex-1">
         <View
           className="absolute top-0 right-0 left-0 z-20 pr-3 pb-1"
-          pointerEvents="box-none"
           style={{ paddingTop: Math.max(topInset, 16) }}
           onLayout={(event) => {
             const measured = event.nativeEvent.layout.height;
             setHeaderHeight((current) => (current === measured ? current : measured));
           }}
         >
-          <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3" pointerEvents="box-none">
+          <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3">
             {activeServer ? (
               <Pressable
                 accessibilityRole="button"
