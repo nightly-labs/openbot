@@ -13,7 +13,7 @@ import {
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -47,7 +47,7 @@ const HOST_DEFAULT_LABEL = {
   steer: "mobile.agent.busyMessage.hostDefaultSteer",
 } as const satisfies Record<BusyMessageMode, MobileTextKey>;
 
-interface AgentHostFieldsProps {
+export interface AgentHostFieldsProps {
   agent: MobileAgent;
   server: MobileServer | undefined;
   available: boolean;
@@ -59,9 +59,9 @@ interface AgentHostFieldsProps {
  * A change saves at once, as on desktop, and does not wait for the sheet's Save action. The control
  * shows the new value during the save and goes back on a failure.
  */
-function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
+export function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
-  part: "host" | "task-limit" | "new-chat",
+  part: "host" | "task-limit" | "new-chat" | "backup-models",
   load: (agentId: string, serverId: string) => Promise<Settings | null>,
   update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
 ) {
@@ -70,6 +70,8 @@ function useAgentHostRecord<Settings extends object, Input extends Partial<Setti
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A second tap can come before the render that disables the control, and it would save from the same value.
+  const pending = useRef(false);
   const canAdminister = canAdministerServer(server?.role);
   // Under "agent-info" and ending in an `AGENT_SETTINGS_PARTS` part: the host's `agents-changed`
   // event reads it again, so a change made on another device shows here while the page is open.
@@ -83,26 +85,41 @@ function useAgentHostRecord<Settings extends object, Input extends Partial<Setti
     staleTime: 0,
   });
 
-  async function save(current: Settings, input: Input) {
+  /** Resolves true when the host saved the change. */
+  async function save(current: Settings, input: Input): Promise<boolean> {
+    if (pending.current) return false;
+    pending.current = true;
     setSaving(true);
     setError(null);
+    // A read that an `agents-changed` event started must not put the old value back after the save.
+    await queryClient.cancelQueries({ queryKey, exact: true });
     queryClient.setQueryData<Settings | null>(queryKey, { ...current, ...input });
     try {
       const saved = await update({ ...input, agentId: agent.id }, agent.serverId);
       queryClient.setQueryData<Settings | null>(queryKey, saved);
       void haptics.notification("success");
+      return true;
     } catch (cause) {
       queryClient.setQueryData<Settings | null>(queryKey, current);
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.host.failed")));
+      return false;
     } finally {
+      pending.current = false;
       setSaving(false);
     }
   }
 
   // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
   const current = canAdminister ? (settings.data ?? null) : null;
-  return { current, enabled: available && !saving, error, save };
+  return {
+    current,
+    enabled: available && !saving,
+    failed: settings.isError,
+    retry: () => void settings.refetch(),
+    error,
+    save,
+  };
 }
 
 /** Computer Use, local scripts and the busy-message mode of an agent, from `agent-host-settings-v1`. */

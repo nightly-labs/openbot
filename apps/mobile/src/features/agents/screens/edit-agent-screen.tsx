@@ -392,8 +392,10 @@ function AgentForm({
           }}
         />
       ) : null}
-      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} available={available} /> : null}
-      {page === "backup-model-picker" ? <AgentBackupModelPicker agent={agent} available={available} /> : null}
+      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
+      {page === "backup-model-picker" ? (
+        <AgentBackupModelPicker agent={agent} server={host} available={available} />
+      ) : null}
       {page === "permissions" ? (
         <>
           <AgentAccessFields agent={agent} server={host} available={available} />
@@ -459,7 +461,7 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
-            <AgentBackupModelsRow agent={agent} available={available} />
+            <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
             <SettingsRow

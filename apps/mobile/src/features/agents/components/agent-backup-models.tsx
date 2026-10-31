@@ -9,23 +9,23 @@ import {
   type HostProviderAccounts,
   sameAgentModelChoice,
 } from "@openbot/contracts/ipc";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { router, useNavigation } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Plus from "lucide-react-native/icons/plus";
 import Trash2 from "lucide-react-native/icons/trash";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
+import { type AgentHostFieldsProps, useAgentHostRecord } from "@/features/agents/components/agent-host-fields";
 import { useProviderAccountName, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import {
-  type MobileAgent,
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
@@ -43,32 +43,24 @@ interface BackupModelOption {
   ready: boolean;
 }
 
+type BackupModelsProps = AgentHostFieldsProps;
+
 /**
- * The backup models of an agent, read from and saved on its host. Only an owner or admin of a host
- * that serves `agent-backup-models-v1` reads them; the host checks the role again on every call.
- * The key is under "agent-info" and ends in "backup-models", so the host's `agents-changed` event reads
- * it again: a change made on desktop or another phone shows here while the page is open.
+ * The backup models of an agent, read from and saved on its host through `agent-backup-models-v1`.
+ * Only an owner or admin of a host that serves it reads them; the host checks the role again on every
+ * call. The shared host record reads them again on each `agents-changed` event, so a change made on
+ * desktop or another phone shows here while the page is open.
  */
-export function useAgentBackupModels(agent: MobileAgent, enabled: boolean) {
+function useAgentBackupModels(props: BackupModelsProps) {
   const workspace = useMobileWorkspaceActions();
-  const queryScope = useQueryScope();
-  const canManage = useMobileWorkspaceSelector((current) => current.canManageAgentBackupModels(agent.serverId));
-  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "backup-models");
-  const settings = useQuery({
-    queryKey,
-    queryFn: () => workspace.loadAgentBackupModels(agent.id, agent.serverId),
-    enabled: enabled && canManage,
-    retry: false,
-    // Another device can change these at any time, so a reopened page reads the host again.
-    staleTime: 0,
-  });
-  return {
-    queryKey,
-    canManage,
-    settings: canManage ? (settings.data ?? null) : null,
-    failed: settings.isError,
-    retry: () => void settings.refetch(),
-  };
+  const canManage = useMobileWorkspaceSelector((current) => current.canManageAgentBackupModels(props.agent.serverId));
+  const record = useAgentHostRecord<AgentBackupModelSettings, Pick<AgentBackupModelSettings, "backupModels">>(
+    { ...props, available: props.available && canManage },
+    "backup-models",
+    workspace.loadAgentBackupModels,
+    workspace.updateAgentBackupModels,
+  );
+  return { canManage, ...record };
 }
 
 function useBackupModelSummary() {
@@ -86,14 +78,15 @@ function useBackupModelSummary() {
  * Agent info > Brain: the row that opens the backup models page. Hidden for a member and an older host.
  * It shows before the host answers, so the section does not move; the summary shows when it answers.
  */
-export function AgentBackupModelsRow({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function AgentBackupModelsRow(props: BackupModelsProps) {
   const { t } = useText();
   const summary = useBackupModelSummary();
-  const { canManage, settings } = useAgentBackupModels(agent, available);
+  const { canManage, current } = useAgentBackupModels(props);
+  const { agent } = props;
   if (!canManage) return null;
   return (
     <SettingsRow
-      supportingText={settings ? summary(settings.backupModels) : undefined}
+      supportingText={current ? summary(current.backupModels) : undefined}
       onPress={() =>
         router.push({
           pathname: "/agent-info/[agentId]/backup-models",
@@ -169,12 +162,11 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
  * The saved settings, the options and the save of the backup models page and its model picker.
  * Null until the host answers, and for a member or an older host.
  */
-function useBackupModelEditor(agent: MobileAgent, available: boolean) {
-  const { t, errorMessage } = useText();
+function useBackupModelEditor(props: BackupModelsProps) {
+  const { agent, available } = props;
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const { queryKey, canManage, settings, failed, retry } = useAgentBackupModels(agent, available);
+  const { canManage, current, enabled, failed, retry, error, save } = useAgentBackupModels(props);
   const { accounts } = useProviderAccounts(agent, available);
   const models = useQuery({
     queryKey: queryKeys.agentModels(queryScope, agent.serverId),
@@ -183,13 +175,8 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
     retry: false,
   });
   const { option, all } = useBackupModelOptions(models.data, accounts);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // A second tap can come before the render that disables the controls, and it would save from the same order.
-  const pending = useRef(false);
-  if (!canManage || !settings) return { canManage, failed, retry, editor: null };
+  if (!canManage || !current) return { canManage, failed, retry, editor: null };
 
-  const current = settings;
   const automatic = current.backupModels?.automatic === true;
   const order = current.backupModels?.order ?? [];
   // The agent's own model: the one it went back to, while a usage limit holds it on a backup.
@@ -209,36 +196,6 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
       own.model)
     : (agent.model ?? "");
 
-  /** Resolves true when the host saved the change. A failure puts the old value back and shows why. */
-  async function save(next: AgentBackupModels): Promise<boolean> {
-    // Null returns the agent to the default: ask, with no saved order.
-    const backupModels = next.automatic || next.order.length > 0 ? next : null;
-    if (pending.current) return false;
-    pending.current = true;
-    setSaving(true);
-    setError(null);
-    // A read that an `agents-changed` event started must not put the old value back after the save.
-    await queryClient.cancelQueries({ queryKey, exact: true });
-    const optimistic: AgentBackupModelSettings = { ...current, backupModels };
-    queryClient.setQueryData<AgentBackupModelSettings | null>(queryKey, optimistic);
-    try {
-      const saved = await workspace.updateAgentBackupModels({ agentId: agent.id, backupModels }, agent.serverId);
-      queryClient.setQueryData<AgentBackupModelSettings | null>(queryKey, saved);
-      void haptics.notification("success");
-      return true;
-    } catch (cause) {
-      queryClient.setQueryData<AgentBackupModelSettings | null>(queryKey, current);
-      // Another device can have changed the settings meanwhile, so the host answers what is saved now.
-      void queryClient.invalidateQueries({ queryKey, exact: true });
-      void haptics.notification("error");
-      setError(errorMessage(cause, t("mobile.agent.host.failed")));
-      return false;
-    } finally {
-      pending.current = false;
-      setSaving(false);
-    }
-  }
-
   return {
     canManage,
     failed,
@@ -249,10 +206,12 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
       ownModel,
       entries: order.map(option),
       addable: all(own ? [own, ...order] : order).filter((candidate) => candidate.ready),
-      enabled: available && !saving,
+      enabled,
       models: { pending: models.isPending, failed: models.isError, retry: () => void models.refetch() },
       error,
-      save,
+      /** Null returns the agent to the default: ask, with no saved order. Resolves true when the host saved it. */
+      save: (next: AgentBackupModels) =>
+        save(current, { backupModels: next.automatic || next.order.length > 0 ? next : null }),
     },
   };
 }
@@ -269,6 +228,8 @@ function EditorStatus({
   retry: () => void;
 }) {
   const { t } = useText();
+  // An offline host: the screen already says that the agent is not available.
+  if (!available) return null;
   if (failed && canManage) {
     return (
       <>
@@ -283,7 +244,7 @@ function EditorStatus({
   }
   return (
     <Typography.Paragraph>
-      {t(available && canManage ? "mobile.agent.edit.loading" : "mobile.agent.host.unsupported")}
+      {t(canManage ? "mobile.agent.edit.loading" : "mobile.agent.host.unsupported")}
     </Typography.Paragraph>
   );
 }
@@ -297,13 +258,14 @@ function SaveError({ error }: { error: string | null }) {
 }
 
 /** Agent info > Backup models: what the agent does when a usage limit holds a message. */
-export function AgentBackupModelsPage({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function AgentBackupModelsPage(props: BackupModelsProps) {
+  const { agent, available } = props;
   const { t } = useText();
   const { theme } = useUniwind();
   const [muted, danger] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-danger-text"]);
-  const { canManage, failed, retry, editor } = useBackupModelEditor(agent, available);
+  const { canManage, failed, retry, editor } = useBackupModelEditor(props);
   if (!editor) return <EditorStatus canManage={canManage} available={available} failed={failed} retry={retry} />;
-  const { automatic, order, ownModel, entries, addable, enabled, error, save } = editor;
+  const { automatic, order, ownModel, entries, addable, enabled, models, error, save } = editor;
 
   const iconButton = (label: string, disabled: boolean, onPress: () => void, icon: ReactNode) => (
     <Pressable
@@ -394,6 +356,17 @@ export function AgentBackupModelsPage({ agent, available }: { agent: MobileAgent
             </Typography.Paragraph>
           </SettingsRow>
         ))}
+        {models.failed ? (
+          <SettingsRow disclosure={false} onPress={models.retry}>
+            <Typography.Paragraph>{t("mobile.agent.runtime.retryModels")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : models.pending && available ? (
+          <SettingsRow>
+            <Typography.Paragraph className="text-grouped-secondary">
+              {t("mobile.agent.runtime.loadingModels")}
+            </Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
         {order.length < AGENT_BACKUP_MODEL_LIMIT && addable.length > 0 ? (
           // A page, not a menu: OpenRouter lists hundreds of models, and the Android menu of the app does
           // not scroll a menu with sub-menus, so it went off the screen and its overlay held every touch.
@@ -418,12 +391,14 @@ export function AgentBackupModelsPage({ agent, available }: { agent: MobileAgent
 }
 
 /** Agent info > Backup models > Add backup model: every ready model, by provider, with a search. */
-export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function AgentBackupModelPicker(props: BackupModelsProps) {
+  const { available } = props;
   const { t } = useText();
+  const navigation = useNavigation();
   const [query, setQuery] = useState("");
-  const { canManage, failed, retry, editor } = useBackupModelEditor(agent, available);
+  const { canManage, failed, retry, editor } = useBackupModelEditor(props);
   if (!editor) return <EditorStatus canManage={canManage} available={available} failed={failed} retry={retry} />;
-  const { automatic, order, addable, enabled, models, error, save } = editor;
+  const { automatic, order, addable, enabled, error, save } = editor;
   const words = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   // The search also reads the provider and the model id, as on desktop.
   const matches = addable.filter((candidate) => {
@@ -448,15 +423,7 @@ export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgen
         value={query}
         onChangeText={setQuery}
       />
-      {models.failed ? (
-        <Button variant="ghost" onPress={models.retry}>
-          <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>
-        </Button>
-      ) : models.pending ? (
-        <Typography.Paragraph className="px-4 text-grouped-secondary">
-          {t("mobile.agent.runtime.loadingModels")}
-        </Typography.Paragraph>
-      ) : matches.length === 0 ? (
+      {matches.length === 0 ? (
         <Typography.Paragraph className="px-4 text-grouped-secondary">
           {t("mobile.agent.backupModels.noMatches")}
         </Typography.Paragraph>
@@ -473,7 +440,8 @@ export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgen
                 leading={<ProviderMark provider={provider} size={20} />}
                 onPress={() => {
                   void save({ automatic, order: [...order, candidate.choice] }).then((saved) => {
-                    if (saved && router.canGoBack()) router.back();
+                    // The user can go back during the save. Then the picker must not close the page under it.
+                    if (saved && navigation.isFocused()) router.back();
                   });
                 }}
               >
