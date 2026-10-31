@@ -1,5 +1,5 @@
 ### Fixed
 
-- The account service no longer slows down as a server collects ended connections. Before, each new
-  phone or browser connection to a server read every connection that server ever had, and removing
-  members from a server read every connection of every server.
+- The account service does less database work when a phone or browser connects to a server. Before,
+  each connection read the connections of all users of that server, and each server or account
+  deletion read every connection of every server.

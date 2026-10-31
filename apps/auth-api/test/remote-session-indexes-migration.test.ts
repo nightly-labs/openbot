@@ -72,9 +72,9 @@ describe("remote session indexes migration", () => {
         "UPDATE remote_sessions SET ended_at = 1 WHERE host_id = 'office' AND user_id = 'owner' AND ended_at IS NULL AND expires_at <= 1",
       ),
     ).toContain("remote_sessions_active_host_user");
-    expect(plan(database, "DELETE FROM remote_memberships WHERE host_id = 'office'")).not.toContain(
-      "SCAN remote_sessions",
-    );
+    const cascade = plan(database, "DELETE FROM remote_memberships WHERE host_id = 'office'");
+    expect(cascade).toContain("remote_sessions_membership_id");
+    expect(cascade).not.toContain("SCAN remote_sessions");
   });
 
   it("still sweeps only expired active sessions and cascades a membership delete to its sessions", () => {
