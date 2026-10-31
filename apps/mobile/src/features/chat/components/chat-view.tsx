@@ -366,7 +366,7 @@ export function ChatView({
     [queued, heldQueueEdit, queuePending],
   );
   usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
-  // The thinking sheet reads the agent's conversation, so only an agent chat opens it.
+  // The thinking sheet reads the agent's conversation, so a channel does not open it. A thread opens it with its task.
   const turnLines = useTurnStepLines(target.serverId);
   const conversationMessages = conversation?.messages;
   const conversationTurnId = conversation?.activeTurnId ?? null;
