@@ -351,6 +351,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Domyślne hosta (Pokieruj)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
+  "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
+  "mobile.agent.planCard.footer":
+    "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
   "mobile.agent.notifications.failed": "Nie udało się zmienić powiadomień",

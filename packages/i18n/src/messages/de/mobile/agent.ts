@@ -337,6 +337,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host-Standard (Steuern)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchlauf nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
+  "mobile.agent.planCard.label": "Plan vor langen Aufgaben zeigen",
+  "mobile.agent.planCard.footer":
+    "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
   "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.notifications.failed": "Benachrichtigungen konnten nicht geändert werden",

@@ -324,6 +324,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "호스트 기본값 (방향 지시)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider}은(는) 진행 중인 턴에 방향을 지시할 수 없어요. 작업 중에 보낸 메시지는 대기열에서 기다려요.",
+  "mobile.agent.planCard.label": "긴 작업 전에 계획 표시",
+  "mobile.agent.planCard.footer":
+    "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
   "mobile.agent.workspace.title": "워크스페이스 폴더",
   "mobile.agent.workspace.footer": "호스트 컴퓨터에 있는 이 에이전트의 폴더예요.",
   "mobile.agent.notifications.failed": "알림을 변경할 수 없어요",

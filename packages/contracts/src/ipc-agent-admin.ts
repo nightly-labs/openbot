@@ -238,6 +238,31 @@ export function parseUpdateAgentTaskLimitInput(value: unknown): UpdateAgentTaskL
   return { agentId: value.agentId, taskLimit: decodeTaskLimit(value.taskLimit) };
 }
 
+/**
+ * Whether one agent shows its plan card before a long task. The local window reads it from the agent
+ * summary and the app defaults; an owner or admin of a joined server reads it here, as the value that
+ * applies on the host.
+ */
+export interface AgentPlanCardSettings {
+  quickAcknowledgement: boolean;
+}
+
+export interface UpdateAgentPlanCardInput {
+  agentId: string;
+  quickAcknowledgement: boolean;
+}
+
+export function decodeAgentPlanCardSettings(value: unknown): AgentPlanCardSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.quickAcknowledgement)) throw new Error("Invalid plan card setting.");
+  return { quickAcknowledgement: value.quickAcknowledgement };
+}
+
+export function parseUpdateAgentPlanCardInput(value: unknown): UpdateAgentPlanCardInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.quickAcknowledgement))
+    throw new Error("Invalid plan card setting.");
+  return { agentId: value.agentId, quickAcknowledgement: value.quickAcknowledgement };
+}
+
 /** The agent a host added from a marketplace listing or a shared template. The agent list has the rest. */
 export interface AddedAgent {
   id: string;

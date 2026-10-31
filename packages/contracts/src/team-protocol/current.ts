@@ -13,6 +13,7 @@ import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
+import { AGENT_PLAN_CARD_CAPABILITY } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "./agent-task-limit-v1";
@@ -91,6 +92,7 @@ import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
+import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
@@ -146,6 +148,7 @@ export {
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_TASK_LIMIT_CAPABILITY,
@@ -223,6 +226,7 @@ export {
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
@@ -348,6 +352,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  AGENT_PLAN_CARD_CAPABILITY,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -481,7 +487,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MEMORY_REVIEW_CAPABILITY &&
     capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
     capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
-    capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+    capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&
+    capability !== AGENT_PLAN_CARD_CAPABILITY &&
+    capability !== TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -491,6 +499,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_PLAN_CARD_CAPABILITY,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -583,6 +593,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
       capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&
+      capability !== AGENT_PLAN_CARD_CAPABILITY &&
+      capability !== TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY &&
       capability !== TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   );
 }

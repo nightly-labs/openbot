@@ -340,6 +340,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Ana makine varsayılanı (Yönlendir)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
+  "mobile.agent.planCard.footer":
+    "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",

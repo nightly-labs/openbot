@@ -313,6 +313,8 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "主机默认（引导）",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} 无法引导运行中的对话。它工作期间发送的消息会留在队列中等待。",
+  "mobile.agent.planCard.label": "长任务开始前显示计划",
+  "mobile.agent.planCard.footer": "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
   "mobile.agent.workspace.title": "工作区文件夹",
   "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
   "mobile.agent.notifications.failed": "无法更改通知设置",

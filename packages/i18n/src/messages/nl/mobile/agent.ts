@@ -330,6 +330,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Hoststandaard (Bijsturen)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
+  "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
+  "mobile.agent.planCard.footer":
+    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",

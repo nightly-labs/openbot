@@ -46,6 +46,7 @@ import {
   agentComputerUseEnabled,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentQuickAcknowledgementEnabled,
   agentTaskLimit,
   type BackgroundProcess,
   type BrowserProfileSummary,
@@ -1980,6 +1981,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentTaskLimit: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentTaskLimit(input.agentId);
+      },
+      getAgentPlanCard: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { quickAcknowledgement: agentQuickAcknowledgementEnabled(agent, agentDefaults) };
+      },
+      updateAgentPlanCard: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentPlanCard(input.agentId);
       },
       listBrowserProfiles: async () => ({
         profiles: browserProfiles.map(browserProfileSummary),

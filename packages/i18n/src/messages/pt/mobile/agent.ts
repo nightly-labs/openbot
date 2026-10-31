@@ -334,6 +334,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Padrão do anfitrião (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
+  "mobile.agent.planCard.label": "Mostrar o plano antes de tarefas longas",
+  "mobile.agent.planCard.footer":
+    "Antes de uma tarefa longa, o agente mostra o plano. Ele começa após 10 s ou quando você toca em Iniciar.",
   "mobile.agent.workspace.title": "Pasta do espaço de trabalho",
   "mobile.agent.workspace.footer": "A pasta deste agente no computador anfitrião.",
   "mobile.agent.notifications.failed": "Não foi possível alterar as notificações",

@@ -328,6 +328,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Predefinita dell'host (Indirizza)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
+  "mobile.agent.planCard.label": "Mostra il piano prima delle attività lunghe",
+  "mobile.agent.planCard.footer":
+    "Prima di un'attività lunga, l'agente mostra il suo piano. Inizia dopo 10 s o quando premi Avvia.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.notifications.failed": "Impossibile modificare le notifiche",

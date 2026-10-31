@@ -13,6 +13,7 @@ import type {
   AgentModelId,
   AgentModelOption,
   AgentNotificationLevelsSnapshot,
+  AgentPlanCardSettings,
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
@@ -93,6 +94,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
+  UpdateAgentPlanCardInput,
   UpdateRestartMode,
   UpdateRoutineInput,
   VaultHostImportResult,
@@ -558,6 +560,15 @@ export interface MobileWorkspaceContextValue {
   loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** An owner or admin of an online host that serves `agent-plan-card-v1`. The host checks the role again. */
+  canManageAgentPlanCard: (serverId: string) => boolean;
+  /**
+   * Whether the agent shows its plan card before a long task, as it applies on the host. Null when the
+   * host does not advertise `agent-plan-card-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
+  updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -791,6 +802,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentSkills"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
+  | "canManageAgentPlanCard"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canPublishAgent";

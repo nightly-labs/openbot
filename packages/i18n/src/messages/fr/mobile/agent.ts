@@ -339,6 +339,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Par défaut de l’hôte (Orienter)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
+  "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
+  "mobile.agent.planCard.footer":
+    "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
   "mobile.agent.notifications.failed": "Impossible de modifier les notifications",

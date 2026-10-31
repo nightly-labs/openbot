@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -1301,7 +1302,10 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
                   }),
                 )
               : yield* peerDecode(() =>
-                  decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
+                  withWireAutoAnswers(
+                    decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
+                    body,
+                  ),
                 ),
           });
         }
@@ -1344,7 +1348,11 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       if (decoded.status === "invalid")
         return yield* new RemotePeerError({ message: sourceText("error.remote.malformedEvent") });
       state.lastEventSequence = frame.sequence;
-      if (decoded.status === "known") yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
+      if (decoded.status === "known") {
+        // The frozen event codec leaves the automatic answer of a block out; the wire frame has it.
+        addUiBlockAutoAnswers(decoded.event, frame.payload);
+        yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
+      }
       yield* sendEventAckEffect(state);
     })();
   }
@@ -1959,4 +1967,13 @@ function signalErrorCode(data: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A decoded response with the automatic answer of each block, which the frozen response codec leaves
+ * out. Only a host that the client told `ui-block-auto-answer-v1` puts it on the wire.
+ */
+function withWireAutoAnswers<T>(decoded: T, wire: unknown): T {
+  if (decoded !== null && typeof decoded === "object") addUiBlockAutoAnswers(decoded, wire);
+  return decoded;
 }

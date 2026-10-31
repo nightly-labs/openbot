@@ -321,6 +321,9 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host default (Steer)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
+  "mobile.agent.planCard.label": "Show the plan before long tasks",
+  "mobile.agent.planCard.footer":
+    "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
   "mobile.agent.workspace.title": "Workspace folder",
   "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
   "mobile.agent.notifications.failed": "Could not change notifications",

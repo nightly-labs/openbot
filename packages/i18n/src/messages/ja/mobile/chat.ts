@@ -76,6 +76,8 @@ export const messages = {
   "mobile.chat.question.privateAnswer": "非公開の回答",
   "mobile.chat.question.answerForm": "フォームに回答",
   "mobile.chat.question.answersSent": "回答を送信しました",
+  "mobile.chat.question.autoAction": "{action} · {seconds}秒",
+  "mobile.chat.question.autoAnswered": "{outcome}（時間内に回答がありませんでした）",
   "mobile.chat.question.formCancelled": "フォームはキャンセルされました",
   "mobile.chat.question.formExpired": "フォームの期限が切れました",
   "mobile.chat.question.form": "質問フォーム",

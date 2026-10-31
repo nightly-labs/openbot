@@ -3,6 +3,7 @@ import type {
   AgentBackupModelSettings,
   AgentBackupModels,
   AgentHostSettings,
+  AgentPlanCardSettings,
   AgentTaskLimitSettings,
   AgentUsageLimitReturn,
   BusyMessageMode,
@@ -14,6 +15,7 @@ import type {
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
+import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, untrack } from "solid-js";
@@ -31,6 +33,8 @@ export type RemoteAgentAdminCalls = Pick<
   | "updateAgentBackupModels"
   | "getAgentTaskLimit"
   | "updateAgentTaskLimit"
+  | "getAgentPlanCard"
+  | "updateAgentPlanCard"
 >;
 
 /** A joined server where this account may change agent access and auto-approve. */
@@ -47,6 +51,8 @@ interface RemoteAgentAdminState {
   backupModels: AgentBackupModelSettings | null;
   taskLimitKey: string | null;
   taskLimit: AgentTaskLimitSettings | null;
+  planCardKey: string | null;
+  planCard: AgentPlanCardSettings | null;
 }
 
 /**
@@ -67,6 +73,8 @@ export function createRemoteAgentAdmin(
     backupModels: null,
     taskLimitKey: null,
     taskLimit: null,
+    planCardKey: null,
+    planCard: null,
   });
   const hostKey = () => {
     const current = target();
@@ -175,6 +183,41 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
+  const planCardKey = () => {
+    const current = target();
+    if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_PLAN_CARD_CAPABILITY))
+      return null;
+    return JSON.stringify([current.server.id, current.agentId]);
+  };
+  function acceptPlanCard(requestKey: string, settings: AgentPlanCardSettings): void {
+    if (planCardKey() !== requestKey) return;
+    setState((draft) => {
+      draft.planCardKey = requestKey;
+      draft.planCard = settings;
+    });
+  }
+  let planCardReadGeneration = 0;
+  createEffect(
+    () => JSON.stringify([planCardKey(), target()?.updatedAt]),
+    () => {
+      const requestKey = untrack(planCardKey);
+      const generation = ++planCardReadGeneration;
+      if (untrack(() => state.planCardKey) !== requestKey)
+        setState((draft) => {
+          draft.planCardKey = null;
+          draft.planCard = null;
+        });
+      const current = untrack(target);
+      if (!requestKey || !current) return;
+      calls()
+        .getAgentPlanCard(current.agentId, current.server.id)
+        .then((settings) => {
+          if (generation === planCardReadGeneration) acceptPlanCard(requestKey, settings);
+        })
+        // A failed read keeps the setting hidden. The host checks the role on every write anyway.
+        .catch(() => undefined);
+    },
+  );
   const key = () => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdministerAgents(current.server)) return null;
@@ -243,6 +286,19 @@ export function createRemoteAgentAdmin(
       if (taskLimitKey() === JSON.stringify([server.id, agentId])) taskLimitReadGeneration += 1;
       acceptTaskLimit(JSON.stringify([server.id, agentId]), settings);
     },
+    /** Undefined for a local agent, before the host answers, and without the capability. */
+    quickAcknowledgement: (): boolean | undefined =>
+      state.planCardKey !== null && state.planCardKey === planCardKey()
+        ? state.planCard?.quickAcknowledgement
+        : undefined,
+    async updatePlanCard(agentId: string, quickAcknowledgement: boolean): Promise<void> {
+      const server = target()?.server;
+      if (server?.kind !== "remote" || !serverCanAdminister(server, AGENT_PLAN_CARD_CAPABILITY))
+        throw new Error(currentText().t("agent.error.adminOnly"));
+      const settings = await calls().updateAgentPlanCard({ agentId, quickAcknowledgement }, server.id);
+      if (planCardKey() === JSON.stringify([server.id, agentId])) planCardReadGeneration += 1;
+      acceptPlanCard(JSON.stringify([server.id, agentId]), settings);
+    },
     /** Null for a local agent, before the first answer, and when the host does not serve the capability. */
     settings: (): AgentAdminSettings | null => (state.key !== null && state.key === key() ? state.settings : null),
     /** Undefined until the host answers. A released host with Turbo mode on locks every agent to auto-approve. */
@@ -267,19 +323,32 @@ export function createRemoteAgentAdmin(
 
 /**
  * Sends a profile change to an agent of a joined server. The Team API agent route ignores access,
- * so access, Local scripts, the busy-message mode, backup models and the task limit go to their admin
- * routes. Other fields keep the agent route.
+ * so access, Local scripts, the busy-message mode, backup models, the task limit and the plan card go
+ * to their admin routes. Other fields keep the agent route.
  */
 export async function updateRemoteAgent(
-  admin: Pick<RemoteAgentAdmin, "update" | "updateHostSettings" | "updateBackupModels" | "updateTaskLimit">,
+  admin: Pick<
+    RemoteAgentAdmin,
+    "update" | "updateHostSettings" | "updateBackupModels" | "updateTaskLimit" | "updatePlanCard"
+  >,
   input: UpdateAgentInput,
   updateProfile: (input: UpdateAgentInput) => Promise<void>,
 ): Promise<void> {
-  const { access, allowAutomation, busyMessageMode, backupModels, taskLimit, agentId, ...fields } = input;
+  const {
+    access,
+    allowAutomation,
+    busyMessageMode,
+    backupModels,
+    taskLimit,
+    quickAcknowledgement,
+    agentId,
+    ...fields
+  } = input;
   // A joined server's host keeps one value for each agent: it has no account default to return to.
   // Only Settings › Agents sends `null`, and only for this computer, so no user sees this error.
   // It comes before the first write, so that a wrong call changes nothing.
   if (allowAutomation === null) throw new Error("A joined server has no default for Local scripts.");
+  if (quickAcknowledgement === null) throw new Error("A joined server has no default for the plan card.");
   if (access !== undefined) await admin.update({ agentId, access });
   // Null busy-message mode is valid here: the agent follows the host default.
   if (allowAutomation !== undefined || busyMessageMode !== undefined)
@@ -290,6 +359,7 @@ export async function updateRemoteAgent(
     });
   if (backupModels !== undefined) await admin.updateBackupModels(agentId, backupModels);
   if (taskLimit !== undefined) await admin.updateTaskLimit(agentId, taskLimit);
+  if (quickAcknowledgement !== undefined) await admin.updatePlanCard(agentId, quickAcknowledgement);
   if (Object.keys(fields).length) await updateProfile({ agentId, ...fields });
 }
 

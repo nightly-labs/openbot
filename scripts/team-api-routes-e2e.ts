@@ -47,6 +47,10 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
+import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
@@ -706,6 +710,9 @@ try {
               else if (input.backupModels) target.backupModels = input.backupModels;
               if (input.taskLimit === null) delete target.taskLimit;
               else if (input.taskLimit !== undefined) target.taskLimit = input.taskLimit;
+              if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
+              else if (input.quickAcknowledgement !== undefined)
+                target.quickAcknowledgement = input.quickAcknowledgement;
               return target;
             }),
         },
@@ -1674,6 +1681,122 @@ try {
     });
     check(
       "an admin cannot read or set the task limit of an agent that the client protocol does not show",
+      errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Plan card before long tasks (agent-plan-card-v1) ----
+  {
+    const planCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_PLAN_CARD_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-plan-card-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const adminRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin reads the host default plan card setting of an agent without its own",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { quickAcknowledgement: DEFAULT_AGENT_DEFAULTS.quickAcknowledgement }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the plan card routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    check(
+      "a member cannot read or set the plan card",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet)],
+    );
+    const notBoolean = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: null },
+      capabilities: planCapabilities,
+    });
+    check(
+      "the host refuses a plan card value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const adminOn = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    const readOn = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns on the plan card through the agent writer and reads it back",
+      adminOn.status === 200 &&
+        isDeepStrictEqual(adminOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(readOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", quickAcknowledgement: true }]),
+      [summary(adminOn), summary(readOn)],
+    );
+    const adminOff = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: false },
+      capabilities: planCapabilities,
+    });
+    const missing = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns off the plan card, and an unknown agent gets 404",
+      adminOff.status === 200 &&
+        isDeepStrictEqual(adminOff.body, { quickAcknowledgement: false }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(adminOff), summary(missing)],
+    );
+    const hiddenRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-pi" },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    const hiddenSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an admin cannot read or set the plan card of an agent that the client protocol does not show",
       errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,

@@ -2,6 +2,7 @@ import {
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentHostSettingsInput,
+  parseUpdateAgentPlanCardInput,
   parseUpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -13,6 +14,10 @@ import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
+import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -166,6 +171,42 @@ export async function routeAgentTaskLimit(
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid task limit.");
     }
     return json(200, await runCauseEffect(settings.updateTaskLimit(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Whether one agent shows its plan card before a long task, changed from a joined server. It is an
+ * agent setting of this computer, like the other host settings, so only an owner or admin can read
+ * or change it. Frozen by `agent-plan-card-v1`.
+ */
+export async function routeAgentPlanCard(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_PLAN_CARD_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_PLAN_CARD_ROUTES.update;
+  if (!read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_PLAN_CARD_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the agent-plan-card wire codec.
+  const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  try {
+    if (read) return json(200, settings.readPlanCard(stringField(body, "agentId")));
+    let input: ReturnType<typeof parseUpdateAgentPlanCardInput>;
+    try {
+      input = parseUpdateAgentPlanCardInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid plan card setting.");
+    }
+    return json(200, await runCauseEffect(settings.updatePlanCard(input)));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

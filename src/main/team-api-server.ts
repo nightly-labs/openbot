@@ -32,6 +32,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
@@ -132,6 +133,10 @@ import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/provid
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  withUiBlockAutoAnswers,
+} from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
   TEAM_PROTOCOL_V1_CAPABILITIES,
@@ -195,6 +200,7 @@ import {
   routeAgentAdmin,
   routeAgentBackupModels,
   routeAgentHostSettings,
+  routeAgentPlanCard,
   routeAgentTaskLimit,
 } from "./team-api/route-agent-admin";
 import { routeAgentHidden, visibleSnapshot } from "./team-api/route-agent-hidden";
@@ -945,6 +951,7 @@ export class TeamApiServer {
       if ((await routeAgentHostSettings(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentBackupModels(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"
@@ -1163,8 +1170,8 @@ export class TeamApiServer {
     for (const id of blocked) hidden.add(id);
     const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
-    if (protocol !== 1)
-      return (
+    if (protocol !== 1) {
+      const encoded = (
         protocol === 8
           ? encodeTeamProtocolV8BaseCurrentEvent
           : protocol === 7
@@ -1185,6 +1192,10 @@ export class TeamApiServer {
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       });
+      return encoded !== null && capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+        ? withUiBlockAutoAnswers(encoded, visible)
+        : encoded;
+    }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
 
@@ -1860,9 +1871,12 @@ export class TeamApiServer {
             )
         : value;
     const sideRoute = teamSideRouteCodec(route.path);
-    const body = sideRoute
+    const encoded = sideRoute
       ? JSON.stringify(sideRoute.response(route.path, status, visibleValue, options))
       : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, visibleValue, options);
+    const body = route.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
+      ? withUiBlockAutoAnswers(encoded, visibleValue)
+      : encoded;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2040,6 +2054,7 @@ export class TeamApiServer {
           if (capability === AGENT_HOST_SETTINGS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_BACKUP_MODELS_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === BROWSER_PROFILES_CAPABILITY) return this.#options.browserProfiles !== undefined;
           if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
           if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;

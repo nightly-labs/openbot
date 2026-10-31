@@ -1,5 +1,6 @@
 import {
   type AgentHostSettings,
+  type AgentPlanCardSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
@@ -172,6 +173,69 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
           }
         >
           <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
+ * Agent info > Advanced: whether the agent shows its plan before a long task, read from and saved on
+ * its host. Only an owner or admin sees it, and only when the host serves `agent-plan-card-v1`, as for
+ * the other host settings. A change saves at once and goes back on a failure.
+ */
+export function AgentPlanCardField({ agent, server, available }: AgentHostFieldsProps) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canAdminister = canAdministerServer(server?.role);
+  // `plan-card` is an agent settings part, so the host's `agents-changed` event reads it again.
+  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "plan-card");
+  const settings = useQuery({
+    queryKey,
+    queryFn: () => workspace.loadAgentPlanCard(agent.id, agent.serverId),
+    enabled: available && canAdminister,
+    retry: false,
+    staleTime: 0,
+  });
+  const current = canAdminister ? (settings.data ?? null) : null;
+  if (!current) return null;
+
+  async function save(quickAcknowledgement: boolean) {
+    setSaving(true);
+    setError(null);
+    const previous = queryClient.getQueryData<AgentPlanCardSettings | null>(queryKey) ?? null;
+    const optimistic: AgentPlanCardSettings = { quickAcknowledgement };
+    queryClient.setQueryData<AgentPlanCardSettings | null>(queryKey, optimistic);
+    try {
+      const saved = await workspace.updateAgentPlanCard({ agentId: agent.id, quickAcknowledgement }, agent.serverId);
+      queryClient.setQueryData<AgentPlanCardSettings | null>(queryKey, saved);
+      void haptics.notification("success");
+    } catch (cause) {
+      queryClient.setQueryData<AgentPlanCardSettings | null>(queryKey, previous);
+      void haptics.notification("error");
+      setError(errorMessage(cause, t("mobile.agent.host.failed")));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection footer={t("mobile.agent.planCard.footer")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={current.quickAcknowledgement}
+            disabled={!available || saving}
+            label={t("mobile.agent.planCard.label")}
+            dark={theme === "dark"}
+            onValueChange={(next) => void save(next)}
+          />
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

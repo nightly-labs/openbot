@@ -278,6 +278,15 @@ for a connection that advertises the capability; the frozen agent-tasks-v1 decod
 every other client. The HTTP and WebRTC clients accept it whenever it is present, and the WebRTC host
 peer encodes the local response and the events again with the same option.
 
+`ui-block-auto-answer-v1` (`team-protocol/ui-block-auto-answer-v1.ts`, protocol 9 only) adds
+`state.autoAnswer` to the blocks that the two capabilities above already send: the action that the
+host presses when nobody answers, its time, and `done` after the host pressed it. The plan card of
+`acknowledge_request` uses it. The frozen `ui-blocks-v1` codecs leave the key out in both
+directions, so the host adds it after it encodes a response or an event (`withUiBlockAutoAnswers`),
+and the WebRTC host peer adds it again after its own encoding. A client copies it back from the wire
+value after it decodes (`addUiBlockAutoAnswers`); the shared team client does this, and the mobile
+app shows the countdown with it. The desktop transports do not copy it yet.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -429,6 +438,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | `agentAdmin` |
 | `agent-backup-models-v1` | Agent backup models: the order and whether to switch without asking. Unknown providers are refused | `agentAdmin` |
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
+| `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |

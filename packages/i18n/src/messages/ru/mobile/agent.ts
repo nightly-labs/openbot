@@ -353,6 +353,9 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Направлять (по умолчанию на хосте)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
+  "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
+  "mobile.agent.planCard.footer":
+    "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.notifications.failed": "Не удалось изменить уведомления",
