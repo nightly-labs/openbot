@@ -278,7 +278,7 @@ function ServerLevels({
                   const own = pending?.row === agent.id ? pending.level : (agentLevels?.get(agent.id) ?? null);
                   return (
                     <CollapsingRow key={agent.id} open={isShown(agent)}>
-                      <View className={agent.id === highlightAgentId ? "bg-control" : undefined}>
+                      <View className={agent.id === highlightShown ? "bg-control" : undefined}>
                         <SettingsRow
                           leading={
                             <BloubAvatar
@@ -342,6 +342,8 @@ function ServerLevels({
                 <ChooseAgentMenu
                   agents={hiddenAgents}
                   another={shownAgents.length > 0}
+                  // One save at a time, as for the levels of the rows.
+                  disabled={!hostEnabled}
                   onChoose={(agentId) => {
                     // As on desktop, the chosen agent gets the first level that is not the server level.
                     if (!hostEnabled) return;
@@ -367,11 +369,12 @@ function ServerLevels({
  * closes shrinks with its real height, so the rows and the sections below move up and do not jump.
  */
 function CollapsingRow({ open, children }: PropsWithChildren<{ open: boolean }>) {
-  const [mounted, setMounted] = useState(open);
+  const [closed, setClosed] = useState(!open);
   // Stable, so that a new render does not start the animation again.
-  const onClosed = useCallback(() => setMounted(false), []);
-  if (open && !mounted) setMounted(true);
-  if (!mounted) return null;
+  const onClosed = useCallback(() => setClosed(true), []);
+  // A row that opens again before the end of its close stays mounted.
+  if (open && closed) setClosed(false);
+  if (!open && closed) return null;
   return (
     <CollapsingBody open={open} onClosed={onClosed}>
       {children}
@@ -428,11 +431,13 @@ function firstOtherLevel(level: ServerNotificationLevel): ServerNotificationLeve
 function ChooseAgentMenu({
   agents,
   another,
+  disabled,
   onChoose,
 }: {
   agents: readonly MobileAgent[];
   /** Some agents show already. */
   another: boolean;
+  disabled: boolean;
   onChoose: (agentId: string) => void;
 }) {
   const { t } = useText();
@@ -442,7 +447,7 @@ function ChooseAgentMenu({
     : t("mobile.settings.notifications.chooseAgent");
   return (
     <MenuView
-      actions={agents.map((agent) => ({ id: agent.id, title: agent.name }))}
+      actions={agents.map((agent) => ({ id: agent.id, title: agent.name, attributes: { disabled } }))}
       onPressAction={({ nativeEvent }) => {
         const agentId = nativeEvent.event;
         if (agents.some((agent) => agent.id === agentId)) onChoose(agentId);
@@ -454,7 +459,9 @@ function ChooseAgentMenu({
         accessible
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={{ disabled }}
         className="min-h-12 min-w-0 shrink flex-row items-center gap-3 px-4 py-3"
+        style={{ opacity: disabled ? 0.45 : 1 }}
       >
         <View className="items-center justify-center" style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}>
           <Plus size={20} color={accent} />
