@@ -203,6 +203,9 @@ export const messages = {
   "chat.marker.openRoutine": "Открыть регулярную задачу {name}",
   "chat.marker.unavailable": "Недоступно",
   "chat.marker.contextReset": "Начат новый чат",
+  "chat.marker.instructionsView": "Показать",
+  "chat.marker.instructionsUndo": "Отменить",
+  "chat.marker.instructionsUndone": "Отменено",
   "chat.usageLimit.title": "Лимит использования {provider} исчерпан",
   "chat.usageLimit.onHold": "Сообщение отложено",
   "chat.usageLimit.bodyReset":

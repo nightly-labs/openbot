@@ -99,7 +99,9 @@ export const messages = {
   "agentSettings.descriptionPlaceholder": "이 에이전트의 용도",
   "agentSettings.instructions": "지침",
   "agentSettings.instructionsLabel": "에이전트 지침",
-  "agentSettings.instructionsResize": "지침 크기 조정",
+  "agentSettings.instructionsEdit": "지침 편집",
+  "agentSettings.instructionsChangedWhileEditing":
+    "편집하는 동안 에이전트가 지침을 바꿨어요. 다시 저장하면 에이전트의 버전을 대체해요.",
   "agentSettings.instructionsPlaceholder": "이 에이전트가 항상 따르는 규칙",
   "agentSettings.avatar.edit": "에이전트 아바타 편집",
   "agentSettings.avatar.editor": "아바타 편집기",

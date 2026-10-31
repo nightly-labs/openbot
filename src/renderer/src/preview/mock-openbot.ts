@@ -11,6 +11,7 @@ import {
   type AccountUsage,
   AGENT_DEFAULT_KEYS,
   AGENT_FOLDER_LIMIT,
+  AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   type AgentAccessChange,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -2709,9 +2710,32 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                 },
               ]
             : [];
+          // A message that asks for a rule adds it to the instruction file, as a real agent does.
+          const instructionsChange: ConversationMessage[] = [];
+          if (/\brule\b/iu.test(input.text)) {
+            const before = mockAgentInstructions(input.agentId);
+            const after = `${before.text}${before.text && !before.text.endsWith("\n") ? "\n" : ""}- ${input.text.slice(0, 200)}\n`;
+            mockInstructionFiles.set(input.agentId, { ...before, exists: true, text: after });
+            instructionsChange.push({
+              id: `${turnId}:instructions-change`,
+              author: "system",
+              source: "system",
+              text: sourceText("status.agent.instructionsChanged"),
+              createdAt: new Date().toISOString(),
+              status: "completed",
+              itemType: AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
+              instructionsChange: { before: before.text, after },
+            });
+          }
           updateSnapshot(input.agentId, (snapshot) => {
             snapshot.activeTurnId = null;
-            snapshot.messages = [...snapshot.messages, assistantMessage, ...memoryMessage, ...planContinuation];
+            snapshot.messages = [
+              ...snapshot.messages,
+              assistantMessage,
+              ...memoryMessage,
+              ...instructionsChange,
+              ...planContinuation,
+            ];
           });
           queues.set(input.agentId, {
             agentId: input.agentId,

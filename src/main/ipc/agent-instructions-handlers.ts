@@ -43,7 +43,8 @@ async function run(
 export function agentInstructionsIpcHandlers({
   service,
 }: AgentInstructionsIpcDependencies): Pick<IpcGroupHandlers, "agentInstructions"> {
-  // An autosave and a save on blur can overlap. One at a time for each agent, so the last text wins.
+  // A save in the editor and an Undo in the chat can overlap. One at a time for each agent, so each
+  // save compares with the text that the save before it wrote.
   const oneAtATime = oneAtATimePerKey();
 
   function workspace(agentId: string): string {
@@ -58,7 +59,11 @@ export function agentInstructionsIpcHandlers({
         run(readAgentInstructionsFile(workspace(agentId))),
       ),
       saveAgentInstructions: payloadHandler(parseSaveAgentInstructionsInput, ({ agentId, text, expected }) =>
-        oneAtATime(agentId, () => run(saveAgentInstructionsFile(workspace(agentId), text, expected))),
+        oneAtATime(agentId, async () => {
+          const file = await run(saveAgentInstructionsFile(workspace(agentId), text, expected));
+          service.instructionsSaved(agentId, file.text);
+          return file;
+        }),
       ),
     },
   };

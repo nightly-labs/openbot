@@ -41,6 +41,7 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
+import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
@@ -283,6 +284,10 @@ export function ConversationTimeline() {
   const runtime = conversationRuntime(props);
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const loadImageFile = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
+  const instructionsCalls = agentInstructionsCalls();
+  /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
+  const localInstructionsCalls = () =>
+    props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
   /**
@@ -808,6 +813,7 @@ export function ConversationTimeline() {
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}
+                                                instructions={localInstructionsCalls()}
                                               />
                                             }
                                           >

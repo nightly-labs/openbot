@@ -143,6 +143,9 @@ export const messages = {
   "chat.marker.openRoutine": "ルーティン {name} を開く",
   "chat.marker.unavailable": "利用不可",
   "chat.marker.contextReset": "新しいチャットを開始しました",
+  "chat.marker.instructionsView": "表示",
+  "chat.marker.instructionsUndo": "元に戻す",
+  "chat.marker.instructionsUndone": "元に戻しました",
   "chat.usageLimit.title": "{provider} の使用量の上限に達しました",
   "chat.usageLimit.onHold": "メッセージを保留中",
   "chat.usageLimit.bodyReset":

@@ -146,6 +146,9 @@ export const messages = {
   "chat.marker.openRoutine": "Routine {name} öffnen",
   "chat.marker.unavailable": "Nicht verfügbar",
   "chat.marker.contextReset": "Neuer Chat gestartet",
+  "chat.marker.instructionsView": "Ansehen",
+  "chat.marker.instructionsUndo": "Rückgängig",
+  "chat.marker.instructionsUndone": "Rückgängig gemacht",
   "chat.usageLimit.title": "Nutzungslimit von {provider} erreicht",
   "chat.usageLimit.onHold": "Nachricht wartet",
   "chat.usageLimit.bodyReset":

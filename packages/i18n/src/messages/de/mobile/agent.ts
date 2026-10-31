@@ -489,8 +489,8 @@ export const messages = {
   "mobile.agent.edit.appearance": "Aussehen bearbeiten",
   "mobile.agent.edit.title": "Titel",
   "mobile.agent.edit.titlePlaceholder": "Beschreibe, was dein Agent tut",
-  "mobile.agent.edit.instructions": "Anweisungen",
-  "mobile.agent.edit.instructionsPlaceholder": "Wofür dieser Agent da ist",
+  "mobile.agent.edit.description": "Beschreibung",
+  "mobile.agent.edit.descriptionPlaceholder": "Wofür dieser Agent gedacht ist",
   "mobile.agent.instructions.length": "{length} / {limit}",
   "mobile.agent.instructions.tooLong":
     "Kürze die Anweisungen auf {limit} Zeichen. Längere Anweisungen werden nicht gespeichert.",

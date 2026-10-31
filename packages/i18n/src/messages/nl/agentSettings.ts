@@ -102,7 +102,9 @@ export const messages = {
   "agentSettings.descriptionPlaceholder": "Waar deze agent voor is",
   "agentSettings.instructions": "Instructies",
   "agentSettings.instructionsLabel": "Instructies voor agent",
-  "agentSettings.instructionsResize": "Formaat van instructies wijzigen",
+  "agentSettings.instructionsEdit": "Instructies bewerken",
+  "agentSettings.instructionsChangedWhileEditing":
+    "De agent heeft zijn instructies gewijzigd terwijl je ze bewerkte. Sla opnieuw op om zijn versie te vervangen.",
   "agentSettings.instructionsPlaceholder": "Regels die deze agent altijd volgt",
   "agentSettings.avatar.edit": "Avatar van agent bewerken",
   "agentSettings.avatar.editor": "Avatar-editor",

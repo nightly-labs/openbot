@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "Scrittura di {path}, fuori dal workspace dell'agente, dalla cartella condivisa e dalle cartelle temporanee.",
   "status.agent.contextCleared": "Contesto cancellato. Da qui inizia una nuova chat.",
+  "status.agent.instructionsChanged": "Ha aggiornato le sue istruzioni",
   "status.agent.modelSwitchedForLimit": "Limite di utilizzo raggiunto. Passato a {model}.",
   "status.agent.modelReturnedAfterLimit": "Limite di utilizzo terminato. Tornato a {model}.",
   "status.agent.modelSwitchedForError": "Errore del provider. Passato a {model}.",

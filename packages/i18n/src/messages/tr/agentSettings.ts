@@ -102,7 +102,9 @@ export const messages = {
   "agentSettings.descriptionPlaceholder": "Bu ajanın amacı nedir",
   "agentSettings.instructions": "Talimatlar",
   "agentSettings.instructionsLabel": "Ajan talimatları",
-  "agentSettings.instructionsResize": "Talimatları yeniden boyutlandır",
+  "agentSettings.instructionsEdit": "Talimatları düzenle",
+  "agentSettings.instructionsChangedWhileEditing":
+    "Sen düzenlerken ajan talimatlarını değiştirdi. Onun sürümünü değiştirmek için yeniden kaydet.",
   "agentSettings.instructionsPlaceholder": "Bu ajanın her zaman uyduğu kurallar",
   "agentSettings.avatar.edit": "Ajan avatarını düzenle",
   "agentSettings.avatar.editor": "Avatar düzenleyici",

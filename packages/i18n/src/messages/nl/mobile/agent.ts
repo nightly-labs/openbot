@@ -484,8 +484,8 @@ export const messages = {
   "mobile.agent.edit.appearance": "Uiterlijk bewerken",
   "mobile.agent.edit.title": "Titel",
   "mobile.agent.edit.titlePlaceholder": "Beschrijf wat je agent doet",
-  "mobile.agent.edit.instructions": "Instructies",
-  "mobile.agent.edit.instructionsPlaceholder": "Waar deze agent voor is",
+  "mobile.agent.edit.description": "Beschrijving",
+  "mobile.agent.edit.descriptionPlaceholder": "Waar deze agent voor is",
   "mobile.agent.instructions.length": "{length} / {limit}",
   "mobile.agent.instructions.tooLong":
     "Kort de instructies in tot {limit} tekens. Langere instructies worden niet opgeslagen.",

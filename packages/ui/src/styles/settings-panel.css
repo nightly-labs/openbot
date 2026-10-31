@@ -179,6 +179,80 @@
   resize: none;
 }
 
+/* The description is one or two sentences, so its field starts lower than the instructions. */
+.settings-field .settings-description-input {
+  height: 72px;
+  min-height: 72px;
+}
+
+/* The Instructions show the start of the file as formatted text. Edit opens the whole file. */
+.agent-instructions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  margin: 0 0 6px 8px;
+}
+
+.agent-instructions-header > span {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
+.agent-instructions-preview {
+  max-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-shadow-popover-ambient);
+  padding: 10px 11px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+}
+
+.agent-instructions-preview[data-clamped="true"] {
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) calc(100% - 48px), var(--openbot-transparent));
+}
+
+.agent-instructions-preview .message-markdown-heading[data-level] {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.agent-instructions-preview .message-markdown-heading:not([data-level="1"], [data-level="2"]) {
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.agent-instructions-empty {
+  color: var(--openbot-text-muted);
+}
+
+.agent-instructions-dialog {
+  width: min(760px, 100%);
+  height: min(720px, calc(100dvh - 2 * var(--openbot-space-6)));
+}
+
+.agent-instructions-form {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+.agent-instructions-form .agent-instructions-editor {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
 .settings-field input::placeholder,
 .settings-field textarea::placeholder {
   color: var(--openbot-text-muted);

@@ -470,8 +470,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.edit.appearance": "Edit appearance",
   "mobile.agent.edit.title": "Title",
   "mobile.agent.edit.titlePlaceholder": "Describe what your agent does",
-  "mobile.agent.edit.instructions": "Instructions",
-  "mobile.agent.edit.instructionsPlaceholder": "What this agent is for",
+  "mobile.agent.edit.description": "Description",
+  "mobile.agent.edit.descriptionPlaceholder": "What this agent is for",
   "mobile.agent.instructions.length": "{length} / {limit}",
   "mobile.agent.instructions.tooLong":
     "Shorten the instructions to {limit} characters. Longer instructions are not saved.",

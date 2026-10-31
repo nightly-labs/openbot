@@ -648,9 +648,22 @@ for teammates and the Team API; it keeps its meaning and its 2,000-character lim
   `AGENTS.md` with mode 0600. An existing file keeps its mode; a hard link to it is replaced by a
   new file. A save never deletes the file.
 - The editor sends the text that the edit started from. When the agent changed the file after
-  that, main refuses the save and the editor shows the agent's text.
+  that, main refuses the save. The editor keeps the user's text, says that the agent changed the
+  file, and a second Save replaces the agent's version.
 - The agent settings show the file as "Instructions" for a local agent only
-  (`agentInstructions` IPC group). The Team API does not carry the file.
+  (`agentInstructions` IPC group). The panel shows the start of the file as Markdown; Edit opens
+  the whole file in a dialog that saves only on Save. The Team API does not carry the file.
+- `InstructionsChanges` (`src/backend/agent/instructions-changes.ts`) reads the file when the first
+  turn of an agent starts and again when a turn ends. When the text changed, the turn ends with an
+  `instructions-change` system line, "Updated its instructions". The baseline is one per agent, so
+  two turns at the same time show the change once. A save in the editor moves the baseline, so
+  the user's own edit does not show as the agent's. A turn that a restart settles shows no line.
+- The line carries `instructionsChange` (`before`, `after`) when both texts fit the editor limit.
+  The message stays in `projection_thread_messages.message_json`, so no migration is needed. The
+  Team API projections do not copy the field: a remote client sees the text only. View opens the
+  editor; Undo saves `before` with `after` as the expected text, so main refuses it after a later
+  change. A save in the dialog or an Undo updates the panel and each line of the same agent. The
+  unread counts skip the line.
 - The developer instructions name the file and tell the agent to keep its rules there.
   `workspaceInstructionFiles` in the provider descriptor lists the files that each CLI reads by
   itself from its working directory. `ThreadLifecycle` adds the text of the file, at most 32,000

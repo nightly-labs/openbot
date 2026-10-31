@@ -97,7 +97,8 @@ export const messages = {
   "agentSettings.descriptionPlaceholder": "这个助手用来做什么",
   "agentSettings.instructions": "指令",
   "agentSettings.instructionsLabel": "助手指令",
-  "agentSettings.instructionsResize": "调整指令大小",
+  "agentSettings.instructionsEdit": "编辑指令",
+  "agentSettings.instructionsChangedWhileEditing": "你编辑时，代理更改了它的指令。再次保存即可替换它的版本。",
   "agentSettings.instructionsPlaceholder": "这个助手始终遵守的规则",
 
   "agentSettings.avatar.edit": "编辑助手头像",

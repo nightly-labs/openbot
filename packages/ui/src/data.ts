@@ -2,6 +2,7 @@ import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import type {
   AgentAccess,
   AgentExchangeSummary,
+  AgentInstructionsChange,
   AgentModelId,
   AgentReasoningEffort,
   AttachmentSummary,
@@ -156,6 +157,17 @@ export type ChatActionMarkerModel =
   | { kind: "vault-change"; text: string; timestamp: string }
   /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
   | { kind: "plan-continuation"; text: string; timestamp: string }
+  /**
+   * The agent changed its instruction file in a turn. `text` is the host's note. `change` is absent on a
+   * remote client and for a text longer than the editor saves: then the line has no Undo.
+   */
+  | {
+      kind: "instructions-change";
+      agentId: string | null;
+      change: AgentInstructionsChange | null;
+      text: string;
+      timestamp: string;
+    }
   | {
       kind: "unavailable";
       label: string;

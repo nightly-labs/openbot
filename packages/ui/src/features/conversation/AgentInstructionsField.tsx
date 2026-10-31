@@ -1,33 +1,35 @@
 /**
- * The Instructions field of a local agent: the text of `AGENTS.md` at the root of its workspace, or
- * of `CLAUDE.md` in an older workspace. The agent reads the file in each session and can change it,
- * so the field reads it again after each turn when the user has no unsaved change in it. A save
- * sends the text that the edit started from: when the agent changed the file since then, main
- * refuses the save and the field shows the agent's text.
+ * The Instructions of a local agent: the text of `AGENTS.md` at the root of its workspace, or of
+ * `CLAUDE.md` in an older workspace. The panel shows the start of the file as formatted text, and
+ * Edit opens the whole file in a dialog. The agent reads the file in each session and can change it,
+ * so the preview reads it again after each turn.
  */
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentInstructionsFile } from "@openbot/contracts/ipc";
-import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
-import { SettingsField } from "@openbot/ui/components/SettingsPanel";
+import { Button } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
-import { InstructionsLimit, instructionsTooLong } from "../agents/InstructionsLimit";
+import { AgentInstructionsDialog } from "./AgentInstructionsDialog";
+import { MarkdownMessageText } from "./MarkdownMessageText";
 
 /** The calls of the computer that runs the agent. */
-export interface AgentInstructionsCalls {
+export interface AgentInstructionsFileCalls {
   read: (agentId: string) => Promise<AgentInstructionsFile>;
   /** `expected` is the file text that the edit started from. */
   save: (agentId: string, text: string, expected: string) => Promise<AgentInstructionsFile>;
+  /** Calls `watcher` after each save. Returns the call that stops it. */
+  watch: (watcher: (agentId: string, file: AgentInstructionsFile) => void) => () => void;
 }
 
-const SAVE_DELAY_MS = 400;
-const LIMIT = INPUT_LIMITS.agentInstructionsFile;
+export interface AgentInstructionsCalls extends AgentInstructionsFileCalls {
+  /** Opens a link of the formatted text. */
+  openLink: (url: string) => void;
+}
 
 export function AgentInstructionsField(props: {
   agentId: string;
-  /** The agent has a turn now. When it ends, the field reads the file again. */
+  /** The agent has a turn now. When it ends, the preview reads the file again. */
   working: boolean;
   calls: AgentInstructionsCalls;
 }): JSX.Element {
@@ -35,22 +37,19 @@ export function AgentInstructionsField(props: {
   const [text, setText] = createSignal("");
   const [loaded, setLoaded] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  /** The agent whose file the field shows. A late answer for the agent shown before is dropped. */
+  const [editing, setEditing] = createSignal(false);
+  const [clamped, setClamped] = createSignal(false);
+  /** The agent whose file the preview shows. A late answer for the agent shown before is dropped. */
   let shown: string | undefined;
-  let dirty = false;
-  /** The file text of each agent after the last read or save. A save on an agent switch still uses it. */
-  const bases = new Map<string, string>();
-  let timer: ReturnType<typeof setTimeout> | undefined;
   let request = 0;
-  // One save at a time, so that an older save cannot write over a newer text.
-  let saving: Promise<void> = Promise.resolve();
+  let preview: HTMLDivElement | undefined;
+  let content: HTMLDivElement | undefined;
 
   async function load(agentId: string): Promise<void> {
     const current = ++request;
     try {
       const file = await props.calls.read(agentId);
-      if (current !== request || shown !== agentId || dirty) return;
-      bases.set(agentId, file.text);
+      if (current !== request || shown !== agentId) return;
       setText(file.text);
       setLoaded(true);
       setError(null);
@@ -60,58 +59,11 @@ export function AgentInstructionsField(props: {
     }
   }
 
-  function clearTimer(): void {
-    if (timer === undefined) return;
-    clearTimeout(timer);
-    timer = undefined;
-  }
-
-  // Text over the limit stays in the field, unsaved, until the user shortens it.
-  function save(agentId: string, value: string): void {
-    clearTimer();
-    if (instructionsTooLong(value, LIMIT)) return;
-    saving = saving.then(async () => {
-      // A newer text has its own save. When the agent changed the file, the field shows its text now.
-      if (shown === agentId && text() !== value) return;
-      try {
-        await props.calls.save(agentId, value, bases.get(agentId) ?? "");
-        bases.set(agentId, value);
-        if (shown !== agentId) return;
-        if (text() === value) dirty = false;
-        setError(null);
-      } catch (failure) {
-        if (shown !== agentId) return;
-        setError(errorMessage(failure, t("error.agent.instructionsSaveFailed")));
-        await showChangedFile(agentId);
-      }
-    });
-  }
-
-  /** After a failed save: when the agent changed the file, the field shows its text. */
-  async function showChangedFile(agentId: string): Promise<void> {
-    const current = ++request;
-    try {
-      const file = await props.calls.read(agentId);
-      if (current !== request || shown !== agentId || file.text === bases.get(agentId)) return;
-      clearTimer();
-      bases.set(agentId, file.text);
-      dirty = false;
-      setText(file.text);
-    } catch {
-      // The save error already shows.
-    }
-  }
-
-  function flush(): void {
-    if (dirty && shown !== undefined) save(shown, text());
-  }
-
   createEffect(
     () => props.agentId,
     (agentId) => {
-      flush();
       shown = agentId;
-      dirty = false;
+      setEditing(false);
       setLoaded(false);
       setText("");
       setError(null);
@@ -122,34 +74,76 @@ export function AgentInstructionsField(props: {
   createEffect(
     () => props.working,
     (working, previous) => {
-      if (working || previous !== true || dirty || shown === undefined) return;
+      if (working || previous !== true || shown === undefined) return;
       void load(shown);
     },
   );
 
-  onSettled(() => () => flush());
+  onSettled(() =>
+    props.calls.watch((agentId, file) => {
+      if (agentId !== shown) return;
+      ++request;
+      setText(file.text);
+      setLoaded(true);
+      setError(null);
+    }),
+  );
+
+  // A long file shows only its start, with a fade at the bottom edge.
+  onSettled(() => {
+    if (!preview || !content) return;
+    const box = preview;
+    const inner = content;
+    const observer = new ResizeObserver(() => setClamped(inner.offsetHeight > box.clientHeight));
+    observer.observe(inner);
+    observer.observe(box);
+    return () => observer.disconnect();
+  });
 
   return (
-    <SettingsField label={t("agentSettings.instructions")}>
-      <ResizableTextarea
-        class="settings-instructions-input"
-        rows="5"
-        value={text()}
-        disabled={!loaded()}
-        aria-label={t("agentSettings.instructionsLabel")}
-        resizeLabel={t("agentSettings.instructionsResize")}
-        placeholder={t("agentSettings.instructionsPlaceholder")}
-        invalid={instructionsTooLong(text(), LIMIT)}
-        onValueChange={(value) => {
-          setText(value);
-          dirty = true;
-          const agentId = shown;
-          clearTimer();
-          if (agentId !== undefined) timer = setTimeout(() => save(agentId, value), SAVE_DELAY_MS);
+    <div class="settings-field agent-instructions-field">
+      <div class="agent-instructions-header">
+        <span>{t("agentSettings.instructions")}</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={t("agentSettings.instructionsEdit")}
+          disabled={!loaded()}
+          onClick={() => setEditing(true)}
+        >
+          {t("common.edit")}
+        </Button>
+      </div>
+      <div
+        ref={(element) => {
+          preview = element;
         }}
-        onBlur={flush}
-      />
-      <InstructionsLimit text={text()} limit={LIMIT} />
+        class="agent-instructions-preview message-markdown"
+        data-clamped={clamped() ? "true" : undefined}
+      >
+        <div
+          ref={(element) => {
+            content = element;
+          }}
+        >
+          <Show
+            when={text().trim()}
+            fallback={<span class="agent-instructions-empty">{t("agentSettings.instructionsPlaceholder")}</span>}
+          >
+            {(body) => (
+              <MarkdownMessageText
+                imagesAsLinks
+                linkFavicons={false}
+                body={body()}
+                agents={[]}
+                onSelectAgent={() => undefined}
+                onOpenLink={props.calls.openLink}
+              />
+            )}
+          </Show>
+        </div>
+      </div>
       <Show when={error()}>
         {(message) => (
           <span class="ui-field-error" role="alert">
@@ -157,6 +151,7 @@ export function AgentInstructionsField(props: {
           </span>
         )}
       </Show>
-    </SettingsField>
+      <AgentInstructionsDialog open={editing()} onOpenChange={setEditing} agentId={props.agentId} calls={props.calls} />
+    </div>
   );
 }

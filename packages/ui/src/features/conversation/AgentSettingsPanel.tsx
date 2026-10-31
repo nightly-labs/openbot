@@ -1235,10 +1235,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onBlur={saveTitle}
                 />
               </SettingsField>
+              <Show when={props.instructionsFile}>
+                {(calls) => <AgentInstructionsField agentId={props.agent.id} working={props.working} calls={calls()} />}
+              </Show>
               <SettingsField label={t("agentSettings.description")}>
                 <ResizableTextarea
-                  class="settings-instructions-input"
-                  rows="5"
+                  class="settings-instructions-input settings-description-input"
+                  rows="3"
                   value={draft.fields.description}
                   aria-label={t("agentSettings.descriptionLabel")}
                   resizeLabel={t("agentSettings.descriptionResize")}
@@ -1255,9 +1258,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 />
                 <InstructionsLimit text={draft.fields.description} tooLong="agent.description.tooLong" />
               </SettingsField>
-              <Show when={props.instructionsFile}>
-                {(calls) => <AgentInstructionsField agentId={props.agent.id} working={props.working} calls={calls()} />}
-              </Show>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows" title={t("agentSettings.groups.brain")}>
                 <ProviderModelPicker
                   variant="field"

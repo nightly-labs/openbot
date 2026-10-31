@@ -99,7 +99,9 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.descriptionPlaceholder": "What this agent is for",
   "agentSettings.instructions": "Instructions",
   "agentSettings.instructionsLabel": "Agent instructions",
-  "agentSettings.instructionsResize": "Resize instructions",
+  "agentSettings.instructionsEdit": "Edit instructions",
+  "agentSettings.instructionsChangedWhileEditing":
+    "The agent changed its instructions while you edited them. Save again to replace its version.",
   "agentSettings.instructionsPlaceholder": "Rules this agent always follows",
 
   "agentSettings.avatar.edit": "Edit agent avatar",

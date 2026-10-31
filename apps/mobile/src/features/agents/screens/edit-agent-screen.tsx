@@ -322,9 +322,9 @@ function AgentForm({
             onChangeText={(value) => change({ title: value })}
           />
           <SheetFormField
-            label={t("mobile.agent.edit.instructions")}
+            label={t("mobile.agent.edit.description")}
             appearance="soft"
-            placeholder={t("mobile.agent.edit.instructionsPlaceholder")}
+            placeholder={t("mobile.agent.edit.descriptionPlaceholder")}
             multiline
             value={description}
             editable={!saving}

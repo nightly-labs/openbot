@@ -52,6 +52,7 @@ import type { FailureContext, FailureSignal } from "./failure-signal";
 import { readCapturedSteps } from "./handoff-tool-steps";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
+import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import type { PlanContinuation } from "./plan-continuation";
@@ -206,6 +207,7 @@ export interface TurnLifecycleOptions {
   conversation: ConversationRuntime;
   providers: ProviderRuntime;
   memories: AgentMemories;
+  instructions: InstructionsChanges;
   attention: AttentionRegistry;
   browser: AgentBrowserHost;
   compaction: ContextCompaction;
@@ -232,6 +234,7 @@ export class TurnLifecycle {
   readonly #conversation: ConversationRuntime;
   readonly #providers: ProviderRuntime;
   readonly #memories: AgentMemories;
+  readonly #instructions: InstructionsChanges;
   readonly #attention: AttentionRegistry;
   readonly #browser: AgentBrowserHost;
   readonly #compaction: ContextCompaction;
@@ -312,6 +315,7 @@ export class TurnLifecycle {
     this.#conversation = options.conversation;
     this.#providers = options.providers;
     this.#memories = options.memories;
+    this.#instructions = options.instructions;
     this.#attention = options.attention;
     this.#browser = options.browser;
     this.#compaction = options.compaction;
@@ -412,6 +416,7 @@ export class TurnLifecycle {
       ) {
         // The turn does not end here, so it keeps no trace.
         this.#traces.drop(turnId);
+        this.#instructions.dropTurn(turn.agentId, turnId);
         // The client is gone, so no browser tool of this turn can run. Other agents keep their controls.
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
         // The turn does not end here, so a provider error held for a failover shows now.
@@ -577,6 +582,8 @@ export class TurnLifecycle {
         }
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
+        const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+        if (workspace) yield* this.#instructions.startTurn(agentId, turnId, workspace);
         return;
       }
       case "item/started":
@@ -936,6 +943,8 @@ export class TurnLifecycle {
       const association = this.#turnAssociations.get(turnId);
       if (association) yield* Deferred.await(association).pipe(Effect.catch(() => Effect.void));
       const memoryChanges = this.#memories.finishTurn(turnId, status).get(agentId) ?? [];
+      const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+      const instructionsChange = yield* this.#instructions.finishTurn(agentId, turnId, workspace);
       // A refused session is closed below, and a spent plan would refuse the summary turn too, so
       // neither is compacted.
       // A routine run's own session closes after this turn, so it is not compacted either. Nor is a
@@ -1192,6 +1201,7 @@ export class TurnLifecycle {
       if (trace) this.#attachTrace(snapshot.messages, agentId, turnId, trace);
       const memoryLine = memoryChangesMessage(turnId, memoryChanges, (text) => this.#hooks.redactMcp(text));
       if (memoryLine) snapshot.messages.push(memoryLine);
+      if (instructionsChange) snapshot.messages.push(instructionsChangeMessage(turnId, instructionsChange));
       if (continuation) {
         // No `turnId`: inside the turn, a system row sorts before the answer. Alone, the line shows
         // after this turn's answer and before the continuation turn.
@@ -1279,6 +1289,7 @@ export class TurnLifecycle {
     this.#runningTurns.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#markEnded(turnId);
+    this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
     const deliveries = yield* turnStep(() => this.#mailbox.findDeliveriesByTurn(agentId, turnId)).pipe(
       Effect.catchCause((cause) => report(cause).pipe(Effect.as([]))),

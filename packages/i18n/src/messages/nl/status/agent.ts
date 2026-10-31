@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "{path} schrijven, buiten de werkruimte van de agent, de gedeelde map en de tijdelijke mappen.",
   "status.agent.contextCleared": "Context gewist. Hier begint een nieuwe chat.",
+  "status.agent.instructionsChanged": "Heeft zijn instructies bijgewerkt",
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",

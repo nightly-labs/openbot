@@ -2,7 +2,7 @@
 // Instructions field. Only the local server has them: the Team API does not carry them.
 
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
-import type { AgentInstructionsCalls } from "@openbot/ui/features/conversation/AgentInstructionsField";
+import type { AgentInstructionsFileCalls } from "@openbot/ui/features/conversation/AgentInstructionsField";
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function agentFolderCalls(): AgentFolderCalls {
@@ -19,10 +19,23 @@ export function agentFolderCalls(): AgentFolderCalls {
   };
 }
 
+type InstructionsWatcher = Parameters<AgentInstructionsFileCalls["watch"]>[0];
+
+/** The Settings preview and each chat line show the file. A save in one of them updates the others. */
+const instructionsWatchers = new Set<InstructionsWatcher>();
+
 /** The instruction file in a local agent's workspace. The Team API does not carry it. */
-export function agentInstructionsCalls(): AgentInstructionsCalls {
+export function agentInstructionsCalls(): AgentInstructionsFileCalls {
   return {
     read: (agentId) => window.openbot.agent.readAgentInstructions(agentId),
-    save: (agentId, text, expected) => window.openbot.agent.saveAgentInstructions({ agentId, text, expected }),
+    save: async (agentId, text, expected) => {
+      const file = await window.openbot.agent.saveAgentInstructions({ agentId, text, expected });
+      for (const watcher of instructionsWatchers) watcher(agentId, file);
+      return file;
+    },
+    watch: (watcher) => {
+      instructionsWatchers.add(watcher);
+      return () => instructionsWatchers.delete(watcher);
+    },
   };
 }

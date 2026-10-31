@@ -58,3 +58,26 @@ export function parseSaveAgentInstructionsInput(value: unknown): SaveAgentInstru
     throw new Error("Invalid agent instructions input.");
   return { agentId: value.agentId, text: value.text, expected: value.expected };
 }
+
+/**
+ * The item type of the system line after a turn in which the agent changed its instruction file. The
+ * text says so, for a client that does not read `instructionsChange`, such as a Team API client.
+ */
+export const AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE = "instructions-change";
+
+/**
+ * The file text before and after the turn, so that the user can undo the change. Absent when either
+ * text is longer than the editor saves. It stays on this computer: the Team API projections drop it.
+ */
+export interface AgentInstructionsChange {
+  before: string;
+  after: string;
+}
+
+export function isAgentInstructionsChange(value: unknown): value is AgentInstructionsChange {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.before, INPUT_LIMITS.agentInstructionsFile) &&
+    isBoundedString(value.after, INPUT_LIMITS.agentInstructionsFile)
+  );
+}

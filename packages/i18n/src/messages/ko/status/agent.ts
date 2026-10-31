@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/status/agent";
 export const messages = {
   "status.agent.claudeWriteOutside": "에이전트의 워크스페이스, 공유 폴더, 임시 폴더 밖에 있는 {path}에 써요.",
   "status.agent.contextCleared": "컨텍스트를 지웠어요. 여기서 새 채팅이 시작돼요.",
+  "status.agent.instructionsChanged": "지침을 업데이트했어요",
   "status.agent.modelSwitchedForLimit": "사용 한도에 도달했어요. {model}(으)로 전환했어요.",
   "status.agent.modelReturnedAfterLimit": "사용 한도가 끝났어요. {model}(으)로 다시 전환했어요.",
   "status.agent.modelSwitchedForError": "제공자 오류가 발생했어요. {model}(으)로 전환했어요.",

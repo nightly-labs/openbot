@@ -143,7 +143,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const folderCalls = agentFolderCalls();
   /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
   const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
-  const instructionsCalls = agentInstructionsCalls();
+  const instructionsCalls = {
+    ...agentInstructionsCalls(),
+    openLink: (url: string) => void openExternalMessageUrl(url),
+  };
   /** The instruction file is in the agent's workspace on this computer. */
   const localInstructionsCalls = () =>
     props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;

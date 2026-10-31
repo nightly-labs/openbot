@@ -4,6 +4,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.claudeWriteOutside":
     "Write {path}, outside the agent's workspace, the shared folder and the temporary folders.",
   "status.agent.contextCleared": "Context cleared. A new chat starts here.",
+  "status.agent.instructionsChanged": "Updated its instructions",
   "status.agent.modelSwitchedForLimit": "Usage limit reached. Switched to {model}.",
   "status.agent.modelReturnedAfterLimit": "Usage limit ended. Switched back to {model}.",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
