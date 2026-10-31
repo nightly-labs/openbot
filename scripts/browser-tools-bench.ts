@@ -948,8 +948,11 @@ function harnessInstalled(): boolean {
 }
 
 function selectTasks(raw: string | undefined): BenchTask[] {
-  if (raw === undefined) return TASKS;
-  if (/^\d+$/u.test(raw)) return TASKS.slice(0, Number(raw));
+  // The calendar tasks measure one recovery path and run only by id, so the default and a number
+  // select the same public-site tasks as before.
+  const publicTasks = TASKS.filter((task) => !task.calendar);
+  if (raw === undefined) return publicTasks;
+  if (/^\d+$/u.test(raw)) return publicTasks.slice(0, Number(raw));
   const wanted = raw.split(",").map((part) => part.trim());
   const selected = TASKS.filter((task) => wanted.includes(task.id));
   if (selected.length === 0) throw new Error(`No task matches "${raw}".`);
@@ -968,9 +971,7 @@ async function main(): Promise<void> {
     logger.warn("browser-harness is not on PATH, so variant D is skipped. The bench does not install it.");
     variants = variants.filter((variant) => variant.id !== "D");
   }
-  // Without --tasks, the public-site tasks only: the calendar tasks measure one recovery path.
-  const tasks =
-    parsed.values.tasks === undefined ? TASKS.filter((task) => !task.calendar) : selectTasks(parsed.values.tasks);
+  const tasks = selectTasks(parsed.values.tasks);
   const repeats = Number(parsed.values.repeats ?? "3");
   if (!Number.isInteger(repeats) || repeats < 1 || repeats > 10) throw new Error("--repeats must be from 1 to 10.");
 
