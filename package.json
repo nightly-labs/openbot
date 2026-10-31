@@ -267,6 +267,7 @@
     "test:claude-usage-resume": "bun scripts/claude-usage-resume-e2e.ts",
     "test:claude-late-steer": "bun scripts/claude-late-steer-e2e.ts",
     "test:provider-session-reuse": "bun scripts/provider-session-reuse-e2e.ts",
+    "test:claude-thinking-stream": "bun scripts/claude-thinking-stream-e2e.ts",
     "test:claude-cache": "bun scripts/claude-cache-e2e.ts",
     "test:token-usage": "bun scripts/token-usage-e2e.ts",
     "test:backup-model-failover": "bun scripts/backup-model-failover-e2e.ts",

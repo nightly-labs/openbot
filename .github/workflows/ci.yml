@@ -462,6 +462,9 @@ jobs:
       - name: Run the provider session reuse E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-session-reuse
+      - name: Run the Claude thinking stream E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-thinking-stream
 
       - name: Run the backup model failover E2E test
         if: ${{ !cancelled() }}
@@ -572,6 +575,7 @@ jobs:
             .openbot-build/claude-usage-resume-e2e/
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/provider-session-reuse-e2e/
+            .openbot-build/claude-thinking-stream-e2e/
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/

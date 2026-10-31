@@ -191,7 +191,8 @@ interface ActiveTurn {
   narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
-  thinkingStreamId: string | null;
+  /** A thinking block began in the stream, and its first delta has not come yet. */
+  thinkingBlockOpened: boolean;
   assistantMessages: Map<string, string>;
   thinkingMessages: Map<string, string>;
   toolCalls: Map<string, string>;
@@ -1058,7 +1059,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
-      thinkingStreamId: null,
+      thinkingBlockOpened: false,
       assistantMessages: new Map<string, string>(),
       thinkingMessages: new Map<string, string>(),
       toolCalls: new Map<string, string>(),
@@ -1248,13 +1249,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
-      if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
+      const block = isRecord(event) ? event.content_block : null;
+      // Each stream event has a uuid of its own. Only the start of a block says that a new thinking block began.
+      if (isRecord(event) && event.type === "content_block_start" && isRecord(block) && block.type === "thinking") {
+        this.#outputTurn(runtime);
+        this.#openThinkingBlock(runtime);
+      } else if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
         if (delta.type === "text_delta" && isString(delta.text)) {
           this.#outputTurn(runtime);
           this.#bufferText(runtime, delta.text);
         } else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
           this.#outputTurn(runtime);
-          this.#appendThinkingDelta(runtime, delta.thinking, message.uuid);
+          this.#appendThinkingDelta(runtime, delta.thinking, true);
         }
       }
       return;
@@ -1283,9 +1289,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // an answer. The result after it carries the same text and fails the turn.
       if (message.error && message.error !== "max_output_tokens") return;
       const thinking = messageThinking(message.message);
-      /* The deltas never announced this block, so its own order is all there is to say what came
-         before it. Text the message placed there is narration, and only that much may go. */
-      if (thinking && message.uuid !== turn.thinkingStreamId) {
+      /* The message's own order is all there is to say what came before its thinking. Text the
+         message placed there is narration, and only that much may go. */
+      if (thinking) {
         const before = textBeforeThinking(message.message);
         if (before) {
           turn.assistantMessages.set(message.uuid, before);
@@ -1540,15 +1546,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** The stream began a thinking block. Its first delta closes the step and starts a new line. */
+  #openThinkingBlock(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (turn) turn.thinkingBlockOpened = true;
+  }
+
   /* Claude streams reasoning as its own content block; the app-server vocabulary carries it as a
      separate agentMessage item whose `commentary` phase becomes the thinking disclosure. */
-  #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
+  #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamed = false): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
+    const opensBlock = streamed && turn.thinkingBlockOpened;
+    if (streamed) turn.thinkingBlockOpened = false;
     /* A thinking block beginning closes the step. Filling in the rest of one that already began
        does not, and a message carries that backfill with no stream of its own: flushing there
        would publish text the turn holds for its answer as narration and end with no answer. */
-    if (streamId !== undefined && streamId !== turn.thinkingStreamId) this.#flushNarration(runtime);
+    if (opensBlock) this.#flushNarration(runtime);
     if (!turn.thinkingStarted) {
       turn.thinkingStarted = true;
       this.emit("notification", {
@@ -1560,8 +1574,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
-    const nextDelta = streamId && turn.thinkingStreamId && streamId !== turn.thinkingStreamId ? `\n${delta}` : delta;
-    if (streamId) turn.thinkingStreamId = streamId;
+    // Blocks are one line apart, as `messageThinking` joins them, so the complete messages still match.
+    const nextDelta = opensBlock && turn.thinking ? `\n${delta}` : delta;
     turn.thinking += nextDelta;
     this.emit("notification", {
       method: "item/agentMessage/delta",
