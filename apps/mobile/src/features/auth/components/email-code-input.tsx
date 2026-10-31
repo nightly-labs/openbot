@@ -40,10 +40,12 @@ interface EmailCodeInputProps {
 const GROUP_SIZE = 4;
 // Slots rise in one after another: the last one starts 240 ms after the first.
 const SLOT_STAGGER_MS = 30;
-// The email shows the code as `XXXX-XXXX`. Paste and autofill keep the dash, so the native field
-// accepts one more character than the code. HeroUI `InputOTP` fixes the native length at the code
-// length and cuts the pasted code short, so this field draws its own slots.
-const NATIVE_MAX_LENGTH = ONE_TIME_CODE_LENGTH + 1;
+// The email shows the code as `XXXX-XXXX`. Paste and autofill keep the dash and can add words around
+// the code, and a paste into a field that has part of a code adds to that part. The native field
+// takes all of it, and the code is read from it below. A native limit of the code length cut the text
+// before that read. HeroUI `InputOTP` fixes the native length at the code length and cuts the pasted
+// code short, so this field draws its own slots.
+const NATIVE_MAX_LENGTH = 64;
 const CHARACTER_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 6 }, { scale: 0.85 }] },
   100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: SIGN_IN_EASE_OUT },
@@ -133,7 +135,10 @@ export function EmailCodeInput({
         ref={input}
         value={value}
         onChangeText={(text) => {
-          const next = normalizeCodeInput(text);
+          // A full code pasted after part of a code replaces that part: "AB" and a pasted
+          // "ABCD-2345" give "ABCD2345", not "ABABCD23".
+          const added = normalizeCodeInput(text.startsWith(value) ? text.slice(value.length) : text);
+          const next = added.length === ONE_TIME_CODE_LENGTH ? added : normalizeCodeInput(text);
           if (next === value) return;
           onChange(next);
           if (next.length === ONE_TIME_CODE_LENGTH) onComplete(next);
