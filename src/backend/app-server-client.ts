@@ -43,9 +43,13 @@ interface ClientEvents {
 
 /**
  * A stderr record that reports an error: Codex's own `ERROR` or `FATAL` level, as in
- * `2026-10-31T16:34:28Z ERROR codex_app_server: …`, or a launcher's `Error: …`, `fatal: …`.
+ * `2026-10-31T16:34:28Z ERROR codex_app_server: …`, a Rust panic, or a launcher's `Error: …`,
+ * `fatal: …`.
  */
-const ERROR_RECORD = /^(?:\S+\s+)?(?:ERROR|FATAL)\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
+const ERROR_RECORD =
+  /^(?:\S+\s+)?(?:ERROR|FATAL)\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S|\bpanicked at\b/u;
+/** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
+const STDERR_END_WAIT_MS = 250;
 
 export class AppServerError extends Error {
   constructor(
@@ -130,6 +134,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
+    child.stderr.once("end", () => diagnostics.flush());
     child.once("close", () => diagnostics.flush());
 
     child.once("error", (error) => this.#fail(error, child));
@@ -138,9 +143,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       // then an unrelated line.
       if (signal) return this.#fail(new Error(`Codex App Server exited with signal ${signal}.`), child);
       if (code === 0) return this.#fail(new Error("Codex App Server exited with code 0."), child);
-      diagnostics.flush();
-      const detail = (lastError ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
-      this.#fail(new AgentProcessExitError(`Codex App Server exited with code ${code ?? "unknown"}.`, detail), child);
+      const fail = () => {
+        const detail = (lastError ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
+        this.#fail(new AgentProcessExitError(`Codex App Server exited with code ${code ?? "unknown"}.`, detail), child);
+      };
+      // Node can send `exit` before stderr is read to its end, and a CLI that fails writes the
+      // reason last. The `end` listener above flushes the held record before this one runs.
+      if (child.stderr.readableEnded) return fail();
+      const wait = setTimeout(fail, STDERR_END_WAIT_MS);
+      child.stderr.once("end", () => {
+        clearTimeout(wait);
+        fail();
+      });
     });
   }
 
