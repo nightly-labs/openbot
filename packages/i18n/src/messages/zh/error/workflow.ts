@@ -36,6 +36,7 @@ export const messages = {
   "error.workflow.githubItemMissing": "该输出没有议题或拉取请求。从 GitHub 事件启动运行，或在它的输入中填入编号。",
   "error.workflow.githubPullRequestOnly": "该操作仅适用于拉取请求。",
   "error.workflow.githubTextMissing": "该输出没有可发送的文本。连接一个生成文本的步骤。",
+  "error.workflow.githubEventText": "该输出无法发送触发器的原始事件。在触发器和该输出之间放置一个助手。",
   "error.workflow.githubChoiceMissing": "为该输出选择标签或用户。",
   "error.workflow.githubChoseNothing": "模型没有选择该仓库中的任何标签或用户。",
   "error.workflow.githubNotConnected": "在运行该工作流的电脑上连接 GitHub。",

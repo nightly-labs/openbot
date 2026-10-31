@@ -45,6 +45,8 @@ export const messages = {
     "Cette sortie n’a ni issue ni pull request. Lancez l’exécution depuis un événement GitHub, ou mettez le numéro dans son entrée.",
   "error.workflow.githubPullRequestOnly": "Cette action ne fonctionne que sur les pull requests.",
   "error.workflow.githubTextMissing": "Cette sortie n’a aucun texte à envoyer. Connectez une étape qui l’écrit.",
+  "error.workflow.githubEventText":
+    "Cette sortie ne peut pas envoyer l’événement brut du déclencheur. Placez un agent entre le déclencheur et cette sortie.",
   "error.workflow.githubChoiceMissing": "Choisissez les étiquettes ou la personne pour cette sortie.",
   "error.workflow.githubChoseNothing": "Le modèle n’a choisi aucune étiquette ni personne de ce dépôt.",
   "error.workflow.githubNotConnected": "Connectez GitHub sur l’ordinateur qui exécute ce workflow.",

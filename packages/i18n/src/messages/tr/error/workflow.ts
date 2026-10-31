@@ -43,6 +43,8 @@ export const messages = {
     "Bu çıktının bir sorunu veya çekme isteği yok. Çalıştırmayı bir GitHub olayından başlatın ya da numarayı girdisine yazın.",
   "error.workflow.githubPullRequestOnly": "Bu eylem yalnızca çekme isteklerinde çalışır.",
   "error.workflow.githubTextMissing": "Bu çıktının gönderecek metni yok. Metni yazan bir adım bağlayın.",
+  "error.workflow.githubEventText":
+    "Bu çıktı tetikleyicinin ham olayını gönderemez. Tetikleyici ile bu çıktı arasına bir ajan koyun.",
   "error.workflow.githubChoiceMissing": "Bu çıktı için etiketleri veya kişiyi seçin.",
   "error.workflow.githubChoseNothing": "Model bu depodan hiçbir etiket veya kişi seçmedi.",
   "error.workflow.githubNotConnected": "Bu iş akışını çalıştıran bilgisayarda GitHub'ı bağlayın.",

@@ -44,6 +44,8 @@ export const messages = {
   "error.workflow.githubPullRequestOnly": "Deze actie werkt alleen bij pull requests.",
   "error.workflow.githubTextMissing":
     "Deze uitvoer heeft geen tekst om te sturen. Verbind een stap die de tekst schrijft.",
+  "error.workflow.githubEventText":
+    "Deze uitvoer kan de onbewerkte gebeurtenis van de trigger niet sturen. Zet een agent tussen de trigger en deze uitvoer.",
   "error.workflow.githubChoiceMissing": "Kies de labels of de persoon voor deze uitvoer.",
   "error.workflow.githubChoseNothing": "Het model koos geen label of persoon van deze repository.",
   "error.workflow.githubNotConnected": "Verbind GitHub op de computer waarop deze workflow draait.",

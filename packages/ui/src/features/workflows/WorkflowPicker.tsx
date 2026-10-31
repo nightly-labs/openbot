@@ -86,11 +86,13 @@ export function PickerRow(props: { option: PickerOption<string>; checked?: boole
 /**
  * The panel, the search field and the filter. With `search`, the field takes focus when the menu
  * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
+ * With `loading`, a line under the rows tells that more rows come.
  */
 function PickerShell<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
   search: string | undefined;
+  loading?: boolean | undefined;
   children: (group: PickerGroup<T>) => JSX.Element;
 }) {
   const { t } = useText();
@@ -169,6 +171,9 @@ function PickerShell<T extends string>(props: {
         <For each={shown()} fallback={<p class="wfn-picker-empty">{t("workflow.picker.noMatches")}</p>}>
           {(group) => props.children(group)}
         </For>
+        <Show when={props.loading}>
+          <p class="wfn-picker-empty">{t("common.loading")}</p>
+        </Show>
       </div>
     </DropdownMenu.Content>
   );
@@ -181,7 +186,9 @@ export function PickerMenu<T extends string>(props: {
   value: T | undefined;
   onSelect: (value: T) => void;
   /** The placeholder of the search field. Without it, the list has no search. */
-  search?: string;
+  search?: string | undefined;
+  /** More rows come, such as the labels of a repository that the host still reads. */
+  loading?: boolean | undefined;
 }) {
   const choose = (value: string) => {
     for (const group of props.groups) {
@@ -190,7 +197,7 @@ export function PickerMenu<T extends string>(props: {
     }
   };
   return (
-    <PickerShell label={props.label} groups={props.groups} search={props.search}>
+    <PickerShell label={props.label} groups={props.groups} search={props.search} loading={props.loading}>
       {(group) => (
         <DropdownMenu.RadioGroup
           class="wfn-picker-group"

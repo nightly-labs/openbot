@@ -172,6 +172,7 @@ export const messages = {
   "workflow.row.whoChooses": "Quién elige",
   "workflow.github.repository": "Repositorio",
   "workflow.github.chooseRepository": "Elegir repositorio",
+  "workflow.github.searchRepositories": "Buscar repositorios",
   "workflow.github.events.issues": "Incidencias",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Incidencias y pull requests",

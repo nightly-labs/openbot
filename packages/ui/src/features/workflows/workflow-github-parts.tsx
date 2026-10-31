@@ -281,6 +281,8 @@ function useRepositoryOptions(repository: () => string) {
     labels: () => options()?.labels.map((label) => label.name) ?? [],
     tone: (name: string) => labelTone(options()?.labels.find((label) => label.name === name)?.color),
     people: () => options()?.people ?? [],
+    /** The host still reads them. */
+    loading: () => Boolean(repository()) && options() === undefined,
   };
 }
 
@@ -365,6 +367,7 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
         name={t("workflow.github.repository")}
         value={fields.repository()}
         placeholder={t("workflow.github.chooseRepository")}
+        search={t("workflow.github.searchRepositories")}
         choices={repositories(fields.repository())}
         disabled={props.locked}
         onChange={fields.setRepository}
@@ -383,6 +386,7 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
         options={withValues(options.labels(), fields.labels())}
         tone={options.tone}
         values={fields.labels()}
+        loading={options.loading()}
         disabled={props.locked}
         onChange={fields.setLabels}
       />
@@ -776,6 +780,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
         name={t("workflow.github.repository")}
         value={fields.repository() || "trigger"}
         placeholder={t("workflow.github.chooseRepository")}
+        search={t("workflow.github.searchRepositories")}
         choices={repositories()}
         disabled={props.locked}
         onChange={fields.setRepository}
@@ -812,6 +817,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
           options={withValues(options.labels(), fields.labels())}
           tone={options.tone}
           values={fields.labels()}
+          loading={options.loading()}
           disabled={props.locked}
           onChange={fields.setLabels}
           agent={labelsAgent()}
@@ -823,6 +829,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
           value={fields.person()}
           placeholder={t("workflow.github.output.choosePerson")}
           choices={people()}
+          loading={options.loading()}
           disabled={props.locked}
           onChange={fields.setPerson}
         />

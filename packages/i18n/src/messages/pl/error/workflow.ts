@@ -42,6 +42,8 @@ export const messages = {
     "To wyjście nie ma zgłoszenia ani pull requestu. Uruchom przepływ ze zdarzenia GitHub albo wpisz numer na jego wejściu.",
   "error.workflow.githubPullRequestOnly": "Ta akcja działa tylko dla pull requestów.",
   "error.workflow.githubTextMissing": "To wyjście nie ma tekstu do wysłania. Połącz krok, który go pisze.",
+  "error.workflow.githubEventText":
+    "To wyjście nie może wysłać surowego zdarzenia wyzwalacza. Umieść agenta między wyzwalaczem a tym wyjściem.",
   "error.workflow.githubChoiceMissing": "Wybierz etykiety lub osobę dla tego wyjścia.",
   "error.workflow.githubChoseNothing": "Model nie wybrał żadnej etykiety ani osoby z tego repozytorium.",
   "error.workflow.githubNotConnected": "Połącz GitHub na komputerze, na którym działa ten przepływ pracy.",

@@ -172,6 +172,7 @@ export const messages = {
   "workflow.row.whoChooses": "選択者",
   "workflow.github.repository": "リポジトリ",
   "workflow.github.chooseRepository": "リポジトリを選択",
+  "workflow.github.searchRepositories": "リポジトリを検索",
   "workflow.github.events.issues": "Issue",
   "workflow.github.events.pullRequests": "プルリクエスト",
   "workflow.github.events.both": "Issue とプルリクエスト",

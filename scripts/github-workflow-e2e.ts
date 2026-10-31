@@ -6,7 +6,8 @@
 // (`self`); the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an
 // event of a repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close
 // times offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output
-// posts once, and the event of that comment is skipped (`self`); a change that is done already is not
+// posts once, with the text of the step before it and not the event, and the event of that comment is
+// skipped (`self`); a comment output with only the trigger's event posts nothing; a change that is done already is not
 // made again; "Agent chooses" gives the repository's own label; a restart while a comment is on its way
 // does not post it again, but sends a label again; "Run with last event" starts a run with the newest
 // matching item. No app, provider, account, Signal or network is started.
@@ -92,6 +93,14 @@ const lineOf = (repository: string, steps: WorkflowNode[], filters = ""): Workfl
     strokes: [],
   };
 };
+/** The text that a prompt node gives a comment output, next to the trigger's event. */
+const SAY = "Thanks, I look at it.";
+/** `graph` with a prompt node that gives its output `SAY`. */
+const saying = (graph: WorkflowGraph): WorkflowGraph => ({
+  ...graph,
+  nodes: [...graph.nodes, { id: "say", kind: "prompt", at: { x: 300, y: 200 }, fields: { text: SAY } }],
+  edges: [...graph.edges, { id: "edge-say", from: "say", to: "out", type: "text" }],
+});
 const githubOutput = (fields: Record<string, string>): WorkflowNode => ({
   id: "out",
   kind: "output",
@@ -305,15 +314,19 @@ try {
   };
 
   const reply = await run(
-    workflows.create({ title: "Reply", graph: lineOf("acme/out", [githubOutput({ action: "comment" })]) }),
+    workflows.create({ title: "Reply", graph: saying(lineOf("acme/out", [githubOutput({ action: "comment" })])) }),
   );
   const replyRun = await startedRun(reply.summary.id, comment("acme/out", 5, "ana").body);
   const replyEnd = await runEnd(replyRun);
   const replyStep = await outputStep(replyRun);
   const posted = changes.filter((change) => change.repository === "acme/out");
   check(
-    "a comment output posts one comment on the run's issue",
-    replyEnd.status === "done" && posted.length === 1 && posted[0]?.number === 5 && replyStep?.output === "acme/out#5",
+    "a comment output posts one comment on the run's issue, with the text and not the event",
+    replyEnd.status === "done" &&
+      posted.length === 1 &&
+      posted[0]?.number === 5 &&
+      posted[0]?.body === SAY &&
+      replyStep?.output === "acme/out#5",
     { replyEnd, posted, replyStep },
   );
   const ownComment = comment("acme/out", 5, `${BOT}[bot]`, "Bot");
@@ -326,10 +339,12 @@ try {
   const hold = await run(
     workflows.create({
       title: "Hold",
-      graph: lineOf("acme/hold", [
-        { id: "ask", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Go on?" } },
-        githubOutput({ action: "comment" }),
-      ]),
+      graph: saying(
+        lineOf("acme/hold", [
+          { id: "ask", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Go on?" } },
+          githubOutput({ action: "comment" }),
+        ]),
+      ),
     }),
   );
   const holdRun = await startedRun(hold.summary.id, comment("acme/hold", 6, "ana").body);
@@ -351,6 +366,20 @@ try {
     { holdEnd, changes },
   );
 
+  const raw = await run(
+    workflows.create({ title: "Raw", graph: lineOf("acme/raw", [githubOutput({ action: "comment" })]) }),
+  );
+  const rawRun = await startedRun(raw.summary.id, comment("acme/raw", 9, "ana").body);
+  const rawEnd = await runEnd(rawRun);
+  const rawStep = await outputStep(rawRun);
+  check(
+    "a comment output with only the trigger's event posts nothing",
+    rawEnd.status === "failed" &&
+      rawStep?.error === sourceText("error.workflow.githubEventText") &&
+      !changes.some((change) => change.repository === "acme/raw"),
+    { rawEnd, rawStep },
+  );
+
   const label = await run(
     workflows.create({
       title: "Label",
@@ -367,7 +396,7 @@ try {
   );
 
   const slow = await run(
-    workflows.create({ title: "Slow", graph: lineOf("acme/slow", [githubOutput({ action: "comment" })]) }),
+    workflows.create({ title: "Slow", graph: saying(lineOf("acme/slow", [githubOutput({ action: "comment" })])) }),
   );
   const slowLabel = await run(
     workflows.create({
@@ -406,7 +435,7 @@ try {
   const last = await run(
     workflows.create({
       title: "Last",
-      graph: lineOf("acme/last", [githubOutput({ action: "comment" })], "notBot"),
+      graph: saying(lineOf("acme/last", [githubOutput({ action: "comment" })], "notBot")),
     }),
   );
   const lastDetail = await run(

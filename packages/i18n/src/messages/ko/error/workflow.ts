@@ -41,6 +41,8 @@ export const messages = {
     "이 출력에는 이슈나 풀 리퀘스트가 없어요. GitHub 이벤트에서 실행을 시작하거나 입력에 번호를 넣으세요.",
   "error.workflow.githubPullRequestOnly": "이 동작은 풀 리퀘스트에서만 작동해요.",
   "error.workflow.githubTextMissing": "이 출력에는 보낼 텍스트가 없어요. 텍스트를 작성하는 단계를 연결하세요.",
+  "error.workflow.githubEventText":
+    "이 출력은 트리거의 원본 이벤트를 보낼 수 없어요. 트리거와 이 출력 사이에 에이전트를 넣으세요.",
   "error.workflow.githubChoiceMissing": "이 출력의 레이블 또는 사용자를 선택하세요.",
   "error.workflow.githubChoseNothing": "모델이 이 저장소의 레이블이나 사용자를 하나도 선택하지 않았어요.",
   "error.workflow.githubNotConnected": "이 워크플로를 실행하는 컴퓨터에서 GitHub를 연결하세요.",

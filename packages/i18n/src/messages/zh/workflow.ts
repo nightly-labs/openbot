@@ -172,6 +172,7 @@ export const messages = {
   "workflow.row.whoChooses": "由谁选择",
   "workflow.github.repository": "仓库",
   "workflow.github.chooseRepository": "选择仓库",
+  "workflow.github.searchRepositories": "搜索仓库",
   "workflow.github.events.issues": "议题",
   "workflow.github.events.pullRequests": "拉取请求",
   "workflow.github.events.both": "议题和拉取请求",

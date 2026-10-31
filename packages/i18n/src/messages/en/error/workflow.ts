@@ -40,6 +40,8 @@ export const messages = defineMessages("error.workflow", {
     "This output has no issue or pull request. Start the run from a GitHub event, or put the number in its input.",
   "error.workflow.githubPullRequestOnly": "This action works only on pull requests.",
   "error.workflow.githubTextMissing": "This output has no text to send. Connect a step that writes it.",
+  "error.workflow.githubEventText":
+    "This output cannot send the raw event of the trigger. Put an agent between the trigger and this output.",
   "error.workflow.githubChoiceMissing": "Choose the labels or the person for this output.",
   "error.workflow.githubChoseNothing": "The model chose no label or person of this repository.",
   "error.workflow.githubNotConnected": "Connect GitHub on the computer that runs this workflow.",

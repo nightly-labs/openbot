@@ -4,6 +4,7 @@
  * keeps for the change.
  */
 
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isGitHubRepositoryName,
   WORKFLOW_GITHUB_ACTIONS,
@@ -18,9 +19,10 @@ import {
 import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
+import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { githubObjectKey, githubTriggerRepository } from "./github-matching";
 import type { WorkflowGitHubChange, WorkflowGitHubChangeResult } from "./workflow-github-api";
-import { fieldText } from "./workflow-walk";
+import { fieldText, inputText } from "./workflow-walk";
 
 /** GitHub refuses a longer issue title. */
 const TITLE_LIMIT = 256;
@@ -65,7 +67,11 @@ export function githubOutputPlan(
     number = item.number;
   }
 
-  const body = input.trim().slice(0, BODY_LIMIT);
+  // The event of a trigger is data for an agent. GitHub does not get it as a comment, a review or an issue.
+  const text = withoutEvents(input);
+  const onlyEvent = text !== input && !text.trim();
+  const body = text.trim().slice(0, BODY_LIMIT);
+  const textMissing = sourceText(onlyEvent ? "error.workflow.githubEventText" : "error.workflow.githubTextMissing");
   const chooseLabels = fieldText(node, "labelsFrom") === "agent";
   const labels = chooseLabels ? [] : workflowListField(node.fields.labels);
   const person = fieldText(node, "person");
@@ -85,11 +91,12 @@ export function githubOutputPlan(
 
   switch (action) {
     case "comment":
+      if (onlyEvent) return { kind: "failed", error: textMissing };
       if (!body) return { kind: "quiet" };
       break;
     case "review.changes":
       // GitHub asks for the changes in the review text.
-      if (!body) return { kind: "failed", error: sourceText("error.workflow.githubTextMissing") };
+      if (!body) return { kind: "failed", error: textMissing };
       break;
     case "label.add":
     case "label.remove":
@@ -104,13 +111,33 @@ export function githubOutputPlan(
       break;
     case "issue.create": {
       const title = (fieldText(node, "title") || body.split("\n", 1)[0] || "").trim().slice(0, TITLE_LIMIT);
-      if (!title) return { kind: "failed", error: sourceText("error.workflow.githubTextMissing") };
+      if (!title) return { kind: "failed", error: textMissing };
       change.title = title;
       choose.labels = chooseLabels;
       break;
     }
   }
   return { kind: "change", change, choose };
+}
+
+/**
+ * The input of a GitHub output step: the text of the steps before it as one text, then the events of
+ * triggers as framed data. The change leaves the events out; "Agent chooses" still reads them.
+ */
+export function githubOutputInput(inputs: readonly string[]): string {
+  const events = inputs.map((input) => input.trim()).filter((input) => input.startsWith(EXTERNAL_EVENT_START));
+  const text = inputText(inputs.filter((input) => !input.trim().startsWith(EXTERNAL_EVENT_START)));
+  return [text, ...events].filter(Boolean).join("\n\n").slice(0, INPUT_LIMITS.workflowStepInput);
+}
+
+/** The input without the framed events of triggers. */
+function withoutEvents(input: string): string {
+  let text = input;
+  for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
+    const end = text.indexOf(EXTERNAL_EVENT_END, start);
+    text = text.slice(0, start) + (end < 0 ? "" : text.slice(end + EXTERNAL_EVENT_END.length));
+  }
+  return text;
 }
 
 /** The question that lets a model choose from the repository's own labels and people. */

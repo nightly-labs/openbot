@@ -161,6 +161,7 @@ export const messages = {
   "workflow.row.whoChooses": "Wie kiest",
   "workflow.github.repository": "Repository",
   "workflow.github.chooseRepository": "Kies repository",
+  "workflow.github.searchRepositories": "Repository's zoeken",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues en pull requests",

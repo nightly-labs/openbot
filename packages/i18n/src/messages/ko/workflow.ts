@@ -172,6 +172,7 @@ export const messages = {
   "workflow.row.whoChooses": "선택 주체",
   "workflow.github.repository": "저장소",
   "workflow.github.chooseRepository": "저장소 선택",
+  "workflow.github.searchRepositories": "저장소 검색",
   "workflow.github.events.issues": "이슈",
   "workflow.github.events.pullRequests": "풀 리퀘스트",
   "workflow.github.events.both": "이슈 및 풀 리퀘스트",

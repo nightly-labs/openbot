@@ -83,6 +83,7 @@ import {
   githubChangeKeys,
   githubChoicePrompt,
   githubChoices,
+  githubOutputInput,
   githubOutputPlan,
   githubOutputText,
   githubResultKeys,
@@ -599,7 +600,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             Effect.flatMap((result) =>
               Effect.gen(function* () {
                 if (Result.isFailure(result)) {
-                  logger.warn("A workflow GitHub output made no change.", { stepId: step.id });
+                  logger.warn("A workflow GitHub output failed.", { stepId: step.id });
                   settle(step, { status: "failed", error: result.failure.message });
                 } else settle(step, { status: "done", output: result.success });
                 yield* requestSweep();
@@ -742,8 +743,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         });
 
-        /** The text a new step of `node` keeps as its input: the message itself for an agent. */
+        /**
+         * The text a new step of `node` keeps as its input: the message itself for an agent, and the text
+         * apart from the trigger's event for a GitHub output.
+         */
         const stepInput = (node: WorkflowNode, workflowId: string, inputs: readonly string[]) => {
+          if (node.kind === "output" && fieldText(node, "target") === "github") return githubOutputInput(inputs);
           const text = inputText(inputs);
           return node.kind === "agent" ? agentStepText(titleOf(workflowId), fieldText(node, "task"), text) : text;
         };

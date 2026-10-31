@@ -45,6 +45,8 @@ export const messages = {
   "error.workflow.githubPullRequestOnly": "Diese Aktion funktioniert nur bei Pull Requests.",
   "error.workflow.githubTextMissing":
     "Diese Ausgabe hat keinen Text zum Senden. Verbinde einen Schritt, der ihn schreibt.",
+  "error.workflow.githubEventText":
+    "Diese Ausgabe kann das unbearbeitete Ereignis des Auslösers nicht senden. Setze einen Agenten zwischen den Auslöser und diese Ausgabe.",
   "error.workflow.githubChoiceMissing": "Wähle die Labels oder die Person für diese Ausgabe.",
   "error.workflow.githubChoseNothing": "Das Modell hat kein Label und keine Person dieses Repositorys gewählt.",
   "error.workflow.githubNotConnected": "Verbinde GitHub auf dem Computer, auf dem dieser Workflow läuft.",

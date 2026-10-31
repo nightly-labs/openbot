@@ -46,6 +46,8 @@ export const messages = {
   "error.workflow.githubPullRequestOnly": "この操作はプルリクエストでのみ使えます。",
   "error.workflow.githubTextMissing":
     "この出力には送信するテキストがありません。テキストを書くステップを接続してください。",
+  "error.workflow.githubEventText":
+    "この出力はトリガーの未加工のイベントを送信できません。トリガーとこの出力の間にエージェントを置いてください。",
   "error.workflow.githubChoiceMissing": "この出力のラベルまたはユーザーを選択してください。",
   "error.workflow.githubChoseNothing": "モデルはこのリポジトリのラベルもユーザーも選択しませんでした。",
   "error.workflow.githubNotConnected": "このワークフローを実行するコンピューターで GitHub に接続してください。",

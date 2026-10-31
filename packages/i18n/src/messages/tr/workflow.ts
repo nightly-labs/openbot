@@ -172,6 +172,7 @@ export const messages = {
   "workflow.row.whoChooses": "Kim seçer",
   "workflow.github.repository": "Depo",
   "workflow.github.chooseRepository": "Depo seç",
+  "workflow.github.searchRepositories": "Depolarda ara",
   "workflow.github.events.issues": "Sorunlar",
   "workflow.github.events.pullRequests": "Çekme istekleri",
   "workflow.github.events.both": "Sorunlar ve çekme istekleri",

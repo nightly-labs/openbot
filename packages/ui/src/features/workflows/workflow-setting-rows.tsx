@@ -29,6 +29,10 @@ export function SettingRow<T extends string>(props: {
   choices: readonly Choice<T>[];
   groups?: readonly { label: string; choices: readonly Choice<T>[] }[] | undefined;
   placeholder?: string | undefined;
+  /** The placeholder of a search field, for a long list. */
+  search?: string | undefined;
+  /** More choices come, such as the people of a repository that the host still reads. */
+  loading?: boolean | undefined;
   disabled?: boolean | undefined;
   onChange: (value: T) => void;
 }) {
@@ -55,7 +59,14 @@ export function SettingRow<T extends string>(props: {
         <ChevronDown class="wfn-row-arrow" aria-hidden="true" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <PickerMenu label={props.name} groups={groups()} value={props.value} onSelect={props.onChange} />
+        <PickerMenu
+          label={props.name}
+          groups={groups()}
+          value={props.value}
+          search={props.search}
+          loading={props.loading}
+          onSelect={props.onChange}
+        />
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
@@ -76,6 +87,8 @@ export function SettingListRow(props: {
   tagLabel?: ((value: string) => string) | undefined;
   /** The colour of an option, such as the colour of a GitHub label. */
   tone?: ((value: string) => string | undefined) | undefined;
+  /** More options come, such as the labels of a repository that the host still reads. */
+  loading?: boolean | undefined;
   disabled?: boolean | undefined;
   onChange: (values: readonly string[]) => void;
   agent?: { on: boolean; onChange: (on: boolean) => void } | undefined;
@@ -180,6 +193,9 @@ export function SettingListRow(props: {
                 )}
               </For>
             </fieldset>
+            <Show when={props.loading}>
+              <p class="wfn-picker-empty">{t("common.loading")}</p>
+            </Show>
           </div>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

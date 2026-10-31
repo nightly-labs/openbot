@@ -42,6 +42,8 @@ export const messages = {
     "Questo output non ha issue o pull request. Avvia l'esecuzione da un evento GitHub o inserisci il numero nel suo input.",
   "error.workflow.githubPullRequestOnly": "Questa azione funziona solo sulle pull request.",
   "error.workflow.githubTextMissing": "Questo output non ha testo da inviare. Collega un passaggio che lo scriva.",
+  "error.workflow.githubEventText":
+    "Questo output non può inviare l'evento grezzo del trigger. Metti un agente tra il trigger e questo output.",
   "error.workflow.githubChoiceMissing": "Scegli le etichette o la persona per questo output.",
   "error.workflow.githubChoseNothing": "Il modello non ha scelto nessuna etichetta o persona di questo repository.",
   "error.workflow.githubNotConnected": "Collega GitHub sul computer che esegue questo workflow.",
