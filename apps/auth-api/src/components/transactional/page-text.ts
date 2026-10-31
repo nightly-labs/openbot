@@ -16,6 +16,9 @@ const JOIN_LINK_MARKERS = { browser: "", download: "" } as const;
 
 export type JoinLink = keyof typeof JOIN_LINK_MARKERS;
 
+/** Splits a sentence at each marker and keeps the markers as parts. */
+const JOIN_LINK_SPLIT = new RegExp(`([${Object.values(JOIN_LINK_MARKERS).join("")}])`, "u");
+
 /** One part of a sentence with links: plain text, or the text of the link that `link` names. */
 export interface JoinTextPart {
   text: string;
@@ -24,7 +27,7 @@ export interface JoinTextPart {
 
 function joinTextParts(sentence: string, links: Record<JoinLink, string>): JoinTextPart[] {
   return sentence
-    .split(/([])/u)
+    .split(JOIN_LINK_SPLIT)
     .filter((part) => part !== "")
     .map((part) => {
       if (part === JOIN_LINK_MARKERS.browser) return { text: links.browser, link: "browser" };

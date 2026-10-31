@@ -17,8 +17,7 @@ export const messages = {
   "sitePage.join.noAppMobile": "没有应用？{browser}。",
   "sitePage.join.browserLink": "在此浏览器中加入",
   "sitePage.join.downloadLink": "下载 OpenBot",
-  "sitePage.join.notOpened":
-    "此电脑上没有安装 OpenBot，或它尚未启动。请先安装，然后再次点击“{open}”。你也可以在此浏览器中加入。",
+  "sitePage.join.notOpened": "如果此电脑上有 OpenBot，请先启动它，然后再次点击“{open}”。如果没有，请先下载。",
   // {open} is the label of the button above this note.
   "sitePage.join.mobile": "如果已安装 OpenBot，请点按“{open}”。你也可以把该链接粘贴到应用的“添加服务器”中。",
   "sitePage.join.email": "如果邀请是通过电子邮件发来的，请用该邮箱地址登录 OpenBot。",

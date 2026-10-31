@@ -21,7 +21,7 @@ export const messages = {
   "sitePage.join.browserLink": "Rejoignez dans ce navigateur",
   "sitePage.join.downloadLink": "téléchargez OpenBot",
   "sitePage.join.notOpened":
-    "OpenBot n’est pas installé sur cet ordinateur ou n’a pas encore démarré. Installez-le, puis cliquez à nouveau sur {open}. Vous pouvez aussi rejoindre dans ce navigateur.",
+    "Si OpenBot est installé sur cet ordinateur, lancez-le, puis cliquez à nouveau sur {open}. Sinon, téléchargez-le d’abord.",
   "sitePage.join.mobile":
     "Si OpenBot est installé, touchez {open}. Vous pouvez aussi coller ce lien dans Ajouter un serveur dans l’app.",
   "sitePage.join.email": "Si l’invitation est arrivée par e-mail, connectez-vous à OpenBot avec cette adresse e-mail.",

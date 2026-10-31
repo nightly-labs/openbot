@@ -19,7 +19,7 @@ export const messages = {
   "sitePage.join.browserLink": "이 브라우저에서 참여",
   "sitePage.join.downloadLink": "OpenBot 다운로드",
   "sitePage.join.notOpened":
-    "이 컴퓨터에 OpenBot이 설치되어 있지 않거나 아직 시작되지 않았어요. 설치한 다음 {open}을(를) 다시 눌러 주세요. 이 브라우저에서 참여할 수도 있어요.",
+    "이 컴퓨터에 OpenBot이 있다면 실행한 다음 {open}을(를) 다시 눌러 주세요. 없다면 먼저 다운로드하세요.",
   "sitePage.join.mobile":
     "OpenBot이 설치되어 있다면 {open}을(를) 탭해 주세요. 앱의 서버 추가에 이 링크를 붙여넣을 수도 있어요.",
   "sitePage.join.email": "초대를 이메일로 받았다면 해당 이메일 주소로 OpenBot에 로그인해 주세요.",

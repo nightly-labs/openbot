@@ -21,7 +21,7 @@ export const messages = {
   "sitePage.join.browserLink": "Word lid via deze browser",
   "sitePage.join.downloadLink": "download OpenBot",
   "sitePage.join.notOpened":
-    "OpenBot is niet geïnstalleerd op deze computer, of is nog niet gestart. Installeer het en klik dan opnieuw op {open}. Je kunt ook lid worden via deze browser.",
+    "Staat OpenBot op deze computer? Start het en klik dan opnieuw op {open}. Zo niet, download het dan eerst.",
   "sitePage.join.mobile":
     "Is OpenBot geïnstalleerd? Tik dan op {open}. Je kunt deze link ook plakken bij Server toevoegen in de app.",
   "sitePage.join.email": "Kwam de uitnodiging per e-mail? Log dan in bij OpenBot met dat e-mailadres.",

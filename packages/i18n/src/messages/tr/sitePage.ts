@@ -20,7 +20,7 @@ export const messages = {
   "sitePage.join.browserLink": "Bu tarayıcıda katılın",
   "sitePage.join.downloadLink": "OpenBot'u indirin",
   "sitePage.join.notOpened":
-    "OpenBot bu bilgisayarda yüklü değil veya henüz başlamadı. Yükleyin, ardından {open} öğesine yeniden basın. Bu tarayıcıda da katılabilirsiniz.",
+    "OpenBot bu bilgisayardaysa başlatın, ardından {open} öğesine yeniden basın. Değilse önce indirin.",
   "sitePage.join.mobile":
     "OpenBot yüklüyse {open} öğesine dokunun. Bu bağlantıyı uygulamadaki Sunucu ekle bölümüne de yapıştırabilirsiniz.",
   "sitePage.join.email": "Davet e-postayla geldiyse OpenBot'ta o e-posta adresiyle oturum açın.",

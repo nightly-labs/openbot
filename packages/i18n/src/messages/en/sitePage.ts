@@ -27,7 +27,7 @@ export const messages = defineMessages("sitePage", {
   "sitePage.join.downloadLink": "download OpenBot",
   // {open} is the label of the button that did not open OpenBot.
   "sitePage.join.notOpened":
-    "OpenBot is not installed on this computer, or it has not started yet. Install it, then press {open} again. You can also join in this browser.",
+    "If OpenBot is on this computer, start it, then press {open} again. If it is not, download it first.",
   // {open} is the label of the button above this note.
   "sitePage.join.mobile":
     "If OpenBot is installed, tap {open}. You can also paste this link into Add server in the app.",
