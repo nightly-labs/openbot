@@ -353,6 +353,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "ホストの既定 (方向を修正)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
+  "mobile.agent.taskLimit.label": "並列スレッド",
+  "mobile.agent.taskLimit.footer": "同時に実行するスレッド",
+  "mobile.agent.taskLimit.default": "デフォルト ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
+  "mobile.agent.browserProfile.label": "ブラウザープロファイル",
+  "mobile.agent.browserProfile.shared": "共有",
+  "mobile.agent.browserProfile.own": "このエージェントのみ",
+  "mobile.agent.browserProfile.missing": "削除されたプロファイル",
+  "mobile.agent.browserProfile.new": "新しいプロファイル",
+  "mobile.agent.browserProfile.manage": "プロファイルを管理",
+  "mobile.agent.browserProfile.footer":
+    "各プロファイルは独自のサインインと Cookie を保持します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot はエージェントのブラウザープロファイルを変更できませんでした。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.notifications.failed": "通知を変更できませんでした",
@@ -374,6 +388,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "新しいチャットを始められませんでした",
   "mobile.agent.newChat.failedBody": "ホストは新しいチャットを始められませんでした。",
   "mobile.agent.newChat.unsupported": "このホストでは、リモートデバイスから新しいチャットを始められません。",
+  "mobile.agent.agentNewChat.title": "エージェントが新しいチャットを開始",
+  "mobile.agent.agentNewChat.footer":
+    "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "mobile.agent.tables.title": "テーブル",
   "mobile.agent.tables.loading": "テーブルを読み込んでいます…",
   "mobile.agent.tables.reconnect": "テーブルを読み込むには再接続してください。",

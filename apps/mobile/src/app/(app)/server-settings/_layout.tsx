@@ -57,6 +57,10 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       {/* The page names its item. */}
       <Stack.Screen name="vault-item" options={{ title: t("mobile.server.route.vault") }} />
+      <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      {/* The page names its profile. */}
+      <Stack.Screen name="browser-profile" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
     </Stack>
   );
 }

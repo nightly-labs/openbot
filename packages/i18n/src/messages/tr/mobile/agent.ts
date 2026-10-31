@@ -362,6 +362,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Ana makine varsayılanı (Yönlendir)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "mobile.agent.taskLimit.label": "Paralel mesaj dizileri",
+  "mobile.agent.taskLimit.footer": "Aynı anda çalışan mesaj dizileri",
+  "mobile.agent.taskLimit.default": "Varsayılan ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
+  "mobile.agent.browserProfile.label": "Tarayıcı profili",
+  "mobile.agent.browserProfile.shared": "Ortak",
+  "mobile.agent.browserProfile.own": "Yalnızca bu ajan",
+  "mobile.agent.browserProfile.missing": "Silinmiş profil",
+  "mobile.agent.browserProfile.new": "Yeni profil",
+  "mobile.agent.browserProfile.manage": "Profilleri yönet",
+  "mobile.agent.browserProfile.footer":
+    "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",
@@ -383,6 +397,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Yeni bir sohbet başlatılamadı",
   "mobile.agent.newChat.failedBody": "Ana makine yeni bir sohbet başlatamadı.",
   "mobile.agent.newChat.unsupported": "Bu ana makine uzak bir cihazdan yeni sohbet başlatamaz.",
+  "mobile.agent.agentNewChat.title": "Ajan yeni sohbetler başlatır",
+  "mobile.agent.agentNewChat.footer":
+    "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "mobile.agent.tables.title": "Tablolar",
   "mobile.agent.tables.loading": "Tablolar yükleniyor…",
   "mobile.agent.tables.reconnect": "Tabloları yüklemek için yeniden bağlanın.",

@@ -351,6 +351,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Predeterminado del host (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} no puede orientar un turno en curso. Los mensajes enviados mientras trabaja esperan en la cola.",
+  "mobile.agent.taskLimit.label": "Hilos en paralelo",
+  "mobile.agent.taskLimit.footer": "Hilos que se ejecutan a la vez",
+  "mobile.agent.taskLimit.default": "Predeterminado ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} ejecuta un turno a la vez. Los hilos de este agente se esperan entre sí.",
+  "mobile.agent.browserProfile.label": "Perfil del navegador",
+  "mobile.agent.browserProfile.shared": "Compartido",
+  "mobile.agent.browserProfile.own": "Solo este agente",
+  "mobile.agent.browserProfile.missing": "Perfil eliminado",
+  "mobile.agent.browserProfile.new": "Nuevo perfil",
+  "mobile.agent.browserProfile.manage": "Gestionar perfiles",
+  "mobile.agent.browserProfile.footer":
+    "Cada perfil guarda sus propios inicios de sesión y cookies. Un cambio cierra las pestañas abiertas del agente.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot no pudo cambiar el perfil del navegador del agente.",
   "mobile.agent.workspace.title": "Carpeta del espacio de trabajo",
   "mobile.agent.workspace.footer": "La carpeta de este agente en el equipo host.",
   "mobile.agent.notifications.failed": "No se pudieron cambiar las notificaciones",
@@ -371,6 +385,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "No se pudo iniciar un nuevo chat",
   "mobile.agent.newChat.failedBody": "El host no pudo iniciar un nuevo chat.",
   "mobile.agent.newChat.unsupported": "Este host no puede iniciar un nuevo chat desde un dispositivo remoto.",
+  "mobile.agent.agentNewChat.title": "El agente inicia chats nuevos",
+  "mobile.agent.agentNewChat.footer":
+    "Permite que el agente inicie un chat nuevo cuando su chat sea largo. Antes guarda notas.",
   "mobile.agent.tables.title": "Tablas",
   "mobile.agent.tables.loading": "Cargando tablas…",
   "mobile.agent.tables.reconnect": "Vuelve a conectarte para cargar las tablas.",

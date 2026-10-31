@@ -350,6 +350,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Predefinita dell'host (Indirizza)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
+  "mobile.agent.taskLimit.label": "Thread in parallelo",
+  "mobile.agent.taskLimit.footer": "Thread eseguiti contemporaneamente",
+  "mobile.agent.taskLimit.default": "Predefinito ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
+  "mobile.agent.browserProfile.label": "Profilo del browser",
+  "mobile.agent.browserProfile.shared": "Condiviso",
+  "mobile.agent.browserProfile.own": "Solo questo agente",
+  "mobile.agent.browserProfile.missing": "Profilo eliminato",
+  "mobile.agent.browserProfile.new": "Nuovo profilo",
+  "mobile.agent.browserProfile.manage": "Gestisci profili",
+  "mobile.agent.browserProfile.footer":
+    "Ogni profilo ha i propri accessi e cookie. Una modifica chiude le schede aperte dell'agente.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot non è riuscito a modificare il profilo del browser dell'agente.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.notifications.failed": "Impossibile modificare le notifiche",
@@ -370,6 +384,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Impossibile iniziare una nuova chat",
   "mobile.agent.newChat.failedBody": "L'host non ha potuto iniziare una nuova chat.",
   "mobile.agent.newChat.unsupported": "Questo host non può iniziare una nuova chat da un dispositivo remoto.",
+  "mobile.agent.agentNewChat.title": "L'agente avvia nuove chat",
+  "mobile.agent.agentNewChat.footer":
+    "L'agente può avviare una nuova chat quando la sua diventa lunga. Prima salva delle note.",
   "mobile.agent.tables.title": "Tabelle",
   "mobile.agent.tables.loading": "Caricamento delle tabelle…",
   "mobile.agent.tables.reconnect": "Riconnettiti per caricare le tabelle.",

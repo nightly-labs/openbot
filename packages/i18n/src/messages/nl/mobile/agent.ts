@@ -352,6 +352,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Hoststandaard (Bijsturen)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
+  "mobile.agent.taskLimit.label": "Parallelle threads",
+  "mobile.agent.taskLimit.footer": "Threads die tegelijk draaien",
+  "mobile.agent.taskLimit.default": "Standaard ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
+  "mobile.agent.browserProfile.label": "Browserprofiel",
+  "mobile.agent.browserProfile.shared": "Gedeeld",
+  "mobile.agent.browserProfile.own": "Alleen deze agent",
+  "mobile.agent.browserProfile.missing": "Verwijderd profiel",
+  "mobile.agent.browserProfile.new": "Nieuw profiel",
+  "mobile.agent.browserProfile.manage": "Profielen beheren",
+  "mobile.agent.browserProfile.footer":
+    "Elk profiel heeft eigen aanmeldingen en cookies. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot kon het browserprofiel van de agent niet wijzigen.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",
@@ -372,6 +386,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Kan geen nieuwe chat starten",
   "mobile.agent.newChat.failedBody": "De host kan geen nieuwe chat starten.",
   "mobile.agent.newChat.unsupported": "Deze host kan geen nieuwe chat starten vanaf een extern apparaat.",
+  "mobile.agent.agentNewChat.title": "Agent start nieuwe chats",
+  "mobile.agent.agentNewChat.footer":
+    "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "mobile.agent.tables.title": "Tabellen",
   "mobile.agent.tables.loading": "Tabellen laden…",
   "mobile.agent.tables.reconnect": "Maak opnieuw verbinding om tabellen te laden.",

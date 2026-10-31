@@ -1,11 +1,12 @@
-import type {
-  AgentBrowserProfile,
-  BrowserProfileList,
-  BrowserProfileSummary,
-  BrowserTabProfile,
-  ClearBrowserDataInput,
-  UpdateAgentBrowserProfileInput,
-  UpdateBrowserProfileInput,
+import {
+  type AgentBrowserProfile,
+  type BrowserProfileList,
+  type BrowserProfileSummary,
+  type BrowserTabProfile,
+  type ClearBrowserDataInput,
+  LOCAL_SERVER_ID,
+  type UpdateAgentBrowserProfileInput,
+  type UpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 
 /**
@@ -22,11 +23,17 @@ export interface BrowserProfileCalls {
   updateAgent(input: UpdateAgentBrowserProfileInput): Promise<AgentBrowserProfile>;
   /** The profile of each open tab that is not in the shared session. */
   tabProfiles(): Promise<BrowserTabProfile[]>;
+  /**
+   * Calls `listener` each time the host reports a change of its profiles or of an agent's profile,
+   * also one made on another device. Absent when the host does not report changes.
+   */
+  onChanged?(listener: () => void): () => void;
 }
 
 /** The desktop calls for one server. Reads `window.openbot` on each call: stories replace it per case. */
 export function desktopBrowserProfileCalls(serverId?: string): BrowserProfileCalls {
   const agent = () => window.openbot.agent;
+  const eventServerId = serverId ?? LOCAL_SERVER_ID;
   return {
     list: () => agent().listBrowserProfiles(serverId),
     create: (name) => agent().createBrowserProfile(name, serverId),
@@ -36,5 +43,9 @@ export function desktopBrowserProfileCalls(serverId?: string): BrowserProfileCal
     readAgent: (agentId) => agent().getAgentBrowserProfile(agentId, serverId),
     updateAgent: (input) => agent().updateAgentBrowserProfile(input, serverId),
     tabProfiles: () => agent().listBrowserTabProfiles(serverId),
+    onChanged: (listener) =>
+      agent().onScopedEvent((scoped) => {
+        if (scoped.serverId === eventServerId && scoped.event.type === "browser-profiles-changed") listener();
+      }),
   };
 }

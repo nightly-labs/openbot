@@ -183,7 +183,7 @@ export function createWebConversationRuntime(
   });
   // The host's relay routes are admin only, so only an admin relays a sign-in link.
   const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
-  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest) : undefined;
+  const browserProfiles = adminRequest ? webBrowserProfileCalls(adminRequest, onHostEvent) : undefined;
   const listLevels = remote.listAgentNotificationLevels;
   return {
     agent: {

@@ -356,6 +356,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Padrão do anfitrião (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
+  "mobile.agent.taskLimit.label": "Tópicos em paralelo",
+  "mobile.agent.taskLimit.footer": "Tópicos executados ao mesmo tempo",
+  "mobile.agent.taskLimit.default": "Padrão ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
+  "mobile.agent.browserProfile.label": "Perfil do navegador",
+  "mobile.agent.browserProfile.shared": "Compartilhado",
+  "mobile.agent.browserProfile.own": "Só este agente",
+  "mobile.agent.browserProfile.missing": "Perfil excluído",
+  "mobile.agent.browserProfile.new": "Novo perfil",
+  "mobile.agent.browserProfile.manage": "Gerenciar perfis",
+  "mobile.agent.browserProfile.footer":
+    "Cada perfil guarda seus próprios logins e cookies. Uma alteração fecha as abas abertas do agente.",
+  "mobile.agent.browserProfile.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador do agente.",
   "mobile.agent.workspace.title": "Pasta do espaço de trabalho",
   "mobile.agent.workspace.footer": "A pasta deste agente no computador anfitrião.",
   "mobile.agent.notifications.failed": "Não foi possível alterar as notificações",
@@ -377,6 +391,9 @@ export const messages = {
   "mobile.agent.newChat.failedBody": "O computador anfitrião não conseguiu iniciar um novo chat.",
   "mobile.agent.newChat.unsupported":
     "Este computador anfitrião não pode iniciar um novo chat a partir de um dispositivo remoto.",
+  "mobile.agent.agentNewChat.title": "O agente inicia novos chats",
+  "mobile.agent.agentNewChat.footer":
+    "Permite que o agente inicie um novo chat quando o chat dele ficar longo. Ele salva notas antes.",
   "mobile.agent.tables.title": "Tabelas",
   "mobile.agent.tables.loading": "Carregando tabelas…",
   "mobile.agent.tables.reconnect": "Reconecte-se para carregar as tabelas.",
