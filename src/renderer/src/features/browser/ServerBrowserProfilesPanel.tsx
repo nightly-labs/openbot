@@ -39,11 +39,8 @@ export function ServerBrowserProfilesPanel(
         },
         () => undefined,
       );
+      return store.follow();
     },
-  );
-  createEffect(
-    () => props.store,
-    (store) => store.follow(),
   );
   return (
     <BrowserProfilesPanel
