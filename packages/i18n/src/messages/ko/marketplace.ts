@@ -168,8 +168,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain은 연결한 모든 AI가 읽고 쓸 수 있는 Markdown 메모리예요. 에이전트는 작업하기 전에 고객이나 프로젝트의 컨텍스트를 불러오고, 과거 노트와 결정을 검색하고, 배운 내용을 저장해서 다음 스레드가 이전 스레드가 끝난 곳에서 시작되도록 해요. 사용자는 각자 자신의 Cobrain 계정으로 로그인해요.",
   "marketplace.plugin.cobrain.app": "Cobrain 브레인의 노트를 MCP 서버 하나로 읽고, 검색하고, 작성해요.",
-  "marketplace.plugin.cobrain.prompt.startSession": "시작하기 전에 이 프로젝트의 Cobrain 컨텍스트를 불러와 줘.",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "가격에 대해 우리가 뭘 결정했는지 Cobrain 노트에서 검색해 줘.",
+  "marketplace.plugin.cobrain.prompt.firstNote": "내 일에 대해 질문 세 개를 하고, 내 답을 Cobrain에 저장해 줘.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain에서 나에 대해 뭘 알고 있어?",
   "marketplace.plugin.cobrain.prompt.saveNote": "오늘 한 일과 남은 일을 Cobrain에 노트로 저장해 줘.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",
   "marketplace.plugin.figma.description":

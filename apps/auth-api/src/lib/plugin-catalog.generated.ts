@@ -539,8 +539,8 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     iconUrl: "https://cobrain.space/apple-icon.png",
     version: "1.0.0",
     prompts: [
-      { id: "prompt-start-session", text: "Load my Cobrain context for this project before we start." },
-      { id: "prompt-search-decision", text: "Search my Cobrain notes for what we decided about pricing." },
+      { id: "prompt-first-note", text: "Ask me three questions about my work, then save my answers in Cobrain." },
+      { id: "prompt-what-you-know", text: "What do you know about me from Cobrain?" },
       { id: "prompt-save-note", text: "Save a note in Cobrain with what we did today and what is left." },
     ],
     apps: [

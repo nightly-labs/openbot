@@ -181,9 +181,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain は、接続したすべての AI が読み書きできる Markdown のメモリーです。エージェントは作業の前にクライアントやプロジェクトのコンテキストを読み込み、過去のメモや決定事項を検索し、学んだことを保存します。そのため、次の会話は前回の続きから始まります。各ユーザーは自分の Cobrain アカウントにサインインします。",
   "marketplace.plugin.cobrain.app": "1 つの MCP サーバーで、Cobrain のメモを読み取り、検索し、書き込みます。",
-  "marketplace.plugin.cobrain.prompt.startSession":
-    "始める前に、このプロジェクトの Cobrain コンテキストを読み込んでください。",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
+  "marketplace.plugin.cobrain.prompt.firstNote": "私の仕事について3つ質問して、その答えを Cobrain に保存してください。",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain から私について何がわかりますか？",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",

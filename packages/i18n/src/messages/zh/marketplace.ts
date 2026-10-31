@@ -179,8 +179,8 @@ export const messages = {
   "marketplace.plugin.cobrain.description":
     "Cobrain 是一份 Markdown 记忆，你连接的每个 AI 都可以读取和写入。助手开工前会加载客户或项目的上下文，搜索过去的笔记和决定，并保存所学内容，让下一次对话从上一次结束的地方继续。每位用户登录自己的 Cobrain 账号。",
   "marketplace.plugin.cobrain.app": "通过一个 MCP 服务器，在你的 Cobrain 中读取、搜索和写入笔记。",
-  "marketplace.plugin.cobrain.prompt.startSession": "开始之前，请先加载我在 Cobrain 中的这个项目的上下文。",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "在我的 Cobrain 笔记中搜索我们关于定价的决定。",
+  "marketplace.plugin.cobrain.prompt.firstNote": "问我三个关于我工作的问题，然后把我的回答保存到 Cobrain。",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "你从 Cobrain 里知道我哪些事？",
   "marketplace.plugin.cobrain.prompt.saveNote": "在 Cobrain 中保存一条笔记，记下我们今天做了什么、还剩什么。",
   "marketplace.plugin.figma.tagline": "设计与原型",
   "marketplace.plugin.figma.description":

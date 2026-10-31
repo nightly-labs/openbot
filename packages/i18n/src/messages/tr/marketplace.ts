@@ -205,9 +205,8 @@ export const messages = {
     "Cobrain, bağladığınız her yapay zekânın okuyup yazabildiği bir Markdown belleğidir. Ajanlar çalışmadan önce bir müşterinin veya projenin bağlamını yükler, geçmiş notları ve kararları arar ve öğrendiklerini kaydeder; böylece bir sonraki konuşma, öncekinin bittiği yerden başlar. Her kullanıcı kendi Cobrain hesabında oturum açar.",
   "marketplace.plugin.cobrain.app":
     "Tek bir MCP sunucusu üzerinden Cobrain beyninizdeki notları okuma, arama ve yazma.",
-  "marketplace.plugin.cobrain.prompt.startSession": "Başlamadan önce bu proje için Cobrain bağlamımı yükle.",
-  "marketplace.plugin.cobrain.prompt.searchDecision":
-    "Fiyatlandırma hakkında ne karar verdiğimizi Cobrain notlarımda ara.",
+  "marketplace.plugin.cobrain.prompt.firstNote": "Bana işim hakkında üç soru sor, sonra cevaplarımı Cobrain'e kaydet.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain'den benim hakkımda ne biliyorsun?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Bugün ne yaptığımızı ve neyin kaldığını Cobrain'e not olarak kaydet.",
   "marketplace.plugin.figma.tagline": "Tasarımlar ve prototipler",
   "marketplace.plugin.figma.description":

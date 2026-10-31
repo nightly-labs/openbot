@@ -194,9 +194,9 @@ export const messages = {
     "Cobrain to pamięć w Markdownie, którą może czytać i zapisywać każda podłączona AI. Agenci przed pracą wczytują kontekst klienta lub projektu, przeszukują wcześniejsze notatki i decyzje oraz zapisują to, czego się nauczą, aby następna rozmowa zaczynała się tam, gdzie skończyła się poprzednia. Każdy użytkownik loguje się na własne konto Cobrain.",
   "marketplace.plugin.cobrain.app":
     "Czytanie, wyszukiwanie i zapisywanie notatek w twoim mózgu Cobrain przez jeden serwer MCP.",
-  "marketplace.plugin.cobrain.prompt.startSession": "Wczytaj mój kontekst Cobrain dla tego projektu, zanim zaczniemy.",
-  "marketplace.plugin.cobrain.prompt.searchDecision":
-    "Wyszukaj w moich notatkach Cobrain, co ustaliliśmy w sprawie cen.",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "Zadaj mi trzy pytania o moją pracę, a potem zapisz moje odpowiedzi w Cobrain.",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Co wiesz o mnie z Cobrain?",
   "marketplace.plugin.cobrain.prompt.saveNote": "Zapisz w Cobrain notatkę o tym, co dziś zrobiliśmy i co zostało.",
   "marketplace.plugin.figma.tagline": "Projekty i prototypy",
   "marketplace.plugin.figma.description":
