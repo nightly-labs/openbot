@@ -795,6 +795,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskConversations = new Map<string, ConversationSnapshot>(
     Object.entries(clone(options.taskConversations ?? {})),
   );
+  /** The branch of each `branchTask` request id, so a retry returns the same branch. */
+  const branches = new Map<string, AgentTask>();
 
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
@@ -2744,6 +2746,45 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "queue-changed", snapshot: clone(queue) });
         const task = createTask(input.agentId, delivery.text);
         runTaskTurn(task, delivery.text);
+        return clone(task);
+      },
+      branchTask: async (input) => {
+        const earlier = branches.get(input.requestId);
+        if (earlier) return clone(earlier);
+        const sourceTask = input.taskId === null ? null : findTask(input.agentId, input.taskId);
+        const source = sourceTask ? taskConversation(sourceTask) : getSnapshot(input.agentId);
+        if (source.activeTurnId) throw new Error(sourceText("error.backend.branchSourceBusy"));
+        const index = source.messages.findIndex((message) => message.id === input.messageId);
+        const chosen = source.messages[index];
+        if (chosen?.author !== "assistant" || chosen.status === "streaming") {
+          throw new Error(sourceText("error.backend.branchMessageNotFound"));
+        }
+        const messages = source.messages
+          .slice(0, index + 1)
+          .map(({ delivery: _delivery, reaction: _reaction, reactions: _reactions, ...message }) => ({
+            ...clone(message),
+            id: `mock-branch-message-${messageCounter++}`,
+          }));
+        const lastUserText = messages.findLast((message) => message.author === "user")?.text;
+        const task = createTask(
+          input.agentId,
+          sourceTask ? `${sourceTask.title} #2` : lastUserText?.trim() || sourceText("status.agent.branchTitle"),
+        );
+        const through = messages.at(-1);
+        task.branch = {
+          sourceTaskId: input.taskId,
+          sourceMessageId: input.messageId,
+          throughMessageId: through?.id ?? input.messageId,
+        };
+        taskConversations.set(task.id, {
+          agentId: task.agentId,
+          threadId: task.threadId,
+          activeTurnId: null,
+          revision: 0,
+          messages,
+        });
+        branches.set(input.requestId, task);
+        emitTasks(input.agentId);
         return clone(task);
       },
       stopTask: async (input) => {

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -7,19 +7,28 @@ import {
   type AgentEvent,
   type AgentSummary,
   type AgentTask,
+  type AgentTaskBranch,
   type AgentTaskHold,
   type AgentTasksSnapshot,
+  type AttachmentSummary,
   agentTaskLimit,
+  type BranchAgentTaskInput,
+  type ConversationMessage,
   type ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
-import type { AgentThreadOrigin, AgentThreadRecord, AgentThreadStore } from "../agent-threads/agent-thread-store";
+import {
+  type AgentThreadOrigin,
+  type AgentThreadRecord,
+  type AgentThreadStore,
+  copyBranchMessages,
+} from "../agent-threads/agent-thread-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { storedSync } from "../stored-state-effects";
@@ -53,6 +62,18 @@ export interface AgentTaskCaller {
   inExecutionThread: boolean;
 }
 
+/** Why a branch was not made. The cause holds the localized message for the person. */
+export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFailed>()("AgentTaskBranchFailed", {
+  reason: Schema.Literals(["source-not-found", "source-busy", "message-not-found", "thread-limit", "storage"]),
+  cause: Schema.Defect(),
+}) {}
+
+type BranchFailure = AgentTaskBranchFailed["reason"];
+
+function branchStep<A>(reason: BranchFailure, run: () => A): Effect.Effect<A, AgentTaskBranchFailed> {
+  return Effect.try({ try: run, catch: (cause) => new AgentTaskBranchFailed({ reason, cause }) });
+}
+
 export interface AgentTasksOptions {
   store: AgentThreadStore;
   mailbox: MailboxStore;
@@ -78,6 +99,8 @@ export class AgentTasks implements TaskLanes {
   readonly #stoppedTurns = new Map<string, string>();
   /** Who waits for the running turn of a task to end, by task id. */
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
+  /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
+  readonly #branches = Semaphore.makeUnsafe(1);
 
   constructor(options: AgentTasksOptions) {
     this.#store = options.store;
@@ -154,6 +177,107 @@ export class AgentTasks implements TaskLanes {
     const task = this.#store.create({ agentId, origin, title, titleSource: origin === "agent" ? "agent" : "auto" });
     this.#conversation.registerTaskThread(agentId, task.threadId);
     return task;
+  }
+
+  /**
+   * Makes a branch: a new side thread with a copy of a conversation of the agent, through the turn of
+   * the chosen message. The files of the copied messages are copied as files of the branch, so they
+   * stay when the source is deleted. No turn starts. A retry with the same request id returns the
+   * branch that the first call made, also with no new copies of the files.
+   */
+  branch(input: BranchAgentTaskInput): Effect.Effect<AgentThreadRecord, AgentTaskBranchFailed> {
+    return this.#branches.withPermit(this.#branch(input));
+  }
+
+  readonly #branch = Effect.fn("AgentTasks.branch")(function* (
+    this: AgentTasks,
+    input: BranchAgentTaskInput,
+  ): Effect.fn.Return<AgentThreadRecord, AgentTaskBranchFailed> {
+    const earlier = this.#store.branchFor(input.agentId, input.requestId);
+    if (earlier) {
+      this.#conversation.registerTaskThread(earlier.agentId, earlier.threadId);
+      return earlier;
+    }
+    const source = yield* branchStep("source-not-found", () => this.#branchSource(input));
+    yield* branchStep("source-busy", () => {
+      if (source.running) throw new Error(sourceText("error.backend.branchSourceBusy"));
+    });
+    yield* branchStep("thread-limit", () => this.#requireRoom(input.agentId));
+    const messages = yield* branchStep("message-not-found", () => {
+      const rows = this.#store.branchSource(source.threadId, input.messageId);
+      if (!rows) throw new Error(sourceText("error.backend.branchMessageNotFound"));
+      return rows;
+    });
+    const title =
+      source.title === null
+        ? taskTitle(messages.findLast((message) => message.author === "user")?.text ?? "") ||
+          sourceText("status.agent.branchTitle")
+        : branchTitle(source.title, this.#store.titles(input.agentId));
+    const threadId = `openbot-thread-${randomUUID()}`;
+    const staged: string[] = [];
+    const record = yield* Effect.gen({ self: this }, function* () {
+      const files = new Map<string, AttachmentSummary>();
+      for (const attachment of branchFiles(messages)) {
+        if (files.has(attachment.id)) continue;
+        // A file that is gone keeps its card as it is in the source.
+        const file = yield* this.#mailbox.resolveAttachment(attachment.id);
+        if (!file) continue;
+        const copy = yield* this.#mailbox.stageGeneratedCopy({
+          sourcePath: file.path,
+          name: file.name,
+          mimeType: file.mimeType,
+          ownerAgentId: input.agentId,
+          ownerThreadId: threadId,
+        });
+        staged.push(copy.id);
+        files.set(attachment.id, copy);
+      }
+      return yield* branchStep("storage", () =>
+        this.#mailbox.persistGeneratedAttachmentsWith(staged, "attachment.branch-copied", () =>
+          this.#store.branch({
+            agentId: input.agentId,
+            requestId: input.requestId,
+            threadId,
+            title,
+            sourceThreadId: source.threadId,
+            sourceMessageId: input.messageId,
+            messages: copyBranchMessages(messages, files),
+          }),
+        ),
+      );
+    }).pipe(
+      Effect.mapError((failure) =>
+        failure instanceof AgentTaskBranchFailed
+          ? failure
+          : new AgentTaskBranchFailed({ reason: "storage", cause: failure.cause }),
+      ),
+      // Copies that no committed branch names are removed.
+      Effect.onError(() => this.#mailbox.discardStagedGeneratedAttachments(staged).pipe(Effect.ignore)),
+    );
+    this.#conversation.registerTaskThread(record.agentId, record.threadId);
+    return record;
+  });
+
+  /** The thread that a branch copies, its title for a side thread, and whether a turn runs in it. */
+  #branchSource(input: BranchAgentTaskInput): { threadId: string; title: string | null; running: boolean } {
+    if (input.taskId === null) {
+      const threadId = this.#hooks.agent(input.agentId)?.threadId;
+      if (!threadId) throw new Error(sourceText("error.backend.threadNotFound"));
+      const chat = this.#conversation.loadedSnapshot(input.agentId);
+      return {
+        threadId,
+        title: null,
+        running: chat?.threadId === threadId && chat.activeTurnId !== null,
+      };
+    }
+    const task = this.require(input.agentId, input.taskId);
+    return {
+      threadId: task.threadId,
+      title: task.title,
+      running:
+        Boolean(this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId) ||
+        this.#mailbox.laneActive(task.agentId, task.taskId),
+    };
   }
 
   /** The task list holds `INPUT_LIMITS.agentTasks` tasks, open ones first, so more open tasks could not be seen or stopped. */
@@ -278,6 +402,10 @@ export class AgentTasks implements TaskLanes {
     }
     return [...agentIds];
   });
+
+  isBranchThread(threadId: string): boolean {
+    return Boolean(this.#store.taskForThread(threadId)?.branch);
+  }
 
   taskForThread(threadId: string): string | null {
     return this.#store.taskForThread(threadId)?.taskId ?? null;
@@ -447,8 +575,49 @@ export class AgentTasks implements TaskLanes {
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
+      branch: this.#publicBranch(task),
     };
   }
+
+  /** The source is a task id, or null for the agent's own chat. A deleted source keeps its thread id. */
+  #publicBranch(task: AgentThreadRecord): AgentTaskBranch | null {
+    if (!task.branch) return null;
+    const { sourceThreadId, sourceMessageId, throughMessageId } = task.branch;
+    const ownChat = this.#hooks.agent(task.agentId)?.threadId === sourceThreadId;
+    return {
+      sourceTaskId: ownChat ? null : (this.#store.taskForThread(sourceThreadId)?.taskId ?? sourceThreadId),
+      sourceMessageId,
+      throughMessageId,
+    };
+  }
+}
+
+/** The files of the copied messages: attachments and voice recordings. */
+function branchFiles(messages: readonly ConversationMessage[]): AttachmentSummary[] {
+  return messages.flatMap((message) => [
+    ...(message.attachments ?? []),
+    ...(message.voiceRecording ? [message.voiceRecording] : []),
+  ]);
+}
+
+/** Room for " #9999" after the source title. */
+const BRANCH_NUMBER_ROOM = 6;
+
+/**
+ * The title of a branch of a side thread: the source title without its own number, then the next
+ * number after those that the agent's threads already use, from #2.
+ */
+function branchTitle(sourceTitle: string, titles: readonly string[]): string {
+  const stripped = sourceTitle.replace(/ #\d+$/, "");
+  const room = INPUT_LIMITS.agentTaskTitle - BRANCH_NUMBER_ROOM;
+  const root = stripped.length > room ? `${stripped.slice(0, room - 1)}…` : stripped;
+  const prefix = `${root} #`;
+  let last = 1;
+  for (const title of titles) {
+    const number = title.startsWith(prefix) ? title.slice(prefix.length) : "";
+    if (/^\d{1,4}$/.test(number)) last = Math.max(last, Number(number));
+  }
+  return `${prefix}${last + 1}`;
 }
 
 function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {

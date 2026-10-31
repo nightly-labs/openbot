@@ -438,6 +438,26 @@ export interface ConversationThreads {
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+  /**
+   * Copies a conversation through an agent answer into a new thread, and opens it: the agent's own
+   * chat when `sourceTaskId` is null, or a side thread. Resolves true when the branch opened. Missing
+   * when the host cannot branch.
+   */
+  onBranch?: ((sourceTaskId: string | null, messageId: string) => Promise<boolean>) | undefined;
+  /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
+  branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
+  /** The message that a side thread scrolls to once, after a click on "Branched from". */
+  focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+}
+
+/** The source of a branch: the agent's own chat, a side thread, or a side thread that was deleted. */
+export interface ConversationBranchSource {
+  throughMessageId: string;
+  /** The title of the source thread. Null for the agent's own chat, which shows the agent's name. */
+  title: string | null;
+  deleted: boolean;
+  /** Opens the source at the message that the branch came from. */
+  onOpen: () => void;
 }
 
 /** The side threads in the side panel. Each shows beside the agent's own chat. */

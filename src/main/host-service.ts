@@ -7,6 +7,7 @@ import type {
   AgentEvent,
   AgentTaskReadState,
   AvatarImageInput,
+  BranchAgentTaskInput,
   CentralAuthUser,
   ChannelSummary,
   ConfigureHostInput,
@@ -119,7 +120,7 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -1160,6 +1161,13 @@ export class HostService extends EventEmitter<HostEvents> {
       Effect.flatMap((readerId) =>
         this.#options.agents.markConversationUnread(input.agentId, readerId, input.fromMessageId),
       ),
+    );
+  }
+
+  /** Makes a branch of a local conversation. This computer's reader has read the branch through its last copied message. */
+  branchAgentTask(input: BranchAgentTaskInput) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) => this.#options.agents.branchTask(input, readerId)),
     );
   }
 

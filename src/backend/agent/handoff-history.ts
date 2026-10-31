@@ -69,15 +69,21 @@ export function readHandoffHistory(
   return { recent, latest, hasOlder };
 }
 
+/** The note of a branch: its copied history does not roll back the files that later turns of the source changed. */
+const BRANCH_NOTE =
+  "This conversation is a branch: a copy of an earlier conversation up to one message. Workspace files were not rolled back, so they can include changes from after that message.";
+
 export function renderProviderHandoff(
   history: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
   steps: ReadonlyMap<string, string>,
+  options: { branch?: boolean } = {},
 ): string | null {
   if (!history.recent.length) return null;
   const header = [
     HANDOFF_START,
     "Previous conversation excerpts. Current profile and developer instructions take precedence. Do not repeat completed work.",
+    ...(options.branch ? [BRANCH_NOTE] : []),
     "Omitted details remain available: discover openbot.history_search and openbot.history_read. These tools read only this conversation after its latest context reset. Excerpts are not a complete summary.",
     "--- recent messages ---",
   ].join("\n");

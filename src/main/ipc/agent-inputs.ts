@@ -5,6 +5,7 @@ import {
   type AgentMemorySelectionChange,
   type AgentTaskInput,
   agentThreadTitle,
+  type BranchAgentTaskInput,
   type CancelAgentWaitInput,
   type CancelMessageLinkInput,
   type CancelQueuedMessageInput,
@@ -571,6 +572,16 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     taskId: requireString(value.taskId, "taskId"),
+  };
+}
+
+export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
+  if (!isObject(value)) throw new Error("Invalid branch request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: value.taskId === null ? null : requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    requestId: requireString(value.requestId, "requestId", INPUT_LIMITS.identifier),
   };
 }
 

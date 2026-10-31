@@ -1,4 +1,4 @@
-import type { AgentApproval, AgentContextState, AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentApproval, AgentContextState, AgentEvent, AgentTask } from "@openbot/contracts/ipc";
 import { isAgentTaskActive, taskApproval } from "@openbot/team-client/agent-tasks";
 import {
   activeThreadId,
@@ -9,6 +9,7 @@ import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversati
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type {
   BrowserTakeoverRequest,
+  ConversationBranchSource,
   ConversationThreads,
   PromptAnswerOptions,
   SideThread,
@@ -40,6 +41,11 @@ export interface ConversationThreadsInput {
   contextStates?: (() => Readonly<Record<string, AgentContextState>>) | undefined;
   /** Missing when the host cannot compact a side thread. */
   onCompactContext?: ((taskId: string) => Promise<void>) | undefined;
+  /**
+   * Opens the agent's own chat at a message, as a search result does. Without it, a click on
+   * "Branched from" opens the agent's own chat at its latest message.
+   */
+  onOpenMainMessage?: ((messageId: string) => void) | undefined;
 }
 
 /** The threads of one agent, for the conversation. Read it in a memo: it reads the thread state. */
@@ -92,6 +98,30 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onCompactContext: onCompactContext ? () => onCompactContext(task.id) : undefined,
     };
   };
+  /** The source of a branch. A source id that the list does not have is a deleted thread. */
+  const branchSource = (task: AgentTask): ConversationBranchSource | undefined => {
+    const branch = task.branch;
+    if (!branch) return undefined;
+    const { sourceTaskId, sourceMessageId, throughMessageId } = branch;
+    if (sourceTaskId === null)
+      return {
+        throughMessageId,
+        title: null,
+        deleted: false,
+        onOpen: () => {
+          tabs.open(agentId, MAIN_THREAD_ID);
+          input.onOpenMainMessage?.(sourceMessageId);
+        },
+      };
+    const source = list.find((entry) => entry.id === sourceTaskId);
+    return {
+      throughMessageId,
+      title: source?.title ?? null,
+      deleted: source === undefined,
+      onOpen: () => void tabs.openAt(agentId, sourceTaskId, sourceMessageId),
+    };
+  };
+  const focus = tabs.messageFocus();
   return {
     header: {
       ...lists,
@@ -138,6 +168,11 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
     // Only this computer moves a queued message to a new thread.
     onRunQueuedMessage: tasks.local() ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId) : undefined,
+    onBranch: tasks.canBranch()
+      ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
+      : undefined,
+    branchSource,
+    focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
 }
 

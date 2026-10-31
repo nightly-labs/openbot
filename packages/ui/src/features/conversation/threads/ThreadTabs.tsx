@@ -15,6 +15,7 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, For, flush, onSettled, Show } from "solid-js";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./ThreadStatusMark";
 import { ThreadTabGhost } from "./ThreadTabGhost";
+import { ThreadTitle } from "./ThreadTitle";
 import { setCarriedThreadTab, sidePanelTabRow, swallowNextClick } from "./thread-tab-drag";
 import { MAIN_THREAD_ID, type ThreadHeaderProps, type ThreadItem, threadBusy } from "./thread-types";
 
@@ -138,7 +139,7 @@ function ThreadTab(props: {
         </span>
         <X class="agent-threads-tab-x" />
       </span>
-      <span class="agent-threads-tab-title">{props.thread.title}</span>
+      <ThreadTitle class="agent-threads-tab-title" title={props.thread.title} />
       <ThreadStatusText status={props.thread.status} />
     </SlidingTabs.Trigger>
   );

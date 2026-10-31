@@ -16,6 +16,7 @@ import {
   type ApplyAgentImportInput,
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
+  type BranchAgentTaskInput,
   type CancelQueuedMessageInput,
   type ConversationSnapshot,
   decodeChannel,
@@ -69,6 +70,11 @@ import {
   AGENT_MEMORY_SELECTION_PAGE_ROUTE,
 } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_BRANCHES_ROUTES,
+  type AgentThreadBranchLink,
+  isAgentThreadBranchLinks,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
 import { AGENT_THREAD_FILES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
@@ -300,6 +306,32 @@ export const markAgentThreadRead = Effect.fn("TeamClient.markAgentThreadRead")(f
   return yield* teamCall(() =>
     request("POST", AGENT_THREAD_READS_ROUTES.mark, decodeThreadReadState, { agentId, taskId, throughMessageId }),
   );
+});
+
+const decodeThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "thread branches");
+
+/**
+ * Branches a conversation of the agent into a new side thread, and answers the task with its link.
+ * Send it only to a host that serves `agent-thread-branches-v1`.
+ */
+export const branchAgentThread = Effect.fn("TeamClient.branchAgentThread")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, requestId }: BranchAgentTaskInput,
+): Effect.fn.Return<AgentTask, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", AGENT_THREAD_BRANCHES_ROUTES.branch, decodeAgentTask, { agentId, taskId, messageId, requestId }),
+  );
+});
+
+/** The link of each branch among the listed tasks. Send it only to a host that serves `agent-thread-branches-v1`. */
+export const listAgentThreadBranches = Effect.fn("TeamClient.listAgentThreadBranches")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<AgentThreadBranchLink[], TeamRequestError> {
+  const answer = yield* teamCall(() =>
+    request("POST", AGENT_THREAD_BRANCHES_ROUTES.list, decodeThreadBranches, { agentId }),
+  );
+  return answer.branches;
 });
 
 /** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */

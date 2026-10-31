@@ -9,6 +9,7 @@ import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChat
 import { AgentStepsDisclosure, type AgentStepsTrace } from "@openbot/ui/features/conversation/AgentSteps";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { UsageLimitAskCard } from "@openbot/ui/features/conversation/BackupModels";
+import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
@@ -122,6 +123,7 @@ export function ConversationTimeline() {
     closeChatSearch,
     composerHasContent,
     copiedMessageId,
+    branchThread,
     dismissPendingSend,
     downloadMessageImageFile,
     editingDeliveryId,
@@ -212,6 +214,15 @@ export function ConversationTimeline() {
     const onMarkUnread = props.onMarkUnread;
     if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
     return () => void onMarkUnread(message.id);
+  };
+  /** The answers of the agent that end a finished turn. Each one offers a branch. */
+  const branchPoints = createMemo(() =>
+    channel ? new Set<string>() : branchPointIds(timelineMessages(), props.activeTurnId),
+  );
+  /** Copies the agent's own chat through the answer into a new thread. A channel has no branch. */
+  const branchAction = (message: AgentMessage) => {
+    if (channel || !props.threads?.onBranch || !branchPoints().has(message.id)) return;
+    return () => void branchThread(null, message.id);
   };
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
   const spokenReplyIds = createMemo(() => {
@@ -1288,6 +1299,8 @@ export function ConversationTimeline() {
                                     }}
                                     {...messageActions}
                                     readAloud={messageReadAloud()}
+                                    onBranch={branchAction(message() ?? initialMessage)}
+                                    branchDisabled={Boolean(props.activeTurnId)}
                                   />
                                 </Show>
                               </>
@@ -1303,6 +1316,8 @@ export function ConversationTimeline() {
                                       {...messageActions}
                                       readAloud={messageReadAloud()}
                                       onMarkUnread={markUnreadAction(message() ?? initialMessage)}
+                                      onBranch={branchAction(message() ?? initialMessage)}
+                                      branchDisabled={Boolean(props.activeTurnId)}
                                     />
                                   )
                             }

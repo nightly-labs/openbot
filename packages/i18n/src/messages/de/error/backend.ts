@@ -360,6 +360,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Dieser Agent hat {count} offene Threads. Archiviere einen Thread und starte dann einen anderen oder stelle einen wieder her.",
   "error.backend.threadRemoteUnsupported": "Threads sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.branchSourceBusy": "Stoppe die laufende Runde, bevor du diesen Chat abzweigst.",
+  "error.backend.branchMessageNotFound": "Du kannst nur von einer fertigen Antwort des Agenten abzweigen.",
+  "error.backend.branchRemoteUnsupported": "Abzweigungen sind nur für Agenten auf diesem Computer verfügbar.",
   "error.backend.threadMoveRefused":
     "Nur eine Nachricht, die du allein an diesen Agenten gesendet hast, kann in einem neuen Thread laufen.",
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",

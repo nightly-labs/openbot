@@ -354,6 +354,11 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Cet agent a {count} fils ouverts. Archivez un fil, puis lancez-en ou restaurez-en un autre.",
   "error.backend.threadRemoteUnsupported": "Les fils sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.branchSourceBusy": "Arrêtez le tour en cours avant de créer une branche de ce chat.",
+  "error.backend.branchMessageNotFound":
+    "Vous pouvez créer une branche uniquement à partir d'une réponse terminée de l'agent.",
+  "error.backend.branchRemoteUnsupported":
+    "Les branches sont disponibles uniquement pour les agents de cet ordinateur.",
   "error.backend.threadMoveRefused":
     "Seul un message envoyé uniquement à cet agent peut s’exécuter dans un nouveau fil.",
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",

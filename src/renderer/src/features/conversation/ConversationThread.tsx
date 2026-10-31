@@ -7,6 +7,7 @@ import type { AgentMessage } from "@openbot/ui/data";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { contextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
+import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createProjection, createSignal, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -18,6 +19,7 @@ import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
+import type { ConversationThreads } from "./conversation-types";
 import { createTurnSteps } from "./turn-steps";
 
 /** A thread takes files only from this computer, which reads every supported type. */
@@ -57,6 +59,9 @@ export function ConversationThread() {
     activeThreadSearchIndex,
     setThreadSearchQuery,
     setThreadScrollElement,
+    copyMessage,
+    copiedMessageId,
+    branchThread,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
@@ -155,6 +160,27 @@ export function ConversationThread() {
       onSend: stopVoiceRecordingAndSend,
     };
   };
+  /** Branches the open thread through an answer. A new thread has no answer to branch from. */
+  const branch = (threads: ConversationThreads) => {
+    const taskId = threads.open?.id;
+    if (!threads.onBranch || !taskId) return undefined;
+    return (messageId: string) => void branchThread(taskId, messageId);
+  };
+  /** Where the open thread came from, when it is a branch. The agent's own chat shows the agent's name. */
+  const branchSource = (threads: ConversationThreads, agentName: string): AgentThreadBranchSource | undefined => {
+    const source = threads.open ? threads.branchSource(threads.open) : undefined;
+    if (!source) return undefined;
+    return {
+      throughMessageId: source.throughMessageId,
+      label: source.deleted ? null : (source.title ?? agentName),
+      onOpen: source.onOpen,
+    };
+  };
+  /** The message that the open thread scrolls to once, after a click on "Branched from". */
+  const focusMessage = (threads: ConversationThreads) => {
+    const focus = threads.focusMessage;
+    return focus && focus.taskId === threads.open?.id ? focus : undefined;
+  };
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;
@@ -238,6 +264,11 @@ export function ConversationThread() {
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             sendShortcut={deviceSendShortcut(props.platform)}
+            onCopyMessage={(message) => void copyMessage(message)}
+            copiedMessageId={copiedMessageId()}
+            onBranch={branch(current().threads)}
+            branchSource={branchSource(current().threads, current().agent.name)}
+            focusMessage={focusMessage(current().threads)}
           />
         </>
       )}

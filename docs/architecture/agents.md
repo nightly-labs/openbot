@@ -288,6 +288,22 @@ at once and shows an Undo toast; when the toast ends, `AgentService.deleteTask` 
 messages and deletes the thread with its conversation, attachments, event history and provider
 session. It refuses a thread with a running turn. The main thread has no archive, rename or delete.
 
+"Branch from here" (`AgentService.branchTask`, `AgentTasks.branch`, `AgentThreadStore.branch`) makes a
+new side thread of the same agent from the last agent message of a finished turn, in the main thread
+or in a side thread. The button and the message menu item are off while the source has a running
+turn. One dispatch copies the messages through the end of that turn, with new message ids, and writes
+one `thread.branched` snapshot event. It copies no usage rows, deliveries or reactions; a reply link
+and an attachment move to the copy, and each file is copied as a generated attachment of the branch.
+Migration 48 adds `branch_source_thread_id`, `branch_source_message_id` and
+`branch_through_message_id` to `projection_agent_threads`: all three are set, or none. The link stays
+when its source is deleted. The title is "{source} #N", or the last user message for a branch of the
+main thread. The `requestId` of the client makes a retry answer the same branch. The member has read
+the copy through its last message, and the new tab opens with focus. A divider "Branched from
+{source}" follows the copied messages and opens the source at that message. The thread menu shows
+each branch under its source. The branch has no provider session, so its first turn gets a handoff of
+its own transcript, with a note that workspace files were not rolled back. A branch counts toward the
+open-thread limit.
+
 The agent starts a side thread with the `start_task` OpenBot tool, up to 8 open tasks. On desktop and
 the web, it opens as a tab of the agent and does not take focus. An agent has at most 50
 open tasks (`INPUT_LIMITS.agentTasks`, the size of the task list), so each open task stays visible. A message to a
@@ -326,7 +342,17 @@ a start or a message with up to 10 attachment drafts that the member uploaded wi
 and text that can be empty. The answers are the frozen `agent-tasks-v1` task and receipt. The team client
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
-and the phone shows the plus in the thread composer only on a server that has it. A server without either shows only
+and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
+route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs
+the `chat` agent level as a start does, and answers the frozen `agent-tasks-v1` task with its `branch` link. The
+member is the reader of the copy. A source or message that is not there is 404; a running source or the open-thread
+limit is 409. `branches` answers `{branches: [{taskId, sourceTaskId, sourceMessageId, throughMessageId}]}`, the
+links among the listed tasks. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
+the web read `branches` after the task list and add the links, and read the list again when an event names a task
+that they do not know. A server without the capability does not show "Branch from here", and a joined desktop
+refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`

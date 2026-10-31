@@ -158,6 +158,7 @@
     "./team-protocol/agent-task-ui-blocks-v1": "./src/team-protocol/agent-task-ui-blocks-v1.ts",
     "./team-protocol/agent-tasks-v1": "./src/team-protocol/agent-tasks-v1.ts",
     "./team-protocol/agent-thread-files-v1": "./src/team-protocol/agent-thread-files-v1.ts",
+    "./team-protocol/agent-thread-branches-v1": "./src/team-protocol/agent-thread-branches-v1.ts",
     "./team-protocol/agent-thread-reads-v1": "./src/team-protocol/agent-thread-reads-v1.ts",
     "./team-protocol/agent-threads-v1": "./src/team-protocol/agent-threads-v1.ts",
     "./team-protocol/agent-session-settings-v1": "./src/team-protocol/agent-session-settings-v1.ts",

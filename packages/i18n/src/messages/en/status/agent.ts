@@ -56,4 +56,5 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultUpdated": "Changed in Vault: {name}",
   "status.agent.vaultDeleted": "Deleted from Vault: {name}",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
+  "status.agent.branchTitle": "Branched chat",
 });

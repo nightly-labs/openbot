@@ -364,6 +364,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
       contextStates: threadContextStates,
       onCompactContext: compactTaskContext(),
+      onOpenMainMessage: (messageId) => void openAgentMessage(agent.id, messageId),
     });
   });
   /** The thread that the conversation shows: the open side thread, or the agent's own chat. */

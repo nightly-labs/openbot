@@ -335,6 +335,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.threadOpenLimitReached":
     "This agent has {count} open threads. Archive a thread, then start or restore another one.",
   "error.backend.threadRemoteUnsupported": "Threads are only available for agents on this computer.",
+  "error.backend.branchSourceBusy": "Stop the current turn before you branch this chat.",
+  "error.backend.branchMessageNotFound": "You can branch only from a finished answer of the agent.",
+  "error.backend.branchRemoteUnsupported": "Branches are only available for agents on this computer.",
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",

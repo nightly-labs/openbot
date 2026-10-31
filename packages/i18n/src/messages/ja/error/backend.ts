@@ -345,6 +345,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "このエージェントには {count} 件の開いているスレッドがあります。スレッドをアーカイブしてから、別のスレッドを開始するか復元してください。",
   "error.backend.threadRemoteUnsupported": "スレッドは、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.branchSourceBusy": "このチャットを分岐する前に、現在のターンを停止してください。",
+  "error.backend.branchMessageNotFound": "分岐できるのは、エージェントの完了した回答からのみです。",
+  "error.backend.branchRemoteUnsupported": "分岐は、このコンピューター上のエージェントでのみ利用できます。",
   "error.backend.threadMoveRefused":
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",

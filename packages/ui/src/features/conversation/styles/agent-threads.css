@@ -195,6 +195,23 @@
   text-overflow: ellipsis;
 }
 
+/* A cut title that ends in a number, as " #2" of a branch, loses its middle, not the number. */
+.agent-threads-title-numbered {
+  display: flex;
+  white-space: nowrap;
+}
+
+.agent-threads-title-root {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-threads-title-number {
+  flex: none;
+  white-space: pre;
+}
+
 /* A tab whose title the user edits has the fill of a selected tab and a thin border, so it reads as
    a field. Its own title hides under the field, and the icon slot stays. */
 .agent-threads-tab.ui-sliding-tabs-trigger[data-renaming] {
@@ -370,6 +387,53 @@
 /* The open thread has the hover color, in place of a check. */
 .agent-threads-menu .agent-threads-menu-list .agent-threads-menu-item[aria-current] {
   background: var(--ui-menu-item-hover);
+}
+
+/* The tree lines of a branch under its source thread. The stem fills the full height of the row, so
+ * the line of one level continues from row to row. The line of the last branch ends in a curve. */
+.agent-threads-menu-stem {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  margin-block: calc(var(--openbot-space-1-5) * -1);
+}
+
+.agent-threads-stem-rail,
+.agent-threads-stem-elbow {
+  position: relative;
+  width: 16px;
+}
+
+.agent-threads-stem-line::before,
+.agent-threads-stem-elbow::before,
+.agent-threads-stem-elbow::after {
+  position: absolute;
+  left: 7px;
+  border: 0 solid color-mix(in srgb, var(--openbot-text-muted) 60%, transparent);
+  content: "";
+}
+
+.agent-threads-stem-line::before,
+.agent-threads-stem-elbow::before {
+  inset-block: 0;
+  border-left-width: 1px;
+}
+
+.agent-threads-stem-elbow::after {
+  top: 50%;
+  right: 0;
+  border-top-width: 1px;
+}
+
+.agent-threads-stem-last::before {
+  right: 0;
+  bottom: 50%;
+  border-bottom-width: 1px;
+  border-bottom-left-radius: 6px;
+}
+
+.agent-threads-stem-last::after {
+  content: none;
 }
 
 .agent-threads-menu-title {
@@ -588,6 +652,50 @@
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
+}
+
+/* The line after the messages that a branch copied: "Branched from" and the source, between two rules. */
+.agent-thread-branch-divider {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: var(--openbot-space-2) 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-thread-branch-divider hr {
+  height: 1px;
+  flex: 1;
+  border: 0;
+  background: var(--openbot-border);
+}
+
+.agent-thread-branch-text,
+.agent-thread-branch-divider .agent-thread-branch-link {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: inherit;
+  font-size: inherit;
+}
+
+.agent-thread-branch-text svg,
+.agent-thread-branch-link svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.agent-thread-branch-text span,
+.agent-thread-branch-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-thread-queued {

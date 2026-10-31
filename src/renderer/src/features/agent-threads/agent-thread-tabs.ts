@@ -44,6 +44,8 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   const [hidden, setHidden] = createSignal<ReadonlySet<string>>(new Set());
   /** Agent-started threads that already had their tab added, so a closed tab stays closed. */
   const seen = new Set<string>();
+  /** The message that a side thread scrolls to when it shows, after a click on "Branched from". */
+  const [messageFocus, setMessageFocus] = createSignal<ThreadMessageFocus | null>(null);
   const sessionStart = new Date().toISOString();
 
   const storedTabs = (agentId: string): AgentThreadTabs => tabsByServer()[serverId()]?.[agentId] ?? NO_TABS;
@@ -393,6 +395,28 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     open(agentId, started.id);
   }
 
+  /**
+   * Copies a conversation through an agent answer into a new thread. The branch gets a tab after the
+   * tab of its source, or at the end, and opens, as a queued message that runs in a new thread does.
+   * Resolves true when the branch opened.
+   */
+  async function branch(agentId: string, sourceTaskId: string | null, messageId: string): Promise<boolean> {
+    const started = await tasks.branchTask(agentId, sourceTaskId, messageId);
+    if (!started || !scopeIsCurrent()) return false;
+    seen.add(started.id);
+    const ids = keptIds(agentId).filter((id) => id !== started.id);
+    const at = sourceTaskId === null ? -1 : ids.indexOf(sourceTaskId);
+    ids.splice(at < 0 ? ids.length : at + 1, 0, started.id);
+    writeTabs(agentId, { open: ids, active: started.id });
+    return true;
+  }
+
+  /** Opens a side thread at one of its messages. An archived thread is restored, as from the menu. */
+  async function openAt(agentId: string, id: string, messageId: string): Promise<void> {
+    setMessageFocus({ taskId: id, messageId, nonce: (messageFocus()?.nonce ?? 0) + 1 });
+    await restore(agentId, id);
+  }
+
   /** Removes the tabs of a deleted agent. */
   function forgetAgent(agentId: string): void {
     forgetPendingThreadDeletes(serverId(), agentId);
@@ -472,8 +496,18 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     send,
     sendDraft,
     runQueuedMessage,
+    branch,
+    openAt,
+    messageFocus,
     forgetAgent,
   };
+}
+
+/** A message that a side thread scrolls to once. A new request has a new nonce. */
+export interface ThreadMessageFocus {
+  taskId: string;
+  messageId: string;
+  nonce: number;
 }
 
 export type AgentThreadTabsState = ReturnType<typeof createAgentThreadTabs>;

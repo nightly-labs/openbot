@@ -51,4 +51,5 @@ export const messages = {
   "status.agent.vaultUpdated": "已在保险库中修改：{name}",
   "status.agent.vaultDeleted": "已从保险库删除：{name}",
   "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
+  "status.agent.branchTitle": "分支聊天",
 } as const satisfies PartialTranslation<typeof source>;

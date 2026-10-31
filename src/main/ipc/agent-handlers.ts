@@ -46,6 +46,11 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
+  AGENT_THREAD_BRANCHES_CAPABILITY,
+  AGENT_THREAD_BRANCHES_ROUTES,
+  withAgentThreadBranches,
+} from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import {
   AGENT_THREAD_FILES_CAPABILITY,
   AGENT_THREAD_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
@@ -67,6 +72,7 @@ import {
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { Effect } from "effect";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -88,6 +94,7 @@ import {
   decodeQueueSnapshot,
   decodeRemoteAgentTask,
   decodeRemoteAgentTasks,
+  decodeRemoteAgentThreadBranches,
   decodeRemoteTaskConversation,
   decodeRemoteTaskReadState,
   decodeSidebarLayoutSnapshot,
@@ -100,6 +107,7 @@ import {
   parseAgentId,
   parseAgentTask,
   parseApprovalResponse,
+  parseBranchAgentTask,
   parseBrowserTakeoverResponse,
   parseCancelAgentWait,
   parseCancelMessageLink,
@@ -655,18 +663,31 @@ export function agentIpcHandlers({
           throw new Error(sourceText("error.backend.agentWaitRemoteUnsupported"));
         },
       }),
-      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task.
+      // A joined server has tasks through `agent-tasks-v1`. A server without it shows no task. A server
+      // with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that each
+      // listed branch has its link.
       listTasks: scopedHandler(parseAgentId, {
         local: (agentId) => service.listTasks(agentId),
-        remote: (agentId, serverId) =>
-          remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)
-            ? runCauseEffect(
-                remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, {
-                  method: "POST",
-                  body: { agentId },
-                }),
-              )
-            : { agentId, tasks: [], limit: 1 },
+        remote: (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY))
+            return { agentId, tasks: [], limit: 1 };
+          const init = { method: "POST", body: { agentId } } as const;
+          const tasks = remoteServers.request(serverId, AGENT_TASKS_ROUTES.list, decodeRemoteAgentTasks, init);
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY))
+            return runCauseEffect(tasks);
+          return runCauseEffect(
+            Effect.gen(function* () {
+              const snapshot = yield* tasks;
+              const links = yield* remoteServers.request(
+                serverId,
+                AGENT_THREAD_BRANCHES_ROUTES.list,
+                decodeRemoteAgentThreadBranches,
+                init,
+              );
+              return withAgentThreadBranches(snapshot, links.branches);
+            }),
+          );
+        },
       }),
       readTask: scopedHandler(parseAgentTask, {
         local: (parsed) => service.readTask(parsed.agentId, parsed.taskId),
@@ -694,6 +715,25 @@ export function agentIpcHandlers({
       runQueuedMessageAsTask: scopedHandler(parseRunQueuedMessageAsTask, {
         local: (parsed) => runCauseEffect(service.runQueuedMessageAsTask(parsed)),
         remote: taskRemoteUnsupported,
+      }),
+      // A joined server branches through `agent-thread-branches-v1`; an older one cannot branch.
+      branchTask: scopedHandler(parseBranchAgentTask, {
+        local: (parsed) => runCauseEffect(host.branchAgentTask(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY))
+            throw new Error(sourceText("error.backend.branchRemoteUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_THREAD_BRANCHES_ROUTES.branch, decodeRemoteAgentTask, {
+              method: "POST",
+              body: {
+                agentId: parsed.agentId,
+                taskId: parsed.taskId,
+                messageId: parsed.messageId,
+                requestId: parsed.requestId,
+              },
+            }),
+          );
+        },
       }),
       stopTask: scopedHandler(parseAgentTask, {
         local: (parsed) => runCauseEffect(service.stopTask(parsed)),

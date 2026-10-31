@@ -1,4 +1,4 @@
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV9, type TeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 // One Team API call, from picking a wire format to recording that it failed.
 //
 // **Two encodings, on purpose. Never merge them.** The HTTPS path frames V1 or V3 according to the
@@ -411,10 +411,44 @@ export class RemoteServerClient {
     apiUrl: string,
   ): Effect.fn.Return<ServerCompatibility, RemoteWorkflowError> {
     if (!this.#appVersion) return assumedCompatibility(this.#appVersion);
+    const host = yield* this.#readCompatibilityEffect(apiUrl, 7, TEAM_BOOTSTRAP_CAPABILITIES);
+    const negotiatedProtocol = highestCommonTeamProtocol(LOCAL_TEAM_PROTOCOL, host.protocol);
+    if (negotiatedProtocol === null) {
+      if (teamProtocolUpdateDirection(LOCAL_TEAM_PROTOCOL, host.protocol) === "client_update_required") {
+        return yield* new RemoteWorkflowError({
+          cause: new RemoteProtocolError("client_update_required", sourceText("error.remote.appUpdateRequired"), host),
+        });
+      }
+      return yield* new RemoteWorkflowError({
+        cause: new RemoteProtocolError("host_update_required", sourceText("error.team.hostUpdateRequired"), host),
+      });
+    }
+    if (negotiatedProtocol <= 7) return negotiatedCompatibility(this.#appVersion, host, negotiatedProtocol);
+    // The first read is a protocol 7 request, so every released host can answer it, but a host shows
+    // a protocol 7 peer no protocol 9 capabilities. Read the list again as the negotiated protocol.
+    const current = yield* this.#readCompatibilityEffect(
+      apiUrl,
+      negotiatedProtocol,
+      teamCapabilitiesForProtocol(negotiatedProtocol),
+    );
+    return negotiatedCompatibility(
+      this.#appVersion,
+      { ...host, capabilities: current.capabilities },
+      negotiatedProtocol,
+    );
+  }).bind(this);
+
+  /** One compatibility read against a bare URL, with its failures as the user is told them. */
+  readonly #readCompatibilityEffect = Effect.fn("RemoteClient.readCompatibility")(function* (
+    this: RemoteServerClient,
+    apiUrl: string,
+    protocol: number,
+    capabilities: readonly TeamCurrentCapability[],
+  ): Effect.fn.Return<TeamProtocolSupportV9, RemoteWorkflowError> {
     const attempt4 = yield* Effect.gen({ self: this }, function* () {
       return yield* requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV9, {
-        protocol: 7,
-        capabilities: TEAM_BOOTSTRAP_CAPABILITIES,
+        protocol,
+        capabilities,
       }).pipe(
         Effect.mapError(
           (failure) =>
@@ -441,19 +475,7 @@ export class RemoteServerClient {
       }
       return yield* new RemoteWorkflowError({ cause: error });
     }
-    const host = attempt4.success;
-    const negotiatedProtocol = highestCommonTeamProtocol(LOCAL_TEAM_PROTOCOL, host.protocol);
-    if (negotiatedProtocol === null) {
-      if (teamProtocolUpdateDirection(LOCAL_TEAM_PROTOCOL, host.protocol) === "client_update_required") {
-        return yield* new RemoteWorkflowError({
-          cause: new RemoteProtocolError("client_update_required", sourceText("error.remote.appUpdateRequired"), host),
-        });
-      }
-      return yield* new RemoteWorkflowError({
-        cause: new RemoteProtocolError("host_update_required", sourceText("error.team.hostUpdateRequired"), host),
-      });
-    }
-    return negotiatedCompatibility(this.#appVersion, host, negotiatedProtocol);
+    return attempt4.success;
   }).bind(this);
 
   /**

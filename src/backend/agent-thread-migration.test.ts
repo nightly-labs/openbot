@@ -47,6 +47,7 @@ function seedTasks(db: DatabaseSync): void {
         '2026-10-01T09:00:00.000Z', '2026-10-02T09:00:00.000Z', '2026-10-03T09:00:00.000Z', 7)`);
 }
 
+// Migration 48 adds the branch link, null for every moved task.
 const THREADS = [
   {
     thread_id: "openbot-thread-closed",
@@ -61,6 +62,9 @@ const THREADS = [
     updated_at: "2026-10-02T09:00:00.000Z",
     archived_at: "2026-10-03T09:00:00.000Z",
     last_event_sequence: 7,
+    branch_source_thread_id: null,
+    branch_source_message_id: null,
+    branch_through_message_id: null,
   },
   {
     thread_id: "openbot-thread-open",
@@ -75,6 +79,9 @@ const THREADS = [
     updated_at: "2026-10-02T08:00:00.000Z",
     archived_at: null,
     last_event_sequence: 4,
+    branch_source_thread_id: null,
+    branch_source_message_id: null,
+    branch_through_message_id: null,
   },
 ];
 
@@ -109,7 +116,7 @@ function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 47 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 48 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -215,9 +222,9 @@ describe("agent thread migration", () => {
     seedThreads(db);
     seedTasks(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(48,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(49,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=48; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=49; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
   });
