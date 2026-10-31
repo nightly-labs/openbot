@@ -1,5 +1,40 @@
 [
   {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Branch a conversation: right-click an agent message and select Branch from here. A new thread opens with the conversation up to that message.",
+          "Agent settings have an Instructions page that shows the agent's AGENTS.md file. When the agent changes its instructions, the chat shows the change with Undo.",
+          "The Marketplace is on openbot.run. Each agent and skill has its own page, and Copy link shares it.",
+          "An agent can answer a website's alert or confirmation that its own browser action opened.",
+          "A stopped or failed channel task has a Cancel task button."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Memories open in the agent's settings pane, with a short title for each memory and a search field.",
+          "Agents send fewer tokens in each request, with every provider.",
+          "Each routine shows as its own card with a switch that pauses or resumes it.",
+          "Settings › Notifications shows one card for each server, with All, Needs me and Nothing as one control."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "In-app updates install on slow Macs, such as Intel Macs.",
+          "An idle agent browser tab uses much less memory.",
+          "An agent on an OpenCode Go model moves to its backup model at the Go usage limit.",
+          "The file preview panel updates when the agent changes the open file."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.56.0",
     "date": "2026-10-30",
     "notices": [],
