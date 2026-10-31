@@ -233,7 +233,7 @@ export type WorkflowWebhookResult =
   | { kind: "too-large" };
 
 /** One event of the OpenBot GitHub App, as Signal relayed it. */
-export interface WorkflowGitHubEventInput {
+interface WorkflowGitHubEventInput {
   /** The `X-GitHub-Event` header. */
   event: string;
   deliveryId: string;
@@ -242,7 +242,7 @@ export interface WorkflowGitHubEventInput {
 }
 
 /** Whether a GitHub trigger of this host watches the event: it is then in the trigger's history. */
-export type WorkflowGitHubResult = { kind: "saved" } | { kind: "unwatched" };
+type WorkflowGitHubResult = { kind: "saved" } | { kind: "unwatched" };
 
 /** The workflow of a run or a step, and the agents that the run can still reach. */
 interface WorkflowRunScope {

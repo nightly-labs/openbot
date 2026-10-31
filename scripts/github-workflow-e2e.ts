@@ -211,10 +211,10 @@ try {
     workflows.create({ title: "Answer comments", graph: graphOf("acme/app", "approval", "notBot") }),
   );
   const chain = await run(workflows.create({ title: "Chain", graph: graphOf("acme/chain", "notify") }));
-  report.watched = watched.at(-1);
+  report.watched = watched.at(-1) ?? [];
   check(
     "the saved triggers set the watched repositories",
-    [...(watched.at(-1) ?? [])].sort().join() === "acme/app,acme/chain",
+    [...report.watched].sort().join() === "acme/app,acme/chain",
     watched,
   );
 

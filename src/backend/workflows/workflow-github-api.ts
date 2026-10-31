@@ -37,7 +37,7 @@ export interface WorkflowGitHubChangeResult {
 }
 
 /** `unreachable`: the call went out and no answer came, so GitHub may have made the change. `notSent`: nothing went out. */
-export const WORKFLOW_GITHUB_API_FAILURES = [
+const WORKFLOW_GITHUB_API_FAILURES = [
   "notConnected",
   "notSent",
   "noAccess",

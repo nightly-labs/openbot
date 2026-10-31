@@ -35,7 +35,7 @@ const RECENT_DETAIL_LIMIT = 10;
 const DETAIL_LIMIT = 300;
 
 /** The tokens for one repository: the user's, and the app's where the user can push. */
-export interface GitHubRepositoryTokens {
+interface GitHubRepositoryTokens {
   user: string;
   bot: string | null;
 }

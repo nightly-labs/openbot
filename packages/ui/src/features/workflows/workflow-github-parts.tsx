@@ -296,7 +296,7 @@ const withValues = (options: readonly string[], values: readonly string[]) => [
 export const GITHUB_TRIGGER_DEFAULTS = { event: "issue.opened", filters: "notBot" } as const;
 
 /** The settings of a GitHub trigger. An output reads them too: it acts on the event. */
-export function useGitHubTrigger(id: () => string) {
+function useGitHubTrigger(id: () => string) {
   const board = useBoard();
   const [repository] = useField<string>(id, "repository", "", asString);
   const [event, setEvent] = useField<WorkflowGitHubEvent>(
@@ -467,7 +467,7 @@ const sameItem = (left: WorkflowGitHubItem, right: WorkflowGitHubItem) =>
   left.number === right.number && left.repository.toLowerCase() === right.repository.toLowerCase();
 
 /** The texts and the runs of the events of a GitHub trigger. */
-export function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
+function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
   const { t, format } = useText();
   const runName = (number: number) => t("workflow.canvas.run.number", { number });
   const clock = (at: string) => format.date(new Date(at), { hour: "numeric", minute: "2-digit" });
