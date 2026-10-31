@@ -132,6 +132,8 @@ interface McpChallenge {
   status: number;
   /** Whether `WWW-Authenticate` names the Bearer scheme, which is what an OAuth server asks for. */
   bearer: boolean;
+  /** Whether the challenge names `resource_metadata`, the OAuth discovery document of the server. */
+  resourceMetadata: boolean;
   /** Where the request ended up after any redirect. */
   url: string;
 }
@@ -195,6 +197,23 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     !hasCredentialHeader(config)
   )
     // The same Test deadline covers the lookup: it gets only the time the connection left.
+    seen.challenge = {
+      ...unexplained,
+      bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
+    };
+  // OpenBot signs in only over https or loopback. A Bearer challenge to another plain-http address is
+  // a sign-in only when the server publishes OAuth metadata; otherwise it wants a key in a header, as
+  // a token-protected server on a local network does. Without this check, the error asked for an
+  // https address that such a server does not have.
+  else if (
+    !signIn &&
+    signInPlace !== null &&
+    unexplained?.status === 401 &&
+    unexplained.bearer &&
+    !unexplained.resourceMetadata &&
+    !normalizeResource(config.url) &&
+    !hasCredentialHeader(config)
+  )
     seen.challenge = {
       ...unexplained,
       bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
@@ -426,6 +445,7 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
         status: response.status,
         // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
         bearer: /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
+        resourceMetadata: /\bresource_metadata\s*=/iu.test(response.headers.get("www-authenticate") ?? ""),
         url: response.url || input.toString(),
       });
     }

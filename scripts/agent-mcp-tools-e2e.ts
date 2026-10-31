@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { tmpdir } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -82,6 +82,27 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   };
 }
 
+/**
+ * A server on a plain-http LAN address that wants a bearer token and publishes no OAuth metadata.
+ * The address is not loopback, so OpenBot cannot sign in to it: only a key in a header can work.
+ */
+async function lanBearerServer(): Promise<{ url: string; close: () => Promise<void> }> {
+  const host = Object.values(networkInterfaces())
+    .flat()
+    .find((entry) => entry && entry.family === "IPv4" && !entry.internal)?.address;
+  assert.ok(host, "this test needs a non-loopback IPv4 address");
+  const server: Server = createServer((_request, response) =>
+    json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="lan"' }),
+  );
+  await new Promise<void>((done) => server.listen(0, host, done));
+  const address = server.address();
+  assert.ok(address !== null && typeof address === "object");
+  return {
+    url: `http://${host}:${address.port}/mcp`,
+    close: () => new Promise<void>((done) => server.close(() => done())),
+  };
+}
+
 /** A port nothing listens on: the server is down. */
 async function closedUrl(): Promise<string> {
   const server = await mcpServer("open");
@@ -118,6 +139,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
 };
+const lanBearer = await lanBearerServer();
 const calls: Call[] = [];
 let refreshes = 0;
 const report: { passed: boolean; calls: Call[]; refreshes: number; failures: string[] } = {
@@ -216,6 +238,15 @@ try {
   assert.equal(key.signInCards.length, 0);
   assert.ok(row("crm"), "a server that needs a key is saved for the user to add it");
 
+  // A Bearer challenge with no OAuth metadata over plain http asks for a key, not for https.
+  const lan = await call("add a LAN http server that wants a bearer token", "save_mcp_server", {
+    name: "lan_tool",
+    url: lanBearer.url,
+  });
+  assert.equal(lan.result.status, "needs_key", lan.result.error);
+  assert.equal(lan.signInCards.length, 0);
+  assert.ok(row("lan_tool"), "a LAN server that needs a key is saved for the user to add it");
+
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
     url: await closedUrl(),
@@ -305,7 +336,7 @@ try {
   report.failures.push(error instanceof Error ? (error.stack ?? error.message) : String(error));
 } finally {
   report.refreshes = refreshes;
-  await Promise.all(Object.values(servers).map((server) => server.close()));
+  await Promise.all([...Object.values(servers), lanBearer].map((server) => server.close()));
   database.close();
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
