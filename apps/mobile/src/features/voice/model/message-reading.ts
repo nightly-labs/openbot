@@ -33,7 +33,6 @@ export function toggleReadAloud(messageId: string, markdown: string): void {
   const own = readReply(markdown, {
     onPart: () => undefined,
     onDone: finish,
-    onReplaced: finish,
     onError: (failure) => {
       finish();
       const { t } = currentText();

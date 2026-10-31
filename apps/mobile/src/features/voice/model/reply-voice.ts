@@ -49,10 +49,9 @@ export interface ReplyReading {
 
 type ReplyHandlers = {
   onPart: (text: string) => void;
+  /** The reading ended: it played to its end, or a newer reading stopped it. */
   onDone: () => void;
   onError: (failure: ReplyVoiceFailure) => void;
-  /** A newer reading started and stopped this one, such as a voice conversation or another message. */
-  onReplaced?: () => void;
 };
 
 /** The chosen voice can read now: Supertonic 3 is downloaded, or ElevenLabs has a key and a voice. */
@@ -167,7 +166,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     wake?.();
     native?.stop();
   };
-  /** The newer reading stopped the playback already. */
+  /** A newer reading stopped the playback already; the owner continues as after the end. */
   const replace = () => {
     if (ended) return;
     ended = true;
@@ -175,7 +174,7 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     listeners.delete(listener);
     abort.abort();
     wake?.();
-    handlers.onReplaced?.();
+    handlers.onDone();
   };
   const settings = useVoiceSettings.getState();
   const engine = choice?.engine ?? settings.engine;
