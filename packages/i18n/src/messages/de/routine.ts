@@ -153,8 +153,6 @@ export const messages = {
   "routine.card.saved": "Gespeichert",
   "routine.card.saveFailed": "Der Zeitplan konnte nicht gespeichert werden.",
   "routine.card.deleted": "Diese Routine wurde gelöscht.",
-  "routine.card.changedLater": "Später in diesem Chat geändert.",
-  "routine.card.showLatest": "Neueste anzeigen",
   "routine.card.created": "Routine erstellt",
   "routine.card.updated": "Routine aktualisiert",
   "routine.card.open": "Routine {name} öffnen",

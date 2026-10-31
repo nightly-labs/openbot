@@ -150,8 +150,6 @@ export const messages = {
   "routine.card.saved": "저장됨",
   "routine.card.saveFailed": "일정을 저장할 수 없어요.",
   "routine.card.deleted": "이 루틴은 삭제됐어요.",
-  "routine.card.changedLater": "이 채팅에서 나중에 변경됐어요.",
-  "routine.card.showLatest": "최신 보기",
   "routine.card.created": "루틴을 만들었어요",
   "routine.card.updated": "루틴을 업데이트했어요",
   "routine.card.open": "루틴 {name} 열기",

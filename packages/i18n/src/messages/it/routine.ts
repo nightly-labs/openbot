@@ -153,8 +153,6 @@ export const messages = {
   "routine.card.saved": "Salvata",
   "routine.card.saveFailed": "Impossibile salvare la pianificazione.",
   "routine.card.deleted": "Questa routine è stata eliminata.",
-  "routine.card.changedLater": "Modificata più avanti in questa chat.",
-  "routine.card.showLatest": "Mostra l'ultima",
   "routine.card.created": "Routine creata",
   "routine.card.updated": "Routine aggiornata",
   "routine.card.open": "Apri la routine {name}",

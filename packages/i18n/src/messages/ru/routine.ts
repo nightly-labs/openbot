@@ -180,8 +180,6 @@ export const messages = {
   "routine.card.saved": "Сохранено",
   "routine.card.saveFailed": "Не удалось сохранить расписание.",
   "routine.card.deleted": "Эта регулярная задача удалена.",
-  "routine.card.changedLater": "Изменена позже в этом чате.",
-  "routine.card.showLatest": "Показать последнюю",
   "routine.card.created": "Регулярная задача создана",
   "routine.card.updated": "Регулярная задача обновлена",
   "routine.card.open": "Открыть регулярную задачу {name}",

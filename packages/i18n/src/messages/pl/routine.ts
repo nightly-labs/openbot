@@ -180,8 +180,6 @@ export const messages = {
   "routine.card.saved": "Zapisano",
   "routine.card.saveFailed": "Nie udało się zapisać harmonogramu.",
   "routine.card.deleted": "Ta rutyna została usunięta.",
-  "routine.card.changedLater": "Zmieniono później w tym czacie.",
-  "routine.card.showLatest": "Pokaż najnowszą",
   "routine.card.created": "Utworzono rutynę",
   "routine.card.updated": "Zaktualizowano rutynę",
   "routine.card.open": "Otwórz rutynę {name}",

@@ -150,8 +150,6 @@ export const messages = {
   "routine.card.saved": "保存しました",
   "routine.card.saveFailed": "スケジュールを保存できませんでした。",
   "routine.card.deleted": "このルーティンは削除されました。",
-  "routine.card.changedLater": "このチャットの後半で変更されました。",
-  "routine.card.showLatest": "最新を表示",
   "routine.card.created": "ルーティンを作成しました",
   "routine.card.updated": "ルーティンを更新しました",
   "routine.card.open": "ルーティン {name} を開く",
