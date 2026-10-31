@@ -47,6 +47,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
+import { DrawerHeaderBlur } from "./drawer-header-blur";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
 import { SERVER_ROW_HEIGHT, SortableServerList } from "./sortable-server-list";
@@ -55,6 +56,13 @@ import { useDrawerMemberCount, useDrawerServerValues } from "./use-drawer-server
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const SERVER_LIST_MOTION = { duration: 240, easing: EASE_OUT };
 const SERVER_AVATAR_SIZE = 40;
+const HEADER_AVATAR_SIZE = 48;
+// The blur is full behind the header text and fades out slowly: it starts this far above the
+// header's bottom and goes on this far below it.
+const HEADER_FADE_START = 16;
+const HEADER_EDGE = 16;
+// The first row starts below the blur, so it is clear when the list is at the top.
+const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 
@@ -65,6 +73,8 @@ interface ServerDrawerContentProps {
   open: boolean;
   servers: MobileServer[];
   session: MobileSession;
+  /** The drawer's left padding. The header blur reaches over it to the screen edge. */
+  sideInset: number;
   topInset: number;
   onNavigate: (href: Href) => void;
   onLeave: (serverId: string) => Promise<void>;
@@ -98,6 +108,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   open,
   servers,
   session,
+  sideInset,
   topInset,
   onNavigate,
   onLeave,
@@ -117,6 +128,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const [editing, setEditing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
   // The iOS menu host sizes to its content, so a row in a menu gets the slot width explicitly.
   const [rowWidth, setRowWidth] = useState<number>();
   const activeServer = servers.find((server) => server.id === activeServerId);
@@ -350,112 +362,130 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
   return (
     <>
-      <View className="pr-3 pb-1" style={{ paddingTop: Math.max(topInset, 16) }}>
-        <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3">
-          {activeServer ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={activeServer.name}
-              accessibilityHint={t("mobile.server.drawer.serverListHint")}
-              accessibilityState={{ expanded: showsList }}
-              className="min-w-0 shrink flex-row items-center gap-1"
-              disabled={editing}
-              hitSlop={8}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-              onPress={() => {
-                void haptics.selection();
-                setListOpen((current) => !current);
-              }}
-            >
-              <Typography.Heading className="font-bold shrink" numberOfLines={1} style={typeScale.drawerTitle}>
-                {activeServer.name}
-              </Typography.Heading>
-              <Animated.View
-                style={{
-                  marginTop: 3,
-                  transform: [{ rotate: showsList ? "180deg" : "0deg" }],
-                  transitionProperty: "transform",
-                  transitionDuration: reducedMotion ? 0 : 240,
-                  transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
+      <View className="flex-1">
+        <View
+          className="absolute top-0 right-0 left-0 z-20 pr-3 pb-1"
+          style={{ paddingTop: Math.max(topInset, 16) }}
+          onLayout={(event) => {
+            const measured = event.nativeEvent.layout.height;
+            setHeaderHeight((current) => (current === measured ? current : measured));
+          }}
+        >
+          <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3">
+            {activeServer ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={subtitle ? `${activeServer.name}, ${subtitle}` : activeServer.name}
+                accessibilityHint={t("mobile.server.drawer.serverListHint")}
+                accessibilityState={{ expanded: showsList }}
+                className="min-w-0 shrink flex-row items-center gap-3"
+                disabled={editing}
+                hitSlop={8}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                onPress={() => {
+                  void haptics.selection();
+                  setListOpen((current) => !current);
                 }}
               >
-                <ChevronDown color={mutedColor} size={20} strokeWidth={2.4} />
-              </Animated.View>
-            </Pressable>
-          ) : (
-            <Typography.Heading className="font-bold shrink" numberOfLines={1} style={typeScale.drawerTitle}>
-              {t("mobile.server.drawer.title")}
-            </Typography.Heading>
-          )}
-          {editing ? (
-            <ServerDrawerIconButton
-              accessibilityLabel={t("mobile.server.drawer.doneEditing")}
-              color={mutedColor}
-              fallbackVariant="filled"
-              systemName="checkmark"
-              onPress={stopEditing}
-            >
-              <Check color={mutedColor} size={18} strokeWidth={2} />
-            </ServerDrawerIconButton>
-          ) : (
-            <ServerDrawerIconButton
-              accessibilityLabel={showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
-              color={mutedColor}
-              fallbackVariant="filled"
-              systemName="plus"
-              onPress={() =>
-                onNavigate(
-                  showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
-                )
-              }
-            >
-              <Plus color={mutedColor} size={18} strokeWidth={2} />
-            </ServerDrawerIconButton>
-          )}
+                <ServerAvatar server={activeServer} size={HEADER_AVATAR_SIZE} />
+                <View className="min-w-0 shrink">
+                  <View className="min-w-0 flex-row items-center gap-1">
+                    <Typography.Heading className="font-bold shrink" numberOfLines={1} style={typeScale.drawerTitle}>
+                      {activeServer.name}
+                    </Typography.Heading>
+                    <Animated.View
+                      style={{
+                        marginTop: 3,
+                        transform: [{ rotate: showsList ? "180deg" : "0deg" }],
+                        transitionProperty: "transform",
+                        transitionDuration: reducedMotion ? 0 : 240,
+                        transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
+                      }}
+                    >
+                      <ChevronDown color={mutedColor} size={20} strokeWidth={2.4} />
+                    </Animated.View>
+                  </View>
+                  {subtitle ? (
+                    <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.caption}>
+                      {subtitle}
+                    </Typography.Paragraph>
+                  ) : null}
+                </View>
+              </Pressable>
+            ) : (
+              <Typography.Heading className="font-bold shrink" numberOfLines={1} style={typeScale.drawerTitle}>
+                {t("mobile.server.drawer.title")}
+              </Typography.Heading>
+            )}
+            {editing ? (
+              <ServerDrawerIconButton
+                accessibilityLabel={t("mobile.server.drawer.doneEditing")}
+                color={mutedColor}
+                fallbackVariant="filled"
+                systemName="checkmark"
+                onPress={stopEditing}
+              >
+                <Check color={mutedColor} size={18} strokeWidth={2} />
+              </ServerDrawerIconButton>
+            ) : (
+              <ServerDrawerIconButton
+                accessibilityLabel={showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
+                color={mutedColor}
+                fallbackVariant="filled"
+                systemName="plus"
+                onPress={() =>
+                  onNavigate(
+                    showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
+                  )
+                }
+              >
+                <Plus color={mutedColor} size={18} strokeWidth={2} />
+              </ServerDrawerIconButton>
+            )}
+          </View>
         </View>
-        {subtitle ? (
-          <Typography.Paragraph
-            className="-mt-1.5 px-3 text-text-secondary"
-            numberOfLines={1}
-            style={typeScale.caption}
-          >
-            {subtitle}
-          </Typography.Paragraph>
-        ) : null}
+
+        {/* The list scrolls under the header, which blurs it as the other screens blur theirs. */}
+        <DrawerHeaderBlur
+          left={-sideInset}
+          solidHeight={Math.max(0, headerHeight - HEADER_FADE_START)}
+          fadeHeight={headerHeight === 0 ? 0 : HEADER_FADE_START + HEADER_EDGE}
+        />
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="pr-3 pb-4"
+          contentContainerStyle={{ paddingTop: headerHeight + LIST_TOP_GAP }}
+          contentInsetAdjustmentBehavior="never"
+          scrollEnabled={!dragging}
+          scrollIndicatorInsets={{ top: headerHeight }}
+          showsVerticalScrollIndicator={false}
+        >
+          <ServerListCollapse open={showsList} reducedMotion={reducedMotion}>
+            {editing ? (
+              <SortableServerList
+                color={mutedColor}
+                ids={serverIds}
+                renderRow={(id) => {
+                  const serverItem = servers.find((candidate) => candidate.id === id);
+                  return serverItem ? renderRow(serverItem) : null;
+                }}
+                onDragActive={setDragging}
+                onReorder={onReorder}
+              />
+            ) : (
+              servers.map(withMenu)
+            )}
+            {editing ? (
+              <Typography.Paragraph className="px-3 pt-3 text-text-secondary" style={typeScale.caption}>
+                {t("mobile.server.drawer.orderHint")}
+              </Typography.Paragraph>
+            ) : null}
+            {activeServer ? <DrawerDivider /> : null}
+          </ServerListCollapse>
+
+          {activeServer ? <DrawerServerTools server={activeServer} open={open} onNavigate={onNavigate} /> : null}
+        </ScrollView>
       </View>
-
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="pt-1 pr-3 pb-4"
-        contentInsetAdjustmentBehavior="never"
-        scrollEnabled={!dragging}
-        showsVerticalScrollIndicator={false}
-      >
-        <ServerListCollapse open={showsList} reducedMotion={reducedMotion}>
-          {editing ? (
-            <SortableServerList
-              color={mutedColor}
-              ids={serverIds}
-              renderRow={(id) => {
-                const serverItem = servers.find((candidate) => candidate.id === id);
-                return serverItem ? renderRow(serverItem) : null;
-              }}
-              onDragActive={setDragging}
-              onReorder={onReorder}
-            />
-          ) : (
-            servers.map(withMenu)
-          )}
-          {editing ? (
-            <Typography.Paragraph className="px-3 pt-3 text-text-secondary" style={typeScale.caption}>
-              {t("mobile.server.drawer.orderHint")}
-            </Typography.Paragraph>
-          ) : null}
-          {activeServer ? <DrawerDivider /> : null}
-        </ServerListCollapse>
-
-        {activeServer ? <DrawerServerTools server={activeServer} open={open} onNavigate={onNavigate} /> : null}
-      </ScrollView>
 
       <View className="mr-3 flex-row items-center gap-2 pt-2">
         <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 rounded-2xl px-2 py-2">

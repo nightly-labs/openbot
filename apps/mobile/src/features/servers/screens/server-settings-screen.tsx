@@ -13,7 +13,7 @@ import { useUniwind } from "uniwind";
 import { confirmOwner } from "@/features/app-lock/model/app-lock";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
-import { ServerAvatar } from "@/features/servers/components/server-avatar";
+import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
@@ -672,7 +672,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
     setPicking(true);
     setError(null);
     try {
-      const photo = await pickAvatarPhoto({ pathname: "/server-settings/crop-logo" });
+      const photo = await pickAvatarPhoto({ pathname: "/server-settings/crop-logo" }, SERVER_AVATAR_CORNER_RATIO);
       if (photo) setLogo(photo);
     } catch (cause) {
       void haptics.notification("error");
