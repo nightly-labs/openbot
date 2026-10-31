@@ -41,13 +41,14 @@ async function realFolder(path: string): Promise<string> {
 async function subfolders(folder: string): Promise<string[] | null> {
   const items = await readdir(folder, { withFileTypes: true }).catch(() => null);
   if (!items) return null;
-  const names: string[] = [];
-  for (const item of items) {
-    if (item.name.startsWith(".")) continue;
-    // A link to a folder is a folder for the picker too.
-    if (item.isDirectory() || (item.isSymbolicLink() && (await isDirectory(join(folder, item.name)))))
-      names.push(item.name);
-  }
+  const visible = items.filter((item) => !item.name.startsWith("."));
+  // A link to a folder is a folder for the picker too. The links are checked at the same time.
+  const kept = await Promise.all(
+    visible.map(
+      async (item) => item.isDirectory() || (item.isSymbolicLink() && (await isDirectory(join(folder, item.name)))),
+    ),
+  );
+  const names = visible.filter((_, index) => kept[index]).map((item) => item.name);
   return names.sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base", numeric: true }));
 }
 
@@ -94,7 +95,18 @@ async function volumes(): Promise<AgentFolderBrowseEntry[]> {
   return [...seen.values()].slice(0, AGENT_FOLDER_VOLUME_LIMIT);
 }
 
+/** How long one list of the disks serves the browse steps after it. */
+const VOLUMES_TTL_MS = 30_000;
+
 export function createAgentFolders({ service, userDataPath }: AgentFoldersDependencies) {
+  // Each browse step sends the disks, and a missing network drive can make the list slow, so the
+  // steps of one browse share one list.
+  let disks: { at: number; list: Promise<AgentFolderBrowseEntry[]> } | null = null;
+  function currentVolumes(): Promise<AgentFolderBrowseEntry[]> {
+    if (!disks || Date.now() - disks.at > VOLUMES_TTL_MS) disks = { at: Date.now(), list: volumes() };
+    return disks.list;
+  }
+
   // Each change reads the list, checks the disk, then saves the whole list. One change at a time for
   // each agent, so an Undo during a remove does not save over it.
   const pending = new Map<string, Promise<unknown>>();
@@ -255,7 +267,7 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
         entries: names.slice(0, AGENT_FOLDER_BROWSE_LIMIT).map((name) => ({ name, path: join(folder, name) })),
         truncated: names.length > AGENT_FOLDER_BROWSE_LIMIT,
         home: await realFolder(homedir()),
-        volumes: await volumes(),
+        volumes: await currentVolumes(),
       };
     },
   };

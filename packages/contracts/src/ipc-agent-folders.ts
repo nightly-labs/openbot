@@ -107,6 +107,35 @@ export function agentFolderName(path: string): string {
   return parts.at(-1) ?? path;
 }
 
+/** Where the folder is: its parent, or the root for a folder directly in it. */
+export function agentFolderParent(path: string): string {
+  const end = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  if (end === 0) return path.slice(0, 1);
+  return end > 0 ? path.slice(0, end) : path;
+}
+
+/**
+ * The folder that holds an excluded folder, as the Folders page names it, with the path below it.
+ * Null when no folder of the list holds it: a folder that the user removed no longer holds it.
+ */
+export function agentExclusionPlace(
+  path: string,
+  list: AgentFolderList,
+  names: { workspace: string; shared: string },
+): string | null {
+  const holders: [string, string][] = [
+    [list.workspace, names.workspace],
+    [list.shared, names.shared],
+    ...list.folders.map((folder): [string, string] => [folder.path, agentFolderName(folder.path)]),
+  ];
+  const holder = holders.find(([root]) => folderInside(root, path));
+  if (!holder) return null;
+  const below = agentFolderParent(path)
+    .slice(holder[0].length)
+    .replace(/^[/\\]+/, "");
+  return below ? `${holder[1]}/${below}` : holder[1];
+}
+
 export function isAgentAdditionalFolders(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&

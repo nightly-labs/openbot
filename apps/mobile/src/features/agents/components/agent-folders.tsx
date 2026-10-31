@@ -6,10 +6,11 @@ import {
   type AgentFolderChange,
   type AgentFolderCoverageReason,
   type AgentFolderList,
+  agentExclusionPlace,
   agentFolderName,
+  agentFolderParent,
   agentPermissionLevel,
   agentProviderDescriptor,
-  folderInside,
 } from "@openbot/contracts/ipc";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -128,27 +129,6 @@ export function AgentFoldersRow({
       <Typography.Paragraph>{t("mobile.agent.folders.title")}</Typography.Paragraph>
     </SettingsRow>
   );
-}
-
-/** Where the folder is. The name is on the line above, so the path stops at its parent. */
-function folderParent(path: string): string {
-  const end = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return end > 0 ? path.slice(0, end) : path;
-}
-
-/** The folder that holds an excluded folder, as the page names it, with the path below it. */
-function exclusionPlace(path: string, list: AgentFolderList, names: { workspace: string; shared: string }) {
-  const holders: [string, string][] = [
-    [list.workspace, names.workspace],
-    [list.shared, names.shared],
-    ...list.folders.map((folder): [string, string] => [folder.path, agentFolderName(folder.path)]),
-  ];
-  const holder = holders.find(([root]) => folderInside(root, path));
-  if (!holder) return null;
-  const below = folderParent(path)
-    .slice(holder[0].length)
-    .replace(/^[/\\]+/, "");
-  return below ? `${holder[1]}/${below}` : holder[1];
 }
 
 function openBrowser(agent: MobileAgent, mode: BrowseMode, path?: string, replace?: string) {
@@ -299,8 +279,8 @@ export function AgentFolders({
               leading={folder.found ? <Folder size={18} color={muted} /> : <TriangleAlert size={18} color={warning} />}
               supportingText={
                 folder.found
-                  ? folderParent(folder.path)
-                  : t("mobile.agent.folders.notFound", { path: folderParent(folder.path) })
+                  ? agentFolderParent(folder.path)
+                  : t("mobile.agent.folders.notFound", { path: agentFolderParent(folder.path) })
               }
               // A moved folder opens the browser, to pick its new place.
               onPress={folder.found ? undefined : () => openBrowser(agent, "locate", undefined, folder.path)}
@@ -329,13 +309,13 @@ export function AgentFolders({
       <SettingsSection title={t("mobile.agent.folders.excluded")}>
         {list.excluded.map((path) => {
           const name = agentFolderName(path);
-          const place = exclusionPlace(path, list, names);
+          const place = agentExclusionPlace(path, list, names);
           return (
             <SettingsRow
               key={path}
               disabled={busy}
               leading={<Lock size={18} color={muted} />}
-              supportingText={place ? t("mobile.agent.folders.excludedIn", { folder: place }) : folderParent(path)}
+              supportingText={place ? t("mobile.agent.folders.excludedIn", { folder: place }) : agentFolderParent(path)}
               trailing={
                 <RowAction
                   label={t("mobile.agent.folders.include", { folder: name })}
@@ -352,8 +332,11 @@ export function AgentFolders({
           disabled={busy || list.excluded.length >= AGENT_FOLDER_LIMIT}
           disclosure={false}
           leading={<Plus size={18} color={muted} />}
-          // The browser opens in the first added folder, else in the workspace, as the desktop picker does.
-          onPress={() => openBrowser(agent, "exclude", list.folders[0]?.path ?? list.workspace)}
+          // The browser opens in the first added folder that is there, else in the workspace, as the
+          // desktop picker does.
+          onPress={() =>
+            openBrowser(agent, "exclude", list.folders.find((folder) => folder.found)?.path ?? list.workspace)
+          }
         >
           <Typography.Paragraph>{t("mobile.agent.folders.exclude")}</Typography.Paragraph>
         </SettingsRow>

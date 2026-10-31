@@ -1889,6 +1889,16 @@ try {
         callsOf("updateAgentFolders").length === writes + 4,
       [summary(missing), summary(hidden)],
     );
+    const emptyPath = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: "" },
+      ...v9,
+    });
+    check(
+      "an empty folder path gets 400, and the host writes nothing",
+      emptyPath.status === 400 && callsOf("updateAgentFolders").length === writes + 4,
+      summary(emptyPath),
+    );
   }
 
   // ---- Memory review (memory-review-v1) ----
