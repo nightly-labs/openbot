@@ -17,7 +17,7 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
-  | { id: string; kind: "progress"; text: string }
+  | { id: string; kind: "progress"; text: string; error?: string | undefined }
   | { id: string; kind: "memory"; change: ConversationMemoryChange }
   | { id: string; kind: "memory-summary"; text: string };
 
@@ -92,6 +92,38 @@ export function AgentStepList(props: {
   );
 }
 
+function StepProgress(props: { text: string; error?: string | undefined; newest: boolean }) {
+  const text = useText();
+  const [errorOpen, setErrorOpen] = createSignal(false);
+  return (
+    <div class="agent-step-content">
+      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>{text.sourceText(props.text)}</span>
+      <Show when={props.error}>
+        {(error) => (
+          <div class="agent-step-error-container">
+            <Button
+              type="button"
+              variant="ghost"
+              class="agent-step-error-toggle"
+              aria-expanded={errorOpen() ? "true" : "false"}
+              onClick={() => setErrorOpen(!errorOpen())}
+            >
+              <ChevronRight
+                class={["agent-step-error-chevron", { "agent-step-error-chevron-open": errorOpen() }]}
+                aria-hidden="true"
+              />
+              <span>{text.t(errorOpen() ? "chat.steps.hideError" : "chat.steps.showError")}</span>
+            </Button>
+            <Show when={errorOpen()}>
+              <pre class="agent-step-error-output">{error()}</pre>
+            </Show>
+          </div>
+        )}
+      </Show>
+    </div>
+  );
+}
+
 function StepBody(props: { step: AgentStep; newest: boolean }) {
   const text = useText();
   return <>{stepBody(props.step, props.newest, text)}</>;
@@ -108,8 +140,10 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
       </span>
     );
   }
-  const shown = step.kind === "thinking" ? step.text : text.sourceText(step.text);
-  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{shown}</span>;
+  if (step.kind === "progress") {
+    return <StepProgress text={step.text} error={step.error} newest={newest} />;
+  }
+  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{step.text}</span>;
 }
 
 function StepIcon(props: { kind: AgentStep["kind"] }) {

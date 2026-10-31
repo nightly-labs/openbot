@@ -1348,7 +1348,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const name = turn.toolCalls.get(toolCallId);
         if (!name) continue;
         turn.toolCalls.delete(toolCallId);
-        this.#emitToolCall(runtime, toolCallId, name, true, undefined, isError);
+        this.#emitToolCall(runtime, toolCallId, name, true, undefined, isError, isError ? text : undefined);
       }
       return;
     }
@@ -1480,6 +1480,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     completed: boolean,
     input?: unknown,
     failed = false,
+    error?: string,
   ): void {
     const turn = runtime.activeTurn;
     if (!turn) return;
@@ -1506,6 +1507,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           type: "toolCall",
           name,
           status: completed ? (failed ? "failed" : "completed") : "in_progress",
+          ...(failed && error ? { error } : {}),
           // The skill that a `Skill` call loads, for the turn's activity line.
           ...(name === "Skill" && isRecord(input) && typeof input.skill === "string"
             ? { skill: input.skill.slice(0, INPUT_LIMITS.identifier) }

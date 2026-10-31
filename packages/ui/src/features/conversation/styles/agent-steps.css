@@ -182,6 +182,59 @@
   margin-top: 2px;
 }
 
+.agent-step-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-step-error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: var(--openbot-space-1);
+}
+
+.agent-step-error-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: 0;
+  height: auto;
+  font-size: var(--openbot-text-xs);
+  color: var(--openbot-danger-text);
+  cursor: pointer;
+}
+
+.agent-step-error-chevron {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  flex-shrink: 0;
+  color: var(--openbot-danger-text);
+  transition: rotate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.agent-step-error-chevron-open {
+  rotate: 90deg;
+}
+
+.agent-step-error-output {
+  margin: var(--openbot-space-1) 0 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-xs);
+  border: 1px solid var(--openbot-border);
+  background: var(--openbot-hover);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono, monospace);
+  font-size: var(--openbot-text-xs);
+  line-height: var(--openbot-leading-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 .agent-step[data-kind="thinking"] .agent-step-text {
   color: var(--openbot-text-muted);
   font-style: italic;
@@ -207,6 +260,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .agent-steps-chevron,
+  .agent-step-error-chevron,
   .agent-steps-panel,
   .agent-steps-list {
     transition: none;
