@@ -801,6 +801,12 @@ export function ChatView({
     );
   }
 
+  /** The text of a chat card goes alone: the composer keeps its draft, reply and files. */
+  function sendCardMessage(text: string): void {
+    if (!canSend) return;
+    deliver(text, null, []);
+  }
+
   /** Explain, Improve and the other selection actions send at once, as on desktop. */
   function sendSelectionAction(instruction: string): void {
     if (!canSend || !selection) return;
@@ -890,6 +896,9 @@ export function ChatView({
   const latestSend = useRef(sendMessage);
   latestSend.current = sendMessage;
   const send = useCallback((value: string) => latestSend.current(value), []);
+  const latestCardSend = useRef(sendCardMessage);
+  latestCardSend.current = sendCardMessage;
+  const sendCard = useCallback((text: string) => latestCardSend.current(text), []);
   const cancelReply = useCallback(() => setReplyTarget(null), []);
   const dismissStarter = useCallback(() => setShowStarter(false), []);
   const respondToApproval = useCallback(
@@ -1038,6 +1047,7 @@ export function ChatView({
               topInset={insets.top}
               onDismissStarter={dismissStarter}
               onSelectStarter={send}
+              onSendCardMessage={readOnly ? undefined : sendCard}
               onRetryHistory={fetchHistory}
               focusMessageId={focusMessageId}
               onFocusPlaced={onFocusPlaced}

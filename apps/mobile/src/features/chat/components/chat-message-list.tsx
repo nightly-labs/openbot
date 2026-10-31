@@ -58,6 +58,7 @@ import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/componen
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { ChatMcpSignInCard } from "@/features/chat/components/chat-mcp-sign-in-card";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import { ChatTurnStepsRow } from "@/features/chat/components/chat-turn-steps-row";
@@ -280,6 +281,8 @@ interface ChatMessageListProps {
   topInset: number;
   onDismissStarter: () => void;
   onSelectStarter: (value: string) => void;
+  /** Sends the text of a chat card, such as Continue on an MCP sign-in, without the composer's files. */
+  onSendCardMessage?: (text: string) => void;
   onRetryHistory: () => void;
   onReply?: (message: ChatBubbleMessage) => void;
   /** Sets the reader's reaction on a message. `null` removes it. */
@@ -342,11 +345,13 @@ interface MessageRowShared {
   canReact: boolean;
   canSelectText: boolean;
   canSelectQuestion: boolean;
+  canSendCardMessage: boolean;
   /** The width inside the list padding. The iOS menu of a queued message does not limit its width. */
   listWidth: number;
   actions: {
     reply: (message: ChatBubbleMessage) => void;
     selectQuestion: (messageId: string) => void;
+    sendCardMessage: (text: string) => void;
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     selectText: (message: ChatBubbleMessage) => void;
     selectionChange: (selected: string) => void;
@@ -558,6 +563,15 @@ const MessageRow = memo(function MessageRow({
       <RoutineMarkerRow key={message.id} message={message} muted={muted} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "mcp-sign-in" ? (
+      <ChatMcpSignInCard
+        key={message.id}
+        mcpServerId={message.mcpServerId}
+        serverId={serverId}
+        canSend={canSend}
+        onContinue={shared.canSendCardMessage ? actions.sendCardMessage : undefined}
+        muted={muted}
+      />
     ) : message.kind === "exchange-group" ? (
       <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
@@ -946,6 +960,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   topInset,
   onDismissStarter,
   onSelectStarter,
+  onSendCardMessage,
   onRetryHistory,
   onReply,
   onReact,
@@ -1112,12 +1127,22 @@ export const ChatMessageList = memo(function ChatMessageList({
     onSelectionChange,
     onNativeSelection,
     onSelectQuestion,
+    onSendCardMessage,
   });
-  actionHandlers.current = { onReply, onReact, onSelectText, onSelectionChange, onNativeSelection, onSelectQuestion };
+  actionHandlers.current = {
+    onReply,
+    onReact,
+    onSelectText,
+    onSelectionChange,
+    onNativeSelection,
+    onSelectQuestion,
+    onSendCardMessage,
+  };
   const actions = useMemo<MessageRowShared["actions"]>(
     () => ({
       reply: (message) => actionHandlers.current.onReply?.(message),
       selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
+      sendCardMessage: (text) => actionHandlers.current.onSendCardMessage?.(text),
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
       selectionChange: (selected) => actionHandlers.current.onSelectionChange?.(selected),
@@ -1161,6 +1186,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   const canReact = Boolean(onReact);
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
+  const canSendCardMessage = Boolean(onSendCardMessage);
   // The rows keep clear of the side insets: the rail of iPhone Duo and the edges in landscape.
   const listWidth = columnWidth - insets.left - insets.right - LIST_PADDING * 2;
   const shared = useMemo<MessageRowShared>(
@@ -1190,6 +1216,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canSelectText,
       canSelectQuestion,
+      canSendCardMessage,
       listWidth,
       actions,
     }),
@@ -1217,6 +1244,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       canReact,
       canSelectText,
       canSelectQuestion,
+      canSendCardMessage,
       listWidth,
       actions,
     ],
