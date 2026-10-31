@@ -176,6 +176,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!agentId) return;
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
+      setInstructionsSettingsRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
