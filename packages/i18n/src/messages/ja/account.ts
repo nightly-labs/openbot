@@ -101,4 +101,5 @@ export const messages = {
   "account.language.previous": "前の言語",
   "account.language.next": "次の言語",
   "account.language.continue": "続ける",
+  "account.language.change": "言語を変更",
 } as const satisfies PartialTranslation<typeof source>;
