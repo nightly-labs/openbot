@@ -5,7 +5,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAdmin, requireVisibleBodyAgent } from "./request-helpers";
+import { readJson, requireAdmin, requireListedAgent, requireVisibleBodyAgent } from "./request-helpers";
 
 /** The wire codec permits an empty path; the folder checks do not. */
 function parsed<T>(parse: (value: unknown) => T, body: DynamicRecord): T {
@@ -37,15 +37,12 @@ export async function routeAgentFolders(
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const agentId = typeof body.agentId === "string" ? body.agentId : "";
-  // An agent that another device deleted answers as a hidden one.
-  if (!folders.listAgents().some((agent) => agent.id === agentId))
-    throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  requireListedAgent(folders, agentId);
   try {
     return await answer(context, folders, agentId, body);
   } catch (error) {
     // Another device can delete the agent while the change waits for the one before it.
-    if (!folders.listAgents().some((agent) => agent.id === agentId))
-      throw new HttpError(404, sourceText("error.team.agentNotFound"));
+    requireListedAgent(folders, agentId);
     throw error;
   }
 }
