@@ -45,13 +45,15 @@ interface OpenCodeProviderOptions {
 
 /**
  * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
- * endpoint's models. `output: 0` keeps OpenCode's own output budget, which it also cuts to the room
- * the context leaves. Checked in OpenCode 2.1.4: a model with no `limit` reports 200K context, and
- * `{ context: 32768, output: 0 }` sent `max_completion_tokens: 21071`.
+ * endpoint's models. OpenCode 2.2.5 reads `output: 0` as unknown and serves every request with its
+ * own fixed output budget of 32,000 (#4234); before that, in 2.1.4, it cut the budget to the room
+ * the context leaves. A model that allows less than 32,000, such as one with a 16K window, had
+ * every turn refused before the first token. Write a real value instead: half the window, as the
+ * Pi harness does, so the prompt keeps room and the budget never passes the model's length.
  */
 interface OpenCodeModelEntry {
   readonly name: string;
-  readonly limit?: { readonly context: number; readonly output: 0 };
+  readonly limit?: { readonly context: number; readonly output: number };
 }
 
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
@@ -176,10 +178,18 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
   };
 }
 
+/** OpenCode's own output budget for a model whose output limit it does not know (OpenCode 2.2.5). */
+const OPENCODE_OUTPUT_BUDGET = 32_000;
+
 function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
-  return model.contextWindow === undefined
-    ? { name: model.name }
-    : { name: model.name, limit: { context: model.contextWindow, output: 0 } };
+  if (model.contextWindow === undefined) return { name: model.name };
+  return {
+    name: model.name,
+    limit: {
+      context: model.contextWindow,
+      output: Math.min(OPENCODE_OUTPUT_BUDGET, Math.floor(model.contextWindow / 2)),
+    },
+  };
 }
 
 /**
