@@ -125,6 +125,8 @@ export function ActionFailedAlert(props: { title: string; message: string }) {
 export interface DetailHeaderProps {
   logo: JSX.Element;
   name: string;
+  /** A mark after the name, inside the heading, such as the Marketplace's verified shield. */
+  nameMark?: JSX.Element;
   status: IntegrationStatus;
   statusLabel: string;
   subtitle: JSX.Element;
@@ -184,6 +186,7 @@ export function IntegrationPage(
       <DetailHeader
         logo={props.logo}
         name={props.name}
+        nameMark={props.nameMark}
         status={props.status}
         statusLabel={props.statusLabel}
         subtitle={props.tagline ?? props.subtitle}
@@ -207,8 +210,9 @@ export function DetailHeader(props: DetailHeaderProps) {
       <LogoTile size="lg">{props.logo}</LogoTile>
       <div class="integration-detail-copy">
         <div class="integration-detail-title">
-          <Heading as="h3" size="md">
+          <Heading as="h3" size="md" class="integration-detail-name">
             {props.name}
+            {props.nameMark}
           </Heading>
           <StatusPill status={props.status} label={props.statusLabel} />
         </div>

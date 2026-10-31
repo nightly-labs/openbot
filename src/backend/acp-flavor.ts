@@ -1,7 +1,14 @@
 import { win32 } from "node:path";
-import type { RequestError } from "@agentclientprotocol/sdk";
+import type { NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
+
+/** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
+export interface AcpCustomEndpoint {
+  readonly name: string;
+  /** Whether the endpoint has a saved API key or header. */
+  readonly hasCredentials: boolean;
+}
 
 /**
  * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
@@ -18,7 +25,8 @@ export interface AcpFlavor {
   sessionNotFound?(error: RequestError, sessionId: string): boolean | null;
   /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
-   * writes a diagnostic that it redacts first, and `model` is the session's model.
+   * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
+   * custom endpoint that serves that model, or null.
    */
   turnFailure?(
     error: unknown,
@@ -26,6 +34,7 @@ export interface AcpFlavor {
     redact: (text: string) => string,
     log: (text: string) => void,
     model: string | null,
+    endpoint: AcpCustomEndpoint | null,
   ): string;
   /** The message of a turn that ended with no answer text. Absent: such a turn succeeds. */
   emptyAnswerFailure?(reasoned: boolean): string;
@@ -105,6 +114,8 @@ export interface AcpFlavor {
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
+  /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
+  sessionMeta?: NewSessionRequest["_meta"];
 }
 
 /** The protocol's own behavior: Grok and Cline. */

@@ -75,7 +75,7 @@ function llmsTxt(): string {
   lines.push(
     "## Optional",
     "",
-    `- [Plugins](${pluginIndexUrl()}): ${PLUGINS_DESCRIPTION}`,
+    `- [Marketplace apps](${pluginIndexUrl()}): ${PLUGINS_DESCRIPTION}`,
     `- [Changelog](${changelogUrl()}): ${CHANGELOG_DESCRIPTION}`,
     "",
   );

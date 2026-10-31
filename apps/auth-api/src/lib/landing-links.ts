@@ -32,7 +32,7 @@ export const OPENBOT_LINKS = {
   download: "#download",
   news: "/news",
   guides: "/guides",
-  plugins: "/plugins",
+  marketplace: "/marketplace",
   changelog: "/changelog",
   releases: "https://github.com/nightly-labs/openbot/releases",
   repository: "https://github.com/nightly-labs/openbot",
@@ -66,7 +66,7 @@ export type FooterLink =
         | "/download"
         | "/news"
         | "/guides"
-        | "/plugins"
+        | "/marketplace"
         | "/changelog"
         | "/compare"
         | "/providers"
@@ -99,7 +99,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Download", external: false, to: "/download" },
       { label: "News", external: false, to: "/news" },
       { label: "Guides", external: false, to: "/guides" },
-      { label: "Plugins", external: false, to: "/plugins" },
+      { label: "Marketplace", external: false, to: "/marketplace" },
       { label: "Changelog", external: false, to: "/changelog" },
       { label: "Teams", external: false, to: "/teams" },
       { label: "Pricing", external: false, to: "/pricing" },

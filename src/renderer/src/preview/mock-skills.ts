@@ -151,6 +151,11 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
       if (!detail) throw new Error("Skill not found");
       return clone(detail);
     },
+    getBySlug: async (slug) => {
+      const detail = Object.values(STORY_MARKETPLACE_SKILL_DETAILS).find((skill) => skill.slug === slug);
+      if (!detail) throw new Error("Skill not found");
+      return clone(detail);
+    },
     listMine: async () => clone(skillSubmissions),
     choosePackage: async () => clone(STORY_SKILL_PACKAGE_PREVIEW),
     submit: async (input) => {

@@ -20,6 +20,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import type { PricingOrder } from "@openbot/contracts/license";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -294,6 +295,9 @@ type WebWorkspaceProps = {
   /** A plugin listing that a `/app?plugin=<slug>` link named. The marketplace opens on it. */
   pluginSlug?: string | null;
   onPluginSlugConsumed?: () => void;
+  /** An agent or skill that a `/app?marketplaceAgent=` or `?marketplaceSkill=` link named. */
+  marketplaceListing?: MarketplaceListingLink | null;
+  onMarketplaceListingConsumed?: () => void;
   /** What a pricing page button asked for: the add server dialog or Billing. */
   start?: WebAppStart | null;
   onStartConsumed?: () => void;
@@ -948,6 +952,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => props.pluginSlug,
     (slug) => {
       if (slug) openMarketplace();
+    },
+  );
+  createEffect(
+    () => props.marketplaceListing,
+    (link) => {
+      if (link) openMarketplace();
     },
   );
   const [billingOpen, setBillingOpen] = createSignal(false);
@@ -1870,6 +1880,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           if (suggestedApp()) setSuggestedApp(null);
                           else props.onPluginSlugConsumed?.();
                         }}
+                        marketplaceListing={props.marketplaceListing}
+                        onMarketplaceListingConsumed={props.onMarketplaceListingConsumed}
                         onAddServer={(serverId) => {
                           void openServerSettings(serverId, null, "mcp").then(() => setMcpAddRequest(true));
                         }}

@@ -157,6 +157,67 @@ describe("marketplace presentation migration", () => {
   });
 });
 
+describe("marketplace verified agents and cards migration", () => {
+  it("keeps listings and gives inserts from the old Worker no verified state and no card", () => {
+    const database = presentationDatabase();
+    expect(count(database, "marketplace_agents")).toBe(1);
+    expect(count(database, "marketplace_agent_versions")).toBe(1);
+    expect(count(database, "marketplace_skill_versions")).toBe(1);
+    expect(database.prepare("SELECT verified, approved_version_id FROM marketplace_agents").get()).toEqual({
+      verified: 0,
+      approved_version_id: "agent-version-1",
+    });
+    database.exec(
+      "INSERT INTO marketplace_agents(id, owner_user_id, created_at, updated_at) VALUES ('old-worker', 'user-1', 2, 2)",
+    );
+    database.exec(
+      `INSERT INTO marketplace_agent_versions(
+        id, agent_id, version, name, title, description, avatar_seed, avatar_hue, skills_json, routines_json, status, created_at
+      ) VALUES ('old-version', 'old-worker', 1, 'Old', 'Title', 'Description', 'seed', NULL, '[]', '[]', 'pending', 2)`,
+    );
+    expect(database.prepare("SELECT verified FROM marketplace_agents WHERE id = 'old-worker'").get()).toEqual({
+      verified: 0,
+    });
+    expect(database.prepare("SELECT card_key FROM marketplace_agent_versions WHERE id = 'old-version'").get()).toEqual({
+      card_key: null,
+    });
+    expect(database.prepare("SELECT card_key FROM marketplace_skill_versions").get()).toEqual({ card_key: null });
+    expect(() => database.exec("UPDATE marketplace_agents SET verified = 2")).toThrow();
+    expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    expect(database.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
+  });
+
+  it("shows a pending agent only by its link, and never a rejected one", async () => {
+    const database = presentationDatabase();
+    const agents = new AgentMarketplace({ DB: d1(database), SKILLS: unusedBucket() });
+    database.exec(
+      "INSERT INTO marketplace_agents(id, owner_user_id, created_at, updated_at) VALUES ('agent-2', 'user-1', 2, 2)",
+    );
+    database.exec(
+      `INSERT INTO marketplace_agent_versions(
+        id, agent_id, version, name, title, description, avatar_seed, avatar_hue, skills_json, routines_json, status, created_at
+      ) VALUES ('agent-version-2', 'agent-2', 1, 'Pending', 'Title', 'Description', 'seed', NULL, '[]', '[]', 'pending', 2)`,
+    );
+    expect((await runApiEffect(agents.list())).agents.map((item) => item.id)).toEqual(["agent-1"]);
+    await expect(runApiEffect(agents.get("agent-2"))).rejects.toMatchObject({ status: 404 });
+    expect(await runApiEffect(agents.getListing("agent-2"))).toMatchObject({ name: "Pending", pending: true });
+    expect(await runApiEffect(agents.getListing("agent-1"))).not.toHaveProperty("pending");
+
+    database.exec("UPDATE marketplace_agent_versions SET status = 'rejected' WHERE id = 'agent-version-2'");
+    await expect(runApiEffect(agents.getListing("agent-2"))).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("filters and marks verified agents", async () => {
+    const database = presentationDatabase();
+    const agents = new AgentMarketplace({ DB: d1(database), SKILLS: unusedBucket() });
+    expect((await runApiEffect(agents.list({ verified: true }))).agents).toEqual([]);
+    await runApiEffect(agents.setVerified("agent-1", true));
+    expect((await runApiEffect(agents.list({ verified: true }))).agents.map((item) => item.verified)).toEqual([true]);
+    expect((await runApiEffect(agents.list({ verified: false }))).agents).toEqual([]);
+    await expect(runApiEffect(agents.setVerified("missing", true))).rejects.toMatchObject({ status: 404 });
+  });
+});
+
 function presentationDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   databases.push(database);
@@ -168,6 +229,7 @@ function presentationDatabase(): DatabaseSync {
   seedMarketplace(database);
   database.exec(migration("0019_marketplace_presentation.sql"));
   database.exec(migration("0042_marketplace_skill_verified.sql"));
+  database.exec(migration("0045_marketplace_verified_agents_and_cards.sql"));
   database.exec("UPDATE users SET avatar_url = '/v1/avatars/user-1?v=one'");
   return database;
 }

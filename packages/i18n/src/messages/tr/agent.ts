@@ -63,7 +63,6 @@ export const messages = {
   "agent.error.adminOnly": "Ajan ayarları yalnızca bir sunucu yöneticisi tarafından değiştirilebilir.",
   "agent.error.continueFailed": "Ajan devam edemedi. Tekrar deneyin.",
   "agent.error.mcpNotStarted": "MCP sunucusu başlatılmadı",
-  "agent.error.codexConfigIgnored": "Codex yapılandırma uyarısı",
   "agent.error.provider": "Sağlayıcı hatası",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} hatası",

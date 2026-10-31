@@ -55,6 +55,8 @@ export interface MarketplaceSkillDetail extends MarketplaceSkillSummary {
   files: string[];
   instructions: string;
   examplePrompt?: string;
+  /** The share card of this version, on the Worker's origin. Absent from a Worker that draws none. */
+  cardUrl?: string | null;
 }
 
 export interface MarketplaceSkillPage {
@@ -322,6 +324,7 @@ function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDeta
     isString(value.bundleSha256) &&
     isString(value.instructions) &&
     (value.examplePrompt === undefined || (isString(value.examplePrompt) && value.examplePrompt.length <= 1_000)) &&
+    (value.cardUrl === undefined || value.cardUrl === null || isString(value.cardUrl)) &&
     Array.isArray(value.files) &&
     value.files.every(isString)
   );

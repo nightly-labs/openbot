@@ -42,7 +42,6 @@ import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agen
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
-import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerScope } from "../servers/server-scope";
@@ -96,6 +95,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     cancelProviderRuntimeDownload,
     providerAdminServerId,
     connection,
+    activeCustomProviders,
   } = useProviders();
   /**
    * The composer's sign-ins: Connect, and the code from the ⋯ menu. The dialog shows here only while
@@ -109,9 +109,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     else await connection.connect(provider, "composer");
   };
   const signInWithCode = (provider: AgentProviderId) => connection.alternative(provider, "composer");
-  // Not gated on the server: the picker needs these IDs to label a model it is already showing, and
-  // a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
-  const { customProviders } = useCustomProviders();
   const { customAgents } = useCustomAgents();
   const {
     agentStatus,
@@ -511,7 +508,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentsConnecting={agentListConnecting()}
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
-        customProviders={customProviders()}
+        customProviders={activeCustomProviders()}
         // The custom agents are this computer's. A joined host's picker counts its own from its models.
         customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
         onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}

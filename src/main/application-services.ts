@@ -1671,11 +1671,27 @@ export async function createApplicationServices({
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
   // The schedule triggers of workflows share the routine timer; built after the workflows below.
   let workflowTriggers: WorkflowTriggers | null = null;
+  // Load the local catalog before telemetry starts so tool steps and inventory use the same names.
+  // Agents read it too, for the state of a Marketplace app they suggest.
+  const catalogPluginServers = await Effect.runPromise(
+    loadCatalogPluginServers(
+      app.isPackaged
+        ? join(process.resourcesPath, "plugin-catalog")
+        : resolve(__dirname, "../../resources/plugin-catalog"),
+    ),
+  );
   const service: AgentService = new AgentService({
     store,
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    marketplaceAppServer: (appId) => {
+      const listed = catalogPluginServers.filter((server) => server.slug === appId);
+      const [server] = listed;
+      if (!server || listed.length !== 1) return null;
+      const config = service.listMcpServers().find((saved) => catalogPluginSlug(saved, listed, homedir()) === appId);
+      return config ? { config, setupSteps: server.setupSteps } : null;
+    },
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
         startToolRuntimes: () => {
@@ -2241,7 +2257,7 @@ export async function createApplicationServices({
     browser,
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders });
+  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),
@@ -2640,15 +2656,7 @@ export async function createApplicationServices({
   if (analyticsPlatform !== "darwin" && analyticsPlatform !== "win32" && analyticsPlatform !== "linux") {
     throw new Error(`Unsupported analytics platform: ${analyticsPlatform}`);
   }
-  // Load the local catalog before telemetry starts so tool steps and inventory use the same names.
   performance.mark("openbot:services.remote-desktop");
-  const catalogPluginServers = await Effect.runPromise(
-    loadCatalogPluginServers(
-      app.isPackaged
-        ? join(process.resourcesPath, "plugin-catalog")
-        : resolve(__dirname, "../../resources/plugin-catalog"),
-    ),
-  );
   const analyticsEnabled = (app.isPackaged && appVariant === "production") || analyticsCaptureUrl !== null;
   const failureReports = analyticsEnabled
     ? new ReportQueue(

@@ -54,6 +54,7 @@ import { MuseAgentClient } from "./muse-client";
 import {
   type CustomProviderSource,
   customProvidersOn,
+  OPENCODE_AGENT_CONFIG,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
@@ -805,13 +806,18 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...context.agentEnvironment?.(),
           ...opencodeEnv(cli, context),
-          ...openCodeConfigEnv({}, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
           ...(confinement ? OPENCODE_CONFINED_ENV : {}),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
-        // A stalled turn on a custom endpoint names the endpoint, not OpenCode (#3234).
-        providerName: (modelId) => customProviderOfModel(modelId, openCodeEndpoints(context)())?.name ?? null,
+        // A stalled or refused turn on a custom endpoint names the endpoint, not OpenCode (#3234).
+        customEndpoint: (modelId) => {
+          const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
+          return endpoint
+            ? { name: endpoint.name, hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0 }
+            : null;
+        },
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,

@@ -45,7 +45,11 @@ export class GrokAgentClient extends AcpAgentClient {
         "agent",
         "stdio",
       ],
-      env: { GROK_OAUTH2_REFERRER: "openbot" },
+      // Grok declares `send_feedback` and `workflow` in each request, about 6.7k characters. Feedback
+      // goes to xAI, and a workflow runs a background agent fleet that OpenBot does not show. Without
+      // workflows Grok declares `update_goal`, about 1k characters. Grok `agent stdio` ignores
+      // `--disallowed-tools`, so only these switches remove the tools.
+      env: { GROK_OAUTH2_REFERRER: "openbot", GROK_FEEDBACK_ENABLED: "0", GROK_WORKFLOWS: "0" },
       ...(agentEnvironment ? { extraEnv: () => ({ ...agentEnvironment() }) } : {}),
       history,
       signInMessage: sourceText("error.provider.grokSignIn"),

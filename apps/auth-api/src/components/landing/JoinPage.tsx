@@ -1,10 +1,11 @@
 import { AppLogo } from "@openbot/brand";
 import { createWebAppInvitePath, OPENBOT_INVITE_ORIGIN, toOpenBotInviteUrl } from "@openbot/contracts/invite-links";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { detectDownloadPlatform } from "../../lib/download-platforms";
 import { OPENBOT_DOWNLOAD_LINKS } from "../../lib/landing-links";
-import type { JoinPageText } from "../transactional/page-text";
+import { createOpenAppFallback, OpenAppFallbackDialog } from "../transactional/OpenAppFallback";
+import type { JoinLink, JoinPageText } from "../transactional/page-text";
 import { TransactionalPage } from "../transactional/TransactionalPage";
 import { Button } from "../ui/button";
 
@@ -14,7 +15,7 @@ export function JoinPage(props: { lang: string; text: JoinPageText }) {
   const [downloadUrl, setDownloadUrl] = createSignal<string>(OPENBOT_DOWNLOAD_LINKS.macos);
   const [mobile, setMobile] = createSignal(false);
   const [invalid, setInvalid] = createSignal(false);
-  const [openAttempted, setOpenAttempted] = createSignal(false);
+  const fallback = createOpenAppFallback();
 
   onSettled(() => {
     setMobile(
@@ -37,20 +38,22 @@ export function JoinPage(props: { lang: string; text: JoinPageText }) {
     return cleanup;
   });
 
+  const noApp = () => (mobile() ? props.text.noAppMobile : props.text.noApp);
+  const linkHref = (link: JoinLink) => (link === "browser" ? browserUrl() : downloadUrl());
+  // The dialog offers the desktop download, which a phone cannot install. Phones get the note below.
+  const armFallback = () => {
+    if (!mobile()) fallback.arm();
+  };
+
   return (
     <TransactionalPage titleId="join-title" lang={props.lang}>
-      <div class="join-card-signal" aria-hidden="true">
-        <span />
-        <i />
-        <span />
-      </div>
       <AppLogo variant="production" animation="blink" class="join-card-logo" />
       <p class="join-card-eyebrow">{props.text.eyebrow}</p>
       <h1 id="join-title">{props.text.title}</h1>
       <p class="join-card-copy">{props.text.intro}</p>
 
       <Show when={!invalid()} fallback={<p class="join-card-error">{props.text.invalid}</p>}>
-        <div class="join-card-actions">
+        <div class="join-card-actions join-card-actions-full">
           {/* Until the page reads the link, the app cannot open it. The button is then a real
               disabled button, so it is not a link that goes nowhere. */}
           <Show
@@ -62,40 +65,30 @@ export function JoinPage(props: { lang: string; text: JoinPageText }) {
             }
           >
             {(href) => (
-              <Button href={href()} variant="primary" size="lg" icon="open" onClick={() => setOpenAttempted(true)}>
+              <Button href={href()} variant="primary" size="lg" icon="open" onClick={armFallback}>
                 {props.text.open}
               </Button>
             )}
           </Show>
-          <Show when={browserUrl()}>
-            {(href) => (
-              <Button href={href()} variant="secondary" size="lg" icon="arrow-right">
-                {props.text.browser}
-              </Button>
-            )}
-          </Show>
-          <Show when={!mobile()}>
-            <Button href={downloadUrl()} variant="secondary" size="lg" icon="download">
-              {props.text.download}
-            </Button>
-          </Show>
         </div>
+        <Show when={browserUrl()}>
+          <p class="join-card-alternatives">
+            <For each={noApp()}>
+              {(part) => (
+                <Show when={part.link} fallback={part.text}>
+                  {(link) => <a href={linkHref(link())}>{part.text}</a>}
+                </Show>
+              )}
+            </For>
+          </p>
+        </Show>
       </Show>
 
-      <Show when={!mobile()}>
-        {/* The live region exists before the click, so screen readers announce the text when it appears. */}
-        <p class={openAttempted() ? "join-card-note" : "join-card-status-empty"} role="status">
-          <Show when={openAttempted()}>{props.text.notOpened}</Show>
-        </p>
-      </Show>
       <Show when={mobile()}>
         <p class="join-card-note">{props.text.mobile}</p>
       </Show>
-      <ul class="transactional-notes">
-        <li>{props.text.singleUse}</li>
-        <li>{props.text.email}</li>
-        <li>{props.text.share}</li>
-      </ul>
+      <p class="join-card-note">{props.text.email}</p>
+      <OpenAppFallbackDialog fallback={fallback} text={props.text.openAppFallback} />
     </TransactionalPage>
   );
 }

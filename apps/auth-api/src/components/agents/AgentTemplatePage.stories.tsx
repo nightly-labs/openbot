@@ -63,7 +63,8 @@ rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: "/" }),
   createRoute({ getParentRoute: () => rootRoute, path: "/news" }),
   createRoute({ getParentRoute: () => rootRoute, path: "/guides" }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/plugins" }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/marketplace" }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/marketplace/apps" }),
   createRoute({ getParentRoute: () => rootRoute, path: "/download" }),
 ]);
 const router = createRouter({ routeTree: rootRoute });

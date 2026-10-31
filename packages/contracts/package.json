@@ -47,6 +47,7 @@
     "./ipc-skills": "./src/ipc-skills.ts",
     "./mobile-connect": "./src/mobile-connect.ts",
     "./mobile-features": "./src/mobile-features.ts",
+    "./marketplace-links": "./src/marketplace-links.ts",
     "./plugin-links": "./src/plugin-links.ts",
     "./runtime-values": "./src/runtime-values.ts",
     "./ipc-decoding": "./src/ipc-decoding.ts",

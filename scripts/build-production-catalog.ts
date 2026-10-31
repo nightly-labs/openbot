@@ -79,6 +79,8 @@ interface CatalogSpec {
   sources: Record<UpstreamProvider, UpstreamSource>;
   skills: SkillSpec[];
   agents: AgentSpec[];
+  /** Slugs of earlier agents that the publisher unlists. Installed copies keep their snapshot. */
+  retiredAgents: string[];
 }
 
 interface BuiltSkill {
@@ -178,6 +180,7 @@ export async function buildProductionCatalog(outputArgument?: string): Promise<s
       schemaVersion: spec.schemaVersion,
       catalogVersion: spec.catalogVersion,
       agents: spec.agents.map((agent) => buildAgent(agent, builtSkills, version)),
+      retired: { agents: spec.retiredAgents },
     };
     const notices = createUpstreamNotices(spec, builtSkills);
     await writeFile(join(staging, "catalog.json"), stableJson(catalog));
@@ -478,13 +481,33 @@ async function loadCatalogSpec(): Promise<CatalogSpec> {
   const skills = [...raw.skills.map(parseSkillSpec), ...packs];
   const duplicateSkill = skills.find((skill, index) => skills.findIndex((item) => item.slug === skill.slug) !== index);
   if (duplicateSkill) throw new Error(`Duplicate production skill slug: ${duplicateSkill.slug}.`);
+  const agents = raw.agents.map(parseAgentSpec);
+  const agentSlugs = new Set(agents.map((agent) => agent.slug));
+  if (agentSlugs.size !== agents.length) throw new Error("Production catalog contains a duplicate agent slug.");
+  const retiredAgents = parseRetiredAgents(raw.retired);
+  const listedRetired = retiredAgents.find((slug) => agentSlugs.has(slug));
+  if (listedRetired) throw new Error(`Retired agent ${listedRetired} is also in the agent list.`);
   return {
     schemaVersion: raw.schemaVersion,
     catalogVersion: raw.catalogVersion,
     sources,
     skills,
-    agents: raw.agents.map(parseAgentSpec),
+    agents,
+    retiredAgents,
   };
+}
+
+function parseRetiredAgents(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.agents) ||
+    !value.agents.every((slug) => isString(slug) && /^[a-z0-9][a-z0-9-]*$/u.test(slug)) ||
+    new Set(value.agents).size !== value.agents.length
+  ) {
+    throw new Error("Production catalog retired list is invalid.");
+  }
+  return value.agents;
 }
 
 function parsePackSpec(value: unknown): PackSpec {

@@ -18,6 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AgentLifecycleFailed, type AgentService } from "../backend/agent-service";
 import type { CustomProviderStore } from "./custom-provider-store";
+import type { ProviderRuntimeManager } from "./provider-runtime-manager";
 
 export interface CustomProviderChangeDependencies {
   // Only the endpoint-change methods, so the order of writes can be checked without a running
@@ -31,6 +32,7 @@ export interface CustomProviderChangeDependencies {
     | "startHarnessForMovedAgents"
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
+  providerRuntimes: Pick<ProviderRuntimeManager, "startCustomProviderHarness">;
 }
 
 export interface CustomProviderChanges {
@@ -45,6 +47,7 @@ export interface CustomProviderChanges {
 export function createCustomProviderChanges({
   service,
   customProviders,
+  providerRuntimes,
 }: CustomProviderChangeDependencies): CustomProviderChanges {
   /**
    * One endpoint change at a time, from the first read to the last write.
@@ -75,6 +78,19 @@ export function createCustomProviderChanges({
     // does not activate by itself.
     if (outcome === "not-running") yield* service.startHarnessForMovedAgents(now);
     return before === "skipped-busy" ? before : outcome;
+  });
+  /**
+   * `restart` for a saved endpoint, and a download of the provider that runs it when this computer
+   * has none. Without that download the endpoint is in no model list.
+   */
+  const serve = Effect.fn("CustomProviderChanges.serve")(function* (
+    id: string,
+    previous: CustomProviderHarness | undefined,
+  ) {
+    const current = harnessOf(id);
+    const outcome = yield* restart(current, previous);
+    yield* providerRuntimes.startCustomProviderHarness(current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
+    return outcome;
   });
   function serialize<T>(run: () => Effect.Effect<T, ProviderRuntimeFailure>): Effect.Effect<T, ProviderRuntimeFailure> {
     return gate.withPermit(Effect.suspend(run));
@@ -109,7 +125,7 @@ export function createCustomProviderChanges({
             .pipe(toProviderRuntimeFailure);
           return {
             providers,
-            restart: yield* restart(harnessOf(input.id), previous).pipe(toProviderRuntimeFailure),
+            restart: yield* serve(input.id, previous).pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),
@@ -138,7 +154,7 @@ export function createCustomProviderChanges({
             .pipe(toProviderRuntimeFailure);
           return {
             providers,
-            restart: yield* restart(harnessOf(input.id), previous).pipe(toProviderRuntimeFailure),
+            restart: yield* serve(input.id, previous).pipe(toProviderRuntimeFailure),
           };
         })().pipe(Effect.uninterruptible),
       ),

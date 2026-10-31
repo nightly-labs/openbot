@@ -17,14 +17,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
-import {
-  PLUGINS_DESCRIPTION,
-  PLUGINS_TITLE,
-  pluginIndexUrl,
-  pluginUrl,
-  SITE_PLUGINS,
-  type SitePlugin,
-} from "./plugins";
+import { pluginUrl, type SitePlugin } from "./plugins";
 import {
   OPENBOT_LOGO_URL,
   OPENBOT_SITE_TITLE,
@@ -248,49 +241,6 @@ function collectionStructuredData(collection: ContentCollection, siteUrl: string
  * pipeline in `content-images.ts` draws articles, and a listing is not an article. The structured
  * data is `SoftwareApplication`, which is what a plugin is.
  */
-export function pluginsIndexHead(siteUrl: string) {
-  const url = pluginIndexUrl(siteUrl);
-
-  return {
-    meta: [
-      { title: PLUGINS_TITLE },
-      { name: "description", content: PLUGINS_DESCRIPTION },
-      { "script:ld+json": pluginsIndexStructuredData(url, siteUrl) },
-      { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "OpenBot" },
-      { property: "og:locale", content: "en_US" },
-      { property: "og:url", content: url },
-      { property: "og:title", content: PLUGINS_TITLE },
-      { property: "og:description", content: PLUGINS_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: OPENBOT_X_HANDLE },
-      { name: "twitter:title", content: PLUGINS_TITLE },
-      { name: "twitter:description", content: PLUGINS_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
-    ],
-    links: [{ rel: "canonical", href: url }],
-  };
-}
-
-/** The index as a list of the plugin pages, as the comparison index is. */
-function pluginsIndexStructuredData(url: string, siteUrl: string) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: PLUGINS_TITLE,
-    description: PLUGINS_DESCRIPTION,
-    url,
-    itemListElement: SITE_PLUGINS.map((plugin, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: plugin.name,
-      url: pluginUrl(plugin.slug, siteUrl),
-    })),
-  };
-}
-
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;

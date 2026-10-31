@@ -36,7 +36,7 @@ import {
   sessionSettingsSnapshot,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpFlavor } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor } from "./acp-flavor";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { type AgentProvider, type DiagnosticOrigin, ProviderTurnActiveError } from "./agent-client";
@@ -348,8 +348,8 @@ export interface AcpProviderOptions {
   additionalModels?: () => Effect.Effect<AcpModel[]>;
   /** The name to show for a listed model, from its id and the name that the agent sent. */
   modelName?: (id: string, name: string) => string;
-  /** The name to show for the provider of a model, when it is not this agent's own (a custom endpoint). */
-  providerName?: (modelId: string | null) => string | null;
+  /** The custom endpoint that serves a model, when the provider is not this agent's own. */
+  customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null;
   /**
    * Values to mask in every diagnostic and error this client emits, read at each use: the custom
    * agent's environment values, which have no secret name that `redactText` could know them by.
@@ -885,7 +885,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const connection = yield* providerSync(() => this.#requireConnection());
     if (this.#privateSession?.connection !== connection) {
       const { sessionId } = yield* providerCall(() =>
-        connection.newSession({ cwd: this.options.discoveryCwd?.() ?? process.cwd(), mcpServers: [] }),
+        connection.newSession({
+          cwd: this.options.discoveryCwd?.() ?? process.cwd(),
+          mcpServers: [],
+          ...(this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {}),
+        }),
       );
       this.#privateSession = { connection, sessionId };
     }
@@ -1490,6 +1494,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             // Sent only to an agent that advertises them: Grok 1.0.60 refuses them on every session
             // request, so each new Grok session failed.
             const directories = this.#acceptsAdditionalDirectories ? { additionalDirectories } : {};
+            const meta = this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {};
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
@@ -1529,7 +1534,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 yield* Effect.result(
                   this.#restoreSessionEffect(
                     connection,
-                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers },
+                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
                     this.#supportsSessionResume ? "resume" : "load",
                   ),
                 ),
@@ -1539,7 +1544,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId = currentModelFromSessionSetup(response);
             } else {
               const response = providerResult(
-                yield* Effect.result(providerCall(() => connection().newSession({ cwd, ...directories, mcpServers }))),
+                yield* Effect.result(
+                  providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
+                ),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -1568,7 +1575,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               agentId,
               idleRelease: null,
               idleSince: 0,
-              restore: { cwd, ...directories, mcpServers },
+              restore: { cwd, ...directories, mcpServers, ...meta },
               shownIds: new Set(),
               backgroundUntil: 0,
               backgroundUpdatedAt: null,
@@ -2521,7 +2528,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn,
         "failed",
         sourceText("error.agent.turnStalled", {
-          provider: this.options.providerName?.(thread.currentModelId) ?? this.#label,
+          provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
         }),
       );
     }
@@ -2800,6 +2807,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (text) => this.#redact(text),
           (text) => this.emit("diagnostic", this.#redact(text)),
           thread.currentModelId,
+          this.options.customEndpoint?.(thread.currentModelId) ?? null,
         ) ?? detail;
       this.emit("notification", {
         method: "error",

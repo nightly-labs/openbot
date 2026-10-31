@@ -1,27 +1,18 @@
-import { SKILL_CATEGORIES, type SkillCategory } from "@openbot/contracts/ipc";
 import { Button, Heading, Input, Plus, Search, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createEffect, For, Match, Show, Switch } from "solid-js";
-import { AgentGrid, AppRow } from "./MarketplaceCards";
-import { type FilterGroup, MarketplaceFilter } from "./MarketplaceFilter";
-import { ListingPanel } from "./MarketplaceParts";
+import { AgentLibrary, agentFromSource } from "./MarketplaceAgents";
+import { AppRow } from "./MarketplaceCards";
+import { MissingNotice } from "./MarketplaceParts";
 import { SkillLibrary } from "./MarketplaceSkills";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import {
   appCategories,
-  MARKETPLACE_TAB_LABEL,
   MARKETPLACE_TABS,
   type MarketplaceScope,
   type MarketplaceTab,
   matchesApp,
-  type OwnedFilter,
 } from "./marketplace-view";
-
-const DESCRIPTION = {
-  agents: "marketplace.description.agents",
-  apps: "marketplace.description.apps",
-  skills: "marketplace.description.skills",
-} as const;
 
 const NO_MATCH = {
   agents: "marketplace.noMatch.agents",
@@ -40,18 +31,6 @@ const SHOW_TAB = {
   apps: "marketplace.noMatch.showApps",
   skills: "marketplace.noMatch.showSkills",
 } as const;
-
-function ownedOf(value: string | null): OwnedFilter | null {
-  return value === "yes" || value === "no" ? value : null;
-}
-
-function categoryOf(value: string | null): SkillCategory | null {
-  return SKILL_CATEGORIES.find((category) => category === value) ?? null;
-}
-
-function owns(owned: OwnedFilter | null, have: boolean) {
-  return owned === null || (owned === "yes") === have;
-}
 
 /** A tab with nothing to show: the filters hide it, the search finds nothing, or the catalog is empty. */
 function NoMatch(props: {
@@ -109,10 +88,8 @@ export function createBrowseLists(scope: MarketplaceScope) {
   const { format } = useText();
   const model = () => scope.model;
   const state = () => scope.nav.state;
-  const agents = () =>
-    scope.agents
-      .items()
-      .filter((listing) => owns(state().agentsOwned, (model().agentState(listing) ?? "add") !== "add"));
+  // A Worker before the `verified` filter sends every agent, so the list filters by source too.
+  const agents = () => scope.agents.items().filter((listing) => agentFromSource(listing, state().agentSource));
   const skills = () => scope.skills.items();
   const apps = () =>
     model()
@@ -176,15 +153,12 @@ function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   );
 }
 
-/** The list of the kind that the side panel selected: its title, the search and the filter, then the rows. */
+/** The list of the kind that the side panel selected: its title and the search, then the rows. */
 export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const nav = () => props.scope.nav;
   const state = () => props.scope.nav.state;
-  const agents = () => props.lists.agents();
-  /** Add custom, on the Apps list for a user who can add a server. */
-  const addServer = () => (state().tab === "apps" ? model().addServer : undefined);
 
   /* "Your skills" and the agents of each skill row need each agent's skills. */
   createEffect(
@@ -194,53 +168,18 @@ export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: Brows
     },
   );
 
-  const categoryOptions = () =>
-    SKILL_CATEGORIES.map((category) => ({ value: category, label: t(CATEGORY_LABELS[category]) }));
-  const agentGroups = (): FilterGroup[] => [
-    /* A chosen status stays in the menu, so that the user can clear it. */
-    ...(state().agentsOwned !== null || props.scope.agents.items().some((item) => model().agentState(item) !== null)
-      ? [
-          {
-            legend: t("marketplace.filter.status"),
-            options: [
-              { value: "yes", label: t("marketplace.filter.added") },
-              { value: "no", label: t("marketplace.filter.notAdded") },
-            ],
-            value: state().agentsOwned,
-            set: (value: string | null) =>
-              nav().set((draft) => {
-                draft.agentsOwned = ownedOf(value);
-              }),
-          },
-        ]
-      : []),
-    {
-      legend: t("marketplace.filter.category"),
-      options: categoryOptions(),
-      value: state().agentCategory,
-      set: (value) =>
-        nav().set((draft) => {
-          draft.agentCategory = categoryOf(value);
-        }),
-    },
-  ];
-  const agentsFiltered = () => state().agentCategory !== null || state().agentsOwned !== null;
-  const clearAgentFilters = () =>
-    nav().set((draft) => {
-      draft.agentCategory = null;
-      draft.agentsOwned = null;
-    });
-  const clearSource = () =>
+  const clearSkillSource = () =>
     nav().set((draft) => {
       draft.skillSource = null;
     });
-
-  const sourceFiltered = () => state().skillSource !== null;
+  const clearAgentSource = () =>
+    nav().set((draft) => {
+      draft.agentSource = null;
+    });
 
   return (
-    <Show
-      when={state().tab !== "skills"}
-      fallback={
+    <Switch>
+      <Match when={state().tab === "skills"}>
         <SkillLibrary
           scope={props.scope}
           noMatch={
@@ -248,85 +187,71 @@ export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: Brows
               scope={props.scope}
               tab="skills"
               counts={props.lists.counts}
-              filtered={sourceFiltered()}
-              onClearFilters={clearSource}
+              filtered={state().skillSource !== null}
+              onClearFilters={clearSkillSource}
             />
           }
         />
-      }
-    >
-      <div class="marketplace-view marketplace-browse">
-        <header class="marketplace-browse-head">
-          <div class="marketplace-browse-copy">
-            <Heading as="h3" size="lg" class="marketplace-browse-title">
-              {t(MARKETPLACE_TAB_LABEL[state().tab])}
-            </Heading>
-            <Text as="p" variant="body" tone="muted">
-              {t(DESCRIPTION[state().tab])}
-            </Text>
-          </div>
-          <div class="marketplace-toolbar">
-            <label class="search-field marketplace-search">
-              <Search aria-hidden="true" />
-              <Input
-                type="search"
-                aria-label={t("marketplace.search.label")}
-                placeholder={t("marketplace.search.placeholder")}
-                value={state().query}
-                onInput={(event) => {
-                  const value = event.currentTarget.value;
-                  nav().set((draft) => {
-                    draft.query = value;
-                  });
-                }}
-              />
-            </label>
-            <Show when={addServer()}>
-              {(add) => (
-                <Button type="button" size="sm" onClick={() => add()()}>
-                  <Plus aria-hidden="true" />
-                  {t("marketplace.app.addCustom")}
-                </Button>
-              )}
-            </Show>
-            <Show when={state().tab === "agents"}>
-              <MarketplaceFilter groups={agentGroups()} />
-            </Show>
-          </div>
-        </header>
-        <Switch>
-          <Match when={state().tab === "apps"}>
-            <div class="marketplace-stack">
-              <Show when={state().missingApp}>
-                <div class="marketplace-empty" role="alert">
-                  <Text as="p" variant="body-sm" tone="muted">
-                    {t("marketplace.plugins.missing")}
-                  </Text>
-                </div>
-              </Show>
-              <AppList scope={props.scope} lists={props.lists} />
+      </Match>
+      <Match when={state().tab === "agents"}>
+        <AgentLibrary
+          scope={props.scope}
+          noMatch={
+            <NoMatch
+              scope={props.scope}
+              tab="agents"
+              counts={props.lists.counts}
+              filtered={state().agentSource !== null}
+              onClearFilters={clearAgentSource}
+            />
+          }
+        />
+      </Match>
+      <Match when={state().tab === "apps"}>
+        <div class="marketplace-view marketplace-browse">
+          <header class="marketplace-browse-head">
+            <div class="marketplace-browse-copy">
+              <Heading as="h3" size="lg" class="marketplace-browse-title">
+                {t("marketplace.tab.apps")}
+              </Heading>
+              <Text as="p" variant="body" tone="muted">
+                {t("marketplace.description.apps")}
+              </Text>
             </div>
-          </Match>
-          <Match when={state().tab === "agents"}>
-            <ListingPanel
-              listing={props.scope.agents}
-              loadingLabel={t("marketplace.loading.agents")}
-              count={agents().length}
-              empty={
-                <NoMatch
-                  scope={props.scope}
-                  tab="agents"
-                  counts={props.lists.counts}
-                  filtered={agentsFiltered()}
-                  onClearFilters={clearAgentFilters}
+            <div class="marketplace-toolbar">
+              <label class="search-field marketplace-search">
+                <Search aria-hidden="true" />
+                <Input
+                  type="search"
+                  aria-label={t("marketplace.search.label")}
+                  placeholder={t("marketplace.search.placeholder")}
+                  value={state().query}
+                  onInput={(event) => {
+                    const value = event.currentTarget.value;
+                    nav().set((draft) => {
+                      draft.query = value;
+                    });
+                  }}
                 />
-              }
-            >
-              <AgentGrid scope={props.scope} items={agents()} />
-            </ListingPanel>
-          </Match>
-        </Switch>
-      </div>
-    </Show>
+              </label>
+              <Show when={model().addServer}>
+                {(add) => (
+                  <Button type="button" size="sm" onClick={() => add()()}>
+                    <Plus aria-hidden="true" />
+                    {t("marketplace.app.addCustom")}
+                  </Button>
+                )}
+              </Show>
+            </div>
+          </header>
+          <div class="marketplace-stack">
+            <Show when={state().missingApp}>
+              <MissingNotice>{t("marketplace.plugins.missing")}</MissingNotice>
+            </Show>
+            <AppList scope={props.scope} lists={props.lists} />
+          </div>
+        </div>
+      </Match>
+    </Switch>
   );
 }

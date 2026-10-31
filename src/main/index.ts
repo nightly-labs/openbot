@@ -81,6 +81,7 @@ import { licenseIpcHandlers } from "./ipc/license-handlers";
 import { localServerIpcHandlers } from "./ipc/local-server-handlers";
 import { macAutomationIpcHandlers } from "./ipc/mac-automation-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
+import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
@@ -728,7 +729,7 @@ function registerIpcHandlers({
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
-      takePendingLink: () => takePendingDeepLink("agent-template"),
+      takePendingLink: () => takePendingDeepLink("agent-template")?.id ?? null,
     }),
     ...agentImportIpcHandlers({
       agentImport,
@@ -757,10 +758,13 @@ function registerIpcHandlers({
       host,
       remoteDesktop,
       remoteServers,
-      takePendingInvite: () => takePendingDeepLink("invite"),
+      takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
     }),
     ...pluginIpcHandlers({
-      takePendingPluginSlug: () => takePendingDeepLink("plugin"),
+      takePendingPluginSlug: () => takePendingDeepLink("plugin")?.slug ?? null,
+    }),
+    ...marketplaceLinkIpcHandlers({
+      takePendingListing: () => takePendingDeepLink("marketplace")?.link ?? null,
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
@@ -1014,25 +1018,41 @@ function acceptDeepLink(link: DeepLink): void {
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
   showMainWindow(window);
-  const delivered =
-    link.kind === "invite"
-      ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
-      : link.kind === "plugin"
-        ? sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug)
-        : sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
-  if (delivered) pendingDeepLink = null;
+  if (sendDeepLink(window, link)) pendingDeepLink = null;
+}
+
+function sendDeepLink(window: BrowserWindow, link: RendererDeepLink): boolean {
+  switch (link.kind) {
+    case "invite":
+      return sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url);
+    case "plugin":
+      return sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
+    case "agent-template":
+      return sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
+    case "marketplace":
+      return sendToRenderer(window, IPC_ENDPOINTS.marketplace.openListing, link.link);
+  }
 }
 
 /**
  * The pending link, if it is the kind that asked. Any request marks the receiver ready, because
  * the renderer subscribes to every kind before it asks for any.
  */
-function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
+function takePendingDeepLink<Kind extends RendererDeepLink["kind"]>(
+  kind: Kind,
+): Extract<RendererDeepLink, { kind: Kind }> | null {
   deepLinkReceiverReady = true;
   const link = pendingDeepLink;
-  if (link?.kind !== kind) return null;
+  if (!link || !isDeepLinkKind(link, kind)) return null;
   pendingDeepLink = null;
-  return link.kind === "invite" ? link.url : link.kind === "plugin" ? link.slug : link.id;
+  return link;
+}
+
+function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
+  link: RendererDeepLink,
+  kind: Kind,
+): link is Extract<RendererDeepLink, { kind: Kind }> {
+  return link.kind === kind;
 }
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */

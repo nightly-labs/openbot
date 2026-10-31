@@ -1706,7 +1706,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           (agent) =>
             matchesQuery(`${agent.name} ${agent.title} ${agent.description} ${agent.creatorName}`, query?.query) &&
             (!query?.category || (agent.category ?? "other") === query.category) &&
-            (query?.featured !== true || agent.featured),
+            (query?.featured !== true || agent.featured) &&
+            (query?.verified === undefined || (agent.verified === true) === query.verified),
         );
         const start = Number(query?.cursor ?? 0);
         const end = start + (query?.limit ?? 50);
@@ -1717,6 +1718,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       get: async (listingId) => {
         const detail = STORY_MARKETPLACE_AGENT_DETAILS[listingId];
+        if (!detail) throw new Error("Agent not found");
+        return clone(detail);
+      },
+      getListing: async (agentId) => {
+        const detail = STORY_MARKETPLACE_AGENT_DETAILS[agentId];
         if (!detail) throw new Error("Agent not found");
         return clone(detail);
       },
@@ -3099,6 +3105,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     localServers: mockTeam.localServers,
     plugins: {
       // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingListing: async () => null,
+      onOpenListing: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
+    marketplace: {
       takePendingListing: async () => null,
       onOpenListing: (listener) => {
         void listener;

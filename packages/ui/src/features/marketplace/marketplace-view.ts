@@ -1,4 +1,5 @@
 import {
+  type MarketplaceAgentDetail,
   type MarketplaceAgentSummary,
   type MarketplaceSkillSort,
   type MarketplaceSkillSummary,
@@ -6,6 +7,7 @@ import {
   SKILL_CATEGORIES,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
+import type { MarketplaceListingKind } from "@openbot/contracts/marketplace-links";
 import { errorReference } from "@openbot/user-errors";
 import { createStore, onCleanup, onSettled, untrack } from "solid-js";
 import type { MarketplaceListing } from "./marketplace-listing";
@@ -13,7 +15,13 @@ import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
 
 export type MarketplaceView =
   | { kind: "browse" }
-  | { kind: "agent"; listing: MarketplaceAgentSummary }
+  /**
+   * `detail`: the listing a Marketplace link loaded. The page shows it and does not read the catalog
+   * again, because the catalog has no agent that waits for its first review.
+   */
+  | { kind: "agent"; listing: MarketplaceAgentSummary; detail?: MarketplaceAgentDetail | undefined }
+  /** The catalog agents of one category, on their own page. */
+  | { kind: "agentGroup"; category: SkillCategory }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
   | { kind: "app"; id: string }
   /** "Your skills" or one catalog category, on its own page. */
@@ -39,21 +47,20 @@ export const MARKETPLACE_TAB_LABEL = {
   skills: "marketplace.tab.skills",
 } as const satisfies Record<MarketplaceTab, string>;
 
-/** "yes": only what the user has. "no": only what the user does not have. */
-export type OwnedFilter = "yes" | "no";
-
 export interface MarketplaceNavigationState {
   /** The views the user went through. The first is always the browse view. */
   stack: MarketplaceView[];
   tab: MarketplaceTab;
   query: string;
-  agentCategory: SkillCategory | null;
-  agentsOwned: OwnedFilter | null;
+  /** Verified or Public on the Agents tab. No source shows all agents. */
+  agentSource: SkillSource | null;
   /** The order of a skill group page. */
   skillSort: MarketplaceSkillSort;
   skillSource: SkillSource | null;
   /** The slug of a link that names no app of this catalog. */
   missingApp: string | null;
+  /** A link named an agent or a skill that the Marketplace does not have. */
+  missingListing: MarketplaceListingKind | null;
 }
 
 /** The `verified` value of a catalog query for a source. */
@@ -80,11 +87,11 @@ function initialState(): MarketplaceNavigationState {
     stack: [{ kind: "browse" }],
     tab: "apps",
     query: "",
-    agentCategory: null,
-    agentsOwned: null,
+    agentSource: null,
     skillSort: "installs",
     skillSource: null,
     missingApp: null,
+    missingListing: null,
   };
 }
 
@@ -105,6 +112,7 @@ export function createMarketplaceNavigation(): MarketplaceNavigation {
       set((draft) => {
         draft.stack = [...draft.stack, view];
         draft.missingApp = null;
+        draft.missingListing = null;
       }),
     back: () =>
       set((draft) => {
@@ -118,6 +126,7 @@ export function createMarketplaceNavigation(): MarketplaceNavigation {
       set((draft) => {
         draft.tab = tab;
         draft.missingApp = null;
+        draft.missingListing = null;
         // The list stays the same element, so it keeps its place.
         if (view) draft.stack = [draft.stack[0] ?? { kind: "browse" }, view];
         else draft.stack = draft.stack.slice(0, 1);
