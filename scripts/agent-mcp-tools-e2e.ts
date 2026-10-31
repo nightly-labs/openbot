@@ -35,7 +35,22 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
-async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promise<void> }> {
+const tool = (name: string) => ({ name, description: name, inputSchema: { type: "object", properties: {} } });
+const DEFAULT_TOOLS = [tool("search"), tool("read_page"), tool("create_page")];
+// JSON Schema lets a sub-schema be `true` (any value) or `false` (no value). A server that uses them is valid.
+const BOOLEAN_SCHEMA_TOOLS = [
+  {
+    name: "store",
+    description: "store",
+    inputSchema: { type: "object", properties: { key: { type: "string" }, data: true, unused: false } },
+    outputSchema: { type: "object", properties: { data: true } },
+  },
+];
+
+async function mcpServer(
+  mode: Mode,
+  tools: unknown[] = DEFAULT_TOOLS,
+): Promise<{ url: string; close: () => Promise<void> }> {
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
@@ -62,14 +77,8 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
             serverInfo: { name: "e2e", version: "1" },
           },
         });
-      if (message.method === "tools/list") {
-        const tool = (name: string) => ({ name, description: name, inputSchema: { type: "object", properties: {} } });
-        return json(response, 200, {
-          jsonrpc: "2.0",
-          id: message.id,
-          result: { tools: [tool("search"), tool("read_page"), tool("create_page")] },
-        });
-      }
+      if (message.method === "tools/list")
+        return json(response, 200, { jsonrpc: "2.0", id: message.id, result: { tools } });
       return json(response, 200, { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "unknown" } });
     })().catch((error: unknown) => response.writeHead(500).end(String(error)));
   });
@@ -118,6 +127,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
 };
+const booleanSchemas = await mcpServer("open", BOOLEAN_SCHEMA_TOOLS);
 const calls: Call[] = [];
 let refreshes = 0;
 const report: { passed: boolean; calls: Call[]; refreshes: number; failures: string[] } = {
@@ -203,6 +213,14 @@ try {
   assert.match(added.approvals[0] ?? "", /Every agent on this server/u);
   assert.equal(row("docs")?.enabled, true);
   assert.equal(refreshes, 1);
+
+  const boolean = await call("add a server with boolean sub-schemas", "save_mcp_server", {
+    name: "storage",
+    url: booleanSchemas.url,
+  });
+  assert.equal(boolean.result.status, "ready", boolean.result.error);
+  assert.deepEqual(boolean.result.tools, ["store"]);
+  assert.equal(row("storage")?.enabled, true);
 
   const signIn = await call("add a server that needs a sign-in", "save_mcp_server", {
     name: "calendar",
@@ -305,7 +323,7 @@ try {
   report.failures.push(error instanceof Error ? (error.stack ?? error.message) : String(error));
 } finally {
   report.refreshes = refreshes;
-  await Promise.all(Object.values(servers).map((server) => server.close()));
+  await Promise.all([...Object.values(servers), booleanSchemas].map((server) => server.close()));
   database.close();
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });

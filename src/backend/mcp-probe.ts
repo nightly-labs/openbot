@@ -11,6 +11,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
+import { z } from "zod";
 import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
@@ -325,6 +326,18 @@ interface ListedTools {
   names: string[];
 }
 
+/**
+ * The part of a `tools/list` page that the probe reads.
+ *
+ * `client.listTools` decodes each tool with the SDK schema, which refuses a property schema that is
+ * `true` or `false`. JSON Schema permits these boolean schemas, so that decoder refused a valid server.
+ * The provider reads the tool schemas itself; the probe needs only the names and the cursor.
+ */
+const listedToolsPageSchema = z.object({
+  tools: z.array(z.object({ name: z.string() })),
+  nextCursor: z.string().optional(),
+});
+
 /** Count all pages within the connection deadline, without repeating a cursor. */
 const countToolsEffect = Effect.fnUntraced(function* (client: Client) {
   const seen = new Set<string>();
@@ -332,8 +345,9 @@ const countToolsEffect = Effect.fnUntraced(function* (client: Client) {
   let count = 0;
   let cursor: string | undefined;
   for (;;) {
+    const params = cursor === undefined ? undefined : { cursor };
     const page = yield* probeIo((signal) =>
-      client.listTools(cursor === undefined ? undefined : { cursor }, { signal }),
+      client.request({ method: "tools/list", params }, listedToolsPageSchema, { signal }),
     );
     for (const tool of page.tools) if (names.length < MCP_PROBE_TOOL_NAMES) names.push(tool.name.slice(0, 128));
     count += page.tools.length;
