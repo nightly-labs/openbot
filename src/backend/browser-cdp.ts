@@ -44,12 +44,15 @@ import {
   collectBoundedSnapshot,
   collectFocus,
   cssObjectMatch,
+  describeTargetCandidates,
   fallbackRole,
   MAX_SNAPSHOT_SCANNED_NODES,
+  MAX_TARGET_CANDIDATES,
   pageContainsText,
   type SemanticMatch,
   type SnapshotTarget,
   semanticAxMatches,
+  type TargetCandidateText,
   type TargetRecord,
   visibleTextObjectMatches,
 } from "./browser-cdp-snapshot";
@@ -2745,44 +2748,60 @@ export class BrowserCdpEngine {
       };
     }
     if (target.kind === "css") {
-      const matches: Array<{ objectId: string; sessionId?: string | undefined }> = [];
-      let ambiguous = false;
+      const matches: Array<{ objectId: string; sessionId?: string | undefined; targetId?: string | undefined }> = [];
+      const releaseMatches = () =>
+        Effect.all(
+          matches.map((match) =>
+            Effect.exit(send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId)),
+          ),
+          { concurrency: "unbounded" },
+        );
       yield* Effect.gen({ self: this }, function* () {
         for (const capture of this.#snapshotTargets(Number.POSITIVE_INFINITY)) {
-          const match = yield* cssObjectMatch(send, target.selector, capture.sessionId);
-          ambiguous ||= match.ambiguous;
-          if (match.objectId)
+          for (const objectId of yield* cssObjectMatch(send, target.selector, capture.sessionId)) {
             matches.push({
-              objectId: match.objectId,
+              objectId,
               ...(capture.sessionId === undefined ? {} : { sessionId: capture.sessionId }),
+              ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
             });
+          }
+          if (matches.length >= MAX_TARGET_CANDIDATES) break;
         }
       }).pipe(
         Effect.catch((operationFailure) =>
-          Effect.gen({ self: this }, function* () {
-            const error = operationFailure.cause;
-            yield* Effect.all(
-              matches
-                .map((match) =>
-                  send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).pipe(Effect.ignore),
-                )
-                .map((operation) => Effect.exit(operation)),
-              { concurrency: "unbounded" },
-            );
-            return yield* browserFailure(error);
+          Effect.gen(function* () {
+            yield* releaseMatches();
+            return yield* browserFailure(operationFailure.cause);
           }),
         ),
       );
-      if (ambiguous || matches.length > 1) {
-        yield* Effect.all(
-          matches
-            .map((match) =>
-              send("Runtime.releaseObject", { objectId: match.objectId }, match.sessionId).pipe(Effect.ignore),
-            )
-            .map((operation) => Effect.exit(operation)),
-          { concurrency: "unbounded" },
+      if (matches.length > 1) {
+        const candidates = yield* Effect.forEach(matches.slice(0, MAX_TARGET_CANDIDATES), (match) =>
+          send("DOM.describeNode", { objectId: match.objectId, depth: 0 }, match.sessionId).pipe(
+            Effect.map((described): SemanticMatch[] => {
+              const node = recordValue(described.node);
+              const backendNodeId = numberValue(node?.backendNodeId);
+              if (!backendNodeId) return [];
+              return [
+                {
+                  backendNodeId,
+                  ...(match.sessionId === undefined ? {} : { sessionId: match.sessionId }),
+                  ...(match.targetId === undefined ? {} : { targetId: match.targetId }),
+                  role: fallbackRole(node ?? {}),
+                  name: "",
+                },
+              ];
+            }),
+          ),
+        ).pipe(
+          Effect.catch(() => Effect.succeed([])),
+          Effect.ensuring(releaseMatches()),
         );
-        return yield* browserFailure(new Error(`CSS selector is ambiguous (at least 2 matches): ${target.selector}`));
+        return yield* this.#ambiguousTarget(
+          send,
+          `CSS selector is ambiguous (at least ${Math.min(matches.length, MAX_TARGET_CANDIDATES)} matches): ${target.selector}`,
+          candidates.flat(),
+        );
       }
       const match = matches[0];
       if (!match) return yield* browserFailure(new Error(`No element matches CSS selector: ${target.selector}`));
@@ -2815,9 +2834,9 @@ export class BrowserCdpEngine {
         if (seen.has(key)) continue;
         seen.add(key);
         candidates.push(candidate);
-        if (candidates.length >= 2) break;
+        if (candidates.length >= MAX_TARGET_CANDIDATES) break;
       }
-      if (candidates.length >= 2) break;
+      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
       if (target.kind === "text") {
         const objectIds = yield* visibleTextObjectMatches(send, capture, target, deadline);
         yield* Effect.gen({ self: this }, function* () {
@@ -2836,7 +2855,7 @@ export class BrowserCdpEngine {
               role: fallbackRole(node ?? {}),
               name: target.text,
             });
-            if (candidates.length >= 2) break;
+            if (candidates.length >= MAX_TARGET_CANDIDATES) break;
           }
         }).pipe(
           Effect.ensuring(
@@ -2851,7 +2870,7 @@ export class BrowserCdpEngine {
           ),
         );
       }
-      if (candidates.length >= 2) break;
+      if (candidates.length >= MAX_TARGET_CANDIDATES) break;
     }
     if (navigationGeneration !== this.#navigationGeneration) {
       return yield* browserFailure(
@@ -2861,14 +2880,11 @@ export class BrowserCdpEngine {
     const [found] = candidates;
     if (!found) return yield* browserFailure(new Error(`No element matches ${describeBrowserTarget(target)}.`));
     if (candidates.length > 1) {
-      const sample = candidates
-        .slice(0, 5)
-        .map(
-          (candidate) =>
-            `${candidate.targetId ?? "main"}:${candidate.backendNodeId} ${candidate.role} “${candidate.name.slice(0, 80)}”`,
-        )
-        .join("; ");
-      return yield* browserFailure(new Error(`Target is ambiguous (at least 2 matches). Candidates: ${sample}`));
+      return yield* this.#ambiguousTarget(
+        send,
+        `Target is ambiguous (at least ${candidates.length} matches): ${describeBrowserTarget(target)}`,
+        candidates,
+      );
     }
     return {
       backendNodeId: found.backendNodeId,
@@ -2876,6 +2892,60 @@ export class BrowserCdpEngine {
       x: 0,
       y: 0,
     };
+  });
+
+  /**
+   * Refuses an ambiguous target before any input. The error names each candidate with its text, the
+   * text of its item when labels repeat, and its ref when the last snapshot has one, so that the
+   * agent can choose the intended item without guessing. Candidate text goes through the card scrub
+   * like a snapshot.
+   */
+  readonly #ambiguousTarget = Effect.fn("BrowserCdp.ambiguousTarget")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    summary: string,
+    candidates: readonly SemanticMatch[],
+  ): Effect.fn.Return<never, BrowserOperationError> {
+    const key = (candidate: SemanticMatch) => `${candidate.targetId ?? "main"}:${candidate.backendNodeId}`;
+    const texts = new Map<string, TargetCandidateText>();
+    for (const sessionId of new Set(candidates.map((candidate) => candidate.sessionId))) {
+      const own = candidates.filter((candidate) => candidate.sessionId === sessionId);
+      const described = yield* describeTargetCandidates(
+        send,
+        sessionId,
+        own.map((candidate) => candidate.backendNodeId),
+      ).pipe(Effect.catch(() => Effect.succeed([])));
+      own.forEach((candidate, index) => {
+        const text = described[index];
+        if (text) texts.set(key(candidate), text);
+      });
+    }
+    const labels = candidates.map((candidate) => candidate.name.slice(0, 120) || texts.get(key(candidate))?.text || "");
+    const revision = this.#lastSnapshot?.revision;
+    let missingRef = false;
+    const lines = candidates.map((candidate, index) => {
+      const text = texts.get(key(candidate));
+      const label = labels[index] ?? "";
+      const ref = revision === undefined ? undefined : `${revision}:${key(candidate)}`;
+      const tokens = [`${index + 1}.`];
+      if (ref !== undefined && this.#targets.has(ref)) tokens.push(`ref=${ref}`);
+      else missingRef = true;
+      if (candidate.role) tokens.push(candidate.role);
+      else if (text?.tag) tokens.push(`<${text.tag}>`);
+      tokens.push(JSON.stringify(label));
+      // The item text tells apart candidates with the same label; a distinct label needs none.
+      const shared = !label || labels.filter((other) => other === label).length > 1;
+      if (shared && text?.item && text.item !== label) tokens.push(`in ${JSON.stringify(text.item)}`);
+      return tokens.join(" ");
+    });
+    const message = [
+      `${summary}. No input was sent. Candidates:`,
+      ...lines,
+      "Act on the ref of the intended item, or use a target that matches only that item." +
+        (missingRef ? " Take a fresh snapshot to get a ref for a candidate that has none." : "") +
+        " If the task does not say which item, ask the user.",
+    ].join("\n");
+    return yield* browserFailure(new Error(this.#cardScrub.text(message)));
   });
 
   readonly #targetFingerprint = Effect.fn("BrowserCdp.targetFingerprint")(function* (

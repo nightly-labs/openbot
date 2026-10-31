@@ -195,6 +195,7 @@
     "test:browser-agent-session": "bun scripts/browser-agent-session-e2e.ts",
     "test:browser-steps": "bun scripts/browser-steps-e2e.ts",
     "test:browser-dialogs": "bun scripts/browser-dialogs-e2e.ts",
+    "test:browser-ambiguous-targets": "bun scripts/browser-ambiguous-targets-e2e.ts",
     "test:browser-profile-agents": "bun scripts/browser-profile-agents-e2e.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
     "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
