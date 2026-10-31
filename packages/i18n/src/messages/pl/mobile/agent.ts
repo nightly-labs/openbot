@@ -351,6 +351,10 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Domyślne hosta (Pokieruj)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
+  "mobile.agent.taskLimit.label": "Równoległe wątki",
+  "mobile.agent.taskLimit.footer": "Wątki, które działają w tym samym czasie",
+  "mobile.agent.taskLimit.default": "Domyślnie ({count})",
+  "mobile.agent.taskLimit.oneTurn": "{provider} wykonuje jedną turę naraz. Wątki tego agenta czekają na siebie.",
   "mobile.agent.browserProfile.label": "Profil przeglądarki",
   "mobile.agent.browserProfile.shared": "Wspólny",
   "mobile.agent.browserProfile.own": "Tylko ten agent",

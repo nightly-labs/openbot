@@ -23,7 +23,11 @@ import {
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
-import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
+import {
+  AgentBusyMessageField,
+  AgentHostPermissionFields,
+  AgentTaskLimitField,
+} from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
@@ -110,6 +114,7 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentTaskLimit,
     canManageBrowserProfiles,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
@@ -125,6 +130,7 @@ function AgentForm({
     Boolean(agent.workspacePath) ||
     canStartNewChat(agent.serverId) ||
     canManageAgentHostSettings(agent.serverId) ||
+    canManageAgentTaskLimit(agent.serverId) ||
     canManageBrowserProfiles(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
@@ -385,7 +391,8 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
-          {/* After the busy message, as in the desktop Advanced group. */}
+          <AgentTaskLimitField agent={agent} server={host} available={available} />
+          {/* After the task limit, as in the desktop Advanced group. */}
           <AgentBrowserProfileRow agent={agent} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>

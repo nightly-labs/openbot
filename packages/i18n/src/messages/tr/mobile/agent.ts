@@ -340,6 +340,11 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Ana makine varsayılanı (Yönlendir)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "mobile.agent.taskLimit.label": "Paralel mesaj dizileri",
+  "mobile.agent.taskLimit.footer": "Aynı anda çalışan mesaj dizileri",
+  "mobile.agent.taskLimit.default": "Varsayılan ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
   "mobile.agent.browserProfile.label": "Tarayıcı profili",
   "mobile.agent.browserProfile.shared": "Ortak",
   "mobile.agent.browserProfile.own": "Yalnızca bu ajan",

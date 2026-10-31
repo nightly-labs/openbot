@@ -337,6 +337,11 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host-Standard (Steuern)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchlauf nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
+  "mobile.agent.taskLimit.label": "Parallele Threads",
+  "mobile.agent.taskLimit.footer": "Threads, die gleichzeitig laufen",
+  "mobile.agent.taskLimit.default": "Standard ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} führt immer nur einen Durchlauf aus. Die Threads dieses Agenten warten aufeinander.",
   "mobile.agent.browserProfile.label": "Browser-Profil",
   "mobile.agent.browserProfile.shared": "Gemeinsam",
   "mobile.agent.browserProfile.own": "Nur dieser Agent",
