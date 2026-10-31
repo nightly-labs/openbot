@@ -181,6 +181,12 @@
       "version": "1.1.0",
       "featured": false,
       "detailSha256": "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f"
+    },
+    {
+      "slug": "opennavo",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b5530f6911eae21093d5e23b363c85ace3629b5a037d0bddcefe243ff78164f2"
     }
   ]
 }
