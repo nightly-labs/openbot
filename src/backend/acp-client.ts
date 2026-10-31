@@ -885,7 +885,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const connection = yield* providerSync(() => this.#requireConnection());
     if (this.#privateSession?.connection !== connection) {
       const { sessionId } = yield* providerCall(() =>
-        connection.newSession({ cwd: this.options.discoveryCwd?.() ?? process.cwd(), mcpServers: [] }),
+        connection.newSession({
+          cwd: this.options.discoveryCwd?.() ?? process.cwd(),
+          mcpServers: [],
+          ...(this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {}),
+        }),
       );
       this.#privateSession = { connection, sessionId };
     }
@@ -1490,6 +1494,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             // Sent only to an agent that advertises them: Grok 1.0.60 refuses them on every session
             // request, so each new Grok session failed.
             const directories = this.#acceptsAdditionalDirectories ? { additionalDirectories } : {};
+            const meta = this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {};
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
@@ -1529,7 +1534,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 yield* Effect.result(
                   this.#restoreSessionEffect(
                     connection,
-                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers },
+                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
                     this.#supportsSessionResume ? "resume" : "load",
                   ),
                 ),
@@ -1539,7 +1544,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId = currentModelFromSessionSetup(response);
             } else {
               const response = providerResult(
-                yield* Effect.result(providerCall(() => connection().newSession({ cwd, ...directories, mcpServers }))),
+                yield* Effect.result(
+                  providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
+                ),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -1568,7 +1575,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               agentId,
               idleRelease: null,
               idleSince: 0,
-              restore: { cwd, ...directories, mcpServers },
+              restore: { cwd, ...directories, mcpServers, ...meta },
               shownIds: new Set(),
               backgroundUntil: 0,
               backgroundUpdatedAt: null,

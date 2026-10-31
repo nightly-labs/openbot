@@ -129,6 +129,13 @@ interface InstructionsFileInPrompt {
 const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
 
 /**
+ * Codex declares `create_goal`, `get_goal` and `update_goal` in each request, about 3.5k characters.
+ * A goal continues the turn by itself until the agent marks it done, and only the user can pause or
+ * resume it. OpenBot has no control for a goal, so it turns the feature off.
+ */
+export const CODEX_FEATURES_CONFIG = { "features.goals": false } as const;
+
+/**
  * In code mode the model calls tools from an `exec` cell, and `exec` gives control back to the model
  * after its yield time while `ask_user` still waits. A model that then ends its turn expires the
  * question within seconds. Direct calls keep the turn waiting for the answer. It goes in as one
@@ -804,6 +811,7 @@ export class ThreadLifecycle {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
         project_doc_max_bytes: number;
+        "features.goals": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & ReturnType<typeof codexSandboxConfig>;
@@ -821,6 +829,7 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        ...CODEX_FEATURES_CONFIG,
         // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
         // script can be longer, and Codex would drop its end.
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,

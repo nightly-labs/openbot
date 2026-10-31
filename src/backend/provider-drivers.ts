@@ -54,6 +54,7 @@ import { MuseAgentClient } from "./muse-client";
 import {
   type CustomProviderSource,
   customProvidersOn,
+  OPENCODE_AGENT_CONFIG,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
@@ -796,7 +797,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...context.agentEnvironment?.(),
           ...opencodeEnv(cli, context),
-          ...openCodeConfigEnv({}, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
           ...(confinement ? OPENCODE_CONFINED_ENV : {}),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),

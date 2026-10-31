@@ -56,12 +56,15 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
         return [key, `\${${variable}}`];
       }),
     );
+  // Pi declares a direct tool in each request. Computer use alone has 56 tools, about 24k tokens, so
+  // the user's servers wait for Pi's `tool_search`, which records each loaded tool in the session for
+  // resume. The OpenBot bridge stays direct: its tool search is the way to every other tool.
   const entries = Object.entries(servers).map(([name, server]) => ({
     name: serverName("external", name),
     config:
       server.type === "http"
-        ? { ...server, headers: values(server.headers), exposure: "direct" }
-        : { ...server, env: values(server.env), exposure: "direct" },
+        ? { ...server, headers: values(server.headers), exposure: "deferred" }
+        : { ...server, env: values(server.env), exposure: "deferred" },
   }));
   const bridge = local.servers.map((server) => ({
     name: serverName("local", server.name),

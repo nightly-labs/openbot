@@ -1,5 +1,5 @@
 import { win32 } from "node:path";
-import type { RequestError } from "@agentclientprotocol/sdk";
+import type { NewSessionRequest, RequestError } from "@agentclientprotocol/sdk";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
@@ -105,6 +105,8 @@ export interface AcpFlavor {
   contextCompaction?: "handoff";
   /** A whole answer chunk that is the agent's own transport error, not answer text. OpenBot drops it. */
   noiseChunk?: RegExp;
+  /** The `_meta` of each `session/new`, `session/load` and `session/resume` request. */
+  sessionMeta?: NewSessionRequest["_meta"];
 }
 
 /** The protocol's own behavior: Grok and Cline. */
