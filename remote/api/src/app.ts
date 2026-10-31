@@ -460,7 +460,9 @@ export function createRemoteApiApp(
     .ws("/v1/signal", {
       idleTimeout: 120,
       maxPayloadLength: 64 * 1024,
-      backpressureLimit: 256 * 1024,
+      // Above the delivery budget of a host (`DEFAULT_INGRESS_DELIVERY_LIMITS`), so that the largest
+      // GitHub event fits with the frames of other routes.
+      backpressureLimit: 1024 * 1024,
       closeOnBackpressureLimit: true,
       perMessageDeflate: false,
       sendPings: true,

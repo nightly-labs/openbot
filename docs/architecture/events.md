@@ -87,8 +87,8 @@ syntax (401), a socket that holds the route (503), rate limit by route and clien
 body size (413). So an unknown route uses no rate-limit entry and Signal does not read its body.
 Signal then sends the exact bytes and the three header values to the host socket and waits for the
 status. It also returns 503 when the host has too many pending requests or does not answer in 2.5
-seconds. Slack and webhook deliveries share one pending budget for each host (16 requests, 128 KiB),
-which stays below the socket backpressure limit. Signal has no queue and does not store or log the
+seconds. Slack, webhook and GitHub deliveries share one pending budget for each host (16 requests,
+768 KiB of base64), which stays below the 1 MiB socket backpressure limit. Signal has no queue and does not store or log the
 body. The header patterns are in `packages/contracts/src/signal-protocol/webhook-route.ts`.
 
 The host (`HostEventsService.receive`) returns:

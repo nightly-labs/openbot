@@ -278,13 +278,14 @@ export interface IngressDeliveryLimits {
 
 /**
  * Slack, webhook and GitHub deliveries share these limits, so the bytes in flight to one host stay under the
- * socket's 256 KB backpressure limit, which closes the socket when it is reached. A body travels as
- * base64, a third larger than the body. The remainder leaves room for frame fields and Discord events.
+ * socket's 1 MiB backpressure limit, which closes the socket when it is reached. A body travels as
+ * base64, a third larger than the body: the largest GitHub event is about 683 KiB. The remainder leaves
+ * room for frame fields and Discord events.
  */
 const DEFAULT_INGRESS_DELIVERY_LIMITS: IngressDeliveryLimits = {
   timeoutMilliseconds: 2_500,
   maximumPendingPerHost: 16,
-  maximumPendingBytesPerHost: 128 * 1024,
+  maximumPendingBytesPerHost: 768 * 1024,
   maximumPending: 1_000,
 };
 

@@ -62,7 +62,7 @@ App's webhook secret (`GITHUB_WEBHOOK_SECRET`, at least 32 bytes), and reads onl
 delivery ID, the installation ID and the repository ID. Then it passes the exact body to the `ingress`
 socket of every host whose GitHub route names the repository, at the same time. It answers 202 when a
 host saved the event, 204 when no host watches the repository or every host refused it, and 503 when a
-host did not answer. A body larger than 64 KiB gets 413. GitHub does not send an event again by itself:
+host did not answer. A body larger than 512 KiB gets 413. GitHub does not send an event again by itself:
 an event for a host that is offline is lost, and the host shows the gap in its event history.
 
 An `ingress` socket names its repositories with a GitHub route ticket: an ES256 JWT with the audience

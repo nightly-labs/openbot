@@ -14,8 +14,10 @@ export const GITHUB_ROUTE_TTL_SECONDS = 5 * 60;
 // The repositories that the GitHub triggers of one host can watch.
 export const GITHUB_ROUTE_REPOSITORIES_LIMIT = 100;
 
-// The largest GitHub event body Signal passes to a host. Signal refuses a larger one with 413.
-export const GITHUB_DELIVERY_BODY_BYTES_LIMIT = 64 * 1024;
+// The largest GitHub event body Signal passes to a host. Signal refuses a larger one with 413. An event can
+// hold two texts of up to 65,536 characters each, such as an issue and its comment, and three repository
+// objects. Images and files are links in the text.
+export const GITHUB_DELIVERY_BODY_BYTES_LIMIT = 512 * 1024;
 
 // The events that GitHub triggers need. The App's installation must send all of them.
 export const GITHUB_ROUTE_EVENTS = [

@@ -13,6 +13,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { resolve } from "node:path";
 import {
+  GITHUB_DELIVERY_BODY_BYTES_LIMIT,
   GITHUB_DELIVERY_HEADER,
   GITHUB_EVENT_HEADER,
   GITHUB_EVENTS_PATH,
@@ -834,11 +835,28 @@ try {
       const body = JSON.parse(Buffer.from(frame.bodyBase64, "base64").toString());
       expect(body.repository.id === GITHUB_REPOSITORY, "The body changed on the way.");
     }
+    // An issue and its comment at GitHub's longest text, as CJK, fit; a larger body gets 413.
+    const long = JSON.stringify({
+      ...JSON.parse(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY)),
+      issue: { body: "文".repeat(65_536) },
+      comment: { body: "字".repeat(65_536) },
+    });
+    const large = await postGitHub(long, "github-large");
+    expect(large.status === 202, `largest event: ${large.status}`);
+    const largeFrame = JSON.parse(
+      await githubFirst.next((text) => text.includes('"github-large"'), "large GitHub event"),
+    );
+    expect(Buffer.from(largeFrame.bodyBase64, "base64").toString() === long, "The large body changed on the way.");
+    const tooLarge = await postGitHub(
+      JSON.stringify({ ...JSON.parse(long), padding: "x".repeat(GITHUB_DELIVERY_BODY_BYTES_LIMIT) }),
+      "github-too-large",
+    );
+    expect(tooLarge.status === 413, `event above the limit: ${tooLarge.status}`);
     const leaked = [...githubFirst.frames, ...githubSecond.frames].filter(
       (frame) => frame.includes("github-other-") || frame.includes("github-ping"),
     );
     expect(leaked.length === 0, "An event of another repository or installation reached a host.");
-    return "other repository 204, other installation 204, ping 204, routed 202 with the exact body on both hosts";
+    return "other repository 204, other installation 204, ping 204, routed 202 with the exact body on both hosts, largest event 202, larger 413";
   });
 
   await check(
