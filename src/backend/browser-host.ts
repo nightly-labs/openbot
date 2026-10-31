@@ -479,14 +479,6 @@ export class BrowserHost {
     for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
     if (activeTab) yield* this.#wake(activeTab);
-    // A view that never navigated is a debugger target that never answers, which stops a CDP client
-    // from attaching to the app. A blank page answers, and costs far less than the saved page.
-    for (const tab of tabs) {
-      if (tab.pendingRestore)
-        yield* Effect.forkIn(browserCall(() => tab.contents.loadURL("about:blank")).pipe(Effect.ignore), tab.scope, {
-          startImmediately: true,
-        });
-    }
   }).bind(this);
 
   /**
@@ -553,9 +545,9 @@ export class BrowserHost {
   }
 
   /**
-   * Unloads the page and keeps the tab: its id, owner, URL and settings stay, and the next use loads
-   * the page again through `#wake`. The page's own state, such as its history and unsent form
-   * input, is lost, as when a browser discards a background tab.
+   * Unloads the page and ends its renderer process, and keeps the tab: its id, owner, URL and settings
+   * stay, and the next use loads the page again through `#wake`. The page's own state, such as its
+   * history and unsent form input, is lost, as when a browser discards a background tab.
    */
   readonly #sleep = Effect.fn("BrowserHost.sleep")(function* (this: BrowserHost, tab: BrowserHostTab) {
     const saved = savedPreview(tab);
@@ -568,13 +560,13 @@ export class BrowserHost {
       enqueueTabOperation(
         tab,
         () =>
-          Effect.gen(function* () {
+          Effect.gen({ self: this }, function* () {
             sleeping.preview =
               saved ??
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
-            yield* browserCall(() => tab.contents.loadURL("about:blank"));
+            yield* this.#closeRenderer(tab);
           }),
         true,
       ).pipe(Effect.ignore),
@@ -582,6 +574,27 @@ export class BrowserHost {
       { startImmediately: true },
     );
     this.#emitChanged();
+  });
+
+  /**
+   * Gives the tab a new view that has loaded no page, and closes the old one. A blank page keeps its
+   * renderer process and that memory; a view with no page has no process until `#wake` loads one.
+   */
+  readonly #closeRenderer = Effect.fn("BrowserHost.closeRenderer")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    const { view, contents, engine } = tab;
+    engine.releaseDialogs();
+    yield* engine.destroy();
+    yield* browserSync(() => {
+      const next = this.#createView(undefined, this.#tabSession(tab));
+      this.#mountView(next);
+      next.setBounds(view.getBounds());
+      tab.view = next;
+      tab.contents = next.webContents;
+      tab.engine = new BrowserCdpEngine(next.webContents);
+      this.#bindTabEvents(tab);
+      this.#unmountView(view);
+      if (!contents.isDestroyed()) contents.close();
+    });
   });
 
   onChanged(listener: (...args: BrowserHostEvents["changed"]) => void): () => void {
@@ -2665,10 +2678,13 @@ export class BrowserHost {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
     contents.on("close", () => {
+      // `#closeRenderer` closes the old contents of a tab that stays open.
+      if (tab.contents !== contents) return;
       tab.closing = true;
       tab.focusedAtPageClose = contents.isFocused();
     });
     contents.once("destroyed", () => {
+      if (tab.contents !== contents) return;
       // Finish native destruction before removing the view and draining queued work.
       setImmediate(() => {
         void runCauseEffect(this.close(tab.id)).catch((error) =>
@@ -2792,7 +2808,7 @@ export class BrowserHost {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
     });
     contents.on("did-stop-loading", () => {
-      if (tab.closing || contents.isDestroyed()) return;
+      if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;
       changed();
       Effect.runFork(
         this.#syncViewBackground(tab).pipe(Effect.ignore, Effect.forkIn(tab.scope, { startImmediately: true })),
