@@ -824,25 +824,37 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    */
   startKeyProviderCli(provider: AgentProviderRef): Effect.Effect<boolean, ProviderRuntimeFailure> {
     if (!isKeyOnlyProvider(provider)) return Effect.succeed(false);
-    return resolvePiCli({ bundledExecutable: this.executablePath("pi") }).pipe(
-      Effect.as(false),
-      Effect.catch(() =>
-        this.download("pi").pipe(
-          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers.pi.phase)),
-        ),
-      ),
-    );
+    return this.#startMissingCli("pi");
   }
   /**
-   * Starts the download of the provider that runs a saved custom endpoint, when that provider cannot
-   * start. The endpoint form saves on OpenCode by default and nothing else downloads it, so the
-   * endpoint stayed out of every model list. Does not wait: the model picker shows the download.
+   * Starts the download of the provider that runs a saved custom endpoint, when that provider is on
+   * and cannot start. The endpoint form saves on OpenCode by default and nothing else downloads it,
+   * so the endpoint stayed out of every model list. Does not wait, also not for the release check
+   * that a download waits for: an endpoint change holds every other one until it ends, and the model
+   * picker shows the download.
    */
   startCustomProviderHarness(harness: CustomProviderHarness): Effect.Effect<void> {
-    const resolveCli = harness === "pi" ? resolvePiCli : resolveOpencodeCli;
-    return resolveCli({ bundledExecutable: this.executablePath(harness) }).pipe(
-      Effect.asVoid,
-      Effect.catch(() => this.download(harness).pipe(Effect.ignore)),
+    if (!this.#isProviderOn(harness)) return Effect.void;
+    return this.#startMissingCli(harness).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid);
+  }
+  /**
+   * Starts the download of a CLI that cannot start, and keeps one that can, from OpenBot or from the
+   * user. True while that download runs.
+   */
+  #startMissingCli(provider: CustomProviderHarness): Effect.Effect<boolean, ProviderRuntimeFailure> {
+    const resolveCli = provider === "pi" ? resolvePiCli : resolveOpencodeCli;
+    return Effect.suspend(() => {
+      // A removal of the download that runs now would take away the CLI that this finds.
+      const removal = this.#removals.get(provider);
+      return removal ? Fiber.await(removal) : Effect.void;
+    }).pipe(
+      Effect.andThen(Effect.suspend(() => resolveCli({ bundledExecutable: this.executablePath(provider) }))),
+      Effect.as(false),
+      Effect.catch(() =>
+        this.download(provider).pipe(
+          Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers[provider].phase)),
+        ),
+      ),
     );
   }
   cancel(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {
