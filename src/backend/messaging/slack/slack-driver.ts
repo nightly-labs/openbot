@@ -20,7 +20,7 @@ import type {
   StatusReaction,
 } from "../messaging-types";
 import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
-import { plainText, SLACK_ACTION_IDS, slackMentionIds } from "./slack-events";
+import { inboundFiles, plainText, SLACK_ACTION_IDS, slackMentionIds } from "./slack-events";
 import { SlackEventsTransport } from "./slack-events-transport";
 import { slackChunks, slackMrkdwn } from "./slack-render";
 import { SlackApiError, SlackWebApi } from "./slack-web-api";
@@ -236,15 +236,20 @@ class SlackAdapter implements MessagingAdapter {
     afterId: string | null,
     beforeId: string,
   ): Effect.fn.Return<ContextEntry[], MessagingAdapterError> {
-    // Every conversation is a thread, in a direct message too.
-    const response = yield* this.#api.call("conversations.replies", {
-      channel: platformChannelId,
-      ts: threadKey,
-      latest: beforeId,
-      oldest: afterId ?? undefined,
-      inclusive: false,
-      limit: HISTORY_LIMIT,
-    });
+    // Every conversation is a thread, in a direct message too. A limited read fails at once: the
+    // message runs without it, and the connection does not wait.
+    const response = yield* this.#api.call(
+      "conversations.replies",
+      {
+        channel: platformChannelId,
+        ts: threadKey,
+        latest: beforeId,
+        oldest: afterId ?? undefined,
+        inclusive: false,
+        limit: HISTORY_LIMIT,
+      },
+      { rateLimitRetries: 0 },
+    );
     const messages = Array.isArray(response.messages) ? response.messages.filter(isDynamicRecord) : [];
     const kept = messages.filter((message) => {
       const ts = message.ts;
@@ -325,11 +330,18 @@ class SlackAdapter implements MessagingAdapter {
       const ts = String(message.ts);
       const replies = withReplyCounts && typeof message.reply_count === "number" ? message.reply_count : 0;
       const text = withMentionNames(plainText(raw[index] ?? "", this.#botUserId), names);
+      const files = inboundFiles(message.files);
       entries.push({
         id: ts,
         authorName: yield* this.#author(message),
-        text: replies ? `${text} (thread with ${replies} replies)` : text,
+        text: [
+          replies ? `${text} (thread with ${replies} replies)` : text,
+          files.length ? `(Attached files: ${files.map((file) => file.name).join(", ")})` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
         sentAt: new Date(Number(ts) * 1000).toISOString(),
+        ...(files.length ? { files } : {}),
       });
     }
     return entries.sort((left, right) => Number(left.id) - Number(right.id));

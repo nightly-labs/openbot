@@ -100,7 +100,8 @@ export function slackInboundAction(payload: unknown, workspaceId: string): Inbou
   }
 }
 
-function inboundFiles(value: unknown): InboundFile[] {
+/** Slack's `files` of a message, each with the address that a download with the bot token reads. */
+export function inboundFiles(value: unknown): InboundFile[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isDynamicRecord).flatMap((file: DynamicRecord) =>
     isString(file.id) && isString(file.url_private_download)

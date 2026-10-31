@@ -313,6 +313,7 @@
     "test:plan-continuation": "bun scripts/plan-continuation-e2e.ts",
     "test:messaging-pause-resume": "bun scripts/messaging-pause-resume-e2e.ts",
     "test:messaging-discord-access": "bun scripts/messaging-discord-access-e2e.ts",
+    "test:messaging-slack-thread-files": "bun scripts/messaging-slack-thread-files-e2e.ts",
     "test:turn-input": "bun scripts/turn-input-e2e.ts",
     "test:analytics-redaction": "bun scripts/analytics-redaction-e2e.ts",
     "test:central-auth-startup": "bun scripts/central-auth-startup-stall-e2e.ts",
