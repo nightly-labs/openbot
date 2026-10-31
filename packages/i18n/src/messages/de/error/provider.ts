@@ -130,16 +130,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT wurde heruntergeladen, konnte aber nicht gestartet werden. Lade es in OpenBot erneut herunter.",
   "error.provider.codexMissing": "ChatGPT wurde nicht heruntergeladen. Lade es in OpenBot herunter, um fortzufahren.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex hat {count} Einstellung in seiner Konfiguration ignoriert: {settings}. Korrigiere oder entferne sie oder aktualisiere Codex.",
-    other:
-      "Codex hat {count} Einstellungen in seiner Konfiguration ignoriert: {settings}. Korrigiere oder entferne sie oder aktualisiere Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex hat {count} Einstellung in seiner Konfiguration ignoriert. Korrigiere oder entferne sie oder aktualisiere Codex.",
-    other:
-      "Codex hat {count} Einstellungen in seiner Konfiguration ignoriert. Korrigiere oder entferne sie oder aktualisiere Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} ist zu alt. OpenBot benötigt 2.1.232 oder neuer.",
   "error.provider.claudeNotStarted": "Claude CLI wurde gefunden, konnte aber nicht gestartet werden.",
   "error.provider.claudeNotStartedHint":

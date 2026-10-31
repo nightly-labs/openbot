@@ -86,7 +86,6 @@ import type { ProviderAccountStore, StoredProviderAccount } from "./provider-acc
 import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
 import {
   createAcpRequestEchoReader,
-  ignoredCodexSettings,
   isAcpHandlerDiagnostic,
   isBackgroundRefreshDiagnostic,
   isBundledSandboxFallbackDiagnostic,
@@ -478,11 +477,6 @@ export class ProviderRuntime implements ProviderPort {
    * Their next connect runs `onProvidersReady`, also when it is a retry after a timeout.
    */
   readonly #exitRecovery = new Set<AgentProvider>();
-  /**
-   * Ignored-settings warnings already shown. Codex repeats one at each start, and a reconnect does
-   * not change the file it reads, so the user sees each one once per app run.
-   */
-  readonly #reportedConfigWarnings = new Set<string>();
   /** Counts `dispose()` calls, so a start from before one cannot add its client after it. */
   #disposals = 0;
   readonly #modelCatalog: ModelCatalog;
@@ -3649,24 +3643,19 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Codex's report of the settings it ignored, with each key named: the stderr copy of it has only
-   * the summary (see `isIgnoredConfigDiagnostic`). The full text, with the path of each file, goes
-   * to the log; the user gets the keys, because the renderer does not show paths.
+   * the summary (see `isIgnoredConfigDiagnostic`). It goes to the log only. Codex works without the
+   * keys, and a key can belong to another Codex app that shares the file, such as the desktop app's
+   * saved Windows app approvals (#4179), so the user has nothing to correct.
    *
    * Other configuration warnings are not reported here.
    */
   #reportConfigWarning(client: AgentClient, params: unknown): void {
     const summary = getString(params, "summary");
-    const ignored = summary ? ignoredCodexSettings(summary) : null;
-    if (!summary || !ignored) return;
-    const redacted = shortenDiagnostic(this.#redactMcp(summary));
-    logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message: redacted });
-    if (this.#reportedConfigWarnings.has(redacted)) return;
-    this.#reportedConfigWarnings.add(redacted);
-    const message =
-      ignored.keys.length > 0
-        ? sourceText("error.provider.codexConfigIgnored", { count: ignored.count, settings: ignored.keys.join(", ") })
-        : sourceText("error.provider.codexConfigIgnoredUnnamed", { count: ignored.count });
-    this.#emitError(`${client.provider}_config_ignored`, message);
+    if (!summary || !isIgnoredConfigDiagnostic(summary)) return;
+    logger.warn("A provider ignored settings in its configuration.", {
+      provider: client.provider,
+      message: shortenDiagnostic(this.#redactMcp(summary)),
+    });
   }
 
   #handleExit(client: AgentClient, error: Error): void {

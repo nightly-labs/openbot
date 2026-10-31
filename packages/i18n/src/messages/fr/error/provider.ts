@@ -141,16 +141,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT a été téléchargé mais n’a pas pu démarrer. Téléchargez-le à nouveau dans OpenBot.",
   "error.provider.codexMissing": "ChatGPT n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex a ignoré {count} paramètre de sa configuration : {settings}. Corrigez-le ou supprimez-le, ou mettez Codex à jour.",
-    other:
-      "Codex a ignoré {count} paramètres de sa configuration : {settings}. Corrigez-les ou supprimez-les, ou mettez Codex à jour.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex a ignoré {count} paramètre de sa configuration. Corrigez-le ou supprimez-le, ou mettez Codex à jour.",
-    other:
-      "Codex a ignoré {count} paramètres de sa configuration. Corrigez-les ou supprimez-les, ou mettez Codex à jour.",
-  },
   "error.provider.claudeOutdated":
     "Claude Code {version} est trop ancien. OpenBot nécessite la version 2.1.232 ou plus récente.",
   "error.provider.claudeNotStarted": "La CLI Claude a été trouvée mais n’a pas pu démarrer.",

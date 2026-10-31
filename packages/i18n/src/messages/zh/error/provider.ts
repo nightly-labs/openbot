@@ -117,14 +117,6 @@ export const messages = {
   "error.provider.codexNotStartedHint": "找到了 Codex CLI，但无法启动。请在新终端中运行 `codex --version`。",
   "error.provider.codexManagedNotStarted": "ChatGPT 已下载，但无法启动。请在 OpenBot 中重新下载。",
   "error.provider.codexMissing": "ChatGPT 尚未下载。请在 OpenBot 中下载后继续。",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex 忽略了配置中的 {count} 项设置：{settings}。请修正或移除它，或更新 Codex。",
-    other: "Codex 忽略了配置中的 {count} 项设置：{settings}。请修正或移除它们，或更新 Codex。",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex 忽略了配置中的 {count} 项设置。请修正或移除它，或更新 Codex。",
-    other: "Codex 忽略了配置中的 {count} 项设置。请修正或移除它们，或更新 Codex。",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} 版本过低。OpenBot 需要 2.1.232 或更高版本。",
   "error.provider.claudeNotStarted": "找到了 Claude CLI，但无法启动。",
   "error.provider.claudeNotStartedHint": "找到了 Claude CLI，但无法启动。请在新终端中运行 `claude --version`。",

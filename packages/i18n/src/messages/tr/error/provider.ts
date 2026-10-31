@@ -126,15 +126,6 @@ export const messages = {
     "Codex CLI bulundu ancak başlatılamadı. Yeni bir terminalde `codex --version` komutunu çalıştırın.",
   "error.provider.codexManagedNotStarted": "ChatGPT indirildi ancak başlatılamadı. OpenBot içinde yeniden indirin.",
   "error.provider.codexMissing": "ChatGPT indirilmedi. Devam etmek için OpenBot içinde indirin.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other:
-      "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} çok eski. OpenBot 2.1.232 veya daha yenisini gerektirir.",
   "error.provider.claudeNotStarted": "Claude CLI bulundu ancak başlatılamadı.",
   "error.provider.claudeNotStartedHint":

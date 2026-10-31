@@ -65,7 +65,6 @@ export const messages = {
   "agent.error.adminOnly": "Alleen een serverbeheerder kan agentinstellingen wijzigen.",
   "agent.error.continueFailed": "De agent kan niet doorgaan. Probeer het opnieuw.",
   "agent.error.mcpNotStarted": "MCP-server niet gestart",
-  "agent.error.codexConfigIgnored": "Waarschuwing over Codex-configuratie",
   "agent.error.provider": "Fout bij aanbieder",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Fout bij {provider}",

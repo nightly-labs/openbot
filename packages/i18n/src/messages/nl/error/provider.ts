@@ -125,16 +125,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT is gedownload, maar kon niet worden gestart. Download het opnieuw in OpenBot.",
   "error.provider.codexMissing": "ChatGPT is niet gedownload. Download het in OpenBot om door te gaan.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd: {settings}. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd: {settings}. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} is te oud. OpenBot vereist 2.1.232 of nieuwer.",
   "error.provider.claudeNotStarted": "Claude CLI is gevonden, maar kon niet worden gestart.",
   "error.provider.claudeNotStartedHint":

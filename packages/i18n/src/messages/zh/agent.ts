@@ -57,7 +57,6 @@ export const messages = {
   "agent.error.adminOnly": "只有服务器管理员可以更改助手设置。",
   "agent.error.continueFailed": "助手无法继续，请重试。",
   "agent.error.mcpNotStarted": "MCP 服务器未启动",
-  "agent.error.codexConfigIgnored": "Codex 配置警告",
   "agent.error.provider": "服务商错误",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} 错误",

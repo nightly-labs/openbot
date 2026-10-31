@@ -62,7 +62,6 @@ export const messages = {
   "agent.error.adminOnly": "Настройки агента может менять только администратор сервера.",
   "agent.error.continueFailed": "Агент не смог продолжить. Повторите попытку.",
   "agent.error.mcpNotStarted": "Сервер MCP не запущен",
-  "agent.error.codexConfigIgnored": "Предупреждение о конфигурации Codex",
   "agent.error.provider": "Ошибка провайдера",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Ошибка провайдера {provider}",

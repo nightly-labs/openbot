@@ -62,7 +62,6 @@ export const messages = {
   "agent.error.adminOnly": "에이전트 설정은 서버 관리자만 변경할 수 있어요.",
   "agent.error.continueFailed": "에이전트가 계속 진행하지 못했어요. 다시 시도해 주세요.",
   "agent.error.mcpNotStarted": "MCP 서버가 시작되지 않았어요",
-  "agent.error.codexConfigIgnored": "Codex 구성 경고",
   "agent.error.provider": "제공자 오류",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} 오류",

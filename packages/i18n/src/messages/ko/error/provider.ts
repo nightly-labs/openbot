@@ -125,13 +125,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT를 다운로드했지만 시작할 수 없었어요. OpenBot에서 다시 다운로드하세요.",
   "error.provider.codexMissing": "ChatGPT가 다운로드되지 않았어요. 계속하려면 OpenBot에서 다운로드하세요.",
-  "error.provider.codexConfigIgnored": {
-    other:
-      "Codex가 구성에서 설정 {count}개를 무시했어요: {settings}. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    other: "Codex가 구성에서 설정 {count}개를 무시했어요. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
   "error.provider.claudeOutdated":
     "Claude Code {version}이(가) 너무 오래되었어요. OpenBot에는 2.1.232 이상이 필요해요.",
   "error.provider.claudeNotStarted": "Claude CLI를 찾았지만 시작할 수 없었어요.",
