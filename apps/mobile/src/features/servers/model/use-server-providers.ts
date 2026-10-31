@@ -135,9 +135,9 @@ export function useServerProviderAccounts(serverId: string, admin: ProviderAdmin
   const refresh = useCallback(
     () =>
       queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey.includes("provider-accounts"),
+        predicate: (query) => query.queryKey.includes("provider-accounts") && query.queryKey.includes(serverId),
       }),
-    [queryClient],
+    [queryClient, serverId],
   );
   return { list, refresh };
 }

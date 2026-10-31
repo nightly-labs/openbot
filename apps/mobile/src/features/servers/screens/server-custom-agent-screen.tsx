@@ -252,7 +252,9 @@ function CustomAgentForm({
           onChangeText={(command) => edit({ command })}
         />
       </View>
+      {/* A preset replaces the arguments from outside the field, so the field starts again with its rows. */}
       <ListField
+        key={preset}
         title={t("mobile.server.customAgents.arguments")}
         footer={t("mobile.server.customAgents.argumentsHint")}
         items={draft.args}

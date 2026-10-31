@@ -234,6 +234,18 @@ function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderA
             )
       }
     >
+      {admin.customAgents && list.isPending && !list.isError ? (
+        <SettingsRow disclosure={false}>
+          <Typography.Paragraph className="text-grouped-secondary">
+            {t("mobile.server.customAgents.loading")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {list.isError ? (
+        <SettingsRow disclosure={false} disabled={list.isFetching} onPress={() => void list.refetch()}>
+          <Typography.Paragraph className="text-accent">{t("mobile.server.providers.retry")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
       {list.data?.map((agent) => (
         <SettingsRow
           key={agent.id}

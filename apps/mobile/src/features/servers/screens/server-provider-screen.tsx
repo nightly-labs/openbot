@@ -176,12 +176,12 @@ export function ServerProviderScreen() {
 
   // The account page asks for a sign-in of one account, which runs here. The request runs once.
   const requestedAccount = params.signInAccount;
-  const startAccountSignIn = useRef<(account: string) => void>(() => undefined);
+  const startAccountSignIn = useRef<(account: string) => boolean>(() => false);
   useEffect(() => {
-    if (!requestedAccount || !row) return;
-    router.setParams({ signInAccount: undefined });
-    startAccountSignIn.current(requestedAccount);
-  }, [requestedAccount, row]);
+    // A sign-in or another action that runs keeps the request until it ends.
+    if (!requestedAccount || !row || pending !== null) return;
+    if (startAccountSignIn.current(requestedAccount)) router.setParams({ signInAccount: undefined });
+  }, [requestedAccount, row, pending]);
 
   if (!available || !admin || !provider || !row)
     return (
@@ -242,7 +242,11 @@ export function ServerProviderScreen() {
     });
   }
 
-  startAccountSignIn.current = (account) => startSignIn("relay", account);
+  startAccountSignIn.current = (account) => {
+    if (signIn !== null || locked.current) return false;
+    startSignIn("relay", account);
+    return true;
+  };
 
   function openPage(url: string) {
     void Linking.openURL(url).catch(() => setError(t("mobile.server.providers.openFailed")));

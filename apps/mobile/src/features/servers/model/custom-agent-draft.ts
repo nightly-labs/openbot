@@ -126,7 +126,8 @@ export function customAgentInput(draft: CustomAgentDraft, saved: CustomAgentSumm
     id: draft.id.trim(),
     name: draft.name.trim(),
     command: draft.command.trim(),
-    args: draft.args.map((arg) => arg.trim()).filter(Boolean),
+    // As desktop keeps them: only an empty row that the user added goes, and a saved empty argument stays.
+    args: draft.args.filter((arg, index) => arg !== "" || saved?.args[index] === ""),
     env: draft.env
       .filter((row) => !blank(row))
       .map((row) => {

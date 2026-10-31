@@ -1,11 +1,11 @@
-import { type AcpRegistryEntry, isNewCustomAgentId } from "@openbot/contracts/ipc";
+import { type AcpRegistryEntry, CUSTOM_AGENT_LIMITS, isNewCustomAgentId } from "@openbot/contracts/ipc";
 import { useLocalSearchParams } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
-import { useProviderAdmin } from "@/features/servers/model/use-server-providers";
+import { useProviderAdmin, useServerCustomAgents } from "@/features/servers/model/use-server-providers";
 import {
   SettingsContent,
   SettingsNote,
@@ -23,9 +23,23 @@ const QUERY_LIMIT = 256;
 
 type Registry = NonNullable<ProviderAdmin["registry"]>;
 
-/** The agent ID of a new install, as desktop suggests it. */
-function suggestedAgentId(entry: AcpRegistryEntry): string {
-  return isNewCustomAgentId(entry.id) ? entry.id : `registry-${entry.id}`.slice(0, 40);
+/**
+ * The agent ID of a new install, as desktop suggests it, with a number added when the host has an
+ * agent of that ID. The host does not replace an agent that it did not install from the registry.
+ */
+function suggestedAgentId(entry: AcpRegistryEntry, taken: ReadonlySet<string>): string {
+  const base = isNewCustomAgentId(entry.id) ? entry.id : `registry-${entry.id}`.slice(0, 40);
+  if (!taken.has(base)) return base;
+  for (let number = 2; number <= CUSTOM_AGENT_LIMITS.agents + 1; number += 1) {
+    const id = candidateId(base, number);
+    if (!taken.has(id)) return id;
+  }
+  return base;
+}
+
+function candidateId(base: string, number: number): string {
+  const suffix = `-${number}`;
+  return `${base.slice(0, 40 - suffix.length)}${suffix}`;
 }
 
 /**
@@ -44,10 +58,10 @@ export function ServerAcpRegistryScreen() {
         </SettingsNote>
       </SettingsContent>
     );
-  return <RegistryPage registry={admin.registry} />;
+  return <RegistryPage serverId={serverId} admin={admin} registry={admin.registry} />;
 }
 
-function RegistryPage({ registry }: { registry: Registry }) {
+function RegistryPage({ serverId, admin, registry }: { serverId: string; admin: ProviderAdmin; registry: Registry }) {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const [query, setQuery] = useState("");
@@ -57,6 +71,17 @@ function RegistryPage({ registry }: { registry: Registry }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searched = useRef("");
+  // An install adds a custom agent, so the Agents section reads the list again after each change.
+  const customAgents = useServerCustomAgents(serverId, admin);
+  const hasCustomAgents = admin.customAgents !== null;
+  const refetchAgents = customAgents.list.refetch;
+  const refreshAgents = useCallback(() => {
+    if (hasCustomAgents) void refetchAgents();
+  }, [hasCustomAgents, refetchAgents]);
+  const taken = new Set([
+    ...(customAgents.list.data?.map((agent) => agent.id) ?? []),
+    ...(entries?.flatMap((entry) => (entry.customAgentId ? [entry.customAgentId] : [])) ?? []),
+  ]);
 
   const search = useCallback(
     async (text: string) => {
@@ -101,6 +126,7 @@ function RegistryPage({ registry }: { registry: Registry }) {
             setError(operation.message ?? t("mobile.server.acpRegistry.installFailed"));
             void haptics.notification("error");
           }
+          refreshAgents();
           void search(searched.current);
         })
         .catch((cause: unknown) => {
@@ -114,7 +140,7 @@ function RegistryPage({ registry }: { registry: Registry }) {
       current = false;
       clearInterval(timer);
     };
-  }, [busy, registry, search, errorMessage, t]);
+  }, [busy, registry, search, errorMessage, t, refreshAgents]);
 
   async function change(entry: AcpRegistryEntry, failure: string, operation: () => Promise<unknown>) {
     setBusy(entry.id);
@@ -122,6 +148,7 @@ function RegistryPage({ registry }: { registry: Registry }) {
     try {
       await operation();
       void haptics.notification("success");
+      refreshAgents();
       await search(searched.current);
     } catch (cause) {
       setBusy(null);
@@ -134,7 +161,11 @@ function RegistryPage({ registry }: { registry: Registry }) {
     void change(
       entry,
       t(entry.installedVersion ? "mobile.server.acpRegistry.updateFailed" : "mobile.server.acpRegistry.installFailed"),
-      () => registry.install({ registryId: entry.id, customAgentId: entry.customAgentId ?? suggestedAgentId(entry) }),
+      () =>
+        registry.install({
+          registryId: entry.id,
+          customAgentId: entry.customAgentId ?? suggestedAgentId(entry, taken),
+        }),
     );
   const remove = (entry: AcpRegistryEntry) =>
     void change(entry, t("mobile.server.acpRegistry.removeFailed"), () => registry.remove(entry.id));
@@ -159,7 +190,7 @@ function RegistryPage({ registry }: { registry: Registry }) {
     if (!entry.installedVersion) {
       Alert.alert(
         t("mobile.server.acpRegistry.installTitle", { name: entry.name }),
-        t("mobile.server.acpRegistry.installBody", { id: entry.customAgentId ?? suggestedAgentId(entry) }),
+        t("mobile.server.acpRegistry.installBody", { id: entry.customAgentId ?? suggestedAgentId(entry, taken) }),
         [
           { text: t("common.cancel"), style: "cancel" },
           { text: t("mobile.server.acpRegistry.install"), onPress: () => install(entry) },

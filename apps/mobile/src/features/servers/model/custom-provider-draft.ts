@@ -59,8 +59,9 @@ export function suggestedCustomProviderId(name: string): string {
     .replace(/[̀-ͯ]/gu, "")
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/gu, "-")
-    .replace(/^[-_]+|-+$/gu, "")
-    .slice(0, INPUT_LIMITS.identifier);
+    .replace(/^[-_]+/u, "")
+    .slice(0, INPUT_LIMITS.identifier)
+    .replace(/[-_]+$/u, "");
 }
 
 /** Whether the user changed the form that the preset opened with. */
