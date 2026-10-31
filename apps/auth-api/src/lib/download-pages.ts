@@ -9,9 +9,7 @@ import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNL
 import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
 import {
   OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
-  OPENBOT_SOCIAL_IMAGE_URL,
+  OPENBOT_SOCIAL_IMAGE_TAGS,
   OPENBOT_X_HANDLE,
   type PageSocialImage,
   pageSocialImageMeta,
@@ -399,7 +397,7 @@ export const DOWNLOAD_HUB = {
 /** The hub's own social card. The page of each system keeps the site's card. */
 const DOWNLOAD_HUB_SOCIAL_IMAGE: PageSocialImage = {
   path: "/social/download.jpg",
-  alt: "From idea to done. OpenBot agents on a folded paper path",
+  alt: "Teamwork. Now installing. OpenBot agents around a glass ring",
 };
 
 export function downloadPagePath(platform: DownloadPagePlatform | "hub"): string {
@@ -452,15 +450,7 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
         downloadUrl: page.installers.map((installer) => new URL(installer.href, siteUrl).toString()),
       }
     : OPENBOT_SOFTWARE_APPLICATION;
-  const image = page
-    ? {
-        openGraph: OPENBOT_SOCIAL_IMAGE_META,
-        twitter: [
-          { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-          { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
-        ],
-      }
-    : pageSocialImageMeta(DOWNLOAD_HUB_SOCIAL_IMAGE, siteUrl);
+  const image = page ? OPENBOT_SOCIAL_IMAGE_TAGS : pageSocialImageMeta(DOWNLOAD_HUB_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [

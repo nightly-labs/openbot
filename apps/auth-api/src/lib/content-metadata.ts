@@ -19,6 +19,7 @@ import {
 } from "./content-collection";
 import {
   PLUGINS_DESCRIPTION,
+  PLUGINS_SOCIAL_IMAGE,
   PLUGINS_TITLE,
   pluginIndexUrl,
   pluginUrl,
@@ -31,8 +32,10 @@ import {
   OPENBOT_SITE_URL,
   OPENBOT_SOCIAL_IMAGE_ALT,
   OPENBOT_SOCIAL_IMAGE_META,
+  OPENBOT_SOCIAL_IMAGE_TAGS,
   OPENBOT_SOCIAL_IMAGE_URL,
   OPENBOT_X_HANDLE,
+  pageSocialImageMeta,
 } from "./site-metadata";
 
 /** The generated social cards. Matches what `content-images.ts` writes. */
@@ -67,6 +70,9 @@ function articleOgImageAlt(title: string): string {
 export function collectionIndexHead(collection: ContentCollection, siteUrl: string) {
   const url = collectionIndexUrl(collection, siteUrl);
   const feed = collectionFeedUrl(collection, siteUrl);
+  const image = collection.indexSocialImage
+    ? pageSocialImageMeta(collection.indexSocialImage, siteUrl)
+    : OPENBOT_SOCIAL_IMAGE_TAGS;
 
   return {
     meta: [
@@ -79,13 +85,12 @@ export function collectionIndexHead(collection: ContentCollection, siteUrl: stri
       { property: "og:url", content: url },
       { property: "og:title", content: collection.indexTitle },
       { property: "og:description", content: collection.indexDescription },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: collection.indexTitle },
       { name: "twitter:description", content: collection.indexDescription },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [
       { rel: "canonical", href: url },
@@ -250,6 +255,7 @@ function collectionStructuredData(collection: ContentCollection, siteUrl: string
  */
 export function pluginsIndexHead(siteUrl: string) {
   const url = pluginIndexUrl(siteUrl);
+  const image = pageSocialImageMeta(PLUGINS_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -262,13 +268,12 @@ export function pluginsIndexHead(siteUrl: string) {
       { property: "og:url", content: url },
       { property: "og:title", content: PLUGINS_TITLE },
       { property: "og:description", content: PLUGINS_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: PLUGINS_TITLE },
       { name: "twitter:description", content: PLUGINS_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [{ rel: "canonical", href: url }],
   };

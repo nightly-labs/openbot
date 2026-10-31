@@ -12,7 +12,7 @@ import { SKILL_CATEGORY_LABELS } from "@openbot/contracts/ipc-skills";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { PLUGIN_CATALOG_DETAILS, PLUGIN_CATALOG_INDEX, type PluginCatalogDetail } from "./plugin-catalog.generated";
-import { OPENBOT_SITE_URL } from "./site-metadata";
+import { OPENBOT_SITE_URL, type PageSocialImage } from "./site-metadata";
 
 /**
  * One listing as the pages read it: what the generator writes, and the two facts the index carries
@@ -40,6 +40,11 @@ export const PLUGIN_DETAIL_ROUTE = "/plugins/$slug";
 export const PLUGINS_TITLE = "OpenBot Plugins: Apps and Tools for Your AI Agents";
 export const PLUGINS_DESCRIPTION =
   "Apps and skills an OpenBot agent can use. Open a plugin in the app, and decide there what it connects to.";
+/** The index's own social card. The page of each plugin keeps the site's card. */
+export const PLUGINS_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/plugins.jpg",
+  alt: "Your kind of team. Four OpenBot agents in front of a rainbow",
+};
 
 /** Newest listing first is not a thing here: the order is the order the index declares. */
 export const SITE_PLUGINS: readonly SitePlugin[] = PLUGIN_CATALOG_INDEX.plugins.flatMap((entry) => {

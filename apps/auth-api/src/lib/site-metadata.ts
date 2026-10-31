@@ -35,6 +35,15 @@ export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
 ] as const;
 
+/** The site's card in the shape of `pageSocialImageMeta`, for a page that can have either. */
+export const OPENBOT_SOCIAL_IMAGE_TAGS = {
+  openGraph: OPENBOT_SOCIAL_IMAGE_META,
+  twitter: [
+    { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+    { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+  ],
+} as const;
+
 /** A page's own social card: a 1600x900 JPEG in `public/social/`, the size of the site's card. */
 export interface PageSocialImage {
   /** The path from the site root, for example `/social/teams.jpg`. */

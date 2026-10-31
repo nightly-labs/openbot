@@ -15,6 +15,10 @@ export const PROVIDERS_COLLECTION: ContentCollection<"providers"> = {
   indexTitle: "AI coding agents that OpenBot runs",
   indexDescription:
     "Claude Code, Codex, Gemini, Grok, Cursor, OpenCode, Cline, Muse Code, Pi, Inception, ACP agents and local models in one desktop app: how to set each one up, and what OpenBot adds to it.",
+  indexSocialImage: {
+    path: "/social/providers.jpg",
+    alt: "Models come and go. Your team stays. OpenBot agents on a paper planet",
+  },
   feedTitle: "OpenBot providers",
   backLabel: "All providers",
   moreTitle: "More providers",
