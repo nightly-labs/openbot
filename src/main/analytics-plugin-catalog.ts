@@ -15,6 +15,8 @@ export interface CatalogPluginServer {
   url: string;
   command: string;
   args: string[];
+  /** The listing's steps to start a server that runs on this computer, such as Figma's. */
+  setupSteps: string[];
 }
 
 /**
@@ -47,7 +49,7 @@ export const loadCatalogPluginServers = Effect.fn("Analytics.loadPluginCatalog")
 
 function catalogServer(slug: string, app: unknown): CatalogPluginServer[] {
   if (!isDynamicRecord(app) || !isDynamicRecord(app.server)) return [];
-  const { name, transport, url, command, args } = app.server;
+  const { name, transport, url, command, args, auth } = app.server;
   if (!isString(name) || (transport !== "http" && transport !== "stdio")) return [];
   return [
     {
@@ -57,8 +59,14 @@ function catalogServer(slug: string, app: unknown): CatalogPluginServer[] {
       url: isString(url) ? url : "",
       command: isString(command) ? command : "",
       args: Array.isArray(args) ? args.filter(isString) : [],
+      setupSteps: Array.isArray(auth) ? auth.flatMap(localSetupSteps) : [],
     },
   ];
+}
+
+function localSetupSteps(flow: unknown): string[] {
+  if (!isDynamicRecord(flow) || flow.kind !== "local" || !Array.isArray(flow.steps)) return [];
+  return flow.steps.filter(isString);
 }
 
 /**

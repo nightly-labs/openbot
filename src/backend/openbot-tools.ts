@@ -6,9 +6,10 @@ import {
   CHAT_VISUAL_TITLE_LIMIT,
 } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { API_KEY_NAME_PATTERN } from "@openbot/contracts/ipc";
+import { API_KEY_NAME_PATTERN, CONNECTOR_IDS } from "@openbot/contracts/ipc";
 import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
+import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
@@ -282,6 +283,12 @@ export const requestApiKeyToolSchema = z.strictObject({
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
 /** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
+/** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
+export const MARKETPLACE_APP_IDS: readonly string[] = [
+  ...pluginCatalog.plugins.map((plugin) => plugin.slug),
+  ...CONNECTOR_IDS,
+];
+
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
   ...MESSAGING_TOOL_DEFINITIONS,
@@ -658,8 +665,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description:
-      "Show the user a card in this conversation for one Marketplace app that the task needs and that is not in your tools. The user connects it, opens its listing, or dismisses the card; nothing connects without the user. Keep your normal answer. Returns not_found and the known apps, with no card, when no Marketplace app has that slug.",
+    description: `Call this when the user asks to connect or use a service in this list and you have no tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows the user a card in this conversation to connect the app; nothing connects without the user. For an app that is already installed, it tests the app and returns what the user must do, such as a Sign in card or setup steps. Keep your normal answer.`,
     shape: {
       app: z
         .string()
