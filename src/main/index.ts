@@ -129,6 +129,7 @@ import { trustSystemCertificates } from "./system-certificates";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setWindowAppearance } from "./window-appearance";
 
 const logger = createOpenBotLogger("main");
@@ -1319,7 +1320,7 @@ if (!hasSingleInstanceLock) {
       updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
-        await prepareForUpdateInstall();
+        await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
         app.quit();
       });
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
@@ -1572,16 +1573,22 @@ function reopenMainWindow(): void {
  */
 const SHUTDOWN_DEADLINE_MS = 30_000;
 
-function forceExitAfterShutdownDeadline(): void {
+function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
-    logger.error(`OpenBot did not quit within ${SHUTDOWN_DEADLINE_MS} ms and will exit now.`);
+    logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
     app.exit(0);
-  }, SHUTDOWN_DEADLINE_MS);
+  }, deadlineMs);
 }
 
-async function prepareForUpdateInstall(): Promise<void> {
+/**
+ * An in-app update keeps the process alive after the teardown: on macOS Squirrel only now copies,
+ * unpacks and verifies the downloaded ZIP, and quits when that is done. On a slow Mac this takes
+ * longer than a quit may, and an exit before it ends leaves the old version installed (#4244). The
+ * update deadline is the one the update service gives the install.
+ */
+async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
-  await prepareForShutdown();
+  await prepareForShutdown(deadlineMs);
 }
 
 /**
@@ -1591,14 +1598,14 @@ async function prepareForUpdateInstall(): Promise<void> {
  * registered as well, for the case where the quit arrives before those services exist; both are
  * idempotent, so running twice costs nothing.
  */
-async function prepareForShutdown(): Promise<void> {
+async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<void> {
   if (shutdownStarted) return;
   // An update install runs this before its `app.quit()`, and the teardown closes the trace.
   recordExit("quit");
   shutdownStarted = true;
   isQuitting = true;
   hideExceptionErrorBox();
-  forceExitAfterShutdownDeadline();
+  forceExitAfterShutdownDeadline(deadlineMs);
   if (services) Effect.runFork(services.updater.stop());
   await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
     logger.error("Unable to save the main window position:", toLogValue(error)),
