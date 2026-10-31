@@ -358,6 +358,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "哪些 Trello 卡片分配给了我？",
   "marketplace.plugin.trello.prompt.board": "总结我的 Trello 看板上正在进行的工作。",
   "marketplace.plugin.trello.prompt.newCards": "把这些待办事项作为卡片添加到我的 Trello 看板。",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp 群组和频道",
+  "marketplace.plugin.ninebot.description":
+    "9bot 让智能体处理连接到用户 9bot 账号的 WhatsApp 群组、公告群组和频道。智能体可以查看群组、成员、管理员和设置，生成活跃度和参与度报告，发送和定时发送消息，创建 Workflow，并使用警告和允许列表等管理功能。9bot 是付费服务，提供 7 天试用。用户在 9bot Dashboard 中启用 MCP，创建只读或完全访问的应用，将其限制在所选群组，然后在浏览器中登录。9bot 是一家独立公司，与 Meta 或 WhatsApp 没有关联。",
+  "marketplace.plugin.ninebot.app": "通过 9bot 的 MCP 服务器处理 WhatsApp 群组和频道，在浏览器中登录。",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "这周我哪些 WhatsApp 群组最活跃？",
+  "marketplace.plugin.ninebot.prompt.listChannels": "列出我的公告群组和频道。",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "为这个群组创建每周参与度报告。",
   "marketplace.plugin.huggingface.tagline": "Hub 上的模型、数据集和论文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face 让助手在 Hugging Face Hub 上搜索模型、数据集、Spaces、合集和论文，读取模型卡片和仓库文件，预览数据集，并搜索 Hugging Face 文档。它使用 Hub 的公开数据，无需账号和密钥。这些工具只读取数据：助手不能创建仓库，也不能运行任务。",

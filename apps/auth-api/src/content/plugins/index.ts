@@ -12,6 +12,7 @@ import { HUGGINGFACE_PLUGIN_GUIDE } from "./huggingface";
 import { LINEAR_PLUGIN_GUIDE } from "./linear";
 import { NEON_PLUGIN_GUIDE } from "./neon";
 import { NETLIFY_PLUGIN_GUIDE } from "./netlify";
+import { NINEBOT_PLUGIN_GUIDE } from "./ninebot";
 import { NOTION_PLUGIN_GUIDE } from "./notion";
 import { PAPER_PLUGIN_GUIDE } from "./paper";
 import type { PluginGuide } from "./plugin-guide";
@@ -49,6 +50,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   vercel: VERCEL_PLUGIN_GUIDE,
   todoist: TODOIST_PLUGIN_GUIDE,
   trello: TRELLO_PLUGIN_GUIDE,
+  ninebot: NINEBOT_PLUGIN_GUIDE,
   railway: RAILWAY_PLUGIN_GUIDE,
   render: RENDER_PLUGIN_GUIDE,
   prisma: PRISMA_PLUGIN_GUIDE,

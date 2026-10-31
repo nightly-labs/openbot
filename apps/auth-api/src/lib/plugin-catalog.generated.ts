@@ -67,6 +67,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "f85666d6f360a29f8cb29be4c7fd992e1c0d018b5b1a0f5c59cadddefa6883b8",
     },
     {
+      slug: "ninebot",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "54531dd77307d70a5d05a485766a14ef9c1fbc3e3cbf0631b73dcaebdcfcf064",
+    },
+    {
       slug: "cobrain",
       version: "1.0.0",
       featured: false,
@@ -526,6 +532,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://trello.com",
     privacyPolicyUrl: "https://www.atlassian.com/legal/privacy-policy",
     termsUrl: "https://www.atlassian.com/legal/atlassian-customer-agreement",
+    skills: [],
+  },
+  ninebot: {
+    slug: "ninebot",
+    name: "9bot",
+    tagline: "WhatsApp groups and channels",
+    description:
+      "9bot lets agents work with the WhatsApp groups, announcement groups and channels connected to the user's 9bot account. Agents can look up groups, members, administrators and settings, generate activity and engagement reports, send and schedule messages, create Workflows, and use moderation features such as strikes and allowlists. 9bot is a paid service with a 7-day trial. The user enables MCP in the 9bot Dashboard, creates an application with read-only or full access, limits it to chosen groups, and signs in through the browser. 9bot is an independent company and is not affiliated with Meta or WhatsApp.",
+    category: "automation",
+    creatorName: "9bot",
+    iconUrl: "https://raw.githubusercontent.com/9-bot/mcp/main/assets/logo.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-active-groups", text: "Which of my WhatsApp groups are most active this week?" },
+      { id: "prompt-list-channels", text: "List my announcement groups and channels." },
+      { id: "prompt-weekly-report", text: "Create a weekly engagement report for this group." },
+    ],
+    apps: [
+      {
+        id: "app-9bot-mcp",
+        name: "9bot",
+        description: "WhatsApp groups and channels, over 9bot's MCP server with browser sign-in.",
+        iconUrl: "https://raw.githubusercontent.com/9-bot/mcp/main/assets/logo.png",
+        server: {
+          name: "9bot",
+          transport: "http",
+          url: "https://mcp.9bot.com.br/mcp",
+          auth: [{ id: "9bot-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://9bot.com.br/en/",
+    privacyPolicyUrl: "https://9bot.com.br/en/privacy-policy/",
+    termsUrl: "https://9bot.com.br/en/terms-of-use/",
     skills: [],
   },
   cobrain: {

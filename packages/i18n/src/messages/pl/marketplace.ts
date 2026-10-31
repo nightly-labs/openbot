@@ -402,6 +402,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Które karty w Trello są przypisane do mnie?",
   "marketplace.plugin.trello.prompt.board": "Podsumuj, co jest w toku na mojej tablicy w Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Dodaj te punkty do działania jako karty na mojej tablicy w Trello.",
+  "marketplace.plugin.ninebot.tagline": "Grupy i kanały WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "9bot pozwala agentom pracować z grupami, grupami ogłoszeń i kanałami WhatsApp połączonymi z kontem 9bot użytkownika. Agenci mogą sprawdzać grupy, członków, administratorów i ustawienia, tworzyć raporty aktywności i zaangażowania, wysyłać i planować wiadomości, tworzyć Workflows oraz korzystać z funkcji moderacji, takich jak ostrzeżenia i listy dozwolonych. 9bot to płatna usługa z 7-dniowym okresem próbnym. Użytkownik włącza MCP w panelu 9bot, tworzy aplikację z dostępem tylko do odczytu lub pełnym, ogranicza ją do wybranych grup i loguje się w przeglądarce. 9bot to niezależna firma, niepowiązana z Meta ani WhatsApp.",
+  "marketplace.plugin.ninebot.app": "Grupy i kanały WhatsApp przez serwer MCP 9bot z logowaniem w przeglądarce.",
+  "marketplace.plugin.ninebot.prompt.activeGroups":
+    "Które z moich grup WhatsApp są najbardziej aktywne w tym tygodniu?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Wypisz moje grupy ogłoszeń i kanały.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Utwórz cotygodniowy raport zaangażowania dla tej grupy.",
   "marketplace.plugin.huggingface.tagline": "Modele, zbiory danych i publikacje w Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face pozwala agentom wyszukiwać modele, zbiory danych, Spaces, kolekcje i publikacje w Hugging Face Hub, czytać karty modeli i pliki repozytoriów, podglądać zbiory danych oraz przeszukiwać dokumentację Hugging Face. Korzysta z publicznych danych Hub i nie wymaga konta ani klucza. Narzędzia tylko czytają: agenci nie mogą tworzyć repozytoriów ani uruchamiać zadań.",

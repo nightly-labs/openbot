@@ -347,6 +347,38 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "ninebot",
+    name: "9bot",
+    tagline: "WhatsApp groups and channels",
+    description:
+      "9bot lets agents work with the WhatsApp groups, announcement groups and channels connected to the user's 9bot account. Agents can look up groups, members, administrators and settings, generate activity and engagement reports, send and schedule messages, create Workflows, and use moderation features such as strikes and allowlists. 9bot is a paid service with a 7-day trial. The user enables MCP in the 9bot Dashboard, creates an application with read-only or full access, limits it to chosen groups, and signs in through the browser. 9bot is an independent company and is not affiliated with Meta or WhatsApp.",
+    category: "automation",
+    creatorName: "9bot",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-active-groups", text: "Which of my WhatsApp groups are most active this week?" },
+      { id: "prompt-list-channels", text: "List my announcement groups and channels." },
+      { id: "prompt-weekly-report", text: "Create a weekly engagement report for this group." },
+    ],
+    websiteUrl: "https://9bot.com.br/en/",
+    privacyPolicyUrl: "https://9bot.com.br/en/privacy-policy/",
+    termsUrl: "https://9bot.com.br/en/terms-of-use/",
+    featured: false,
+    apps: [
+      {
+        id: "app-9bot-mcp",
+        name: "9bot",
+        description: "WhatsApp groups and channels, over 9bot's MCP server with browser sign-in.",
+        server: {
+          name: "9bot",
+          transport: "http",
+          url: "https://mcp.9bot.com.br/mcp",
+          auth: [{ id: "9bot-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "cobrain",
     name: "Cobrain",
     tagline: "Shared memory for your AI agents",

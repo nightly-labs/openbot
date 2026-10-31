@@ -383,6 +383,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quais cartões do Trello estão atribuídos a mim?",
   "marketplace.plugin.trello.prompt.board": "Resuma o que está em andamento no meu quadro do Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Adicione estes itens de ação como cartões ao meu quadro do Trello.",
+  "marketplace.plugin.ninebot.tagline": "Grupos e canais do WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "O 9bot permite que os agentes trabalhem com os grupos, grupos de avisos e canais do WhatsApp conectados à conta 9bot do usuário. Os agentes podem consultar grupos, membros, administradores e configurações, gerar relatórios de atividade e engajamento, enviar e agendar mensagens, criar Workflows e usar recursos de moderação como strikes e listas de permissão. O 9bot é um serviço pago com teste de 7 dias. O usuário ativa o MCP no Dashboard do 9bot, cria um aplicativo com acesso somente leitura ou total, limita esse aplicativo aos grupos escolhidos e faz login no navegador. O 9bot é uma empresa independente e não tem vínculo com a Meta ou o WhatsApp.",
+  "marketplace.plugin.ninebot.app": "Grupos e canais do WhatsApp, pelo servidor MCP do 9bot com login no navegador.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Quais dos meus grupos do WhatsApp estão mais ativos nesta semana?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Liste meus grupos de avisos e canais.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Crie um relatório semanal de engajamento deste grupo.",
   "marketplace.plugin.huggingface.tagline": "Modelos, datasets e artigos no Hub",
   "marketplace.plugin.huggingface.description":
     "O Hugging Face permite que agentes pesquisem modelos, datasets, Spaces, coleções e artigos no Hugging Face Hub, leiam model cards e arquivos de repositórios, vejam uma prévia de datasets e pesquisem na documentação do Hugging Face. Ele usa dados públicos do Hub e não precisa de conta nem de chave. As ferramentas apenas leem: os agentes não podem criar repositórios nem executar jobs.",

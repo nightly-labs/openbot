@@ -413,6 +413,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Bana hangi Trello kartları atanmış?",
   "marketplace.plugin.trello.prompt.board": "Trello panomda devam eden işleri özetle.",
   "marketplace.plugin.trello.prompt.newCards": "Bu yapılacak maddeleri Trello panoma kart olarak ekle.",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp grupları ve kanalları",
+  "marketplace.plugin.ninebot.description":
+    "9bot, ajanların kullanıcının 9bot hesabına bağlı WhatsApp grupları, duyuru grupları ve kanallarıyla çalışmasını sağlar. Ajanlar grupları, üyeleri, yöneticileri ve ayarları görüntüleyebilir, etkinlik ve etkileşim raporları oluşturabilir, mesaj gönderip zamanlayabilir, Workflow oluşturabilir ve uyarılar ile izin listeleri gibi moderasyon özelliklerini kullanabilir. 9bot, 7 günlük deneme süresi olan ücretli bir hizmettir. Kullanıcı 9bot Dashboard'da MCP'yi açar, salt okunur veya tam erişimli bir uygulama oluşturur, bunu seçtiği gruplarla sınırlar ve tarayıcıda oturum açar. 9bot bağımsız bir şirkettir ve Meta veya WhatsApp ile bağlantılı değildir.",
+  "marketplace.plugin.ninebot.app":
+    "9bot'un MCP sunucusu üzerinden, tarayıcıda oturum açarak WhatsApp grupları ve kanalları.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Bu hafta en aktif WhatsApp gruplarım hangileri?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Duyuru gruplarımı ve kanallarımı listele.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Bu grup için haftalık bir etkileşim raporu oluştur.",
   "marketplace.plugin.huggingface.tagline": "Hub'daki modeller, veri kümeleri ve makaleler",
   "marketplace.plugin.huggingface.description":
     "Hugging Face, ajanların Hugging Face Hub'da modelleri, veri kümelerini, Spaces'i, koleksiyonları ve makaleleri aramasına, model kartlarını ve depo dosyalarını okumasına, veri kümelerini önizlemesine ve Hugging Face belgelerinde arama yapmasına olanak tanır. Herkese açık Hub verilerini kullanır ve hesap ya da anahtar gerektirmez. Araçlar yalnızca okur: ajanlar depo oluşturamaz ve iş (job) çalıştıramaz.",

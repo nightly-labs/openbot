@@ -51,6 +51,12 @@
       "detailSha256": "f85666d6f360a29f8cb29be4c7fd992e1c0d018b5b1a0f5c59cadddefa6883b8"
     },
     {
+      "slug": "ninebot",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "54531dd77307d70a5d05a485766a14ef9c1fbc3e3cbf0631b73dcaebdcfcf064"
+    },
+    {
       "slug": "cobrain",
       "version": "1.0.0",
       "featured": false,

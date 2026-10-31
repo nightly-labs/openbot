@@ -410,6 +410,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quelles cartes Trello me sont attribuées ?",
   "marketplace.plugin.trello.prompt.board": "Résume ce qui est en cours sur mon tableau Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Ajoute ces actions comme cartes à mon tableau Trello.",
+  "marketplace.plugin.ninebot.tagline": "Groupes et chaînes WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "9bot permet aux agents de travailler avec les groupes, groupes d’annonces et chaînes WhatsApp connectés au compte 9bot de l’utilisateur. Les agents peuvent consulter les groupes, les membres, les administrateurs et les paramètres, générer des rapports d’activité et d’engagement, envoyer et programmer des messages, créer des Workflows et utiliser des fonctions de modération comme les avertissements et les listes d’autorisation. 9bot est un service payant avec un essai de 7 jours. L’utilisateur active MCP dans le Dashboard de 9bot, crée une application en lecture seule ou avec accès complet, la limite aux groupes choisis et se connecte dans le navigateur. 9bot est une entreprise indépendante, sans lien avec Meta ni WhatsApp.",
+  "marketplace.plugin.ninebot.app":
+    "Groupes et chaînes WhatsApp, via le serveur MCP de 9bot avec connexion dans le navigateur.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Quels sont mes groupes WhatsApp les plus actifs cette semaine ?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Liste mes groupes d’annonces et mes chaînes.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Crée un rapport hebdomadaire d’engagement pour ce groupe.",
   "marketplace.plugin.huggingface.tagline": "Modèles, jeux de données et articles sur le Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permet aux agents de rechercher des modèles, des jeux de données, des Spaces, des collections et des articles sur le Hugging Face Hub, de lire les model cards et les fichiers des dépôts, de prévisualiser des jeux de données et de rechercher dans la documentation de Hugging Face. Il utilise les données publiques du Hub et ne demande ni compte ni clé. Les outils ne font que lire : les agents ne peuvent pas créer de dépôts ni lancer de jobs.",

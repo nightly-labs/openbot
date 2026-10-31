@@ -387,6 +387,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Welke Trello-kaarten zijn aan mij toegewezen?",
   "marketplace.plugin.trello.prompt.board": "Vat samen wat er onderhanden is op mijn Trello-bord.",
   "marketplace.plugin.trello.prompt.newCards": "Zet deze actiepunten als kaarten op mijn Trello-bord.",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp-groepen en -kanalen",
+  "marketplace.plugin.ninebot.description":
+    "Met 9bot werken agents met de WhatsApp-groepen, aankondigingsgroepen en kanalen die aan het 9bot-account van de gebruiker zijn gekoppeld. Agents kunnen groepen, leden, beheerders en instellingen opvragen, rapporten over activiteit en betrokkenheid maken, berichten versturen en inplannen, Workflows maken en moderatiefuncties gebruiken, zoals strikes en toegestane lijsten. 9bot is een betaalde dienst met een proefperiode van 7 dagen. De gebruiker zet MCP aan in het 9bot-dashboard, maakt een applicatie met alleen-lezen of volledige toegang, beperkt die tot gekozen groepen en meldt zich aan in de browser. 9bot is een onafhankelijk bedrijf en is niet verbonden aan Meta of WhatsApp.",
+  "marketplace.plugin.ninebot.app":
+    "WhatsApp-groepen en -kanalen via de MCP-server van 9bot met aanmelding in de browser.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Welke van mijn WhatsApp-groepen zijn deze week het actiefst?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Toon mijn aankondigingsgroepen en kanalen.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Maak een wekelijks betrokkenheidsrapport voor deze groep.",
   "marketplace.plugin.huggingface.tagline": "Modellen, datasets en papers op de Hub",
   "marketplace.plugin.huggingface.description":
     "Met Hugging Face kunnen agents modellen, datasets, Spaces, collecties en papers op de Hugging Face Hub zoeken, modelkaarten en repositorybestanden lezen, datasets bekijken en de Hugging Face-documentatie doorzoeken. Het gebruikt openbare Hub-data en heeft geen account en geen sleutel nodig. De tools lezen alleen: agents kunnen geen repository’s maken of jobs uitvoeren.",

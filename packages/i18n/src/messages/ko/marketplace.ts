@@ -358,6 +358,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "나에게 배정된 Trello 카드는 뭐야?",
   "marketplace.plugin.trello.prompt.board": "내 Trello 보드에서 진행 중인 작업을 요약해 줘.",
   "marketplace.plugin.trello.prompt.newCards": "이 실행 항목들을 내 Trello 보드에 카드로 추가해 줘.",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp 그룹과 채널",
+  "marketplace.plugin.ninebot.description":
+    "9bot을 사용하면 에이전트가 사용자의 9bot 계정에 연결된 WhatsApp 그룹, 공지 그룹, 채널을 다룰 수 있습니다. 에이전트는 그룹, 멤버, 관리자, 설정을 조회하고, 활동 및 참여 보고서를 만들고, 메시지를 보내거나 예약하고, Workflow를 만들고, 경고와 허용 목록 같은 관리 기능을 사용할 수 있습니다. 9bot은 7일 체험이 있는 유료 서비스입니다. 사용자는 9bot Dashboard에서 MCP를 켜고, 읽기 전용 또는 전체 권한 애플리케이션을 만들어 선택한 그룹으로 제한한 뒤 브라우저에서 로그인합니다. 9bot은 독립 회사이며 Meta 또는 WhatsApp과 제휴하지 않았습니다.",
+  "marketplace.plugin.ninebot.app": "브라우저 로그인으로 9bot의 MCP 서버를 통해 WhatsApp 그룹과 채널을 다룹니다.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "이번 주에 가장 활발한 내 WhatsApp 그룹은 어디야?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "내 공지 그룹과 채널을 나열해 줘.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "이 그룹의 주간 참여 보고서를 만들어 줘.",
   "marketplace.plugin.huggingface.tagline": "Hub의 모델, 데이터셋, 논문",
   "marketplace.plugin.huggingface.description":
     "Hugging Face를 사용하면 에이전트가 Hugging Face Hub에서 모델, 데이터셋, Spaces, 컬렉션, 논문을 검색하고, 모델 카드와 저장소 파일을 읽고, 데이터셋을 미리 보고, Hugging Face 문서를 검색할 수 있어요. 공개 Hub 데이터를 사용하므로 계정도 키도 필요 없어요. 도구는 읽기만 해요. 에이전트는 저장소를 만들거나 작업(Jobs)을 실행할 수 없어요.",

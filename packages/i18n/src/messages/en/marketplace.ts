@@ -392,6 +392,13 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.trello.prompt.myCards": "Which Trello cards are assigned to me?",
   "marketplace.plugin.trello.prompt.board": "Summarize what is in progress on my Trello board.",
   "marketplace.plugin.trello.prompt.newCards": "Add these action items as cards to my Trello board.",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp groups and channels",
+  "marketplace.plugin.ninebot.description":
+    "9bot lets agents work with the WhatsApp groups, announcement groups and channels connected to the user's 9bot account. Agents can look up groups, members, administrators and settings, generate activity and engagement reports, send and schedule messages, create Workflows, and use moderation features such as strikes and allowlists. 9bot is a paid service with a 7-day trial. The user enables MCP in the 9bot Dashboard, creates an application with read-only or full access, limits it to chosen groups, and signs in through the browser. 9bot is an independent company and is not affiliated with Meta or WhatsApp.",
+  "marketplace.plugin.ninebot.app": "WhatsApp groups and channels, over 9bot's MCP server with browser sign-in.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Which of my WhatsApp groups are most active this week?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "List my announcement groups and channels.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Create a weekly engagement report for this group.",
   "marketplace.plugin.huggingface.tagline": "Models, datasets and papers on the Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face lets agents search models, datasets, Spaces, collections and papers on the Hugging Face Hub, read model cards and repository files, preview datasets, and search the Hugging Face documentation. It uses public Hub data and needs no account and no key. The tools only read: agents cannot create repositories or run jobs.",

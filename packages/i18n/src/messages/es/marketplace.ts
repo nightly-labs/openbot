@@ -404,6 +404,15 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "¿Qué tarjetas de Trello tengo asignadas?",
   "marketplace.plugin.trello.prompt.board": "Resume lo que está en curso en mi tablero de Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Añade estas tareas pendientes como tarjetas a mi tablero de Trello.",
+  "marketplace.plugin.ninebot.tagline": "Grupos y canales de WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "9bot permite a los agentes trabajar con los grupos, grupos de anuncios y canales de WhatsApp conectados a la cuenta de 9bot del usuario. Los agentes pueden consultar grupos, miembros, administradores y configuración, generar informes de actividad y participación, enviar y programar mensajes, crear Workflows y usar funciones de moderación como strikes y listas de permitidos. 9bot es un servicio de pago con una prueba de 7 días. El usuario activa MCP en el Dashboard de 9bot, crea una aplicación con acceso de solo lectura o completo, la limita a los grupos elegidos e inicia sesión en el navegador. 9bot es una empresa independiente y no está afiliada a Meta ni a WhatsApp.",
+  "marketplace.plugin.ninebot.app":
+    "Grupos y canales de WhatsApp, a través del servidor MCP de 9bot con inicio de sesión en el navegador.",
+  "marketplace.plugin.ninebot.prompt.activeGroups":
+    "¿Cuáles de mis grupos de WhatsApp tienen más actividad esta semana?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Enumera mis grupos de anuncios y canales.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Crea un informe semanal de participación de este grupo.",
   "marketplace.plugin.huggingface.tagline": "Modelos, datasets y artículos en el Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permite a los agentes buscar modelos, datasets, Spaces, colecciones y artículos en el Hugging Face Hub, leer model cards y archivos de repositorios, ver una vista previa de datasets y buscar en la documentación de Hugging Face. Usa datos públicos del Hub y no necesita cuenta ni clave. Las herramientas solo leen: los agentes no pueden crear repositorios ni ejecutar jobs.",

@@ -399,6 +399,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "自分に割り当てられた Trello カードはどれですか？",
   "marketplace.plugin.trello.prompt.board": "Trello ボードで進行中の作業をまとめてください。",
   "marketplace.plugin.trello.prompt.newCards": "これらのアクション項目をカードとして Trello ボードに追加してください。",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp のグループとチャンネル",
+  "marketplace.plugin.ninebot.description":
+    "9bot を使うと、エージェントはユーザーの 9bot アカウントに接続された WhatsApp のグループ、アナウンスグループ、チャンネルを扱えます。グループ、メンバー、管理者、設定の確認、アクティビティとエンゲージメントのレポート作成、メッセージの送信と予約、Workflow の作成、警告や許可リストなどのモデレーション機能を利用できます。9bot は 7 日間のトライアルがある有料サービスです。ユーザーは 9bot の Dashboard で MCP を有効にし、読み取り専用またはフルアクセスのアプリケーションを作成して対象グループを限定し、ブラウザでサインインします。9bot は独立した企業であり、Meta や WhatsApp とは提携していません。",
+  "marketplace.plugin.ninebot.app":
+    "9bot の MCP サーバー経由で WhatsApp のグループとチャンネルを扱います。ブラウザでサインインします。",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "今週いちばん活発な WhatsApp グループはどれですか？",
+  "marketplace.plugin.ninebot.prompt.listChannels": "アナウンスグループとチャンネルを一覧にしてください。",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "このグループの週次エンゲージメントレポートを作成してください。",
   "marketplace.plugin.huggingface.tagline": "Hub のモデル、データセット、論文",
   "marketplace.plugin.huggingface.description":
     "Hugging Face を使うと、エージェントは Hugging Face Hub のモデル、データセット、Spaces、コレクション、論文を検索し、モデルカードやリポジトリのファイルを読み、データセットをプレビューし、Hugging Face のドキュメントを検索できます。公開されている Hub のデータを使うので、アカウントもキーも不要です。ツールは読み取り専用で、エージェントはリポジトリの作成やジョブの実行はできません。",

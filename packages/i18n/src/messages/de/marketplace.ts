@@ -409,6 +409,14 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Welche Trello-Karten sind mir zugewiesen?",
   "marketplace.plugin.trello.prompt.board": "Fasse zusammen, was auf meinem Trello-Board gerade in Arbeit ist.",
   "marketplace.plugin.trello.prompt.newCards": "Füge diese To-dos als Karten zu meinem Trello-Board hinzu.",
+  "marketplace.plugin.ninebot.tagline": "WhatsApp-Gruppen und -Kanäle",
+  "marketplace.plugin.ninebot.description":
+    "Mit 9bot arbeiten Agenten mit den WhatsApp-Gruppen, Ankündigungsgruppen und Kanälen, die mit dem 9bot-Konto des Nutzers verbunden sind. Agenten können Gruppen, Mitglieder, Administratoren und Einstellungen abfragen, Berichte zu Aktivität und Engagement erstellen, Nachrichten senden und planen, Workflows anlegen und Moderationsfunktionen wie Strikes und Positivlisten nutzen. 9bot ist ein kostenpflichtiger Dienst mit einer 7-tägigen Testphase. Der Nutzer aktiviert MCP im 9bot-Dashboard, legt eine Anwendung mit Lesezugriff oder vollem Zugriff an, beschränkt sie auf ausgewählte Gruppen und meldet sich im Browser an. 9bot ist ein unabhängiges Unternehmen und nicht mit Meta oder WhatsApp verbunden.",
+  "marketplace.plugin.ninebot.app":
+    "WhatsApp-Gruppen und -Kanäle über den MCP-Server von 9bot mit Anmeldung im Browser.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Welche meiner WhatsApp-Gruppen sind diese Woche am aktivsten?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Liste meine Ankündigungsgruppen und Kanäle auf.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Erstelle einen wöchentlichen Engagement-Bericht für diese Gruppe.",
   "marketplace.plugin.huggingface.tagline": "Modelle, Datensätze und Paper auf dem Hub",
   "marketplace.plugin.huggingface.description":
     "Mit Hugging Face durchsuchen Agenten Modelle, Datensätze, Spaces, Collections und Paper auf dem Hugging Face Hub, lesen Model Cards und Repository-Dateien, zeigen eine Vorschau von Datensätzen und durchsuchen die Hugging-Face-Dokumentation. Es verwendet öffentliche Hub-Daten und braucht kein Konto und keinen Schlüssel. Die Tools lesen nur: Agenten können keine Repositorys anlegen und keine Jobs ausführen.",

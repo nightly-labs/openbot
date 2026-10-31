@@ -407,6 +407,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Какие карточки в Trello назначены мне?",
   "marketplace.plugin.trello.prompt.board": "Кратко опиши, что сейчас в работе на моей доске Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Добавь эти пункты как карточки на мою доску Trello.",
+  "marketplace.plugin.ninebot.tagline": "Группы и каналы WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "9bot позволяет агентам работать с группами, группами объявлений и каналами WhatsApp, подключёнными к аккаунту 9bot пользователя. Агенты могут просматривать группы, участников, администраторов и настройки, создавать отчёты об активности и вовлечённости, отправлять и планировать сообщения, создавать Workflows и использовать функции модерации, например предупреждения и списки разрешённых. 9bot является платным сервисом с пробным периодом 7 дней. Пользователь включает MCP в панели 9bot, создаёт приложение с доступом только для чтения или полным доступом, ограничивает его выбранными группами и входит через браузер. 9bot является независимой компанией и не связан с Meta или WhatsApp.",
+  "marketplace.plugin.ninebot.app": "Группы и каналы WhatsApp через MCP-сервер 9bot со входом в браузере.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Какие из моих групп WhatsApp самые активные на этой неделе?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Покажи мои группы объявлений и каналы.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Создай еженедельный отчёт о вовлечённости для этой группы.",
   "marketplace.plugin.huggingface.tagline": "Модели, датасеты и статьи на Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face позволяет агентам искать модели, датасеты, Spaces, коллекции и статьи на Hugging Face Hub, читать карточки моделей и файлы репозиториев, просматривать датасеты и искать по документации Hugging Face. Он использует публичные данные Hub и не требует аккаунта и ключа. Инструменты только читают данные: агенты не могут создавать репозитории или запускать задачи.",

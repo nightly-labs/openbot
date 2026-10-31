@@ -398,6 +398,13 @@ export const messages = {
   "marketplace.plugin.trello.prompt.myCards": "Quali schede di Trello sono assegnate a me?",
   "marketplace.plugin.trello.prompt.board": "Riassumi cosa è in corso sulla mia bacheca Trello.",
   "marketplace.plugin.trello.prompt.newCards": "Aggiungi queste azioni come schede alla mia bacheca Trello.",
+  "marketplace.plugin.ninebot.tagline": "Gruppi e canali WhatsApp",
+  "marketplace.plugin.ninebot.description":
+    "9bot permette agli agenti di lavorare con i gruppi, i gruppi di annunci e i canali WhatsApp collegati all’account 9bot dell’utente. Gli agenti possono consultare gruppi, membri, amministratori e impostazioni, generare report su attività e coinvolgimento, inviare e programmare messaggi, creare Workflow e usare funzioni di moderazione come strike e liste di elementi consentiti. 9bot è un servizio a pagamento con una prova di 7 giorni. L’utente attiva MCP nel Dashboard di 9bot, crea un’applicazione con accesso in sola lettura o completo, la limita ai gruppi scelti e accede dal browser. 9bot è un’azienda indipendente e non è affiliata a Meta o WhatsApp.",
+  "marketplace.plugin.ninebot.app": "Gruppi e canali WhatsApp, tramite il server MCP di 9bot con accesso dal browser.",
+  "marketplace.plugin.ninebot.prompt.activeGroups": "Quali dei miei gruppi WhatsApp sono più attivi questa settimana?",
+  "marketplace.plugin.ninebot.prompt.listChannels": "Elenca i miei gruppi di annunci e canali.",
+  "marketplace.plugin.ninebot.prompt.weeklyReport": "Crea un report settimanale sul coinvolgimento di questo gruppo.",
   "marketplace.plugin.huggingface.tagline": "Modelli, dataset e paper sull'Hub",
   "marketplace.plugin.huggingface.description":
     "Hugging Face permette agli agenti di cercare modelli, dataset, Spaces, collezioni e paper sull'Hugging Face Hub, leggere model card e file dei repository, vedere un'anteprima dei dataset e cercare nella documentazione di Hugging Face. Usa dati pubblici dell'Hub e non richiede account né chiave. Gli strumenti leggono soltanto: gli agenti non possono creare repository né eseguire job.",
