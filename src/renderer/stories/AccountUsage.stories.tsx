@@ -58,6 +58,12 @@ const mixedRows = accountUsageProviderRows({
       primary: { usedPercent: 37, windowDurationMins: 43_200, resetsAt: monthlyReset },
       secondary: { usedPercent: 82, windowDurationMins: 43_200, resetsAt: monthlyReset },
     },
+    {
+      id: "opencode",
+      primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: fiveHourReset },
+      secondary: { usedPercent: 58, windowDurationMins: 43_200, resetsAt: monthlyReset },
+      tertiary: { usedPercent: 31, windowDurationMins: 10_080, resetsAt: weeklyReset },
+    },
   ],
 });
 

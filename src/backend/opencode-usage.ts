@@ -155,9 +155,9 @@ const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: 
 const UsageWindow = Schema.Struct({ percent: Schema.Finite, resetsAt: Schema.NullOr(Schema.String) });
 
 /**
- * The account usage contract holds two windows, so the monthly and weekly readings share the second
- * one: whichever is closer to its limit, since that is the one that stops a turn first. When both
- * are spent, the one that resets later, since turns stay stopped until then.
+ * The second window of the reading is the weekly or the monthly one, whichever is closer to its
+ * limit, since that is the one that stops a turn first. When both are spent, the one that resets
+ * later, since turns stay stopped until then. The other one goes to `tertiary` for the usage list.
  */
 function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usage = getRecord(value, "usage");
@@ -166,8 +166,10 @@ function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const monthly = usageWindow(getRecord(usage, "monthly"), MONTHLY_WINDOW_MINS);
   const secondary = weekly && monthly ? bindingWindow(weekly, monthly) : (weekly ?? monthly);
   if (!rolling && !secondary) return NO_USAGE;
+  const tertiary = weekly && monthly ? (secondary === weekly ? monthly : weekly) : undefined;
   return {
     rateLimits: { limitId: "opencode", primary: rolling, secondary },
+    ...(tertiary ? { tertiary } : {}),
     rateLimitsByLimitId: null,
   };
 }
