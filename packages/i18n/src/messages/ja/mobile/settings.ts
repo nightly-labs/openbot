@@ -148,6 +148,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "このサーバーの全員に対してオフ",
   "mobile.settings.notifications.turnOn": "オンにする",
   "mobile.settings.notifications.turnOnFor": "このサーバーの全員に対して {name} の通知をオンにする",
+  "mobile.settings.notifications.chooseAgent": "エージェントごとに選ぶ",
+  "mobile.settings.notifications.chooseAnotherAgent": "別のエージェントを選ぶ",
   "mobile.settings.notifications.levelsFooter":
     "エージェントのレベルをもう一度タップすると、サーバーの設定に従います。",
   "mobile.settings.notifications.agentsUnsupported":

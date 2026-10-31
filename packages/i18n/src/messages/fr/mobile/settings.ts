@@ -149,6 +149,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Désactivé pour tous sur ce serveur",
   "mobile.settings.notifications.turnOn": "Activer",
   "mobile.settings.notifications.turnOnFor": "Activer les notifications de {name} pour tous sur ce serveur",
+  "mobile.settings.notifications.chooseAgent": "Choisir pour un agent",
+  "mobile.settings.notifications.chooseAnotherAgent": "Choisir un autre agent",
   "mobile.settings.notifications.levelsFooter": "Touchez à nouveau le niveau d’un agent pour qu’il suive le serveur.",
   "mobile.settings.notifications.agentsUnsupported": "Mettez à jour OpenBot sur ce serveur pour choisir des agents.",
   "mobile.settings.notifications.agentsOffline": "Les agents s’affichent quand ce serveur est en ligne.",

@@ -146,6 +146,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Uit voor iedereen op deze server",
   "mobile.settings.notifications.turnOn": "Inschakelen",
   "mobile.settings.notifications.turnOnFor": "Meldingen van {name} inschakelen voor iedereen op deze server",
+  "mobile.settings.notifications.chooseAgent": "Kies voor één agent",
+  "mobile.settings.notifications.chooseAnotherAgent": "Kies een andere agent",
   "mobile.settings.notifications.levelsFooter": "Tik nog eens op het niveau van een agent om de server te volgen.",
   "mobile.settings.notifications.agentsUnsupported": "Werk OpenBot bij op deze server om agents te kiezen.",
   "mobile.settings.notifications.agentsOffline": "Agents verschijnen als deze server online is.",
