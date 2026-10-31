@@ -36,4 +36,23 @@ export const messages = {
   "error.workflow.tooLargeToSend":
     "Questo workflow è troppo grande per essere inviato a un altro computer. Aprilo sul computer che esegue il server.",
   "error.workflow.webhookMissing": "Questo passaggio non è un trigger webhook. Salva il workflow, poi riprova.",
+  "error.workflow.githubActionMissing": "Scegli cosa fa questo output su GitHub.",
+  "error.workflow.githubRepositoryMissing": "Scegli un repository per questo output.",
+  "error.workflow.githubItemMissing":
+    "Questo output non ha issue o pull request. Avvia l'esecuzione da un evento GitHub o inserisci il numero nel suo input.",
+  "error.workflow.githubPullRequestOnly": "Questa azione funziona solo sulle pull request.",
+  "error.workflow.githubTextMissing": "Questo output non ha testo da inviare. Collega un passaggio che lo scriva.",
+  "error.workflow.githubChoiceMissing": "Scegli le etichette o la persona per questo output.",
+  "error.workflow.githubChoseNothing": "Il modello non ha scelto nessuna etichetta o persona di questo repository.",
+  "error.workflow.githubNotConnected": "Collega GitHub sul computer che esegue questo workflow.",
+  "error.workflow.githubNoAccess":
+    "La GitHub App di OpenBot non vede questo repository o elemento. Apri GitHub e concedile l'accesso.",
+  "error.workflow.githubNoWrite":
+    "La GitHub App di OpenBot non può modificare questo repository. Apri GitHub e concedile l'accesso.",
+  "error.workflow.githubLocked": "Questa conversazione è bloccata su GitHub.",
+  "error.workflow.githubRefused": "GitHub ha rifiutato la modifica: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot non è riuscito a raggiungere GitHub. Esegui di nuovo il passaggio.",
+  "error.workflow.githubUncertain":
+    "La modifica si è fermata a metà. Può essere già su GitHub. Controlla lì prima di eseguire di nuovo il passaggio.",
+  "error.workflow.githubNoEvent": "Su GitHub non c'è una issue o pull request da cui parte questo trigger.",
 } as const satisfies PartialTranslation<typeof source>;

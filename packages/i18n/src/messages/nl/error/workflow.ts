@@ -37,4 +37,24 @@ export const messages = {
   "error.workflow.tooLargeToSend":
     "Deze workflow is te groot om naar een andere computer te sturen. Open hem op de computer waarop de server draait.",
   "error.workflow.webhookMissing": "Deze stap is geen webhooktrigger. Sla de workflow op en probeer het opnieuw.",
+  "error.workflow.githubActionMissing": "Kies wat deze uitvoer op GitHub doet.",
+  "error.workflow.githubRepositoryMissing": "Kies een repository voor deze uitvoer.",
+  "error.workflow.githubItemMissing":
+    "Deze uitvoer heeft geen issue of pull request. Start de run vanuit een GitHub-event of zet het nummer in de invoer.",
+  "error.workflow.githubPullRequestOnly": "Deze actie werkt alleen bij pull requests.",
+  "error.workflow.githubTextMissing":
+    "Deze uitvoer heeft geen tekst om te sturen. Verbind een stap die de tekst schrijft.",
+  "error.workflow.githubChoiceMissing": "Kies de labels of de persoon voor deze uitvoer.",
+  "error.workflow.githubChoseNothing": "Het model koos geen label of persoon van deze repository.",
+  "error.workflow.githubNotConnected": "Verbind GitHub op de computer waarop deze workflow draait.",
+  "error.workflow.githubNoAccess":
+    "De OpenBot GitHub App kan deze repository of dit item niet zien. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoWrite":
+    "De OpenBot GitHub App kan deze repository niet wijzigen. Open GitHub en geef de app toegang.",
+  "error.workflow.githubLocked": "Dit gesprek is vergrendeld op GitHub.",
+  "error.workflow.githubRefused": "GitHub heeft de wijziging geweigerd: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot kon GitHub niet bereiken. Voer de stap opnieuw uit.",
+  "error.workflow.githubUncertain":
+    "De wijziging is onderweg gestopt. Hij kan al op GitHub staan. Kijk daar voordat je de stap opnieuw uitvoert.",
+  "error.workflow.githubNoEvent": "GitHub heeft geen issue of pull request waarop deze trigger start.",
 } as const satisfies PartialTranslation<typeof source>;

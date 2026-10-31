@@ -35,4 +35,23 @@ export const messages = {
   "error.workflow.tooLargeToSend":
     "이 워크플로는 너무 커서 다른 컴퓨터로 보낼 수 없어요. 서버를 실행하는 컴퓨터에서 여세요.",
   "error.workflow.webhookMissing": "이 단계는 웹훅 트리거가 아니에요. 워크플로를 저장한 후 다시 시도해 주세요.",
+  "error.workflow.githubActionMissing": "이 출력이 GitHub에서 할 동작을 선택하세요.",
+  "error.workflow.githubRepositoryMissing": "이 출력의 저장소를 선택하세요.",
+  "error.workflow.githubItemMissing":
+    "이 출력에는 이슈나 풀 리퀘스트가 없어요. GitHub 이벤트에서 실행을 시작하거나 입력에 번호를 넣으세요.",
+  "error.workflow.githubPullRequestOnly": "이 동작은 풀 리퀘스트에서만 작동해요.",
+  "error.workflow.githubTextMissing": "이 출력에는 보낼 텍스트가 없어요. 텍스트를 작성하는 단계를 연결하세요.",
+  "error.workflow.githubChoiceMissing": "이 출력의 레이블 또는 사용자를 선택하세요.",
+  "error.workflow.githubChoseNothing": "모델이 이 저장소의 레이블이나 사용자를 하나도 선택하지 않았어요.",
+  "error.workflow.githubNotConnected": "이 워크플로를 실행하는 컴퓨터에서 GitHub를 연결하세요.",
+  "error.workflow.githubNoAccess":
+    "OpenBot GitHub App이 이 저장소나 항목을 볼 수 없어요. GitHub를 열고 액세스 권한을 주세요.",
+  "error.workflow.githubNoWrite":
+    "OpenBot GitHub App이 이 저장소를 변경할 수 없어요. GitHub를 열고 액세스 권한을 주세요.",
+  "error.workflow.githubLocked": "이 대화는 GitHub에서 잠겨 있어요.",
+  "error.workflow.githubRefused": "GitHub가 변경을 거부했어요: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot이 GitHub에 연결하지 못했어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.githubUncertain":
+    "변경이 도중에 멈췄어요. GitHub에 이미 반영됐을 수 있어요. 단계를 다시 실행하기 전에 GitHub를 확인하세요.",
+  "error.workflow.githubNoEvent": "이 트리거가 시작할 이슈나 풀 리퀘스트가 GitHub에 없어요.",
 } as const satisfies PartialTranslation<typeof source>;

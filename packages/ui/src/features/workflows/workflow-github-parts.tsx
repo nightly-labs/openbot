@@ -19,7 +19,7 @@ import {
   type WorkflowGitHubSkipReason,
   workflowGitHubEventItemKind,
 } from "@openbot/contracts/ipc";
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   AtSign,
   Bot,
@@ -97,9 +97,37 @@ const ACTION_ICONS: Record<WorkflowGitHubAction, () => JSX.Element> = {
   "issue.create": () => <CirclePlus aria-hidden="true" />,
 };
 
+const EVENT_LABEL = {
+  "issue.opened": "workflow.github.event.issue.opened",
+  "issue.closed": "workflow.github.event.issue.closed",
+  "issue.labeled": "workflow.github.event.issue.labeled",
+  "pr.opened": "workflow.github.event.pr.opened",
+  "pr.updated": "workflow.github.event.pr.updated",
+  "pr.reviewRequested": "workflow.github.event.pr.reviewRequested",
+  "pr.reviewSubmitted": "workflow.github.event.pr.reviewSubmitted",
+  "pr.checksFailed": "workflow.github.event.pr.checksFailed",
+  "pr.merged": "workflow.github.event.pr.merged",
+  comment: "workflow.github.event.comment",
+  mention: "workflow.github.event.mention",
+  assigned: "workflow.github.event.assigned",
+} as const satisfies Record<WorkflowGitHubEvent, AppTextKey>;
+
+const ACTION_LABEL = {
+  comment: "workflow.github.action.comment",
+  "label.add": "workflow.github.action.label.add",
+  "label.remove": "workflow.github.action.label.remove",
+  assign: "workflow.github.action.assign",
+  "review.request": "workflow.github.action.review.request",
+  "review.approve": "workflow.github.action.review.approve",
+  "review.changes": "workflow.github.action.review.changes",
+  close: "workflow.github.action.close",
+  reopen: "workflow.github.action.reopen",
+  "issue.create": "workflow.github.action.issue.create",
+} as const satisfies Record<WorkflowGitHubAction, AppTextKey>;
+
 const eventChoice = (t: AppTranslate, event: WorkflowGitHubEvent): Choice<WorkflowGitHubEvent> => ({
   value: event,
-  label: t(`workflow.github.event.${event}`),
+  label: t(EVENT_LABEL[event]),
   icon: EVENT_ICONS[event],
 });
 
@@ -686,7 +714,7 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   const fields = useGitHubOutput(() => props.id);
   const repositoryChoices = useRepositoryChoices();
   const options = useRepositoryOptions(fields.target);
-  const actionLabel = (action: WorkflowGitHubAction) => t(`workflow.github.action.${action}`);
+  const actionLabel = (action: WorkflowGitHubAction) => t(ACTION_LABEL[action]);
   const isLabels = () => fields.action() === "label.add" || fields.action() === "label.remove" || fields.creates();
   const isPerson = () => fields.action() === "assign" || fields.action() === "review.request";
   /** The reason "not planned" exists only on issues. */

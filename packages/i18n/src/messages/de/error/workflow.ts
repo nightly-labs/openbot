@@ -38,4 +38,24 @@ export const messages = {
     "Dieser Workflow ist zu groß, um ihn an einen anderen Computer zu senden. Öffne ihn auf dem Computer, auf dem der Server läuft.",
   "error.workflow.webhookMissing":
     "Dieser Schritt ist kein Webhook-Auslöser. Speichere den Workflow und versuche es erneut.",
+  "error.workflow.githubActionMissing": "Wähle, was diese Ausgabe auf GitHub tut.",
+  "error.workflow.githubRepositoryMissing": "Wähle ein Repository für diese Ausgabe.",
+  "error.workflow.githubItemMissing":
+    "Diese Ausgabe hat kein Issue und keinen Pull Request. Starte den Lauf über ein GitHub-Ereignis oder gib die Nummer in ihre Eingabe.",
+  "error.workflow.githubPullRequestOnly": "Diese Aktion funktioniert nur bei Pull Requests.",
+  "error.workflow.githubTextMissing":
+    "Diese Ausgabe hat keinen Text zum Senden. Verbinde einen Schritt, der ihn schreibt.",
+  "error.workflow.githubChoiceMissing": "Wähle die Labels oder die Person für diese Ausgabe.",
+  "error.workflow.githubChoseNothing": "Das Modell hat kein Label und keine Person dieses Repositorys gewählt.",
+  "error.workflow.githubNotConnected": "Verbinde GitHub auf dem Computer, auf dem dieser Workflow läuft.",
+  "error.workflow.githubNoAccess":
+    "Die OpenBot-GitHub-App kann dieses Repository oder Element nicht sehen. Öffne GitHub und gib ihr Zugriff.",
+  "error.workflow.githubNoWrite":
+    "Die OpenBot-GitHub-App kann dieses Repository nicht ändern. Öffne GitHub und gib ihr Zugriff.",
+  "error.workflow.githubLocked": "Diese Unterhaltung ist auf GitHub gesperrt.",
+  "error.workflow.githubRefused": "GitHub hat die Änderung abgelehnt: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot konnte GitHub nicht erreichen. Führe den Schritt erneut aus.",
+  "error.workflow.githubUncertain":
+    "Die Änderung wurde unterwegs unterbrochen. Sie kann schon auf GitHub sein. Sieh dort nach, bevor du den Schritt erneut ausführst.",
+  "error.workflow.githubNoEvent": "GitHub hat kein Issue und keinen Pull Request, bei dem dieser Auslöser startet.",
 } as const satisfies PartialTranslation<typeof source>;

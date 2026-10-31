@@ -39,4 +39,24 @@ export const messages = {
     "このワークフローは大きすぎるため、別のコンピューターに送信できません。サーバーを実行しているコンピューターで開いてください。",
   "error.workflow.webhookMissing":
     "このステップは Webhook トリガーではありません。ワークフローを保存してから、もう一度お試しください。",
+  "error.workflow.githubActionMissing": "この出力が GitHub で行う操作を選択してください。",
+  "error.workflow.githubRepositoryMissing": "この出力のリポジトリを選択してください。",
+  "error.workflow.githubItemMissing":
+    "この出力には Issue もプルリクエストもありません。GitHub イベントから実行を開始するか、入力に番号を入れてください。",
+  "error.workflow.githubPullRequestOnly": "この操作はプルリクエストでのみ使えます。",
+  "error.workflow.githubTextMissing":
+    "この出力には送信するテキストがありません。テキストを書くステップを接続してください。",
+  "error.workflow.githubChoiceMissing": "この出力のラベルまたはユーザーを選択してください。",
+  "error.workflow.githubChoseNothing": "モデルはこのリポジトリのラベルもユーザーも選択しませんでした。",
+  "error.workflow.githubNotConnected": "このワークフローを実行するコンピューターで GitHub に接続してください。",
+  "error.workflow.githubNoAccess":
+    "OpenBot GitHub App はこのリポジトリまたは項目を参照できません。GitHub を開いてアクセスを許可してください。",
+  "error.workflow.githubNoWrite":
+    "OpenBot GitHub App はこのリポジトリを変更できません。GitHub を開いてアクセスを許可してください。",
+  "error.workflow.githubLocked": "この会話は GitHub でロックされています。",
+  "error.workflow.githubRefused": "GitHub が変更を拒否しました: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot は GitHub に接続できませんでした。ステップをもう一度実行してください。",
+  "error.workflow.githubUncertain":
+    "変更が途中で止まりました。GitHub にすでに反映されている可能性があります。ステップを再実行する前に GitHub を確認してください。",
+  "error.workflow.githubNoEvent": "このトリガーが開始する Issue またはプルリクエストが GitHub にありません。",
 } as const satisfies PartialTranslation<typeof source>;

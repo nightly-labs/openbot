@@ -37,4 +37,23 @@ export const messages = {
     "Bu iş akışı başka bir bilgisayara gönderilemeyecek kadar büyük. Sunucuyu çalıştıran bilgisayarda açın.",
   "error.workflow.webhookMissing":
     "Bu adım bir webhook tetikleyicisi değil. İş akışını kaydedin, sonra yeniden deneyin.",
+  "error.workflow.githubActionMissing": "Bu çıktının GitHub'da ne yapacağını seçin.",
+  "error.workflow.githubRepositoryMissing": "Bu çıktı için bir depo seçin.",
+  "error.workflow.githubItemMissing":
+    "Bu çıktının bir sorunu veya çekme isteği yok. Çalıştırmayı bir GitHub olayından başlatın ya da numarayı girdisine yazın.",
+  "error.workflow.githubPullRequestOnly": "Bu eylem yalnızca çekme isteklerinde çalışır.",
+  "error.workflow.githubTextMissing": "Bu çıktının gönderecek metni yok. Metni yazan bir adım bağlayın.",
+  "error.workflow.githubChoiceMissing": "Bu çıktı için etiketleri veya kişiyi seçin.",
+  "error.workflow.githubChoseNothing": "Model bu depodan hiçbir etiket veya kişi seçmedi.",
+  "error.workflow.githubNotConnected": "Bu iş akışını çalıştıran bilgisayarda GitHub'ı bağlayın.",
+  "error.workflow.githubNoAccess":
+    "OpenBot GitHub Uygulaması bu depoyu veya öğeyi göremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubNoWrite":
+    "OpenBot GitHub Uygulaması bu depoyu değiştiremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubLocked": "Bu konuşma GitHub'da kilitli.",
+  "error.workflow.githubRefused": "GitHub değişikliği reddetti: {detail}",
+  "error.workflow.githubUnreachable": "OpenBot GitHub'a ulaşamadı. Adımı yeniden çalıştırın.",
+  "error.workflow.githubUncertain":
+    "Değişiklik yolda durdu. GitHub'da olabilir. Adımı yeniden çalıştırmadan önce orayı kontrol edin.",
+  "error.workflow.githubNoEvent": "GitHub'da bu tetikleyicinin başladığı bir sorun veya çekme isteği yok.",
 } as const satisfies PartialTranslation<typeof source>;
