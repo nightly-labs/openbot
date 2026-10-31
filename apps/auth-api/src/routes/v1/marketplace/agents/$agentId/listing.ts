@@ -10,6 +10,7 @@ import {
 /**
  * The agent a shared link names. Unlike `GET /v1/marketplace/agents/:id`, which a released desktop
  * reads as "approved", it also returns an agent that waits for its first review, marked `pending`.
+ * Add uses this answer, so no cache keeps a pending agent after a rejection.
  */
 export const Route = createFileRoute("/v1/marketplace/agents/$agentId/listing")({
   server: {
@@ -17,7 +18,10 @@ export const Route = createFileRoute("/v1/marketplace/agents/$agentId/listing")(
       GET: ({ params }) =>
         runApiResponse(
           Effect.gen(function* () {
-            return publicMarketplaceJson(yield* requestAgentMarketplace().getListing(params.agentId));
+            const listing = yield* requestAgentMarketplace().getListing(params.agentId);
+            const response = publicMarketplaceJson(listing);
+            if (listing.pending) response.headers.set("Cache-Control", "private, no-store");
+            return response;
           }),
           marketplaceErrorResponse,
         ),
