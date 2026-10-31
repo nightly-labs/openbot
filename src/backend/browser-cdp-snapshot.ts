@@ -592,7 +592,7 @@ export const visibleTextObjectMatches = Effect.fn("Browser.visibleTextObjectMatc
   return yield* collectionElements(send, stringValue(recordValue(collection.result)?.objectId), capture.sessionId);
 });
 
-/** What tells the candidates of an ambiguous target apart, in the order of `backendNodeIds`. */
+/** What tells the candidates of an ambiguous target apart. */
 export interface TargetCandidateText {
   tag: string;
   /** The candidate's own visible text. */
@@ -603,7 +603,8 @@ export interface TargetCandidateText {
 
 /**
  * Reads the candidates of one frame together, because the item of a candidate is the part of the page
- * that no other candidate shares. The text is visible page text, which a snapshot also returns.
+ * that no other candidate shares. The text is visible page text, which a snapshot also returns. The
+ * result is in the order of `backendNodeIds`, with no entry for a node that could not be read.
  */
 export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandidates")(function* (
   send: SendCommand,
@@ -613,28 +614,45 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
   const executionContextId = yield* automationContextId(send, sessionId);
   const objectIds: string[] = [];
   return yield* Effect.gen(function* () {
+    // A node that cannot be resolved, such as one removed after the match, has no text. The others keep theirs.
     for (const backendNodeId of backendNodeIds) {
-      const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId);
+      const resolved = yield* send("DOM.resolveNode", { backendNodeId, executionContextId }, sessionId).pipe(
+        Effect.catch(() => Effect.succeed<CdpResult>({})),
+      );
       objectIds.push(stringValue(recordValue(resolved.object)?.objectId));
     }
-    const [first] = objectIds;
-    if (!first || objectIds.some((objectId) => !objectId)) return [];
+    const resolvedIds = objectIds.filter(Boolean);
+    const [first] = resolvedIds;
+    if (!first) return [];
     const result = yield* send(
       "Runtime.callFunctionOn",
       {
         objectId: first,
         functionDeclaration: String.raw`function(...nodes) {
           const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+          // innerText gives all of textContent for a node that is not rendered, so a hidden node gets no text.
+          const rendered = (element) =>
+            element.checkVisibility ? element.checkVisibility() : element.getClientRects().length > 0;
           return nodes.map((node) => {
-            const text = clean(node.innerText ?? node.textContent);
+            if (!rendered(node)) return { tag: node.localName, text: '', item: '' };
+            const text = clean(node.innerText);
             const own = clean(node.textContent);
             // Another element with the same tag and text, such as the next card's button, which a
-            // capped candidate list can leave out. Its item is not this candidate's item.
+            // capped candidate list can leave out. Its item is not this candidate's item. Each peer is
+            // compared once, and only when it has the same shape, so that large wrappers cost little.
+            const twins = new Map();
+            const isTwin = (peer) => {
+              let known = twins.get(peer);
+              if (known === undefined) {
+                known = peer !== node && peer.childElementCount === node.childElementCount && clean(peer.textContent) === own;
+                twins.set(peer, known);
+              }
+              return known;
+            };
             const holdsTwin = (parent) => {
               const peers = parent.getElementsByTagName(node.localName);
               for (let index = 0; index < peers.length && index < ${MAX_CANDIDATE_PEERS}; index++) {
-                const peer = peers[index];
-                if (peer !== node && clean(peer.textContent) === own) return true;
+                if (isTwin(peers[index])) return true;
               }
               return false;
             };
@@ -651,19 +669,21 @@ export const describeTargetCandidates = Effect.fn("Browser.describeTargetCandida
             return { tag: node.localName, text: text.slice(0, ${MAX_CANDIDATE_TEXT}), item: item.slice(0, ${MAX_CANDIDATE_ITEM_TEXT}) };
           });
         }`,
-        arguments: objectIds.map((objectId) => ({ objectId })),
+        arguments: resolvedIds.map((objectId) => ({ objectId })),
         returnByValue: true,
       },
       sessionId,
     );
     const values = recordValue(result.result)?.value;
-    return (Array.isArray(values) ? values.filter(isRecord) : []).map(
+    const described = (Array.isArray(values) ? values.filter(isRecord) : []).map(
       (value): TargetCandidateText => ({
         tag: stringValue(value.tag),
         text: stringValue(value.text),
         item: stringValue(value.item),
       }),
     );
+    let next = 0;
+    return objectIds.map((objectId) => (objectId ? described[next++] : undefined));
   }).pipe(
     Effect.ensuring(
       Effect.gen(function* () {

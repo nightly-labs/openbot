@@ -106,6 +106,13 @@ async function main(): Promise<void> {
         field.type = 'password';
         field.value = 'fixture-field-secret';
         card.append(hidden, field);
+        for (let index = 0; index < 2; index++) {
+          const note = document.createElement('div');
+          note.className = 'fixture-hidden-note';
+          note.style.display = 'none';
+          note.textContent = 'hidden-candidate-note';
+          document.body.append(note);
+        }
         return true;
       })()`,
       true,
@@ -135,8 +142,9 @@ async function main(): Promise<void> {
       assert(!message.includes("ref="), message);
       assert.match(message, /Take a fresh snapshot/u);
 
-      // Five of the six buttons are candidates. The item of a candidate stops before another
-      // "Register" button, so it does not take in the lesson that the capped list leaves out.
+      // Five of the six "Register" buttons are candidates: the selector leaves out the Boxing lesson in
+      // the Thursday column. The item of a candidate stops before another "Register" button, so the
+      // Thursday item does not take in that lesson.
       const buttons = refusal(
         await call("click", { tabId, target: { kind: "css", selector: `${SHARED_LAYOUT_SELECTOR} button` } }),
       );
@@ -154,6 +162,12 @@ async function main(): Promise<void> {
 
       assert(!message.includes("hidden-fixture-note"), "A candidate showed hidden text.");
       assert(!message.includes("fixture-field-secret"), "A candidate showed a field value.");
+      // innerText gives all of textContent for a node that is not rendered. A hidden match shows no text.
+      const hiddenMatches = refusal(
+        await call("click", { tabId, target: { kind: "css", selector: ".fixture-hidden-note" } }),
+      );
+      assert.equal(candidateLines(hiddenMatches).length, 2, hiddenMatches);
+      assert(!hiddenMatches.includes("hidden-candidate-note"), "A hidden candidate showed its text.");
       recordCases("candidate-text-hides-hidden-text-and-field-values");
     }
 
