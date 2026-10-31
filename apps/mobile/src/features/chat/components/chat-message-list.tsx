@@ -77,6 +77,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
+import { canReadAloud, stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -758,6 +759,7 @@ const MessageRow = memo(function MessageRow({
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
           onSelectText={selectable ? () => actions.selectText(message) : undefined}
           selecting={selecting}
+          readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
         />
       ) : null}
     </View>
@@ -965,6 +967,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     [messages, messageAliases, referenceMessages],
   );
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  // A message that reads aloud stops when its chat closes.
+  useEffect(() => stopReadAloud, []);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {

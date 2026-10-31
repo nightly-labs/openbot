@@ -51,6 +51,8 @@ type ReplyHandlers = {
   onPart: (text: string) => void;
   onDone: () => void;
   onError: (failure: ReplyVoiceFailure) => void;
+  /** A newer reading started and stopped this one, such as a voice conversation or another message. */
+  onReplaced?: () => void;
 };
 
 /** The chosen voice can read now: Supertonic 3 is downloaded, or ElevenLabs has a key and a voice. */
@@ -92,6 +94,8 @@ function elevenLabsFailure(code: ElevenLabsError["code"]): ReplyVoiceFailure {
 }
 
 let nextReading = 0;
+/** Ends the reading that plays now, when a newer one starts. */
+let replaceActive: (() => void) | null = null;
 
 /** Reads a whole Markdown reply aloud, as `streamReply` does with a reply that is complete. */
 export function readReply(markdown: string, handlers: ReplyHandlers, choice?: ReplyVoiceChoice): ReplyReading {
@@ -124,9 +128,13 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     const [owner, index] = id.split(":");
     return owner === String(reading) ? Number(index) : -1;
   };
+  const release = () => {
+    if (replaceActive === replace) replaceActive = null;
+  };
   const end = (failure?: ReplyVoiceFailure) => {
     if (ended) return;
     ended = true;
+    release();
     listeners.delete(listener);
     abort.abort();
     wake?.();
@@ -153,10 +161,21 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const stop = () => {
     if (ended) return;
     ended = true;
+    release();
     listeners.delete(listener);
     abort.abort();
     wake?.();
     native?.stop();
+  };
+  /** The newer reading stopped the playback already. */
+  const replace = () => {
+    if (ended) return;
+    ended = true;
+    replaceActive = null;
+    listeners.delete(listener);
+    abort.abort();
+    wake?.();
+    handlers.onReplaced?.();
   };
   const settings = useVoiceSettings.getState();
   const engine = choice?.engine ?? settings.engine;
@@ -169,6 +188,8 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     return { stop, update: () => undefined };
   }
   native.stop();
+  replaceActive?.();
+  replaceActive = replace;
   listeners.add(listener);
 
   /** The next part to play; null when the reply is complete and every part is out. */
