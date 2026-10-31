@@ -60,7 +60,7 @@ function splitMemory(text: string): { title: string; body: string } {
   // A label colon has a space after it, so a time such as "7:00" stays in the sentence.
   const label = /^([^:.!?\n]{2,40}?):\s+(.+)$/s.exec(text);
   if (label?.[1] && label[2]) {
-    return { title: label[1], body: label[2].charAt(0).toUpperCase() + label[2].slice(1) };
+    return { title: label[1], body: label[2] };
   }
   const sentence = /^([^\n]{8,100}?[.!?])\s+(.+)$/s.exec(text);
   if (sentence?.[1] && sentence[2]) return { title: sentence[1], body: sentence[2] };
@@ -105,7 +105,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   const title = () => {
     const memory = current();
     if (!memory) return t("memory.title");
-    // A memory with no label and one sentence has no short title. The page shows its text once, below.
+    // A memory with no label and one sentence has no short title: the title would repeat the text below.
     const { title, body } = splitMemory(memory.text);
     return body ? title : t("memory.single");
   };
@@ -291,7 +291,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                   when={editing()}
                   fallback={
                     <div class="agent-memories-reading">
-                      <p class="agent-memories-text">{splitMemory(memory().text).body || memory().text}</p>
+                      <p class="agent-memories-text">{memory().text}</p>
                       <p class="agent-memories-meta">
                         {memory().origin === "automatic" ? t("memory.learned") : t("memory.manual")}
                         {" · "}

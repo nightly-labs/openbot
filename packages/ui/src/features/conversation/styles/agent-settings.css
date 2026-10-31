@@ -761,6 +761,14 @@
   flex-direction: column;
 }
 
+/* A memory title is up to 100 characters; the header has the height of one line. */
+.agent-memories-view .settings-panel-header h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-memories-page {
   display: grid;
   width: min(100%, 680px);
