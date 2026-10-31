@@ -186,8 +186,8 @@ try {
     calls.push(entry);
     return entry;
   };
-  /** suggest_marketplace_app for an app whose server is saved, as the router answers it. */
-  const appStatus = async (name: string, app: MarketplaceAppServer) => {
+  /** suggest_marketplace_app for an app whose server is saved, after the router finds that server. */
+  const appStatus = async (name: string, appId: string, app: MarketplaceAppServer) => {
     const signInCards: string[] = [];
     const response = await runCauseEffect(
       marketplaceAppStatus(tools, app, (config) =>
@@ -200,7 +200,7 @@ try {
     const entry: Call = {
       name,
       tool: "suggest_marketplace_app",
-      arguments: { server: app.config.name },
+      arguments: { app: appId },
       approved: true,
       success: response.success,
       result: JSON.parse(text),
@@ -318,24 +318,30 @@ try {
   const setupSteps = ["Open the desktop app.", "Turn on its MCP server."];
   const disabledApp = row("docs");
   assert.ok(disabledApp);
-  const disabled = await appStatus("an installed app that is off", { config: disabledApp, setupSteps: [] });
+  const disabled = await appStatus("an installed app that is off", "notion", { config: disabledApp, setupSteps: [] });
   assert.equal(disabled.result.status, "disabled");
   assert.equal(disabled.signInCards.length, 0);
 
   const calendar = row("calendar");
   assert.ok(calendar);
-  const appSignIn = await appStatus("an installed app that needs a sign-in", { config: calendar, setupSteps: [] });
+  const appSignIn = await appStatus("an installed app that needs a sign-in", "atlassian", {
+    config: calendar,
+    setupSteps: [],
+  });
   assert.equal(appSignIn.result.status, "needs_sign_in");
   assert.deepEqual(appSignIn.signInCards, [calendar.id]);
 
   const localApp = store.save({ ...calendar, id: "", name: "figma-desktop", url: await closedUrl() });
-  const notRunning = await appStatus("an installed local app that is not running", { config: localApp, setupSteps });
+  const notRunning = await appStatus("an installed local app that is not running", "figma", {
+    config: localApp,
+    setupSteps,
+  });
   assert.equal(notRunning.result.status, "not_running");
   assert.deepEqual(notRunning.result.setupSteps, setupSteps);
   assert.equal(notRunning.signInCards.length, 0);
 
   const readyApp = store.save({ ...calendar, id: "", name: "wiki", url: servers.open.url });
-  const ready = await appStatus("an installed app that answers", { config: readyApp, setupSteps });
+  const ready = await appStatus("an installed app that answers", "linear", { config: readyApp, setupSteps });
   assert.equal(ready.result.status, "ready");
   assert.deepEqual(ready.result.tools, ["search", "read_page", "create_page"]);
   assert.equal(ready.result.setupSteps, undefined);

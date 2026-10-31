@@ -186,10 +186,11 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
     return openBotToolResult({
       status: "ready",
       server,
+      toolCount: outcome.toolCount,
       tools: outcome.tools,
-      next: "The app answers. Its tools reach you from your next turn: ask the user to send the request again.",
+      next: "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.",
     });
-  if (outcome.error !== null && outcome.needs === null && setupSteps.length > 0)
+  if (outcome.needs === null && setupSteps.length > 0)
     return openBotToolResult({
       status: "not_running",
       server,

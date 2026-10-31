@@ -282,13 +282,13 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
-/** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 /** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
 export const MARKETPLACE_APP_IDS: readonly string[] = [
   ...pluginCatalog.plugins.map((plugin) => plugin.slug),
   ...CONNECTOR_IDS,
 ];
 
+/** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
   ...MESSAGING_TOOL_DEFINITIONS,
