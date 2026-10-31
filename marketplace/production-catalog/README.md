@@ -41,7 +41,7 @@ After a version has been seeded or published, increase `catalogVersion` before c
 
 ## Retiring an Agent
 
-Move the slug from `agents` to `retired.agents` in `catalog.json` and increase `catalogVersion`. The build fails when a slug is in both lists. The publisher sets the listing's approved version to none and clears Featured, so Marketplace no longer shows it and offers no update for it. Its versions and bundles stay, and installed copies keep working as local Agents. To list the slug again, move it back to `agents`; the next publication approves its new version.
+Move the slug from `agents` to `retired.agents` in `catalog.json` and increase `catalogVersion`. The build fails when a slug is in both lists. The publisher sets the listing's approved version to none and clears Featured, so Marketplace no longer shows it and offers no update for it. Its versions and bundles stay, and installed copies keep working as local Agents. To list the slug again, move it back to `agents`; the next publication approves its new version. The publisher sets Featured only when it creates a listing, so set Featured again with `PATCH /v1/marketplace/agents/admin/featured/<id>`.
 
 v4 retires `product-design-lead`, `communications-partner`, `meeting-assistant`, `account-research-partner`, `outreach-writer` and `operations-planner`. Their jobs moved to Design Critic and Prototype Builder, Copy Editor, Chief of Staff, Prospect Researcher, and Ops Digest. The other v3 Agents keep their slugs with a new name, so their installs get the normal update offer.
 
