@@ -320,6 +320,27 @@ export const messages = {
     "Permitir que los scripts del equipo host envíen mensajes, ejecuten rutinas, respondan preguntas y acepten o rechacen solicitudes de aprobación",
   "mobile.agent.host.failed": "No se pudo cambiar este ajuste.",
   "mobile.agent.host.unsupported": "Este host no puede cambiar estos ajustes desde un dispositivo remoto.",
+  "mobile.agent.backupModels.title": "Modelos de respaldo",
+  "mobile.agent.backupModels.valueAsk": "Preguntar primero",
+  "mobile.agent.backupModels.valueAutomatic": "Automático",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Cuando {model} alcanza su límite de uso antes de que {name} empiece a escribir, {name} te pregunta qué modelo usar.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Cuando {model} alcanza su límite de uso o falla con un error del proveedor antes de que {name} empiece a escribir, {name} cambia al primer modelo disponible del orden.",
+  "mobile.agent.backupModels.ask": "Preguntar antes de cambiar",
+  "mobile.agent.backupModels.order": "Orden",
+  "mobile.agent.backupModels.empty": "Sin orden definido. {name} ofrece cada modelo disponible.",
+  "mobile.agent.backupModels.add": "Añadir modelo de respaldo",
+  "mobile.agent.backupModels.search": "Buscar modelos",
+  "mobile.agent.backupModels.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "mobile.agent.backupModels.moveUp": "Subir {model}",
+  "mobile.agent.backupModels.moveDown": "Bajar {model}",
+  "mobile.agent.backupModels.remove": "Quitar {model}",
+  "mobile.agent.backupModels.unavailable": "No disponible ahora · omitido",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} nunca cambia después de empezar a escribir. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "mobile.agent.busyMessage.label": "Mientras trabaja",
   "mobile.agent.busyMessage.footer":
     "Qué ocurre con un mensaje que envías mientras el agente trabaja. En cola lo guarda hasta que termina el turno. Orientar se lo da al agente durante el turno.",

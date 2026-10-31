@@ -342,6 +342,32 @@ export const messages = {
     "Pozwól skryptom na hoście wysyłać wiadomości, uruchamiać rutyny, odpowiadać na pytania oraz akceptować lub odrzucać prośby o zatwierdzenie",
   "mobile.agent.host.failed": "Nie udało się zmienić tego ustawienia.",
   "mobile.agent.host.unsupported": "Ten host nie może zmieniać tych ustawień ze zdalnego urządzenia.",
+  "mobile.agent.backupModels.title": "Modele zapasowe",
+  "mobile.agent.backupModels.valueAsk": "Najpierw zapytaj",
+  "mobile.agent.backupModels.valueAutomatic": "Automatycznie",
+  "mobile.agent.backupModels.valueCount": {
+    one: "{mode} · {count}",
+    few: "{mode} · {count}",
+    many: "{mode} · {count}",
+    other: "{mode} · {count}",
+  },
+  "mobile.agent.backupModels.intro":
+    "Gdy {model} osiągnie limit użycia, zanim {name} zacznie pisać, {name} zapyta cię, którego modelu użyć.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Gdy {model} osiągnie limit użycia lub zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać, {name} przełączy się na pierwszy dostępny model w kolejności.",
+  "mobile.agent.backupModels.ask": "Pytaj przed przełączeniem",
+  "mobile.agent.backupModels.order": "Kolejność",
+  "mobile.agent.backupModels.empty": "Nie ustawiono kolejności. {name} proponuje każdy dostępny model.",
+  "mobile.agent.backupModels.add": "Dodaj model zapasowy",
+  "mobile.agent.backupModels.search": "Szukaj modeli",
+  "mobile.agent.backupModels.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.backupModels.moveUp": "Przesuń {model} w górę",
+  "mobile.agent.backupModels.moveDown": "Przesuń {model} w dół",
+  "mobile.agent.backupModels.remove": "Usuń {model}",
+  "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
   "mobile.agent.busyMessage.footer":
     "Co dzieje się z wiadomością wysłaną, gdy agent pracuje. Kolejka trzyma ją do końca tury. Pokieruj przekazuje ją agentowi w trakcie tury.",

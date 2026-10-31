@@ -315,6 +315,27 @@ export const messages = {
     "호스트의 스크립트가 메시지를 보내고, 루틴을 실행하고, 질문에 답하고, 승인을 수락하거나 거절하도록 허용해요",
   "mobile.agent.host.failed": "이 설정을 변경할 수 없어요.",
   "mobile.agent.host.unsupported": "이 호스트는 원격 기기에서 이 설정을 변경할 수 없어요.",
+  "mobile.agent.backupModels.title": "백업 모델",
+  "mobile.agent.backupModels.valueAsk": "먼저 묻기",
+  "mobile.agent.backupModels.valueAutomatic": "자동",
+  "mobile.agent.backupModels.valueCount": { other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하면, 어떤 모델을 사용할지 {name}이(가) 물어봐요.",
+  "mobile.agent.backupModels.introAutomatic":
+    "{name}이(가) 글을 쓰기 시작하기 전에 {model}의 사용 한도에 도달하거나 제공자 오류로 실패하면, {name}이(가) 순서상 사용 가능한 첫 번째 모델로 전환해요.",
+  "mobile.agent.backupModels.ask": "전환 전에 묻기",
+  "mobile.agent.backupModels.order": "순서",
+  "mobile.agent.backupModels.empty": "설정된 순서가 없어요. {name}이(가) 사용 가능한 모든 모델을 제안해요.",
+  "mobile.agent.backupModels.add": "백업 모델 추가",
+  "mobile.agent.backupModels.search": "모델 검색",
+  "mobile.agent.backupModels.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.backupModels.moveUp": "{model} 위로 이동",
+  "mobile.agent.backupModels.moveDown": "{model} 아래로 이동",
+  "mobile.agent.backupModels.remove": "{model} 삭제",
+  "mobile.agent.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name}은(는) 글을 쓰기 시작한 뒤에는 전환하지 않아요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "mobile.agent.busyMessage.label": "작업 중일 때",
   "mobile.agent.busyMessage.footer":
     "에이전트가 작업하는 중에 메시지를 보낼 때의 동작이에요. 대기열은 턴이 끝날 때까지 메시지를 보관해요. 방향 지시는 턴이 진행되는 동안 에이전트에게 메시지를 전달해요.",

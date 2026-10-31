@@ -328,6 +328,27 @@ export const messages = {
     "Skripten auf dem Host erlauben, Nachrichten zu senden, Routinen auszuführen, Fragen zu beantworten und Anfragen zu genehmigen oder abzulehnen",
   "mobile.agent.host.failed": "Diese Einstellung konnte nicht geändert werden.",
   "mobile.agent.host.unsupported": "Dieser Host kann diese Einstellungen nicht von einem Remote-Gerät aus ändern.",
+  "mobile.agent.backupModels.title": "Ersatzmodelle",
+  "mobile.agent.backupModels.valueAsk": "Erst fragen",
+  "mobile.agent.backupModels.valueAutomatic": "Automatisch",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Wenn {model} sein Nutzungslimit erreicht, bevor {name} zu schreiben beginnt, fragt {name} dich, welches Modell verwendet werden soll.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Wenn {model} sein Nutzungslimit erreicht oder mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge.",
+  "mobile.agent.backupModels.ask": "Vor dem Wechsel fragen",
+  "mobile.agent.backupModels.order": "Reihenfolge",
+  "mobile.agent.backupModels.empty": "Keine Reihenfolge festgelegt. {name} bietet jedes verfügbare Modell an.",
+  "mobile.agent.backupModels.add": "Ersatzmodell hinzufügen",
+  "mobile.agent.backupModels.search": "Modelle suchen",
+  "mobile.agent.backupModels.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "mobile.agent.backupModels.moveUp": "{model} nach oben",
+  "mobile.agent.backupModels.moveDown": "{model} nach unten",
+  "mobile.agent.backupModels.remove": "{model} entfernen",
+  "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} wechselt nie, nachdem das Schreiben begonnen hat. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
   "mobile.agent.busyMessage.footer":
     "Was mit einer Nachricht passiert, die du sendest, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",

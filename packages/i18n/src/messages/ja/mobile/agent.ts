@@ -322,6 +322,27 @@ export const messages = {
     "ホスト上のスクリプトによるメッセージの送信、ルーティンの実行、質問への回答、承認リクエストの許可または拒否を許可します",
   "mobile.agent.host.failed": "この設定を変更できませんでした。",
   "mobile.agent.host.unsupported": "このホストでは、リモートデバイスからこれらの設定を変更できません。",
+  "mobile.agent.backupModels.title": "バックアップモデル",
+  "mobile.agent.backupModels.valueAsk": "先に確認",
+  "mobile.agent.backupModels.valueAutomatic": "自動",
+  "mobile.agent.backupModels.valueCount": { other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "{name} が書き始める前に {model} が使用量の上限に達した場合、{name} はどのモデルを使うかを確認します。",
+  "mobile.agent.backupModels.introAutomatic":
+    "{name} が書き始める前に {model} が使用量の上限に達した場合、またはプロバイダーのエラーで失敗した場合、{name} は順番の中で最初に使えるモデルに切り替えます。",
+  "mobile.agent.backupModels.ask": "切り替える前に確認",
+  "mobile.agent.backupModels.order": "順番",
+  "mobile.agent.backupModels.empty": "順番は設定されていません。{name} は使えるモデルをすべて表示します。",
+  "mobile.agent.backupModels.add": "バックアップモデルを追加",
+  "mobile.agent.backupModels.search": "モデルを検索",
+  "mobile.agent.backupModels.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.backupModels.moveUp": "{model} を上へ移動",
+  "mobile.agent.backupModels.moveDown": "{model} を下へ移動",
+  "mobile.agent.backupModels.remove": "{model} を削除",
+  "mobile.agent.backupModels.unavailable": "現在使用できません · スキップ",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} は書き始めた後は切り替えません。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "mobile.agent.busyMessage.label": "作業中",
   "mobile.agent.busyMessage.footer":
     "エージェントの作業中に送信したメッセージの扱いです。「キュー」ではターンが終わるまで保持します。「方向を修正」ではターン中にエージェントに渡します。",

@@ -21,6 +21,11 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import {
+  AgentBackupModelPicker,
+  AgentBackupModelsPage,
+  AgentBackupModelsRow,
+} from "@/features/agents/components/agent-backup-models";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
 import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
@@ -61,6 +66,8 @@ type AgentPage =
   | "tables"
   | "publish"
   | "runtime"
+  | "backup-models"
+  | "backup-model-picker"
   | "permissions"
   | "advanced"
   | "memory"
@@ -371,6 +378,8 @@ function AgentForm({
           }}
         />
       ) : null}
+      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} available={available} /> : null}
+      {page === "backup-model-picker" ? <AgentBackupModelPicker agent={agent} available={available} /> : null}
       {page === "permissions" ? (
         <>
           <AgentAccessFields agent={agent} server={host} available={available} />
@@ -432,6 +441,7 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
+            <AgentBackupModelsRow agent={agent} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
             <SettingsRow

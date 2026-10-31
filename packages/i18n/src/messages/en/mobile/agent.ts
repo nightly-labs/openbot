@@ -312,6 +312,27 @@ export const messages = defineMessages("mobile.agent", {
     "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "mobile.agent.host.failed": "Could not change this setting.",
   "mobile.agent.host.unsupported": "This host cannot change these settings from a remote device.",
+  "mobile.agent.backupModels.title": "Backup models",
+  "mobile.agent.backupModels.valueAsk": "Ask first",
+  "mobile.agent.backupModels.valueAutomatic": "Automatic",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "When {model} reaches its usage limit before {name} starts to write, {name} asks you which model to use.",
+  "mobile.agent.backupModels.introAutomatic":
+    "When {model} reaches its usage limit or fails with a provider error before {name} starts to write, {name} switches to the first available model in the order.",
+  "mobile.agent.backupModels.ask": "Ask before switching",
+  "mobile.agent.backupModels.order": "Order",
+  "mobile.agent.backupModels.empty": "No order set. {name} offers each available model.",
+  "mobile.agent.backupModels.add": "Add backup model",
+  "mobile.agent.backupModels.search": "Search models",
+  "mobile.agent.backupModels.noMatches": "No models match your search.",
+  "mobile.agent.backupModels.moveUp": "Move {model} up",
+  "mobile.agent.backupModels.moveDown": "Move {model} down",
+  "mobile.agent.backupModels.remove": "Remove {model}",
+  "mobile.agent.backupModels.unavailable": "Not available now · skipped",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} never switches after it starts to write. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
   "mobile.agent.busyMessage.footer":
     "What a message does when you send it while the agent works. Queue keeps it until the turn ends. Steer gives it to the agent during the turn.",

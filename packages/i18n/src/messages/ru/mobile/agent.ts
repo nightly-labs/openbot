@@ -344,6 +344,32 @@ export const messages = {
     "Разрешить скриптам на хосте отправлять сообщения, запускать регулярные задачи, отвечать на вопросы, принимать и отклонять запросы на подтверждение",
   "mobile.agent.host.failed": "Не удалось изменить этот параметр.",
   "mobile.agent.host.unsupported": "Этот хост не позволяет менять эти параметры с удалённого устройства.",
+  "mobile.agent.backupModels.title": "Резервные модели",
+  "mobile.agent.backupModels.valueAsk": "Сначала спросить",
+  "mobile.agent.backupModels.valueAutomatic": "Автоматически",
+  "mobile.agent.backupModels.valueCount": {
+    one: "{mode} · {count}",
+    few: "{mode} · {count}",
+    many: "{mode} · {count}",
+    other: "{mode} · {count}",
+  },
+  "mobile.agent.backupModels.intro":
+    "Если {model} достигнет лимита использования до того, как {name} начнёт писать, {name} спросит вас, какую модель использовать.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Если {model} достигнет лимита использования или завершится с ошибкой провайдера до того, как {name} начнёт писать, {name} переключится на первую доступную модель по порядку.",
+  "mobile.agent.backupModels.ask": "Спрашивать перед переключением",
+  "mobile.agent.backupModels.order": "Порядок",
+  "mobile.agent.backupModels.empty": "Порядок не задан. {name} предлагает каждую доступную модель.",
+  "mobile.agent.backupModels.add": "Добавить резервную модель",
+  "mobile.agent.backupModels.search": "Поиск моделей",
+  "mobile.agent.backupModels.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.backupModels.moveUp": "Переместить {model} вверх",
+  "mobile.agent.backupModels.moveDown": "Переместить {model} вниз",
+  "mobile.agent.backupModels.remove": "Убрать {model}",
+  "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "После начала ответа {name} не переключает модель. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
   "mobile.agent.busyMessage.footer":
     "Что происходит с сообщением, которое вы отправляете во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",

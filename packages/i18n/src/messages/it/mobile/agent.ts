@@ -319,6 +319,27 @@ export const messages = {
     "Consenti agli script sull'host di inviare messaggi, eseguire routine, rispondere alle domande e accettare o rifiutare le approvazioni",
   "mobile.agent.host.failed": "Impossibile modificare questa impostazione.",
   "mobile.agent.host.unsupported": "Questo host non può modificare queste impostazioni da un dispositivo remoto.",
+  "mobile.agent.backupModels.title": "Modelli di riserva",
+  "mobile.agent.backupModels.valueAsk": "Chiedi prima",
+  "mobile.agent.backupModels.valueAutomatic": "Automatico",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Quando {model} raggiunge il limite di utilizzo prima che {name} inizi a scrivere, {name} ti chiede quale modello usare.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Quando {model} raggiunge il limite di utilizzo o fallisce per un errore del provider prima che {name} inizi a scrivere, {name} passa al primo modello disponibile nell'ordine.",
+  "mobile.agent.backupModels.ask": "Chiedi prima di cambiare",
+  "mobile.agent.backupModels.order": "Ordine",
+  "mobile.agent.backupModels.empty": "Nessun ordine impostato. {name} propone ogni modello disponibile.",
+  "mobile.agent.backupModels.add": "Aggiungi modello di riserva",
+  "mobile.agent.backupModels.search": "Cerca modelli",
+  "mobile.agent.backupModels.noMatches": "Nessun modello corrisponde alla ricerca.",
+  "mobile.agent.backupModels.moveUp": "Sposta {model} su",
+  "mobile.agent.backupModels.moveDown": "Sposta {model} giù",
+  "mobile.agent.backupModels.remove": "Rimuovi {model}",
+  "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} non cambia mai dopo aver iniziato a scrivere. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
   "mobile.agent.busyMessage.footer":
     "Cosa fa un messaggio inviato mentre l'agente lavora. Coda lo tiene fino alla fine del turno. Indirizza lo consegna all'agente durante il turno.",

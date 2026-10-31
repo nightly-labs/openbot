@@ -41,6 +41,8 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="memory" options={{ title: t("mobile.agent.record.memory") }} />
       <Stack.Screen name="routine" options={{ title: t("mobile.agent.record.routine") }} />
       <Stack.Screen name="runtime" options={{ title: t("mobile.agent.runtime.model") }} />
+      <Stack.Screen name="backup-models" options={{ title: t("mobile.agent.backupModels.title") }} />
+      <Stack.Screen name="backup-model-picker" options={{ title: t("mobile.agent.backupModels.add") }} />
       <Stack.Screen name="permissions" options={{ title: t("mobile.agent.permissions.title") }} />
       <Stack.Screen name="advanced" options={{ title: t("mobile.agent.advanced.title") }} />
       <Stack.Screen name="notifications" options={{ title: t("mobile.settings.notifications.title") }} />

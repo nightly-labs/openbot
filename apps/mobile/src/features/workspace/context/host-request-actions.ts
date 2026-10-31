@@ -4,6 +4,7 @@ import {
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
   decodeAgentAdminSettings,
+  decodeAgentBackupModelSettings,
   decodeAgentHostSettings,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
@@ -27,6 +28,10 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import {
+  AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BACKUP_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -263,6 +268,8 @@ type HostRequestActions = Pick<
   | "updateAgentAdminSettings"
   | "loadAgentHostSettings"
   | "updateAgentHostSettings"
+  | "loadAgentBackupModels"
+  | "updateAgentBackupModels"
   | "loadProviderAccounts"
   | "loadPlanLimits"
   | "setAgentProviderAccount"
@@ -806,6 +813,29 @@ export function createHostRequestActions({
     updateAgentHostSettings: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_HOST_SETTINGS_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_HOST_SETTINGS_ROUTES.update, decodeAgentHostSettings, { ...input }, serverId);
+    },
+    loadAgentBackupModels: async (agentId, serverId) =>
+      has(serverId, AGENT_BACKUP_MODELS_CAPABILITY)
+        ? request("POST", AGENT_BACKUP_MODELS_ROUTES.settings, decodeAgentBackupModelSettings, { agentId }, serverId)
+        : null,
+    updateAgentBackupModels: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_BACKUP_MODELS_CAPABILITY, "mobile.agent.host.unsupported");
+      // The wire body copies each field, as the request takes JSON values and not the IPC interfaces.
+      const backupModels = input.backupModels && {
+        automatic: input.backupModels.automatic,
+        order: input.backupModels.order.map(({ provider, model, providerAccountId }) => ({
+          provider,
+          model,
+          ...(providerAccountId === undefined ? {} : { providerAccountId }),
+        })),
+      };
+      return request(
+        "POST",
+        AGENT_BACKUP_MODELS_ROUTES.update,
+        decodeAgentBackupModelSettings,
+        { agentId: input.agentId, backupModels },
+        serverId,
+      );
     },
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,

@@ -7,6 +7,7 @@ import type {
   AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
+  AgentBackupModelSettings,
   AgentHostSettings,
   AgentMemory,
   AgentMemorySelectionState,
@@ -91,6 +92,7 @@ import type {
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
+  UpdateAgentBackupModelsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateRestartMode,
@@ -558,6 +560,15 @@ export interface MobileWorkspaceContextValue {
   loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** An owner or admin of an online host that serves `agent-backup-models-v1`. The host checks the role again. */
+  canManageAgentBackupModels: (serverId: string) => boolean;
+  /**
+   * The backup models of an agent, and the model it left for a usage limit. Null when the host does
+   * not advertise `agent-backup-models-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentBackupModels: (agentId: string, serverId: string) => Promise<AgentBackupModelSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
+  updateAgentBackupModels: (input: UpdateAgentBackupModelsInput, serverId: string) => Promise<AgentBackupModelSettings>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -791,6 +802,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentSkills"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
+  | "canManageAgentBackupModels"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canPublishAgent";

@@ -330,6 +330,27 @@ export const messages = {
     "Autoriser les scripts sur l’hôte à envoyer des messages, exécuter des routines, répondre aux questions et accepter ou refuser les demandes d’approbation",
   "mobile.agent.host.failed": "Impossible de modifier ce réglage.",
   "mobile.agent.host.unsupported": "Cet hôte ne permet pas de modifier ces réglages depuis un appareil distant.",
+  "mobile.agent.backupModels.title": "Modèles de secours",
+  "mobile.agent.backupModels.valueAsk": "Demander d’abord",
+  "mobile.agent.backupModels.valueAutomatic": "Automatique",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Quand {model} atteint sa limite d’utilisation avant que {name} commence à écrire, {name} vous demande quel modèle utiliser.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Quand {model} atteint sa limite d’utilisation ou échoue sur une erreur du fournisseur avant que {name} commence à écrire, {name} passe au premier modèle disponible dans l’ordre.",
+  "mobile.agent.backupModels.ask": "Demander avant de changer",
+  "mobile.agent.backupModels.order": "Ordre",
+  "mobile.agent.backupModels.empty": "Aucun ordre défini. {name} propose chaque modèle disponible.",
+  "mobile.agent.backupModels.add": "Ajouter un modèle de secours",
+  "mobile.agent.backupModels.search": "Rechercher des modèles",
+  "mobile.agent.backupModels.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.backupModels.moveUp": "Monter {model}",
+  "mobile.agent.backupModels.moveDown": "Descendre {model}",
+  "mobile.agent.backupModels.remove": "Retirer {model}",
+  "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} ne change jamais de modèle après avoir commencé à écrire. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
   "mobile.agent.busyMessage.footer":
     "Ce que devient un message envoyé pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",

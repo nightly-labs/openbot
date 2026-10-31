@@ -321,6 +321,27 @@ export const messages = {
     "Laat scripts op de host berichten sturen, routines uitvoeren, vragen beantwoorden en goedkeuringen accepteren of weigeren",
   "mobile.agent.host.failed": "Kan deze instelling niet wijzigen.",
   "mobile.agent.host.unsupported": "Deze host kan deze instellingen niet wijzigen vanaf een extern apparaat.",
+  "mobile.agent.backupModels.title": "Reservemodellen",
+  "mobile.agent.backupModels.valueAsk": "Eerst vragen",
+  "mobile.agent.backupModels.valueAutomatic": "Automatisch",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+  "mobile.agent.backupModels.ask": "Vragen voor overschakelen",
+  "mobile.agent.backupModels.order": "Volgorde",
+  "mobile.agent.backupModels.empty": "Geen volgorde ingesteld. {name} biedt elk beschikbaar model aan.",
+  "mobile.agent.backupModels.add": "Reservemodel toevoegen",
+  "mobile.agent.backupModels.search": "Modellen zoeken",
+  "mobile.agent.backupModels.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.backupModels.moveUp": "{model} omhoog",
+  "mobile.agent.backupModels.moveDown": "{model} omlaag",
+  "mobile.agent.backupModels.remove": "{model} verwijderen",
+  "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} schakelt nooit over nadat het begint te schrijven. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
   "mobile.agent.busyMessage.footer":
     "Wat een bericht doet als je het stuurt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",

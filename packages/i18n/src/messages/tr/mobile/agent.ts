@@ -331,6 +331,27 @@ export const messages = {
     "Ana makinedeki betiklerin mesaj göndermesine, rutinleri çalıştırmasına, soruları yanıtlamasına ve onay isteklerini kabul etmesine veya reddetmesine izin verin",
   "mobile.agent.host.failed": "Bu ayar değiştirilemedi.",
   "mobile.agent.host.unsupported": "Bu ana makine bu ayarları uzak bir cihazdan değiştiremez.",
+  "mobile.agent.backupModels.title": "Yedek modeller",
+  "mobile.agent.backupModels.valueAsk": "Önce sor",
+  "mobile.agent.backupModels.valueAutomatic": "Otomatik",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa {name} hangi modelin kullanılacağını size sorar.",
+  "mobile.agent.backupModels.introAutomatic":
+    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa veya bir sağlayıcı hatasıyla başarısız olursa {name} sıradaki ilk uygun modele geçer.",
+  "mobile.agent.backupModels.ask": "Değiştirmeden önce sor",
+  "mobile.agent.backupModels.order": "Sıra",
+  "mobile.agent.backupModels.empty": "Sıra ayarlanmadı. {name} uygun her modeli sunar.",
+  "mobile.agent.backupModels.add": "Yedek model ekle",
+  "mobile.agent.backupModels.search": "Modellerde ara",
+  "mobile.agent.backupModels.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.backupModels.moveUp": "{model} modelini yukarı taşı",
+  "mobile.agent.backupModels.moveDown": "{model} modelini aşağı taşı",
+  "mobile.agent.backupModels.remove": "{model} modelini kaldır",
+  "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} yazmaya başladıktan sonra asla model değiştirmez. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
     "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
