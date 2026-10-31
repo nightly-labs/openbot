@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
+import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
@@ -22,13 +22,12 @@ export function AgentProviderAvatar({ agent, size }: { agent: MobileAgent; size:
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <BloubAvatar
+      <BloubAvatarThumbnail
         agentId={agent.id}
         serverId={agent.serverId}
         hue={agent.avatarHue}
         seed={agent.avatarSeed}
         size={size}
-        animateIdle={false}
       />
       {agent.provider ? (
         <View

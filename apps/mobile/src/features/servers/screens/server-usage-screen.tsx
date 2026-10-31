@@ -33,7 +33,7 @@ export function ServerUsageScreen() {
     mobileAnalytics.track("usage_viewed", { scope: "server" });
   }, []);
   const usage = useQuery({
-    queryKey: queryKeys.serverUsage(queryScope, serverId, range, undefined),
+    queryKey: queryKeys.serverUsage(queryScope, serverId, range),
     queryFn: () => loadHostAnalytics(range, serverId),
     enabled: online,
     // The last report stays on screen while the next range loads, so its values change in place.
@@ -53,7 +53,8 @@ export function ServerUsageScreen() {
           onPress: () =>
             router.push({
               pathname: "/agent-info/[agentId]/usage",
-              params: { agentId: agent.id, serverId: agent.serverId },
+              // The agent's usage opens on the range of this screen.
+              params: { agentId: agent.id, serverId: agent.serverId, ...range },
             }),
         }
       : { ...row, name: row.agentId };
