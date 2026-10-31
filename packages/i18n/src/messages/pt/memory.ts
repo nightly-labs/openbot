@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "Sempre usadas",
   "memory.group.relevant": "Usadas quando relevantes",
   "memory.everyChat": "Usar em todo chat",
+  "memory.inclusion.automatic": "Deixar o agente decidir",
   "memory.limitAgent":
     "Este agente atingiu o limite de {limit} memórias. Edite, combine ou exclua uma memória antes de adicionar outra.",
   "memory.limitChannel":

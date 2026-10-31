@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "常に使用",
   "memory.group.relevant": "必要なときに使用",
   "memory.everyChat": "すべてのチャットで使用",
+  "memory.inclusion.automatic": "エージェントに任せる",
   "memory.limitAgent":
     "このエージェントはメモリーの上限（{limit} 件）に達しました。別のメモリーを追加する前に、メモリーを編集、統合、または削除してください。",
   "memory.limitChannel":

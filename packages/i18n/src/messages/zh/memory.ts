@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "始终使用",
   "memory.group.relevant": "需要时使用",
   "memory.everyChat": "在每个聊天中使用",
+  "memory.inclusion.automatic": "由助手决定",
   "memory.limitAgent": "该助手的记忆已达 {limit} 条上限，请先编辑、合并或删除一条再添加。",
   "memory.limitChannel": "该频道的记忆已达 {limit} 条上限，请先编辑、合并或删除一条再添加。",
   "memory.loading": "正在加载记忆…",

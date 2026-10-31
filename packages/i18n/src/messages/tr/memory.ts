@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "Her zaman kullanılır",
   "memory.group.relevant": "Gerektiğinde kullanılır",
   "memory.everyChat": "Her sohbette kullan",
+  "memory.inclusion.automatic": "Ajan karar versin",
   "memory.limitAgent":
     "Bu ajan {limit} bellek sınırına ulaştı. Yenisini eklemeden önce bir belleği düzenleyin, birleştirin veya silin.",
   "memory.limitChannel":

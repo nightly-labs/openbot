@@ -13,6 +13,7 @@ export const messages = defineMessages("memory", {
   "memory.group.always": "Always used",
   "memory.group.relevant": "Used when relevant",
   "memory.everyChat": "Use in every chat",
+  "memory.inclusion.automatic": "Let the agent decide",
   "memory.limitAgent":
     "This agent has reached the limit of {limit} memories. Edit, merge, or delete a memory before you add another one.",
   "memory.limitChannel":

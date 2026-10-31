@@ -33,6 +33,8 @@ export interface AgentMemoriesViewProps {
    * no groups and a memory has no switch.
    */
   inclusion?: ReadonlyMap<string, Inclusion> | undefined;
+  /** The memories whose use the user set. The agent does not move them until the user gives control back. */
+  userControlled?: ReadonlySet<string> | undefined;
   loading: boolean;
   error: string | null;
   /** The cap the owner reached, or null. */
@@ -46,6 +48,7 @@ export interface AgentMemoriesViewProps {
   onUpdate: (memory: MemoryEntry, text: string) => Promise<boolean>;
   onDelete: (memory: MemoryEntry) => void;
   onSetEveryChat: (memory: MemoryEntry, everyChat: boolean) => void;
+  onLetAgentDecide: (memory: MemoryEntry) => void;
   onClearAll: () => void;
 }
 
@@ -106,6 +109,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
     const { title, body } = splitMemory(memory.text);
     return body ? title : t("memory.single");
   };
+  const backLabel = () => (current() ? t("memory.backToList") : t("memory.backToSettings"));
 
   function openMemory(memory: MemoryEntry): void {
     setAdding(false);
@@ -127,6 +131,8 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   }
 
   function startAdding(): void {
+    // A search would hide the new memory, and the field is gone when the list is empty.
+    setQuery("");
     setOpenId(null);
     setAdding(true);
   }
@@ -148,7 +154,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
       <SettingsPanelHeader
         title={title()}
         onBack={back}
-        backLabel={current() ? t("memory.backToList") : t("memory.backToSettings")}
+        backLabel={backLabel()}
         onClose={props.onClose}
         closeLabel={t("memory.closePane")}
       />
@@ -168,9 +174,9 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
               </p>
             )}
           </Show>
+          {/* Not keyed: a reload gives a new object for the same memory, and the open editor keeps its draft. */}
           <Show
             when={current()}
-            keyed
             fallback={
               <Show when={!props.loading} fallback={<p class="agent-memory-state">{t("memory.loading")}</p>}>
                 <Show
@@ -285,27 +291,27 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                   when={editing()}
                   fallback={
                     <div class="agent-memories-reading">
-                      <p class="agent-memories-text">{splitMemory(memory.text).body || memory.text}</p>
+                      <p class="agent-memories-text">{splitMemory(memory().text).body || memory().text}</p>
                       <p class="agent-memories-meta">
-                        {memory.origin === "automatic" ? t("memory.learned") : t("memory.manual")}
+                        {memory().origin === "automatic" ? t("memory.learned") : t("memory.manual")}
                         {" · "}
-                        {memoryDate(memory.updatedAt)}
+                        {memoryDate(memory().updatedAt)}
                       </p>
                     </div>
                   }
                 >
                   <MemoryEditor
-                    initial={memory.text}
+                    initial={memory().text}
                     label={t("memory.edit")}
                     saveLabel={t("common.save")}
-                    saving={props.savingId === memory.id}
+                    saving={props.savingId === memory().id}
                     onSave={async (text) => {
-                      if (text === memory.text || (await props.onUpdate(memory, text))) setEditing(false);
+                      if (text === memory().text || (await props.onUpdate(memory(), text))) setEditing(false);
                     }}
                     onCancel={() => setEditing(false)}
                   />
                 </Show>
-                <Show when={props.inclusion?.get(memory.id)}>
+                <Show when={props.inclusion?.get(memory().id)}>
                   {(inclusion) => (
                     <SettingsLinkGroup inset class="agent-settings-runtime-rows">
                       <div class="agent-settings-switch-row">
@@ -315,7 +321,7 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                           aria-label={t("memory.everyChat")}
                           checked={inclusion() === "essential"}
                           disabled={props.savingId !== null}
-                          onChange={(checked) => props.onSetEveryChat(memory, checked)}
+                          onChange={(checked) => props.onSetEveryChat(memory(), checked)}
                         />
                       </div>
                     </SettingsLinkGroup>
@@ -326,7 +332,17 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                     <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
                       {t("memory.editAction")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => deleteMemory(memory)}>
+                    <Show when={props.userControlled?.has(memory().id)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={props.savingId !== null}
+                        onClick={() => props.onLetAgentDecide(memory())}
+                      >
+                        {t("memory.inclusion.automatic")}
+                      </Button>
+                    </Show>
+                    <Button size="sm" variant="ghost" onClick={() => deleteMemory(memory())}>
                       {t("memory.deleteAction")}
                     </Button>
                   </div>

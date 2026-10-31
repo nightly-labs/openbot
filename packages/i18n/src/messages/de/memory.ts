@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "Immer verwendet",
   "memory.group.relevant": "Bei Bedarf verwendet",
   "memory.everyChat": "In jedem Chat verwenden",
+  "memory.inclusion.automatic": "Agent entscheidet",
   "memory.limitAgent":
     "Dieser Agent hat das Limit von {limit} Erinnerungen erreicht. Bearbeite, lösche oder führe Erinnerungen zusammen, bevor du eine weitere hinzufügst.",
   "memory.limitChannel":

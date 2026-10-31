@@ -1,4 +1,4 @@
-import type { AgentMemorySelectionState, MemoryEntry } from "@openbot/contracts/ipc";
+import type { AgentMemorySelectionChange, AgentMemorySelectionState, MemoryEntry } from "@openbot/contracts/ipc";
 import { ConfirmDialog, toast } from "@openbot/ui";
 import { AGENT_DELETE_UNDO_MS } from "@openbot/ui/features/agents/AgentDeleteUndoToast";
 import { AgentMemoriesView } from "@openbot/ui/features/conversation/AgentMemoriesView";
@@ -27,6 +27,12 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
   const inclusionById = createMemo(() => {
     const state = selection();
     return state ? new Map(state.selections.map((entry) => [entry.memoryId, entry.inclusion])) : undefined;
+  });
+  const userControlled = createMemo(() => {
+    const state = selection();
+    return state
+      ? new Set(state.selections.filter((entry) => entry.userControlled).map((entry) => entry.memoryId))
+      : undefined;
   });
   const [memories, setMemories] = createSignal<MemoryEntry[]>([]);
   // Memories that wait for the undo time to end. The page hides them; the host still has them.
@@ -227,8 +233,11 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
-  /** The switch sets the memory's use, and the user then controls it: the agent no longer moves it. */
-  async function setEveryChat(memory: MemoryEntry, everyChat: boolean): Promise<void> {
+  /**
+   * The switch sets the memory's use, and the user then controls it: the agent no longer moves it.
+   * `automatic` gives control back to the agent.
+   */
+  async function setInclusion(memory: MemoryEntry, inclusion: AgentMemorySelectionChange["inclusion"]): Promise<void> {
     const current = selection()?.selections.find((entry) => entry.memoryId === memory.id);
     const port = props.port.selection;
     if (!current || !port || savingId()) return;
@@ -239,7 +248,7 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
         await port.set([
           {
             memoryId: memory.id,
-            inclusion: everyChat ? "essential" : "searchable",
+            inclusion,
             expectedRevision: current.revision,
           },
         ]),
@@ -253,6 +262,9 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
+  /** The confirm dialog shows the error of a clear, so the page does not show it too. */
+  const pageError = () => (clearConfirmation() ? null : error());
+
   return (
     <>
       <Show when={props.open}>
@@ -261,8 +273,9 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
           ownerLabel={props.port.ownerLabel}
           memories={visibleMemories()}
           inclusion={inclusionById()}
+          userControlled={userControlled()}
           loading={loading()}
-          error={clearConfirmation() ? null : error()}
+          error={pageError()}
           reachedLimit={reachedLimit()}
           savingId={savingId()}
           onBack={props.onBack}
@@ -270,7 +283,8 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
           onCreate={createMemory}
           onUpdate={updateMemory}
           onDelete={deleteMemory}
-          onSetEveryChat={(memory, everyChat) => void setEveryChat(memory, everyChat)}
+          onSetEveryChat={(memory, everyChat) => void setInclusion(memory, everyChat ? "essential" : "searchable")}
+          onLetAgentDecide={(memory) => void setInclusion(memory, "automatic")}
           onClearAll={() => setClearConfirmation(true)}
         />
       </Show>

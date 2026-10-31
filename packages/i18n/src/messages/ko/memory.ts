@@ -14,6 +14,7 @@ export const messages = {
   "memory.group.always": "항상 사용",
   "memory.group.relevant": "필요할 때 사용",
   "memory.everyChat": "모든 채팅에서 사용",
+  "memory.inclusion.automatic": "에이전트가 결정",
   "memory.limitAgent":
     "이 에이전트는 메모리 {limit}개 한도에 도달했어요. 메모리를 더 추가하려면 기존 메모리를 수정하거나 병합하거나 삭제해 주세요.",
   "memory.limitChannel":
