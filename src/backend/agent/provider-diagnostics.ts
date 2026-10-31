@@ -1,45 +1,3 @@
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-
-/**
- * Codex's text record of a completed fallback, as Codex 0.163 writes it when `LOG_FORMAT` is not
- * `json`: `<time>  WARN codex_otel::auth_storage: credential storage file fallback completed
- * credential_kind="codex" … outcome="not_found" … secure_error="none" …`.
- */
-const CODEX_FALLBACK_LINE =
-  /^(?:\S+\s+)?(?:TRACE|DEBUG|INFO|WARN)\s+codex_otel::auth_storage: credential storage file fallback completed\s/u;
-
-/**
- * Codex can finish a credential-store fallback while the provider keeps working. The record has a
- * `secure_error` field even when its value is `none`, so a keyword search reads it as an error.
- * Codex writes the record only when `RUST_LOG` lets warnings through, as text or, with
- * `LOG_FORMAT=json`, as JSON. Keep only this completed, non-error fallback in the log. Failed
- * storage operations and authentication replies still use the normal failure paths.
- */
-export function isCodexCredentialFallbackDiagnostic(message: string): boolean {
-  if (CODEX_FALLBACK_LINE.test(message)) {
-    // A space before the name, so `secure_outcome` is not read as `outcome`.
-    return /\ssecure_error="none"(?:\s|$)/u.test(message) && /\soutcome="(?:success|not_found)"(?:\s|$)/u.test(message);
-  }
-  try {
-    const record = JSON.parse(message);
-    if (!isDynamicRecord(record)) return false;
-    if (!("target" in record) || record.target !== "codex_otel::auth_storage") return false;
-    if (!("level" in record) || !["TRACE", "DEBUG", "INFO", "WARN"].includes(String(record.level))) return false;
-    if (!("fields" in record) || typeof record.fields !== "object" || record.fields === null) return false;
-    const fields = record.fields;
-    return (
-      "message" in fields &&
-      fields.message === "credential storage file fallback completed" &&
-      "secure_error" in fields &&
-      fields.secure_error === "none" &&
-      "outcome" in fields &&
-      (fields.outcome === "success" || fields.outcome === "not_found")
-    );
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
  *
@@ -163,11 +121,6 @@ function bracketBalance(line: string) {
  * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
  * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
  *
- * Codex logs each failed tool call as `codex_core::tools::router: error=…`, such as a cancelled
- * dynamic tool call or a failed image generation. It sends the error to the model as the tool's
- * result, and the turn continues. The toast had no chat, so it stayed over each chat the user
- * opened (#2965). Only a `Fatal error:` stops the turn, and it stays visible.
- *
  * Antigravity logs failed MCP calls as `error executing cascade step: CORTEX_STEP_TYPE_MCP_TOOL:`,
  * followed by the tool's error (`Error: …` or `calling "tools/call": Error: …`) or its own call
  * timeout. These records describe one tool call, which the agent reads as the tool's result (#1524).
@@ -175,7 +128,6 @@ function bracketBalance(line: string) {
  */
 export function isToolCallDiagnostic(message: string): boolean {
   return (
-    /^[^\r\n]*\bcodex_core:[^\r\n]*\brouter:\s*error=(?!Fatal error:)/.test(message) ||
     /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message) ||
     /\berror executing cascade step:\s*CORTEX_STEP_TYPE_MCP_TOOL:\s*(?:calling "tools\/call":\s*)?Error:/.test(
       message,
@@ -184,21 +136,6 @@ export function isToolCallDiagnostic(message: string): boolean {
       message,
     )
   );
-}
-
-/**
- * Whether a provider diagnostic reports a background refresh that the CLI retries by itself.
- *
- * Codex refreshes its model list and its remote settings on a timer, and logs each failed attempt
- * on stderr. A computer that wakes without internet access writes one line per attempt, and the user
- * met them as a stack of "Provider error" toasts to close one by one (#717). No turn reads either
- * refresh: OpenBot reads the model catalogue itself and reports that failure where it happens.
- *
- * Only these two refreshes count. Any other failure, a network failure included, stays visible.
- */
-export function isBackgroundRefreshDiagnostic(message: string): boolean {
-  if (/openbot/i.test(message)) return false;
-  return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
 }
 
 /**
@@ -215,21 +152,6 @@ export function isBackgroundRefreshDiagnostic(message: string): boolean {
  */
 export function isUsageReadDiagnostic(message: string): boolean {
   return /\bERROR\s+billing:\s+(?:upstream request failed|upstream error|failed to parse response)\b/.test(message);
-}
-
-/**
- * Whether a provider diagnostic is Codex's notice that it uses its bundled bubblewrap.
- *
- * On Linux, Codex looks for `bwrap` on PATH for its sandbox. When it is not there, it writes "Codex
- * could not find bubblewrap on PATH" at `ERROR` level, and then "Codex will use the bundled bubblewrap
- * in the meantime". Codex starts and works. The user of a Docker server met the line as a "Provider
- * error" toast on each connect, with no way to know if the provider worked (#2177). The release
- * installs `bubblewrap` now; a server with an older package list still writes the notice.
- *
- * Only the notice with the fallback counts. A bubblewrap failure that has no fallback stays visible.
- */
-export function isBundledSandboxFallbackDiagnostic(message: string): boolean {
-  return /\bcould not find bubblewrap on PATH\b[\s\S]*\bwill use the bundled bubblewrap\b/i.test(message);
 }
 
 /**

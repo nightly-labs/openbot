@@ -3,7 +3,8 @@ import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber } from "effect";
-import { type AgentProvider, RequestTimeoutError } from "./agent-client";
+import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
+import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
@@ -39,6 +40,12 @@ interface ClientEvents {
   exit: [error: Error];
   diagnostic: [message: string];
 }
+
+/**
+ * A stderr record that reports an error: Codex's own `ERROR` or `FATAL` level, as in
+ * `2026-10-31T16:34:28Z ERROR codex_app_server: …`, or a launcher's `Error: …`, `fatal: …`.
+ */
+const ERROR_RECORD = /^(?:\S+\s+)?(?:ERROR|FATAL)\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 
 export class AppServerError extends Error {
   constructor(
@@ -111,17 +118,29 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     // Whole records only. A chunk ends wherever the pipe filled up, and half a record is neither
     // readable nor reliably redactable.
+    // The runtime only logs these records. An exit names the last error record, or the last record.
+    let lastRecord: string | null = null;
+    let lastError: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: redactDiagnostic,
-      emit: (message) => this.emit("diagnostic", message),
+      emit: (message) => {
+        lastRecord = message;
+        if (ERROR_RECORD.test(message)) lastError = message;
+        this.emit("diagnostic", message);
+      },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
     child.once("close", () => diagnostics.flush());
 
     child.once("error", (error) => this.#fail(error, child));
     child.once("exit", (code, signal) => {
-      const suffix = signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
-      this.#fail(new Error(`Codex App Server exited with ${suffix}.`), child);
+      // A signal, or code 0 after Codex handled one, is a stop from outside. The last record is
+      // then an unrelated line.
+      if (signal) return this.#fail(new Error(`Codex App Server exited with signal ${signal}.`), child);
+      if (code === 0) return this.#fail(new Error("Codex App Server exited with code 0."), child);
+      diagnostics.flush();
+      const detail = (lastError ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
+      this.#fail(new AgentProcessExitError(`Codex App Server exited with code ${code ?? "unknown"}.`, detail), child);
     });
   }
 

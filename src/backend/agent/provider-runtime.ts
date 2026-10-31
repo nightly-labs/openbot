@@ -88,9 +88,6 @@ import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./pr
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
-  isBackgroundRefreshDiagnostic,
-  isBundledSandboxFallbackDiagnostic,
-  isCodexCredentialFallbackDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSubsystemDiagnostic,
@@ -2780,7 +2777,7 @@ export class ProviderRuntime implements ProviderPort {
   });
 
   /** A CLI exit with its last stderr line in the message, after the MCP values are out of it. */
-  #withExitDetail(error: unknown): unknown {
+  #withExitDetail<E>(error: E): E | AgentProcessExitError {
     if (!(error instanceof AgentProcessExitError)) return error;
     const detailed = error.withDetail(this.#redactMcp);
     // OpenCode 2 makes a database with only `session_v2`, and OpenCode 1 refuses it (OpenCode issue #53221).
@@ -3561,10 +3558,6 @@ export class ProviderRuntime implements ProviderPort {
       // logged or turned into a renderer error event. Shortened after that, because a value cut in
       // half is a value the redactor does not match.
       const message = shortenDiagnostic(this.#redactMcp(raw));
-      if (client.provider === "codex" && isCodexCredentialFallbackDiagnostic(raw)) {
-        logger.info("Codex completed a credential storage fallback.", { provider: client.provider, message });
-        return;
-      }
       // An agent that tears down its sessions while OpenBot stops it (idle release, restart, quit)
       // can write an error for each one. It is not a failure the user can act on, so it goes to the log.
       if (origin?.duringStop) {
@@ -3596,10 +3589,6 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed tool call.", { provider: client.provider, message });
         return;
       }
-      if (isBackgroundRefreshDiagnostic(message)) {
-        stderrLogger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
-        return;
-      }
       if (client.provider === "grok" && isUsageReadDiagnostic(message)) {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
@@ -3609,14 +3598,6 @@ export class ProviderRuntime implements ProviderPort {
           provider: client.provider,
           message,
         });
-        return;
-      }
-      if (isIgnoredConfigDiagnostic(message)) {
-        stderrLogger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
-        return;
-      }
-      if (isBundledSandboxFallbackDiagnostic(message)) {
-        stderrLogger.warn("A provider uses its bundled bubblewrap.", { provider: client.provider, message });
         return;
       }
       // The usage notice reports the limit only for a provider with a usage reading. Another
@@ -3629,6 +3610,14 @@ export class ProviderRuntime implements ProviderPort {
       ) {
         stderrLogger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         Effect.runFork(this.refreshUsageAfterLimit(client));
+        return;
+      }
+      if (client.provider === "codex") {
+        // Codex reports each failure the user can act on in its protocol: a failed turn, a sign-in
+        // error, a usage limit. Its stderr also has records that need nothing from the user, such as
+        // a folder that is not trusted, one "ChatGPT error" toast per start (#4265). An exit keeps
+        // the last error record in its message.
+        stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (isGlogBelowErrorDiagnostic(message)) {
@@ -3670,7 +3659,8 @@ export class ProviderRuntime implements ProviderPort {
     });
   }
 
-  #handleExit(client: AgentClient, error: Error): void {
+  #handleExit(client: AgentClient, exit: Error): void {
+    const error = this.#withExitDetail(exit);
     if (this.#handleConfinedExit(client, error)) return;
     if (this.#clients.get(client.provider) !== client || this.#hooks.isStopping()) return;
     this.#clients.delete(client.provider);
