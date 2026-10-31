@@ -53,6 +53,7 @@ export function serverSupportsCapability(
       capability === "agent-host-settings-v1" ||
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
+      capability === "agent-plan-card-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
       capability === "skills-admin-v1" ||

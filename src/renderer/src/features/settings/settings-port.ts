@@ -20,6 +20,7 @@ export interface SettingsPort {
   getRemoteNetworkRoute: OpenBotDesktopApi["getRemoteNetworkRoute"];
   getRemoteSessionReusePreference: OpenBotDesktopApi["getRemoteSessionReusePreference"];
   onAgentMemoryLimitPreference: OpenBotDesktopApi["onAgentMemoryLimitPreference"];
+  onAnalyticsPreference: OpenBotDesktopApi["onAnalyticsPreference"];
   onApprovalAutomation: OpenBotDesktopApi["onApprovalAutomation"];
   onOpenSettings: OpenBotDesktopApi["onOpenSettings"];
   onOpenUpdateSettings: OpenBotDesktopApi["onOpenUpdateSettings"];

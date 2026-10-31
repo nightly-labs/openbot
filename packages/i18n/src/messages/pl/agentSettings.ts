@@ -174,7 +174,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "Domyślne serwera ({level})",
   "agentSettings.notificationLevel.note":
     "Ten wybór dotyczy tylko ciebie, na wszystkich twoich urządzeniach. Gdy serwer jest wyciszony lub ustawiony na „Nic”, ten agent też milczy.",
-  "agentSettings.notificationLevel.sharedOff": "Powiadomienia tego agenta są wyłączone dla wszystkich członków.",
   "agentSettings.newChat.title": "Nowy czat",
   "agentSettings.newChat.description": "Agent zapomni ten czat. Jego konfiguracja zostanie.",
   "agentSettings.newChat.button": "Rozpocznij",

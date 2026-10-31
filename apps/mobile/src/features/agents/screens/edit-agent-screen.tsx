@@ -21,8 +21,21 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import {
+  AgentBackupModelPicker,
+  AgentBackupModelsPage,
+  AgentBackupModelsRow,
+} from "@/features/agents/components/agent-backup-models";
+import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
-import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
+import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
+import {
+  AgentBusyMessageField,
+  AgentHostPermissionFields,
+  AgentNewChatAllowedField,
+  AgentPlanCardField,
+  AgentTaskLimitField,
+} from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
@@ -61,7 +74,11 @@ type AgentPage =
   | "tables"
   | "publish"
   | "runtime"
+  | "backup-models"
+  | "backup-model-picker"
   | "permissions"
+  | "folders"
+  | "folder-browser"
   | "advanced"
   | "memory"
   | "routine";
@@ -109,6 +126,11 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentTaskLimit,
+    canManageAgentNewChat,
+    canManageAgentPlanCard,
+    canManageBrowserProfiles,
+    canManageAgentFolders,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
@@ -116,11 +138,18 @@ function AgentForm({
   // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
   const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+  const showFolders = canManageAgentFolders(agent.serverId);
   // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
   // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
-    Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+    Boolean(agent.workspacePath) ||
+    canStartNewChat(agent.serverId) ||
+    canManageAgentHostSettings(agent.serverId) ||
+    canManageAgentTaskLimit(agent.serverId) ||
+    canManageAgentNewChat(agent.serverId) ||
+    canManageAgentPlanCard(agent.serverId) ||
+    canManageBrowserProfiles(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -371,6 +400,10 @@ function AgentForm({
           }}
         />
       ) : null}
+      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
+      {page === "backup-model-picker" ? (
+        <AgentBackupModelPicker agent={agent} server={host} available={available} />
+      ) : null}
       {page === "permissions" ? (
         <>
           <AgentAccessFields agent={agent} server={host} available={available} />
@@ -380,6 +413,9 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
+          <AgentTaskLimitField agent={agent} server={host} available={available} />
+          {/* After the task limit, as in the desktop Advanced group. */}
+          <AgentBrowserProfileRow agent={agent} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
               <SettingsRow>
@@ -390,8 +426,13 @@ function AgentForm({
             </SettingsSection>
           ) : null}
           {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
+          {/* After the new-chat switch, as in the desktop Advanced group. */}
+          <AgentPlanCardField agent={agent} server={host} available={available} />
         </>
       ) : null}
+      {page === "folders" ? <AgentFolders agent={agent} host={host} available={available} /> : null}
+      {page === "folder-browser" ? <AgentFolderBrowser agent={agent} available={available} /> : null}
       {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}
       {page === "publish" ? <AgentPublish agent={agent} available={available} /> : null}
       {page === "usage" ||
@@ -432,6 +473,7 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
+            <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
             <SettingsRow
@@ -515,7 +557,7 @@ function AgentForm({
           {host && canAdministerServer(host.role) ? (
             <AgentSessionSettingsSection key={`${agent.serverId}:${agent.id}`} agent={agent} available={available} />
           ) : null}
-          {showPermissions || showNotificationLevel || showAdvanced ? (
+          {showPermissions || showFolders || showNotificationLevel || showAdvanced ? (
             <SettingsSection
               title={t("mobile.agent.groups.rules")}
               footer={showNotificationLevel ? t("mobile.agent.notificationLevel.footer") : undefined}
@@ -533,6 +575,7 @@ function AgentForm({
                   <Typography.Paragraph>{t("mobile.agent.permissions.title")}</Typography.Paragraph>
                 </SettingsRow>
               ) : null}
+              {showFolders ? <AgentFoldersRow agent={agent} host={host} available={available} /> : null}
               {showNotificationLevel ? <AgentNotificationLevelRow agent={agent} /> : null}
               {showAdvanced ? (
                 <SettingsRow

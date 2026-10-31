@@ -568,6 +568,7 @@ const MessageRow = memo(function MessageRow({
       <ChatQuestionPrompt
         key={message.id}
         prompt={message.prompt}
+        uiBlock={message.uiBlock}
         controller={questionForm}
         canSend={canSend}
         onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}

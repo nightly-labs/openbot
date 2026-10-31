@@ -6,6 +6,78 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-10-30
+
+### Added
+
+- Server settings > Storage now counts the CLI copies of providers that are off in the Provider runtimes row, with the old CLI versions. Clear removes all of them in one step. A provider that is off downloads its CLI again when you turn it on.
+- Right-click an agent message in a chat on this computer and select Mark unread. That message and
+  the messages after it are unread again, the NEW line moves above it, and the agent shows an
+  unread count in the sidebar until you open the chat again.
+- When you have another server, you can hide the Local server. Open its menu and select
+  **Hide server**. To show it again, select **Show Local** in the menu where you add a server. Its
+  agents, chats and files stay on your computer.
+- Agents can do many browser actions in one step, such as typing a search, pressing Enter, and waiting for results, or paging through a list until they find an item. This uses fewer tokens, because the agent does them in one call and reads the page once at the end. You can still take control of the tab at any time.
+- The server plans show how many hosted sites each plan has: Starter 3, Standard 10 and Pro 50.
+- Server settings > Sites shows See plans when a server on your computer is at its site limit.
+
+### Changed
+
+- The website now says that the source code of OpenBot is open on GitHub, not that OpenBot is
+  open source.
+- A provider uses the CLI that you installed when it is the same version as OpenBot's copy or newer. Before, OpenBot's copy always ran once it was downloaded. Update still downloads a newer version for you. Server settings > Storage can then remove the copy that no agent uses.
+- Agents find and use OpenBot tools in fewer steps, so browser tasks finish sooner and use fewer tokens.
+- When the connection service restarts, each app waits a random 0.5 to 4 seconds before it connects again. Before, all apps connected again in the same half second, and many of them had to try again. Open chats and connections to your servers stay up while the app waits.
+- The Instructions field in agent settings and channel settings has a grip in its bottom-right corner. Drag it, or use the arrow keys, to make the field taller. Double-click the grip to go back to the start height.
+- Settings search finds Providers and Import, and opens them in Server settings. The command palette
+  has a Providers entry.
+- First run says that you accept the Terms of Service when you continue, with links to the Terms of Service and the Privacy Policy.
+- First run has a "Help make OpenBot better" box. In the United States, Mexico, Japan, Australia and New Zealand it starts ticked; everywhere else it starts clear, and OpenBot sends no analytics until you tick it or turn it on in Settings. OpenBot reads the region and time zone of your computer to choose. If you use OpenBot now, your analytics setting does not change.
+- When you tick the box, three agents pop up to say thank you, and a toast thanks you once.
+- The web sign-in has the same box, directly under the send button, and the Terms of Service notice at the bottom. The web app reads the region of the browser language and the time zone to choose. Your answer is saved when you ask for a sign-in code. After you agree once, the sign-in screen does not ask again. If you are signed in to the web app now, your analytics setting does not change.
+- Toasts have no drop shadow.
+- Your analytics answer follows your account. When you tick or clear the box, or change the setting in Settings on desktop, web or mobile, the account keeps your answer, and your other devices use it after sign-in. A box that you did not change is not sent. An older choice from a device that was offline does not replace a newer one.
+- The icon buttons at the top of the file preview panel, such as Copy, Download and Close, now show
+  their name in a tooltip when you point to them or move to them with the keyboard.
+- Choose the sound that plays when a task finishes: Off, Classic, Warm, Mechanical, Bubbly or
+  Clicky. Classic is the sound from before. The task sound plays also when action sounds are off.
+  In Settings > Notifications, both sound settings are now menus. Select the play icon before a
+  sound name, or move to it with the arrow keys, to hear it before you choose it.
+- If you turned analytics off before this version, an analytics answer from another device does not turn it on again on that device. Only a change on that device turns it on.
+
+### Fixed
+
+- A channel lead now routes a request in a channel with many members that have long descriptions.
+  Before, routing stopped with "This request exceeds the routing context limit", also for a short
+  request.
+- A Workspace only Claude agent on a computer where Claude cannot start its sandbox, such as Windows, now says that the sandbox is not available and tells you to choose Full access or another provider. Before, it showed Claude's message about a `sandbox.failIfUnavailable` setting that OpenBot does not have.
+- In the sidebar, a chat that you drag now lands in the section that is below the pointer. Before, a drop near the edge of a long section could go to the next section, and a chat dragged into another section could go back to its own section.
+- OpenBot keeps one version of each provider CLI that it downloads. Before, it kept the version before the last update too, so each CLI used about two times its size on disk. The old version is removed a few hours after an update.
+- Cloudflare checks now pass in the built-in browser. Before, the check stayed on "Performing
+  security verification" or asked again after you completed it.
+- Agents that work in a busy web page compact their conversation less often. Before, each click sent the full page details and the same page log again, and an agent could compact its context every minute.
+- A click, key press or other browser input now returns a short status (address, title, focus and new errors), not the full page. The element references from the last page read stay valid, so an agent reads the page again only when it needs to.
+- An agent can take a screenshot of one element of a web page. The image is much smaller than a screenshot of the full page.
+- Selecting an option in a list that the web page replaces after each change now selects the correct option. Before, the agent selected the wrong option, for example on a shop's sort list.
+- A page read is approximately one third smaller: each element is one line of text, and successful network requests and actions are not in it.
+- Browser instructions that an agent gets when it finds a tool are approximately four times shorter. Sign-in and payment rules come only with the tools for these steps.
+- A page read does not attach a second image of the page when the agent got one just before and nothing changed the page since.
+- A web request that the page cancels, for example a live price stream on a trading site, is not shown to the agent as an error.
+- In a channel, a turn that the provider starts by itself, as when a Claude or ACP background job ends, no longer takes the member's next task. Before, that turn ran as the next task, its text showed as the task's reply, the task's own request did not start, and the channel showed "The provider could not start this assignment."
+- After an agent publishes, replaces or deletes a site, the chat shows one row with the latest
+  status. Before, a "Deploying site" row with a spinner stayed next to the "Published site" row.
+- Show only the providers that you connected in the model list of a workflow LLM or agent step, as
+  the agent model list does. Before, the list showed ChatGPT and its models when ChatGPT was not
+  connected, and a new LLM step took a ChatGPT model. A step keeps the provider that it has.
+- Show a neutral mark for a provider that this OpenBot does not know in a workflow step. Before, it
+  showed the ChatGPT mark.
+- The Gemini sign-in hint names the correct place: Server settings > Providers.
+- A site that a computer published before it became a server now shows in the server's Sites list and counts against the server. Before, the list was empty and showed 0 sites. The site moves to the server the next time the server connects to your account.
+- An upload that stopped before it finished no longer takes a site slot, so a publish no longer fails when Sites shows a free slot.
+- When the site limit stops a publish, the agent and the app now say what the limit is and how to publish more sites.
+- A message that you send to an agent at a usage limit now tries the provider again at once. Before,
+  it waited for the reset time, also after you signed in to another account or got more usage.
+
 ## [0.55.0] - 2026-10-30
 
 ### Added

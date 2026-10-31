@@ -198,6 +198,8 @@ export interface AnalyticsPreference {
 
 export interface SetAnalyticsPreferenceInput {
   enabled: boolean;
+  /** True when the user chose this value. Only a choice is sent to the account; a default is not. */
+  chosen?: boolean;
 }
 
 export interface CentralAuthUser {
@@ -205,6 +207,11 @@ export interface CentralAuthUser {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  /**
+   * The latest product analytics answer of the account, from any device. Null or missing: the user
+   * never answered, or the account service is older.
+   */
+  analyticsEnabled?: boolean | null;
 }
 
 export interface CentralAuthIssue {

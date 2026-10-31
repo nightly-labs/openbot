@@ -11,11 +11,15 @@ import {
   SwitchField,
   toast,
 } from "@openbot/ui";
-import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import {
+  ACTION_SOUND_CHOICES,
+  type GeneralSettingsValue,
+  TASK_SOUND_CHOICES,
+} from "@openbot/ui/features/settings/app-settings";
 import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
-import { SoundThemePicker } from "@openbot/ui/features/settings/SoundThemePicker";
+import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { Show } from "solid-js";
-import { replayActionSoundChoice } from "../../action-sounds";
+import { playSoundChoice } from "../../completion-sound";
 import { useI18n } from "../../i18n-context";
 import type { NotificationLevelsStore } from "./notification-levels-store";
 
@@ -66,7 +70,6 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
           device="computer"
           onSetServerLevel={props.onSetServerLevel}
           onSetAgentLevel={props.levels.setAgentLevel}
-          onTurnOnAgent={props.levels.turnOnAgent}
           onMute={(serverId, durationMs) =>
             durationMs === null
               ? props.onSetServerMuted(serverId, true)
@@ -133,27 +136,41 @@ export function SettingsNotificationsTab(props: SettingsNotificationsTabProps) {
               </Item>
             )}
           </Show>
-          <SwitchField
-            data-settings-row="settings.taskSound.title"
-            checked={props.value.taskCompletionSound}
-            onChange={(checked) => props.onUpdateSetting("taskCompletionSound", checked)}
-            label={i18n.t("settings.taskSound.title")}
-            description={i18n.t("settings.taskSound.description")}
-          />
-          <Item data-settings-row="settings.soundFeedback.title" class="settings-modal-row settings-sound-theme-row">
+          <Item data-settings-row="settings.taskSound.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.taskSound.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.taskSound.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SoundChoiceSelect
+                label={i18n.t("settings.taskSound.title")}
+                choices={TASK_SOUND_CHOICES}
+                value={props.value.taskSound}
+                onChange={(value) => props.onUpdateSetting("taskSound", value)}
+                onPreview={playSoundChoice}
+                mount={props.menuMount}
+              />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.soundFeedback.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("settings.soundFeedback.title")}</ItemTitle>
               <ItemDescription>{i18n.t("settings.soundFeedback.description")}</ItemDescription>
             </ItemContent>
-            <SoundThemePicker
-              value={props.value.soundFeedback ? props.value.soundTheme : "off"}
-              onChange={(value) =>
-                props.onUpdateSettings(
-                  value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
-                )
-              }
-              onReplay={replayActionSoundChoice}
-            />
+            <ItemActions>
+              <SoundChoiceSelect
+                label={i18n.t("settings.soundFeedback.title")}
+                choices={ACTION_SOUND_CHOICES}
+                value={props.value.soundFeedback ? props.value.soundTheme : "off"}
+                onChange={(value) =>
+                  props.onUpdateSettings(
+                    value === "off" ? { soundFeedback: false } : { soundFeedback: true, soundTheme: value },
+                  )
+                }
+                onPreview={playSoundChoice}
+                mount={props.menuMount}
+              />
+            </ItemActions>
           </Item>
         </ItemGroup>
       </SettingsSection>

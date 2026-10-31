@@ -260,7 +260,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (
         resolved.name === state.user.name &&
         resolved.email === state.user.email &&
-        resolved.avatarUrl === state.user.avatarUrl
+        resolved.avatarUrl === state.user.avatarUrl &&
+        resolved.analyticsEnabled === state.user.analyticsEnabled
       )
         return this.getState();
       return this.#setState({ status: "signed_in", user: resolved });
@@ -1701,6 +1702,39 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       return this.#setState({
         status: "signed_in",
         user: { ...this.#state.user, name: user.name },
+      });
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * Saves the user's analytics answer on the account, so their other devices follow it. `ageMs` is
+   * the age of the choice; the account keeps a newer answer from another device.
+   */
+  readonly updateAnalytics = Effect.fn("CentralAuth.updateAnalytics")(
+    function* (
+      this: CentralAuthManager,
+      enabled: boolean,
+      ageMs: number,
+    ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+      const sessionToken = this.#sessionToken;
+      if (!sessionToken)
+        return yield* new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        });
+      const user = yield* this.#authorizedRequestEffect(
+        "/v1/me/analytics",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled, ageMs }),
+        },
+        decodeCentralAuthUser,
+      );
+      if (this.#sessionToken !== sessionToken || this.#state.status !== "signed_in") return this.getState();
+      return this.#setState({
+        status: "signed_in",
+        user: { ...this.#state.user, analyticsEnabled: user.analyticsEnabled ?? null },
       });
     },
     (operation) => this.#owned(operation),

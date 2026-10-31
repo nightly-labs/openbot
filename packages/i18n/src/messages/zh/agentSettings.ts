@@ -70,7 +70,7 @@ export const messages = {
   "agentSettings.backupModels.ask": "切换前询问",
   "agentSettings.backupModels.order": "顺序",
   "agentSettings.backupModels.listLabel": "备用模型（按顺序）",
-  "agentSettings.backupModels.empty": "未设置顺序。{name} 会依次尝试每个可用模型。",
+  "agentSettings.backupModels.empty": "未设置顺序。{name} 会列出每个可用模型供你选择。",
   "agentSettings.backupModels.add": "添加备用模型",
   "agentSettings.backupModels.moveUp": "上移 {model}",
   "agentSettings.backupModels.moveDown": "下移 {model}",
@@ -152,7 +152,6 @@ export const messages = {
   "agentSettings.notificationLevel.server": "服务器默认（{level}）",
   "agentSettings.notificationLevel.note":
     "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
-  "agentSettings.notificationLevel.sharedOff": "此助手的通知已对所有成员关闭。",
 
   "agentSettings.newChat.title": "新对话",
   "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",

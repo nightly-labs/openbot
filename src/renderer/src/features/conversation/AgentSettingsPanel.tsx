@@ -29,7 +29,7 @@ import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
-import { AgentMemoriesModal } from "./AgentMemoriesModal";
+import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
@@ -134,7 +134,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const [hostChoice, setHostChoice] = createSignal<AgentBrowserProfile | undefined>(undefined);
   let choiceRequest = 0;
   // The settings page covers the conversation while it changes the profiles, so the list loads again
-  // each time the conversation shows.
+  // each time the conversation shows. A change made on another device, such as the phone, shows while
+  // the settings are open. The choice of an agent on this computer comes with its summary.
   createEffect(
     () => ({
       store: props.workspaceCovered === true ? undefined : browserProfiles(),
@@ -143,18 +144,25 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       local: props.localHost === true,
     }),
     ({ store, calls, agentId, local }) => {
-      const request = ++choiceRequest;
+      // A read that an earlier agent or server started does not show.
+      ++choiceRequest;
       setHostChoice(undefined);
       if (!store || !calls) return;
       const failed = (error: unknown) => actionToast.error(errorMessage(error, t("browser.profiles.loadFailed")));
+      const readChoice = (report: (error: unknown) => void) => {
+        const request = ++choiceRequest;
+        calls
+          .readAgent(agentId)
+          .then((choice) => {
+            if (request === choiceRequest) setHostChoice(choice);
+          })
+          .catch(report);
+      };
       store.refresh().catch(failed);
-      if (local) return;
-      calls
-        .readAgent(agentId)
-        .then((choice) => {
-          if (request === choiceRequest) setHostChoice(choice);
-        })
-        .catch(failed);
+      if (local) return store.follow();
+      readChoice(failed);
+      // A read after a change keeps the shown choice when it fails; the next change reads it again.
+      return store.follow(() => readChoice(() => undefined));
     },
   );
   const browserProfileOptions = (): AgentBrowserProfileOptions | undefined => {
@@ -406,7 +414,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
-      detailOpen={draft.routines.open || draft.files.open}
+      detailOpen={draft.routines.open || draft.files.open || draft.memories.open}
       links={
         <>
           <Show when={sessionSettings()}>
@@ -556,14 +564,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           }
         />
       </Show>
-      <AgentMemoriesModal
+      <AgentMemoriesSettings
         port={memoriesPort()}
         open={draft.memories.open}
-        onOpenChange={(open) =>
+        onBack={() =>
           setDraft((state) => {
-            state.memories.open = open;
+            state.memories.open = false;
           })
         }
+        onClose={props.onClose}
         onCountChange={(count) =>
           setDraft((state) => {
             state.memories.count = count;

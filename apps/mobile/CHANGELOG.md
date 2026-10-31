@@ -51,7 +51,7 @@ the [root changelog](../../CHANGELOG.md).
 - Notifications and Live Activity updates reach an iPhone app that is not from the App Store, such as a build that Xcode installs or an ad hoc build. Before, the app could name the wrong Apple push environment, and Apple refused every notification and update for it.
 - Show the full names in the chat + menu. Before, a long name, such as "Use skill or app" in Polish, was cut off.
 
-## [1.4.3] - 2026-10-29 (iOS)
+## [1.4.3] - 2026-10-29 (iOS), 2026-10-31 (Android)
 
 ### Added
 

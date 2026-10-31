@@ -20,8 +20,20 @@ const OUT = join(ROOT, ".openbot-build", "invite-acceptance-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const HOST_ID = "host-1";
 const HOUR = 60 * 60 * 1000;
-const OWNER: AuthUser = { id: "user-owner", email: "owner@example.test", name: "Owner", avatarUrl: null };
-const MEMBER: AuthUser = { id: "user-member", email: "member@example.test", name: "Member", avatarUrl: null };
+const OWNER: AuthUser = {
+  id: "user-owner",
+  email: "owner@example.test",
+  name: "Owner",
+  avatarUrl: null,
+  analyticsEnabled: null,
+};
+const MEMBER: AuthUser = {
+  id: "user-member",
+  email: "member@example.test",
+  name: "Member",
+  avatarUrl: null,
+  analyticsEnabled: null,
+};
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {

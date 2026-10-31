@@ -1,6 +1,6 @@
 import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
 import { Context, Deferred, Effect, Fiber } from "effect";
-import type { BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
+import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -24,6 +24,35 @@ const OPERATION_DEADLINE_BACKSTOP_MS = 250;
 export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("openbot/BrowserToolHold", {
   defaultValue: () => () => false,
 });
+
+/**
+ * The agent turn that runs a tool. Only the agent tool paths provide it: a dialog that opens during the
+ * action of a person stays with the person.
+ */
+export const BrowserDialogTurn = Context.Reference<BrowserDialogOwner | undefined>("openbot/BrowserDialogTurn", {
+  defaultValue: () => undefined,
+});
+
+/** An action that opened a page dialog returns this in place of its result. */
+export interface DialogTabResult {
+  tabId: string;
+  dialog: { id?: string; type: BrowserDialog["type"]; message: string };
+  note: string;
+}
+
+export function dialogTabResult(tabId: string, dialog: BrowserDialog): DialogTabResult {
+  return dialog.agent
+    ? {
+        tabId,
+        dialog: { id: dialog.id, type: dialog.type, message: dialog.message },
+        note: "The page opened a dialog. Answer it with handle_dialog. Do not repeat the action: its input reached the page.",
+      }
+    : {
+        tabId,
+        dialog: { type: dialog.type, message: dialog.message },
+        note: "The page opened a dialog that only a person can answer. Ask the user to answer it, then read the tab again.",
+      };
+}
 
 /** An agent tool operation reached a tab that a person controls. The caller waits for the release. */
 export class BrowserUserControlHeld extends Error {
@@ -257,133 +286,175 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
     timeoutMs = 10_000,
     onOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void,
   ) =>
-    enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
-      Effect.gen(function* () {
-        if (tab.secret)
-          return yield* browserFailure(
-            new Error("Browser inspection is protected during authentication. Use takeover."),
-          );
-        const deadline = Date.now() + timeoutMs;
-        const timeoutMessage = `Browser ${action} timed out.`;
-        let actionRecorded = false;
-        let dispatched = false;
-        let cancellationConfirmed = false;
-        let stalledSettle: Fiber.Fiber<void, BrowserOperationError> | undefined;
-        const completion = yield* Effect.forkIn(
-          Effect.gen(function* () {
-            let highlighted = false;
-            yield* Effect.gen(function* () {
-              // CDP emulates page focus. Native focus would interrupt typing in another chat.
-              if (target && target.kind !== "point")
-                highlighted = yield* tab.engine.highlight(target).pipe(
-                  Effect.as(true),
-                  Effect.catch(() => Effect.succeed(false)),
-                );
-              yield* browserSync(() => remainingTime(deadline, timeoutMessage));
-              yield* operation(tab, deadline, () => {
-                dispatched = true;
-              });
-            }).pipe(
-              Effect.ensuring(
-                Effect.suspend(() =>
-                  highlighted && !cancellationConfirmed ? tab.engine.hideHighlight().pipe(Effect.ignore) : Effect.void,
-                ),
+    Effect.flatMap(BrowserDialogTurn, (dialogTurn) =>
+      enqueueTabOperation(tab, (_tab, keepQueueBlocked) =>
+        Effect.gen(function* () {
+          if (tab.secret)
+            return yield* browserFailure(
+              new Error("Browser inspection is protected during authentication. Use takeover."),
+            );
+          const openDialog = tab.engine.dialog;
+          // The dialog opened after the tool checked the tab. The input would wait for its answer.
+          if (dialogTurn && openDialog)
+            return dialogTabResult(tab.id, { ...openDialog, agent: tab.engine.dialogOwnedBy(dialogTurn) });
+          // A dialog can open from the input or while the page settles. Drains run after both.
+          const watch = dialogTurn ? tab.engine.watchDialogs(dialogTurn) : undefined;
+          let watchedInput: Fiber.Fiber<void, BrowserOperationError> | undefined;
+          // Registered before the fork, so an interruption cannot leave the watch on.
+          if (watch)
+            keepQueueBlocked(
+              Effect.suspend(() => (watchedInput ? Fiber.await(watchedInput) : Effect.void)).pipe(
+                Effect.ensuring(Effect.sync(watch.end)),
               ),
             );
-          }),
-          tab.scope,
-          { startImmediately: true },
-        );
-        onOperationStarted?.(completion);
-        // Register before waiting, so even an interrupted caller leaves the queue protected.
-        keepQueueBlocked(
-          Effect.gen(function* () {
-            if (!cancellationConfirmed) yield* Fiber.await(completion);
-            if (!tab.closing && !tab.contents.isDestroyed() && tab.contents.isLoading())
-              yield* tab.engine.stopLoading().pipe(Effect.ignore);
-            if (stalledSettle) yield* unwindStalledOperation(tab, stalledSettle);
-          }),
-        );
-        return yield* Effect.gen(function* () {
-          yield* withTimeout(
-            Fiber.join(completion),
-            Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
-            timeoutMessage,
-          ).pipe(
-            Effect.catch((error) =>
-              Effect.gen(function* () {
-                if (!(error instanceof TimeoutError)) return yield* error;
-                cancellationConfirmed = tab.engine.cancelPendingCommands();
-                if (dispatched && !cancellationConfirmed) yield* Fiber.await(completion);
-                return yield* browserFailure(error);
-              }),
-            ),
+          let dialogReturned = false;
+          const deadline = Date.now() + timeoutMs;
+          const timeoutMessage = `Browser ${action} timed out.`;
+          let actionRecorded = false;
+          let dispatched = false;
+          let cancellationConfirmed = false;
+          let stalledSettle: Fiber.Fiber<void, BrowserOperationError> | undefined;
+          const completion = yield* Effect.forkIn(
+            Effect.gen(function* () {
+              let highlighted = false;
+              // The input itself reports a failure to attach.
+              if (watch) yield* tab.engine.observeDialogs().pipe(Effect.ignore);
+              yield* Effect.gen(function* () {
+                // CDP emulates page focus. Native focus would interrupt typing in another chat.
+                if (target && target.kind !== "point")
+                  highlighted = yield* tab.engine.highlight(target).pipe(
+                    Effect.as(true),
+                    Effect.catch(() => Effect.succeed(false)),
+                  );
+                yield* browserSync(() => remainingTime(deadline, timeoutMessage));
+                yield* operation(tab, deadline, () => {
+                  dispatched = true;
+                });
+              }).pipe(
+                Effect.ensuring(
+                  Effect.suspend(() =>
+                    highlighted && !cancellationConfirmed
+                      ? tab.engine.hideHighlight().pipe(Effect.ignore)
+                      : Effect.void,
+                  ),
+                ),
+              );
+            }),
+            tab.scope,
+            { startImmediately: true },
           );
-          const settleTimeout = Math.max(1, deadline - Date.now());
-          const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, { startImmediately: true });
-          yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
+          watchedInput = completion;
+          onOperationStarted?.(completion);
+          // Register before waiting, so even an interrupted caller leaves the queue protected.
+          keepQueueBlocked(
+            Effect.gen(function* () {
+              if (!cancellationConfirmed) yield* Fiber.await(completion);
+              // An accepted confirmation often submits a form. Its navigation is the agent's answer.
+              if (!dialogReturned && !tab.closing && !tab.contents.isDestroyed() && tab.contents.isLoading())
+                yield* tab.engine.stopLoading().pipe(Effect.ignore);
+              if (stalledSettle) yield* unwindStalledOperation(tab, stalledSettle);
+            }),
+          );
+          const result = Effect.gen(function* () {
+            yield* withTimeout(
+              Fiber.join(completion),
+              Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
+              timeoutMessage,
+            ).pipe(
+              Effect.catch((error) =>
+                Effect.gen(function* () {
+                  if (!(error instanceof TimeoutError)) return yield* error;
+                  cancellationConfirmed = tab.engine.cancelPendingCommands();
+                  if (dispatched && !cancellationConfirmed) yield* Fiber.await(completion);
+                  return yield* browserFailure(error);
+                }),
+              ),
+            );
+            const settleTimeout = Math.max(1, deadline - Date.now());
+            const settle = yield* Effect.forkIn(tab.engine.settle(settleTimeout), tab.scope, {
+              startImmediately: true,
+            });
+            yield* withTimeout(Fiber.join(settle), settleTimeout, timeoutMessage).pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                  if (tab.engine.cancelPendingCommands()) settle.interruptUnsafe();
+                  stalledSettle = settle;
+                }),
+              ),
+              Effect.catch((error) =>
+                Effect.gen(function* () {
+                  const cause = error instanceof TimeoutError ? error : error.cause;
+                  if (!isTimeoutError(cause)) return yield* browserFailure(cause);
+                  stalledSettle = settle;
+                  if (tab.contents.isLoading()) yield* tab.engine.stopLoading().pipe(Effect.ignore);
+                }),
+              ),
+            );
+            tab.diagnostics.action({
+              action,
+              ...(target ? { target: describeBrowserTarget(target) } : {}),
+              outcome: "success",
+              ...(Date.now() >= deadline
+                ? { detail: "Action completed; page settling exceeded the requested timeout." }
+                : {}),
+            });
+            actionRecorded = true;
+            return yield* readResult(tab, keepQueueBlocked, timeoutMessage);
+          }).pipe(
             Effect.onInterrupt(() =>
               Effect.sync(() => {
-                if (tab.engine.cancelPendingCommands()) settle.interruptUnsafe();
-                stalledSettle = settle;
+                cancellationConfirmed = tab.engine.cancelPendingCommands();
+                // Target resolution can issue CDP commands before input dispatch.
+                if (cancellationConfirmed) completion.interruptUnsafe();
+                keepQueueBlocked(Fiber.await(completion));
               }),
             ),
             Effect.catch((error) =>
               Effect.gen(function* () {
-                const cause = error instanceof TimeoutError ? error : error.cause;
-                if (!isTimeoutError(cause)) return yield* browserFailure(cause);
-                stalledSettle = settle;
-                if (tab.contents.isLoading()) yield* tab.engine.stopLoading().pipe(Effect.ignore);
+                if (dispatched && (tab.closing || tab.contents.isDestroyed()))
+                  return {
+                    tabId: tab.id,
+                    closed: true as const,
+                    ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
+                  };
+                if (!actionRecorded)
+                  tab.diagnostics.action({
+                    action,
+                    ...(target ? { target: describeBrowserTarget(target) } : {}),
+                    outcome: "error",
+                    detail: String(error.cause),
+                  });
+                // The input can have changed the site already. A plain timeout invites a repeat.
+                // Partial typing already says how many characters reached the page.
+                if (dispatched && isTimeoutError(error.cause) && !String(error.cause).includes("reached the page"))
+                  return yield* browserFailure(
+                    new Error(
+                      `Browser ${action} timed out after its input reached the page. Check the page before you repeat the action.`,
+                    ),
+                  );
+                return yield* error;
               }),
             ),
           );
-          tab.diagnostics.action({
-            action,
-            ...(target ? { target: describeBrowserTarget(target) } : {}),
-            outcome: "success",
-            ...(Date.now() >= deadline
-              ? { detail: "Action completed; page settling exceeded the requested timeout." }
-              : {}),
-          });
-          actionRecorded = true;
-          return yield* readResult(tab, keepQueueBlocked, timeoutMessage);
-        }).pipe(
-          Effect.onInterrupt(() =>
-            Effect.sync(() => {
-              cancellationConfirmed = tab.engine.cancelPendingCommands();
-              // Target resolution can issue CDP commands before input dispatch.
-              if (cancellationConfirmed) completion.interruptUnsafe();
-              keepQueueBlocked(Fiber.await(completion));
-            }),
-          ),
-          Effect.catch((error) =>
-            Effect.gen(function* () {
-              if (dispatched && (tab.closing || tab.contents.isDestroyed()))
-                return {
-                  tabId: tab.id,
-                  closed: true as const,
-                  ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
-                };
-              if (!actionRecorded)
-                tab.diagnostics.action({
-                  action,
-                  ...(target ? { target: describeBrowserTarget(target) } : {}),
-                  outcome: "error",
-                  detail: String(error.cause),
-                });
-              // The input can have changed the site already. A plain timeout invites a repeat.
-              // Partial typing already says how many characters reached the page.
-              if (dispatched && isTimeoutError(error.cause) && !String(error.cause).includes("reached the page"))
-                return yield* browserFailure(
-                  new Error(
-                    `Browser ${action} timed out after its input reached the page. Check the page before you repeat the action.`,
-                  ),
-                );
-              return yield* error;
-            }),
-          ),
-        );
-      }),
+          if (!watch) return yield* result;
+          return yield* Effect.raceFirst(
+            result,
+            watch.opened.pipe(
+              Effect.map((dialog) => {
+                dialogReturned = true;
+                if (!actionRecorded)
+                  tab.diagnostics.action({
+                    action,
+                    ...(target ? { target: describeBrowserTarget(target) } : {}),
+                    outcome: "success",
+                    detail: `The page opened a ${dialog.type} dialog.`,
+                  });
+                return dialogTabResult(tab.id, dialog);
+              }),
+            ),
+          );
+        }),
+      ),
     ),
 );
 

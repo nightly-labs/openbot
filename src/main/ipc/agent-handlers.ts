@@ -489,6 +489,7 @@ export function agentIpcHandlers({
           if (input.allowNewChat !== undefined) {
             throw new Error(sourceText("error.agent.newChatLocalOnly"));
           }
+          // The released agent route does not carry it; the renderer sends it on `agent-plan-card-v1`.
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }

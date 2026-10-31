@@ -17,6 +17,8 @@ export interface AgentsPort {
     | "updateAgentBackupModels"
     | "getAgentTaskLimit"
     | "updateAgentTaskLimit"
+    | "getAgentPlanCard"
+    | "updateAgentPlanCard"
     | "listAgents"
     | "listConversationReads"
     | "listModels"

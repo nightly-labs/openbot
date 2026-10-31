@@ -115,7 +115,9 @@ export function createNotificationLevelsStore(options: {
         name: agent.name,
         // Only the short title: a long description would change the height of the row.
         detail: agent.title,
-        sharedOff: !agent.notifications,
+        avatarSeed: agent.avatarSeed,
+        avatarHue: agent.avatarHue,
+        avatarUrl: agent.avatarUrl,
         level: own.get(agent.id) ?? null,
       })),
     };
@@ -129,6 +131,7 @@ export function createNotificationLevelsStore(options: {
     ].map((server) => ({
       id: server.id,
       name: server.name,
+      logoUrl: server.logoUrl,
       level: server.notificationLevel,
       muted: server.notificationsMuted,
       mutedUntil: server.notificationsMutedUntil,
@@ -138,24 +141,28 @@ export function createNotificationLevelsStore(options: {
     })),
   );
 
+  /**
+   * Writes the level of the user for one agent. An agent that a member turned off for every member,
+   * with the agent switch of earlier versions, stays silent at each level, and no control shows that
+   * switch now. So a level of its own also turns the agent on again. The host keeps that switch.
+   */
   async function setAgentLevel(
     serverId: string,
     agentId: string,
     level: ServerNotificationLevel | null,
   ): Promise<void> {
-    const levels = await settingsPort().agent.setAgentNotificationLevel({ agentId, level }, serverId);
+    const port = settingsPort().agent;
+    const levels = await port.setAgentNotificationLevel({ agentId, level }, serverId);
     setEntries((draft) => {
       const entry = draft[serverId];
       if (entry) entry.levels = levels;
     });
-  }
-
-  /** Turns on an agent that a member turned off for every member. The host keeps that switch. */
-  async function turnOnAgent(serverId: string, agentId: string): Promise<void> {
-    await settingsPort().agent.updateAgent({ agentId, notifications: true }, serverId);
+    const agent = entries[serverId]?.agents.find((candidate) => candidate.id === agentId);
+    if (level === null || !agent || agent.notifications) return;
+    await port.updateAgent({ agentId, notifications: true }, serverId);
     setEntries((draft) => {
-      const agent = draft[serverId]?.agents.find((candidate) => candidate.id === agentId);
-      if (agent) agent.notifications = true;
+      const turnedOn = draft[serverId]?.agents.find((candidate) => candidate.id === agentId);
+      if (turnedOn) turnedOn.notifications = true;
     });
   }
 
@@ -164,7 +171,7 @@ export function createNotificationLevelsStore(options: {
     if (server) void load(server);
   }
 
-  return { matrixServers, setAgentLevel, turnOnAgent, retry };
+  return { matrixServers, setAgentLevel, retry };
 }
 
 export type NotificationLevelsStore = ReturnType<typeof createNotificationLevelsStore>;

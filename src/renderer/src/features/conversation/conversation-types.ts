@@ -319,6 +319,8 @@ export interface ConversationProps {
   remoteBackupModelsLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
   remoteTaskLimitLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
+  remotePlanCardLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
   remoteBusyMessageModeLoaded?: boolean | undefined;
   /**

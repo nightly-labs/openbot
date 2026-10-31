@@ -68,6 +68,17 @@ export function useProviderAccounts(agent: MobileAgent, enabled: boolean) {
   return { queryKey, accounts: canManage ? (accounts.data ?? null) : null };
 }
 
+/** The name of an account, as on desktop: the user's name for it, its email, "API key", or its place in the list. */
+export function useProviderAccountName() {
+  const { t } = useText();
+  return (account: ProviderAccountStatus, index: number) =>
+    account.label ||
+    account.email ||
+    (account.id === CLAUDE_API_KEY_ACCOUNT_ID
+      ? t("mobile.agent.runtime.accountApiKey")
+      : t("mobile.agent.runtime.accountNumbered", { number: index + 1 }));
+}
+
 export function AgentRuntimeFields({
   serverId,
   available,
@@ -104,13 +115,7 @@ export function AgentRuntimeFields({
   onAccountChange?: (accountId: string) => void;
 }) {
   const { t } = useText();
-  // The name of an account, as on desktop: the user's name for it, its email, "API key", or its place in the list.
-  const accountName = (account: ProviderAccountStatus, index: number) =>
-    account.label ||
-    account.email ||
-    (account.id === CLAUDE_API_KEY_ACCOUNT_ID
-      ? t("mobile.agent.runtime.accountApiKey")
-      : t("mobile.agent.runtime.accountNumbered", { number: index + 1 }));
+  const accountName = useProviderAccountName();
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const { theme } = useUniwind();
