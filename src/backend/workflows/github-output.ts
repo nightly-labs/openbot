@@ -130,6 +130,8 @@ export function githubOutputInput(inputs: readonly string[]): string {
   return [text, ...events].filter(Boolean).join("\n\n").slice(0, INPUT_LIMITS.workflowStepInput);
 }
 
+const FRAME_END = `\n${EXTERNAL_EVENT_END}`;
+
 /** The name that `inputText` puts before each input it joins, with no text after it. */
 const EMPTY_INPUT_NAME = /(?<=^|\n)Input \d+:\s*(?=Input \d+:\n|$)/gu;
 const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
@@ -141,8 +143,9 @@ const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
 function withoutEvents(input: string): string {
   let text = input;
   for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
-    const end = text.indexOf(EXTERNAL_EVENT_END, start);
-    text = text.slice(0, start) + (end < 0 ? "" : text.slice(end + EXTERNAL_EVENT_END.length));
+    // The event is one line of JSON, which keeps no line break, so a marker in a comment does not end it.
+    const end = text.indexOf(FRAME_END, start);
+    text = text.slice(0, start) + (end < 0 ? "" : text.slice(end + FRAME_END.length));
   }
   if (text === input) return text;
   text = text.replace(EMPTY_INPUT_NAME, "");

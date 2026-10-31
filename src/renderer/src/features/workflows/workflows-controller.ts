@@ -31,6 +31,9 @@ const RUN_PAGE = 20;
 /** The pause after the last edit before the canvas saves. */
 const SAVE_DELAY_MS = 400;
 
+/** The options of a repository that the host could not read. */
+const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
+
 const FAILURE_CODES = {
   create: "create_failed",
   rename: "update_failed",
@@ -380,8 +383,8 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
           if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, next));
         },
         (error: unknown) => {
-          // The next ask reads again, such as after the App gets the repository.
-          askedOptions.delete(key);
+          // The menus stop loading and show no options. A change on GitHub reads them again.
+          if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, NO_OPTIONS));
           report(error);
         },
       );
