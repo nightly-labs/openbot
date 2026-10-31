@@ -1161,15 +1161,15 @@ export class ThreadLifecycle {
     agent: AgentSummary,
     client: AgentClient,
   ) {
-    const file = yield* promptInstructionsFile(agent.workspacePath);
     const read =
       client.provider === "claude" && workspaceAccessEnforced(agent)
         ? []
         : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
+    const file = yield* promptInstructionsFile(agent.workspacePath, read);
     return {
       fileName: file?.fileName ?? "AGENTS.md",
       found: file,
-      file: file && !read.includes(file.fileName) ? file : null,
+      file: file && !file.readByCli ? file : null,
     } satisfies InstructionsFileInPrompt;
   });
 

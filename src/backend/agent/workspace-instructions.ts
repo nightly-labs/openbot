@@ -138,6 +138,8 @@ export interface PromptInstructionsFile {
   text: string;
   /** The file was longer than the prompt carries. */
   truncated: boolean;
+  /** The CLI reads the file by itself, under its own name or through a link with another name. */
+  readByCli: boolean;
 }
 
 /**
@@ -146,12 +148,29 @@ export interface PromptInstructionsFile {
  */
 export const AGENT_INSTRUCTIONS_FILE_BYTES = INPUT_LIMITS.agentInstructionsFile * 4;
 
+/** `CLAUDE.md` can be a link to `AGENTS.md`, or the reverse: a CLI that reads one name reads both. */
+const cliReadsFile = Effect.fn("WorkspaceInstructions.cliReads")(function* (
+  workspace: string,
+  file: FoundFile,
+  cliReads: readonly AgentInstructionFileName[],
+) {
+  if (cliReads.includes(file.fileName)) return true;
+  for (const fileName of cliReads) {
+    const path = yield* optionalIo(() => realpath(join(workspace, fileName)));
+    if (Option.isSome(path) && path.value === file.path) return true;
+  }
+  return false;
+});
+
 /**
  * The file for the prompt, trimmed and cut at the editor limit. An empty file keeps its name. A file
  * that cannot be read, or a link outside the workspace, gives none: the workspace belongs to the
  * agent, and its session must still start.
  */
-export const promptInstructionsFile = Effect.fn("WorkspaceInstructions.prompt")(function* (workspace: string) {
+export const promptInstructionsFile = Effect.fn("WorkspaceInstructions.prompt")(function* (
+  workspace: string,
+  cliReads: readonly AgentInstructionFileName[],
+) {
   const found = yield* findFile(workspace).pipe(Effect.orElseSucceed(() => Option.none<FoundFile>()));
   if (Option.isNone(found)) return null;
   const limit = INPUT_LIMITS.agentInstructionsFile;
@@ -163,5 +182,6 @@ export const promptInstructionsFile = Effect.fn("WorkspaceInstructions.prompt")(
     fileName: found.value.fileName,
     text: text.slice(0, limit),
     truncated: text.length > limit || found.value.size > bytes,
+    readByCli: yield* cliReadsFile(workspace, found.value, cliReads),
   } satisfies PromptInstructionsFile;
 });
