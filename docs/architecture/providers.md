@@ -824,6 +824,17 @@ the summary check accepts a summary without it. An older build drops `usagePromp
 the next time it saves the file. An instance transfer does not carry it, because the import never
 saves a custom agent.
 
+OpenBot books what a custom agent itself reports about its usage. The result of `session/prompt` can
+carry a `usage` object whose counts are the session's totals: the ACP schema documents
+`inputTokens` as "Total input tokens across all turns". The optional `cachedReadTokens` and
+`cachedWriteTokens` read as 0 when the agent leaves them out, and an agent whose `inputTokens`
+stand below the cache it reports keeps its input as the uncached count. Each turn books the
+difference between its report and the one before it. The `cost` of a `usage_update` before the
+result is the session's total in USD, and each turn books its difference from the last total; the
+first total of a session that has records but no cost yet books nothing, because that total also
+counts the use from before OpenBot kept costs. An agent that reports each turn's counts instead of
+session totals meters only its first turn correctly, so an agent author must send session totals.
+
 ### Local detection and endpoint edit
 
 The `providerDetection` IPC group scans local model servers and custom agents, loads the models of
