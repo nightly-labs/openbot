@@ -57,7 +57,7 @@ const COVERED_TEXT = {
  * `agents-changed` after each change, from this phone or from the desktop, so an open page reads them
  * again (`AGENT_SETTINGS_PARTS`).
  */
-export function useAgentFolders(agent: MobileAgent, enabled: boolean) {
+function useAgentFolders(agent: MobileAgent, enabled: boolean) {
   const { canManageAgentFolders, loadAgentFolders } = useMobileWorkspace();
   const queryScope = useQueryScope();
   const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "folders");
