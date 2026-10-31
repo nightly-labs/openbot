@@ -369,7 +369,7 @@ export const messages = {
     "服务器会生成一个新密钥。当前密钥和新密钥都会为这次更改签名，因此已配对的应用会保持配对，并在下次连接时切换到新密钥。更改前的 Mobile Connect 链接将失效。如果服务器的密钥文件被复制或泄露，请执行此操作。",
   "mobile.server.settings.keyConfirm": "更改",
   "mobile.server.settings.keyDescription": "如果服务器的密钥文件被复制或泄露，请更改密钥。成员会保持配对。",
-  "mobile.server.settings.keySigned": "之前的密钥为这次更改签了名，因此此应用信任新密钥。",
+  "mobile.server.settings.keySigned": "之前的密钥和新密钥都为这次更改签了名。",
   "mobile.server.settings.keyChangedNow": "服务器密钥已更改。成员的应用会在下次连接时切换到新密钥。",
   "mobile.server.settings.keyFollowing": "服务器正在使用新密钥。服务器列表重新加载后，此应用也会切换到新密钥。",
   "mobile.server.settings.keyChangeFailed": "无法更改服务器密钥。请重试。",

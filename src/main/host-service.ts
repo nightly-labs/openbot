@@ -173,6 +173,8 @@ interface HostServiceOptions {
     hostId: string,
     handover: HostKeyHandover,
   ) => Effect.Effect<"accepted" | "refused", RemoteWorkflowError>;
+  /** The account service accepted a key handover. The server list carries it and its time now. */
+  onKeyRotated?: () => void;
   issueRemoteHostTicket?: (
     hostId: string,
   ) => Effect.Effect<{ ticket: string; signalUrl: string; expiresAt: number }, RemoteWorkflowError>;
@@ -793,35 +795,41 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   readonly rotateIdentityKey = Effect.fn("HostService.rotateIdentityKey")(
     function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
-      if (!this.#options.handOverRemoteHostKey || !this.#options.registerRemoteHost)
-        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationUnavailable")) });
-      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
-      const { handover, result } = yield* this.#hostKeyLock.withPermit(
-        Effect.gen({ self: this }, function* () {
-          const handover = yield* this.#options.store.beginKeyRotation();
-          return { handover, result: yield* this.#resolvePendingKeyRotation() };
-        }),
-      );
-      if (result !== "accepted" || this.#options.store.getIdentity()?.publicKey !== handover.publicKey)
-        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) });
-      if (this.#isActiveHost(handover.hostId)) {
-        this.#setStatus({ message: sourceText("status.host.keyRotated") });
-        this.#api.refreshIdentity();
-      }
+      yield* this.#rotateKey();
       return this.getStatus();
     },
     (operation) => this.#provide(operation),
   ).bind(this);
 
   /** `host-key-rotation-v1`: the owner asked from another device. The answer names the new public key. */
-  readonly #rotateIdentityKeyForOwner = Effect.fn("HostService.rotateIdentityKeyForOwner")(function* (
+  readonly #rotateIdentityKeyForOwner = Effect.fn("HostService.rotateIdentityKeyForOwner")(
+    function* (this: HostService): Effect.fn.Return<{ publicKey: string }, RemoteWorkflowError> {
+      return { publicKey: yield* this.#rotateKey() };
+    },
+    (operation) => this.#provide(operation),
+  );
+
+  /** One key change for both callers. Gives the public key of this change, not a later one. */
+  readonly #rotateKey = Effect.fn("HostService.rotateKey")(function* (
     this: HostService,
-  ): Effect.fn.Return<{ publicKey: string }, RemoteWorkflowError> {
-    yield* this.rotateIdentityKey();
-    const publicKey = this.#options.store.getIdentity()?.publicKey;
-    if (!publicKey)
+  ): Effect.fn.Return<string, RemoteWorkflowError> {
+    if (!this.#options.handOverRemoteHostKey || !this.#options.registerRemoteHost)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationUnavailable")) });
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const { handover, result } = yield* this.#hostKeyLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const handover = yield* this.#options.store.beginKeyRotation();
+        return { handover, result: yield* this.#resolvePendingKeyRotation() };
+      }),
+    );
+    if (result !== "accepted" || this.#options.store.getIdentity()?.publicKey !== handover.publicKey)
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) });
-    return { publicKey };
+    if (this.#isActiveHost(handover.hostId)) {
+      this.#setStatus({ message: sourceText("status.host.keyRotated") });
+      this.#api.refreshIdentity();
+    }
+    this.#options.onKeyRotated?.();
+    return handover.publicKey;
   });
 
   /**

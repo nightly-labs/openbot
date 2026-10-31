@@ -368,7 +368,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "변경",
   "mobile.server.settings.keyDescription":
     "서버 키 파일이 복사되었거나 노출되었다면 키를 변경하세요. 멤버는 페어링을 유지해요.",
-  "mobile.server.settings.keySigned": "이전 키가 이 변경에 서명했으므로 이 앱은 새 키를 신뢰해요.",
+  "mobile.server.settings.keySigned": "이전 키와 새 키가 모두 이 변경에 서명했어요.",
   "mobile.server.settings.keyChangedNow": "서버 키를 변경했어요. 멤버의 앱은 다음에 연결할 때 새 키로 바뀌어요.",
   "mobile.server.settings.keyFollowing": "서버가 새 키를 사용해요. 서버 목록을 다시 불러오면 이 앱도 새 키로 바뀌어요.",
   "mobile.server.settings.keyChangeFailed": "서버 키를 변경하지 못했어요. 다시 시도하세요.",

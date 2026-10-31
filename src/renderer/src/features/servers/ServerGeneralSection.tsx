@@ -435,19 +435,17 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
         <Show when={canRotateKey() || keyChangedAt() !== undefined}>
           <SettingsSection title={t("server.settings.hostKeyTitle")}>
             <ItemGroup class="settings-modal-card">
-              <Show when={keyChangedAt()}>
-                {(changedAt) => (
-                  <Item>
-                    <ItemContent>
-                      <ItemTitle>{t("server.settings.hostKeyChanged")}</ItemTitle>
-                      <ItemDescription>
-                        {t("server.settings.hostKeyChangedDescription", {
-                          date: format.date(new Date(changedAt()), { dateStyle: "medium", timeStyle: "short" }),
-                        })}
-                      </ItemDescription>
-                    </ItemContent>
-                  </Item>
-                )}
+              <Show when={keyChangedAt() !== undefined}>
+                <Item>
+                  <ItemContent>
+                    <ItemTitle>{t("server.settings.hostKeyChanged")}</ItemTitle>
+                    <ItemDescription>
+                      {t("server.settings.hostKeyChangedDescription", {
+                        date: format.date(new Date(keyChangedAt() ?? 0), { dateStyle: "medium", timeStyle: "short" }),
+                      })}
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
               </Show>
               <Show when={canRotateKey()}>
                 <Item>

@@ -123,6 +123,7 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -610,6 +611,8 @@ const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-al
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
 const ROTATED_HOST_KEY = "-----BEGIN PUBLIC KEY-----\nrotated-e2e\n-----END PUBLIC KEY-----\n";
+/** The account service refuses the next handover, as when it holds another key for the host. */
+let refuseHostKeyRotation = false;
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
@@ -722,10 +725,12 @@ try {
       // signing. This checks the gate and that a refused request never reaches the host.
       hostKey: {
         rotate: () =>
-          Effect.sync(() => {
-            record("rotateHostKey");
-            return { publicKey: ROTATED_HOST_KEY };
-          }),
+          refuseHostKeyRotation
+            ? Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) }))
+            : Effect.sync(() => {
+                record("rotateHostKey");
+                return { publicKey: ROTATED_HOST_KEY };
+              }),
       },
       // The setup file in memory. The host writes it and tells the agent service, as `saveSetup` does.
       defaultProvider: {
@@ -1808,6 +1813,18 @@ try {
         isDeepStrictEqual(ownerRotate.body, { publicKey: ROTATED_HOST_KEY }) &&
         callsOf("rotateHostKey").length === 1,
       summary(ownerRotate),
+    );
+    refuseHostKeyRotation = true;
+    const refusedRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    refuseHostKeyRotation = false;
+    check(
+      "a refused key change gives the owner 409 with the reason, not a host fault",
+      errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
+      summary(refusedRotate),
     );
   }
 

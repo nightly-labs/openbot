@@ -383,8 +383,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Wijzigen",
   "mobile.server.settings.keyDescription":
     "Wijzig de sleutel als het sleutelbestand van de server is gekopieerd of gelekt. Leden blijven gekoppeld.",
-  "mobile.server.settings.keySigned":
-    "De vorige sleutel heeft deze wijziging ondertekend, dus deze app vertrouwt de nieuwe sleutel.",
+  "mobile.server.settings.keySigned": "De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
   "mobile.server.settings.keyChangedNow":
     "Serversleutel gewijzigd. Apps van leden gaan bij de volgende verbinding over op de nieuwe sleutel.",
   "mobile.server.settings.keyFollowing":

@@ -378,7 +378,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "変更",
   "mobile.server.settings.keyDescription":
     "サーバーのキーファイルがコピーまたは漏えいした場合はキーを変更してください。メンバーのペアリングは保たれます。",
-  "mobile.server.settings.keySigned": "以前のキーがこの変更に署名したため、このアプリは新しいキーを信頼しています。",
+  "mobile.server.settings.keySigned": "以前のキーと新しいキーの両方がこの変更に署名しました。",
   "mobile.server.settings.keyChangedNow":
     "サーバーキーを変更しました。メンバーのアプリは次に接続したときに新しいキーへ切り替わります。",
   "mobile.server.settings.keyFollowing":

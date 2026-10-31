@@ -389,8 +389,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Değiştir",
   "mobile.server.settings.keyDescription":
     "Sunucunun anahtar dosyası kopyalandıysa veya açığa çıktıysa anahtarı değiştirin. Üyeler eşli kalır.",
-  "mobile.server.settings.keySigned":
-    "Önceki anahtar bu değişikliği imzaladı, bu yüzden bu uygulama yeni anahtara güveniyor.",
+  "mobile.server.settings.keySigned": "Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
   "mobile.server.settings.keyChangedNow":
     "Sunucu anahtarı değiştirildi. Üyelerin uygulamaları yeniden bağlandıklarında yeni anahtara geçer.",
   "mobile.server.settings.keyFollowing":

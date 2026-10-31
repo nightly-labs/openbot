@@ -386,7 +386,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Cambiar",
   "mobile.server.settings.keyDescription":
     "Cambia la clave si el archivo de clave del servidor se copió o quedó expuesto. Los miembros siguen vinculados.",
-  "mobile.server.settings.keySigned": "La clave anterior firmó este cambio, así que esta app confía en la clave nueva.",
+  "mobile.server.settings.keySigned": "La clave anterior y la clave nueva firmaron este cambio.",
   "mobile.server.settings.keyChangedNow":
     "Clave del servidor cambiada. Las apps de los miembros pasan a la clave nueva al volver a conectarse.",
   "mobile.server.settings.keyFollowing":

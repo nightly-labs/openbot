@@ -24,5 +24,11 @@ export async function routeHostKeyRotation(
     throw new HttpError(400, sourceText("error.team.hostKeyRotationUnsupported"));
   requireOwner(member);
   await readJson(request);
-  return json(200, await runCauseEffect(hostKey.rotate()));
+  try {
+    return json(200, await runCauseEffect(hostKey.rotate()));
+  } catch (error) {
+    // A signed-out host or a refused handover is a sentence for the owner, not a host fault.
+    if (error instanceof Error) throw new HttpError(409, error.message);
+    throw error;
+  }
 }

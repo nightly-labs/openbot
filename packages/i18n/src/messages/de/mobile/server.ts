@@ -393,8 +393,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Ändern",
   "mobile.server.settings.keyDescription":
     "Ändere den Schlüssel, wenn die Schlüsseldatei des Servers kopiert oder offengelegt wurde. Mitglieder bleiben gekoppelt.",
-  "mobile.server.settings.keySigned":
-    "Der vorherige Schlüssel hat diese Änderung signiert, daher vertraut diese App dem neuen Schlüssel.",
+  "mobile.server.settings.keySigned": "Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
   "mobile.server.settings.keyChangedNow":
     "Serverschlüssel geändert. Die Apps der Mitglieder wechseln beim nächsten Verbinden zum neuen Schlüssel.",
   "mobile.server.settings.keyFollowing":

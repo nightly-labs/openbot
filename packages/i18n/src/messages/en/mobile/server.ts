@@ -379,7 +379,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.keyConfirm": "Change key",
   "mobile.server.settings.keyDescription":
     "Change the key if the key file of the server was copied or exposed. Members stay paired.",
-  "mobile.server.settings.keySigned": "The previous key signed this change, so this app trusts the new key.",
+  "mobile.server.settings.keySigned": "The previous key and the new key both signed this change.",
   "mobile.server.settings.keyChangedNow":
     "Server key changed. Apps of members change to the new key when they connect again.",
   "mobile.server.settings.keyFollowing":

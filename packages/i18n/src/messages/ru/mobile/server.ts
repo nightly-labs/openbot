@@ -439,8 +439,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Сменить",
   "mobile.server.settings.keyDescription":
     "Смените ключ, если файл ключа сервера был скопирован или раскрыт. Участники останутся связанными.",
-  "mobile.server.settings.keySigned":
-    "Предыдущий ключ подписал это изменение, поэтому приложение доверяет новому ключу.",
+  "mobile.server.settings.keySigned": "Предыдущий и новый ключи подписали это изменение.",
   "mobile.server.settings.keyChangedNow":
     "Ключ сервера изменён. Приложения участников перейдут на новый ключ при следующем подключении.",
   "mobile.server.settings.keyFollowing":

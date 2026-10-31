@@ -701,6 +701,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.emit("directoryInvalidated");
   }).bind(this);
 
+  /** Reads the server list again, for example after this computer's host changed its key. */
+  requestDirectoryRefresh(): void {
+    this.emit("directoryInvalidated");
+  }
+
   /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   readonly setAppFocused = Effect.fn("RemoteManager.setAppFocused")(function* (
     this: RemoteServerManager,

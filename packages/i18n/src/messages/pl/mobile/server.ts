@@ -439,7 +439,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Zmień",
   "mobile.server.settings.keyDescription":
     "Zmień klucz, jeśli plik klucza serwera został skopiowany lub ujawniony. Członkowie pozostają sparowani.",
-  "mobile.server.settings.keySigned": "Poprzedni klucz podpisał tę zmianę, więc ta aplikacja ufa nowemu kluczowi.",
+  "mobile.server.settings.keySigned": "Poprzedni i nowy klucz podpisały tę zmianę.",
   "mobile.server.settings.keyChangedNow":
     "Klucz serwera zmieniony. Aplikacje członków przechodzą na nowy klucz przy następnym połączeniu.",
   "mobile.server.settings.keyFollowing":

@@ -386,7 +386,7 @@ export const messages = {
   "mobile.server.settings.keyConfirm": "Alterar",
   "mobile.server.settings.keyDescription":
     "Altere a chave se o arquivo de chave do servidor foi copiado ou exposto. Os membros continuam pareados.",
-  "mobile.server.settings.keySigned": "A chave anterior assinou esta alteração, então este app confia na chave nova.",
+  "mobile.server.settings.keySigned": "A chave anterior e a chave nova assinaram esta alteração.",
   "mobile.server.settings.keyChangedNow":
     "Chave do servidor alterada. Os apps dos membros passam para a chave nova ao se conectar de novo.",
   "mobile.server.settings.keyFollowing":
