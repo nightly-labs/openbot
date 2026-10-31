@@ -1,8 +1,11 @@
 // The bridge calls behind an agent's Folders row, the Folders page, the chat's folder drop and the
-// Instructions field. Only the local server has them: the Team API does not carry them.
+// Instructions page. Only the local server has them: the Team API does not carry them.
 
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
-import type { AgentInstructionsFileCalls } from "@openbot/ui/features/conversation/AgentInstructionsField";
+import type {
+  AgentInstructionsCalls,
+  AgentInstructionsFileCalls,
+} from "@openbot/ui/features/conversation/AgentInstructionsView";
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function agentFolderCalls(): AgentFolderCalls {
@@ -21,11 +24,11 @@ export function agentFolderCalls(): AgentFolderCalls {
 
 type InstructionsWatcher = Parameters<AgentInstructionsFileCalls["watch"]>[0];
 
-/** The Settings preview and each chat line show the file. A save in one of them updates the others. */
+/** The Instructions page and each chat line show the file. A save in one of them updates the others. */
 const instructionsWatchers = new Set<InstructionsWatcher>();
 
 /** The instruction file in a local agent's workspace. The Team API does not carry it. */
-export function agentInstructionsCalls(): AgentInstructionsFileCalls {
+export function agentInstructionsCalls(): Omit<AgentInstructionsCalls, "openLink"> {
   return {
     read: (agentId) => window.openbot.agent.readAgentInstructions(agentId),
     save: async (agentId, text, expected) => {
@@ -37,5 +40,6 @@ export function agentInstructionsCalls(): AgentInstructionsFileCalls {
       instructionsWatchers.add(watcher);
       return () => instructionsWatchers.delete(watcher);
     },
+    reveal: (agentId) => window.openbot.agent.revealAgentInstructions(agentId),
   };
 }

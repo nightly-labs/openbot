@@ -7,9 +7,13 @@ import {
   type FilePreview,
   type ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
-import { BookMarked, CalendarClock, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
+import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import {
+  type AgentInstructionsCalls,
+  AgentInstructionsView,
+} from "@openbot/ui/features/conversation/AgentInstructionsView";
 import {
   AgentSessionSettings,
   type AgentSessionSettingsApi,
@@ -56,6 +60,10 @@ interface AgentSettingsPanelProps
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
+  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
+  instructionsFile?: AgentInstructionsCalls | undefined;
+  /** Opens the Instructions page, from the chat line that says the agent changed the file. */
+  instructionsRequest?: { agentId: string } | null | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string) => void) | undefined;
@@ -122,6 +130,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     memories: { count: 0, open: false },
     routines: { count: 0, open: false },
     files: { open: false },
+    instructions: { open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
   // One store per host. It goes with the host, so the list of the last server never shows for the next.
@@ -268,6 +277,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.memories.open = false;
         state.routines.open = false;
         state.files.open = false;
+        state.instructions.open = false;
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
@@ -398,6 +408,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
+  // Like the skill request: a new request object opens the page again.
+  const instructionsRequest = createMemo(() => props.instructionsRequest);
+  createEffect(instructionsRequest, (request) => {
+    if (request)
+      setDraft((state) => {
+        state.instructions.open = true;
+      });
+  });
+
   return (
     <SharedAgentSettingsPanel
       {...props}
@@ -406,7 +425,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSettingsPanelWidth}
-      detailOpen={draft.routines.open || draft.files.open || draft.memories.open}
+      detailOpen={draft.routines.open || draft.files.open || draft.memories.open || draft.instructions.open}
       links={
         <>
           <Show when={sessionSettings()}>
@@ -418,8 +437,27 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               />
             )}
           </Show>
-          <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false || props.files}>
+          <Show
+            when={
+              !props.remoteClient ||
+              skillsMode() !== "hidden" ||
+              props.tablesVisible !== false ||
+              props.files ||
+              props.instructionsFile
+            }
+          >
             <SettingsLinkGroup inset title={t("agentSettings.groups.knows")}>
+              <Show when={props.instructionsFile}>
+                <SettingsLinkRow
+                  icon={<FileText aria-hidden="true" />}
+                  label={t("agentSettings.instructions")}
+                  onClick={() =>
+                    setDraft((state) => {
+                      state.instructions.open = true;
+                    })
+                  }
+                />
+              </Show>
               <Show when={!props.remoteClient}>
                 <SettingsLinkRow
                   icon={<BookMarked aria-hidden="true" />}
@@ -503,6 +541,22 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         </>
       }
     >
+      <Show when={draft.instructions.open && props.instructionsFile}>
+        {(calls) => (
+          <AgentInstructionsView
+            agentId={props.agent.id}
+            folder={props.agent.workspacePath}
+            working={props.working}
+            calls={calls()}
+            onBack={() =>
+              setDraft((state) => {
+                state.instructions.open = false;
+              })
+            }
+            onClose={props.onClose}
+          />
+        )}
+      </Show>
       <Show when={draft.files.open && props.files}>
         {(files) => (
           <AgentFilesSettings

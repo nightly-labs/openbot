@@ -1185,6 +1185,7 @@ const openbotApi: OpenBotDesktopApi = {
     ...bridgeGroup(IPC_ENDPOINTS.agentInstructions, {
       readAgentInstructions: decodeAgentInstructionsFileFromMain,
       saveAgentInstructions: decodeAgentInstructionsFileFromMain,
+      revealAgentInstructions: decodeVoid,
     }),
     // The page gets the folder, not its path, as for a dropped attachment.
     addDroppedAgentFolder: async (agentId, folder) => {

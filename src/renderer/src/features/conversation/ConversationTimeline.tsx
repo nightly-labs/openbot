@@ -148,6 +148,7 @@ export function ConversationTimeline() {
     openReactionMessageId,
     openRoutineSettings,
     openSkillSettings,
+    openInstructionsSettings,
     openSharedFile,
     openWorkspaceFile,
     openQuote,
@@ -814,6 +815,11 @@ export function ConversationTimeline() {
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}
                                                 instructions={localInstructionsCalls()}
+                                                onOpenInstructions={
+                                                  channel || !localInstructionsCalls()
+                                                    ? undefined
+                                                    : openInstructionsSettings
+                                                }
                                               />
                                             }
                                           >

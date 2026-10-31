@@ -33,7 +33,7 @@ import type {
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { AgentInstructionsFileCalls } from "./AgentInstructionsField";
+import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 import { formatChatTimestamp } from "./chat-timestamp";
 import { InstructionsChangeActions } from "./InstructionsChangeActions";
 
@@ -54,6 +54,8 @@ interface ChatActionMarkerProps {
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
   /** The instruction file of a local agent, for View and Undo on its change line. */
   instructions?: AgentInstructionsFileCalls | undefined;
+  /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
+  onOpenInstructions?: ((agentId: string) => void) | undefined;
 }
 
 /** The parts of a marker that open the text of an agent message, for the markers in a group. */
@@ -123,6 +125,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                   onToggleAgentMessage={props.onToggleAgentMessage}
                   agentMessageText={props.agentMessageText}
                   instructions={props.instructions}
+                  onOpenInstructions={props.onOpenInstructions}
                 />
               )}
             </Show>
@@ -506,7 +509,12 @@ function SingleChatActionMarker(
           </Show>
           <Show when={instructionsChange(props.marker, props.instructions)}>
             {(target) => (
-              <InstructionsChangeActions agentId={target().agentId} change={target().change} calls={target().calls} />
+              <InstructionsChangeActions
+                agentId={target().agentId}
+                change={target().change}
+                calls={target().calls}
+                onView={props.onOpenInstructions}
+              />
             )}
           </Show>
           <time class="chat-action-marker-time" datetime={props.marker.timestamp}>

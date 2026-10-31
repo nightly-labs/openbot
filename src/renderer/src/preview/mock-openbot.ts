@@ -1990,6 +1990,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         mockInstructionFiles.set(agentId, file);
         return file;
       },
+      revealAgentInstructions: async (agentId) => {
+        requireMockAgent(agentId);
+      },
       getAgentTaskLimit: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");

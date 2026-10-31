@@ -95,7 +95,6 @@ import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
-import { type AgentInstructionsCalls, AgentInstructionsField } from "./AgentInstructionsField";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
 import { BackupModelsPage } from "./BackupModels";
 
@@ -142,8 +141,6 @@ export interface AgentSettingsPanelProps {
   backupModelsEditable?: boolean;
   /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
   folders?: AgentFolderCalls | undefined;
-  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
-  instructionsFile?: AgentInstructionsCalls | undefined;
   /** Whether a usage limit holds this model and account now, for the backup models page. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The app or host default an agent without its own busy-message setting follows. */
@@ -1235,9 +1232,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onBlur={saveTitle}
                 />
               </SettingsField>
-              <Show when={props.instructionsFile}>
-                {(calls) => <AgentInstructionsField agentId={props.agent.id} working={props.working} calls={calls()} />}
-              </Show>
               <SettingsField label={t("agentSettings.description")}>
                 <ResizableTextarea
                   class="settings-instructions-input settings-description-input"
@@ -1682,7 +1676,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 }
 
 /** Lets a long path wrap after a slash instead of inside a folder name. */
-function breakablePath(path: string) {
+export function breakablePath(path: string) {
   return path.split("/").map((part, index) =>
     index === 0 ? (
       part

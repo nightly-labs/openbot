@@ -1574,6 +1574,8 @@ export const IPC_ENDPOINTS = {
   agentInstructions: {
     readAgentInstructions: request<string, AgentInstructionsFile>()("agent:instructions:read"),
     saveAgentInstructions: request<SaveAgentInstructionsInput, AgentInstructionsFile>()("agent:instructions:save"),
+    // Main finds the file from the agent id: the page never names a path to show.
+    revealAgentInstructions: request<string, void>()("agent:instructions:reveal"),
   },
   // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
   // renderer must never name a path to import. So this group is never bridged to the renderer.

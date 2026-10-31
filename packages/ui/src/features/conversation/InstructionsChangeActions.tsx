@@ -1,6 +1,6 @@
 /**
- * View and Undo on the chat line that says the agent changed its instructions. View opens the file
- * in the editor. Undo puts back the text from before the turn, but only while the file still has the
+ * View and Undo on the chat line that says the agent changed its instructions. View opens the
+ * Instructions page in the agent settings. Undo puts back the text from before the turn, but only while the file still has the
  * agent's text: the save sends that text, so main refuses it after a later change.
  */
 
@@ -9,18 +9,18 @@ import { Button, FileText, MarkerIcon, Undo2 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
-import { AgentInstructionsDialog } from "./AgentInstructionsDialog";
-import type { AgentInstructionsFileCalls } from "./AgentInstructionsField";
+import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 
 export function InstructionsChangeActions(props: {
   agentId: string;
   change: AgentInstructionsChange | null;
   calls: AgentInstructionsFileCalls;
+  /** Absent where the chat has no settings page for the agent. View then does not show. */
+  onView?: ((agentId: string) => void) | undefined;
 }): JSX.Element {
   const { t, errorMessage } = useText();
   /** The file text now, or null before the first read. */
   const [current, setCurrent] = createSignal<string | null>(null);
-  const [viewing, setViewing] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let closed = false;
@@ -33,7 +33,7 @@ export function InstructionsChangeActions(props: {
       const file = await props.calls.read(props.agentId);
       if (!closed && mine === request) setCurrent(file.text);
     } catch {
-      // Undo stays hidden. View still opens the editor, which shows its own read error.
+      // Undo stays hidden. View still opens the page, which shows its own read error.
     }
   }
 
@@ -73,12 +73,16 @@ export function InstructionsChangeActions(props: {
 
   return (
     <>
-      <Button variant="ghost" type="button" class="chat-action-target" onClick={() => setViewing(true)}>
-        <MarkerIcon>
-          <FileText aria-hidden="true" />
-        </MarkerIcon>
-        <span class="chat-action-target-name">{t("chat.marker.instructionsView")}</span>
-      </Button>
+      <Show when={props.onView}>
+        {(view) => (
+          <Button variant="ghost" type="button" class="chat-action-target" onClick={() => view()(props.agentId)}>
+            <MarkerIcon>
+              <FileText aria-hidden="true" />
+            </MarkerIcon>
+            <span class="chat-action-target-name">{t("chat.marker.instructionsView")}</span>
+          </Button>
+        )}
+      </Show>
       <Show when={undoable()}>
         {(change) => (
           <Button
@@ -105,16 +109,6 @@ export function InstructionsChangeActions(props: {
           </span>
         )}
       </Show>
-      <AgentInstructionsDialog
-        open={viewing()}
-        onOpenChange={(open) => {
-          setViewing(open);
-          // The agent can change the file while the editor is open.
-          if (!open) void refresh();
-        }}
-        agentId={props.agentId}
-        calls={props.calls}
-      />
     </>
   );
 }

@@ -104,6 +104,12 @@ export const readAgentInstructionsFile = Effect.fn("WorkspaceInstructions.read")
   } satisfies AgentInstructionsFile;
 });
 
+/** The file that Show in Finder selects: the instruction file, or the workspace when it has none. */
+export const agentInstructionsRevealPath = Effect.fn("WorkspaceInstructions.revealPath")(function* (workspace: string) {
+  const found = yield* findFile(workspace);
+  return Option.isSome(found) ? found.value.path : workspace;
+});
+
 /**
  * Replaces the text of the first instruction file, or creates `AGENTS.md`. The file keeps its
  * permission bits; a new file is readable only by the user. An empty text keeps an empty file: a

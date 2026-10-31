@@ -1,7 +1,8 @@
 ### Added
 
-- Agent settings show the agent's Instructions, from its `AGENTS.md` file, as formatted text. Edit
-  opens the whole file in a large editor. The agent keeps its standing rules in this file, as short
+- Agent settings have an Instructions page that shows the agent's `AGENTS.md` file as formatted
+  text, with the file name and its folder at the top. Edit opens the whole file on the page, and
+  Show in Finder shows the file. The agent keeps its standing rules in this file, as short
   bullets under headings, and changes the file when you ask it to change its instructions. A
   workspace that has only a `CLAUDE.md` file keeps that file. Each provider gets the file, also a
   provider that does not read it by itself.

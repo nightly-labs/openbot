@@ -1,12 +1,14 @@
 // The instruction file at the root of a local agent's workspace. Only the local service answers: the
 // Team API does not carry the file, so a joined server's agent has none here.
 
-import { type AgentInstructionsFile, parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
+import { parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import { shell } from "electron";
 import {
   type AgentInstructionsFileFailed,
   type AgentInstructionsFileRefused,
+  agentInstructionsRevealPath,
   readAgentInstructionsFile,
   saveAgentInstructionsFile,
 } from "../../backend/agent/workspace-instructions";
@@ -26,9 +28,9 @@ const REFUSED_MESSAGES = {
 } as const satisfies Record<AgentInstructionsFileRefused["reason"], string>;
 
 /** The page gets a message for each failure, never the native one, which names paths. */
-async function run(
-  operation: Effect.Effect<AgentInstructionsFile, AgentInstructionsFileRefused | AgentInstructionsFileFailed>,
-): Promise<AgentInstructionsFile> {
+async function run<A>(
+  operation: Effect.Effect<A, AgentInstructionsFileRefused | AgentInstructionsFileFailed>,
+): Promise<A> {
   const result = await Effect.runPromise(Effect.result(operation));
   if (Result.isSuccess(result)) return result.success;
   const failure = result.failure;
@@ -72,6 +74,9 @@ export function agentInstructionsIpcHandlers({
           }
         }),
       ),
+      revealAgentInstructions: payloadHandler(parseAgentId, async (agentId) => {
+        shell.showItemInFolder(await run(agentInstructionsRevealPath(workspace(agentId))));
+      }),
     },
   };
 }
