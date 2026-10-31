@@ -1,5 +1,6 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
@@ -73,6 +74,9 @@ export function MarketplaceOverlay(props: {
   /** The person pressed Connect for `pluginSlug` on a chat card. */
   pluginConnect?: boolean | undefined;
   onPluginSlugConsumed: () => void;
+  /** The agent or skill a Marketplace link named. Closing the marketplace forgets it too. */
+  marketplaceListing?: MarketplaceListingLink | null | undefined;
+  onMarketplaceListingConsumed?: (() => void) | undefined;
   /** The connectors of `server`. Each one that this account can connect is an app. */
   connectors?: ConnectorRegistry | undefined;
   /** What the Marketplace calls. Absent: this computer's bridge. */
@@ -131,7 +135,10 @@ export function MarketplaceOverlay(props: {
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
-            if (!open) props.onPluginSlugConsumed();
+            if (!open) {
+              props.onPluginSlugConsumed();
+              props.onMarketplaceListingConsumed?.();
+            }
             props.onOpenChange(open);
           }}
           onTrySkill={
@@ -149,6 +156,8 @@ export function MarketplaceOverlay(props: {
           initialPluginSlug={props.pluginSlug ?? undefined}
           initialPluginConnect={props.pluginConnect}
           onInitialPluginSlugConsumed={props.onPluginSlugConsumed}
+          initialListing={props.marketplaceListing ?? undefined}
+          onInitialListingConsumed={props.onMarketplaceListingConsumed}
           pluginServerId={pluginServerId()}
           onAddServer={addServer()}
           pluginHostName={manage() ? remoteAdminServer(props.server, MCP_SERVERS_CAPABILITY)?.name : undefined}

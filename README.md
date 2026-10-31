@@ -503,7 +503,7 @@ Cloudflare Workers
 - `src/backend` owns provider adapters, persistence, message scheduling, transfers, and the browser host.
 - `src/preload` exposes only the typed `window.openbot` API.
 - `src/renderer` contains the SolidJS interface.
-- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the plugin pages at `/plugins` and `/plugins/<slug>`.
+- `apps/auth-api` contains the TanStack Start account API, one-time email codes, rate limits, and D1 migrations. It also serves the public site: the landing page, `/news`, `/guides`, and the Marketplace pages at `/marketplace` (Agents, Skills, and Apps), `/marketplace/agents/<id>`, `/marketplace/skills/<slug>`, and `/plugins/<slug>`. `/plugins` redirects to `/marketplace/apps`.
 - `apps/status` contains the public status page at `status.openbot.run`, the script that the `status-page` workflow runs to check the services, and the script that sends the [status webhooks](docs/status-webhooks.md) of the team. GitHub hosts it, so it stays up when Cloudflare does not.
 - `packages/contracts` contains process-boundary contracts, shared limits, and pure validation.
 - `packages/i18n` contains the interface text in English, French, Japanese, Brazilian Portuguese and Turkish for desktop, web and mobile. See [docs/i18n.md](docs/i18n.md) to add text or a language.

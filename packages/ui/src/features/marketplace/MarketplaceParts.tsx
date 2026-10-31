@@ -1,4 +1,5 @@
 import type { MarketplaceSkillSummary } from "@openbot/contracts/ipc";
+import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import {
   ArrowRight,
   Button,
@@ -6,6 +7,7 @@ import {
   ErrorReference,
   Heading,
   IconButton,
+  Link2,
   Plug,
   Puzzle,
   Skeleton,
@@ -20,7 +22,7 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
 import { LogoTile } from "../settings/IntegrationLayout";
 import type { MarketplaceListing } from "./marketplace-listing";
-import type { MarketplaceApp } from "./marketplace-model";
+import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
 
 /** The top of an agent or skill page. The window moves the focus to the title when the page opens. */
 export function PageHead(props: { media: JSX.Element; title: string; description: string; actions?: JSX.Element }) {
@@ -128,6 +130,28 @@ export function Properties(props: { label: string; items: readonly { label: stri
         </For>
       </dl>
     </aside>
+  );
+}
+
+/** Copies the public page of a listing, as an app page copies its plugin's. */
+export function CopyListingLink(props: { model: MarketplaceModel; link: MarketplaceListingLink }) {
+  const { t } = useText();
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={() => props.model.copyListingLink(props.link)}>
+      <Link2 aria-hidden="true" />
+      {t("plugin.copyLink")}
+    </Button>
+  );
+}
+
+/** A link named a listing that the Marketplace does not have. The list opens with this notice on top. */
+export function MissingNotice(props: { children: string }) {
+  return (
+    <div class="marketplace-empty" role="alert">
+      <Text as="p" variant="body-sm" tone="muted">
+        {props.children}
+      </Text>
+    </div>
   );
 }
 

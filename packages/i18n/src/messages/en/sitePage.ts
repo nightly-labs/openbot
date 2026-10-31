@@ -94,4 +94,71 @@ export const messages = defineMessages("sitePage", {
   "sitePage.pricing.enterprise.body":
     "Larger servers, more than {count} members, or anything else you need. With enterprise support.",
   "sitePage.pricing.enterprise.contact": "Contact sales",
+  // The public Marketplace on openbot.run. The tab and category names are the app's `marketplace.*` keys.
+  "sitePage.marketplace.agents.title": "Agents — OpenBot Marketplace",
+  "sitePage.marketplace.agents.description":
+    "Agents that people made in OpenBot. Add one to OpenBot with its skills and routines.",
+  "sitePage.marketplace.skills.title": "Skills — OpenBot Marketplace",
+  "sitePage.marketplace.skills.description": "Skills that an OpenBot agent can use. Add one to OpenBot.",
+  "sitePage.marketplace.apps.title": "Apps — OpenBot Marketplace",
+  "sitePage.marketplace.apps.description":
+    "Apps and tools that an OpenBot agent can use. Open an app in OpenBot, and decide there what it connects to.",
+  // {name} is the name of an agent or a skill.
+  "sitePage.marketplace.agentTitle": "{name} — OpenBot agent",
+  "sitePage.marketplace.skillTitle": "{name} — OpenBot skill",
+  // The text of the share image for screen readers. {creator} is the name of the person who made it.
+  "sitePage.marketplace.agentImageAlt": "{name}, an OpenBot agent by {creator}",
+  "sitePage.marketplace.skillImageAlt": "{name}, an OpenBot skill by {creator}",
+  "sitePage.marketplace.categories": "Categories",
+  "sitePage.marketplace.allCategories": "All",
+  "sitePage.marketplace.searchAgents": "Search agents",
+  "sitePage.marketplace.searchSkills": "Search skills",
+  "sitePage.marketplace.searchApps": "Search apps",
+  "sitePage.marketplace.featured": "Featured",
+  "sitePage.marketplace.results": "Results",
+  "sitePage.marketplace.seeAll": "See all",
+  "sitePage.marketplace.add": "Add",
+  // {name} is the name of the person who made the agent or the skill.
+  "sitePage.marketplace.by": "by {name}",
+  // A screen reader reads this after the name of a verified agent or skill.
+  "sitePage.marketplace.verifiedName": ", verified by OpenBot",
+  // A screen reader reads this when a search or a category changes the list.
+  "sitePage.marketplace.shownAgents": "Agents shown: {shown} of {total}",
+  "sitePage.marketplace.shownSkills": "Skills shown: {shown} of {total}",
+  "sitePage.marketplace.shownApps": "Apps shown: {shown} of {total}",
+  "sitePage.marketplace.emptyAgentsCategory": "No agents in this category yet.",
+  "sitePage.marketplace.emptySkillsCategory": "No skills in this category yet.",
+  // {query} is the text in the search field.
+  "sitePage.marketplace.emptyAgentsQuery": "No agents match “{query}”.",
+  "sitePage.marketplace.emptySkillsQuery": "No skills match “{query}”.",
+  "sitePage.marketplace.emptyApps": "No app matches.",
+  "sitePage.marketplace.breadcrumb": "Breadcrumb",
+  "sitePage.marketplace.addToOpenBot": "Add to OpenBot",
+  // Shows after "Add to OpenBot" did not open the app.
+  "sitePage.marketplace.addFromApp": "{name} is added from inside OpenBot. Get the app, then open this link again.",
+  // {platform} is macOS, Windows or Linux.
+  "sitePage.marketplace.downloadFor": "Download for {platform}",
+  "sitePage.marketplace.copyLink": "Copy link",
+  "sitePage.marketplace.copied": "Copied",
+  "sitePage.marketplace.trust.agentReviewed":
+    "Made by another OpenBot user. OpenBot reviewed it before it went live. It can act on your behalf once added.",
+  "sitePage.marketplace.trust.agentPending":
+    "Shared by its creator before OpenBot reviewed it. It can act on your behalf once added.",
+  "sitePage.marketplace.trust.skillReviewed": "Made by another OpenBot user. OpenBot reviewed it before it went live.",
+  "sitePage.marketplace.source.verified": "Verified by OpenBot",
+  "sitePage.marketplace.source.reviewed": "Reviewed by OpenBot",
+  "sitePage.marketplace.source.pending": "Not reviewed yet",
+  "sitePage.marketplace.information": "Information",
+  "sitePage.marketplace.fact.creator": "Creator",
+  "sitePage.marketplace.fact.source": "Source",
+  "sitePage.marketplace.fact.category": "Category",
+  "sitePage.marketplace.fact.version": "Version",
+  "sitePage.marketplace.fact.updated": "Updated",
+  // {version} is a number, such as 3.
+  "sitePage.marketplace.skillVersion": "Version {version}",
+  // A routine that the agent brings switched off. It runs only after the user switches it on.
+  "sitePage.marketplace.routineOff": "Starts off",
+  "sitePage.marketplace.missing.title": "Not in the Marketplace",
+  "sitePage.marketplace.missing.body": "The creator removed it, OpenBot did not approve it, or the link is wrong.",
+  "sitePage.marketplace.missing.open": "Open the Marketplace",
 });

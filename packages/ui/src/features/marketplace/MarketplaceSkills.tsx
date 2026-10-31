@@ -28,7 +28,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { DialogAgents, type DialogSkill } from "./MarketplaceAgentsDialog";
 import { useInstalls } from "./MarketplaceCards";
-import { ListingPanel, MenuCheck, SkillMark } from "./MarketplaceParts";
+import { ListingPanel, MenuCheck, MissingNotice, SkillMark } from "./MarketplaceParts";
 import { CATEGORY_LABELS, createMarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceModel } from "./marketplace-model";
 import { moveView } from "./marketplace-motion";
@@ -183,8 +183,8 @@ function UpdateButton(props: { model: MarketplaceModel; skill: DialogSkill; vers
   );
 }
 
-/** The shield after a verified skill's name. */
-function VerifiedMark(props: { on: boolean }) {
+/** The shield after a verified skill's or agent's name. */
+export function VerifiedMark(props: { on: boolean }) {
   const { t } = useText();
   return (
     <Show when={props.on}>
@@ -287,20 +287,13 @@ function CatalogRows(props: { scope: MarketplaceScope; rows: SkillRows; skills: 
   );
 }
 
-/** All, Verified or Public, at the top right of the Skills tab and of each group page. */
-function SourceSwitch(props: { nav: MarketplaceNavigation }) {
+/** All, Verified or Public, at the top right of the Skills and Agents tabs and of each group page. */
+export function SourceSwitch(props: { value: SkillSource | null; onChange: (source: SkillSource | null) => void }) {
   const { t } = useText();
-  const value = () => props.nav.state.skillSource ?? "all";
   return (
     <SlidingTabs.Root
-      value={value()}
-      onChange={(value: string) =>
-        moveView("swap", () =>
-          props.nav.set((draft) => {
-            draft.skillSource = sourceOfValue(value);
-          }),
-        )
-      }
+      value={props.value ?? "all"}
+      onChange={(value: string) => moveView("swap", () => props.onChange(sourceOfValue(value)))}
     >
       <SlidingTabs.List class="marketplace-skill-source" aria-label={t("marketplace.skills.sourceLabel")}>
         <SlidingTabs.Trigger value="all">{t("marketplace.skills.source.all")}</SlidingTabs.Trigger>
@@ -319,8 +312,22 @@ function SourceSwitch(props: { nav: MarketplaceNavigation }) {
   );
 }
 
-/** The search of the Marketplace. The Skills tab and its group pages share it. */
-function SkillSearch(props: { nav: MarketplaceNavigation; label?: string | undefined }) {
+/** The Skills tab's source switch. */
+function SkillSourceSwitch(props: { nav: MarketplaceNavigation }) {
+  return (
+    <SourceSwitch
+      value={props.nav.state.skillSource}
+      onChange={(source) =>
+        props.nav.set((draft) => {
+          draft.skillSource = source;
+        })
+      }
+    />
+  );
+}
+
+/** The search of the Marketplace. The Skills and Agents tabs and their group pages share it. */
+export function MarketplaceSearch(props: { nav: MarketplaceNavigation; label?: string | undefined }) {
   const { t } = useText();
   const label = () => props.label ?? t("marketplace.search.label");
   const placeholder = () => props.label ?? t("marketplace.search.placeholder");
@@ -344,7 +351,7 @@ function SkillSearch(props: { nav: MarketplaceNavigation; label?: string | undef
 }
 
 /** The head of a group: its name, the count of "Your skills", and "See all" when the group has more than it shows. */
-function GroupHead(props: {
+export function GroupHead(props: {
   id: string;
   label: string;
   count?: number | undefined;
@@ -442,14 +449,17 @@ export function SkillLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
               {t("marketplace.description.skills")}
             </Text>
           </div>
-          <SourceSwitch nav={nav()} />
+          <SkillSourceSwitch nav={nav()} />
         </div>
         <div class="marketplace-toolbar">
-          <SkillSearch nav={nav()} />
+          <MarketplaceSearch nav={nav()} />
           <CreateSkill model={model()} />
         </div>
       </header>
       <div class="marketplace-stack">
+        <Show when={nav().state.missingListing === "skill"}>
+          <MissingNotice>{t("marketplace.skills.missing")}</MissingNotice>
+        </Show>
         <Show when={showYours()}>
           <section class="marketplace-app-group" aria-labelledby="marketplace-skills-yours">
             <GroupHead
@@ -760,10 +770,10 @@ export function SkillGroupPage(props: { scope: MarketplaceScope; group: SkillGro
             </Text>
           </Show>
         </div>
-        <SourceSwitch nav={nav()} />
+        <SkillSourceSwitch nav={nav()} />
       </header>
       <div class="marketplace-toolbar marketplace-skill-group-bar">
-        <SkillSearch nav={nav()} label={t("marketplace.skills.searchIn", { name: label() })} />
+        <MarketplaceSearch nav={nav()} label={t("marketplace.skills.searchIn", { name: label() })} />
         <SortMenu value={nav().state.skillSort} onChange={sortBy} />
       </div>
       <Show when={category()} keyed fallback={<YoursPage scope={props.scope} rows={yours} />}>

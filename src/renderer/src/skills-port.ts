@@ -32,11 +32,12 @@ export interface SkillsPort {
     | "testMcpServer"
     | "uninstallAgentSkill"
   >;
-  marketplaceAgents: Pick<OpenBotDesktopApi["marketplaceAgents"], "get" | "install" | "list">;
+  marketplaceAgents: Pick<OpenBotDesktopApi["marketplaceAgents"], "get" | "getListing" | "install" | "list">;
   macAutomation: Pick<OpenBotDesktopApi["macAutomation"], "request">;
   skills: Pick<
     OpenBotDesktopApi["skills"],
     | "get"
+    | "getBySlug"
     | "install"
     | "list"
     | "listInstalled"

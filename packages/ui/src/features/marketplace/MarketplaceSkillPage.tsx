@@ -27,7 +27,8 @@ import { createEffect, createSignal, For, Show } from "solid-js";
 import { IntegrationPage, type IntegrationStatus } from "../settings/IntegrationLayout";
 import { AddToAgents, type DialogSkill } from "./MarketplaceAgentsDialog";
 import { useInstalls } from "./MarketplaceCards";
-import { DetailState, SkillIcon, TryCard } from "./MarketplaceParts";
+import { CopyListingLink, DetailState, SkillIcon, TryCard } from "./MarketplaceParts";
+import { VerifiedMark } from "./MarketplaceSkills";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import type { MarketplaceAgent, MarketplaceModel } from "./marketplace-model";
 import { agentsWith, canSwitch, isOn, matches, outdated, useSkillWords } from "./marketplace-skill-state";
@@ -314,10 +315,16 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
         class="marketplace-skill-page"
         logo={<SkillIcon url={skill().iconUrl} />}
         name={skill().name}
+        nameMark={<VerifiedMark on={skill().verified === true} />}
         status={current().status}
         statusLabel={current().label}
         subtitle={skill().description}
-        actions={<AddToAgents model={model()} skill={skill()} />}
+        actions={
+          <>
+            <CopyListingLink model={model()} link={{ kind: "skill", id: skill().slug }} />
+            <AddToAgents model={model()} skill={skill()} />
+          </>
+        }
         intro={
           <DetailState
             status={detail.status()}

@@ -19,6 +19,9 @@ export function marketplaceAgentIpcHandlers({
         runCauseEffect(marketplaceAgents.list(query)),
       ),
       get: payloadHandler(stringPayload("agentId"), (agentId) => runCauseEffect(marketplaceAgents.get(agentId))),
+      getListing: payloadHandler(stringPayload("agentId"), (agentId) =>
+        runCauseEffect(marketplaceAgents.getListing(agentId)),
+      ),
       listMine: handler(() => runCauseEffect(marketplaceAgents.listMine())),
       preview: payloadHandler(stringPayload("agentId"), (agentId) =>
         runCauseEffect(marketplaceAgents.preview(agentId)),

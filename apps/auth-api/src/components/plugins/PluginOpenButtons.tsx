@@ -11,7 +11,24 @@ export interface PluginOpenButtonsProps {
   browserHref?: string;
   /** What the download offer says after the app did not open. */
   downloadCopy: string;
+  /** The other labels, in the page's language. The plugin and shared agent pages are English and omit it. */
+  text?: PluginOpenButtonsText;
 }
+
+export interface PluginOpenButtonsText {
+  browser: string;
+  notOpened: string;
+  dismiss: string;
+  /** The download button for one platform, such as "Download for macOS". */
+  download: (platform: string) => string;
+}
+
+const ENGLISH_TEXT: PluginOpenButtonsText = {
+  browser: "Open in browser",
+  notOpened: "Nothing opened?",
+  dismiss: "Not now",
+  download: (platform) => `Download for ${platform}`,
+};
 
 /** How long the app is given to take over before the page offers the download instead. */
 const DOWNLOAD_HINT_DELAY_MS = 1200;
@@ -46,6 +63,7 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
   onCleanup(cancel);
 
   const platform = () => DOWNLOAD_PLATFORMS[detectDownloadPlatform(globalThis.navigator ?? {}) ?? "macos"];
+  const text = () => props.text ?? ENGLISH_TEXT;
 
   const armDownloadHint = () => {
     cancel();
@@ -96,7 +114,7 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
         <Show when={props.browserHref}>
           {(href) => (
             <Button href={href()} variant="secondary" size="lg" icon="arrow-right">
-              Open in browser
+              {text().browser}
             </Button>
           )}
         </Show>
@@ -113,17 +131,17 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
             onClose={() => setShowDownload(false)}
           >
             <h2 class="plugin-dialog-title" id={titleId}>
-              Nothing opened?
+              {text().notOpened}
             </h2>
             <p class="plugin-dialog-copy">{props.downloadCopy}</p>
             <div class="plugin-dialog-actions">
               <button class="plugin-dialog-dismiss" type="button" onClick={() => dialog?.close()}>
-                Not now
+                {text().dismiss}
               </button>
               {/* Where the dialog puts the focus, because it is the thing the visitor came for.
                   Without it the modal would open on `Not now`, which is the way out. */}
               <Button autofocus href={platform().href} variant="primary" size="sm" icon="download">
-                {platform().action}
+                {text().download(platform().label)}
               </Button>
             </div>
           </dialog>

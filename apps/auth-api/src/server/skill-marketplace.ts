@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  isAgentTemplateCardPng,
   isSkillCategory,
   type MarketplaceSkillSort,
   SKILL_DESCRIPTION_MAX_LENGTH,
@@ -46,6 +47,8 @@ interface ApprovedRow {
   bundle_sha256: string;
   files_json: string;
   icon_key: string | null;
+  /** Absent from the rows of the catalog list. */
+  card_key?: string | null;
   updated_at: number;
   creator_name: string | null;
 }
@@ -167,7 +170,109 @@ export class SkillMarketplace {
           files: yield* marketplaceDecode(() => parseFiles(row.files_json)),
           instructions: preview.instructions,
           ...(preview.examplePrompt ? { examplePrompt: preview.examplePrompt } : {}),
+          cardUrl: row.card_key ? `/v1/skills/${row.id}/card?v=${row.version_id}` : null,
         };
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  /** The approved skill a shared link names by its slug, which the site's page address holds. */
+  getBySlug(slug: string) {
+    return this.approvedIdBySlug(slug).pipe(Effect.flatMap((skillId) => this.get(skillId)));
+  }
+
+  /**
+   * The approved skill for its page on the site: the catalog entry and its share card, without the
+   * bundle. The page shows no instructions, so it does not read and unpack the archive on each visit.
+   */
+  pageBySlug(slug: string) {
+    return Effect.fn("SkillMarketplace.pageBySlug")(() =>
+      Effect.gen({ self: this }, function* () {
+        const skillId = yield* this.approvedIdBySlug(slug);
+        const row = yield* this.approvedRowEffect(skillId);
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(new SkillMarketplaceError(404, "skill_not_found", "The skill was not found.")),
+          );
+        return {
+          ...(yield* marketplaceDecode(() => publicSummary(row))),
+          cardUrl: row.card_key ? `/v1/skills/${row.id}/card?v=${row.version_id}` : null,
+        };
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  private approvedIdBySlug(slug: string) {
+    return Effect.fn("SkillMarketplace.approvedIdBySlug")(() =>
+      Effect.gen(function* () {
+        const bindings = yield* MarketplaceStorage;
+        const row = yield* marketplaceCall(() =>
+          bindings.DB.prepare("SELECT id FROM marketplace_skills WHERE slug = ? AND approved_version_id IS NOT NULL")
+            .bind(slug)
+            .first<{ id: string }>(),
+        );
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(new SkillMarketplaceError(404, "skill_not_found", "The skill was not found.")),
+          );
+        return row.id;
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  /** The share card of the approved version. Public, like the skill's page. */
+  card(skillId: string, conditions?: Headers) {
+    return Effect.fn("SkillMarketplace.card")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        const key = (yield* this.approvedRowEffect(skillId))?.card_key;
+        if (!key)
+          return yield* Effect.fail(
+            marketplaceError(new SkillMarketplaceError(404, "card_not_found", "The share card was not found.")),
+          );
+        const object = yield* marketplaceCall(() =>
+          bindings.SKILLS.get(key, conditions ? { onlyIf: conditions } : undefined),
+        );
+        if (!object)
+          return yield* Effect.fail(
+            marketplaceError(new SkillMarketplaceError(404, "card_not_found", "The share card was not found.")),
+          );
+        return object;
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
+  /** Stores the share card the reviewer's script drew for an approved version. */
+  setCard(versionId: string, card: Uint8Array) {
+    return Effect.fn("SkillMarketplace.setCard")(() =>
+      Effect.gen({ self: this }, function* () {
+        const bindings = yield* MarketplaceStorage;
+
+        if (!isAgentTemplateCardPng(card))
+          return yield* Effect.fail(
+            marketplaceError(
+              new SkillMarketplaceError(400, "invalid_card", "The share card must be a 1200 × 630 PNG."),
+            ),
+          );
+        const row = yield* marketplaceCall(() =>
+          bindings.DB.prepare("SELECT skill_id FROM marketplace_skill_versions WHERE id = ? AND status = 'approved'")
+            .bind(versionId)
+            .first<{ skill_id: string }>(),
+        );
+        if (!row)
+          return yield* Effect.fail(
+            marketplaceError(
+              new SkillMarketplaceError(404, "skill_version_not_found", "The approved skill version was not found."),
+            ),
+          );
+        const key = `skills/${row.skill_id}/versions/${versionId}.card.png`;
+        yield* marketplaceCall(() => bindings.SKILLS.put(key, card, { httpMetadata: { contentType: "image/png" } }));
+        yield* marketplaceCall(() =>
+          bindings.DB.prepare("UPDATE marketplace_skill_versions SET card_key = ? WHERE id = ?")
+            .bind(key, versionId)
+            .run(),
+        );
       }),
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
@@ -638,7 +743,7 @@ export class SkillMarketplace {
           bindings.DB.prepare(
             `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.verified, skills.updated_at,
               versions.id AS version_id, versions.name, versions.description, versions.category,
-              versions.version, versions.bundle_key, versions.bundle_sha256, versions.files_json, versions.icon_key,
+              versions.version, versions.bundle_key, versions.bundle_sha256, versions.files_json, versions.icon_key, versions.card_key,
               skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
        FROM marketplace_skills skills
        JOIN marketplace_skill_versions versions ON versions.id = skills.approved_version_id

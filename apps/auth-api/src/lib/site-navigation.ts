@@ -12,7 +12,8 @@ import { CHANGELOG_ROUTE } from "./changelog";
 import { HEADER_COLLECTIONS } from "./content";
 import type { CollectionArticle, ContentCollection } from "./content-collection";
 import { OPENBOT_LINKS } from "./landing-links";
-import { PLUGIN_INDEX_ROUTE, SITE_PLUGINS, type SitePlugin } from "./plugins";
+import { MARKETPLACE_APPS_ROUTE } from "./marketplace-routes";
+import { SITE_PLUGINS, type SitePlugin } from "./plugins";
 import { PRICING_ROUTE } from "./pricing-page";
 import { TEAMS_ROUTE } from "./teams-page";
 
@@ -42,7 +43,7 @@ export interface PluginNavigationSection {
   label: string;
   summary: string;
   indexLabel: string;
-  indexRoute: typeof PLUGIN_INDEX_ROUTE;
+  indexRoute: typeof MARKETPLACE_APPS_ROUTE;
   plugins: readonly SitePlugin[];
   pluginCount: number;
 }
@@ -92,7 +93,7 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     label: "Plugins",
     summary: "Apps and skills an agent can use.",
     indexLabel: "Browse plugins",
-    indexRoute: PLUGIN_INDEX_ROUTE,
+    indexRoute: MARKETPLACE_APPS_ROUTE,
     // Featured first, and otherwise in the order the catalog declares.
     plugins: SITE_PLUGINS.toSorted((left, right) => Number(right.featured) - Number(left.featured)).slice(
       0,

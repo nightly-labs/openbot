@@ -126,6 +126,23 @@ export class AgentMarketplaceService {
     });
   }
 
+  /**
+   * The agent a shared link names: the approved version, else the version that waits for its first
+   * review, marked `pending`. Only a link reads this; it never adds the agent.
+   */
+  getListing(agentId: string): Effect.Effect<MarketplaceAgentDetail, AgentMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceAgentDetail, AgentMarketplaceFailure> {
+      const detail = yield* this.auth
+        .requestAuthorized(
+          `/v1/marketplace/agents/${encodeURIComponent(agentId)}/listing`,
+          { method: "GET" },
+          decodeMarketplaceAgentDetail,
+        )
+        .pipe(toAgentMarketplaceFailure);
+      return this.withAbsoluteAvatar(detail);
+    });
+  }
+
   listMine(): Effect.Effect<AgentSubmission[], AgentMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentSubmission[], AgentMarketplaceFailure> {
       const values = yield* this.auth

@@ -2,6 +2,12 @@ import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@
 import { type FirstTouch, readFirstTouch } from "@openbot/contracts/first-touch";
 import { inviteUrlFromWebAppSearch, WEB_APP_INVITE_FIELDS } from "@openbot/contracts/invite-links";
 import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import {
+  type MarketplaceListingLink,
+  marketplaceListingFromWebAppSearch,
+  WEB_APP_MARKETPLACE_AGENT_PARAM,
+  WEB_APP_MARKETPLACE_SKILL_PARAM,
+} from "@openbot/contracts/marketplace-links";
 import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contracts/plugin-links";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
@@ -82,6 +88,20 @@ function takePluginLink(): string | null {
   return slug;
 }
 
+/**
+ * The agent or skill a `/app?marketplaceAgent=<id>` or `/app?marketplaceSkill=<slug>` link names.
+ * The query is removed after it is read.
+ */
+function takeMarketplaceLink(): MarketplaceListingLink | null {
+  const url = new URL(window.location.href);
+  const params = [WEB_APP_MARKETPLACE_AGENT_PARAM, WEB_APP_MARKETPLACE_SKILL_PARAM];
+  if (!params.some((param) => url.searchParams.has(param))) return null;
+  const link = marketplaceListingFromWebAppSearch(url.search);
+  for (const param of params) url.searchParams.delete(param);
+  window.history.replaceState(window.history.state, "", url);
+  return link;
+}
+
 type BillingReturn = DesktopAnalyticsProperties<"billing_return_viewed">;
 
 /**
@@ -141,6 +161,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
+  const [marketplaceListing, setMarketplaceListing] = createSignal(takeMarketplaceLink());
   const [startLink, setStartLink] = createSignal(takeStartLink());
   const initialBillingReturn = takeBillingReturn();
   const initialHostingReturn = takeHostingReturn();
@@ -407,6 +428,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                   onInviteClose={() => setInviteUrl(null)}
                   pluginSlug={pluginSlug()}
                   onPluginSlugConsumed={() => setPluginSlug(null)}
+                  marketplaceListing={marketplaceListing()}
+                  onMarketplaceListingConsumed={() => setMarketplaceListing(null)}
                   start={startLink()}
                   onStartConsumed={() => setStartLink(null)}
                   billingReturn={billingReturn()}

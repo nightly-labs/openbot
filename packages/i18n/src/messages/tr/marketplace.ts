@@ -35,8 +35,20 @@ export const messages = {
   "marketplace.agents.loadingDetail": "Ajan ayrıntıları yükleniyor…",
   "marketplace.agents.skills": "Beceriler",
   "marketplace.agents.routines": "Rutinler",
-  "marketplace.agents.routineActive": "Etkin",
   "marketplace.agents.routineInactive": "Devre dışı",
+  "marketplace.agents.by": "{name} tarafından",
+  "marketplace.agents.routineCount": { one: "{count} rutin", other: "{count} rutin" },
+  "marketplace.agents.yours": "Ajanlarınız",
+  "marketplace.agents.all": "Tüm ajanlar",
+  "marketplace.agents.missing": "Bu ajan Pazaryerinde yok.",
+  "marketplace.agents.trust.reviewed":
+    "Başka bir OpenBot kullanıcısı tarafından yapıldı. OpenBot yayınlanmadan önce inceledi.",
+  "marketplace.agents.trust.reviewedBeforeAdd":
+    "Başka bir OpenBot kullanıcısı tarafından yapıldı. OpenBot yayınlanmadan önce inceledi. Eklendiğinde sizin adınıza işlem yapabilir.",
+  "marketplace.agents.trust.pending": "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı.",
+  "marketplace.agents.trust.pendingBeforeAdd":
+    "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı. Eklendiğinde sizin adınıza işlem yapabilir.",
+  "marketplace.agents.source.pending": "Henüz incelenmedi",
 
   // The skill page, and why Try is off.
   "marketplace.skill.loading": "Beceri yükleniyor",
@@ -81,7 +93,6 @@ export const messages = {
   "marketplace.empty.agents": "Pazaryerinde henüz ajan yok.",
   "marketplace.empty.apps": "Pazaryerinde henüz uygulama yok.",
   "marketplace.empty.skills": "Pazaryerinde henüz beceri yok.",
-  "marketplace.properties.agent": "Bu ajan hakkında",
   "marketplace.properties.creator": "Geliştirici",
   "marketplace.properties.category": "Kategori",
   "marketplace.properties.version": "Sürüm",
@@ -441,7 +452,7 @@ export const messages = {
   "marketplace.skills.source.verified": "Doğrulanmış",
   "marketplace.skills.source.public": "Herkese açık",
   "marketplace.skills.source.verifiedLong": "OpenBot tarafından doğrulandı",
-  "marketplace.skills.source.publicLong": "Herkese açık: OpenBot bunu kontrol etmedi",
+  "marketplace.skills.source.publicLong": "OpenBot tarafından incelendi",
   "marketplace.skills.sortLabel": "Sırala",
   "marketplace.skills.sortName": "Sırala: {name}",
   "marketplace.skills.sort.installs": "En çok kullanılan",
@@ -451,6 +462,7 @@ export const messages = {
   "marketplace.skills.all": "Tüm beceriler",
   "marketplace.skills.count": { one: "{count} beceri", other: "{count} beceri" },
   "marketplace.skills.searchIn": "{name} içinde ara",
+  "marketplace.skills.missing": "Bu beceri Pazaryerinde yok.",
   "marketplace.skills.state.off": "Kapalı",
   "marketplace.skills.state.repair": "Onarılmalı",
   "marketplace.skills.state.update": "Güncelleme var",
