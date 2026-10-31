@@ -11,7 +11,8 @@ set -euo pipefail
 source "$(dirname "$(readlink -f "$0")")/openbot-hosted-update"
 umask 077
 
-SOCKET=/run/openbot/control.sock
+# OPENBOT_CONTROL_SOCKET lets a test drive the commands against its own socket.
+SOCKET=${OPENBOT_CONTROL_SOCKET:-/run/openbot/control.sock}
 UNIT=openbot.service
 
 usage() {
@@ -156,6 +157,32 @@ status_command() {
   show_status
 }
 
+# Asks the server for a sign-in code and tells the user what to look for. Sets `challenge`.
+send_code() {
+  local expires_at
+  control POST /v1/login/start "email=$email" ${name:+"name=$name"}
+  check_answer || exit 1
+  challenge=$(value challenge)
+  expires_at=$(value expires_at)
+  echo "OpenBot sent a sign-in code to $email."
+  # Arithmetic runs a command in an array index, so only digits go into it.
+  if [[ $expires_at =~ ^[0-9]+$ ]]; then
+    echo "The code has 8 characters, such as ABCD-2345, and expires in $(((expires_at / 1000 - $(date +%s) + 59) / 60)) minutes."
+  else
+    echo "The code has 8 characters, such as ABCD-2345."
+  fi
+}
+
+# After a code that cannot work any more, a new code is the only way forward.
+offer_new_code() {
+  local reply
+  read -rp "Send a new code to $email? [Y/n] " reply
+  case $reply in
+    [nN]*) fail "Run openbot login again when you want a new code." ;;
+  esac
+  send_code
+}
+
 login_command() {
   local email="" name="" claim="" with_claim="" challenge code attempt second
   while [ "$#" -gt 0 ]; do
@@ -194,15 +221,30 @@ login_command() {
     [ -t 0 ] || fail "Run openbot login in a terminal."
     if [ -z "$email" ]; then read -rp "Email: " email; fi
     # With the name, OpenBot refuses a name that it cannot publish before it sends a code.
-    control POST /v1/login/start "email=$email" ${name:+"name=$name"}
-    check_answer || exit 1
-    challenge=$(value challenge)
-    echo "OpenBot sent a sign-in code to $email."
-    for attempt in 1 2 3; do
+    send_code
+    attempt=0
+    while :; do
       read -rp "Code: " code
+      # An empty answer is not a try: the email can take a moment.
+      if [ -z "${code//[[:space:]]/}" ]; then
+        echo "Enter the code from the email." >&2
+        continue
+      fi
       control POST /v1/login/verify "challenge=$challenge" "code=$code" ${name:+"name=$name"}
       if check_answer; then break; fi
-      [ "$attempt" -lt 3 ] || exit 1
+      attempt=$((attempt + 1))
+      # The server takes no more codes for this challenge. Asking again would only fail again.
+      case $(value error) in
+        sign_in_code_expired | too_many_code_attempts)
+          offer_new_code
+          attempt=0
+          continue
+          ;;
+      esac
+      if [ "$attempt" -ge 3 ]; then
+        offer_new_code
+        attempt=0
+      fi
     done
   fi
   echo "Signed in as $(value email). Publishing the server..."
