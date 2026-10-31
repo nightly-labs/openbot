@@ -47,6 +47,11 @@ import { ChatListRail } from "@/features/agents/components/chat-list-rail";
 import { EmptyAgentsScene, type WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
+import {
+  loadCollapsedSections,
+  toggleCollapsedSection,
+  useCollapsedSections,
+} from "@/features/agents/model/collapsed-sections";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
   AppUpdateBlock,
@@ -341,8 +346,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const serverDirectoryError = useMobileWorkspaceSelector((current) => current.serverDirectoryError);
   const serverDirectoryState = useMobileWorkspaceSelector((current) => current.serverDirectoryState);
   const servers = useMobileWorkspaceSelector((current) => current.servers);
-  const [collapsedByServer, setCollapsedByServer] = useState<Record<string, ReadonlySet<string>>>({});
-  const collapsedSectionIds = collapsedByServer[activeServer.id];
+  // The collapsed sections stay after a restart, as on desktop.
+  const collapsedSectionIds = useCollapsedSections((state) => state.byServer[activeServer.id]);
+  useEffect(() => {
+    void loadCollapsedSections();
+  }, []);
   const channels = useChannels(activeServer.id);
   const channelAgents = useMemo(
     () => new Map(agents.filter((agent) => agent.serverId === activeServer.id).map((agent) => [agent.id, agent])),
@@ -527,12 +535,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const toggleSection = useCallback(
     (sectionId: string) => {
       setCollapseLayout(sidebarLayout);
-      setCollapsedByServer((current) => {
-        const next = new Set(current[serverId]);
-        if (next.has(sectionId)) next.delete(sectionId);
-        else next.add(sectionId);
-        return { ...current, [serverId]: next };
-      });
+      void toggleCollapsedSection(serverId, sectionId);
     },
     [serverId, sidebarLayout],
   );
