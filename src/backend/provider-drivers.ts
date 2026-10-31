@@ -477,6 +477,11 @@ export interface BuiltInProviderDriver {
   codeSignIn?: ProviderCodeSignIn;
   /** Absent for a provider that holds one account only. */
   accounts?: ProviderAccountSupport;
+  /**
+   * Signs the provider's own sign-in out, in the user's home folder, when its accounts have no
+   * `ProviderAccountSupport.signOut`. Absent for a CLI that has no sign-out command.
+   */
+  signOut?: ProviderCliCommand;
   /** The provider whose downloaded CLI this one runs. Absent when the provider has a CLI of its own. */
   cliProvider?: AgentProviderId;
   /** Absent for a provider whose `model/list` needs no special reading. */
@@ -612,6 +617,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     signIn: { kind: "muse-device", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     // On this computer only: no Team API protocol carries a Muse code sign-in.
     codeSignIn: { kind: "muse-device", timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    // Removes the saved Meta account or key. OpenBot's own key is in `META_API_KEY`, which stays.
+    signOut: { argv: ["logout"], env: () => ({ MUSE_NO_AUTO_UPDATE: "1" }), timeoutMs: 30_000 },
     resolveCli: resolveMuseCli,
     createClient: (cli, timeout, context, confinement) =>
       new MuseAgentClient(cli, {
@@ -740,6 +747,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
+    // Only for the own sign-in: an account folder is removed without it.
+    signOut: { argv: ["--no-auto-update", "logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs, context, confinement) =>
       new GrokAgentClient(
@@ -901,6 +910,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       flow: "link",
       command: { argv: ["login"], env: () => ({ NO_OPEN_BROWSER: "1" }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     },
+    signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveCursorCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

@@ -1656,7 +1656,12 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
-    const accounts = yield* this.#requireAccounts(provider);
+    // A provider with one account, such as Muse, can sign out too: `signOutDefault` checks the command.
+    const accounts = this.#providerAccounts;
+    if (!accounts)
+      return yield* new ProviderOperationFailed({
+        cause: new Error(sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) })),
+      });
     // Codex signs in, by browser or by code, through its own login client.
     const codex = requireProviderDriver(provider).signIn.kind === "browser";
     return yield* this.#runProviderConnectionCommand(provider, () =>

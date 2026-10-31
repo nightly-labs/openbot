@@ -652,7 +652,7 @@ export class ProviderAccounts {
     this: ProviderAccounts,
     provider: AgentProviderId,
   ) {
-    const command = ProviderAccounts.support(provider)?.signOut;
+    const command = ProviderAccounts.support(provider)?.signOut ?? requireProviderDriver(provider).signOut;
     const cli = this.#host.cli(provider);
     if (!command || !cli)
       return yield* accountFailure(
