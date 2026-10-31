@@ -1,5 +1,6 @@
-// Checks that an agent lists the provider accounts and reads and sets another agent's account and backup
-// models with `openbot.list_models`, `openbot.read_agent` and `openbot.update_profile`.
+// Checks that an agent lists the provider accounts and reads and sets another agent's account, backup
+// models, Agent starts new chats and Show the plan before long tasks with `openbot.list_models`,
+// `openbot.read_agent` and `openbot.update_profile`.
 // Runs the real agent service, tool router and provider account store on a temporary profile with a fake
 // Codex app-server and a second Codex account. The fake calls the tools through `tool_call`, as a model
 // does, and logs the tool result that it gets.
@@ -7,8 +8,8 @@
 // list_models lists a short list of models with the models in use and finds the others with a query, that
 // create_agent accepts a model that the short list leaves out, that the
 // account and the backup models are written and read back, that an unknown account or model is a tool
-// failure that changes nothing, that a reset returns both to their defaults, and that a delete stops the
-// process that the agent runs on with the second account.
+// failure that changes nothing, that a reset returns both to their defaults, that the two toggles return
+// to their defaults with null, and that a delete stops the agent’s own process.
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -186,6 +187,8 @@ interface ProfileToolBody {
   providerAccountId?: string;
   backupModels?: { automatic: boolean; order: ChoiceBody[] } | null;
   usageLimitReturn?: unknown;
+  startNewChats?: boolean;
+  showPlanBeforeLongTasks?: boolean;
 }
 
 const report: {
@@ -486,7 +489,51 @@ try {
     reset.text,
   );
 
-  // 7. A delete stops the agent's own process. On Windows a live process in the workspace makes the
+  // 7. The two toggles turn on, read back, and return to the default in Settings, Agents with null.
+  const before = await callTool("read toggles", coordinator.id, "read_agent", { agentId: worker.id });
+  pass(
+    "read_agent reports both toggles off by default",
+    before.body?.startNewChats === false && before.body.showPlanBeforeLongTasks === false,
+    before.text,
+  );
+  const togglesOn = await callTool("toggles on", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    startNewChats: true,
+    showPlanBeforeLongTasks: true,
+  });
+  const afterOn = storedAgent(worker.id);
+  pass(
+    "update_profile turns both toggles on",
+    togglesOn.success &&
+      afterOn.allowNewChat === true &&
+      afterOn.quickAcknowledgement === true &&
+      togglesOn.body?.startNewChats === true &&
+      togglesOn.body.showPlanBeforeLongTasks === true,
+    togglesOn.text,
+  );
+  const readOn = await callTool("read toggles on", coordinator.id, "read_agent", { agentId: worker.id });
+  pass(
+    "read_agent reports both toggles on",
+    readOn.body?.startNewChats === true && readOn.body.showPlanBeforeLongTasks === true,
+    readOn.text,
+  );
+  const togglesDefault = await callTool("toggles default", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    startNewChats: null,
+    showPlanBeforeLongTasks: null,
+  });
+  const afterDefault = storedAgent(worker.id);
+  pass(
+    "null returns both toggles to the default",
+    togglesDefault.success &&
+      afterDefault.allowNewChat === undefined &&
+      afterDefault.quickAcknowledgement === undefined &&
+      togglesDefault.body?.startNewChats === false &&
+      togglesDefault.body.showPlanBeforeLongTasks === false,
+    togglesDefault.text,
+  );
+
+  // 8. A delete stops the agent's own process. On Windows a live process in the workspace makes the
   // folder removal fail with EBUSY until the app restarts (#3205).
   const reassigned = await callTool("set account again", coordinator.id, "update_profile", {
     agentId: worker.id,

@@ -150,6 +150,20 @@ export const updateProfileToolSchema = z
       .describe("false turns Computer Use off for the agent. Only the user can turn it on.")
       .optional(),
     notifications: z.boolean().describe("Whether the user gets notifications for the agent.").optional(),
+    startNewChats: z
+      .boolean()
+      .nullable()
+      .describe(
+        "Agent starts new chats: whether the agent may start a new chat when its chat gets long. null follows the default in Settings, Agents.",
+      )
+      .optional(),
+    showPlanBeforeLongTasks: z
+      .boolean()
+      .nullable()
+      .describe(
+        "Show the plan before long tasks: whether the agent shows its plan card before a long task. null follows the default in Settings, Agents.",
+      )
+      .optional(),
   })
   .strict();
 

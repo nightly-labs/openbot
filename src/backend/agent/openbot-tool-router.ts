@@ -662,6 +662,15 @@ export class OpenBotToolRouter {
     );
   }
 
+  /** The effective value of each toggle, with the agent's own value or the default in Settings, Agents. */
+  #behaviorSettings(agent: AgentSummary) {
+    const defaults = this.#store.agentDefaults();
+    return {
+      startNewChats: agentNewChatAllowed(agent, defaults),
+      showPlanBeforeLongTasks: agentQuickAcknowledgementEnabled(agent, defaults),
+    };
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
@@ -715,6 +724,7 @@ export class OpenBotToolRouter {
       access: workspaceAccessEnforced(agent) ? "workspace" : "full",
       computerUse,
       notifications: agent.notifications,
+      ...this.#behaviorSettings(agent),
       autoApprove: this.#approvalAutomation.autoApproves(agent.id),
       ...(skills ? { skills } : { skillsError }),
       routines: this.#routines.list(agent.id).map((routine) => ({
@@ -1529,6 +1539,8 @@ export class OpenBotToolRouter {
         backupModels,
         access,
         computerUse,
+        startNewChats,
+        showPlanBeforeLongTasks,
         ...fields
       } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
@@ -1542,6 +1554,8 @@ export class OpenBotToolRouter {
         backupModels === undefined &&
         access === undefined &&
         computerUse === undefined &&
+        startNewChats === undefined &&
+        showPlanBeforeLongTasks === undefined &&
         avatarHue === undefined &&
         avatarPath === undefined
       ) {
@@ -1589,6 +1603,8 @@ export class OpenBotToolRouter {
         ...(providerAccountId === undefined ? {} : { providerAccountId }),
         ...(backups === undefined ? {} : { backupModels: backups }),
         ...restrictionInput(access, computerUse),
+        ...(startNewChats === undefined ? {} : { allowNewChat: startNewChats }),
+        ...(showPlanBeforeLongTasks === undefined ? {} : { quickAcknowledgement: showPlanBeforeLongTasks }),
         ...(avatarHue === undefined ? {} : { avatarHue }),
       };
       let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
@@ -1619,6 +1635,7 @@ export class OpenBotToolRouter {
               access: workspaceAccessEnforced(updated) ? "workspace" : "full",
               computerUse: agentComputerUseEnabled(updated),
               notifications: updated.notifications,
+              ...this.#behaviorSettings(updated),
             }),
           },
         ],
