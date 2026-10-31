@@ -20,6 +20,7 @@ export const messages = defineMessages("mobile.channel", {
   "mobile.channel.task.paused": "Paused",
   "mobile.channel.task.resume": "Resume",
   "mobile.channel.task.reassign": "Reassign",
+  "mobile.channel.task.cancel": "Cancel task",
   "mobile.channel.loadFailed": "Could not load channels. Try again.",
   "mobile.channel.actions.historyStale": "The task was changed, but chat history could not refresh.",
   "mobile.channel.actions.refreshFailed": "Could not refresh task history. Try again.",

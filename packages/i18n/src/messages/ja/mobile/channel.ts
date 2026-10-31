@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "一時停止中",
   "mobile.channel.task.resume": "再開",
   "mobile.channel.task.reassign": "割り当てを変更",
+  "mobile.channel.task.cancel": "タスクを中止",
   "mobile.channel.loadFailed": "チャンネルを読み込めませんでした。もう一度お試しください。",
   "mobile.channel.actions.historyStale": "タスクは変更されましたが、チャット履歴を更新できませんでした。",
   "mobile.channel.actions.refreshFailed": "タスクの履歴を更新できませんでした。もう一度お試しください。",

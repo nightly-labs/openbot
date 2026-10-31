@@ -1,5 +1,5 @@
 import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
-import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
+import { CHANNEL_DELETE_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
@@ -176,6 +176,7 @@ export {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   CONNECTORS_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
@@ -372,6 +373,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_KEY_ROTATION_CAPABILITY,
   AGENT_THREAD_BRANCHES_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -513,7 +515,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_FOLDERS_CAPABILITY &&
     capability !== HOST_KEY_ROTATION_CAPABILITY &&
     capability !== AGENT_THREAD_BRANCHES_CAPABILITY &&
-    capability !== CUSTOM_AGENTS_CAPABILITY,
+    capability !== CUSTOM_AGENTS_CAPABILITY &&
+    capability !== CHANNEL_TASK_CANCEL_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -531,6 +534,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_KEY_ROTATION_CAPABILITY,
   AGENT_THREAD_BRANCHES_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -631,6 +635,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_KEY_ROTATION_CAPABILITY &&
       capability !== TEAM_LONG_CAPABILITY_LISTS_CAPABILITY &&
       capability !== AGENT_THREAD_BRANCHES_CAPABILITY &&
-      capability !== CUSTOM_AGENTS_CAPABILITY,
+      capability !== CUSTOM_AGENTS_CAPABILITY &&
+      capability !== CHANNEL_TASK_CANCEL_CAPABILITY,
   );
 }

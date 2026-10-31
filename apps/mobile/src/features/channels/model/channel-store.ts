@@ -1,6 +1,7 @@
 import {
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
@@ -36,6 +37,8 @@ export interface ChannelState {
   pages: ReadonlyMap<string, ChannelPage>;
   supported: boolean;
   canDelete: boolean;
+  /** The host takes `cancel` for a stopped task (`channel-task-cancel-v1`). */
+  canCancelTasks: boolean;
   loading: boolean;
   /** The host list has loaded at least once, or the host has no channels to list. */
   listed: boolean;
@@ -47,6 +50,7 @@ const EMPTY: ChannelState = {
   pages: new Map(),
   supported: false,
   canDelete: false,
+  canCancelTasks: false,
   loading: false,
   listed: false,
   error: null,
@@ -140,6 +144,7 @@ export class MobileChannelStore {
       next.pages === entry.state.pages &&
       next.supported === entry.state.supported &&
       next.canDelete === entry.state.canDelete &&
+      next.canCancelTasks === entry.state.canCancelTasks &&
       next.loading === entry.state.loading &&
       next.listed === entry.state.listed &&
       next.error === entry.state.error
@@ -154,6 +159,7 @@ export class MobileChannelStore {
     this.publish(entry, {
       supported,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
+      canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       // A host without channels has its whole list already: none.
       ...(supported ? {} : { listed: true }),
     });
@@ -427,7 +433,10 @@ export class MobileChannelStore {
       // that no screen shows reads its history when it opens.
       if (options?.waitForRefresh && command.type === "send" && entry.observed.has(result.id))
         await this.refreshHistory(serverId, result.id);
-      else if (options?.waitForRefresh && (command.type === "resume" || command.type === "reassign"))
+      else if (
+        options?.waitForRefresh &&
+        (command.type === "resume" || command.type === "reassign" || command.type === "cancel")
+      )
         await this.refreshHistory(serverId, result.id, sourceText("error.remote.taskHistoryRefreshFailed"));
       else {
         const refresh = this.refresh(serverId);

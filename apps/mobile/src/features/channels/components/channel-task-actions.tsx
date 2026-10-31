@@ -8,7 +8,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import { useText } from "@/shared/lib/text";
 
-type TaskCommand = (taskId: string, type: "resume" | "reassign", recipientAgentId?: string | null) => void;
+type TaskCommand = (taskId: string, type: "resume" | "reassign" | "cancel", recipientAgentId?: string | null) => void;
 
 export function ChannelTaskActions({
   tasks,
@@ -16,6 +16,7 @@ export function ChannelTaskActions({
   online,
   pending,
   archived,
+  canCancel,
   onCommand,
 }: {
   tasks: ChannelTask[];
@@ -23,6 +24,7 @@ export function ChannelTaskActions({
   online: boolean;
   pending: boolean;
   archived: boolean;
+  canCancel: boolean;
   onCommand: TaskCommand;
 }) {
   return (
@@ -33,6 +35,7 @@ export function ChannelTaskActions({
           task={task}
           members={members}
           disabled={!online || pending || archived}
+          canCancel={canCancel}
           onCommand={onCommand}
         />
       ))}
@@ -44,11 +47,13 @@ function TaskActionCard({
   task,
   members,
   disabled,
+  canCancel,
   onCommand,
 }: {
   task: ChannelTask;
   members: MobileAgent[];
   disabled: boolean;
+  canCancel: boolean;
   onCommand: TaskCommand;
 }) {
   const { t, sourceText } = useText();
@@ -113,6 +118,17 @@ function TaskActionCard({
             </CoveringMenuView>
           </View>
         </View>
+        {canCancel ? (
+          <Button
+            className="min-h-11"
+            size="sm"
+            variant="ghost"
+            isDisabled={disabled}
+            onPress={() => onCommand(task.id, "cancel")}
+          >
+            <Button.Label>{t("mobile.channel.task.cancel")}</Button.Label>
+          </Button>
+        ) : null}
       </View>
     </SettingsSection>
   );

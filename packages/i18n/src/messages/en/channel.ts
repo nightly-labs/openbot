@@ -7,6 +7,7 @@ export const messages = defineMessages("channel", {
   "channel.stoppedTask.label": "Stopped task for {name}",
   "channel.stoppedTask.reassignLabel": "Reassign the stopped task of {name}",
   "channel.stoppedTask.reassign": "Reassign",
+  "channel.stoppedTask.cancel": "Cancel task",
   "channel.conversation.noMembers": "Add agents in channel settings to start work.",
   "channel.conversation.archivedNotice": "Deleted channel. Preview only.",
   "channel.composer.label": "Message to channel",

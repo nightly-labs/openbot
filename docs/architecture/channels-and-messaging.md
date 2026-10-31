@@ -275,7 +275,11 @@ interrupts active work, and sets the reason `channelTaskStopped`. The clients sh
 Reassign for a paused task that has a reason. A turn that ends interrupted gets the same reason. An
 archive pauses work with no reason; a restore gives those tasks the stop reason. Startup gives the
 stop reason to a paused task with no reason in a channel that is not archived: older versions stopped
-with no reason. Reassign waits for the old assignment to finish stopping. Restart
+with no reason. Reassign waits for the old assignment to finish stopping. Cancel ends a stopped or
+failed task: it sets every open task of the same root to `cancelled`, interrupts active work, and
+keeps the messages. A parent waits for each task that it delegated, so a cancel always ends the whole
+run. The clients show Cancel without a confirmation, and only on a host that advertises
+`channel-task-cancel-v1`; a host rejects `cancel` from a peer without it. Restart
 recovery checks accepted provider work before retrying. Unknown outcomes require attention.
 Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
 effects do not have an exactly-once guarantee.
@@ -286,7 +290,7 @@ the capability only when its channel service is connected. When a host does not 
 `channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. The account API and Signal service add no channel storage or routing.
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
-with `channel-delete-v1`. It uses the same host channel IDs and commands. The host database stores
+with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
 channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
 in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.

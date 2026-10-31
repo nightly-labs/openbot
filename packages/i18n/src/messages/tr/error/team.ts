@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",
   "error.team.channelsUnsupported": "Kanal sohbetleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.channelDeleteUnsupported": "Kanal silme bu bağlantı tarafından desteklenmiyor.",
+  "error.team.channelTaskCancelUnsupported": "Kanal görevlerini iptal etme bu bağlantı tarafından desteklenmiyor.",
   "error.team.membersCannotDeleteChannels": "Üyeler kanalları silemez.",
   "error.team.membersCannotArchiveChannels": "Üyeler kanalları arşivleyemez.",
   "error.team.membersCannotRestoreChannels": "Üyeler kanalları geri yükleyemez.",

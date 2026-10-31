@@ -8,6 +8,7 @@ export const messages = {
   "channel.stoppedTask.label": "Zatrzymane zadanie: {name}",
   "channel.stoppedTask.reassignLabel": "Przydziel ponownie zatrzymane zadanie: {name}",
   "channel.stoppedTask.reassign": "Przekaż",
+  "channel.stoppedTask.cancel": "Anuluj zadanie",
   "channel.conversation.noMembers": "Dodaj agentów w ustawieniach kanału, aby rozpocząć pracę.",
   "channel.conversation.archivedNotice": "Usunięty kanał. Tylko podgląd.",
   "channel.composer.label": "Wiadomość do kanału",

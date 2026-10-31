@@ -51,6 +51,8 @@ export interface ChannelsEnvironment {
   supported: () => boolean;
   /** Whether this reader may delete a channel; `supported()` is checked as well. */
   deletionSupported: () => boolean;
+  /** Whether the host takes `cancel` (`channel-task-cancel-v1`); `supported()` is checked as well. */
+  taskCancelSupported: () => boolean;
   /** Clears whatever else covers the workspace, because a channel is about to cover it. */
   beforeOpen: () => void;
   /** Whether a message that arrives now is in front of the reader. */
@@ -439,6 +441,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     agents: env.agents,
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),
+    taskCancelSupported: () => supported() && env.taskCancelSupported(),
     refresh,
     retry: async (onAccepted?: (accepted: ChannelCommand) => void) => {
       const previous = failedCommand;

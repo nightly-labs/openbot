@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "已暂停",
   "mobile.channel.task.resume": "继续",
   "mobile.channel.task.reassign": "重新分配",
+  "mobile.channel.task.cancel": "取消任务",
   "mobile.channel.loadFailed": "无法加载频道，请重试。",
   "mobile.channel.actions.historyStale": "任务已更改，但对话记录无法刷新。",
   "mobile.channel.actions.refreshFailed": "无法刷新任务记录，请重试。",

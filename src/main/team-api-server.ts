@@ -61,6 +61,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -2024,7 +2025,11 @@ export class TeamApiServer {
       capabilities: teamCapabilitiesVisibleToProtocol(TEAM_CURRENT_CAPABILITIES, protocol ?? TEAM_PROTOCOL_V1).filter(
         (capability) => {
           if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
-          if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+          if (
+            capability === "channel-chats-v1" ||
+            capability === CHANNEL_DELETE_CAPABILITY ||
+            capability === CHANNEL_TASK_CANCEL_CAPABILITY
+          )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
           // and one that did not never shows the panel.
