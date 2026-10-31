@@ -1020,7 +1020,6 @@ a {
   background: var(--openbot-bg-sidebar);
   padding: clamp(32px, 7vw, 56px);
   text-align: center;
-  box-shadow: 0 24px 80px var(--openbot-glass-shadow);
 }
 
 .join-card-logo {
@@ -11489,7 +11488,6 @@ a {
   display: grid;
   place-items: center;
   padding: clamp(32px, 6vw, 72px) 16px clamp(48px, 8vw, 96px);
-  background: radial-gradient(circle at 50% 42%, var(--openbot-accent-strong), var(--openbot-transparent) 38%);
 }
 
 /* A form reads from the start edge, and needs more width than a message. */

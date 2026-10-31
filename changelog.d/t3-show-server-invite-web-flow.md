@@ -1,6 +1,7 @@
 ### Changed
 
 - The server invitation page has one Open OpenBot button. Below it, links let you join in the browser or download OpenBot. When OpenBot does not open on a computer, a dialog tells you to install it and gives a download button.
+- The invitation, Slack and Discord connect, billing and report pages no longer show a blue glow and a shadow behind the card.
 
 ### Fixed
 
