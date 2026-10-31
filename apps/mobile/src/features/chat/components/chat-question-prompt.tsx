@@ -114,7 +114,7 @@ function ChatPlanPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[88%] flex-row items-start gap-2 self-start rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[30px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="min-w-0 flex-1 pt-1">
@@ -194,7 +194,7 @@ export function ChatQuestionPrompt({
   const plan = confirmPlan(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
+      <View className="max-w-[92%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
         {plan ? <ConfirmPlanBody plan={plan} compact /> : <Typography>{prompt.questions[0]?.question}</Typography>}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
@@ -207,7 +207,7 @@ export function ChatQuestionPrompt({
   if (resolution) {
     return (
       <View
-        className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="flex-row items-center gap-2">
@@ -249,7 +249,7 @@ export function ChatQuestionPrompt({
 
   return (
     <View
-      className="w-full max-w-[88%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
+      className="w-full max-w-[92%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
       accessibilityLabel={t("mobile.chat.question.form")}
     >

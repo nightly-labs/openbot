@@ -66,7 +66,7 @@ export function ChatMessageGesture({
   }, [canReply, canSelect, offset]);
 
   return (
-    <View className="max-w-[88%] self-start">
+    <View className="max-w-[92%] self-start">
       {iconShown ? (
         <Animated.View pointerEvents="none" className="absolute bottom-0 left-0 top-0 justify-center" style={iconStyle}>
           <Reply color={muted} size={22} />

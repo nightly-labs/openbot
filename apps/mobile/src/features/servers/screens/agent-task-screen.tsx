@@ -424,7 +424,7 @@ function AgentTaskChat({ target, taskId }: { target: AgentChatTarget; taskId: st
           {task.queuedMessages.map((queued) => (
             <View
               key={queued.deliveryId}
-              className="max-w-[88%] self-end rounded-[30px] bg-control/40 px-4 py-3"
+              className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
               style={{ borderCurve: "circular" }}
             >
               <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
