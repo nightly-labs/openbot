@@ -16,6 +16,8 @@ The flow is: signed request → route → routine → run.
 | Trigger, route ID, encrypted secret, URL | Host SQLite | `projection_routine_webhooks`, `projection_channel_routine_webhooks` |
 | Workflow trigger route ID, encrypted secret, URL | Host SQLite | `workflow_trigger_webhooks` (schema v46) |
 | Receipts (no body) | Host SQLite | `projection_webhook_receipts`, `workflow_webhook_receipts` |
+| GitHub deliveries (no body), runs per item, changes made | Host SQLite | `workflow_github_deliveries`, `workflow_github_runs`, `workflow_github_actions` (schema v49) |
+| GitHub repository → ingress socket | Signal memory | `SignalService` |
 | Routes to revoke on the relay | Host SQLite | `projection_webhook_route_revocations` |
 | Route ID → host and owner account, link time, revoke time | Account service D1 | `webhook_routes` |
 | Route ID → ingress socket | Signal memory | `SignalService` |
@@ -126,6 +128,32 @@ body. A body of more than 64,000 characters gets 413 and no receipt. A workflow 
 answers 202 `ignored` with the reason `busy`, as a schedule skips an occurrence. The body, marked as
 data, is the trigger's output. Workflow triggers have no test event.
 
+### Workflow GitHub triggers
+
+A GitHub trigger has no secret or route of its own. The OpenBot GitHub App sends every event to
+Signal (`/v1/github/events`, see `remote/README.md`). `GitHubRelay` (`src/main/github-relay.ts`)
+asks the account service for a GitHub route ticket that names the repositories of the saved GitHub
+triggers, and the `ingress` socket sends it to Signal. The account service checks the repositories
+with the host's GitHub sign-in; D1 keeps none of them. Signal gives each event to every host that
+watches its repository, and the host answers with `github-delivery-result`.
+
+`Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
+the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already
+records nothing. A delivery is `started`, `waiting` (its item has an open run), or `skipped` with a
+reason:
+
+- `filter`: the event or a filter of the trigger does not match.
+- `self`: the event is the echo of a change that a run of this workflow made, by the GitHub object
+  ID in `workflow_github_actions`.
+- `chain`: OpenBot's bot caused 3 runs on the item in 10 minutes.
+- `refused`: the run could not start.
+- `offline`: the host lost its GitHub route. Signal does not keep events for a host that is offline,
+  and GitHub does not send them again, so the history shows the gap. Gaps closer than 2 minutes are
+  one gap.
+
+`workflow_github_runs` links a run to its item. When a run ends, the oldest waiting delivery of its
+item starts. The event, marked as data, is the trigger's output.
+
 ## Management surfaces
 
 - Local desktop: the `events` IPC group (`packages/contracts/src/ipc-endpoints.ts`).
@@ -148,6 +176,9 @@ data, is the trigger's output. Workflow triggers have no test event.
   schedule routine writes a conversation event.
 - Workflow webhook triggers: the `workflows` IPC group and the `workflows-v1` Team API capability
   (`rotate-webhook-secret`). Only an owner or admin sees the URL or makes a new secret.
+- Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
+  API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
+  routes need a host administrator. A client without the capability does not offer GitHub.
 - Desktop and web use the shared routine editor components in
   `packages/ui/src/features/conversation`. Mobile uses native components in
   `apps/mobile/src/features/agents/components`.
