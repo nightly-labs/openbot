@@ -142,7 +142,8 @@ export function collectProviderUsage(
   // ACP `Usage` is session-cumulative by contract: its fields are documented as "Sum of all token
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
-  // carries tokens spent before analytics existed.
+  // carries tokens spent before analytics existed. `usage_update.cost` is the session's total too,
+  // and this counter is per session, so its checkpoint keeps the cost with the tokens.
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
@@ -151,6 +152,7 @@ export function collectProviderUsage(
     model,
     counterId: `${session.id}:grok`,
     baseline: session.createdAt < usage.collectionStartedAt(),
+    reportedCost: isDynamicRecord(params) ? cost(params.cost) : null,
     tokens: acpTokens(value),
   });
 }
@@ -194,11 +196,11 @@ export function memoryReviewUsageObserver(
   };
 }
 
-/** An ACP `Usage`, whose `inputTokens` include the cache reads and writes. */
+/** An ACP `Usage`, whose `inputTokens` include the cache reads and writes. A count left out is 0. */
 function acpTokens(value: DynamicRecord): UsageTokens {
   const input = count(value.inputTokens);
-  const cached = count(value.cachedReadTokens);
-  const creation = count(value.cachedWriteTokens);
+  const cached = count(value.cachedReadTokens ?? 0);
+  const creation = count(value.cachedWriteTokens ?? 0);
   return {
     uncachedInput:
       input !== null && cached !== null && creation !== null && input >= cached + creation
