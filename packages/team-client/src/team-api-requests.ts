@@ -14,6 +14,7 @@ import {
   type AgentTaskReadState,
   type AgentTasksSnapshot,
   type ApplyAgentImportInput,
+  type ApplyInstanceTransferInput,
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
   type CancelQueuedMessageInput,
@@ -30,7 +31,13 @@ import {
   decodeInstalledSkills,
   decodeRemoteAgentImportPreview,
   decodeRemoteAgentImportResult,
+  decodeRemoteInstanceTransferPreview,
+  decodeRemoteInstanceTransferResult,
+  decodeRemoteInstanceTransferSummary,
+  type ExportInstanceInput,
   type InstalledSkill,
+  type InstanceTransferPreview,
+  type InstanceTransferSummary,
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
@@ -48,6 +55,7 @@ import {
   type OpenBotDesktopApi,
   type QueuedMessageReceipt,
   type RemoteAgentImportResult,
+  type RemoteInstanceTransferResult,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
@@ -75,6 +83,10 @@ import { AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-thr
 import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  INSTANCE_TRANSFER_REMOTE_BYTES,
+  INSTANCE_TRANSFER_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
@@ -330,6 +342,73 @@ export const discardAgentImport = Effect.fn("TeamClient.discardAgentImport")(fun
   token: string,
 ): Effect.fn.Return<void, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_IMPORT_ROUTES.discard, ignoreResponse, { token }));
+});
+
+/** The host's agents with their counts. Send it only to a host that serves `instance-transfer-v1`. */
+export const loadInstanceTransferSummary = Effect.fn("TeamClient.loadInstanceTransferSummary")(function* (
+  request: TeamApiRequest,
+): Effect.fn.Return<InstanceTransferSummary, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_ROUTES.summary, decodeRemoteInstanceTransferSummary, {}),
+  );
+});
+
+const decodeTransferFile = guardedDecoder(
+  (value: unknown): value is RemoteFileUpload =>
+    isDynamicRecord(value) && isString(value.name) && isString(value.mimeType) && isString(value.base64),
+  "transfer file",
+);
+
+/**
+ * The host's transfer file, as Base64. The transport must let one file of up to
+ * `INSTANCE_TRANSFER_REMOTE_BYTES` answer this request.
+ */
+export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTransfer")(function* (
+  request: TeamApiRequest,
+  input: ExportInstanceInput,
+): Effect.fn.Return<RemoteFileUpload, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_ROUTES.export, decodeTransferFile, {
+      agentIds: input.agentIds,
+      includeFiles: input.includeFiles,
+      includeSettings: input.includeSettings,
+    }),
+  );
+});
+
+/** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */
+export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer")(function* (
+  request: TeamApiRequest,
+  upload: RemoteFileUpload,
+): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_ROUTES.stage, decodeRemoteInstanceTransferPreview, undefined, {
+      ...upload,
+      maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
+    }),
+  );
+});
+
+export const applyInstanceTransfer = Effect.fn("TeamClient.applyInstanceTransfer")(function* (
+  request: TeamApiRequest,
+  input: ApplyInstanceTransferInput,
+  timezone: string,
+): Effect.fn.Return<RemoteInstanceTransferResult, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_ROUTES.apply, decodeRemoteInstanceTransferResult, {
+      token: input.token,
+      keys: input.keys,
+      includeSettings: input.includeSettings,
+      timezone,
+    }),
+  );
+});
+
+export const discardInstanceTransfer = Effect.fn("TeamClient.discardInstanceTransfer")(function* (
+  request: TeamApiRequest,
+  token: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_ROUTES.discard, ignoreResponse, { token }));
 });
 
 /** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */

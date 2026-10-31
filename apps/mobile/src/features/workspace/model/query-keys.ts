@@ -108,6 +108,7 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],

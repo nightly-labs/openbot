@@ -18,6 +18,7 @@ import {
   encodeTeamProtocolV2Frame,
   encodeTeamProtocolV8WebRtcHttpRequest,
   TEAM_PROTOCOL_V2_CHANNELS,
+  TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   type TeamProtocolV2AuthFrame,
   type TeamProtocolV2Json,
   teamCapabilitiesForProtocol,
@@ -94,6 +95,8 @@ export type RemoteTeamCommand =
       body: TeamProtocolV2Json;
       upload?: RemoteFileUpload | undefined;
       timeoutMs?: number | undefined;
+      /** A larger cap for the one file that answers this request, such as a transfer file. */
+      downloadMaxBytes?: number | undefined;
     };
 
 export interface RemoteTeamBootstrapPayload {
@@ -186,6 +189,8 @@ export function decodeRemoteTeamCommand(value: unknown): {
   if (value.type !== "request" || !isString(value.method) || !isString(value.path)) return invalid;
   const timeoutMs = value.timeoutMs;
   if (!(timeoutMs === undefined || isNumber(timeoutMs))) return invalid;
+  const downloadMaxBytes = value.downloadMaxBytes;
+  if (!(downloadMaxBytes === undefined || isNumber(downloadMaxBytes))) return invalid;
   const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
   if (upload === null) return invalid;
   let body: TeamProtocolV2Json;
@@ -203,6 +208,7 @@ export function decodeRemoteTeamCommand(value: unknown): {
       body,
       ...(upload ? { upload } : {}),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      ...(downloadMaxBytes === undefined ? {} : { downloadMaxBytes }),
     },
     commandId: id,
   };
@@ -747,6 +753,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
             ).catch(() => undefined);
           },
           command.timeoutMs,
+          command.downloadMaxBytes,
         );
         return { commandId: command.id, ok: true, status: response.status, body: response.body };
       }).pipe(Effect.result);
@@ -1412,6 +1419,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     upload?: RemoteFileUpload,
     onUploadProgress?: (sent: number, total: number) => void,
     timeoutMs = REQUEST_TIMEOUT_MS,
+    downloadMaxBytes?: number,
   ) {
     return Effect.fn("RemotePeer.request")(function* () {
       const state = peer;
@@ -1426,6 +1434,10 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       else if (state.hostProtocol === undefined && state.hostProtocolRead)
         yield* Deferred.await(state.hostProtocolRead);
       const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
+      const releaseDownload =
+        downloadMaxBytes === undefined
+          ? null
+          : downloads.allow(Math.min(downloadMaxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES));
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
         if (peer !== state || !isPeerOnline(state))
@@ -1547,6 +1559,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         Effect.ensuring(
           Effect.sync(() => {
             delivery?.stop();
+            releaseDownload?.();
             if (protocolRead) Deferred.doneUnsafe(protocolRead, Effect.void);
           }),
         ),

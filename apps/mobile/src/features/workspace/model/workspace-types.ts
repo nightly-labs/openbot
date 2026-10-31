@@ -8,6 +8,7 @@ import type {
   AgentAnalytics,
   AgentAnalyticsInput,
   AgentHostSettings,
+  AgentImportPreview,
   AgentMemory,
   AgentMemorySelectionState,
   AgentModelId,
@@ -22,6 +23,8 @@ import type {
   AgentTasksSnapshot,
   AgentTemplatePreview,
   AgentTemplatePublication,
+  ApplyAgentImportInput,
+  ApplyInstanceTransferInput,
   AvatarHue,
   AvatarImageInput,
   BitwardenConnectorStatus,
@@ -35,6 +38,7 @@ import type {
   CreateWorkflowInput,
   DecideWorkflowStepInput,
   DraftAttachment,
+  ExportInstanceInput,
   ForeignProviderId,
   GitHubConnectorRepositories,
   HostAddMessagingOrchestratorInput,
@@ -55,6 +59,8 @@ import type {
   InstalledSkill,
   InstallMarketplaceAgentInput,
   InstallSkillInput,
+  InstanceTransferPreview,
+  InstanceTransferSummary,
   MarkAgentTaskReadInput,
   McpServerConfig,
   McpSignInState,
@@ -64,6 +70,8 @@ import type {
   OnePasswordConnectorStatus,
   QueuedMessageReceipt,
   QueueSnapshot,
+  RemoteAgentImportResult,
+  RemoteInstanceTransferResult,
   RenameWorkflowInput,
   ResetAgentSessionSettingInput,
   RespondToApprovalInput,
@@ -366,6 +374,13 @@ export interface MobileWorkspaceContextValue {
   canManageVault: (serverId: string) => boolean;
   /** The same for a CSV import from this phone (`vault-import-v1`). */
   canImportVault: (serverId: string) => boolean;
+  /** True on an online host that takes a Grok Bot or Hermes export from any member (`agent-import-v1`). */
+  canImportAgents: (serverId: string) => boolean;
+  /**
+   * True for an owner or admin of an online host that moves its agents to or from an OpenBot
+   * transfer file (`instance-transfer-v1`).
+   */
+  canTransferServer: (serverId: string) => boolean;
   /** The same for API keys in the Vault (`vault-v2`). */
   canManageVaultApiKeys: (serverId: string) => boolean;
   /** Reads or changes the host's GitHub connection. The answer names the GitHub pages that the phone opens. */
@@ -391,6 +406,28 @@ export interface MobileWorkspaceContextValue {
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
   /** The text of a CSV password export. The host adds its logins and answers only the counts. */
   importVaultCsv: (csv: string, serverId: string) => Promise<VaultHostImportResult>;
+  /** Sends a Grok Bot or Hermes export to the host, which keeps it under the preview's token. */
+  stageAgentImport: (
+    upload: RemoteFileUpload,
+    serverId: string,
+    onProgress?: (fraction: number) => void,
+  ) => Promise<AgentImportPreview>;
+  /** Creates the chosen agents and channels. The token is spent, also when the import fails. */
+  applyAgentImport: (input: ApplyAgentImportInput, serverId: string) => Promise<RemoteAgentImportResult>;
+  discardAgentImport: (token: string, serverId: string) => Promise<void>;
+  /** The host's agents with their counts, for the export. */
+  loadInstanceTransferSummary: (serverId: string) => Promise<InstanceTransferSummary>;
+  /** The host's transfer file, as Base64. */
+  downloadInstanceTransfer: (input: ExportInstanceInput, serverId: string) => Promise<RemoteFileUpload>;
+  /** Sends a transfer file to the host, which keeps it under the preview's token. */
+  stageInstanceTransfer: (
+    upload: RemoteFileUpload,
+    serverId: string,
+    onProgress?: (fraction: number) => void,
+  ) => Promise<InstanceTransferPreview>;
+  /** Creates the chosen agents and adds the settings. The token is spent, also when the import fails. */
+  applyInstanceTransfer: (input: ApplyInstanceTransferInput, serverId: string) => Promise<RemoteInstanceTransferResult>;
+  discardInstanceTransfer: (token: string, serverId: string) => Promise<void>;
   loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
@@ -774,6 +811,8 @@ type MobileWorkspaceStateKey =
   | "canManageBitwardenConnector"
   | "canManageVault"
   | "canImportVault"
+  | "canImportAgents"
+  | "canTransferServer"
   | "canManageVaultApiKeys"
   | "serverUpdateAccess"
   | "canReadServerRelease"

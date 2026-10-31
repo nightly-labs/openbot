@@ -32,6 +32,7 @@ import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
+import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
@@ -68,6 +69,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -165,10 +167,16 @@ import {
 import {
   type AgentMemoriesRequest,
   agentTaskControl,
+  applyAgentImport,
+  applyInstanceTransfer,
   clearAgentContext,
   deleteAgentThread,
+  discardAgentImport,
+  discardInstanceTransfer,
+  downloadInstanceTransfer,
   listAgentTasks,
   listAgentThreadReads,
+  loadInstanceTransferSummary,
   markAgentThreadRead,
   readAgentMemories,
   readAgentMemorySelection,
@@ -176,6 +184,8 @@ import {
   renameAgentThread,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
+  stageAgentImport,
+  stageInstanceTransfer,
   startAgentTask,
   type TeamApiRequest,
   TeamRequestError,
@@ -289,6 +299,14 @@ type HostRequestActions = Pick<
   | "saveVaultItem"
   | "deleteVaultItem"
   | "importVaultCsv"
+  | "stageAgentImport"
+  | "applyAgentImport"
+  | "discardAgentImport"
+  | "loadInstanceTransferSummary"
+  | "downloadInstanceTransfer"
+  | "stageInstanceTransfer"
+  | "applyInstanceTransfer"
+  | "discardInstanceTransfer"
   | "loadMessagingConnections"
   | "connectMessaging"
   | "completeMessagingInstall"
@@ -373,7 +391,7 @@ export function createHostRequestActions({
   attachmentDownloads,
 }: {
   request: WorkspaceRequest;
-  teamApi: (serverId: string) => TeamApiRequest;
+  teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
   queryClient: QueryClient;
   /** The API URL, user ID and session scope that start each account query key. */
   queryScope: QueryScope;
@@ -382,9 +400,14 @@ export function createHostRequestActions({
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   /** The Team API of a server that serves `capability`, for an optional admin route set. */
-  function capabilityApi(serverId: string, capability: string, unsupported: MobileTextKey): TeamApiRequest {
+  function capabilityApi(
+    serverId: string,
+    capability: string,
+    unsupported: MobileTextKey,
+    onUploadProgress?: (fraction: number) => void,
+  ): TeamApiRequest {
     requireCapability(capabilities, serverId, capability, unsupported);
-    return teamApi(serverId);
+    return teamApi(serverId, onUploadProgress);
   }
   /** The shared admin requests, sent to one server that serves `skills-admin-v1`. */
   const skillsAdmin = (serverId: string) =>
@@ -439,6 +462,14 @@ export function createHostRequestActions({
   const vaultAdmin = (serverId: string) => capabilityApi(serverId, VAULT_CAPABILITY, "mobile.server.vault.unsupported");
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
+  /** Any member imports agents. The host keeps each export under a token that only its sender uses. */
+  const agentImportApi = (serverId: string, onUploadProgress?: (fraction: number) => void) =>
+    capabilityApi(serverId, AGENT_IMPORT_CAPABILITY, "mobile.server.import.unsupported", onUploadProgress);
+  /** The transfer of the whole server is an optional admin route set. */
+  const transferAdmin = (serverId: string, onUploadProgress?: (fraction: number) => void) =>
+    capabilityApi(serverId, INSTANCE_TRANSFER_CAPABILITY, "mobile.server.transfer.unsupported", onUploadProgress);
+  /** The zone of this phone. The host uses its own when the zone is not valid there. */
+  const phoneTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** The OpenBot update of the host: the admin route set, or the member set that only checks and starts. */
   const updateApi = (serverId: string, access: ServerUpdateAccess) =>
     capabilityApi(
@@ -523,6 +554,21 @@ export function createHostRequestActions({
     deleteVaultItem: async (id, serverId) =>
       runTeamRequest(deleteHostVaultItem(vaultAdmin(serverId), id, has(serverId, VAULT_V2_CAPABILITY))),
     importVaultCsv: async (csv, serverId) => runTeamRequest(importHostVaultCsv(vaultImportAdmin(serverId), csv)),
+    stageAgentImport: async (upload, serverId, onProgress) =>
+      runTeamRequest(stageAgentImport(agentImportApi(serverId, onProgress), upload)),
+    applyAgentImport: async (input, serverId) =>
+      runTeamRequest(applyAgentImport(agentImportApi(serverId), input, phoneTimezone())),
+    discardAgentImport: async (token, serverId) => runTeamRequest(discardAgentImport(agentImportApi(serverId), token)),
+    loadInstanceTransferSummary: async (serverId) =>
+      runTeamRequest(loadInstanceTransferSummary(transferAdmin(serverId))),
+    downloadInstanceTransfer: async (input, serverId) =>
+      runTeamRequest(downloadInstanceTransfer(transferAdmin(serverId), input)),
+    stageInstanceTransfer: async (upload, serverId, onProgress) =>
+      runTeamRequest(stageInstanceTransfer(transferAdmin(serverId, onProgress), upload)),
+    applyInstanceTransfer: async (input, serverId) =>
+      runTeamRequest(applyInstanceTransfer(transferAdmin(serverId), input, phoneTimezone())),
+    discardInstanceTransfer: async (token, serverId) =>
+      runTeamRequest(discardInstanceTransfer(transferAdmin(serverId), token)),
     loadMessagingConnections: async (platform, serverId) =>
       runTeamRequest(messagingConnectorOverview(connectorsAdmin(serverId), { platform })),
     connectMessaging: async (input, serverId) =>

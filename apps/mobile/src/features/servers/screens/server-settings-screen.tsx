@@ -58,6 +58,8 @@ export function ServerSettingsScreen() {
     canManageMcpServers,
     canViewHostedSites,
     canManageServerRoles,
+    canImportAgents,
+    canTransferServer,
   } = useMobileWorkspace();
   const server = useLiveServerRecovery(servers.find((item) => item.id === serverId));
   const update = useServerUpdate(serverId, { poll: false });
@@ -165,7 +167,11 @@ export function ServerSettingsScreen() {
           ) : null}
         </SettingsSection>
       ) : null}
-      {canManageVault(serverId) || canViewHostedSites(serverId) || canReadServerStorage(serverId) ? (
+      {canManageVault(serverId) ||
+      canViewHostedSites(serverId) ||
+      canReadServerStorage(serverId) ||
+      canImportAgents(serverId) ||
+      canTransferServer(serverId) ? (
         <SettingsSection title={t("mobile.server.settings.dataSection")}>
           {canManageVault(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/vault", params: { serverId } })}>
@@ -176,6 +182,16 @@ export function ServerSettingsScreen() {
           {canReadServerStorage(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/storage", params: { serverId } })}>
               <Typography.Paragraph>{t("mobile.server.settings.storage")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {canImportAgents(serverId) ? (
+            <SettingsRow onPress={() => router.push({ pathname: "/server-settings/import", params: { serverId } })}>
+              <Typography.Paragraph>{t("mobile.server.settings.importAgents")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {canTransferServer(serverId) ? (
+            <SettingsRow onPress={() => router.push({ pathname: "/server-settings/transfer", params: { serverId } })}>
+              <Typography.Paragraph>{t("mobile.server.settings.transfer")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
         </SettingsSection>
