@@ -295,6 +295,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.customAgentRemoveBusy":
     "Wait for the active turn and queue to finish before you remove this custom agent.",
   "error.provider.customAgentNone": "No custom agent is saved.",
+  "error.provider.customAgentsUnavailable": "This server cannot change its custom agents. Update OpenBot on it.",
   "error.provider.customAgentMissing": "This custom agent is not saved now. Choose another model.",
   "error.provider.customAgentSignIn": "Sign in with the agent's own command, then try again.",
   "error.provider.customAgentsReadOnly":

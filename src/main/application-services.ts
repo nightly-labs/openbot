@@ -2392,6 +2392,7 @@ export async function createApplicationServices({
       folders: agentFolders,
       sessionSettings: service,
       acpRegistry,
+      customAgents: customAgentChanges,
       skills,
       sharedTables: service,
       marketplaceAgents,

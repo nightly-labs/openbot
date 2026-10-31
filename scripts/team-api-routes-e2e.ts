@@ -26,6 +26,8 @@ import {
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
+  type CustomAgentResult,
+  type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
@@ -68,6 +70,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  CUSTOM_AGENTS_CAPABILITY,
+  CUSTOM_AGENTS_CODECS,
+  CUSTOM_AGENTS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CODECS,
@@ -643,6 +650,19 @@ let customEndpoints: CustomProviderSummary[] = [
   },
 ];
 const customEndpointResult = (): CustomProviderResult => ({ providers: customEndpoints, restart: "not-running" });
+// The host's custom agents in memory. An environment value stays here; a summary names the variable only.
+let customAgentList: CustomAgentSummary[] = [
+  {
+    id: "goose",
+    name: "Goose",
+    command: "goose",
+    args: ["acp"],
+    envNames: ["GOOSE_PROVIDER"],
+    usagePrompt: null,
+    resolvedCommand: "/usr/local/bin/goose",
+  },
+];
+const customAgentResult = (): CustomAgentResult => ({ agents: customAgentList, restart: "not-running" });
 const readMachine = () =>
   Effect.sync(() => {
     record("machineMetrics");
@@ -715,6 +735,24 @@ try {
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      customAgents: {
+        list: () => Effect.succeed(customAgentList),
+        save: (input) =>
+          Effect.sync(() => {
+            record("saveCustomAgent", input.id, input.env);
+            const { env, ...agent } = input;
+            customAgentList = [
+              ...customAgentList.filter((saved) => saved.id !== input.id),
+              { ...agent, envNames: env.map(({ name }) => name), resolvedCommand: null },
+            ];
+            return customAgentResult();
+          }),
+        remove: (id) =>
+          Effect.sync(() => {
+            customAgentList = customAgentList.filter((saved) => saved.id !== id);
+            return customAgentResult();
+          }),
+      },
       // The real folder checks on temporary folders, over an agent writer that records each change.
       folders: createAgentFolders({
         service: {
@@ -3023,6 +3061,88 @@ try {
         isDeepStrictEqual(callsOf("setProviderKey").at(-1), ["inception", key]) &&
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
+    );
+  }
+
+  // ---- Custom agents (custom-agents-v1) ----
+  {
+    const v9 = { token: adaToken, capabilities: [CUSTOM_AGENTS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const decoded = (route: string, reply: Reply) => CUSTOM_AGENTS_CODECS.get(route)?.response(200, reply.body);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises custom-agents-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CUSTOM_AGENTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CUSTOM_AGENTS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const goose = {
+      id: "goose",
+      name: "Goose",
+      command: "goose",
+      args: ["acp"],
+      envNames: ["GOOSE_PROVIDER"],
+      usagePrompt: null,
+      resolvedCommand: "/usr/local/bin/goose",
+    };
+    const listed = await call("POST", CUSTOM_AGENTS_ROUTES.list, { ...v9, json: {} });
+    check(
+      "an admin lists the custom agents with the variable names only",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, [goose]) &&
+        isDeepStrictEqual(decoded(CUSTOM_AGENTS_ROUTES.list, listed), [goose]),
+      summary(listed),
+    );
+    const secret = "sk-custom-agent-secret";
+    const saved = await call("POST", CUSTOM_AGENTS_ROUTES.save, {
+      ...v9,
+      json: {
+        id: "cursor",
+        name: "Cursor",
+        command: "cursor-agent",
+        args: ["acp"],
+        env: [{ name: "CURSOR_API_KEY", value: secret }],
+        usagePrompt: null,
+      },
+    });
+    const cursor = {
+      id: "cursor",
+      name: "Cursor",
+      command: "cursor-agent",
+      args: ["acp"],
+      envNames: ["CURSOR_API_KEY"],
+      usagePrompt: null,
+      resolvedCommand: null,
+    };
+    check(
+      "an admin adds an agent: the value reaches the host, and the result names the variable only",
+      saved.status === 200 &&
+        isDeepStrictEqual(callsOf("saveCustomAgent"), [["cursor", [{ name: "CURSOR_API_KEY", value: secret }]]]) &&
+        !JSON.stringify(saved.body).includes(secret) &&
+        isDeepStrictEqual(decoded(CUSTOM_AGENTS_ROUTES.save, saved), {
+          agents: [goose, cursor],
+          restart: "not-running",
+        }),
+      summary(saved),
+    );
+    const unsupported = await call("POST", CUSTOM_AGENTS_ROUTES.list, {
+      token: adaToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const member = await call("POST", CUSTOM_AGENTS_ROUTES.delete, { ...v9, token: bobToken, json: { id: "cursor" } });
+    check(
+      "the custom agent routes without the capability get 400 customAgentsUnavailable, and a member gets 403",
+      errorIs(unsupported, 400, sourceText("error.provider.customAgentsUnavailable")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")),
+      [summary(unsupported), summary(member)],
+    );
+    const deleted = await call("POST", CUSTOM_AGENTS_ROUTES.delete, { ...v9, json: { id: "cursor" } });
+    check(
+      "an admin removes an agent, and the result lists the one that stays",
+      deleted.status === 200 &&
+        isDeepStrictEqual(decoded(CUSTOM_AGENTS_ROUTES.delete, deleted), { agents: [goose], restart: "not-running" }),
+      summary(deleted),
     );
   }
 
