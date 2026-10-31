@@ -64,6 +64,16 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   },
   // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),
+  // CLDR Ukrainian: one for 1, 21, 31…; few for 2–4, 22–24…; many for 0, 5–20, 25–30…; other for fractions.
+  uk: (count) => {
+    const absolute = Math.abs(count);
+    if (!Number.isInteger(absolute)) return "other";
+    const lastDigit = absolute % 10;
+    const lastTwo = absolute % 100;
+    if (lastDigit === 1 && lastTwo !== 11) return "one";
+    if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) return "few";
+    return "many";
+  },
   // CLDR Chinese has one form for every count, like Japanese.
   zh: () => "other",
 };

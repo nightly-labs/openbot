@@ -14,6 +14,7 @@ export const TRANSLATED_LOCALES = [
   "pt",
   "ru",
   "tr",
+  "uk",
   "zh",
 ] as const;
 

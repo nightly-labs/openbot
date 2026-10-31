@@ -12,6 +12,7 @@ import { plMobile } from "./messages/pl/mobile";
 import { ptMobile } from "./messages/pt/mobile";
 import { ruMobile } from "./messages/ru/mobile";
 import { trMobile } from "./messages/tr/mobile";
+import { ukMobile } from "./messages/uk/mobile";
 import { zhMobile } from "./messages/zh/mobile";
 
 const catalogs = {
@@ -27,6 +28,7 @@ const catalogs = {
   pt: ptMobile,
   ru: ruMobile,
   tr: trMobile,
+  uk: ukMobile,
   zh: zhMobile,
 } as const;
 
