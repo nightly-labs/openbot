@@ -13,8 +13,9 @@ import { pt } from "./messages/pt/index";
 import { ru } from "./messages/ru/index";
 import { tr } from "./messages/tr/index";
 import { zh } from "./messages/zh/index";
+import { zhTW } from "./messages/zh-TW/index";
 
-const catalogs = { en, de, es, fr, it, ja, ko, nl, pl, pt, ru, tr, zh } as const;
+const catalogs = { en, de, es, fr, it, ja, ko, nl, pl, pt, ru, tr, zh, "zh-TW": zhTW } as const;
 
 /**
  * The desktop catalog of `locale`, or `undefined` while it is not loaded.

@@ -66,6 +66,8 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   tr: (count) => (count === 1 ? "one" : "other"),
   // CLDR Chinese has one form for every count, like Japanese.
   zh: () => "other",
+  // Traditional Chinese behaves like Simplified Chinese: one form for every count.
+  "zh-TW": () => "other",
 };
 
 const rulesByLocale = new Map<string, Intl.PluralRules>();

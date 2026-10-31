@@ -60,5 +60,9 @@ export function mobileCatalog(locale: TranslatedLocale): PartialTranslation<AppM
       const catalog: typeof import("./messages/zh/mobile") = require("./messages/zh/mobile");
       return catalog.zhMobile;
     }
+    case "zh-TW": {
+      const catalog: typeof import("./messages/zh-TW/mobile") = require("./messages/zh-TW/mobile");
+      return catalog.zhTWMobile;
+    }
   }
 }
