@@ -863,10 +863,9 @@ export const messages = {
   "mobile.server.usage.agents": "Ajanlar",
   "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Bu aralıkta ajan kullanımı kaydedilmedi.",
-  "mobile.server.usage.allAgents": "Tüm ajanlar",
-  "mobile.server.usage.agent": "Ajan",
   "mobile.server.usage.unsupported":
     "Bu ana makine kullanım analizlerini desteklemiyor. Bu görünümü kullanmak için ana makineyi güncelleyin.",
+  "mobile.server.usage.planLimitsNote": "Her sağlayıcının güncel limitleri. Aşağıdaki aralık bunları değiştirmez.",
   "mobile.server.planLimits.title": "Plan limitleri",
   "mobile.server.planLimits.button": "Plan limitleri: {summary}",
   "mobile.server.planLimits.left": "%{percent} kaldı",

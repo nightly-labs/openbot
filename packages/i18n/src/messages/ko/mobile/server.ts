@@ -824,10 +824,9 @@ export const messages = {
   "mobile.server.usage.agents": "에이전트",
   "mobile.server.usage.agentLine": "토큰 {tokens}개 · {cost} · {percent}",
   "mobile.server.usage.noAgents": "이 기간에 기록된 에이전트 사용량이 없어요.",
-  "mobile.server.usage.allAgents": "모든 에이전트",
-  "mobile.server.usage.agent": "에이전트",
   "mobile.server.usage.unsupported":
     "이 호스트는 사용량 분석을 지원하지 않아요. 이 화면을 쓰려면 호스트를 업데이트해 주세요.",
+  "mobile.server.usage.planLimitsNote": "각 제공자의 현재 한도입니다. 아래의 기간은 한도를 바꾸지 않습니다.",
   "mobile.server.planLimits.title": "요금제 한도",
   "mobile.server.planLimits.button": "요금제 한도: {summary}",
   "mobile.server.planLimits.left": "{percent}% 남음",

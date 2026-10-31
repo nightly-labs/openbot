@@ -839,10 +839,10 @@ export const messages = {
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Geen agentgebruik vastgelegd in deze periode.",
-  "mobile.server.usage.allAgents": "Alle agents",
-  "mobile.server.usage.agent": "Agent",
   "mobile.server.usage.unsupported":
     "Deze host ondersteunt geen gebruiksanalyses. Werk de host bij om deze weergave te gebruiken.",
+  "mobile.server.usage.planLimitsNote":
+    "De huidige limieten van elke provider. De periode hieronder verandert ze niet.",
   "mobile.server.planLimits.title": "Abonnementslimieten",
   "mobile.server.planLimits.button": "Abonnementslimieten: {summary}",
   "mobile.server.planLimits.left": "{percent}% over",

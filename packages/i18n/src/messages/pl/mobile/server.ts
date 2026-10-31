@@ -970,10 +970,9 @@ export const messages = {
   "mobile.server.usage.agents": "Agenci",
   "mobile.server.usage.agentLine": "Tokeny: {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Brak zarejestrowanego użycia agentów w tym okresie.",
-  "mobile.server.usage.allAgents": "Wszyscy agenci",
-  "mobile.server.usage.agent": "Agent",
   "mobile.server.usage.unsupported":
     "Ten host nie obsługuje analityki użycia. Zaktualizuj hosta, aby korzystać z tego widoku.",
+  "mobile.server.usage.planLimitsNote": "Bieżące limity każdego dostawcy. Zakres poniżej ich nie zmienia.",
   "mobile.server.planLimits.title": "Limity planu",
   "mobile.server.planLimits.button": "Limity planu: {summary}",
   "mobile.server.planLimits.left": "Pozostało {percent}%",

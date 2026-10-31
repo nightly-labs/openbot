@@ -97,6 +97,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Data końcowa",
   "mobile.agent.usage.unsupported": "Ten host nie obsługuje analityki agentów.",
   "mobile.agent.info.usage.title": "Użycie",
+  "mobile.agent.info.usage.agentTitle": "Użycie · {name}",
   "mobile.agent.info.usage.loading": "Wczytywanie użycia…",
   "mobile.agent.info.usage.reconnect": "Połącz ponownie, aby wczytać użycie.",
   "mobile.agent.info.usage.failed": "Nie udało się wczytać użycia.",

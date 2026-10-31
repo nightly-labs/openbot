@@ -82,6 +82,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "終了日",
   "mobile.agent.usage.unsupported": "このホストはエージェントの分析に対応していません。",
   "mobile.agent.info.usage.title": "使用量",
+  "mobile.agent.info.usage.agentTitle": "使用量 · {name}",
   "mobile.agent.info.usage.loading": "使用量を読み込んでいます…",
   "mobile.agent.info.usage.reconnect": "使用量を読み込むには再接続してください。",
   "mobile.agent.info.usage.failed": "使用量を読み込めませんでした。",

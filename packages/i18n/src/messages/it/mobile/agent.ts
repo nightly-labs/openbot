@@ -83,6 +83,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Data di fine",
   "mobile.agent.usage.unsupported": "Questo host non supporta le analisi degli agenti.",
   "mobile.agent.info.usage.title": "Utilizzo",
+  "mobile.agent.info.usage.agentTitle": "Utilizzo · {name}",
   "mobile.agent.info.usage.loading": "Caricamento dell'utilizzo…",
   "mobile.agent.info.usage.reconnect": "Riconnettiti per caricare l'utilizzo.",
   "mobile.agent.info.usage.failed": "Impossibile caricare l'utilizzo.",

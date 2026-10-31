@@ -84,6 +84,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Einddatum",
   "mobile.agent.usage.unsupported": "Deze host ondersteunt geen agentanalyses.",
   "mobile.agent.info.usage.title": "Gebruik",
+  "mobile.agent.info.usage.agentTitle": "Gebruik · {name}",
   "mobile.agent.info.usage.loading": "Gebruik laden…",
   "mobile.agent.info.usage.reconnect": "Maak opnieuw verbinding om het gebruik te laden.",
   "mobile.agent.info.usage.failed": "Kan het gebruik niet laden.",

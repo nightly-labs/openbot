@@ -12,6 +12,13 @@ const STROKE_RATIO = 2.25 / 34;
 const SPACING_RATIO = 4.5 / 34;
 const LOGO_RATIO = 12 / 34;
 
+/** The text colour of a window's amount left, in the tone of its ring. */
+export const PLAN_LIMIT_TONE_TEXT = {
+  neutral: "",
+  warning: "text-warning-text",
+  critical: "text-danger-text",
+} as const satisfies Record<PlanLimitTone, string>;
+
 function useToneColors(): Record<PlanLimitTone, string> {
   const [success, warning, danger] = useCSSVariable(["--openbot-success", "--openbot-warning", "--openbot-danger"]);
   return { neutral: String(success), warning: String(warning), critical: String(danger) };

@@ -8,7 +8,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -302,6 +302,10 @@ function AgentForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
+      {/* The server Usage screen opens this page too, so the title names the agent. */}
+      {page === "usage" ? (
+        <Stack.Screen options={{ title: t("mobile.agent.info.usage.agentTitle", { name: agent.name }) }} />
+      ) : null}
       {page === "info" ? (
         <>
           <View className="gap-6">

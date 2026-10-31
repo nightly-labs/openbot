@@ -137,6 +137,25 @@ export function planLimitName(row: PlanLimitRow, accounts: PlanLimits["accounts"
   return `${provider} · ${name}`;
 }
 
+/** The rows with the least left first, as the header, the sheet and the Usage screen order them. */
+export function lowestPlanLimitsFirst(rows: readonly PlanLimitRow[]): PlanLimitRow[] {
+  return [...rows].sort((left, right) => left.remainingPercent - right.remainingPercent);
+}
+
+export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+};
+
+/** When a window resets, or null when the host does not say. */
+export function planLimitResetDate(window: PlanLimitWindow): Date | null {
+  if (window.resetsAt === null) return null;
+  const date = new Date(window.resetsAt * 1_000);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** The identity of a window in a reading. Cursor reports two windows of the same length, so the position is part of it. */
 export function planLimitWindowKey(window: PlanLimitWindow, index: number): string {
   return `${index}-${window.durationMins ?? "limit"}-${window.resetsAt ?? ""}`;

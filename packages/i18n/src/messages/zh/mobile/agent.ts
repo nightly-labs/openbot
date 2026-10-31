@@ -80,6 +80,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "结束日期",
   "mobile.agent.usage.unsupported": "这台主机不支持助手分析。",
   "mobile.agent.info.usage.title": "用量",
+  "mobile.agent.info.usage.agentTitle": "用量 · {name}",
   "mobile.agent.info.usage.loading": "正在加载用量…",
   "mobile.agent.info.usage.reconnect": "请重新连接以加载用量。",
   "mobile.agent.info.usage.failed": "无法加载用量。",

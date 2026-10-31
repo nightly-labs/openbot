@@ -974,10 +974,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "No agent usage recorded in this range.",
-  "mobile.server.usage.allAgents": "All agents",
-  "mobile.server.usage.agent": "Agent",
   "mobile.server.usage.unsupported": "This host does not support usage analytics. Update the host to use this view.",
-  // The plan limits of the host's providers: the rings in the home header and their sheet. {time} is a date.
+  "mobile.server.usage.planLimitsNote": "The current limits of each provider. The range below does not change them.",
+  // The plan limits of the host's providers: the rings in the home header, their sheet and the Usage screen. {time} is a date.
   "mobile.server.planLimits.title": "Plan limits",
   "mobile.server.planLimits.button": "Plan limits: {summary}",
   "mobile.server.planLimits.left": "{percent}% left",
