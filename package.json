@@ -330,6 +330,7 @@
     "test:host-key-rotation": "bun scripts/host-key-rotation-e2e.ts",
     "test:cloud-authorization": "bun apps/auth-api/scripts/cloud-authorization-e2e.ts",
     "test:billing-snapshot": "bun apps/auth-api/scripts/billing-snapshot-e2e.ts",
+    "test:paid-account-identity": "bun apps/auth-api/scripts/paid-account-identity-e2e.ts",
     "test:smtp-stall": "bun apps/auth-api/scripts/smtp-stall-e2e.ts",
     "test:keep-previous-assets": "bun apps/auth-api/scripts/keep-previous-assets-e2e.ts",
     "test:mobile-connected-devices": "bun scripts/mobile-connected-devices-e2e.ts",

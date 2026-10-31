@@ -164,18 +164,34 @@ export interface AccountAnalyticsOptions {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
   /** Keeps the Worker alive until the send ends (`waitUntil`). */
   schedule: (send: Effect.Effect<void>) => void;
-  /** Reads the account email for a paid billing event. Without it, no event sets a profile email. */
-  database?: D1Database;
+  /** Reads the account email for the profile of a paying account. */
+  database: D1Database;
 }
 
 class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
+
+/** The two OpenPanel requests of the account service. An event body never has an email. */
+type OpenPanelBody =
+  | { type: "track"; payload: { name: string; profileId?: string; properties: AnalyticsProperties } }
+  | { type: "identify"; payload: { profileId: string; email: string } };
+
+/**
+ * The normalized email of an account, for the OpenPanel profile of a paying account. `null` when the
+ * account is gone or its email is not valid.
+ */
+export async function readAccountEmail(database: D1Database, accountId: string): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT email FROM users WHERE id = ?")
+    .bind(accountId)
+    .first<{ email: unknown }>();
+  return typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
+}
 
 export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
   if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  const database = options.database;
-  const post = Effect.fn("AccountAnalytics.post")(function* (body: { type: "track" | "identify"; payload: object }) {
+  const post = Effect.fn("AccountAnalytics.post")(function* (body: OpenPanelBody) {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         options.fetch(`${OPENPANEL_API_URL}/track`, {
@@ -190,30 +206,41 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
         }),
       catch: () => new AnalyticsDeliveryError({}),
     });
-    if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
+    if (!response.ok) {
+      console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
+        status: response.status,
+      });
+    }
   });
-  /** Sets the normalized account email on the profile, as the apps do at sign-in. */
+  /** Sets the account email on the profile, as the apps do at sign-in. */
   const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
-    if (!database) return;
-    const row = yield* Effect.tryPromise({
-      try: () => database.prepare("SELECT email FROM users WHERE id = ?").bind(accountId).first<{ email: unknown }>(),
+    const email = yield* Effect.tryPromise({
+      try: () => readAccountEmail(options.database, accountId),
       catch: () => new AnalyticsDeliveryError({}),
     });
-    const email = typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
     if (email) yield* post({ type: "identify", payload: { profileId: accountId, email } });
   });
   return {
     track(accountId, event) {
       const properties = accountEventProperties(event);
       if (!properties || (accountId !== null && !ACCOUNT_ID_PATTERN.test(accountId))) return;
-      const payload = { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties };
+      const send = post({
+        type: "track",
+        payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
+      }).pipe(Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))));
       const paid = accountId !== null && event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action);
       options.schedule(
-        (paid ? identify(accountId) : Effect.void).pipe(
-          Effect.catch(() => Effect.sync(() => console.warn("Account analytics identify failed."))),
-          Effect.andThen(post({ type: "track", payload })),
-          Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))),
-        ),
+        paid
+          ? Effect.all(
+              [
+                send,
+                identify(accountId).pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Account analytics identify failed."))),
+                ),
+              ],
+              { concurrency: 2, discard: true },
+            )
+          : send,
       );
     },
   };
