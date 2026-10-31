@@ -65,6 +65,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
+  "error.backend.channelTaskNotStopped": "Only a stopped or failed task can be cancelled.",
   "error.backend.channelSelectAgent": "Select an agent.",
   "error.backend.channelLeadRequired": "Choose an available channel lead or assign this task to a member.",
   "error.backend.channelRoutingTooLong":

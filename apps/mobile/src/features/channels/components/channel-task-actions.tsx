@@ -2,6 +2,7 @@ import type { ChannelTask } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { channelTaskCancelCards } from "@/features/channels/model/channel-task-actions";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -27,6 +28,7 @@ export function ChannelTaskActions({
   canCancel: boolean;
   onCommand: TaskCommand;
 }) {
+  const cancelCards = channelTaskCancelCards(tasks);
   return (
     <>
       {tasks.map((task) => (
@@ -35,7 +37,7 @@ export function ChannelTaskActions({
           task={task}
           members={members}
           disabled={!online || pending || archived}
-          canCancel={canCancel}
+          canCancel={canCancel && cancelCards.has(task.id)}
           onCommand={onCommand}
         />
       ))}

@@ -69,6 +69,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",
   "error.backend.channelTaskNotFound": "Kanalaufgabe nicht gefunden.",
   "error.backend.channelTaskComplete": "Diese Aufgabe ist bereits abgeschlossen.",
+  "error.backend.channelTaskNotStopped": "Nur eine gestoppte oder fehlgeschlagene Aufgabe kann abgebrochen werden.",
   "error.backend.channelSelectAgent": "Wähle einen Agenten.",
   "error.backend.channelLeadRequired": "Wähle eine verfügbare Kanalleitung oder weise diese Aufgabe einem Mitglied zu.",
   "error.backend.channelRoutingTooLong":

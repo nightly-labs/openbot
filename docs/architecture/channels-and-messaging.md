@@ -278,8 +278,9 @@ stop reason to a paused task with no reason in a channel that is not archived: o
 with no reason. Reassign waits for the old assignment to finish stopping. Cancel ends a stopped or
 failed task: it sets every open task of the same root to `cancelled`, interrupts active work, and
 keeps the messages. A parent waits for each task that it delegated, so a cancel always ends the whole
-run. The clients show Cancel without a confirmation, and only on a host that advertises
-`channel-task-cancel-v1`; a host rejects `cancel` from a peer without it. Restart
+run, and a cancelled routine run records `cancelled`. The host refuses Cancel for a task that is not
+stopped or failed. The clients show Cancel without a confirmation, once for each run, and only on a
+host that advertises `channel-task-cancel-v1`; a host rejects `cancel` from a peer without it. Restart
 recovery checks accepted provider work before retrying. Unknown outcomes require attention.
 Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
 effects do not have an exactly-once guarantee.

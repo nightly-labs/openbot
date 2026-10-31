@@ -62,6 +62,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
   "error.backend.channelTaskComplete": "该任务已完成。",
+  "error.backend.channelTaskNotStopped": "只能取消已停止或失败的任务。",
   "error.backend.channelSelectAgent": "请选择一个助手。",
   "error.backend.channelLeadRequired": "请选择可用的频道主责，或把该任务派给某个成员。",
   "error.backend.channelRoutingTooLong": "该请求超出路由上下文限制。请选择成员，或发送更短的请求。",

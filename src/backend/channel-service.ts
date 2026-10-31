@@ -662,6 +662,9 @@ export class ChannelService {
     // `cancel` ends the whole run of the task, from its root: a parent waits for each task it
     // delegated, so a parent of a cancelled child would wait for ever. The messages stay.
     if (command.type === "cancel") {
+      // Cancel is the way out of a stopped run; Stop is the one for active work.
+      if (selected.state !== "paused" && selected.state !== "failed")
+        return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
       const cancelled = descendants(tasks, selected.rootTaskId);
       const result = yield* channelSync(() =>
         this.store.update(

@@ -68,6 +68,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
   "error.backend.channelTaskComplete": "Deze taak is al voltooid.",
+  "error.backend.channelTaskNotStopped": "Alleen een gestopte of mislukte taak kan worden geannuleerd.",
   "error.backend.channelSelectAgent": "Kies een agent.",
   "error.backend.channelLeadRequired": "Kies een beschikbare kanaalleider of wijs deze taak toe aan een lid.",
   "error.backend.channelRoutingTooLong":
