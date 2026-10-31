@@ -1316,6 +1316,13 @@ if (!hasSingleInstanceLock) {
         ),
       ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
+      // An install that fails after shutdown preparation has no window left to show the failure, and
+      // the process still holds the single-instance lock. Exit now, not at the install deadline.
+      updater.on("status", (status) => {
+        if (!shutdownStarted || status.errorCode !== "install_failed") return;
+        logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
+        app.exit(0);
+      });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
@@ -1584,7 +1591,8 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
  * An in-app update keeps the process alive after the teardown: on macOS Squirrel only now copies,
  * unpacks and verifies the downloaded ZIP, and quits when that is done. On a slow Mac this takes
  * longer than a quit may, and an exit before it ends leaves the old version installed (#4244). The
- * update deadline is the one the update service gives the install.
+ * update uses the install timeout of the update service. It counts from the start of the teardown,
+ * so Squirrel gets that time less the teardown.
  */
 async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
