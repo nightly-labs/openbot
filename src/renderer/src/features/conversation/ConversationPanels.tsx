@@ -90,6 +90,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -343,6 +344,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 sourceUrl={attached()?.previewUrl ?? null}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
+                fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={downloadSidebarFile}
