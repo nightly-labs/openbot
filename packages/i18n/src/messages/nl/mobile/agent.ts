@@ -330,6 +330,11 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Hoststandaard (Bijsturen)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
+  "mobile.agent.taskLimit.label": "Parallelle threads",
+  "mobile.agent.taskLimit.footer": "Threads die tegelijk draaien",
+  "mobile.agent.taskLimit.default": "Standaard ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",

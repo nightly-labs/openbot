@@ -313,6 +313,10 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "主机默认（引导）",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} 无法引导运行中的对话。它工作期间发送的消息会留在队列中等待。",
+  "mobile.agent.taskLimit.label": "并行话题数",
+  "mobile.agent.taskLimit.footer": "同时运行的话题",
+  "mobile.agent.taskLimit.default": "默认（{count}）",
+  "mobile.agent.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
   "mobile.agent.workspace.title": "工作区文件夹",
   "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
   "mobile.agent.notifications.failed": "无法更改通知设置",

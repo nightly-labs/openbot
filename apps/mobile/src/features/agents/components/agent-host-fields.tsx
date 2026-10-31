@@ -1,5 +1,8 @@
 import {
+  AGENT_TASK_LIMIT_DEFAULT,
+  AGENT_TASK_LIMIT_MAX,
   type AgentHostSettings,
+  type AgentTaskLimitSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
@@ -22,6 +25,13 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+
+/** `default` follows the host default. */
+type TaskLimitChoice = "default" | number;
+const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
+  "default",
+  ...Array.from({ length: AGENT_TASK_LIMIT_MAX }, (_, index) => index + 1),
+];
 
 /** `default` follows the host default. */
 type BusyMessageChoice = "default" | BusyMessageMode;
@@ -172,6 +182,89 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
           }
         >
           <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
+ * Agent info > Advanced: how many threads of the agent run at the same time. Only an owner or admin
+ * sees it, and only when the host serves `agent-task-limit-v1`. It saves at once, as the fields above.
+ */
+export function AgentTaskLimitField({ agent, server, available }: AgentHostFieldsProps) {
+  const { t, format, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canAdminister = canAdministerServer(server?.role);
+  // Under "agent-info" and ending in "task-limit": the host's `agents-changed` event reads it again.
+  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "task-limit");
+  const settings = useQuery({
+    queryKey,
+    queryFn: () => workspace.loadAgentTaskLimit(agent.id, agent.serverId),
+    enabled: available && canAdminister,
+    retry: false,
+    staleTime: 0,
+  });
+  const current = canAdminister ? (settings.data ?? null) : null;
+  if (!current) return null;
+
+  async function save(previous: AgentTaskLimitSettings, taskLimit: number | null) {
+    setSaving(true);
+    setError(null);
+    const optimistic: AgentTaskLimitSettings = { taskLimit };
+    queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, optimistic);
+    try {
+      const saved = await workspace.updateAgentTaskLimit({ agentId: agent.id, taskLimit }, agent.serverId);
+      queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, saved);
+      void haptics.notification("success");
+    } catch (cause) {
+      queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, previous);
+      void haptics.notification("error");
+      setError(errorMessage(cause, t("mobile.agent.host.failed")));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // A provider that runs one turn at a time runs one thread, whatever the limit.
+  const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
+  const choice: TaskLimitChoice = oneTurnAtATime ? 1 : (current.taskLimit ?? "default");
+  return (
+    <>
+      <SettingsSection
+        footer={
+          oneTurnAtATime && agent.provider
+            ? t("mobile.agent.taskLimit.oneTurn", { provider: agentProviderName(agent.provider) })
+            : t("mobile.agent.taskLimit.footer")
+        }
+      >
+        <SettingsRow
+          trailing={
+            <SettingsPicker<TaskLimitChoice>
+              value={choice}
+              options={TASK_LIMIT_CHOICES.map((value) => ({
+                value,
+                label:
+                  value === "default"
+                    ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
+                    : format.number(value),
+              }))}
+              enabled={available && !saving && !oneTurnAtATime}
+              dark={theme === "dark"}
+              label={t("mobile.agent.taskLimit.footer")}
+              onChange={(next) => {
+                if (next !== choice) void save(current, next === "default" ? null : next);
+              }}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

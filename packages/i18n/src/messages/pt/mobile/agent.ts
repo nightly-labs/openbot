@@ -334,6 +334,11 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Padrão do anfitrião (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
+  "mobile.agent.taskLimit.label": "Tópicos em paralelo",
+  "mobile.agent.taskLimit.footer": "Tópicos executados ao mesmo tempo",
+  "mobile.agent.taskLimit.default": "Padrão ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
   "mobile.agent.workspace.title": "Pasta do espaço de trabalho",
   "mobile.agent.workspace.footer": "A pasta deste agente no computador anfitrião.",
   "mobile.agent.notifications.failed": "Não foi possível alterar as notificações",
