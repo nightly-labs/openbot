@@ -273,7 +273,8 @@ export class AgentTasks implements TaskLanes {
     const task = this.require(input.agentId, input.taskId);
     return {
       threadId: task.threadId,
-      title: task.title,
+      // The " #N" of a branch title came from a branch. A title that a person wrote keeps its number.
+      title: task.branch && task.titleSource === "auto" ? task.title.replace(/ #\d+$/, "") : task.title,
       running:
         Boolean(this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId) ||
         this.#mailbox.laneActive(task.agentId, task.taskId),
@@ -604,13 +605,12 @@ function branchFiles(messages: readonly ConversationMessage[]): AttachmentSummar
 const BRANCH_NUMBER_ROOM = 6;
 
 /**
- * The title of a branch of a side thread: the source title without its own number, then the next
- * number after those that the agent's threads already use, from #2.
+ * The title of a branch of a side thread: the source title, then the next number after those that the
+ * agent's threads already use, from #2.
  */
 function branchTitle(sourceTitle: string, titles: readonly string[]): string {
-  const stripped = sourceTitle.replace(/ #\d+$/, "");
   const room = INPUT_LIMITS.agentTaskTitle - BRANCH_NUMBER_ROOM;
-  const root = stripped.length > room ? `${stripped.slice(0, room - 1)}…` : stripped;
+  const root = sourceTitle.length > room ? `${sourceTitle.slice(0, room - 1)}…` : sourceTitle;
   const prefix = `${root} #`;
   let last = 1;
   for (const title of titles) {

@@ -94,6 +94,10 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     if (Object.keys(agents).length === 0) delete next[server];
     setTabsByServer(next);
     writeThreadTabs(next);
+    // The scroll to a message belongs to the tab that opened at it. Another tab ends it, so the thread
+    // does not scroll there again when its view shows again.
+    const focus = untrack(messageFocus);
+    if (focus && focus.taskId !== tabs?.active) setMessageFocus(null);
   }
 
   function setDraft(agentId: string, shownDraft: boolean): void {
