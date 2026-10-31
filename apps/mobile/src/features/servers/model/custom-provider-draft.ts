@@ -31,7 +31,7 @@ export interface CustomProviderDraft {
 }
 
 /** The starting points of the add flow, as on desktop. A preset only fills the form. */
-export const CUSTOM_PROVIDER_PRESETS = ["ollama", "lmstudio", "openai-compatible"] as const;
+const CUSTOM_PROVIDER_PRESETS = ["ollama", "lmstudio", "openai-compatible"] as const;
 export type CustomProviderPreset = (typeof CUSTOM_PROVIDER_PRESETS)[number];
 
 export function isCustomProviderPreset(value: unknown): value is CustomProviderPreset {
