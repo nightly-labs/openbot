@@ -202,6 +202,36 @@ export class SkillMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
+  /**
+   * The catalog entries of the approved skills among `skillIds`, in their order, for an agent page.
+   * An agent holds at most `AGENT_TEMPLATE_LIMITS.skills` (32) skills, inside the D1 limit of 100 bound values.
+   */
+  summariesByIds(skillIds: readonly string[]) {
+    return Effect.fn("SkillMarketplace.summariesByIds")(() =>
+      Effect.gen(function* () {
+        if (skillIds.length === 0) return [];
+        const bindings = yield* MarketplaceStorage;
+        const result = yield* marketplaceCall(() =>
+          bindings.DB.prepare(
+            `SELECT skills.id, skills.slug, skills.installs, skills.featured, skills.verified, skills.updated_at,
+              versions.id AS version_id, versions.name, versions.description, versions.category,
+              versions.version, versions.bundle_sha256, versions.files_json, versions.icon_key,
+              skills.show_creator_avatar, users.avatar_url AS creator_avatar_url, users.name AS creator_name
+       FROM marketplace_skills skills
+       JOIN marketplace_skill_versions versions ON versions.id = skills.approved_version_id
+       JOIN users ON users.id = skills.owner_user_id
+       WHERE skills.id IN (${skillIds.map(() => "?").join(", ")})`,
+          )
+            .bind(...skillIds)
+            .all<ApprovedRow>(),
+        );
+        const rows = new Map(result.results.map((row) => [row.id, row]));
+        const found = skillIds.flatMap((id) => rows.get(id) ?? []);
+        return yield* marketplaceDecode(() => found.map(publicSummary));
+      }),
+    )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
+  }
+
   private approvedIdBySlug(slug: string) {
     return Effect.fn("SkillMarketplace.approvedIdBySlug")(() =>
       Effect.gen(function* () {

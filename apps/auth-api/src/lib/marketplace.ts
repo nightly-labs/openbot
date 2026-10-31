@@ -47,7 +47,7 @@ export const readMarketplaceAgentListing = createServerFn({ method: "GET" })
   .validator((id: unknown) => (typeof id === "string" ? id : ""))
   .handler(async ({ data }): Promise<MarketplaceAgentListing | null> => {
     if (!isMarketplaceAgentId(data)) return null;
-    const { requestAgentMarketplace } = await import("../server/request-auth");
+    const { requestAgentMarketplace, requestSkillMarketplace } = await import("../server/request-auth");
     let detail: MarketplaceAgentDetail;
     try {
       detail = await runApiEffect(requestAgentMarketplace().getListing(data));
@@ -59,12 +59,10 @@ export const readMarketplaceAgentListing = createServerFn({ method: "GET" })
       ...detail,
       routines: detail.routines.map(({ name, active, schedule }) => ({ name, active, schedule })),
     };
-    const wanted = new Set(detail.skills.map((skill) => skill.skillId));
-    if (wanted.size === 0) return { agent, skills: [] };
-    const found = (items: readonly MarketplaceSkillSummary[]) => items.filter((skill) => wanted.has(skill.id));
-    const { readSkillCatalog } = await catalog();
-    const skills = await readSkillCatalog((items) => found(items).length >= wanted.size);
-    return { agent, skills: found(skills) };
+    const ids = [...new Set(detail.skills.map((skill) => skill.skillId))];
+    const { skillCategory } = await catalog();
+    const skills = await runApiEffect(requestSkillMarketplace().summariesByIds(ids));
+    return { agent, skills: skills.map((skill) => ({ ...skill, category: skillCategory(skill.category) })) };
   });
 
 /** One approved skill for its page, without its instructions and files. Anything else is null. */

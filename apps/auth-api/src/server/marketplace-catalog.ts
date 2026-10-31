@@ -24,14 +24,13 @@ interface CatalogPage<Item> {
 
 async function readCatalog<Item>(
   readPage: (cursor: string | undefined) => Promise<CatalogPage<Item>>,
-  done: (items: readonly Item[]) => boolean = () => false,
 ): Promise<Item[]> {
   const items: Item[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const result = await readPage(cursor);
     items.push(...result.items);
-    if (result.nextCursor === null || done(items)) break;
+    if (result.nextCursor === null) break;
     cursor = result.nextCursor;
   }
   return items;
@@ -53,17 +52,15 @@ export async function readAgentCatalog(): Promise<MarketplaceAgentSummary[]> {
   });
 }
 
-/** Every approved skill, or the first pages until `done` holds. */
-export async function readSkillCatalog(
-  done?: (items: readonly MarketplaceSkillSummary[]) => boolean,
-): Promise<MarketplaceSkillSummary[]> {
+/** Every approved skill. */
+export async function readSkillCatalog(): Promise<MarketplaceSkillSummary[]> {
   const { requestSkillMarketplace } = await import("./request-auth");
   const marketplace = requestSkillMarketplace();
   return readCatalog(async (cursor) => {
     const page = await runApiEffect(marketplace.list({ cursor, limit: PAGE_LIMIT }));
     const items = page.skills.map((skill) => ({ ...skill, category: skillCategory(skill.category) }));
     return { items, nextCursor: page.nextCursor };
-  }, done);
+  });
 }
 
 /** The approved agents and skills for the sitemap. A pending agent has no approved version, so it is never here. */
