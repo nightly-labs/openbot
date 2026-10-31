@@ -114,10 +114,20 @@ function isMuseMcpStartupFault(provider: AgentProvider, message: string): boolea
 }
 
 /**
+ * A response exceeded the output token budget of the model (`max_output_tokens`), leaving the turn
+ * incomplete or stalled. A new session with the transcript gives room to continue.
+ */
+function isOutputTokenLimitError(message: string): boolean {
+  return /\bmax_output_tokens\b/i.test(message);
+}
+
+/**
  * The failure to show when the provider refused the session's own history, or null when it did
  * not. Each turn of a refused session fails the same way, so the caller closes the session.
  */
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
+  if (isOutputTokenLimitError(message))
+    return sourceText("error.provider.outputTokenLimit", { provider: providerLabel(provider) });
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
