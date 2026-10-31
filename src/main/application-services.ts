@@ -2460,7 +2460,8 @@ export async function createApplicationServices({
       centralAuth.handOverRemoteHostKey(hostId, handover).pipe(toRemoteWorkflowError),
     // The server list carries the handover and its time, also for a change that another device asked for.
     onKeyRotated: () => remoteServers.requestDirectoryRefresh(),
-    issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId).pipe(toRemoteWorkflowError),
+    issueRemoteHostTicket: (hostId, home) =>
+      centralAuth.issueRemoteHostTicket(hostId, home).pipe(toRemoteWorkflowError),
     sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push).pipe(toRemoteWorkflowError),
     sendPushNotification: (hostId, push) => centralAuth.sendPushNotification(hostId, push).pipe(toRemoteWorkflowError),
     pushNotificationStore,

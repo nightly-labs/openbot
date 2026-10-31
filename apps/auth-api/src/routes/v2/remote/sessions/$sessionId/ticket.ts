@@ -8,7 +8,6 @@ import {
   json,
   remoteControlPlaneErrorResponse,
   requestRemoteControlPlane,
-  requestRemoteSignalUrl,
   requestUser,
 } from "../../../../../server/request-auth";
 
@@ -24,14 +23,9 @@ export const Route = createFileRoute("/v2/remote/sessions/$sessionId/ticket")({
             if (!isString(body.clientPublicKey)) {
               return apiError(400, "invalid_remote_request", "The client public key is required.");
             }
-            return json({
-              ...(yield* requestRemoteControlPlane().issueSessionTicket(
-                user.id,
-                params.sessionId,
-                body.clientPublicKey,
-              )),
-              signalUrl: requestRemoteSignalUrl(),
-            });
+            return json(
+              yield* requestRemoteControlPlane().issueSessionTicket(user.id, params.sessionId, body.clientPublicKey),
+            );
           }),
           remoteControlPlaneErrorResponse,
         ),

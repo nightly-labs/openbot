@@ -275,6 +275,26 @@ the encrypted environment. The private and public keys must use ES256. The Signa
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
 
+Two optional variables spread hosts over more than one Signal machine. When both are empty, each
+ticket names `REMOTE_SIGNAL_URL`, as before.
+
+- `REMOTE_SIGNAL_HOMES`: the Signal machines that a host can have as its home, as `id=url,id=url`,
+  for example `a=wss://signal-a.openbot.run/v1/signal,b=wss://signal-b.openbot.run/v1/signal`. An ID
+  has 1 to 32 characters from `a-z`, `0-9` and `-`. A URL must use `wss:`, or `ws:` when
+  `REMOTE_SIGNAL_URL` uses `ws:`. An invalid value makes each ticket request fail with
+  `503 remote_not_configured`. A host ticket request with `signalHome: true` gets a home, which
+  `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
+  until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
+  home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
+  `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
+  again only to the URLs that failed.
+- `SIGNAL_ENTRY_ZONE_ID` and the secret `SIGNAL_ENTRY_DNS_TOKEN`: with both and two homes, the cron
+  `*/1 * * * *` moves the `REMOTE_SIGNAL_URL` name to another home when its machine stops answering
+  `/health/ready` (`src/server/signal-entry-failover.ts`). The token needs only `Zone.DNS:Edit` on that
+  zone. The test and preview Workers keep the zone empty, so they never change production DNS.
+
 To deploy your own copy of this Worker with your own Signal, see
 [Self-hosted remote access](../../docs/self-hosting.md).
 

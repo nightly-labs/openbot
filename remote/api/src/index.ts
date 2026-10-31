@@ -4,7 +4,9 @@ import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-
 import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
 import { createRemoteApiApp, prometheusMetrics } from "./app";
 import { readRemoteApiConfig } from "./config";
+import type { DiscordApi } from "./discord-api";
 import { DiscordGateway } from "./discord-gateway";
+import { SignalEntry } from "./entry";
 import type { RouteWake } from "./ingress-queue";
 import { SignalService } from "./signal-service";
 import { TelegramBotApi } from "./telegram";
@@ -16,8 +18,14 @@ import {
   type TelegramChatLink,
   TelegramFileTokens,
 } from "./tokens";
+import { TurnRelays } from "./turn-relays";
 
 const config = readRemoteApiConfig();
+const turnRelays = new TurnRelays(config);
+const entry = new SignalEntry(config);
+// Probes each TURN relay every minute, so that peers get relays that allocate. Disposal stops it.
+const turnRuntime = ManagedRuntime.make(turnRelays.watch());
+await turnRuntime.runPromise(Effect.void);
 class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("ControlPlaneError", {
   message: Schema.String,
 }) {}
@@ -301,6 +309,7 @@ const tokens = new RemoteTokenService(
       ),
     ),
   {
+    turnHost: (hostId) => turnRelays.pick(hostId),
     validateSlackRoute: (hostId, teams) =>
       controlPlaneService
         .validateSlackRoute(hostId, teams)
@@ -342,6 +351,7 @@ const signal = new SignalService(
       ? (route, wake) => controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null)))
       : null,
     fork: (work) => void signalRuntime.runFork(work),
+    isEntry: () => entry.isEntry,
   },
 );
 const tlsPaths =
@@ -350,20 +360,53 @@ const tlsPaths =
     : undefined;
 
 const signalRuntime = ManagedRuntime.make(signal.dependencies);
-// The Discord bot's Gateway connection lives in this runtime. Disposal closes it.
-const discordRuntime = config.discord
-  ? ManagedRuntime.make(
-      DiscordGateway.layer(config.discord, signal, {
-        removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
-        reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
-      }),
-    )
-  : null;
-const discord = discordRuntime ? await discordRuntime.runPromise(DiscordGateway) : null;
-if (!discord) {
+const discordConfig = config.discord;
+if (!discordConfig) {
   console.log("OpenBot Discord is off: DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID are not both set and valid.");
 }
-const app = createRemoteApiApp(config, signal, signalRuntime, discord?.api ?? null);
+// Null while the Gateway is stopped.
+let discordApi: DiscordApi | null = null;
+// The Discord bot's Gateway connection runs only while this machine is the entry: a second Gateway
+// session would acknowledge each interaction and answer each direct message two times. Each time the
+// machine becomes the entry, a new layer connects the bot. Interruption closes its scope and the connection.
+const discordWhileEntry: Effect.Effect<void> = discordConfig
+  ? Effect.scoped(
+      Effect.gen(function* () {
+        const services = yield* Layer.build(
+          DiscordGateway.layer(discordConfig, signal, {
+            removed: (guildId) => controlPlaneService.discordGuildRemoved(guildId),
+            reconcile: (guildIds, before) => controlPlaneService.reconcileDiscordGuilds(guildIds, before),
+          }),
+        );
+        discordApi = Context.get(services, DiscordGateway).api;
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            discordApi = null;
+          }),
+        );
+        return yield* Effect.never;
+      }),
+    )
+  : Effect.void;
+const setTelegramWebhooks = () => {
+  // A failure is logged and Signal runs on.
+  if (signal.telegram) void signalRuntime.runPromise(signal.telegram.bot.setWebhooks());
+};
+// Resolves the entry name before the listener starts, then every 30 seconds (`SignalEntry`). The
+// Discord Gateway lives in this runtime. Disposal stops the check and closes the Gateway.
+const entryRuntime = ManagedRuntime.make(
+  entry.watch({
+    whileEntry: discordWhileEntry,
+    changed: (isEntry) =>
+      Effect.sync(() => {
+        // The peers without a `signal` claim connect again through the entry name.
+        if (!isEntry) signal.closeEntrySockets();
+        else setTelegramWebhooks();
+      }),
+  }),
+);
+await entryRuntime.runPromise(Effect.void);
+const app = createRemoteApiApp(config, signal, signalRuntime, turnRelays, entry, () => discordApi);
 const listen = () =>
   app.listen({
     hostname: config.host,
@@ -378,8 +421,8 @@ const listen = () =>
       : {}),
   });
 listen();
-// Telegram posts to this Signal only after the listener is up. A failure is logged and Signal runs on.
-if (signal.telegram) void signalRuntime.runPromise(signal.telegram.bot.setWebhooks());
+// Telegram posts to this Signal only after the listener is up, and only to the entry.
+if (entry.isEntry) setTelegramWebhooks();
 const healthServer = Bun.serve({
   hostname: config.healthHost,
   port: config.healthPort,
@@ -390,7 +433,9 @@ const healthServer = Bun.serve({
       const authorization = request.headers.get("Authorization");
       if (!config.metricsToken || authorization !== `Bearer ${config.metricsToken}`)
         return new Response("Not found", { status: 404 });
-      return new Response(prometheusMetrics(signal), { headers: { "Content-Type": "text/plain; version=0.0.4" } });
+      return new Response(prometheusMetrics(signal, turnRelays, entry), {
+        headers: { "Content-Type": "text/plain; version=0.0.4" },
+      });
     },
   },
   fetch: () => new Response("Not found", { status: 404 }),
@@ -461,10 +506,11 @@ const shutdown = () => {
       await app.stop(true);
     } finally {
       try {
-        await discordRuntime?.dispose();
+        await entryRuntime.dispose();
         await signalRuntime.dispose();
         signal.close();
       } finally {
+        await turnRuntime.dispose();
         await controlPlane.dispose();
       }
     }

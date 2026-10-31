@@ -2,7 +2,8 @@
 // with a fake Signal (#2243). Drains that run at the same time must send each event once, one drain
 // sends at most 6 events at a time, a failed send waits with the backoff, a stopped drain keeps the
 // events that it sent, and the hosted server cron
-// sends the events of its deletes once, after the deletes, not inside each one.
+// sends the events of its deletes once, after the deletes, not inside each one. With two Signals,
+// each one gets each event once, and only the Signal that failed gets it again.
 //
 // Run: bun run test:remote-auth-events
 // It writes .openbot-build/remote-auth-events-e2e/report.json and exits non-zero on a failure.
@@ -18,6 +19,7 @@ const ROOT = resolve(import.meta.dirname, "../../..");
 const OUT = join(ROOT, ".openbot-build", "remote-auth-events-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SIGNAL_URL = "https://signal.test/internal/auth-events";
+const SECOND_SIGNAL_URL = "https://signal-b.test/internal/auth-events";
 const SECRET = "webhook-secret";
 const WAIT_LIMIT_MS = 10_000;
 
@@ -321,11 +323,123 @@ async function cronSendsTheEventsOfItsDeletesOnceAfterThem() {
   );
 }
 
+function pendingTargets(database: DatabaseSync) {
+  return database
+    .prepare("SELECT event_id, attempts, next_attempt_at, pending_targets FROM remote_auth_events ORDER BY event_id")
+    .all()
+    .map((row) => ({
+      event_id: String(row.event_id),
+      attempts: Number(row.attempts),
+      next_attempt_at: Number(row.next_attempt_at),
+      pending_targets: row.pending_targets === null ? null : String(row.pending_targets),
+    }));
+}
+
+async function eachSignalGetsEachEventAndOnlyTheFailedOneRetries() {
+  const database = await migratedDatabase();
+  const now = Date.UTC(2026, 9, 31, 12);
+  seedProfileEvents(database, 3, now);
+  const received = new Map<string, string[]>([
+    [SIGNAL_URL, []],
+    [SECOND_SIGNAL_URL, []],
+  ]);
+  const unexpected: string[] = [];
+  const state = { secondUp: false, badSignatures: 0, sentAt: now };
+  const signalFetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    const bodies = received.get(url);
+    if (!bodies) {
+      unexpected.push(url);
+      throw new Error("Unexpected request");
+    }
+    const body = String(init?.body);
+    const headers = new Headers(init?.headers);
+    const signed = await Effect.runPromise(
+      verifyRemoteServiceSignature(
+        SECRET,
+        body,
+        headers.get("OpenBot-Timestamp") ?? "",
+        headers.get("OpenBot-Signature") ?? "",
+        state.sentAt,
+      ),
+    );
+    if (!signed) state.badSignatures += 1;
+    bodies.push(body);
+    return new Response(null, { status: url === SECOND_SIGNAL_URL && !state.secondUp ? 503 : 204 });
+  };
+  // The list replaces the single URL, which this fake Signal refuses.
+  const bindings = {
+    DB: sqliteD1(database),
+    REMOTE_AUTH_WEBHOOK_URL: "https://old-signal.test/internal/auth-events",
+    REMOTE_AUTH_WEBHOOK_URLS: ` ${SIGNAL_URL}, ${SECOND_SIGNAL_URL},`,
+    REMOTE_AUTH_WEBHOOK_SECRET: SECRET,
+  };
+  await Effect.runPromise(deliverPendingRemoteAuthEvents(bindings, now, signalFetch));
+  const afterFailure = pendingTargets(database);
+  check(
+    "the working Signal gets each event once while the other Signal fails",
+    received.get(SIGNAL_URL)?.length === 3 &&
+      new Set(received.get(SIGNAL_URL)).size === 3 &&
+      received.get(SECOND_SIGNAL_URL)?.length === 3,
+    { first: received.get(SIGNAL_URL)?.length, second: received.get(SECOND_SIGNAL_URL)?.length },
+  );
+  check(
+    "each event stays with only the failed Signal as its target, one attempt and the first backoff",
+    afterFailure.length === 3 &&
+      afterFailure.every(
+        (row) =>
+          row.attempts === 1 &&
+          row.next_attempt_at === now + 60_000 &&
+          row.pending_targets === JSON.stringify([SECOND_SIGNAL_URL]),
+      ),
+    { rows: afterFailure },
+  );
+
+  state.secondUp = true;
+  state.sentAt = now + 60_000;
+  await Effect.runPromise(deliverPendingRemoteAuthEvents(bindings, state.sentAt, signalFetch));
+  check(
+    "the retry sends only to the failed Signal",
+    received.get(SIGNAL_URL)?.length === 3 && received.get(SECOND_SIGNAL_URL)?.length === 6,
+    { first: received.get(SIGNAL_URL)?.length, second: received.get(SECOND_SIGNAL_URL)?.length },
+  );
+  check("the outbox deletes each event after both Signals accepted it", pendingTargets(database).length === 0, {
+    rows: pendingTargets(database),
+  });
+
+  // An event whose only target is no longer configured needs no send.
+  database
+    .prepare(
+      `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at, pending_targets)
+       VALUES ('removed-target', ?, ?, 2, ?, ?)`,
+    )
+    .run(
+      JSON.stringify({ type: "account-profile-changed", userId: "user-removed" }),
+      state.sentAt,
+      state.sentAt,
+      JSON.stringify(["https://removed-signal.test/internal/auth-events"]),
+    );
+  await Effect.runPromise(deliverPendingRemoteAuthEvents(bindings, state.sentAt, signalFetch));
+  check(
+    "an event whose targets are no longer configured is deleted with no send",
+    pendingTargets(database).length === 0 &&
+      received.get(SIGNAL_URL)?.length === 3 &&
+      received.get(SECOND_SIGNAL_URL)?.length === 6,
+    { rows: pendingTargets(database) },
+  );
+  check(
+    "each send to two Signals has a valid signature and goes only to a listed URL",
+    state.badSignatures === 0 && unexpected.length === 0,
+    { badSignatures: state.badSignatures, unexpected },
+  );
+}
+
 const scenarios = [
   parallelDrainsSendEachEventOnce,
   oneDrainSendsSixAtATimeAndBacksOff,
   aStoppedDrainKeepsTheSentEvents,
   cronSendsTheEventsOfItsDeletesOnceAfterThem,
+  eachSignalGetsEachEventAndOnlyTheFailedOneRetries,
 ];
 for (const scenario of scenarios) {
   try {

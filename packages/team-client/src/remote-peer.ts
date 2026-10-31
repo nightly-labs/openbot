@@ -240,6 +240,7 @@ export interface RemoteTeamDiagnostic {
     | "signal-closed"
     | "signal-ready"
     | "signal-retry"
+    | "signal-moved"
     | "host-waiting"
     | "path-check"
     | "event-reset"
@@ -333,6 +334,15 @@ interface PeerState {
   /** Signal holds this socket until the host connects. The connect deadline starts at `ready`. */
   waitingForHost: boolean;
   hostWaitTimer: ReturnType<typeof setTimeout> | null;
+  /** Signal sockets in a row that closed before Signal sent `ready` or `host-waiting`. */
+  failedOpens: number;
+  /** Signal sent `ready` or `host-waiting` on the current socket. */
+  signalAnswered: boolean;
+  /** When the peer got a ticket last while Signal said that the host is not connected. Null after `ready`. */
+  hostWaitingSince: number | null;
+  hostWaitTicketTimer: ReturnType<typeof setTimeout> | null;
+  /** A request for a new ticket is in flight; see `followHost`. */
+  ticketRequest: boolean;
   /**
    * Signal sent `ready` on the current socket. Signal gives each `hello` a new connection ID, so a
    * frame sent before `ready` carries the old ID, and Signal rejects it.
@@ -356,6 +366,14 @@ const ICE_RESTART_DELAY_MS = 2_000;
 const SIGNAL_RENEW_DELAY_MS = 8_000;
 /** A socket that waits for the host is renewed with its resume token, so a dead socket does not wait forever. */
 const HOST_WAIT_RENEW_MS = 60_000;
+/**
+ * The host can move to another Signal machine when its machine stops. After this many sockets in a
+ * row that close before Signal answers, the next socket uses a new ticket, which names the host's
+ * machine now.
+ */
+const FAILED_OPENS_BEFORE_NEW_TICKET = 2;
+/** After Signal says this long that the host is not connected, the peer gets a new ticket for the same reason. */
+const HOST_WAIT_TICKET_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 10 * 60_000 + 30_000;
 /**
  * A Signal restart disconnects all peers at the same time, and each resume asks the account service.
@@ -497,7 +515,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
         if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
+        if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
         state.hostWaitTimer = null;
+        state.hostWaitTicketTimer = null;
         state.disconnectedTimer = null;
         state.iceRecoveryTimer = null;
         state.reconnectTimer = null;
@@ -669,7 +689,69 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     // Clear it first, so the close handler does not schedule a second reconnect.
     state.socket = null;
     socket?.close();
-    openSignal(state, actions);
+    reopenSignal(state, actions);
+  }
+
+  /** Opens the next Signal socket, with a new ticket first when the host can be on another machine. */
+  function reopenSignal(state: PeerState, actions: ActionsRef): void {
+    const hostWait = state.hostWaitingSince !== null && Date.now() - state.hostWaitingSince >= HOST_WAIT_TICKET_MS;
+    if (state.failedOpens >= FAILED_OPENS_BEFORE_NEW_TICKET || hostWait)
+      void runPeerEffect(followHost(state, actions)).catch(() => undefined);
+    else openSignal(state, actions);
+  }
+
+  /**
+   * Gets a new ticket for the same session and key. The account service names the Signal machine of
+   * the host now, which changes when the host's machine stops. A new machine does not know the resume
+   * token, so the peer drops it, and the host answers the restarted ICE or refuses the old path. A
+   * failed request keeps the current ticket, and the reconnect continues on its usual steps.
+   */
+  function followHost(state: PeerState, actions: ActionsRef) {
+    return Effect.fn("RemotePeer.followHost")(function* () {
+      if (state.ticketRequest || state.closed || peer !== state) return;
+      state.ticketRequest = true;
+      state.failedOpens = 0;
+      const waiting = state.hostWaitingSince !== null;
+      if (waiting) state.hostWaitingSince = Date.now();
+      const result = yield* RemotePeerIO.use((io) =>
+        io.bootstrap(state.hostId, state.clientPublicKey, state.sessionId),
+      ).pipe(
+        Effect.result,
+        Effect.ensuring(
+          Effect.sync(() => {
+            state.ticketRequest = false;
+          }),
+        ),
+      );
+      if (state.closed || peer !== state) {
+        if (Result.isSuccess(result) && result.success.sessionId !== state.sessionId)
+          yield* notify(peerCall(() => actions.current.endSession(result.success.sessionId)));
+        return;
+      }
+      let moved = false;
+      if (Result.isSuccess(result)) {
+        const bootstrap = result.success;
+        // The account service makes a new session only when this one ended. Signal then refuses the
+        // peer, and the recovery owner starts again; the new session is not for this peer.
+        if (bootstrap.sessionId !== state.sessionId)
+          yield* notify(peerCall(() => actions.current.endSession(bootstrap.sessionId)));
+        else {
+          moved = bootstrap.signalUrl !== state.signalUrl;
+          state.ticket = bootstrap.ticket;
+          if (moved) {
+            state.signalUrl = bootstrap.signalUrl;
+            state.resumeToken = null;
+            state.hostWaitingSince = null;
+            if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
+            state.hostWaitTicketTimer = null;
+            yield* notify(diagnosticCall(state, "signal-moved", waiting ? "host waiting" : "failed opens"));
+          }
+        }
+      }
+      if (!active) return;
+      if (moved && state.socket) renewSignal(state, actions);
+      else if (!state.socket && state.reconnectTimer === null) openSignal(state, actions);
+    })();
   }
 
   function scheduleDisconnectedCheck(state: PeerState, actions: ActionsRef): void {
@@ -837,6 +919,11 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         iceRecoveryTimer: null,
         waitingForHost: false,
         hostWaitTimer: null,
+        failedOpens: 0,
+        signalAnswered: false,
+        hostWaitingSince: null,
+        hostWaitTicketTimer: null,
+        ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
         lastSignalClose: null,
@@ -864,6 +951,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     const socket = new WebSocket(state.signalUrl);
     state.socket = socket;
     state.signalReady = false;
+    state.signalAnswered = false;
     // Signal closes with 1008 after several refusals, and an expired session is not a rate limit (#1867).
     // The error frame arrives before the close, but its locked handler can run after it.
     let refusal: string | null = null;
@@ -918,6 +1006,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
       state.hostWaitTimer = null;
       if (state.closed || peer !== state) return;
+      if (!state.signalAnswered) state.failedOpens += 1;
       if (event) state.lastSignalClose = event.code;
       if (event?.code === 1008 && (refusal === null || refusal === "rate_limited"))
         signalRetryAt = Date.now() + SIGNAL_RATE_LIMIT_MS;
@@ -987,7 +1076,18 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       }
       if (message.type === "host-waiting") {
         state.reconnectAttempt = 0;
+        state.failedOpens = 0;
+        state.signalAnswered = true;
         state.resumeToken = message.resumeToken;
+        // The host can wait on another Signal machine: ask the account service after a short time.
+        if (state.hostWaitingSince === null) {
+          state.hostWaitingSince = Date.now();
+          state.hostWaitTicketTimer = setTimeout(() => {
+            state.hostWaitTicketTimer = null;
+            if (active && !state.closed && peer === state && state.hostWaitingSince !== null)
+              void runPeerEffect(followHost(state, actions)).catch(() => undefined);
+          }, HOST_WAIT_TICKET_MS);
+        }
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
         state.hostWaitTimer = setTimeout(() => {
           state.hostWaitTimer = null;
@@ -1013,8 +1113,13 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       }
       if (message.type === "ready") {
         state.reconnectAttempt = 0;
+        state.failedOpens = 0;
+        state.signalAnswered = true;
+        state.hostWaitingSince = null;
         if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
+        if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
         state.hostWaitTimer = null;
+        state.hostWaitTicketTimer = null;
         if (state.waitingForHost) {
           state.waitingForHost = false;
           armConnectedTimer(state, actions);
@@ -1728,7 +1833,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     diagnose(state, "signal-retry", `in ${delay} ms`);
     state.reconnectTimer = setTimeout(() => {
       state.reconnectTimer = null;
-      openSignal(state, actions);
+      reopenSignal(state, actions);
     }, delay);
   }
 
@@ -1883,6 +1988,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       if (state.disconnectedTimer !== null) clearTimeout(state.disconnectedTimer);
       if (state.iceRecoveryTimer !== null) clearTimeout(state.iceRecoveryTimer);
       if (state.hostWaitTimer !== null) clearTimeout(state.hostWaitTimer);
+      if (state.hostWaitTicketTimer !== null) clearTimeout(state.hostWaitTicketTimer);
       state.socket?.close();
       state.connection?.close();
       for (const decoder of Object.values(state.decoders)) decoder?.reset();

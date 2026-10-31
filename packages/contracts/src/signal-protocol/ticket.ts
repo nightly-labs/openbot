@@ -44,6 +44,10 @@ export interface RemoteTicketClaims {
   // Present only for a client ticket, and only once the client has generated its ed25519 identity:
   // it binds the ticket to the key that signs the handshake on the data channel.
   clientPublicKey?: string;
+  // The ID of the Signal machine that holds the host's room, when the account API gives the host a
+  // home Signal. A Signal with another ID refuses the ticket. Without it, only the machine that
+  // `signal.openbot.run` names accepts the ticket. Older verifiers ignore it.
+  signal?: string;
   iat: number;
   exp: number;
 }

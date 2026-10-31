@@ -50,7 +50,7 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -175,8 +175,10 @@ interface HostServiceOptions {
   ) => Effect.Effect<"accepted" | "refused", RemoteWorkflowError>;
   /** The account service accepted a key handover. The server list carries it and its time now. */
   onKeyRotated?: () => void;
+  /** With `home`, the ticket is for this host's home Signal machine; see `CentralAuthManager`. */
   issueRemoteHostTicket?: (
     hostId: string,
+    home?: RemoteHostTicketHome,
   ) => Effect.Effect<{ ticket: string; signalUrl: string; expiresAt: number }, RemoteWorkflowError>;
   /** Sends one sealed Live Activity update through the account service. `gone` means Apple refused the token. */
   sendLiveActivityPush?: (
@@ -257,6 +259,11 @@ export class HostService extends EventEmitter<HostEvents> {
   /** A registration and a key rotation each read the host key, so only one of them runs at a time. */
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
+  /**
+   * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
+   * it as failed, so a host that starts while its home machine is down gets another home.
+   */
+  #unreachedSignalUrl: string | null = null;
   /** `undefined` until the account service first reports, so the first report always binds. */
   #boundAccountId: string | null | undefined = undefined;
   #legacyCredentialRemoved = false;
@@ -471,14 +478,14 @@ export class HostService extends EventEmitter<HostEvents> {
           store: options.store,
           appVersion: options.appVersion,
           transferDirectory: join(options.logDirectory ?? ".openbot-remote", "transfers"),
-          renewSignal: (hostId) =>
+          renewSignal: (hostId, failedSignalUrl) =>
             Effect.gen(function* () {
               const issueTicket = options.issueRemoteHostTicket;
               if (!issueTicket)
                 return yield* new RemoteWorkflowError({
                   cause: new Error(sourceText("error.host.webRtcNotConfigured")),
                 });
-              return yield* issueTicket(hostId);
+              return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
@@ -943,14 +950,29 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* this.#syncRemoteDirectory(identity.serverId, members);
         if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       }
-      const bootstrap = yield* optionalIssueRemoteHostTicket(identity.serverId);
+      // The host peer meets its devices on its home Signal machine. Chat apps and webhooks stay on
+      // the entry Signal through their own tickets.
+      const failedSignalUrl = this.#unreachedSignalUrl;
+      const bootstrap = yield* optionalIssueRemoteHostTicket(
+        identity.serverId,
+        failedSignalUrl === null ? {} : { failedSignalUrl },
+      );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
-      yield* gateway.start({
-        hostId: identity.serverId,
-        signalUrl: bootstrap.signalUrl,
-        ticket: bootstrap.ticket,
-        localApiPort: apiPort,
-      });
+      yield* gateway
+        .start({
+          hostId: identity.serverId,
+          signalUrl: bootstrap.signalUrl,
+          ticket: bootstrap.ticket,
+          localApiPort: apiPort,
+        })
+        .pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              this.#unreachedSignalUrl = bootstrap.signalUrl;
+            }),
+          ),
+        );
+      this.#unreachedSignalUrl = null;
       this.#webRtcOnline = true;
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       this.#setStatus({

@@ -373,13 +373,6 @@ export function discordAppErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requestRemoteSignalUrl(): string {
-  const value = requireWorkerBindings(env).REMOTE_SIGNAL_URL?.trim();
-  if (!value)
-    throw new RemoteControlPlaneError(503, "remote_not_configured", "The Remote Signal URL is not configured.");
-  return value;
-}
-
 export function bearerToken(request: Request): string | null {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;

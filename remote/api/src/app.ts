@@ -37,13 +37,13 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
+import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
-import { probeTurnAllocation } from "./turn-probe";
+import type { TurnRelays } from "./turn-relays";
 
-const TURN_HEALTH_CACHE = "1 minute";
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
 const DISCORD_SESSION_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
@@ -146,17 +146,21 @@ export function createRemoteApiApp(
   config: RemoteApiConfig,
   signal: SignalService,
   runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
-  // Null when Signal has no Discord bot token: the Discord route answers 503.
-  discord: DiscordApi | null = null,
+  turnRelays: TurnRelays,
+  // The bots and `ingress` sockets go to the entry machine only. Another machine answers their webhooks 503.
+  entry: SignalEntry,
+  // Null when Signal has no Discord bot token, or while the Gateway is stopped because this machine is
+  // not the entry: the Discord route answers 503.
+  discordApi: () => DiscordApi | null = () => null,
 ) {
-  // The route is public, so the relay gets one probe allocation a minute at most.
-  const turnHealth = Effect.runSync(Effect.cachedWithTTL(probeTurnAllocation(config), TURN_HEALTH_CACHE));
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
-    // For the status page: Signal can answer while the TURN relay refuses every allocation.
+    // For the status page: Signal can answer while the TURN relay refuses every allocation. This is the
+    // relay of `TURN_HOST`; the Signal on the machine of each other relay reports that relay. The route is
+    // public, so the probe result is kept for a minute (`TurnRelays`).
     .get("/health/turn", async ({ set }) => {
-      const result = await runtime.runPromise(turnHealth.pipe(Effect.result));
+      const result = await runtime.runPromise(turnRelays.localProbe.pipe(Effect.result));
       if (Result.isSuccess(result)) return { service: "openbot-turn", status: "ready" };
       set.status = 503;
       return result.failure.reason === "full"
@@ -199,7 +203,7 @@ export function createRemoteApiApp(
     .post(
       SLACK_EVENTS_PATH,
       async ({ request, server }) => {
-        if (config.slackSigningSecrets.length === 0) return slackResponse({ status: 503 });
+        if (config.slackSigningSecrets.length === 0 || !entry.isEntry) return slackResponse({ status: 503 });
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) {
           return slackResponse({ status: 413 });
@@ -252,6 +256,7 @@ export function createRemoteApiApp(
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
+        if (!entry.isEntry) return webhookResponse(503);
         const routeId = params.routeId;
         if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
@@ -293,6 +298,7 @@ export function createRemoteApiApp(
     .post(
       DISCORD_API_PATH,
       async ({ request }) => {
+        const discord = discordApi();
         if (!discord) return discordError(503, "unavailable");
         const token = DISCORD_SESSION_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
         const session = token ? signal.discordCaller(token, null) : null;
@@ -317,10 +323,12 @@ export function createRemoteApiApp(
     // The webhook of each OpenBot Telegram bot. Signal checks the bot's secret header, reads only the
     // chat, the callback query and a link code, and passes the exact body to the ingress socket of
     // the chat's host. Nothing here stores or logs the body. A signed update is always answered 200:
-    // Telegram holds back the bot's other updates while one fails.
+    // Telegram holds back the bot's other updates while one fails. A machine that is not the entry
+    // answers 503, and Telegram sends the update again through the entry name.
     .post(
       `${TELEGRAM_UPDATES_PATH}/:botId`,
       async ({ params, request, server }) => {
+        if (!entry.isEntry) return emptyResponse(503);
         const telegram = signal.telegram;
         const botId = params.botId;
         if (!telegram?.bot.hasBot(botId)) return emptyResponse(404);
@@ -657,9 +665,21 @@ function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   }
 }
 
-export function prometheusMetrics(signal: SignalService): string {
+export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays, entry: SignalEntry): string {
   const metrics = signal.metrics();
+  const relays = turnRelays.states().filter((relay) => relay.available !== null);
+  const entryLabel = entry.signalId ? `{signal="${entry.signalId}"}` : "";
   return [
+    // 1 while this machine is the entry, 0 while another machine is. Absent without the entry rule.
+    ...(entry.enabled
+      ? [
+          "# TYPE openbot_remote_signal_entry gauge",
+          `openbot_remote_signal_entry${entryLabel} ${entry.isEntry ? 1 : 0}`,
+        ]
+      : []),
+    // 1 when the last probe of the relay allocated, 0 when it failed. A relay that has no probe yet is absent.
+    "# TYPE openbot_remote_turn_relay_available gauge",
+    ...relays.map((relay) => `openbot_remote_turn_relay_available{host="${relay.host}"} ${relay.available ? 1 : 0}`),
     "# TYPE openbot_remote_signal_sockets gauge",
     `openbot_remote_signal_sockets ${metrics.activeSockets}`,
     "# TYPE openbot_remote_peer_connections gauge",

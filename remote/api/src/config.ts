@@ -15,7 +15,9 @@ export interface RemoteApiConfig {
   sessionSecret: string;
   authWebhookSecret: string;
   turnSecret: string;
-  turnHost: string;
+  // The coturn servers that share `TURN_SHARED_SECRET` and the TURN ports: `TURN_HOST` first, then
+  // `TURN_EXTRA_HOSTS`. Each host gets one of them for itself and its clients (`turn-relays.ts`).
+  turnHosts: string[];
   turnPort: number;
   turnTlsPort: number;
   metricsToken: string | null;
@@ -35,6 +37,23 @@ export interface RemoteApiConfig {
   // The OpenBot Discord bot. Without it, Signal keeps no Gateway connection and the Discord API route
   // answers 503.
   discord: DiscordBotConfig | null;
+  // The ID of this Signal machine (`SIGNAL_ID`). Signal refuses a ticket whose `signal` claim names
+  // another machine. Null: Signal does not check the claim.
+  signalId: string | null;
+  // The entry rule (`entry.ts`). Null: this machine is always the entry.
+  entry: SignalEntryConfig | null;
+}
+
+export interface SignalEntryConfig {
+  // The DNS name of the entry Signal, such as `signal.openbot.run` (`SIGNAL_ENTRY_HOST`).
+  host: string;
+  // The public IPv4 address of this machine (`SIGNAL_PUBLIC_IPV4`).
+  publicIpv4: string;
+  // The time between two lookups. 30 seconds; `SIGNAL_ENTRY_TEST_CHECK_SECONDS` sets it for tests only.
+  checkIntervalMilliseconds: number;
+  // The DNS server to ask, `<IPv4>:<port>`. Null: the servers of the system. For tests only
+  // (`SIGNAL_ENTRY_TEST_DNS_SERVER`).
+  dnsServer: string | null;
 }
 
 export interface DiscordBotConfig {
@@ -161,7 +180,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     sessionSecret: strongSecret(environment.REMOTE_SESSION_SECRET, "REMOTE_SESSION_SECRET"),
     authWebhookSecret: strongSecret(environment.REMOTE_AUTH_WEBHOOK_SECRET, "REMOTE_AUTH_WEBHOOK_SECRET"),
     turnSecret: strongSecret(environment.TURN_SHARED_SECRET, "TURN_SHARED_SECRET"),
-    turnHost: required(environment.TURN_HOST, "TURN_HOST"),
+    turnHosts: readTurnHosts(required(environment.TURN_HOST, "TURN_HOST"), environment.TURN_EXTRA_HOSTS),
     turnPort: positiveInteger(environment.TURN_PORT, 3478),
     turnTlsPort: positiveInteger(environment.TURN_TLS_PORT, 5349),
     metricsToken: optional(environment.REMOTE_METRICS_TOKEN),
@@ -177,7 +196,47 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
       environment.DISCORD_APPLICATION_ID,
       environment.DISCORD_MESSAGE_CONTENT,
     ),
+    signalId: readSignalId(environment.SIGNAL_ID),
+    entry: readEntryConfig(environment),
   };
+}
+
+function readSignalId(value: string | undefined): string | null {
+  const id = optional(value);
+  if (id && !/^[a-z0-9-]{1,32}$/u.test(id)) throw new Error("SIGNAL_ID must match ^[a-z0-9-]{1,32}$.");
+  return id;
+}
+
+const IPV4_PATTERN =
+  /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$/u;
+
+/** `SIGNAL_ENTRY_HOST` and `SIGNAL_PUBLIC_IPV4` turn on the entry rule together. One without the other stops the start. */
+function readEntryConfig(environment: Record<string, string | undefined>): SignalEntryConfig | null {
+  const host = optional(environment.SIGNAL_ENTRY_HOST)?.toLowerCase() ?? null;
+  const publicIpv4 = optional(environment.SIGNAL_PUBLIC_IPV4);
+  if (!host && !publicIpv4) return null;
+  if (!host || !publicIpv4) throw new Error("SIGNAL_ENTRY_HOST and SIGNAL_PUBLIC_IPV4 must be set together.");
+  if (!TURN_HOST_PATTERN.test(host) || IPV4_PATTERN.test(host))
+    throw new Error("SIGNAL_ENTRY_HOST must be a DNS name.");
+  if (!IPV4_PATTERN.test(publicIpv4)) throw new Error("SIGNAL_PUBLIC_IPV4 must be an IPv4 address.");
+  const dnsServer = optional(environment.SIGNAL_ENTRY_TEST_DNS_SERVER);
+  if (dnsServer && !/^[0-9.]+:[0-9]{1,5}$/u.test(dnsServer))
+    throw new Error("SIGNAL_ENTRY_TEST_DNS_SERVER must be <IPv4>:<port>.");
+  return {
+    host,
+    publicIpv4,
+    checkIntervalMilliseconds: positiveInteger(environment.SIGNAL_ENTRY_TEST_CHECK_SECONDS, 30) * 1_000,
+    dnsServer,
+  };
+}
+
+// A host name goes into the ICE server URLs, so only DNS names and IPv4 addresses are allowed.
+const TURN_HOST_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/u;
+
+function readTurnHosts(primary: string, extra: string | undefined): string[] {
+  const hosts = [primary, ...(extra ?? "").split(",").map((host) => host.trim())].filter(Boolean);
+  for (const host of hosts) if (!TURN_HOST_PATTERN.test(host)) throw new Error(`Invalid TURN host: ${host}`);
+  return [...new Set(hosts.map((host) => host.toLowerCase()))];
 }
 
 function required(value: string | undefined, name: string): string {

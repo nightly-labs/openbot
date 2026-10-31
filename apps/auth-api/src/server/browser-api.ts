@@ -73,7 +73,6 @@ export interface BrowserApiServices {
   billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
-  signalUrl: () => string;
   sourceIp: (request: Request) => string;
   errorResponse: (error: unknown) => Response;
 }
@@ -259,15 +258,14 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       yield* services.remote.endSession(user.id, sessionId, yield* sha256(token));
       return json({ ended: true });
     }
-    return json({
-      ...(yield* services.remote.issueSessionTicket(
+    return json(
+      yield* services.remote.issueSessionTicket(
         user.id,
         sessionId,
         yield* requiredString(body, "clientPublicKey"),
         yield* sha256(token),
-      )),
-      signalUrl: services.signalUrl(),
-    });
+      ),
+    );
   }
   if (path === "v2/remote/invites/preview")
     return json(yield* services.remote.previewInvite(yield* requiredString(body, "token")));

@@ -2,10 +2,12 @@
 // fake account service, then checks its secret and authentication rules over real HTTP and
 // WebSocket connections: the Telegram secret header, the Slack signature, the signed account
 // events, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the hello deadline, the reuse of
-// TURN credentials, and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
+// TURN credentials, the pick of one TURN relay that allocates for each host, the `signal` ticket claim and the entry rule of
+// two Signal machines (with a second Signal and a fake DNS server), and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
 // non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHmac, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
+import { createSocket, type Socket } from "node:dgram";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { createServer as createNetServer } from "node:net";
@@ -63,6 +65,18 @@ const BURST_CHECK_MILLISECONDS = 300;
 // `RESUME_CHECK_CONCURRENCY` in remote/api/src/index.ts.
 const RESUME_CHECK_CONCURRENCY = 64;
 const burstChecks = { active: 0, maximum: 0 };
+// Two names of the fake TURN server, which allocates, and one name that does not resolve.
+const LIVE_RELAYS = ["127.0.0.1", "localhost"];
+const DOWN_RELAY = "turn-down.invalid";
+const RELAY_HOST_IDS = Array.from({ length: 12 }, (_, index) => `host-relay-e2e-${index}`);
+const METRICS_TOKEN = randomBytes(32).toString("base64url");
+// The `SIGNAL_ID` of both Signals of this run, and the entry name that the fake DNS server answers.
+const SIGNAL_ID = "a";
+const ENTRY_HOST = "signal.entry.test";
+const ENTRY_IPV4 = "192.0.2.1";
+const OTHER_IPV4 = "192.0.2.2";
+// The address that the fake DNS server gives for the entry name. The run changes it to move the entry.
+const entryDns = { address: ENTRY_IPV4 };
 
 interface Check {
   name: string;
@@ -87,6 +101,84 @@ async function check(name: string, run: () => Promise<string>) {
 
 function expect(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+/**
+ * A TURN server that answers each Allocate as coturn does: 401 with a realm and a nonce without
+ * credentials, success with them. It does not check the credentials. It answers each Refresh.
+ */
+function startTurnServer(): Promise<Socket> {
+  const socket = createSocket("udp4");
+  const attribute = (type: number, value: Buffer) => {
+    const header = Buffer.alloc(4);
+    header.writeUInt16BE(type, 0);
+    header.writeUInt16BE(value.length, 2);
+    return Buffer.concat([header, value, Buffer.alloc((4 - (value.length % 4)) % 4)]);
+  };
+  socket.on("message", (request, sender) => {
+    if (request.length < 20 || request.readUInt32BE(4) !== 0x2112a442) return;
+    const method = request.readUInt16BE(0);
+    let credentials = false;
+    for (let offset = 20; offset + 4 <= request.length; ) {
+      if (request.readUInt16BE(offset) === 0x0006) credentials = true;
+      offset += 4 + Math.ceil(request.readUInt16BE(offset + 2) / 4) * 4;
+    }
+    const body =
+      method === 0x0003 && !credentials
+        ? Buffer.concat([
+            attribute(0x0009, Buffer.from([0, 0, 4, 1])),
+            attribute(0x0014, Buffer.from("e2e")),
+            attribute(0x0015, Buffer.from("nonce")),
+          ])
+        : Buffer.alloc(0);
+    const header = Buffer.alloc(20);
+    header.writeUInt16BE(method | (method === 0x0003 && !credentials ? 0x0110 : 0x0100), 0);
+    header.writeUInt16BE(body.length, 2);
+    request.copy(header, 4, 4, 20);
+    socket.send(Buffer.concat([header, body]), sender.port, sender.address);
+  });
+  return new Promise((resolveSocket) => socket.bind(0, "127.0.0.1", () => resolveSocket(socket)));
+}
+
+/**
+ * A DNS server that answers the A query of `ENTRY_HOST` with `entryDns.address`, and any other query with
+ * NXDOMAIN. The TTL is 0, so each lookup of Signal asks again.
+ */
+function startEntryDns(): Promise<Socket> {
+  const socket = createSocket("udp4");
+  socket.on("message", (query, sender) => {
+    if (query.length < 12) return;
+    const labels: string[] = [];
+    let offset = 12;
+    while (offset < query.length && query[offset] !== 0) {
+      const length = query[offset] ?? 0;
+      labels.push(query.subarray(offset + 1, offset + 1 + length).toString());
+      offset += 1 + length;
+    }
+    // The zero label, the type and the class.
+    const questionEnd = offset + 5;
+    if (questionEnd > query.length) return;
+    const matches = labels.join(".").toLowerCase() === ENTRY_HOST && query.readUInt16BE(offset + 1) === 1;
+    const header = Buffer.alloc(12);
+    query.copy(header, 0, 0, 2);
+    header.writeUInt16BE(matches ? 0x8180 : 0x8183, 2);
+    header.writeUInt16BE(1, 4);
+    header.writeUInt16BE(matches ? 1 : 0, 6);
+    const answer = matches
+      ? Buffer.concat([
+          Buffer.from([0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 0, 0, 4]),
+          Buffer.from(entryDns.address.split(".").map(Number)),
+        ])
+      : Buffer.alloc(0);
+    socket.send(Buffer.concat([header, query.subarray(12, questionEnd), answer]), sender.port, sender.address);
+  });
+  return new Promise((resolveSocket) => socket.bind(0, "127.0.0.1", () => resolveSocket(socket)));
+}
+
+/** The host names in the STUN and TURN URLs of a `ready` frame. */
+function relayHosts(ready: { iceServers?: Array<{ urls: string | string[] }> }): string[] {
+  const urls = (ready.iceServers ?? []).flatMap((server) => [server.urls].flat());
+  return [...new Set(urls.map((url) => url.replace(/^(?:stun|turns?):/u, "").replace(/:[0-9]+(?:\?.*)?$/u, "")))];
 }
 
 function freePort(): Promise<number> {
@@ -181,7 +273,7 @@ function remoteTicket(
   overrides: Partial<
     Pick<
       RemoteTicketClaims,
-      "hostId" | "userId" | "membershipId" | "sessionExpiresAt" | "protocolMinimum" | "protocolMaximum"
+      "hostId" | "userId" | "membershipId" | "sessionExpiresAt" | "protocolMinimum" | "protocolMaximum" | "signal"
     >
   > = {},
   key = privateKey,
@@ -277,6 +369,7 @@ async function waitForReady(url: string, child: ChildProcess) {
 
 const [signalPort, healthPort, controlPlanePort] = await Promise.all([freePort(), freePort(), freePort()]);
 const controlPlane = await startControlPlane(controlPlanePort);
+const turnServer = await startTurnServer();
 const serviceOutput: string[] = [];
 const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
   cwd: resolve(ROOT, "remote/api"),
@@ -293,7 +386,11 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     REMOTE_SESSION_SECRET: randomBytes(32).toString("base64url"),
     REMOTE_AUTH_WEBHOOK_SECRET: AUTH_WEBHOOK_SECRET,
     TURN_SHARED_SECRET: randomBytes(32).toString("base64url"),
-    TURN_HOST: "127.0.0.1",
+    TURN_HOST: LIVE_RELAYS[0],
+    TURN_EXTRA_HOSTS: [...LIVE_RELAYS.slice(1), DOWN_RELAY].join(","),
+    TURN_PORT: String(turnServer.address().port),
+    REMOTE_METRICS_TOKEN: METRICS_TOKEN,
+    SIGNAL_ID,
     SLACK_SIGNING_SECRET: `${SLACK_APP_ID}:${SLACK_SECRET}`,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
@@ -305,6 +402,10 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
 });
 child.stdout?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
 child.stderr?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
+
+// The second Signal and the DNS server of the entry checks.
+let entryChild: ChildProcess | null = null;
+let entryDnsServer: Socket | null = null;
 
 const base = `http://127.0.0.1:${signalPort}`;
 const signalUrl = `ws://127.0.0.1:${signalPort}/v1/signal`;
@@ -336,6 +437,35 @@ const postSlack = (body: string, timestamp: string, signature: string) =>
 const slackSignature = (body: string, timestamp: string, secret = SLACK_SECRET) =>
   `v0=${hmac(secret, `v0:${timestamp}:${body}`, "hex")}`;
 const nowSeconds = () => String(Math.floor(Date.now() / 1_000));
+
+/** Sends a host hello and returns the socket. */
+async function hello(url: string, token: string): Promise<Peer> {
+  const peer = await connect(url);
+  peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "host", token }));
+  return peer;
+}
+
+/** The `ready` frame of a host hello. */
+async function helloReady(url: string, token: string): Promise<{ peer: Peer; ready: { resumeToken?: string } }> {
+  const peer = await hello(url, token);
+  const ready = JSON.parse(await peer.next((frame) => frame.includes('"type":"ready"'), "ready after hello"));
+  return { peer, ready };
+}
+
+/** Waits until `/metrics` of the Signal on `port` has the line `sample`. */
+async function metricShows(port: number, sample: string): Promise<string> {
+  const deadline = Date.now() + WAIT_MS;
+  let lines: string[] = [];
+  while (Date.now() < deadline) {
+    const page = await fetch(`http://127.0.0.1:${port}/metrics`, {
+      headers: { Authorization: `Bearer ${METRICS_TOKEN}` },
+    }).then((response) => response.text());
+    lines = page.split("\n").filter((line) => line.startsWith("openbot_remote_signal_entry"));
+    if (lines.includes(sample)) return sample;
+    await new Promise((wake) => setTimeout(wake, 200));
+  }
+  throw new Error(`metric: ${lines.join(", ") || "absent"}`);
+}
 
 async function helloFails(name: string, ticket: string) {
   await check(name, async () => {
@@ -820,7 +950,184 @@ try {
     return `${controlPlaneCalls.length} requests, all signed: ${[...new Set(controlPlaneCalls.map((call) => call.path))].join(", ")}`;
   });
 
-  // 7. The bot token stays in Signal.
+  // 7. TURN relays: Signal probes each relay and gives each host one relay that allocates.
+  await check("Signal marks each TURN relay by its probe", async () => {
+    const expected = [...LIVE_RELAYS.map((host) => `{host="${host}"} 1`), `{host="${DOWN_RELAY}"} 0`].map(
+      (sample) => `openbot_remote_turn_relay_available${sample}`,
+    );
+    const deadline = Date.now() + WAIT_MS;
+    let samples: string[] = [];
+    while (Date.now() < deadline) {
+      const page = await fetch(`http://127.0.0.1:${healthPort}/metrics`, {
+        headers: { Authorization: `Bearer ${METRICS_TOKEN}` },
+      }).then((response) => response.text());
+      samples = page.split("\n").filter((line) => line.startsWith("openbot_remote_turn_relay_available{"));
+      if (expected.every((sample) => samples.includes(sample))) return samples.join(", ");
+      await new Promise((wake) => setTimeout(wake, 200));
+    }
+    throw new Error(`samples: ${samples.join(", ")}`);
+  });
+  const relayOf = async (hostId: string) => {
+    const peer = await connect(signalUrl);
+    peer.socket.send(
+      JSON.stringify({
+        type: "hello",
+        version: 1,
+        peer: "host",
+        token: await remoteTicket({ hostId, membershipId: `${hostId}:host` }),
+      }),
+    );
+    const ready = JSON.parse(await peer.next((frame) => frame.includes('"type":"ready"'), `ready of ${hostId}`));
+    peer.socket.close();
+    return relayHosts(ready);
+  };
+  await check("Each host gets one TURN relay, and only relays that allocate", async () => {
+    const picks = new Map<string, string[]>();
+    for (const hostId of RELAY_HOST_IDS) picks.set(hostId, await relayOf(hostId));
+    const evidence = [...picks].map(([hostId, hosts]) => `${hostId}=${hosts.join("+")}`).join(", ");
+    expect(
+      [...picks.values()].every((hosts) => hosts.length === 1 && LIVE_RELAYS.includes(hosts[0] ?? "")),
+      evidence,
+    );
+    const used = new Set([...picks.values()].flat());
+    expect(
+      LIVE_RELAYS.every((host) => used.has(host)),
+      `not every live relay was used: ${evidence}`,
+    );
+    return evidence;
+  });
+  await check("Two sessions of one host get the same TURN relay", async () => {
+    const [first, second] = [await relayOf(HOST_ID), await relayOf(HOST_ID)];
+    expect(first.join() === second.join(), `first ${first.join()}, second ${second.join()}`);
+    return `both ${first.join()}`;
+  });
+  await check("/health/turn reports the relay of TURN_HOST", async () => {
+    const response = await fetch(`${base}/health/turn`);
+    const body = await response.text();
+    expect(response.status === 200 && body.includes('"status":"ready"'), `${response.status} ${body}`);
+    return `${response.status} ${body}`;
+  });
+
+  // 8. Two Signal machines. A Signal with `SIGNAL_ID` refuses a ticket of another machine. A second
+  // Signal with the entry rule refuses the tickets of the entry while the entry name names another machine.
+  await check("A ticket whose signal claim names another Signal is refused", async () => {
+    const peer = await hello(signalUrl, await remoteTicket({ signal: "b" }));
+    const code = await withDeadline(peer.closed, "close after a ticket of another Signal");
+    expect(code === 1008, `close code: ${code}`);
+    expect(
+      peer.frames.some((frame) => frame.includes('"code":"authentication_required"')),
+      `frames: ${peer.frames.join(" ").slice(0, 200)}`,
+    );
+    expect(!peer.frames.some((frame) => frame.includes('"type":"ready"')), "Signal sent ready.");
+    return `closed with ${code} and an authentication_required error`;
+  });
+  await check("A ticket with the signal claim of this Signal works, and so does its resume token", async () => {
+    const first = await helloReady(signalUrl, await remoteTicket({ signal: SIGNAL_ID }));
+    const resumeToken = first.ready.resumeToken;
+    expect(typeof resumeToken === "string", "The ready frame has no resume token.");
+    first.peer.socket.close();
+    const resumed = await helloReady(signalUrl, resumeToken);
+    resumed.peer.socket.close();
+    return "ready after the ticket and after its resume token";
+  });
+  await check("A ticket without a signal claim works on the entry", async () => {
+    const { peer } = await helloReady(signalUrl, await remoteTicket());
+    peer.socket.close();
+    return "ready";
+  });
+
+  const dnsServer = await startEntryDns();
+  entryDnsServer = dnsServer;
+  const [entrySignalPort, entryHealthPort] = await Promise.all([freePort(), freePort()]);
+  const secondSignal = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
+    cwd: resolve(ROOT, "remote/api"),
+    env: {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      REMOTE_SIGNAL_HOST: "127.0.0.1",
+      REMOTE_SIGNAL_PORT: String(entrySignalPort),
+      REMOTE_HEALTH_PORT: String(entryHealthPort),
+      REMOTE_TLS_DISABLED: "true",
+      REMOTE_TICKET_PUBLIC_KEYS: JSON.stringify({ keys: [publicJwk] }),
+      REMOTE_CONTROL_PLANE_URL: `http://127.0.0.1:${controlPlanePort}`,
+      REMOTE_SESSION_SECRET: randomBytes(32).toString("base64url"),
+      REMOTE_AUTH_WEBHOOK_SECRET: AUTH_WEBHOOK_SECRET,
+      TURN_SHARED_SECRET: randomBytes(32).toString("base64url"),
+      TURN_HOST: LIVE_RELAYS[0],
+      TURN_PORT: String(turnServer.address().port),
+      REMOTE_METRICS_TOKEN: METRICS_TOKEN,
+      SIGNAL_ID,
+      SIGNAL_ENTRY_HOST: ENTRY_HOST,
+      SIGNAL_PUBLIC_IPV4: ENTRY_IPV4,
+      SIGNAL_ENTRY_TEST_DNS_SERVER: `127.0.0.1:${dnsServer.address().port}`,
+      SIGNAL_ENTRY_TEST_CHECK_SECONDS: "1",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  entryChild = secondSignal;
+  secondSignal.stdout?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
+  secondSignal.stderr?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
+  const entryBase = `http://127.0.0.1:${entrySignalPort}`;
+  const entrySignalUrl = `ws://127.0.0.1:${entrySignalPort}/v1/signal`;
+  const entryTicket = (hostId: string, signal?: string) =>
+    remoteTicket({ hostId, membershipId: `${hostId}:host`, ...(signal ? { signal } : {}) });
+  // Without a content type: the entry answers 415, another machine 503 before it reads anything.
+  const postEntryWebhook = () =>
+    fetch(`${entryBase}${WEBHOOK_EVENTS_PATH}/${WEBHOOK_ROUTE}`, { method: "POST", body: "{}" });
+  await waitForReady(`${entryBase}/health/ready`, secondSignal);
+
+  await check("A Signal whose address the entry name has is the entry", async () => {
+    const sample = await metricShows(entryHealthPort, `openbot_remote_signal_entry{signal="${SIGNAL_ID}"} 1`);
+    const webhook = await postEntryWebhook();
+    expect(webhook.status === 415, `webhook status: ${webhook.status}`);
+    return `${sample}; webhook ${webhook.status}`;
+  });
+  const entryPeer = (await helloReady(entrySignalUrl, await entryTicket("host-entry-e2e"))).peer;
+  const homedPeer = (await helloReady(entrySignalUrl, await entryTicket("host-homed-e2e", SIGNAL_ID))).peer;
+  entryDns.address = OTHER_IPV4;
+  await check("When the entry name names another machine, the Signal stops being the entry", async () => {
+    const sample = await metricShows(entryHealthPort, `openbot_remote_signal_entry{signal="${SIGNAL_ID}"} 0`);
+    return sample;
+  });
+  await check("The Signal closes the sockets without a signal claim with 1013 and no error", async () => {
+    const code = await withDeadline(entryPeer.closed, "close of a socket without a signal claim");
+    expect(code === 1013, `close code: ${code}`);
+    expect(
+      !entryPeer.frames.some((frame) => frame.includes('"type":"error"')),
+      `frames: ${entryPeer.frames.join(" ").slice(0, 200)}`,
+    );
+    expect(homedPeer.socket.readyState === WebSocket.OPEN, "The socket with the signal claim was closed.");
+    return `closed with ${code}; the socket with the signal claim stays open`;
+  });
+  await check("A ticket without a signal claim gets 1013 and no frame when the Signal is not the entry", async () => {
+    const peer = await hello(entrySignalUrl, await entryTicket("host-entry-e2e"));
+    const code = await withDeadline(peer.closed, "close after a hello without a signal claim");
+    expect(code === 1013, `close code: ${code}`);
+    expect(peer.frames.length === 0, `frames: ${peer.frames.join(" ").slice(0, 200)}`);
+    return `closed with ${code} and no frame`;
+  });
+  await check("A ticket with the signal claim of the Signal works when it is not the entry", async () => {
+    const { peer } = await helloReady(entrySignalUrl, await entryTicket("host-homed-e2e", SIGNAL_ID));
+    peer.socket.close();
+    return "ready";
+  });
+  await check("A Signal that is not the entry answers webhooks with 503", async () => {
+    const webhook = await postEntryWebhook();
+    expect(webhook.status === 503, `webhook status: ${webhook.status}`);
+    const health = await fetch(`${entryBase}/health/ready`);
+    expect(health.status === 200, `health status: ${health.status}`);
+    return `webhook ${webhook.status}; health ${health.status}`;
+  });
+  homedPeer.socket.close();
+  entryDns.address = ENTRY_IPV4;
+  await check("When the entry name names the Signal again, it is the entry again", async () => {
+    const sample = await metricShows(entryHealthPort, `openbot_remote_signal_entry{signal="${SIGNAL_ID}"} 1`);
+    const { peer } = await helloReady(entrySignalUrl, await entryTicket("host-entry-e2e"));
+    peer.socket.close();
+    return `${sample}; a ticket without a signal claim is ready`;
+  });
+
+  // 9. The bot token stays in Signal.
   await check("No frame and no log line holds the Telegram bot token", async () => {
     const framesWithToken = allFrames.filter((frame) => frame.includes(BOT_TOKEN_SECRET));
     const logsWithToken = serviceOutput.filter((line) => line.includes(BOT_TOKEN_SECRET));
@@ -833,7 +1140,10 @@ try {
   record("Signal starts and admits a host", false, error instanceof Error ? error.message : String(error));
 } finally {
   child.kill("SIGTERM");
+  entryChild?.kill("SIGTERM");
+  entryDnsServer?.close();
   controlPlane.close();
+  turnServer.close();
 }
 
 mkdirSync(OUT, { recursive: true });

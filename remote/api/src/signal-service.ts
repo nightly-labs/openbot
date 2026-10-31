@@ -16,7 +16,7 @@ import {
   telegramRouteChatKey,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { WEBHOOK_ROUTE_TTL_SECONDS, type WebhookRoute } from "@openbot/contracts/signal-protocol/webhook-route";
-import { Context, Effect, Fiber, Layer, Result } from "effect";
+import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
   type DecodedSignalClientMessage,
@@ -172,7 +172,17 @@ export interface SignalServiceOptions {
   routeWaker?: RouteWaker | null;
   /** Runs the work that an event for an offline route starts, in the process's runtime. */
   fork?: (work: Effect.Effect<unknown>) => void;
+  /**
+   * Whether this Signal is the entry (`SignalEntry`). A machine that is not the entry refuses the
+   * tickets without a `signal` claim. Without it, this Signal is always the entry.
+   */
+  isEntry?: () => boolean;
 }
+
+// A ticket without a `signal` claim reached a Signal that is not the entry. The peer must connect
+// again through the entry name, so Signal closes with 1013 and sends no error frame.
+class NotEntryError extends Schema.TaggedError<NotEntryError>()("NotEntryError", {}) {}
+const NOT_ENTRY_REASON = "This Signal is not the entry.";
 
 /** What the Discord Gateway knows of the bot's guilds. */
 export interface DiscordMembership {
@@ -321,6 +331,7 @@ export class SignalService {
   readonly #pendingDeliveries = new Map<string, PendingDelivery>();
   readonly #queue: IngressQueue;
   readonly #fork: (work: Effect.Effect<unknown>) => void;
+  readonly #isEntry: () => boolean;
   readonly #deliveryLimits: IngressDeliveryLimits;
   readonly #connections = new Map<string, ActiveConnection>();
   readonly #connectionDropTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -381,12 +392,23 @@ export class SignalService {
     this.#discordEnabled = options.discord === true;
     this.#telegram = options.telegram ?? null;
     this.#fork = options.fork ?? ((work) => void Effect.runFork(work));
+    this.#isEntry = options.isEntry ?? (() => true);
     this.#queue = new IngressQueue(options.routeWaker ?? null, { fork: this.#fork });
   }
 
   /** The Bot API and the file tokens, or `null` when Telegram is off. */
   get telegram(): SignalTelegram | null {
     return this.#telegram;
+  }
+
+  /**
+   * Closes the sockets that this Signal has only as the entry: each peer whose ticket has no `signal`
+   * claim. `disconnect` removes them. The peers connect again through the entry name.
+   */
+  closeEntrySockets(): void {
+    for (const peer of [...this.#peers.values()]) {
+      if (!peer.claims.signal) peer.socket.close(1013, NOT_ENTRY_REASON);
+    }
   }
 
   close(): void {
@@ -1148,6 +1170,7 @@ export class SignalService {
             usedInitialTicket = false;
             claims = yield* tokens.verifyResumeToken(message.token);
           } else claims = initial.success;
+          if (!claims.signal && !this.#isEntry()) return yield* new NotEntryError();
           if (message.peer !== "client" && claims.role !== "host")
             return yield* new RemoteTokenError({ message: "Host role required." });
           if (message.peer === "client" && claims.role === "host")
@@ -1232,6 +1255,10 @@ export class SignalService {
             socket.close(1013, "The account service is unavailable.");
             return;
           }
+          if (failure._tag === "NotEntryError") {
+            socket.close(1013, NOT_ENTRY_REASON);
+            return;
+          }
           this.#metrics.authenticationFailures += 1;
           this.#fail(socket, "authentication_required", "Remote ticket is invalid or expired.", 1008);
           return;
@@ -1240,6 +1267,11 @@ export class SignalService {
         if (!this.#sockets.has(socket.id)) return;
         if (this.#peers.has(socket.id)) {
           this.#fail(socket, "protocol_error", "This socket is already authenticated.", 1008);
+          return;
+        }
+        // This machine can stop being the entry while verification waits: check again.
+        if (!authentication.success.claims.signal && !this.#isEntry()) {
+          socket.close(1013, NOT_ENTRY_REASON);
           return;
         }
         const { claims, slackRoute, telegramRoute, discordRoute, webhookRoute, resumeToken } = authentication.success;

@@ -57,6 +57,14 @@ services:
       REMOTE_TRUST_PROXY: ${REMOTE_TRUST_PROXY:-false}
       TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
       TURN_HOST: ${TURN_DOMAIN}
+      # Other coturn servers with the same TURN_SHARED_SECRET and ports, comma-separated: on production
+      # `turn2.openbot.run`, on the standby `turn.openbot.run`. Each host gets one relay (`turn-relays.ts`).
+      TURN_EXTRA_HOSTS: ${TURN_EXTRA_HOSTS:-}
+      # Two Signal machines (README "Two Signal machines"). SIGNAL_ID is the name in the `signal` ticket
+      # claim. SIGNAL_ENTRY_HOST and SIGNAL_PUBLIC_IPV4 go together: without them this Signal is always the entry.
+      SIGNAL_ID: ${SIGNAL_ID:-}
+      SIGNAL_ENTRY_HOST: ${SIGNAL_ENTRY_HOST:-}
+      SIGNAL_PUBLIC_IPV4: ${SIGNAL_PUBLIC_IPV4:-}
       TURN_PORT: 3478
       TURN_TLS_PORT: 5349
     ports:
