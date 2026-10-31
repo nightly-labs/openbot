@@ -64,8 +64,12 @@ const WINDOWS_WRITE_RIGHTS = "0x500D0156";
 // gets its permissions from the entries of this directory. SIDs, not account
 // names: names are localized. The path goes through the environment, so
 // PowerShell never parses it. An ACL that cannot be read fails closed, like a
-// foreign one.
+// foreign one. PSModulePath stays out of that environment: from a PowerShell 7
+// shell it lists PowerShell 7's modules, Windows PowerShell then fails to load
+// Get-Acl's module, and without the variable it builds its own
+// (PowerShell/PowerShell#18530).
 function assertWindowsOwnerOnlyDirectory(directory: string): void {
+  const { PSModulePath: _powerShell7ModulePath, ...environment } = process.env;
   let lines: string[];
   try {
     lines = execFileSync(
@@ -84,7 +88,7 @@ function assertWindowsOwnerOnlyDirectory(directory: string): void {
       ],
       {
         encoding: "utf8",
-        env: { ...process.env, OPENBOT_REGISTRY_DIRECTORY: directory },
+        env: { ...environment, OPENBOT_REGISTRY_DIRECTORY: directory },
         timeout: 5_000,
         stdio: ["ignore", "pipe", "ignore"],
       },
