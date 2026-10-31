@@ -312,6 +312,28 @@ export const messages = defineMessages("mobile.agent", {
     "Let scripts on the host send messages, run routines, answer questions, and accept or decline approvals",
   "mobile.agent.host.failed": "Could not change this setting.",
   "mobile.agent.host.unsupported": "This host cannot change these settings from a remote device.",
+  "mobile.agent.backupModels.title": "Backup models",
+  "mobile.agent.backupModels.valueAsk": "Ask first",
+  "mobile.agent.backupModels.valueAutomatic": "Automatic",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "When {model} reaches its usage limit before {name} starts to write, {name} asks you which model to use.",
+  "mobile.agent.backupModels.introAutomatic":
+    "When {model} reaches its usage limit or fails with a provider error before {name} starts to write, {name} switches to the first available model in the order.",
+  "mobile.agent.backupModels.ask": "Ask before switching",
+  "mobile.agent.backupModels.order": "Order",
+  "mobile.agent.backupModels.empty": "No order set. {name} offers each available model.",
+  "mobile.agent.backupModels.add": "Add backup model",
+  "mobile.agent.backupModels.search": "Search models",
+  "mobile.agent.backupModels.noMatches": "No models match your search.",
+  "mobile.agent.backupModels.readFailed": "Could not read backup models.",
+  "mobile.agent.backupModels.moveUp": "Move {model} up",
+  "mobile.agent.backupModels.moveDown": "Move {model} down",
+  "mobile.agent.backupModels.remove": "Remove {model}",
+  "mobile.agent.backupModels.unavailable": "Not available now · skipped",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} never switches after it starts to write. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
   "mobile.agent.busyMessage.footer":
     "What a message does when you send it while the agent works. Queue keeps it until the turn ends. Steer gives it to the agent during the turn.",
@@ -321,6 +343,20 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host default (Steer)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
+  "mobile.agent.taskLimit.label": "Parallel threads",
+  "mobile.agent.taskLimit.footer": "Threads that run at the same time",
+  "mobile.agent.taskLimit.default": "Default ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} runs one turn at a time. The threads of this agent wait for each other.",
+  "mobile.agent.browserProfile.label": "Browser profile",
+  "mobile.agent.browserProfile.shared": "Shared",
+  "mobile.agent.browserProfile.own": "Only this agent",
+  "mobile.agent.browserProfile.missing": "Deleted profile",
+  "mobile.agent.browserProfile.new": "New profile",
+  "mobile.agent.browserProfile.manage": "Manage profiles",
+  "mobile.agent.browserProfile.footer":
+    "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot could not change the browser profile of the agent.",
   "mobile.agent.planCard.label": "Show the plan before long tasks",
   "mobile.agent.planCard.footer":
     "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
@@ -344,6 +380,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.newChat.failed": "Could not start a new chat",
   "mobile.agent.newChat.failedBody": "The host could not start a new chat.",
   "mobile.agent.newChat.unsupported": "This host cannot start a new chat from a remote device.",
+  "mobile.agent.agentNewChat.title": "Agent starts new chats",
+  "mobile.agent.agentNewChat.footer": "Let the agent start a new chat when its chat gets long. It saves notes first.",
   "mobile.agent.tables.title": "Tables",
   "mobile.agent.tables.loading": "Loading tables…",
   "mobile.agent.tables.reconnect": "Reconnect to load tables.",

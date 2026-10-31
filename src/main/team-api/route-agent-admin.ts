@@ -2,6 +2,7 @@ import {
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentHostSettingsInput,
+  parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
   parseUpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
@@ -14,6 +15,7 @@ import {
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_HOST_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
@@ -171,6 +173,42 @@ export async function routeAgentTaskLimit(
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid task limit.");
     }
     return json(200, await runCauseEffect(settings.updateTaskLimit(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Whether one agent may start a new chat itself when its chat gets long, changed from a joined
+ * server. The agent then works on this computer without the earlier chat, so only an owner or admin
+ * can read or change it. Frozen by `agent-new-chat-v1`.
+ */
+export async function routeAgentNewChat(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_NEW_CHAT_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_NEW_CHAT_ROUTES.update;
+  if (!read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_NEW_CHAT_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the agent-new-chat wire codec.
+  const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  try {
+    if (read) return json(200, settings.readNewChat(stringField(body, "agentId")));
+    let input: ReturnType<typeof parseUpdateAgentNewChatInput>;
+    try {
+      input = parseUpdateAgentNewChatInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid new chat setting.");
+    }
+    return json(200, await runCauseEffect(settings.updateNewChat(input)));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;

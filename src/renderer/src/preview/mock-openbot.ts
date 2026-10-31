@@ -2000,6 +2000,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const hue = nextBrowserProfileHue(browserProfiles.map((profile) => profile.hue));
         const profile = { id: crypto.randomUUID().replaceAll("-", ""), name, hue };
         browserProfiles = [...browserProfiles, profile];
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(profile);
       },
       updateBrowserProfile: async ({ profileId, name, hue }) => {
@@ -2007,10 +2008,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (name !== undefined) requireFreeBrowserProfileName(name, profileId);
         const next = { ...current, name: name ?? current.name, hue: hue ?? current.hue };
         browserProfiles = browserProfiles.map((profile) => (profile.id === profileId ? next : profile));
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return browserProfileSummary(requireBrowserProfile(profileId));
       },
       clearBrowserData: async (input) => {
         if ("profileId" in input) requireBrowserProfile(input.profileId);
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       deleteBrowserProfile: async (profileId) => {
         requireBrowserProfile(profileId);
@@ -2019,6 +2022,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           agent.browserProfileId === profileId ? withBrowserProfile(agent, { kind: "shared" }) : agent,
         );
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
       },
       getAgentBrowserProfile: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -2029,6 +2033,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (profile.kind === "profile") requireBrowserProfile(profile.profileId);
         agents = agents.map((agent) => (agent.id === agentId ? withBrowserProfile(agent, profile) : agent));
         emitAgentEvent({ type: "agents-changed", agents });
+        emitAgentEvent({ type: "browser-profiles-changed" });
         return api.agent.getAgentBrowserProfile(agentId);
       },
       listBrowserTabProfiles: async () => [],

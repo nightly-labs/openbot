@@ -344,6 +344,33 @@ export const messages = {
     "Разрешить скриптам на хосте отправлять сообщения, запускать регулярные задачи, отвечать на вопросы, принимать и отклонять запросы на подтверждение",
   "mobile.agent.host.failed": "Не удалось изменить этот параметр.",
   "mobile.agent.host.unsupported": "Этот хост не позволяет менять эти параметры с удалённого устройства.",
+  "mobile.agent.backupModels.title": "Резервные модели",
+  "mobile.agent.backupModels.valueAsk": "Сначала спросить",
+  "mobile.agent.backupModels.valueAutomatic": "Автоматически",
+  "mobile.agent.backupModels.valueCount": {
+    one: "{mode} · {count}",
+    few: "{mode} · {count}",
+    many: "{mode} · {count}",
+    other: "{mode} · {count}",
+  },
+  "mobile.agent.backupModels.intro":
+    "Если {model} достигнет лимита использования до того, как {name} начнёт писать, {name} спросит вас, какую модель использовать.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Если {model} достигнет лимита использования или завершится с ошибкой провайдера до того, как {name} начнёт писать, {name} переключится на первую доступную модель по порядку.",
+  "mobile.agent.backupModels.ask": "Спрашивать перед переключением",
+  "mobile.agent.backupModels.order": "Порядок",
+  "mobile.agent.backupModels.empty": "Порядок не задан. {name} предлагает каждую доступную модель.",
+  "mobile.agent.backupModels.add": "Добавить резервную модель",
+  "mobile.agent.backupModels.search": "Поиск моделей",
+  "mobile.agent.backupModels.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.backupModels.readFailed": "Не удалось прочитать резервные модели.",
+  "mobile.agent.backupModels.moveUp": "Переместить {model} вверх",
+  "mobile.agent.backupModels.moveDown": "Переместить {model} вниз",
+  "mobile.agent.backupModels.remove": "Убрать {model}",
+  "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "После начала ответа {name} не переключает модель. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
   "mobile.agent.busyMessage.footer":
     "Что происходит с сообщением, которое вы отправляете во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",
@@ -353,6 +380,19 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Направлять (по умолчанию на хосте)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
+  "mobile.agent.taskLimit.label": "Параллельные ветки",
+  "mobile.agent.taskLimit.footer": "Ветки, которые работают одновременно",
+  "mobile.agent.taskLimit.default": "По умолчанию ({count})",
+  "mobile.agent.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
+  "mobile.agent.browserProfile.label": "Профиль браузера",
+  "mobile.agent.browserProfile.shared": "Общий",
+  "mobile.agent.browserProfile.own": "Только этот агент",
+  "mobile.agent.browserProfile.missing": "Удалённый профиль",
+  "mobile.agent.browserProfile.new": "Новый профиль",
+  "mobile.agent.browserProfile.manage": "Управлять профилями",
+  "mobile.agent.browserProfile.footer":
+    "Каждый профиль хранит свои входы и файлы cookie. Изменение закрывает открытые вкладки агента.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot не удалось изменить профиль браузера агента.",
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":
     "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
@@ -376,6 +416,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Не удалось начать новый чат",
   "mobile.agent.newChat.failedBody": "Хосту не удалось начать новый чат.",
   "mobile.agent.newChat.unsupported": "Этот хост не позволяет начать новый чат с удалённого устройства.",
+  "mobile.agent.agentNewChat.title": "Агент начинает новые чаты",
+  "mobile.agent.agentNewChat.footer":
+    "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "mobile.agent.tables.title": "Таблицы",
   "mobile.agent.tables.loading": "Загрузка таблиц…",
   "mobile.agent.tables.reconnect": "Переподключитесь, чтобы загрузить таблицы.",

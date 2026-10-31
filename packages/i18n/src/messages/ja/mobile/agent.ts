@@ -322,6 +322,28 @@ export const messages = {
     "ホスト上のスクリプトによるメッセージの送信、ルーティンの実行、質問への回答、承認リクエストの許可または拒否を許可します",
   "mobile.agent.host.failed": "この設定を変更できませんでした。",
   "mobile.agent.host.unsupported": "このホストでは、リモートデバイスからこれらの設定を変更できません。",
+  "mobile.agent.backupModels.title": "バックアップモデル",
+  "mobile.agent.backupModels.valueAsk": "先に確認",
+  "mobile.agent.backupModels.valueAutomatic": "自動",
+  "mobile.agent.backupModels.valueCount": { other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "{name} が書き始める前に {model} が使用量の上限に達した場合、{name} はどのモデルを使うかを確認します。",
+  "mobile.agent.backupModels.introAutomatic":
+    "{name} が書き始める前に {model} が使用量の上限に達した場合、またはプロバイダーのエラーで失敗した場合、{name} は順番の中で最初に使えるモデルに切り替えます。",
+  "mobile.agent.backupModels.ask": "切り替える前に確認",
+  "mobile.agent.backupModels.order": "順番",
+  "mobile.agent.backupModels.empty": "順番は設定されていません。{name} は使えるモデルをすべて表示します。",
+  "mobile.agent.backupModels.add": "バックアップモデルを追加",
+  "mobile.agent.backupModels.search": "モデルを検索",
+  "mobile.agent.backupModels.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.backupModels.readFailed": "バックアップモデルを読み取れませんでした。",
+  "mobile.agent.backupModels.moveUp": "{model} を上へ移動",
+  "mobile.agent.backupModels.moveDown": "{model} を下へ移動",
+  "mobile.agent.backupModels.remove": "{model} を削除",
+  "mobile.agent.backupModels.unavailable": "現在使用できません · スキップ",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} は書き始めた後は切り替えません。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "mobile.agent.busyMessage.label": "作業中",
   "mobile.agent.busyMessage.footer":
     "エージェントの作業中に送信したメッセージの扱いです。「キュー」ではターンが終わるまで保持します。「方向を修正」ではターン中にエージェントに渡します。",
@@ -331,6 +353,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "ホストの既定 (方向を修正)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
+  "mobile.agent.taskLimit.label": "並列スレッド",
+  "mobile.agent.taskLimit.footer": "同時に実行するスレッド",
+  "mobile.agent.taskLimit.default": "デフォルト ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
+  "mobile.agent.browserProfile.label": "ブラウザープロファイル",
+  "mobile.agent.browserProfile.shared": "共有",
+  "mobile.agent.browserProfile.own": "このエージェントのみ",
+  "mobile.agent.browserProfile.missing": "削除されたプロファイル",
+  "mobile.agent.browserProfile.new": "新しいプロファイル",
+  "mobile.agent.browserProfile.manage": "プロファイルを管理",
+  "mobile.agent.browserProfile.footer":
+    "各プロファイルは独自のサインインと Cookie を保持します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot はエージェントのブラウザープロファイルを変更できませんでした。",
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
@@ -355,6 +391,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "新しいチャットを始められませんでした",
   "mobile.agent.newChat.failedBody": "ホストは新しいチャットを始められませんでした。",
   "mobile.agent.newChat.unsupported": "このホストでは、リモートデバイスから新しいチャットを始められません。",
+  "mobile.agent.agentNewChat.title": "エージェントが新しいチャットを開始",
+  "mobile.agent.agentNewChat.footer":
+    "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "mobile.agent.tables.title": "テーブル",
   "mobile.agent.tables.loading": "テーブルを読み込んでいます…",
   "mobile.agent.tables.reconnect": "テーブルを読み込むには再接続してください。",

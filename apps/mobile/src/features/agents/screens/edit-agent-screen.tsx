@@ -21,11 +21,19 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import {
+  AgentBackupModelPicker,
+  AgentBackupModelsPage,
+  AgentBackupModelsRow,
+} from "@/features/agents/components/agent-backup-models";
+import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
 import {
   AgentBusyMessageField,
   AgentHostPermissionFields,
+  AgentNewChatAllowedField,
   AgentPlanCardField,
+  AgentTaskLimitField,
 } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
@@ -65,6 +73,8 @@ type AgentPage =
   | "tables"
   | "publish"
   | "runtime"
+  | "backup-models"
+  | "backup-model-picker"
   | "permissions"
   | "advanced"
   | "memory"
@@ -113,7 +123,10 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentTaskLimit,
+    canManageAgentNewChat,
     canManageAgentPlanCard,
+    canManageBrowserProfiles,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
@@ -128,7 +141,10 @@ function AgentForm({
     Boolean(agent.workspacePath) ||
     canStartNewChat(agent.serverId) ||
     canManageAgentHostSettings(agent.serverId) ||
-    canManageAgentPlanCard(agent.serverId);
+    canManageAgentTaskLimit(agent.serverId) ||
+    canManageAgentNewChat(agent.serverId) ||
+    canManageAgentPlanCard(agent.serverId) ||
+    canManageBrowserProfiles(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -379,6 +395,10 @@ function AgentForm({
           }}
         />
       ) : null}
+      {page === "backup-models" ? <AgentBackupModelsPage agent={agent} server={host} available={available} /> : null}
+      {page === "backup-model-picker" ? (
+        <AgentBackupModelPicker agent={agent} server={host} available={available} />
+      ) : null}
       {page === "permissions" ? (
         <>
           <AgentAccessFields agent={agent} server={host} available={available} />
@@ -388,7 +408,9 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
-          <AgentPlanCardField agent={agent} server={host} available={available} />
+          <AgentTaskLimitField agent={agent} server={host} available={available} />
+          {/* After the task limit, as in the desktop Advanced group. */}
+          <AgentBrowserProfileRow agent={agent} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
               <SettingsRow>
@@ -399,6 +421,9 @@ function AgentForm({
             </SettingsSection>
           ) : null}
           {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
+          {/* After the new-chat switch, as in the desktop Advanced group. */}
+          <AgentPlanCardField agent={agent} server={host} available={available} />
         </>
       ) : null}
       {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}
@@ -441,6 +466,7 @@ function AgentForm({
             >
               <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
             </SettingsRow>
+            <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
             <SettingsRow

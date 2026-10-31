@@ -239,6 +239,30 @@ export function parseUpdateAgentTaskLimitInput(value: unknown): UpdateAgentTaskL
 }
 
 /**
+ * Whether the agent may start a new chat itself when its chat gets long. The read gives the value
+ * that applies: the agent's own choice, else the host default. A change saves the agent's own choice.
+ */
+export interface AgentNewChatSettings {
+  allowNewChat: boolean;
+}
+
+export interface UpdateAgentNewChatInput {
+  agentId: string;
+  allowNewChat: boolean;
+}
+
+export function decodeAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function parseUpdateAgentNewChatInput(value: unknown): UpdateAgentNewChatInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.allowNewChat))
+    throw new Error("Invalid new chat setting.");
+  return { agentId: value.agentId, allowNewChat: value.allowNewChat };
+}
+
+/**
  * Whether one agent shows its plan card before a long task. The local window reads it from the agent
  * summary and the app defaults; an owner or admin of a joined server reads it here, as the value that
  * applies on the host.

@@ -2143,6 +2143,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "vault-changed" });
   }
 
+  /**
+   * The named browser profiles, or the profile of an agent, changed. The settings of this window and
+   * of each joined client read them again (`browser-profiles-events-v1`).
+   */
+  notifyBrowserProfilesChanged(): void {
+    this.#emit({ type: "browser-profiles-changed" });
+  }
+
   notifyWorkflowRunEnded(end: WorkflowRunEnd): void {
     this.emit("workflowRun", end);
   }

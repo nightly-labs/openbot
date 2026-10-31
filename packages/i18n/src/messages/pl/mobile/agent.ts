@@ -342,6 +342,33 @@ export const messages = {
     "Pozwól skryptom na hoście wysyłać wiadomości, uruchamiać rutyny, odpowiadać na pytania oraz akceptować lub odrzucać prośby o zatwierdzenie",
   "mobile.agent.host.failed": "Nie udało się zmienić tego ustawienia.",
   "mobile.agent.host.unsupported": "Ten host nie może zmieniać tych ustawień ze zdalnego urządzenia.",
+  "mobile.agent.backupModels.title": "Modele zapasowe",
+  "mobile.agent.backupModels.valueAsk": "Najpierw zapytaj",
+  "mobile.agent.backupModels.valueAutomatic": "Automatycznie",
+  "mobile.agent.backupModels.valueCount": {
+    one: "{mode} · {count}",
+    few: "{mode} · {count}",
+    many: "{mode} · {count}",
+    other: "{mode} · {count}",
+  },
+  "mobile.agent.backupModels.intro":
+    "Gdy {model} osiągnie limit użycia, zanim {name} zacznie pisać, {name} zapyta cię, którego modelu użyć.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Gdy {model} osiągnie limit użycia lub zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać, {name} przełączy się na pierwszy dostępny model w kolejności.",
+  "mobile.agent.backupModels.ask": "Pytaj przed przełączeniem",
+  "mobile.agent.backupModels.order": "Kolejność",
+  "mobile.agent.backupModels.empty": "Nie ustawiono kolejności. {name} proponuje każdy dostępny model.",
+  "mobile.agent.backupModels.add": "Dodaj model zapasowy",
+  "mobile.agent.backupModels.search": "Szukaj modeli",
+  "mobile.agent.backupModels.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.backupModels.readFailed": "Nie udało się odczytać modeli zapasowych.",
+  "mobile.agent.backupModels.moveUp": "Przesuń {model} w górę",
+  "mobile.agent.backupModels.moveDown": "Przesuń {model} w dół",
+  "mobile.agent.backupModels.remove": "Usuń {model}",
+  "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
   "mobile.agent.busyMessage.footer":
     "Co dzieje się z wiadomością wysłaną, gdy agent pracuje. Kolejka trzyma ją do końca tury. Pokieruj przekazuje ją agentowi w trakcie tury.",
@@ -351,6 +378,19 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Domyślne hosta (Pokieruj)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
+  "mobile.agent.taskLimit.label": "Równoległe wątki",
+  "mobile.agent.taskLimit.footer": "Wątki, które działają w tym samym czasie",
+  "mobile.agent.taskLimit.default": "Domyślnie ({count})",
+  "mobile.agent.taskLimit.oneTurn": "{provider} wykonuje jedną turę naraz. Wątki tego agenta czekają na siebie.",
+  "mobile.agent.browserProfile.label": "Profil przeglądarki",
+  "mobile.agent.browserProfile.shared": "Wspólny",
+  "mobile.agent.browserProfile.own": "Tylko ten agent",
+  "mobile.agent.browserProfile.missing": "Usunięty profil",
+  "mobile.agent.browserProfile.new": "Nowy profil",
+  "mobile.agent.browserProfile.manage": "Zarządzaj profilami",
+  "mobile.agent.browserProfile.footer":
+    "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki agenta.",
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":
     "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
@@ -375,6 +415,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Nie udało się rozpocząć nowego czatu",
   "mobile.agent.newChat.failedBody": "Host nie mógł rozpocząć nowego czatu.",
   "mobile.agent.newChat.unsupported": "Ten host nie może rozpocząć nowego czatu ze zdalnego urządzenia.",
+  "mobile.agent.agentNewChat.title": "Agent rozpoczyna nowe czaty",
+  "mobile.agent.agentNewChat.footer":
+    "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "mobile.agent.tables.title": "Tabele",
   "mobile.agent.tables.loading": "Wczytywanie tabel…",
   "mobile.agent.tables.reconnect": "Połącz ponownie, aby wczytać tabele.",

@@ -325,6 +325,28 @@ export const messages = {
   "mobile.agent.host.failed": "Não foi possível alterar esta configuração.",
   "mobile.agent.host.unsupported":
     "Este computador anfitrião não pode alterar estas configurações a partir de um dispositivo remoto.",
+  "mobile.agent.backupModels.title": "Modelos de reserva",
+  "mobile.agent.backupModels.valueAsk": "Perguntar antes",
+  "mobile.agent.backupModels.valueAutomatic": "Automático",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Quando {model} atinge o limite de uso antes de {name} começar a escrever, {name} pergunta qual modelo você quer usar.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Quando {model} atinge o limite de uso ou falha por um erro do provedor antes de {name} começar a escrever, {name} troca para o primeiro modelo disponível na ordem.",
+  "mobile.agent.backupModels.ask": "Perguntar antes de trocar",
+  "mobile.agent.backupModels.order": "Ordem",
+  "mobile.agent.backupModels.empty": "Nenhuma ordem definida. {name} oferece cada modelo disponível.",
+  "mobile.agent.backupModels.add": "Adicionar modelo de reserva",
+  "mobile.agent.backupModels.search": "Buscar modelos",
+  "mobile.agent.backupModels.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "mobile.agent.backupModels.readFailed": "Não foi possível ler os modelos de reserva.",
+  "mobile.agent.backupModels.moveUp": "Mover {model} para cima",
+  "mobile.agent.backupModels.moveDown": "Mover {model} para baixo",
+  "mobile.agent.backupModels.remove": "Remover {model}",
+  "mobile.agent.backupModels.unavailable": "Indisponível agora · ignorado",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} nunca troca depois de começar a escrever. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "mobile.agent.busyMessage.label": "Durante o trabalho",
   "mobile.agent.busyMessage.footer":
     "O que acontece com uma mensagem enviada enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",
@@ -334,6 +356,20 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Padrão do anfitrião (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
+  "mobile.agent.taskLimit.label": "Tópicos em paralelo",
+  "mobile.agent.taskLimit.footer": "Tópicos executados ao mesmo tempo",
+  "mobile.agent.taskLimit.default": "Padrão ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
+  "mobile.agent.browserProfile.label": "Perfil do navegador",
+  "mobile.agent.browserProfile.shared": "Compartilhado",
+  "mobile.agent.browserProfile.own": "Só este agente",
+  "mobile.agent.browserProfile.missing": "Perfil excluído",
+  "mobile.agent.browserProfile.new": "Novo perfil",
+  "mobile.agent.browserProfile.manage": "Gerenciar perfis",
+  "mobile.agent.browserProfile.footer":
+    "Cada perfil guarda seus próprios logins e cookies. Uma alteração fecha as abas abertas do agente.",
+  "mobile.agent.browserProfile.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador do agente.",
   "mobile.agent.planCard.label": "Mostrar o plano antes de tarefas longas",
   "mobile.agent.planCard.footer":
     "Antes de uma tarefa longa, o agente mostra o plano. Ele começa após 10 s ou quando você toca em Iniciar.",
@@ -358,6 +394,9 @@ export const messages = {
   "mobile.agent.newChat.failedBody": "O computador anfitrião não conseguiu iniciar um novo chat.",
   "mobile.agent.newChat.unsupported":
     "Este computador anfitrião não pode iniciar um novo chat a partir de um dispositivo remoto.",
+  "mobile.agent.agentNewChat.title": "O agente inicia novos chats",
+  "mobile.agent.agentNewChat.footer":
+    "Permite que o agente inicie um novo chat quando o chat dele ficar longo. Ele salva notas antes.",
   "mobile.agent.tables.title": "Tabelas",
   "mobile.agent.tables.loading": "Carregando tabelas…",
   "mobile.agent.tables.reconnect": "Reconecte-se para carregar as tabelas.",
