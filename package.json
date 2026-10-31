@@ -233,6 +233,7 @@
     "test:agent-mcp-tools": "bun scripts/agent-mcp-tools-e2e.ts",
     "test:agent-update-agents": "bun scripts/agent-update-agents-e2e.ts",
     "test:ui-blocks": "bun scripts/ui-blocks-e2e.ts",
+    "test:approval-cleanup": "bun scripts/approval-cleanup-e2e.ts",
     "test:composer-attachments": "bun scripts/composer-attachments-e2e.ts",
     "test:agent-api-keys": "bun scripts/agent-api-keys-e2e.ts",
     "test:antigravity-start": "bun scripts/antigravity-start-e2e.ts",

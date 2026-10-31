@@ -1428,7 +1428,7 @@ export class AttentionRegistry {
       const pendingTurnId = getString(pending.params, "turnId");
       if (pendingThreadId === threadId && (!pendingTurnId || pendingTurnId === turnId)) {
         this.#approvals.delete(requestId);
-        pending.decide?.("cancel");
+        this.#cancelApproval(pending);
         this.#emitInputResolved("approval", requestId, pending.approval.agentId);
       }
     }
@@ -1518,7 +1518,8 @@ export class AttentionRegistry {
 
   /**
    * Drops the approvals of one lost provider client, or of all clients when none is given. The other
-   * clients are still running and wait for an answer, so their approvals stay.
+   * clients are still running and wait for an answer, so their approvals stay. The client it drops is
+   * gone, so no reply is sent: `#cancelApproval` settles the requests of a client that still waits.
    */
   clearApprovals(client?: AgentClient): void {
     for (const [requestId, pending] of this.#approvals) {
@@ -1526,6 +1527,34 @@ export class AttentionRegistry {
       this.#approvals.delete(requestId);
       pending.decide?.("cancel");
       this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+    }
+  }
+
+  /**
+   * Ends one approval that nothing will answer. A built-in tool takes its own "cancel". A hosted-site
+   * change stays with the site service, which answers that request. Every other approval waits inside
+   * the provider's app-server, which keeps waiting after the card is gone unless it gets a reply, so it
+   * gets the decline that `respondToApproval` sends. A write that fails reaches a provider that already
+   * went away, which is not an error for the user.
+   */
+  #cancelApproval(pending: PendingApproval): void {
+    if (pending.decide) {
+      pending.decide("cancel");
+      return;
+    }
+    if (pending.hostedSiteMutation) return;
+    try {
+      pending.client.respond(
+        pending.id,
+        approvalReply(
+          pending.method,
+          pending.params,
+          "decline",
+          "The turn ended before the user answered this request.",
+        ),
+      );
+    } catch (error) {
+      logger.warn("Unable to answer the approval of an ended turn", { error: toLogValue(error) });
     }
   }
 
