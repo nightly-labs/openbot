@@ -3017,7 +3017,10 @@ export class BrowserHost {
           const body = document.body ? getComputedStyle(document.body).backgroundColor : transparent;
           if (body !== transparent) return body;
           const root = getComputedStyle(document.documentElement).backgroundColor;
-          return root !== transparent ? root : "#0b0b0b";
+          if (root !== transparent) return root;
+          // A page without its own background draws on the browser's white canvas, as in other browsers.
+          // The blank page between loads stays dark. A dark color-scheme page paints its own dark canvas.
+          return location.href === "about:blank" ? "#0b0b0b" : "#ffffff";
         })()`,
           true,
         ),
