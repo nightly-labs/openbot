@@ -192,6 +192,29 @@
   -webkit-line-clamp: unset;
 }
 
+.agent-step-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--openbot-space-1);
+}
+
+/* Closed by default, so a failed step still reads as the same progress line until it is opened. */
+.agent-step-error summary {
+  cursor: pointer;
+  color: var(--openbot-text-muted);
+}
+
+.agent-step-error pre {
+  margin: var(--openbot-space-1) 0 0;
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--openbot-font-mono);
+  color: var(--openbot-text-secondary);
+}
+
 .agent-step-memory {
   display: inline-flex;
   flex-wrap: wrap;

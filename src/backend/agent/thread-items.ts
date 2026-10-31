@@ -1,8 +1,14 @@
 import { RequestError } from "@agentclientprotocol/sdk";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import {
+  agentProviderName,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  TOOL_FAILURE_TEXT_LIMIT,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
@@ -378,6 +384,39 @@ export function toolFailed(item: ThreadItem): boolean {
   const status = getString(item, "status");
   const exitCode = item.exitCode;
   return status === "failed" || status === "declined" || (typeof exitCode === "number" && exitCode !== 0);
+}
+
+const FAILURE_TEXT_KEYS = ["message", "text", "output", "stderr", "error", "content", "result"] as const;
+
+/** The readable text inside a provider tool result. Objects are walked a few levels, then dropped. */
+function failureText(value: unknown, depth = 0): string | null {
+  if (depth > 4) return null;
+  if (typeof value === "string") return value.trim() || null;
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((entry) => failureText(entry, depth + 1))
+      .filter((entry): entry is string => entry !== null);
+    return parts.length > 0 ? parts.join("\n") : null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of FAILURE_TEXT_KEYS) {
+    if (!(key in value)) continue;
+    const nested = failureText(value[key], depth + 1);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/**
+ * The error text of a failed tool step, with known secrets removed. A step that did not fail, or
+ * that failed without any text, returns null so the progress line stays as it is.
+ */
+export function toolFailureDetail(item: ThreadItem): string | null {
+  if (!toolFailed(item)) return null;
+  const text = failureText(item.result) ?? failureText(item.aggregatedOutput) ?? failureText(item.error);
+  if (!text) return null;
+  const redacted = redactText(text);
+  return redacted.length > TOOL_FAILURE_TEXT_LIMIT ? `${redacted.slice(0, TOOL_FAILURE_TEXT_LIMIT - 1)}…` : redacted;
 }
 
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */

@@ -19,6 +19,7 @@ import {
 import { isIdentifier } from "./ipc-bounded-values";
 import type { BrowserControlState, BrowserTab } from "./ipc-browser";
 import { type AgentPromptQuestion, isAgentPromptQuestion, isConversationMessage } from "./ipc-conversation-messages";
+import { TOOL_FAILURE_TEXT_LIMIT } from "./ipc-conversation-trace";
 import {
   type ConversationPage,
   type ConversationSnapshot,
@@ -100,7 +101,15 @@ export type AgentEvent =
       createdAt: string;
       revision: number;
     }
-  | { type: "turn-progress"; agentId: string; threadId: string; turnId: string; detail: string }
+  | {
+      type: "turn-progress";
+      agentId: string;
+      threadId: string;
+      turnId: string;
+      detail: string;
+      /** The failed tool's error text. Absent when the step did not fail. */
+      error?: string;
+    }
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | {
       type: "turn-completed";
@@ -273,7 +282,9 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isIdentifier(value.turnId) &&
         isString(value.detail) &&
         value.detail.length > 0 &&
-        value.detail.length <= INPUT_LIMITS.promptQuestion
+        value.detail.length <= INPUT_LIMITS.promptQuestion &&
+        (value.error === undefined ||
+          (isString(value.error) && value.error.length > 0 && value.error.length <= TOOL_FAILURE_TEXT_LIMIT))
       );
     case "turn-started":
     case "turn-completed":
