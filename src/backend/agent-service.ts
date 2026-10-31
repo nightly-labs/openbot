@@ -1521,6 +1521,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
         requestNoUpdate: (agentId, threadId, turnId) => this.#turn.requestNoUpdate(agentId, threadId, turnId),
+        completeQuietRoutineTurn: (client, threadId, turnId) =>
+          this.#turn.completeQuietRoutineTurn(client, threadId, turnId),
         reportRoutineFailure: (agentId, turnId, reason) => this.#turn.reportRoutineFailure(agentId, turnId, reason),
         requestNewChat: (agentId) => {
           this.#requestedNewChats.add(agentId);

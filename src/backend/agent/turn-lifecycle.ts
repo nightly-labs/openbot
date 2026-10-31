@@ -35,6 +35,7 @@ import {
   type DynamicToolCallParams,
   type DynamicToolResult,
   decodeAccountLoginCompletedResult,
+  decodeRecordResponse,
   getArray,
   getRecord,
   getString,
@@ -290,6 +291,8 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
+  /** Quiet tool calls whose provider is being stopped after the tool result was sent. */
+  readonly #quietCompletions = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -374,6 +377,7 @@ export class TurnLifecycle {
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
     this.#noUpdateTurns.clear();
+    this.#quietCompletions.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -691,7 +695,14 @@ export class TurnLifecycle {
         const turn = getRecord(params, "turn");
         const turnId = getString(turn, "id");
         if (!turnId) return;
-        const status = getString(turn, "status") ?? "completed";
+        if (this.hasEnded(turnId)) return;
+        const providerStatus = getString(turn, "status") ?? "completed";
+        const status =
+          providerStatus === "interrupted" &&
+          this.#mayCompleteQuietTurn(agentId, threadId, turnId) &&
+          this.#quietCompletions.has(turnId)
+            ? "completed"
+            : providerStatus;
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -872,6 +883,43 @@ export class TurnLifecycle {
     return this.#quietRoutineTurn(threadId, deliveries) ? "quiet" : "shown";
   }
 
+  /** Stop the provider after the no-update result is sent; no final model answer is needed. */
+  readonly completeQuietRoutineTurn = Effect.fn("TurnLifecycle.completeQuietRoutineTurn")(function* (
+    this: TurnLifecycle,
+    client: AgentClient,
+    threadId: string,
+    turnId: string,
+  ) {
+    const running = this.#runningTurns.get(turnId);
+    if (
+      !running ||
+      running.client !== client ||
+      running.threadId !== threadId ||
+      this.#quietCompletions.has(turnId) ||
+      !this.#mayCompleteQuietTurn(running.agentId, threadId, turnId)
+    )
+      return;
+    this.#quietCompletions.add(turnId);
+    yield* client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          this.#quietCompletions.delete(turnId);
+          logger.warn("Could not stop a quiet routine turn.", { error: failure });
+        }),
+      ),
+    );
+  }).bind(this);
+
+  #mayCompleteQuietTurn(agentId: string, threadId: string, turnId: string): boolean {
+    return (
+      this.#noUpdateTurns.has(turnId) &&
+      !this.#reportedFailures.has(turnId) &&
+      !this.#turnErrors.has(turnId) &&
+      !this.#hooks.turnStopped(agentId, null, turnId) &&
+      this.#quietRoutineTurn(threadId, this.#mailbox.findDeliveriesByTurn(agentId, turnId))
+    );
+  }
+
   /**
    * Records a call to the failure tool; the latest reason wins. False when no routine run started the
    * turn. A flow handoff counts: its call fails that step only, because a handoff has no run of its own.
@@ -898,6 +946,7 @@ export class TurnLifecycle {
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
       const running = this.#runningTurns.get(turnId);
       this.#runningTurns.delete(turnId);
+      this.#quietCompletions.delete(turnId);
       this.#markEnded(turnId);
       this.#completingTurns.add(turnId);
       // A turn that runs again below starts a new trace, so each path takes this one.
