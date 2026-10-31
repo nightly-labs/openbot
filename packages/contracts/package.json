@@ -161,6 +161,7 @@
     "./team-protocol/agent-thread-reads-v1": "./src/team-protocol/agent-thread-reads-v1.ts",
     "./team-protocol/agent-threads-v1": "./src/team-protocol/agent-threads-v1.ts",
     "./team-protocol/agent-session-settings-v1": "./src/team-protocol/agent-session-settings-v1.ts",
+    "./team-protocol/browser-profiles-events-v1": "./src/team-protocol/browser-profiles-events-v1.ts",
     "./team-protocol/browser-profiles-v1": "./src/team-protocol/browser-profiles-v1.ts",
     "./team-protocol/browser-page-state-v1": "./src/team-protocol/browser-page-state-v1.ts",
     "./team-protocol/browser-secret-vault-v1": "./src/team-protocol/browser-secret-vault-v1.ts",

@@ -337,6 +337,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host-Standard (Steuern)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchlauf nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
+  "mobile.agent.browserProfile.label": "Browser-Profil",
+  "mobile.agent.browserProfile.shared": "Gemeinsam",
+  "mobile.agent.browserProfile.own": "Nur dieser Agent",
+  "mobile.agent.browserProfile.missing": "Gelöschtes Profil",
+  "mobile.agent.browserProfile.new": "Neues Profil",
+  "mobile.agent.browserProfile.manage": "Profile verwalten",
+  "mobile.agent.browserProfile.footer":
+    "Jedes Profil hat eigene Anmeldungen und Cookies. Eine Änderung schließt die offenen Tabs des Agenten.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot konnte das Browser-Profil des Agenten nicht ändern.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
   "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.notifications.failed": "Benachrichtigungen konnten nicht geändert werden",

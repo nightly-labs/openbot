@@ -330,6 +330,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Hoststandaard (Bijsturen)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
+  "mobile.agent.browserProfile.label": "Browserprofiel",
+  "mobile.agent.browserProfile.shared": "Gedeeld",
+  "mobile.agent.browserProfile.own": "Alleen deze agent",
+  "mobile.agent.browserProfile.missing": "Verwijderd profiel",
+  "mobile.agent.browserProfile.new": "Nieuw profiel",
+  "mobile.agent.browserProfile.manage": "Profielen beheren",
+  "mobile.agent.browserProfile.footer":
+    "Elk profiel heeft eigen aanmeldingen en cookies. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot kon het browserprofiel van de agent niet wijzigen.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",

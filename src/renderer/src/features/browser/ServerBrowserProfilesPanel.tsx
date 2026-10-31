@@ -15,7 +15,8 @@ export interface ServerBrowserProfilesOptions {
 /**
  * The Browser profiles section of the server settings. It lists the profiles each time it opens,
  * and again when the settings change to another server. The list also counts the agents of the
- * shared profile, and each change lists it again, because a delete moves agents.
+ * shared profile, and each change lists it again, because a delete moves agents. A change made on
+ * another device, such as the phone, shows while the section is open.
  */
 export function ServerBrowserProfilesPanel(
   props: ServerBrowserProfilesOptions & { menuMount: HTMLElement | undefined },
@@ -39,6 +40,10 @@ export function ServerBrowserProfilesPanel(
         () => undefined,
       );
     },
+  );
+  createEffect(
+    () => props.store,
+    (store) => store.follow(),
   );
   return (
     <BrowserProfilesPanel

@@ -21,6 +21,7 @@ import {
   useAgentAdminSettings,
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
+import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
 import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
@@ -109,6 +110,7 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageBrowserProfiles,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
@@ -120,7 +122,10 @@ function AgentForm({
   // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
-    Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+    Boolean(agent.workspacePath) ||
+    canStartNewChat(agent.serverId) ||
+    canManageAgentHostSettings(agent.serverId) ||
+    canManageBrowserProfiles(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -380,6 +385,8 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
+          {/* After the busy message, as in the desktop Advanced group. */}
+          <AgentBrowserProfileRow agent={agent} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
               <SettingsRow>

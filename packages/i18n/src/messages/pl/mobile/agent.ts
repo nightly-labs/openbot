@@ -351,6 +351,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Domyślne hosta (Pokieruj)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
+  "mobile.agent.browserProfile.label": "Profil przeglądarki",
+  "mobile.agent.browserProfile.shared": "Wspólny",
+  "mobile.agent.browserProfile.own": "Tylko ten agent",
+  "mobile.agent.browserProfile.missing": "Usunięty profil",
+  "mobile.agent.browserProfile.new": "Nowy profil",
+  "mobile.agent.browserProfile.manage": "Zarządzaj profilami",
+  "mobile.agent.browserProfile.footer":
+    "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki agenta.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
   "mobile.agent.notifications.failed": "Nie udało się zmienić powiadomień",

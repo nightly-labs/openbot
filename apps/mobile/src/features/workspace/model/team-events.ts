@@ -108,6 +108,14 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "session-settings",
     });
   }
+  if (event.type === "browser-profiles-changed") {
+    // A change on the desktop or another phone: the profile list and each agent's choice read again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.agentInfo(scope, serverId),
+      predicate: (query) => query.queryKey.at(-1) === "browser-profile",
+    });
+  }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });

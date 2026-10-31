@@ -17,6 +17,7 @@ import { ServerStatusLabel } from "@/features/servers/components/server-status-l
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
+import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
@@ -53,6 +54,7 @@ export function ServerSettingsScreen() {
     canManageOnePasswordConnector,
     canManageBitwardenConnector,
     canManageVault,
+    canManageBrowserProfiles,
     canReadServerStorage,
     canManageProviders,
     canManageMcpServers,
@@ -165,13 +167,17 @@ export function ServerSettingsScreen() {
           ) : null}
         </SettingsSection>
       ) : null}
-      {canManageVault(serverId) || canViewHostedSites(serverId) || canReadServerStorage(serverId) ? (
+      {canManageVault(serverId) ||
+      canManageBrowserProfiles(serverId) ||
+      canViewHostedSites(serverId) ||
+      canReadServerStorage(serverId) ? (
         <SettingsSection title={t("mobile.server.settings.dataSection")}>
           {canManageVault(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/vault", params: { serverId } })}>
               <Typography.Paragraph>{t("mobile.server.settings.vault")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
+          {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
           {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
           {canReadServerStorage(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/storage", params: { serverId } })}>
@@ -472,6 +478,20 @@ function ServerMcpRow({ serverId }: { serverId: string }) {
       onPress={() => router.push({ pathname: "/server-settings/mcp", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.mcp")}</Typography.Paragraph>
+    </SettingsRow>
+  );
+}
+
+/** The Browser profiles row, for an owner or admin of a host that serves `browser-profiles-v1`. */
+function ServerBrowserProfilesRow({ serverId }: { serverId: string }) {
+  const { t } = useText();
+  const { profiles } = useServerBrowserProfiles(serverId);
+  return (
+    <SettingsRow
+      trailing={profiles ? <TrailingValue value={String(profiles.length)} /> : undefined}
+      onPress={() => router.push({ pathname: "/server-settings/browser-profiles", params: { serverId } })}
+    >
+      <Typography.Paragraph>{t("mobile.server.route.browserProfiles")}</Typography.Paragraph>
     </SettingsRow>
   );
 }

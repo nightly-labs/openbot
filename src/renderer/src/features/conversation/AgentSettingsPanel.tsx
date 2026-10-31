@@ -157,6 +157,29 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         .catch(failed);
     },
   );
+  // A change made on another device, such as the phone, shows while the settings are open. The
+  // choice of an agent on this computer comes with its summary.
+  createEffect(
+    () => ({
+      store: props.workspaceCovered === true ? undefined : browserProfiles(),
+      agentId: props.agent.id,
+      local: props.localHost === true,
+    }),
+    ({ store, agentId, local }) => {
+      if (!store) return;
+      return store.follow(() => {
+        const calls = props.browserProfileCalls;
+        if (local || !calls) return;
+        const request = ++choiceRequest;
+        calls.readAgent(agentId).then(
+          (choice) => {
+            if (request === choiceRequest) setHostChoice(choice);
+          },
+          () => undefined,
+        );
+      });
+    },
+  );
   const browserProfileOptions = (): AgentBrowserProfileOptions | undefined => {
     const store = browserProfiles();
     const manage = props.onManageBrowserProfiles;

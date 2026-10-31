@@ -324,6 +324,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "호스트 기본값 (방향 지시)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider}은(는) 진행 중인 턴에 방향을 지시할 수 없어요. 작업 중에 보낸 메시지는 대기열에서 기다려요.",
+  "mobile.agent.browserProfile.label": "브라우저 프로필",
+  "mobile.agent.browserProfile.shared": "공유",
+  "mobile.agent.browserProfile.own": "이 에이전트만",
+  "mobile.agent.browserProfile.missing": "삭제된 프로필",
+  "mobile.agent.browserProfile.new": "새 프로필",
+  "mobile.agent.browserProfile.manage": "프로필 관리",
+  "mobile.agent.browserProfile.footer":
+    "각 프로필은 자체 로그인과 쿠키를 보관합니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot이 에이전트의 브라우저 프로필을 변경하지 못했습니다.",
   "mobile.agent.workspace.title": "워크스페이스 폴더",
   "mobile.agent.workspace.footer": "호스트 컴퓨터에 있는 이 에이전트의 폴더예요.",
   "mobile.agent.notifications.failed": "알림을 변경할 수 없어요",

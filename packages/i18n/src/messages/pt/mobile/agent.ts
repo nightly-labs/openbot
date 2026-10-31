@@ -334,6 +334,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Padrão do anfitrião (Orientar)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. Mensagens enviadas enquanto ele trabalha esperam na fila.",
+  "mobile.agent.browserProfile.label": "Perfil do navegador",
+  "mobile.agent.browserProfile.shared": "Compartilhado",
+  "mobile.agent.browserProfile.own": "Só este agente",
+  "mobile.agent.browserProfile.missing": "Perfil excluído",
+  "mobile.agent.browserProfile.new": "Novo perfil",
+  "mobile.agent.browserProfile.manage": "Gerenciar perfis",
+  "mobile.agent.browserProfile.footer":
+    "Cada perfil guarda seus próprios logins e cookies. Uma alteração fecha as abas abertas do agente.",
+  "mobile.agent.browserProfile.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador do agente.",
   "mobile.agent.workspace.title": "Pasta do espaço de trabalho",
   "mobile.agent.workspace.footer": "A pasta deste agente no computador anfitrião.",
   "mobile.agent.notifications.failed": "Não foi possível alterar as notificações",

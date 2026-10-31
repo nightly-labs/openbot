@@ -353,6 +353,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Направлять (по умолчанию на хосте)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
+  "mobile.agent.browserProfile.label": "Профиль браузера",
+  "mobile.agent.browserProfile.shared": "Общий",
+  "mobile.agent.browserProfile.own": "Только этот агент",
+  "mobile.agent.browserProfile.missing": "Удалённый профиль",
+  "mobile.agent.browserProfile.new": "Новый профиль",
+  "mobile.agent.browserProfile.manage": "Управлять профилями",
+  "mobile.agent.browserProfile.footer":
+    "Каждый профиль хранит свои входы и файлы cookie. Изменение закрывает открытые вкладки агента.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot не удалось изменить профиль браузера агента.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.notifications.failed": "Не удалось изменить уведомления",

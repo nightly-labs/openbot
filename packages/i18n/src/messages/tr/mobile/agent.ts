@@ -340,6 +340,15 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Ana makine varsayılanı (Yönlendir)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "mobile.agent.browserProfile.label": "Tarayıcı profili",
+  "mobile.agent.browserProfile.shared": "Ortak",
+  "mobile.agent.browserProfile.own": "Yalnızca bu ajan",
+  "mobile.agent.browserProfile.missing": "Silinmiş profil",
+  "mobile.agent.browserProfile.new": "Yeni profil",
+  "mobile.agent.browserProfile.manage": "Profilleri yönet",
+  "mobile.agent.browserProfile.footer":
+    "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",
