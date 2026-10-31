@@ -186,10 +186,11 @@ export function TurnThinkingScreen() {
   const opened = useRef(false);
   const placed = useRef(false);
   const follow = useCallback(() => {
-    if (!running || viewportHeight.current === 0 || contentHeight.current <= viewportHeight.current) return;
-    // The first scroll puts the sheet at the end at once. After it, a new step slides into view.
+    if (!running || viewportHeight.current === 0 || contentHeight.current === 0) return;
+    // The first measured pass puts the sheet at the end at once. After it, a new step slides into view.
     const first = !placed.current;
     placed.current = true;
+    if (contentHeight.current <= viewportHeight.current) return;
     if (following.current) scroll.current?.scrollToEnd({ animated: !first && !reducedMotion });
     else setBehind(true);
   }, [running, reducedMotion]);
