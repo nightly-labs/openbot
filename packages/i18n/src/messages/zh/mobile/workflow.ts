@@ -67,6 +67,8 @@ export const messages = {
   "mobile.workflow.trigger.webhookHint": "在其地址收到请求时运行。",
   "mobile.workflow.trigger.message": "消息",
   "mobile.workflow.trigger.messageHint": "在电脑上的 OpenBot 中修改此触发器。",
+  "mobile.workflow.trigger.github": "GitHub",
+  "mobile.workflow.trigger.githubHint": "在 GitHub 仓库中发生事件时运行。",
   "mobile.workflow.trigger.startsWhen": "启动方式",
   "mobile.workflow.trigger.timezone": "时区：{zone}",
   "mobile.workflow.trigger.serverZone": "定时使用服务器的时区。",

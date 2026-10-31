@@ -39,10 +39,10 @@ export type WorkflowPortType = (typeof WORKFLOW_PORT_TYPES)[number];
 export const WORKFLOW_BRANCHES = ["yes", "no"] as const;
 export type WorkflowBranch = (typeof WORKFLOW_BRANCHES)[number];
 
-export const WORKFLOW_TRIGGER_TYPES = ["manual", "schedule", "webhook", "message"] as const;
+export const WORKFLOW_TRIGGER_TYPES = ["manual", "schedule", "webhook", "message", "github"] as const;
 export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
 
-export const WORKFLOW_OUTPUT_TARGETS = ["notify", "channel", "file"] as const;
+export const WORKFLOW_OUTPUT_TARGETS = ["notify", "channel", "file", "github"] as const;
 export type WorkflowOutputTarget = (typeof WORKFLOW_OUTPUT_TARGETS)[number];
 
 /** A value that a node keeps: a text, a choice, a number or a switch. */
@@ -51,11 +51,16 @@ export type WorkflowFieldValue = string | number | boolean;
 /**
  * The fields of a node, by name. The host reads only the names its runtime needs:
  * - trigger: `trigger` (a `WorkflowTriggerType`) and `timezone`; the schedule is `WorkflowNode.schedule`.
+ *   For `github`: `repository` ("owner/name"), `event` (a `WorkflowGitHubEvent`), `filters` and `labels`
+ *   (lists, one name a line), `titleText` and `branch` (the values of those filters).
  * - agent: `agentId`, `task`.
  * - llm: `provider`, `model`, `effort`, `prompt`, `system`.
  * - condition: `rule`, the yes-or-no question about its input.
  * - approval: `question`.
- * - output: `target` (a `WorkflowOutputTarget`); for `channel`, `connectionId` and `placeId`.
+ * - output: `target` (a `WorkflowOutputTarget`); for `channel`, `connectionId` and `placeId`. For
+ *   `github`: `repository` ("owner/name", or "trigger" for the trigger's), `item` ("event" for the item
+ *   of the event, "input" for the number in the input), `action` (a `WorkflowGitHubAction`), `labels`
+ *   (a list), `labelsFrom` and `person` ("agent" when the agent chooses), `reason` and `title`.
  * - prompt: `text`.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
@@ -241,7 +246,7 @@ export type WorkflowRunStatus = (typeof WORKFLOW_RUN_STATUSES)[number];
 export const WORKFLOW_STEP_STATUSES = ["running", "approval", "done", "failed", "stopped", "skipped"] as const;
 export type WorkflowStepStatus = (typeof WORKFLOW_STEP_STATUSES)[number];
 
-export const WORKFLOW_RUN_SOURCES = ["manual", "schedule", "webhook"] as const;
+export const WORKFLOW_RUN_SOURCES = ["manual", "schedule", "webhook", "github"] as const;
 export type WorkflowRunSource = (typeof WORKFLOW_RUN_SOURCES)[number];
 
 export const WORKFLOW_VERSION_KINDS = ["auto", "restore", "run"] as const;

@@ -70,6 +70,8 @@ export const messages = {
   "mobile.workflow.trigger.webhookHint": "Si esegue quando il suo indirizzo riceve una richiesta.",
   "mobile.workflow.trigger.message": "Messaggio",
   "mobile.workflow.trigger.messageHint": "Modifica questo trigger in OpenBot sul computer.",
+  "mobile.workflow.trigger.github": "GitHub",
+  "mobile.workflow.trigger.githubHint": "Si esegue quando succede qualcosa in un repository GitHub.",
   "mobile.workflow.trigger.startsWhen": "Avvio",
   "mobile.workflow.trigger.timezone": "Fuso orario: {zone}",
   "mobile.workflow.trigger.serverZone": "La pianificazione usa il fuso orario del server.",

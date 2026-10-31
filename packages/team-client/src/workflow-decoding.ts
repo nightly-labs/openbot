@@ -2,7 +2,8 @@
 // carries kinds and statuses as open names, so a newer host can add one. The decoders below map a
 // name that this app does not know to a known one before the closed IPC guards run: a status or a
 // source to the nearest neutral value, and a node kind or a port type to a locked note that the app
-// shows but does not save.
+// shows but does not save. A trigger type or an output target that it does not know keeps its node,
+// but the app shows the workflow read-only, as a save from a choice that falls back would change it.
 
 import {
   isWorkflowDetail,
@@ -15,6 +16,7 @@ import {
   isWorkflowVersion,
   isWorkflowWebhookSecret,
   WORKFLOW_NODE_KINDS,
+  WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
@@ -63,15 +65,25 @@ const version = onRecord((record) => withKnown(record, "kind", WORKFLOW_VERSION_
 
 const trigger = onRecord((record) => withKnown(record, "type", WORKFLOW_TRIGGER_TYPES, "manual"));
 
+/** A trigger type or an output target that this app does not know. */
+function hasUnknownSetting(node: Json): boolean {
+  const fields = isDynamicRecord(node.fields) ? node.fields : {};
+  if (node.kind === "trigger") return isUnknownName(WORKFLOW_TRIGGER_TYPES, fields.trigger);
+  if (node.kind === "output") return isUnknownName(WORKFLOW_OUTPUT_TARGETS, fields.target);
+  return false;
+}
+
 /**
  * The detail with each node of an unknown kind as a locked note in its place, without the edges of
- * such nodes and the edges of an unknown port type, and marked so the app does not save it.
+ * such nodes and the edges of an unknown port type, and marked so the app does not save it. A node
+ * with an unknown trigger type or output target stays, and it also marks the detail.
  */
 const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return base;
   const placeholders = new Set<unknown>();
+  const settings = graph.nodes.some((node) => isDynamicRecord(node) && hasUnknownSetting(node));
   const nodes = graph.nodes.map(
     onRecord((node) => {
       if (!isUnknownName(WORKFLOW_NODE_KINDS, node.kind)) return node;
@@ -85,7 +97,7 @@ const detail = onRecord((record) => {
       !isDynamicRecord(edge) ||
       !(isUnknownName(WORKFLOW_PORT_TYPES, edge.type) || placeholders.has(edge.from) || placeholders.has(edge.to)),
   );
-  const newer = placeholders.size > 0 || edges.length < graph.edges.length;
+  const newer = settings || placeholders.size > 0 || edges.length < graph.edges.length;
   return { ...base, graph: { ...graph, nodes, edges }, ...(newer ? { needsNewerApp: true } : {}) };
 });
 

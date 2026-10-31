@@ -82,6 +82,7 @@ export * from "./ipc-storage";
 export * from "./ipc-team-host";
 export * from "./ipc-vault";
 export * from "./ipc-voice";
+export * from "./ipc-workflow-github";
 export * from "./ipc-workflows";
 export * from "./marketplace-suggestion-events";
 export * from "./mcp-sign-in-events";

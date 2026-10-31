@@ -4,6 +4,7 @@ import Bot from "lucide-react-native/icons/bot";
 import Clock from "lucide-react-native/icons/clock";
 import File from "lucide-react-native/icons/file";
 import GitBranch from "lucide-react-native/icons/git-branch";
+import GitPullRequest from "lucide-react-native/icons/git-pull-request";
 import Image from "lucide-react-native/icons/image";
 import MessageSquare from "lucide-react-native/icons/message-square";
 import MessageSquareText from "lucide-react-native/icons/message-square-text";
@@ -52,6 +53,7 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   schedule: Clock,
   webhook: Webhook,
   message: MessageSquare,
+  github: GitPullRequest,
 };
 
 /** The icon of a step on its colour, as the desktop canvas marks each kind. */
