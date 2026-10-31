@@ -209,6 +209,7 @@
     "test:acp-mcp-shared-token": "bun scripts/acp-mcp-shared-token-e2e.ts",
     "test:acp-turn-stall": "bun scripts/acp-turn-stall-e2e.ts",
     "test:acp-instructions-once": "bun scripts/acp-instructions-once-e2e.ts",
+    "test:acp-audio-input": "bun scripts/acp-audio-input-e2e.ts",
     "test:grok-steer": "bun scripts/grok-steer-e2e.ts",
     "test:pi-steer": "bun scripts/pi-steer-e2e.ts",
     "test:custom-provider-pi": "bun scripts/custom-provider-pi-harness-e2e.ts",

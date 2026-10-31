@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import {
   type ClientSideConnection,
   type ContentBlock,
@@ -103,6 +103,12 @@ const SESSION_LIST_PAGES = 50;
 
 /** Maximum replay work waiting for the storage consumer before the import fails safely. */
 const ACP_HISTORY_REPLAY_QUEUE_LIMIT = 256;
+
+/**
+ * The audio bytes one prompt sends inline to an agent that advertises audio input. Gemini takes
+ * inline data up to about 20 MB a request. Audio over the limit reaches the agent as its path only.
+ */
+const ACP_PROMPT_AUDIO_BYTES = 20 * 1024 * 1024;
 
 /**
  * How long a turn may send nothing, with no tool call open and no question to the user, before
@@ -1084,7 +1090,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // as a turn of its own, which OpenBot did not start. The message then waits in the queue.
         if (!thread || !turn || turn.id !== getString(params, "expectedTurnId") || turn.stopped || turn.completing)
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
-        const blocks = yield* promptBlocksEffect(params);
+        const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
         yield* steer(this.#sessionConnection(thread), {
           sessionId: threadId,
           messageId: getString(params, "clientUserMessageId"),
@@ -1359,6 +1365,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Whether the agent answers `session/load`, which it advertises in its initialization. */
   get #loadsSessions(): boolean {
     return this.#initialization?.agentCapabilities?.loadSession === true;
+  }
+
+  /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
+  get #acceptsAudio(): boolean {
+    return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
   }
 
   /** Whether the agent can resume without replaying its transcript. */
@@ -1949,7 +1960,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
     const turnId = getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID();
-    const blocks = yield* promptBlocksEffect(params);
+    const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
     yield* providerSync(() => this.#requireServedModel(thread));
     // The session keeps the instructions in its context, so a prompt carries them only when the
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
@@ -2976,13 +2987,26 @@ function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
   );
 }
 
-const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown) {
+/**
+ * The ACP blocks of a prompt. An agent that advertises audio input also gets attached audio as an
+ * audio block, so the model hears it. The path stays in the prompt for the agent's tools.
+ */
+const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown, acceptsAudio: boolean) {
   const blocks: ContentBlock[] = [];
+  let audioBytes = 0;
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
     if (item.type === "mention" && isString(item.path)) {
-      blocks.push({ type: "text", text: `Attached local file: ${item.path}` });
+      const path = item.path;
+      blocks.push({ type: "text", text: `Attached local file: ${path}` });
+      const mimeType = attachmentMimeTypeForName(path);
+      if (!acceptsAudio || !mimeType.startsWith("audio/")) continue;
+      const { size } = yield* providerCall(() => stat(path));
+      if (audioBytes + size > ACP_PROMPT_AUDIO_BYTES) continue;
+      const data = yield* providerCall(() => readFile(path));
+      audioBytes += data.byteLength;
+      blocks.push({ type: "audio", data: data.toString("base64"), mimeType });
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;
