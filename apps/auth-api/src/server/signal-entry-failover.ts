@@ -21,7 +21,7 @@ export type SignalEntryBindings = Pick<
 
 export type SignalEntryFetch = (input: string, init: RequestInit) => Promise<Response>;
 
-export type SignalEntryCheck =
+type SignalEntryCheck =
   | { status: "off" }
   /** The DNS records do not show one entry machine. The check changes nothing. */
   | { status: "unknown"; reason: "entry_record" | "entry_address" }
@@ -31,7 +31,7 @@ export type SignalEntryCheck =
   | { status: "moved"; from: string; to: string };
 
 /** The Cloudflare API refused a request or did not answer. The token and the answer text are not kept. */
-export class SignalEntryDnsError extends Schema.TaggedError<SignalEntryDnsError>()("SignalEntryDnsError", {
+class SignalEntryDnsError extends Schema.TaggedError<SignalEntryDnsError>()("SignalEntryDnsError", {
   operation: Schema.Literals(["list", "update"]),
   status: Schema.Number,
 }) {}
