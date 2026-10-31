@@ -466,11 +466,12 @@ export class SignalIngress implements MessagingIngress {
     const discord = this.#holds("discord");
     const telegram = this.#holds("telegram");
     const webhooks = this.#webhookHolders > 0;
+    const github = this.#githubHolders > 0;
     let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
       ? account.webhookRoute(hostId)
       : Effect.succeed(null);
-    // A failed webhook ticket must not stop Slack and Discord: the socket then connects without it.
-    if (webhooks && (slack || discord))
+    // A failed webhook ticket must not stop the other routes: the socket then connects without it.
+    if (webhooks && (slack || discord || telegram || github))
       webhookTicket = webhookTicket.pipe(
         Effect.catch(() =>
           Effect.sync(() => {
@@ -479,12 +480,11 @@ export class SignalIngress implements MessagingIngress {
           }),
         ),
       );
-    const github = this.#githubHolders > 0;
     let githubTicket: Effect.Effect<string | null, RemoteWorkflowError> = github
       ? account.githubRoute(hostId)
       : Effect.succeed(null);
     // A failed GitHub ticket, such as a GitHub sign-in that expired, must not stop the other routes.
-    if (github && (slack || discord || webhooks))
+    if (github && (slack || discord || telegram || webhooks))
       githubTicket = githubTicket.pipe(
         Effect.catch(() =>
           Effect.sync(() => {

@@ -130,14 +130,26 @@ export function githubOutputInput(inputs: readonly string[]): string {
   return [text, ...events].filter(Boolean).join("\n\n").slice(0, INPUT_LIMITS.workflowStepInput);
 }
 
-/** The input without the framed events of triggers. */
+/** The name that `inputText` puts before each input it joins, with no text after it. */
+const EMPTY_INPUT_NAME = /(?<=^|\n)Input \d+:\s*(?=Input \d+:\n|$)/gu;
+const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
+
+/**
+ * The input without the framed events of triggers. A loop joins the event into the input of a later
+ * pass, so the names of the joined inputs go with their events, and one text that stays keeps no name.
+ */
 function withoutEvents(input: string): string {
   let text = input;
   for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
     const end = text.indexOf(EXTERNAL_EVENT_END, start);
     text = text.slice(0, start) + (end < 0 ? "" : text.slice(end + EXTERNAL_EVENT_END.length));
   }
-  return text;
+  if (text === input) return text;
+  text = text.replace(EMPTY_INPUT_NAME, "");
+  const names = text.match(INPUT_NAME) ?? [];
+  const rest = text.trimStart();
+  const name = names.length === 1 ? names[0] : undefined;
+  return name && rest.startsWith(name) ? rest.slice(name.length) : text;
 }
 
 /** The question that lets a model choose from the repository's own labels and people. */

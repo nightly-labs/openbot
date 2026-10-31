@@ -17,8 +17,8 @@ import type { DatabaseSync } from "node:sqlite";
 // the row starts or is skipped; `caused_by_bot` lets the loop guard count the run that the row starts.
 // The host keeps the newest 50 rows of each trigger.
 //
-// `workflow_github_actions`: one change that a GitHub output made, keyed by run and node (by step for a
-// step that runs alone, without a run), so a retry does not make it a second time. `sending` is written
+// `workflow_github_actions`: one change that a GitHub output made, keyed by run, node and pass (by step
+// for a step that runs alone, without a run), so a retry does not make it a second time. `sending` is written
 // before the call; a restart that finds it calls again only for a change that a second call does not
 // repeat, such as a label. `object_id` holds the keys of what the change made, one a line: the comment,
 // review or issue that GitHub made, or the labels, people and state it set. The loop guard reads them

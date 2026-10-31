@@ -1,16 +1,17 @@
 // Checks the GitHub triggers of workflows on the real SQLite and the real workflow service, on a
-// temporary profile. The events go through `receiveGitHubDelivery`, as the ingress socket gives them:
-// a comment starts a run; a second comment on the same issue waits and starts when the first run ends;
-// a comment on another issue runs at the same time; the same delivery again records nothing; a bot
-// that is not OpenBot's is refused by "not a bot"; an echo of the workflow's own comment is skipped
-// (`self`); the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an
-// event of a repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close
-// times offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output
-// posts once, with the text of the step before it and not the event, and the event of that comment is
-// skipped (`self`); a comment output with only the trigger's event posts nothing; a change that is done already is not
-// made again; "Agent chooses" gives the repository's own label; a restart while a comment is on its way
-// does not post it again, but sends a label again; "Run with last event" starts a run with the newest
-// matching item. No app, provider, account, Signal or network is started.
+// temporary profile. The events go through `receiveGitHubDelivery`, as the ingress socket gives them: a
+// comment starts a run; a second comment on the same issue waits and starts when the first run ends; a
+// comment on another issue runs at the same time; the same delivery again records nothing; a bot that is
+// not OpenBot's is refused by "not a bot"; an echo of the workflow's own comment is skipped (`self`);
+// the fourth run of a chain that OpenBot's bot caused on one issue is skipped (`chain`); an event of a
+// repository that no trigger watches gets 404 and a body that is not JSON gets 400; two close times
+// offline are one gap. A fake GitHub API takes the changes of GitHub outputs: a comment output posts
+// once, with the text of the step before it and not the event, and the event of that comment is skipped
+// (`self`); a comment output with only the trigger's event posts nothing; a change that is done already
+// is not made again; each pass of a loop posts its own comment; "Agent chooses" gives the repository's
+// own label; a restart while a comment is on its way does not post it again, but sends a label again;
+// "Run with last event" starts a run with the newest matching item. No app, provider, account, Signal or
+// network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
 // Writes .openbot-build/github-workflow-e2e/report.json and exits non-zero on a failure.
@@ -356,7 +357,7 @@ try {
          object_id, created_at, updated_at)
        VALUES (?, ?, ?, 'earlier', 'acme/hold', 6, 'comment', 'done', 'comment:1', ?, ?)`,
     )
-    .run(`${holdRun}:out`, hold.summary.id, holdRun, doneAt, doneAt);
+    .run(`${holdRun}:out:0`, hold.summary.id, holdRun, doneAt, doneAt);
   const holdApproval = (await run(workflows.run(holdRun))).steps.find((step) => step.status === "approval");
   await run(workflows.decide({ stepId: holdApproval?.id ?? "", approved: true }));
   const holdEnd = await runEnd(holdRun);
@@ -378,6 +379,56 @@ try {
       rawStep?.error === sourceText("error.workflow.githubEventText") &&
       !changes.some((change) => change.repository === "acme/raw"),
     { rawEnd, rawStep },
+  );
+
+  // Each pass of a loop makes its own change.
+  const loopLine = lineOf("acme/loop", [
+    { id: "review", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Review?" } },
+    { id: "again", kind: "approval", at: { x: 450, y: 0 }, fields: { question: "Again?" } },
+    githubOutput({ action: "comment" }),
+  ]);
+  const loop = await run(
+    workflows.create({
+      title: "Loop",
+      graph: saying({
+        ...loopLine,
+        edges: [...loopLine.edges, { id: "edge-loop", from: "again", to: "review", type: "text" }],
+      }),
+    }),
+  );
+  const loopRun = await startedRun(loop.summary.id, comment("acme/loop", 10, "ana").body);
+  const loopPosts = () => changes.filter((change) => change.repository === "acme/loop");
+  /** Waits until `ready` is true, at each turn of the event loop. */
+  const until = async (ready: () => boolean | Promise<boolean>) => {
+    const deadline = Date.now() + 5_000;
+    while (!(await ready())) {
+      if (Date.now() > deadline) throw new Error("The loop run did not get to the next state.");
+      await new Promise((done) => setImmediate(done));
+    }
+  };
+  /** Decides the step of `nodeId` that waits for a decision. */
+  const decideAt = async (nodeId: string, approved: boolean) => {
+    let stepId = "";
+    await until(async () => {
+      const step = (await run(workflows.run(loopRun))).steps.find(
+        (candidate) => candidate.nodeId === nodeId && candidate.status === "approval",
+      );
+      stepId = step?.id ?? "";
+      return step !== undefined;
+    });
+    await run(workflows.decide({ stepId, approved }));
+  };
+  for (const pass of [1, 2]) {
+    await decideAt("review", true);
+    await decideAt("again", true);
+    await until(() => loopPosts().length === pass);
+  }
+  await decideAt("review", false);
+  const loopEnd = await runEnd(loopRun);
+  check(
+    "each pass of a loop posts its own comment",
+    loopEnd.status === "stopped" && loopPosts().length === 2 && loopPosts().every((change) => change.body === SAY),
+    { loopEnd, posts: loopPosts() },
   );
 
   const label = await run(

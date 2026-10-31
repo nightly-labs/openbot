@@ -15,6 +15,7 @@ import {
   type McpServerConfig,
   type WorkflowGitHubCatalog,
 } from "@openbot/contracts/ipc";
+import { GITHUB_ROUTE_EVENTS } from "@openbot/contracts/signal-protocol/github-route";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, type Layer, Result, Scope, Semaphore } from "effect";
@@ -62,8 +63,6 @@ const MAX_LISTED_REPOSITORIES = 500;
 const githubInstallationsSchema = z.object({
   installations: z.array(z.object({ id: z.number(), events: z.array(z.string()).optional() })),
 });
-/** The App events that GitHub triggers need. An installation without one of them cannot start every trigger. */
-const WORKFLOW_GITHUB_APP_EVENTS = ["issues", "issue_comment", "pull_request", "pull_request_review", "check_suite"];
 
 /** A repository of an installation, and whether that installation sends every event that triggers need. */
 interface InstallationRepository extends GitHubConnectorRepository {
@@ -667,7 +666,8 @@ export class GitHubConnectorService {
     for (const installation of installations) {
       // An answer without the list of events does not show that the installation sends them.
       const subscribed = installation.events ?? [];
-      const events = WORKFLOW_GITHUB_APP_EVENTS.every((event) => subscribed.includes(event));
+      // An installation without one of the events that triggers need cannot start every trigger.
+      const events = GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event));
       for (let page = 1; ; page += 1) {
         const answer = yield* this.#getGitHubEffect(
           `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,

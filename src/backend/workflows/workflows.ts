@@ -529,9 +529,18 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
         };
 
-        /** The key of a GitHub output's change: one for each node of a run, or one for a step that runs alone. */
-        const githubActionKey = (step: StoredWorkflowStep) =>
-          step.runId ? `${step.runId}:${step.nodeId}` : `step:${step.id}`;
+        /**
+         * The key of a GitHub output's change: one for each pass of a node through a run, or one for a step
+         * that runs alone. A loop brings the node back after a done step, so that pass gets a new key; a
+         * retry or a restart of the same pass keeps it, and does not make the change a second time.
+         */
+        const githubActionKey = (step: StoredWorkflowStep) => {
+          if (!step.runId) return `step:${step.id}`;
+          const pass = runs
+            .steps(step.runId)
+            .filter((other) => other.nodeId === step.nodeId && other.status === "done" && other.id !== step.id).length;
+          return `${step.runId}:${step.nodeId}:${pass}`;
+        };
 
         /**
          * Makes the change of a GitHub output in a fiber of its own; the pass does not wait for it. When the
