@@ -78,7 +78,7 @@ be mixed into current conversion or reliability metrics.
   service sends an OpenPanel `identify` with the account ID and the normalized account email from D1.
   The app analytics preference does not stop it. The email stays a profile trait and is not in the
   event. An account that paid before this change gets its email at its next payment or plan change;
-  the identity backfill below can set it earlier. `bun run test:paid-account-identity` checks this.
+  the identity backfill below can set it earlier. `bun run test:paid-account-identity` checks this in `check:api`.
 - The Signal host (`signal`) sends `signal_capacity` from its capacity reporter, with the same server
   client and no `profileId`. It has counts only: no account, address, session or room.
 - OpenPanel receives the central account ID as `profileId` and the normalized account email as the
