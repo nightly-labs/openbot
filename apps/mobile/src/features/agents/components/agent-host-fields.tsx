@@ -44,41 +44,47 @@ interface AgentHostFieldsProps {
 }
 
 /**
- * Computer Use, local scripts and the busy-message mode of an agent, read from and saved on its host.
- * Only an owner or admin sees them, and only when the host serves `agent-host-settings-v1`. The host
- * checks the role again on every call. A change saves at once, as on desktop, and does not wait for
- * the sheet's Save action. The control shows the new value during the save and goes back on a failure.
+ * One group of agent settings that the host keeps, read from and saved on the host. Only an owner or
+ * admin sees them, and only when the host serves their capability: a host without it answers null.
+ * The host checks the role again on every call. A change saves at once, as on desktop, and does not
+ * wait for the sheet's Save action. The control shows the new value during the save and goes back on
+ * a failure.
  */
-function useAgentHostSettings({ agent, server, available }: AgentHostFieldsProps) {
+function useAgentSetting<Settings extends object, Input extends Partial<Settings>>(
+  { agent, server, available }: AgentHostFieldsProps,
+  part: "host" | "new-chat",
+  load: () => Promise<Settings | null>,
+  update: (input: Input) => Promise<Settings>,
+) {
   const { t, errorMessage } = useText();
-  const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canAdminister = canAdministerServer(server?.role);
-  // Under "agent-info" and ending in "host": the host's `agents-changed` event reads it again, so a
-  // change made on another device shows here while the page is open.
-  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "host");
+  // Under "agent-info" and ending in a part of `AGENT_SETTINGS_PARTS`: the host's `agents-changed`
+  // event reads it again, so a change made on another device shows here while the page is open.
+  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, part);
   const settings = useQuery({
     queryKey,
-    queryFn: () => workspace.loadAgentHostSettings(agent.id, agent.serverId),
+    queryFn: load,
     enabled: available && canAdminister,
     retry: false,
     // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
 
-  async function save(current: AgentHostSettings, input: Omit<UpdateAgentHostSettingsInput, "agentId">) {
+  async function save(current: Settings, input: Input) {
     setSaving(true);
     setError(null);
-    queryClient.setQueryData<AgentHostSettings | null>(queryKey, { ...current, ...input });
+    const next: Settings = { ...current, ...input };
+    queryClient.setQueryData<Settings | null>(queryKey, next);
     try {
-      const saved = await workspace.updateAgentHostSettings({ agentId: agent.id, ...input }, agent.serverId);
-      queryClient.setQueryData<AgentHostSettings | null>(queryKey, saved);
+      const saved = await update(input);
+      queryClient.setQueryData<Settings | null>(queryKey, saved);
       void haptics.notification("success");
     } catch (cause) {
-      queryClient.setQueryData<AgentHostSettings | null>(queryKey, current);
+      queryClient.setQueryData<Settings | null>(queryKey, current);
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.host.failed")));
     } finally {
@@ -86,9 +92,21 @@ function useAgentHostSettings({ agent, server, available }: AgentHostFieldsProps
     }
   }
 
-  // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
+  // A failed read keeps the controls hidden, as for a member.
   const current = canAdminister ? (settings.data ?? null) : null;
   return { current, enabled: available && !saving, error, save };
+}
+
+/** Computer Use, local scripts and the busy-message mode of an agent, on `agent-host-settings-v1`. */
+function useAgentHostSettings(props: AgentHostFieldsProps) {
+  const workspace = useMobileWorkspaceActions();
+  const { agent } = props;
+  return useAgentSetting<AgentHostSettings, Omit<UpdateAgentHostSettingsInput, "agentId">>(
+    props,
+    "host",
+    () => workspace.loadAgentHostSettings(agent.id, agent.serverId),
+    (input) => workspace.updateAgentHostSettings({ agentId: agent.id, ...input }, agent.serverId),
+  );
 }
 
 function SaveError({ error }: { error: string | null }) {
@@ -182,58 +200,31 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
 
 /**
  * Agent info > Advanced: whether the agent starts a new chat itself when its chat gets long, as on
- * desktop. Only an owner or admin sees it, and only when the host serves `agent-new-chat-v1`. The
- * host's `agents-changed` event reads it again, so a change on desktop shows here while the page is
- * open, and a change here shows on desktop at once. The switch saves at once and goes back on a failure.
+ * desktop, on `agent-new-chat-v1`. A change on desktop shows here while the page is open, and a
+ * change here shows on desktop at once.
  */
-export function AgentNewChatAllowedField({ agent, server, available }: AgentHostFieldsProps) {
-  const { t, errorMessage } = useText();
+export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
+  const { t } = useText();
   const { theme } = useUniwind();
   const workspace = useMobileWorkspaceActions();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const canAdminister = canAdministerServer(server?.role);
-  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "new-chat");
-  const settings = useQuery({
-    queryKey,
-    queryFn: () => workspace.loadAgentNewChat(agent.id, agent.serverId),
-    enabled: available && canAdminister,
-    retry: false,
-    staleTime: 0,
-  });
-  const current = canAdminister ? (settings.data ?? null) : null;
+  const { agent } = props;
+  const { current, enabled, error, save } = useAgentSetting<AgentNewChatSettings, AgentNewChatSettings>(
+    props,
+    "new-chat",
+    () => workspace.loadAgentNewChat(agent.id, agent.serverId),
+    (input) => workspace.updateAgentNewChat({ agentId: agent.id, ...input }, agent.serverId),
+  );
   if (!current) return null;
-
-  async function save(previous: AgentNewChatSettings, allowNewChat: boolean) {
-    setSaving(true);
-    setError(null);
-    const next: AgentNewChatSettings = { ...previous, allowNewChat };
-    queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, next);
-    try {
-      const saved = await workspace.updateAgentNewChat({ agentId: agent.id, allowNewChat }, agent.serverId);
-      queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, saved);
-      void haptics.notification("success");
-    } catch (cause) {
-      queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, previous);
-      void haptics.notification("error");
-      setError(errorMessage(cause, t("mobile.agent.host.failed")));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <>
       <SettingsSection footer={t("mobile.agent.agentNewChat.footer")}>
         <SettingsRow>
           <SettingsSwitch
             value={current.allowNewChat}
-            disabled={!available || saving}
+            disabled={!enabled}
             label={t("mobile.agent.agentNewChat.title")}
             dark={theme === "dark"}
-            onValueChange={(allowNewChat) => void save(current, allowNewChat)}
+            onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
           />
         </SettingsRow>
       </SettingsSection>
