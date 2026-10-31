@@ -1,6 +1,6 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import { integerInRange, isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
@@ -94,11 +94,13 @@ export interface AgentTask {
 
 /** Where a branch was copied from. */
 export interface AgentTaskBranch {
-  /**
-   * The source side thread, or null for the agent's own chat. The id stays when the source is deleted,
-   * so a task id that the task list does not have is a deleted source.
-   */
+  /** The source side thread, or null for the agent's own chat. The id stays when the source is deleted. */
   sourceTaskId: string | null;
+  /**
+   * The title of the source side thread when the host read the link. Null for the agent's own chat and
+   * for a deleted source. The task list can leave out an archived source, so its title comes from here.
+   */
+  sourceTitle: string | null;
   /** The message in the source that the person branched from. */
   sourceMessageId: string;
   /** The last copied message in the branch. The copied history ends after it. */
@@ -209,6 +211,7 @@ export function isAgentTaskBranch(value: unknown): value is AgentTaskBranch {
   return (
     isDynamicRecord(value) &&
     (value.sourceTaskId === null || isIdentifier(value.sourceTaskId)) &&
+    isNullableBoundedString(value.sourceTitle, INPUT_LIMITS.agentTaskTitle) &&
     isIdentifier(value.sourceMessageId) &&
     isIdentifier(value.throughMessageId)
   );

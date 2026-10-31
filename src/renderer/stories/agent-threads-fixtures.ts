@@ -34,24 +34,40 @@ const PRICING = thread("pricing", "Pricing page copy", "2026-08-19T09:58:00.000Z
 
 /** A branch of "Pricing page copy" through its headline answer. The menu nests it under its source. */
 const PRICING_SHORT = thread("pricing-short", "Pricing page copy #2", "2026-08-19T10:04:00.000Z", {
-  branch: { sourceTaskId: PRICING.id, sourceMessageId: "pricing-2", throughMessageId: "pricing-short-2" },
+  branch: {
+    sourceTaskId: PRICING.id,
+    sourceTitle: PRICING.title,
+    sourceMessageId: "pricing-2",
+    throughMessageId: "pricing-short-2",
+  },
 });
 
 /** A branch whose source thread was deleted. Its divider has no link. */
 const PRICING_ORPHAN = thread("pricing-orphan", "Pricing FAQ", "2026-08-19T08:20:00.000Z", {
-  branch: { sourceTaskId: "deleted-thread", sourceMessageId: "deleted-2", throughMessageId: "pricing-orphan-2" },
+  branch: {
+    sourceTaskId: "deleted-thread",
+    sourceTitle: null,
+    sourceMessageId: "deleted-2",
+    throughMessageId: "pricing-orphan-2",
+  },
 });
 
 const THREADS: AgentTask[] = [
   PRICING_SHORT,
   PRICING,
   thread("pricing-long", "Pricing page copy #3", "2026-08-19T10:01:00.000Z", {
-    branch: { sourceTaskId: PRICING.id, sourceMessageId: "pricing-2", throughMessageId: "pricing-long-2" },
+    branch: {
+      sourceTaskId: PRICING.id,
+      sourceTitle: PRICING.title,
+      sourceMessageId: "pricing-2",
+      throughMessageId: "pricing-long-2",
+    },
   }),
   // A branch of a branch: the line of "#2" runs on past it to "#3".
   thread("pricing-short-alt", "Pricing page copy #4", "2026-08-19T10:06:00.000Z", {
     branch: {
       sourceTaskId: PRICING_SHORT.id,
+      sourceTitle: PRICING_SHORT.title,
       sourceMessageId: "pricing-short-2",
       throughMessageId: "pricing-short-alt-2",
     },

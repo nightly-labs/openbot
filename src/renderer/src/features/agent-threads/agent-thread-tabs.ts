@@ -415,9 +415,13 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     return true;
   }
 
-  /** Opens a side thread at one of its messages. An archived thread is restored, as from the menu. */
+  /**
+   * Opens a side thread at one of its messages. An archived thread is restored, as from the menu. The list
+   * has every open thread, so a thread that the list does not have is archived.
+   */
   async function openAt(agentId: string, id: string, messageId: string): Promise<void> {
     setMessageFocus({ taskId: id, messageId, nonce: (messageFocus()?.nonce ?? 0) + 1 });
+    if (!task(agentId, id) && !(await tasks.reopenTask(agentId, id))) return;
     await restore(agentId, id);
   }
 

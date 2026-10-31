@@ -15,8 +15,10 @@
 // its open-thread limit is 409; the error text says which.
 //
 // `list` answers the link of each branch among the tasks that the `agent-tasks-v1` list answers, at
-// most 50. A link does not change, and it stays when its source is deleted. `agent-tasks-changed`
-// carries no link: a client reads `list` again when the task list has a task that it does not know.
+// most 50. A link stays when its source is deleted. Its `sourceTitle` is the title of the source side
+// thread when the host answered: null for the agent's own chat and for a deleted source.
+// `agent-tasks-changed` carries no link: a client reads `list` again when the task list has a task that
+// it does not know.
 // Every route is a POST with its ids in the body. The host sends `agent-tasks-changed` after a branch.
 // Bounds and meaning do not follow IPC changes; widening any of it needs a second capability string.
 import type { AgentTaskBranch, AgentTasksSnapshot } from "../ipc-agent-tasks";
@@ -31,6 +33,7 @@ import {
   list,
   nullable,
   type OptionalRouteCodec,
+  string,
 } from "./admin-wire";
 import { AGENT_TASKS_CODECS, AGENT_TASKS_ROUTES } from "./agent-tasks-v1";
 
@@ -52,12 +55,14 @@ const exact =
   };
 const link = fields({
   sourceTaskId: nullable(identifier),
+  sourceTitle: nullable(string(120)),
   sourceMessageId: identifier,
   throughMessageId: identifier,
 });
 const taskLink = fields({
   taskId: identifier,
   sourceTaskId: nullable(identifier),
+  sourceTitle: nullable(string(120)),
   sourceMessageId: identifier,
   throughMessageId: identifier,
 });

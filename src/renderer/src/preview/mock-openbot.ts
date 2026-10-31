@@ -2792,6 +2792,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         const through = messages.at(-1);
         task.branch = {
           sourceTaskId: input.taskId,
+          sourceTitle: sourceTask?.title ?? null,
           sourceMessageId: input.messageId,
           throughMessageId: through?.id ?? input.messageId,
         };

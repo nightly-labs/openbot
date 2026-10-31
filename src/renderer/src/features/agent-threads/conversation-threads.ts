@@ -98,7 +98,10 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onCompactContext: onCompactContext ? () => onCompactContext(task.id) : undefined,
     };
   };
-  /** The source of a branch. A source id that the list does not have is a deleted thread. */
+  /**
+   * The source of a branch. The list has the current title of a listed source. The list can leave out an
+   * archived source, so the link's title is the fallback; a link with no title is a deleted source.
+   */
   const branchSource = (task: AgentTask): ConversationBranchSource | undefined => {
     const branch = task.branch;
     if (!branch) return undefined;
@@ -113,11 +116,11 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           input.onOpenMainMessage?.(sourceMessageId);
         },
       };
-    const source = list.find((entry) => entry.id === sourceTaskId);
+    const title = list.find((entry) => entry.id === sourceTaskId)?.title ?? branch.sourceTitle;
     return {
       throughMessageId,
-      title: source?.title ?? null,
-      deleted: source === undefined,
+      title,
+      deleted: title === null,
       onOpen: () => void tabs.openAt(agentId, sourceTaskId, sourceMessageId),
     };
   };

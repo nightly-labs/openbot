@@ -584,9 +584,12 @@ export class AgentTasks implements TaskLanes {
   #publicBranch(task: AgentThreadRecord): AgentTaskBranch | null {
     if (!task.branch) return null;
     const { sourceThreadId, sourceMessageId, throughMessageId } = task.branch;
-    const ownChat = this.#hooks.agent(task.agentId)?.threadId === sourceThreadId;
+    if (this.#hooks.agent(task.agentId)?.threadId === sourceThreadId)
+      return { sourceTaskId: null, sourceTitle: null, sourceMessageId, throughMessageId };
+    const source = this.#store.taskForThread(sourceThreadId);
     return {
-      sourceTaskId: ownChat ? null : (this.#store.taskForThread(sourceThreadId)?.taskId ?? sourceThreadId),
+      sourceTaskId: source?.taskId ?? sourceThreadId,
+      sourceTitle: source?.title ?? null,
       sourceMessageId,
       throughMessageId,
     };

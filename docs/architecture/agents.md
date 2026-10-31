@@ -350,8 +350,9 @@ route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) 
 `POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs
 the `chat` agent level as a start does, and answers the frozen `agent-tasks-v1` task with its `branch` link. The
 member is the reader of the copy. A source or message that is not there is 404; a running source or the open-thread
-limit is 409. `branches` answers `{branches: [{taskId, sourceTaskId, sourceMessageId, throughMessageId}]}`, the
-links among the listed tasks. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
+limit is 409. `branches` answers `{branches: [{taskId, sourceTaskId, sourceTitle, sourceMessageId, throughMessageId}]}`,
+the links among the listed tasks. `sourceTitle` is null for the agent's own chat and for a deleted source; the
+list can leave out an archived source, so the divider takes its title from the link. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
 the web read `branches` after the task list and add the links, and read the list again when an event names a task
 that they do not know. A server without the capability does not show "Branch from here", and a joined desktop
 refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A server without either shows only

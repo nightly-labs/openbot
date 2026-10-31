@@ -240,6 +240,7 @@ try {
   assert.equal(copy.length, expected.length, "The branch copies the messages through the first turn only.");
   assert.ok(report.branched.sameText && report.branched.newIds);
   assert.equal(branched.branch?.sourceTaskId, source.id);
+  assert.equal(branched.branch?.sourceTitle, sourceTitle);
   assert.equal(branched.branch?.sourceMessageId, firstEnd.id);
   assert.equal(branched.branch?.throughMessageId, copy.at(-1)?.id);
   assert.equal((await readTask(source.id)).messages.length, sourceMessages.length, "The source does not change.");
