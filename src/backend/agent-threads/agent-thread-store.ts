@@ -52,7 +52,7 @@ export interface AgentThreadRecord {
 }
 
 /** The `branch_*` columns: all three are set, or the thread is not a branch. */
-export interface AgentThreadBranch {
+interface AgentThreadBranch {
   /** The agent's own chat or a side thread. The id stays when the source is deleted. */
   sourceThreadId: string;
   /** The message in the source that the person chose. */
