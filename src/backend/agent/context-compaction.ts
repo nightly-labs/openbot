@@ -17,6 +17,8 @@ interface ThreadContextBudget {
   /** `stopping`: the deadline asked Codex to stop the compaction turn, and the queue waits for its end. */
   phase: "idle" | "requested" | "running" | "stopping";
   compactionTurnId: string | null;
+  /** The claimed turn started its compaction item, so it is the compaction we asked for. */
+  compactionItemStarted: boolean;
   lastCompactedTokens: number | null;
 }
 
@@ -267,6 +269,7 @@ export class ContextCompaction {
       pending: false,
       phase: "idle" as const,
       compactionTurnId: null,
+      compactionItemStarted: false,
       lastCompactedTokens: null,
     };
     budget.usedTokens = usedTokens;
@@ -387,6 +390,7 @@ export class ContextCompaction {
     if (budget?.phase !== "requested" || this.#compacting.get(threadId)?.agentId !== agentId) return false;
     budget.phase = "running";
     budget.compactionTurnId = turnId;
+    budget.compactionItemStarted = false;
     const client = this.#compacting.get(threadId)?.client;
     if (client) this.#armDeadline(agentId, threadId, client, this.#runTimeoutMs);
     return true;
@@ -394,6 +398,30 @@ export class ContextCompaction {
 
   isCompactionTurn(threadId: string, turnId: string): boolean {
     return this.#budgets.get(threadId)?.compactionTurnId === turnId;
+  }
+
+  observeCompactionItem(threadId: string, turnId: string): void {
+    const budget = this.#budgets.get(threadId);
+    if (budget?.compactionTurnId === turnId) budget.compactionItemStarted = true;
+  }
+
+  /**
+   * Codex can start a turn on its own, such as a goal continuation, just before the compaction turn.
+   * `thread/compact/start` replaces that turn, and Codex ends it as interrupted (#3886). Such a turn
+   * started no compaction item, so the claim moves to the next turn. True when it moved.
+   */
+  releaseReplacedTurn(threadId: string, turnId: string, status: string): boolean {
+    const budget = this.#budgets.get(threadId);
+    if (
+      status !== "interrupted" ||
+      budget?.phase !== "running" ||
+      budget.compactionTurnId !== turnId ||
+      budget.compactionItemStarted
+    )
+      return false;
+    budget.phase = "requested";
+    budget.compactionTurnId = null;
+    return true;
   }
 
   markCompacted(threadId: string): void {
@@ -539,6 +567,7 @@ export class ContextCompaction {
         pending: false,
         phase: "idle",
         compactionTurnId: null,
+        compactionItemStarted: false,
         lastCompactedTokens: compactedTokens,
       });
     // A session that was not replaced keeps its budget; the growth rule stops an immediate retry.

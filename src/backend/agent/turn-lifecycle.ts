@@ -595,8 +595,10 @@ export class TurnLifecycle {
         this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
           if (this.#conversation.loadedClientFor(threadId) !== source) return;
-          if (notification.method === "item/started") this.#observedCompactions.set(threadId, turnId);
-          else this.#observedCompactions.delete(threadId);
+          if (notification.method === "item/started") {
+            this.#observedCompactions.set(threadId, turnId);
+            this.#compaction.observeCompactionItem(threadId, turnId);
+          } else this.#observedCompactions.delete(threadId);
           if (!this.#compaction.isCompactionTurn(threadId, turnId))
             this.#compaction.observeCompaction(
               threadId,
@@ -709,7 +711,8 @@ export class TurnLifecycle {
         }
         this.#compaction.threadTurnEnded(threadId);
         if (this.#compaction.isCompactionTurn(threadId, turnId)) {
-          this.#compaction.finish(agentId, threadId, status);
+          if (!this.#compaction.releaseReplacedTurn(threadId, turnId, status))
+            this.#compaction.finish(agentId, threadId, status);
           return;
         }
         // A defect too: this fiber has no other handler, and the turn is settled by then.

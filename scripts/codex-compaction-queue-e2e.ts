@@ -2,9 +2,9 @@
 // compaction, and that no message fails because of a compaction (#1766). Runs the real agent
 // service on a temporary profile with a fake Codex app-server that, like Codex 0.160.1, refuses
 // `turn/start` with `ActiveTurnNotSteerable { turn_kind: Compact }` while a compaction turn runs.
-// Four cases: a compaction that ends by itself, one that runs past the start deadline and ends by
-// itself (#3466), one that the run deadline stops, and one that does not stop, so that OpenBot sends
-// a turn that Codex refuses. Then a side thread: the runtime snapshot carries its context, and
+// Five cases: a compaction that ends by itself, one that runs past the start deadline and ends by
+// itself (#3466), one that the run deadline stops, one that does not stop, so that OpenBot sends
+// a turn that Codex refuses, and one that replaces a goal turn that Codex started itself (#3886). Then a side thread: the runtime snapshot carries its context, and
 // `compactTaskContext` compacts its session and not the agent's own chat (#3503). Last, a usage
 // report that Codex sends while the stop ends it does not reach the closed database (#3808).
 // `bun scripts/codex-compaction-queue-e2e.ts`. Writes .openbot-build/codex-compaction-queue-e2e/report.json.
@@ -111,10 +111,16 @@ const answer = (message) => {
       return;
     }
     case "thread/compact/start": {
-      const { compactionMs, ignoreInterrupt } = control();
+      const { compactionMs, ignoreInterrupt, goalTurn } = control();
       const turnId = "compact-turn-" + (++turns);
       const item = { type: "contextCompaction", id: "compact-item-" + turnId };
       write({ id: message.id, result: {} });
+      // Like Codex 0.165.0 with a goal: a turn of its own started first, and the compaction replaces it (#3886).
+      if (goalTurn) {
+        const goalTurnId = "goal-turn-" + (++turns);
+        write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: goalTurnId } } });
+        write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: goalTurnId, status: "interrupted" } } });
+      }
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       write({ method: "item/started", params: { threadId: params.threadId, turnId, item } });
       const finish = (status) => {
@@ -181,6 +187,7 @@ interface CaseReport {
   compactionEnd: string | null;
   interruptSent: boolean;
   refusedStarts: number;
+  compactionErrors: number;
   passed: boolean;
 }
 
@@ -257,6 +264,10 @@ const agents = new AgentService({
   contextCompactionTimeoutMs: COMPACTION_TIMEOUT_MS,
 });
 let stopped = false;
+const errors: Array<{ code: string; agentId: string | null }> = [];
+agents.on("event", (event) => {
+  if (event.type === "error") errors.push({ code: event.code, agentId: event.agentId ?? null });
+});
 
 try {
   await runCauseEffect(agents.initialize());
@@ -289,6 +300,14 @@ try {
       ignoreInterrupt: true,
       end: "completed",
       interrupt: true,
+    },
+    {
+      name: "compaction replaces a goal turn",
+      compactionMs: 400,
+      ignoreInterrupt: false,
+      goalTurn: true,
+      end: "completed",
+      interrupt: false,
     },
   ] as const;
 
@@ -341,6 +360,9 @@ try {
         (line) => line.method === "turn/interrupt" && line.turnId?.startsWith("compact-turn-"),
       ),
       refusedStarts: threadEntries.filter((line) => line.refused === threadId).length,
+      compactionErrors: errors.filter(
+        (error) => error.code === "context_compaction_failed" && error.agentId === agent.id,
+      ).length,
       passed: false,
     };
     report.cases.push(result);
@@ -350,6 +372,7 @@ try {
     assert.equal(result.interruptSent, entry.interrupt, `${entry.name}: turn/interrupt`);
     if (entry.ignoreInterrupt) assert.ok(result.refusedStarts > 0, "Codex refused no start");
     else assert.equal(result.refusedStarts, 0, `${entry.name}: Codex refused a start`);
+    assert.equal(result.compactionErrors, 0, `${entry.name}: a compaction error`);
     result.passed = true;
   }
 
