@@ -121,6 +121,7 @@ import {
   VAULT_V2_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
+  WORKFLOWS_GITHUB_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -2127,6 +2128,7 @@ export class TeamApiServer {
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           if (capability === PUSH_NOTIFICATIONS_CAPABILITY || capability === ANDROID_PUSH_NOTIFICATIONS_CAPABILITY)
             return this.#options.pushNotifications !== undefined;
           if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;

@@ -9,6 +9,8 @@ import {
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
   parseStartWorkflowRun,
+  parseWorkflowGitHubLastEvent,
+  parseWorkflowGitHubRepository,
   parseWorkflowRuns,
   parseWorkflowTrigger,
   parseWorkflowVersion,
@@ -135,6 +137,14 @@ describe("workflow payloads from the renderer", () => {
       workflowId: "w",
       nodeId: "n",
     });
+    expect(parseWorkflowGitHubRepository({ repository: "octo/app", token: "ghs_x" })).toEqual({
+      repository: "octo/app",
+    });
+    expect(parseWorkflowGitHubLastEvent({ workflowId: "w", nodeId: "n", requestId: "r", event: "issues" })).toEqual({
+      workflowId: "w",
+      nodeId: "n",
+      requestId: "r",
+    });
   });
 
   it.each([
@@ -150,6 +160,9 @@ describe("workflow payloads from the renderer", () => {
     ["a runs cursor over the limit", () => parseWorkflowRuns({ workflowId: "w", limit: 1, before: "x".repeat(65) })],
     ["an empty runs cursor", () => parseWorkflowRuns({ workflowId: "w", limit: 1, before: "" })],
     ["a webhook secret request without a node", () => parseWorkflowTrigger({ workflowId: "w" })],
+    ["a GitHub repository without an owner", () => parseWorkflowGitHubRepository({ repository: "app" })],
+    ["a GitHub repository path", () => parseWorkflowGitHubRepository({ repository: "../octo/app" })],
+    ["a last-event run without a request id", () => parseWorkflowGitHubLastEvent({ workflowId: "w", nodeId: "n" })],
   ])("refuses %s", (_name, parse) => {
     expect(parse).toThrow();
   });

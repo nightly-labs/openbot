@@ -1,7 +1,11 @@
-// What main answers for workflows: the list, one workflow, a save, the version history, and runs.
+// What main answers for workflows: the list, one workflow, a save, the version history, runs, and
+// the GitHub catalog, options and event history.
 
 import {
   isWorkflowDetail,
+  isWorkflowGitHubCatalog,
+  isWorkflowGitHubHistory,
+  isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
   isWorkflowRunDetail,
   isWorkflowRunPage,
@@ -23,3 +27,9 @@ export const decodeWorkflowRunDetail = guardedDecoder(isWorkflowRunDetail, "work
 export const decodeWorkflowRunPage = guardedDecoder(isWorkflowRunPage, "workflow runs response");
 export const decodeWorkflowStep = guardedDecoder(isWorkflowStep, "workflow step response");
 export const decodeWorkflowWebhookSecret = guardedDecoder(isWorkflowWebhookSecret, "workflow webhook secret response");
+export const decodeWorkflowGitHubCatalog = guardedDecoder(isWorkflowGitHubCatalog, "workflow GitHub catalog response");
+export const decodeWorkflowGitHubOptions = guardedDecoder(
+  isWorkflowGitHubRepositoryOptions,
+  "workflow GitHub options response",
+);
+export const decodeWorkflowGitHubHistory = guardedDecoder(isWorkflowGitHubHistory, "workflow GitHub history response");

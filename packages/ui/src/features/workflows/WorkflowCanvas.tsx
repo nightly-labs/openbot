@@ -123,6 +123,7 @@ import {
 } from "./workflow-board";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
 import { CLIP_TYPE, type Clip, copied, setCopied } from "./workflow-clipboard";
+import type { WorkflowGitHubCanvas } from "./workflow-github";
 import {
   type CanvasItem,
   type CanvasSnapshot,
@@ -160,7 +161,7 @@ import {
   ToolAction,
   translated,
 } from "./workflow-node-parts";
-import { activeRun, indexRunView, type WorkflowRunView } from "./workflow-run-view";
+import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
@@ -175,6 +176,8 @@ export interface WorkflowCanvasProps {
   /** What this host supports. The canvas hides the kinds, triggers and outputs that it does not list. */
   features: WorkflowFeatures;
   catalogs: WorkflowCatalogs;
+  /** What the GitHub trigger and output cards read from the host. Without it, they show no GitHub data. */
+  github?: WorkflowGitHubCanvas | undefined;
   /** The saved versions of this workflow, newest first. */
   versions: readonly WorkflowVersion[];
   /** The version that the canvas shows, read-only, in place of the live canvas. */
@@ -536,10 +539,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1 });
 
-  /** The run state of each node, from the runs of the host. */
-  const runIndex = createMemo(() => indexRunView(props.runs));
-  /** The run that has not ended. */
-  const openRun = createMemo(() => activeRun(props.runs));
   const running = () => openRun() !== undefined;
   const statusOf = (id: string) => runIndex().get(id)?.status;
   /** The id of the newest step of a node, which Retry, Stop and the approval act on. */
@@ -570,6 +569,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const canvas = createBoard({
     catalogs: () => props.catalogs,
+    github: () => props.github,
     features: () => props.features,
     edges: initial.board.edges,
     locked: initial.board.locked,
@@ -662,6 +662,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   });
   const board = canvas.board;
+  /**
+   * The run that has not ended and that the run bar acts on: the open run that the user views, else
+   * the newest open run. GitHub runs on different items can be open at the same time.
+   */
+  const openRun = createMemo(() => {
+    const number = board.viewing();
+    const viewed = props.runs.runs.find((entry) => entry.run.number === number);
+    return viewed && isOpenRun(viewed) ? viewed : activeRun(props.runs);
+  });
+  /** The run state of each node, from the runs of the host. A viewed open run shows its own steps. */
+  const runIndex = createMemo(() => indexRunView(props.runs, openRun()?.run.id));
 
   /* ---------------------------------------------------------- History */
 
@@ -1214,9 +1225,23 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               at: run.startedAt,
               status: run.status,
               seconds: Math.max(0, (Date.parse(run.endedAt) - Date.parse(run.startedAt)) / 1000),
+              item: runItems().get(run.id),
             },
           ],
     );
+  /** The issue or pull request of each GitHub run. */
+  const runItems = createMemo(
+    () => new Map(props.github?.history().runs.map((entry) => [entry.runId, `#${entry.item.number}`]) ?? []),
+  );
+  /** Runs that have not ended, newest first. */
+  const openRuns = (): readonly HudRun[] =>
+    props.runs.runs.flatMap(({ run }) =>
+      run.endedAt === null
+        ? [{ number: run.number, at: run.startedAt, status: run.status, seconds: null, item: runItems().get(run.id) }]
+        : [],
+    );
+  const waitingEvents = () =>
+    props.github?.history().deliveries.filter((delivery) => delivery.outcome === "waiting").length ?? 0;
   /** The steps of the open run that are done, of the steps on the canvas. */
   const progress = () => {
     const total = live().filter((node) => isWorkflowStepKind(node.kind)).length;
@@ -2940,6 +2965,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           viewing={board.viewing()}
           onView={board.view}
           pastRuns={pastRuns()}
+          openRuns={openRuns()}
+          waiting={waitingEvents()}
           olderRuns={props.runs.nextBefore !== null}
           onLoadOlderRuns={props.onLoadOlderRuns}
           step={current()}

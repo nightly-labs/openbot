@@ -11,6 +11,7 @@ import {
   type WfnResult,
   type WfnRunStatus,
 } from "@openbot/ui/features/workflows/workflow-board";
+import type { WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, untrack } from "solid-js";
@@ -26,6 +27,8 @@ export function NodeGallery(props: {
   locked?: readonly string[];
   /** The choices of the nodes. The story catalogs when absent. */
   catalogs?: WorkflowCatalogs;
+  /** The GitHub of the GitHub cards. */
+  github?: WorkflowGitHubCanvas;
   /** Approve at an approval step runs the steps after it. Without it, and on Reject, the run does not go on. */
   runOnApprove?: boolean;
   /** The fields of the nodes when the story opens, so every card that reads a field reads the same value. */
@@ -72,6 +75,7 @@ export function NodeGallery(props: {
   };
   const gallery = createBoard({
     catalogs: () => props.catalogs ?? STORY_CATALOGS,
+    github: () => props.github,
     selected: untrack(() => props.selected),
     edges: untrack(() => props.edges),
     results: untrack(() => props.results),

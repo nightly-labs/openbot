@@ -57,6 +57,20 @@ export interface GitHubConnectorPanelProps extends IntegrationPageSlots {
   onOpenInstall: () => void;
 }
 
+/** What the connect dialog reads and does. */
+export type GitHubConnection = Pick<
+  GitHubConnectorPanelProps,
+  | "hostName"
+  | "status"
+  | "busy"
+  | "repositories"
+  | "repositoriesError"
+  | "onConnect"
+  | "onCancel"
+  | "onOpenVerification"
+  | "onOpenInstall"
+>;
+
 /**
  * The connect dialog shows one of these. `waiting` is before GitHub sends a code, `failed` is a
  * connect that stopped with no sign-in, and `connected` stays until the user closes the dialog.
@@ -107,9 +121,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
     props.onConnect();
   };
   const closeConnect = () => {
-    // Closing during the wait or the code stops the sign-in, as Cancel does.
-    const step = connectStep(props.status, props.busy);
-    if (step === "waiting" || step === "code") props.onCancel();
+    cancelRunning(props);
     setConnectOpen(false);
   };
   const confirmDisconnect = () => {
@@ -195,7 +207,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
         />
       </Show>
 
-      <ConnectDialog {...props} open={connectOpen()} onRetry={props.onConnect} onClose={closeConnect} />
+      <ConnectDialog {...props} open={connectOpen()} onClose={closeConnect} />
       <DisconnectDialog
         open={confirmOpen()}
         login={login()}
@@ -327,7 +339,25 @@ function RepositoriesSection(props: {
   );
 }
 
-function ConnectDialog(props: GitHubConnectorPanelProps & { open: boolean; onRetry: () => void; onClose: () => void }) {
+/** Closing the dialog during the wait or the code stops the sign-in, as Cancel does. */
+function cancelRunning(connection: GitHubConnection) {
+  const step = connectStep(connection.status, connection.busy);
+  if (step === "waiting" || step === "code") connection.onCancel();
+}
+
+/**
+ * The connect dialog of the GitHub page, for another view that connects GitHub, such as a workflow
+ * card. Closing it during the sign-in stops the sign-in.
+ */
+export function GitHubConnectDialog(props: GitHubConnection & { open: boolean; onClose: () => void }) {
+  const close = () => {
+    cancelRunning(props);
+    props.onClose();
+  };
+  return <ConnectDialog {...props} onClose={close} />;
+}
+
+function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () => void }) {
   const { t, sourceText } = useText();
   const step = () => connectStep(props.status, props.busy);
   const link = (): WizardLink => (step() === "connected" ? "connected" : step() === "failed" ? "broken" : "connecting");
@@ -409,7 +439,7 @@ function ConnectDialog(props: GitHubConnectorPanelProps & { open: boolean; onRet
             <Button type="button" size="sm" variant="ghost" onClick={props.onClose}>
               {t("connector.github.cancel")}
             </Button>
-            <Button type="button" size="sm" onClick={props.onRetry}>
+            <Button type="button" size="sm" onClick={props.onConnect}>
               {t("connector.github.connect")}
             </Button>
           </Match>

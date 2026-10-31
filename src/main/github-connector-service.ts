@@ -13,6 +13,7 @@ import {
   type GitHubConnectorState,
   type GitHubConnectorStatus,
   type McpServerConfig,
+  type WorkflowGitHubCatalog,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
@@ -59,8 +60,15 @@ const GITHUB_PAGE_SIZE = 100;
 /** The list stops here. The status still counts every repository. */
 const MAX_LISTED_REPOSITORIES = 500;
 const githubInstallationsSchema = z.object({
-  installations: z.array(z.object({ id: z.number() })),
+  installations: z.array(z.object({ id: z.number(), events: z.array(z.string()).optional() })),
 });
+/** The App events that GitHub triggers need. An installation without one of them cannot start every trigger. */
+const WORKFLOW_GITHUB_APP_EVENTS = ["issues", "issue_comment", "pull_request", "pull_request_review", "check_suite"];
+
+/** A repository of an installation, and whether that installation sends every event that triggers need. */
+interface InstallationRepository extends GitHubConnectorRepository {
+  events: boolean;
+}
 const githubRepositoriesSchema = z.object({
   total_count: z.number(),
   repositories: z.array(z.object({ full_name: z.string().min(1), private: z.boolean() })),
@@ -342,33 +350,42 @@ export class GitHubConnectorService {
       // The panel reads the list again after an install, which can add repositories.
       this.#botTokens.invalidate();
       yield* this.#checkRefresh();
-      const { installations } = yield* this.#getGitHubEffect(
-        `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
-        token,
-        githubInstallationsSchema,
-      );
-      const repositories: GitHubConnectorRepository[] = [];
-      let total = 0;
-      for (const installation of installations) {
-        for (let page = 1; ; page += 1) {
-          const answer = yield* this.#getGitHubEffect(
-            `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
-            token,
-            githubRepositoriesSchema,
-          );
-          if (page === 1) total += answer.total_count;
-          for (const repository of answer.repositories) {
-            repositories.push({ fullName: repository.full_name, private: repository.private });
-          }
-          const listedAll = page * GITHUB_PAGE_SIZE >= answer.total_count || answer.repositories.length === 0;
-          if (listedAll || repositories.length >= MAX_LISTED_REPOSITORIES) break;
-        }
-        if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
-      }
-      repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
+      const { repositories, total } = yield* this.#installationRepositories(token);
       return {
-        repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
-        total: Math.max(total, repositories.length),
+        repositories: repositories.map((repository) => ({
+          fullName: repository.fullName,
+          private: repository.private,
+        })),
+        total,
+      };
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * The repositories that GitHub triggers and outputs of workflows can use, sorted by name. The App's
+   * bot can change a repository only where it has a bot token, which it has where the user can push.
+   */
+
+  readonly workflowCatalog = Effect.fn("GitHubConnector.workflowCatalog")(
+    function* (
+      this: GitHubConnectorService,
+    ): Effect.fn.Return<WorkflowGitHubCatalog, GitHubOperationError, GitHubPlatform> {
+      const token = yield* this.accessToken();
+      if (!token) return { connected: false, repositories: [] };
+      if (this.#botTokens.due()) yield* this.#renewBotTokens().pipe(Effect.catch(() => Effect.void));
+      const { repositories } = yield* this.#installationRepositories(token);
+      return {
+        connected: true,
+        repositories: repositories.map((repository) => {
+          const [owner = "", name = ""] = repository.fullName.split("/");
+          return {
+            fullName: repository.fullName,
+            private: repository.private,
+            canWrite: this.#botTokens.forRepository(owner, name) !== null,
+            events: repository.events,
+          };
+        }),
       };
     },
     (operation) => this.#owned(operation),
@@ -631,6 +648,47 @@ export class GitHubConnectorService {
   });
 
   /** One GitHub API read. A failure is a `GitHubDeviceFlowError` whose message the panel can show. */
+
+  /**
+   * The repositories of each installation of the app that the user can use, sorted by name, at most
+   * `MAX_LISTED_REPOSITORIES`, and how many there are in all.
+   */
+  readonly #installationRepositories = Effect.fn("GitHubConnector.installationRepositories")(function* (
+    this: GitHubConnectorService,
+    token: string,
+  ): Effect.fn.Return<{ repositories: InstallationRepository[]; total: number }, GitHubOperationError, GitHubPlatform> {
+    const { installations } = yield* this.#getGitHubEffect(
+      `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
+      token,
+      githubInstallationsSchema,
+    );
+    const repositories: InstallationRepository[] = [];
+    let total = 0;
+    for (const installation of installations) {
+      // An answer without the list of events does not show that the installation sends them.
+      const subscribed = installation.events ?? [];
+      const events = WORKFLOW_GITHUB_APP_EVENTS.every((event) => subscribed.includes(event));
+      for (let page = 1; ; page += 1) {
+        const answer = yield* this.#getGitHubEffect(
+          `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
+          token,
+          githubRepositoriesSchema,
+        );
+        if (page === 1) total += answer.total_count;
+        for (const repository of answer.repositories) {
+          repositories.push({ fullName: repository.full_name, private: repository.private, events });
+        }
+        const listedAll = page * GITHUB_PAGE_SIZE >= answer.total_count || answer.repositories.length === 0;
+        if (listedAll || repositories.length >= MAX_LISTED_REPOSITORIES) break;
+      }
+      if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
+    }
+    repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
+    return {
+      repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
+      total: Math.max(total, repositories.length),
+    };
+  });
 
   readonly #getGitHubEffect = Effect.fn("GitHubConnector.getGitHub")(function* <T>(
     this: GitHubConnectorService,

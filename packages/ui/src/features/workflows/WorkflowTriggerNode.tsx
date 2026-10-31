@@ -22,22 +22,12 @@ import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
 import { useBoard } from "./workflow-board";
+import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
 import { newTriggerSchedule, stableJson } from "./workflow-history";
-import {
-  type Choice,
-  ChoicePill,
-  Field,
-  NodeShell,
-  NodeToolbar,
-  oneOf,
-  PlacePill,
-  useField,
-  useLocked,
-  usePlace,
-  useStepRun,
-} from "./workflow-node-parts";
+import { type Choice, NodeShell, NodeToolbar, oneOf, useField, useLocked, useStepRun } from "./workflow-node-parts";
+import { PlaceRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
 
-type TriggerType = "schedule" | "manual" | "webhook" | "message";
+type TriggerType = "schedule" | "manual" | "webhook" | "message" | "github";
 
 const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
   {
@@ -56,17 +46,20 @@ const TRIGGERS = (t: AppTranslate): readonly Choice<TriggerType>[] => [
     label: t("workflow.trigger.type.message"),
     icon: () => <MessageSquare aria-hidden="true" />,
   },
+  { value: "github", label: t("workflow.trigger.type.github"), icon: () => <GitHubIcon /> },
 ];
 
-const TRIGGER_TYPES: readonly TriggerType[] = ["schedule", "manual", "webhook", "message"];
+const TRIGGER_TYPES: readonly TriggerType[] = ["schedule", "manual", "webhook", "message", "github"];
 
 /**
- * The start of a workflow. A schedule shows its next run, a webhook shows the address to call, and a
- * message trigger shows its channel. Each trigger has a run button: on the canvas it runs the steps
- * that this trigger leads to, and a manual trigger has no other way to start.
+ * The start of a workflow. The type is the first row of the card, and the settings of that type follow it:
+ * a schedule shows its next run, a webhook shows the address to call, a message trigger shows its channel,
+ * and a GitHub trigger shows its repository, its event and the events that GitHub sent. Each trigger has a
+ * run button: on the canvas it runs the steps that this trigger leads to, and a manual trigger has no other
+ * way to start. A GitHub trigger runs with the newest item that matches it.
  *
  * The host gives the webhook address and the next run time of a schedule. Without them, the trigger
- * does not show them.
+ * does not show them. GitHub shows only when the host can run it.
  */
 export function TriggerNode(props: {
   id: string;
@@ -85,6 +78,17 @@ export function TriggerNode(props: {
     untrack(() => props.trigger ?? "schedule"),
     oneOf(TRIGGER_TYPES),
   );
+  /** A new GitHub trigger stores the event and the filter that its rows show, so the host reads the same. */
+  const chooseTrigger = (value: TriggerType) => {
+    if (value !== "github" || board.field(props.id, "event") !== undefined) return setTrigger(value);
+    board.setFields(props.id, { trigger: value, ...GITHUB_TRIGGER_DEFAULTS });
+  };
+  /** GitHub needs a host that can run it. Other types show unless the host lists the types it runs. */
+  const offered = (type: TriggerType) => {
+    const triggers = board.features()?.triggers;
+    if (type === trigger()) return true;
+    return type === "github" ? triggers?.includes(type) === true : (triggers?.includes(type) ?? true);
+  };
   /**
    * The draft that the user edits. A cron text with a space at the end saves without it, so the picker
    * shows this draft while it gives the saved schedule. An undo gives another schedule, and its draft.
@@ -116,12 +120,19 @@ export function TriggerNode(props: {
       .catch((cause: unknown) => toast.error(errorMessage(cause, t("routine.webhook.regenerateFailed"))))
       .finally(() => setCreating(false));
   };
-  const place = usePlace(
-    () => props.id,
-    untrack(() => ({ connectionId: props.connectionId, placeId: props.placeId })),
-  );
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
+  const githubReady = useGitHubTriggerReady(() => props.id);
+  const isGitHub = () => trigger() === "github";
+  /** A GitHub trigger has no input of its own, so a run from the card uses the newest event that matches. */
+  const runLabel = () => {
+    if (isGitHub()) return t("workflow.trigger.runLastEvent");
+    return trigger() === "manual" ? t("workflow.trigger.runWorkflow") : t("workflow.trigger.runNow");
+  };
+  const start = () => {
+    if (isGitHub()) return board.github()?.runLastEvent(props.id);
+    return board.runFrom ? board.runFrom(props.id) : run.start();
+  };
   const nextRun = () =>
     props.nextRun
       ? format.date(new Date(props.nextRun), {
@@ -140,10 +151,10 @@ export function TriggerNode(props: {
           fullWidth
           loading={run.running()}
           loadingLabel={t("workflow.node.running")}
-          disabled={locked() || board.running()}
-          onClick={() => (board.runFrom ? board.runFrom(props.id) : run.start())}
+          disabled={locked() || board.running() || (isGitHub() && !githubReady())}
+          onClick={start}
         >
-          {trigger() === "manual" ? t("workflow.trigger.runWorkflow") : t("workflow.trigger.runNow")}
+          {runLabel()}
           <Play aria-hidden="true" />
         </Button>
       }
@@ -152,22 +163,45 @@ export function TriggerNode(props: {
       icon={<Zap aria-hidden="true" />}
       kind="trigger"
       output="text"
+      style={{ "--wfn-width": "320px" }}
       toolbar={<NodeToolbar id={props.id} name={t("workflow.trigger.name")} locked={locked()} onLock={setLocked} />}
     >
-      <Field class="wfn-block-field">
-        <Show when={trigger() === "schedule"}>
-          <RoutineSchedulePicker
-            schedule={schedule()}
-            density="card"
+      <SettingRows
+        head={
+          <SettingRow
+            name={t("workflow.trigger.type")}
+            value={trigger()}
+            choices={TRIGGERS(t).filter((choice) => offered(choice.value))}
             disabled={locked()}
-            onChange={changeSchedule}
-            onEditEnd={board.endScheduleEdit}
+            onChange={chooseTrigger}
           />
+        }
+      >
+        <Show when={trigger() === "schedule"}>
+          <div class="wfn-settings-block">
+            <RoutineSchedulePicker
+              schedule={schedule()}
+              density="card"
+              disabled={locked()}
+              onChange={changeSchedule}
+              onEditEnd={board.endScheduleEdit}
+            />
+          </div>
+          <Show when={nextRun()}>
+            {(time) => (
+              <SettingsFoot>
+                <StaticRow name={t("workflow.trigger.nextRunName")}>
+                  <span class="wfn-row-text">{time()}</span>
+                </StaticRow>
+              </SettingsFoot>
+            )}
+          </Show>
         </Show>
         <Show when={trigger() === "webhook" ? props.webhookUrl : undefined}>
           {(url) => (
-            <div class="wfn-block-copy">
-              <code class="wfn-block-url">{url()}</code>
+            <div class="wfn-row" data-static="">
+              <span class="wfn-row-name">{t("workflow.trigger.webhook.address")}</span>
+              <code class="wfn-row-value wfn-row-code">{url()}</code>
               <CopyButton value={url()} iconOnly label={t("workflow.trigger.copyWebhook")} />
             </div>
           )}
@@ -188,37 +222,27 @@ export function TriggerNode(props: {
               </Button>
             }
           >
-            <RoutineWebhookSecretField
-              secret={secret()}
-              onSecretDismiss={() => setSecret(null)}
-              onRegenerateSecret={rotate}
-            />
+            <div class="wfn-settings-block">
+              <RoutineWebhookSecretField
+                secret={secret()}
+                onSecretDismiss={() => setSecret(null)}
+                onRegenerateSecret={rotate}
+              />
+            </div>
           </Show>
         </Show>
         <Show when={trigger() === "message"}>
-          <PlacePill
-            name={t("workflow.node.place.channel")}
-            connectionId={place.connectionId()}
-            placeId={place.placeId()}
+          <PlaceRow
+            id={props.id}
+            connectionId={untrack(() => props.connectionId)}
+            placeId={untrack(() => props.placeId)}
             disabled={locked()}
-            onChange={place.set}
           />
         </Show>
-        <div class="wfn-field-foot">
-          <ChoicePill
-            name={t("workflow.trigger.title")}
-            value={trigger()}
-            choices={TRIGGERS(t).filter(
-              (choice) => choice.value === trigger() || (board.features()?.triggers.includes(choice.value) ?? true),
-            )}
-            disabled={locked()}
-            onChange={setTrigger}
-          />
-          <Show when={trigger() === "schedule" ? nextRun() : undefined}>
-            {(time) => <span class="wfn-block-meta">{t("workflow.trigger.nextRun", { time: time() })}</span>}
-          </Show>
-        </div>
-      </Field>
+        <Show when={isGitHub()}>
+          <GitHubTriggerRows id={props.id} locked={locked()} />
+        </Show>
+      </SettingRows>
     </NodeShell>
   );
 }

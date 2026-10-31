@@ -2,7 +2,12 @@
 // bot, the labels and people that an output can choose, and the newest events of a repository for
 // "Run with last event". The backend keeps the rules; this adapter keeps the tokens and the HTTP.
 
-import type { WorkflowGitHubEvent, WorkflowGitHubLabel, WorkflowGitHubRepositoryOptions } from "@openbot/contracts/ipc";
+import type {
+  WorkflowGitHubCatalog,
+  WorkflowGitHubEvent,
+  WorkflowGitHubLabel,
+  WorkflowGitHubRepositoryOptions,
+} from "@openbot/contracts/ipc";
 import { WORKFLOW_GITHUB_OPTION_LIMIT } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -16,9 +21,9 @@ import type {
   WorkflowGitHubChangeResult,
   WorkflowGitHubRecentEvent,
 } from "../backend/workflows/workflow-github-api";
+import { WorkflowStoreError } from "../backend/workflows/workflow-store";
 import { GITHUB_REQUEST_TIMEOUT_MS, type GitHubFetch } from "./github-device-flow";
-import type { GitHubOperationError } from "./github-effects";
-import { githubCall } from "./github-effects";
+import { GitHubOperationError, githubCall } from "./github-effects";
 
 const API = "https://api.github.com";
 const PAGE_SIZE = 100;
@@ -360,4 +365,32 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
   });
 
   return { change, options: repositoryOptions, recentEvents };
+}
+
+/**
+ * What the workflow editor offers from this host's GitHub connection: the repositories, and the labels
+ * and people of one of them. Only an owner or admin reads it, as it shows what the sign-in reaches.
+ */
+export interface WorkflowGitHubDirectory {
+  catalog(): Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>;
+  /** A GitHub failure is a refusal of the workflow store, with the failure's message for the user. */
+  options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, GitHubOperationError>;
+}
+
+export function workflowGitHubDirectory(
+  catalog: () => Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>,
+  api: Pick<WorkflowGitHubApi, "options">,
+): WorkflowGitHubDirectory {
+  return {
+    catalog,
+    options: (repository) =>
+      api.options(repository).pipe(
+        Effect.mapError(
+          (failure) =>
+            new GitHubOperationError({
+              cause: new WorkflowStoreError({ code: "refused", message: failure.message }),
+            }),
+        ),
+      ),
+  };
 }

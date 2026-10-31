@@ -197,7 +197,7 @@ import { githubAppConfig } from "./github-connector-config";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
-import { createGitHubRest } from "./github-rest";
+import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { HermesImportService } from "./hermes-import-service";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
@@ -527,6 +527,8 @@ export interface ApplicationServices {
   service: AgentService;
   routineFlows: RoutineFlowsHandle;
   workflows: WorkflowsHandle;
+  /** The repositories, labels and people that the workflow editor offers from the GitHub connection. */
+  workflowGitHub: WorkflowGitHubDirectory;
   routineResults: RoutineResultsHandle;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
@@ -1850,6 +1852,12 @@ export async function createApplicationServices({
     database: store.database,
     nextDueAt: workflowScheduleDueAt(() => serverTimezone.effective()),
   });
+  // The workflow calls to GitHub. The editor reads the labels and people of a repository through it.
+  const githubRest = createGitHubRest({
+    fetch: (url, init) => fetch(url, init),
+    tokens: (repository) => githubConnector.repositoryTokens(repository),
+  });
+  const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
@@ -1858,10 +1866,7 @@ export async function createApplicationServices({
       githubApp: () => githubAppConfig()?.slug ?? null,
       // The relay is made with the ingress socket, below; a graph changes only after start.
       watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
-      githubApi: createGitHubRest({
-        fetch: (url, init) => fetch(url, init),
-        tokens: (repository) => githubConnector.repositoryTokens(repository),
-      }),
+      githubApi: githubRest,
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
@@ -2416,7 +2421,11 @@ export async function createApplicationServices({
     // Present, so the host advertises `routine-flows-v1`. Any member who can see the agents.
     routineFlows: routineFlowRuntime,
     // Present, so the host advertises `workflows-v1`. Any member who can see and talk to the agents.
-    workflows: { ...workflowRuntime, rotateWorkflowSecret: (input) => events.rotateWorkflowSecret(input) },
+    workflows: {
+      ...workflowRuntime,
+      rotateWorkflowSecret: (input) => events.rotateWorkflowSecret(input),
+      github: workflowGitHub,
+    },
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
@@ -3236,6 +3245,7 @@ export async function createApplicationServices({
     service,
     routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
+    workflowGitHub,
     routineResults: routineResultRuntime,
     providerRuntimes,
     providerCredentials,

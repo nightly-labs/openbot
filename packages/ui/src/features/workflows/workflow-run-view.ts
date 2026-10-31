@@ -59,25 +59,31 @@ const byStartNewestFirst = (left: { startedAt: string | null }, right: { started
 
 /** The newest run that has not ended. */
 export function activeRun(view: WorkflowRunView): WorkflowRunDetail | undefined {
-  return view.runs.find((entry) => OPEN_RUN_STATUSES.includes(entry.run.status));
+  return view.runs.find(isOpenRun);
+}
+
+/** Whether a run has not ended. GitHub runs on different items can be open at the same time. */
+export function isOpenRun(entry: WorkflowRunDetail): boolean {
+  return OPEN_RUN_STATUSES.includes(entry.run.status);
 }
 
 /**
  * The run state of each node that has a step. A node shows the status of its newest step in the
- * newest run, or of its newest step that ran alone after that run started.
+ * focused run, or of its newest step that ran alone after that run started. The focused run is the
+ * newest run when `focusRunId` names none of them.
  */
-export function indexRunView(view: WorkflowRunView): ReadonlyMap<string, WorkflowNodeRunState> {
+export function indexRunView(view: WorkflowRunView, focusRunId?: string): ReadonlyMap<string, WorkflowNodeRunState> {
   const numbers = new Map(view.runs.map((entry) => [entry.run.id, entry.run.number]));
   const all = [...view.runs.flatMap((entry) => entry.steps), ...view.soloSteps];
   // Oldest first, so the last step of a node is its newest.
   all.sort((left, right) => -byStartNewestFirst(left, right) || left.attempt - right.attempt);
-  const newestRun = view.runs[0];
+  const focused = view.runs.find((entry) => entry.run.id === focusRunId) ?? view.runs[0];
   const results = new Map<string, WorkflowNodeResult[]>();
   const shown = new Map<string, WorkflowStep>();
   for (const step of all) {
     const result = resultOf(step, step.runId ? numbers.get(step.runId) : undefined);
     if (result) results.set(step.nodeId, [...(results.get(step.nodeId) ?? []), result]);
-    if (step.runId === null || step.runId === newestRun?.run.id) shown.set(step.nodeId, step);
+    if (step.runId === null || step.runId === focused?.run.id) shown.set(step.nodeId, step);
   }
   const index = new Map<string, WorkflowNodeRunState>();
   for (const [nodeId, step] of shown) {

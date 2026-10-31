@@ -104,6 +104,8 @@ export interface HudRun {
   status: WorkflowRunStatus;
   /** How long the run took, in seconds. A run that has not ended has none. */
   seconds: number | null;
+  /** The issue or pull request of a GitHub run, as "#4231". */
+  item?: string | undefined;
 }
 
 /** The step that the run is on, and how many other steps are in the same state. */
@@ -130,6 +132,10 @@ export function WorkflowCanvasHeader(props: {
   onView: (run: number | null) => void;
   /** The runs that ended, newest first. */
   pastRuns: readonly HudRun[];
+  /** The runs that have not ended, newest first. More than one only for GitHub runs on different items. */
+  openRuns: readonly HudRun[];
+  /** The GitHub events that wait for the run of their item. */
+  waiting: number;
   olderRuns: boolean;
   onLoadOlderRuns: () => void;
   step: HudStep | undefined;
@@ -149,7 +155,11 @@ export function WorkflowCanvasHeader(props: {
     if (run.status === "stopped") return t("workflow.canvas.run.stoppedAfter", { duration: time });
     return time;
   };
-  const viewedRun = () => props.pastRuns.find((run) => run.number === props.viewing);
+  const viewedRun = () =>
+    props.openRuns.find((run) => run.number === props.viewing) ??
+    props.pastRuns.find((run) => run.number === props.viewing);
+  /** One open run with nothing waiting shows only its progress, as before GitHub runs. */
+  const manyOpen = () => props.openRuns.length > 1 || props.waiting > 0;
   const statusVerb = (status: HudStep["status"]) =>
     status === "approval"
       ? t("workflow.canvas.status.approval")
@@ -210,7 +220,7 @@ export function WorkflowCanvasHeader(props: {
             <div class="wfn-hud wfn-hud-viewing">
               <History aria-hidden="true" />
               <span class="wfn-hud-label">{t("workflow.canvas.run.number", { number: entry().number })}</span>
-              <span class="wfn-hud-meta">{timeLabel(t, format, entry().at)}</span>
+              <span class="wfn-hud-meta">{entry().item ?? timeLabel(t, format, entry().at)}</span>
               <Hint label={t("workflow.canvas.run.showLatest")} placement="bottom">
                 <LabelTooltipTrigger
                   as={Button}
@@ -331,6 +341,46 @@ export function WorkflowCanvasHeader(props: {
                 </Show>
               }
             >
+              <Show when={manyOpen()}>
+                <DropdownMenu.Root placement="bottom-end" gutter={8} getAnchorRect={hudBarRect} modal={false}>
+                  <DropdownMenu.Trigger class={`${buttonVariants({ variant: "ghost", size: "sm" })} wfn-hud-button`}>
+                    <LoaderCircle class="wfn-hud-spin" aria-hidden="true" />
+                    {t("workflow.canvas.run.open", { count: props.openRuns.length })}
+                    <Show when={props.waiting > 0}>
+                      <span class="wfn-hud-count">
+                        {t("workflow.github.history.waitingCount", {
+                          count: props.waiting,
+                          number: format.number(props.waiting),
+                        })}
+                      </span>
+                    </Show>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      class="wfn-menu wfn-results-menu"
+                      data-wfn-portal=""
+                      aria-label={t("workflow.canvas.run.openList")}
+                    >
+                      <For each={props.openRuns}>
+                        {(entry) => (
+                          <DropdownMenu.Item onSelect={() => props.onView(entry.number)}>
+                            <span class="wfn-menu-text">
+                              {t("workflow.canvas.run.number", { number: entry.number })}
+                            </span>
+                            <span class="wfn-menu-meta">{entry.item ?? timeLabel(t, format, entry.at)}</span>
+                            <Check
+                              class="wfn-menu-check"
+                              data-off={props.viewing === entry.number ? undefined : ""}
+                              aria-hidden="true"
+                            />
+                          </DropdownMenu.Item>
+                        )}
+                      </For>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+                <span class="wfn-hud-separator" aria-hidden="true" />
+              </Show>
               <span class="wfn-hud-progress">
                 <RadialProgress
                   class="wfn-hud-ring"

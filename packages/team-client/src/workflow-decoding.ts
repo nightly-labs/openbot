@@ -7,6 +7,9 @@
 
 import {
   isWorkflowDetail,
+  isWorkflowGitHubCatalog,
+  isWorkflowGitHubHistory,
+  isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
   isWorkflowRunDetail,
   isWorkflowRunPage,
@@ -15,6 +18,9 @@ import {
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
+  WORKFLOW_GITHUB_DELIVERY_OUTCOMES,
+  WORKFLOW_GITHUB_EVENTS,
+  WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
@@ -149,3 +155,35 @@ export function decodeRemoteWorkflowVersions(value: unknown) {
   if (!isDynamicRecord(value) || !Array.isArray(value.versions)) throw new Error("Invalid remote workflow versions.");
   return decodeWorkflowVersions(value.versions.map(version));
 }
+
+/**
+ * A delivery of `workflows-github-v1` with names that this app knows. The capability carries the event,
+ * the outcome and the reason as open names. An event that this app does not know has no text to show,
+ * so its delivery is dropped. An outcome that it does not know shows as skipped, and a reason as none.
+ */
+const githubDelivery = (value: unknown): unknown[] => {
+  if (!isDynamicRecord(value)) return [value];
+  if (isUnknownName(WORKFLOW_GITHUB_EVENTS, value.event)) return [];
+  const outcome = withKnown(value, "outcome", WORKFLOW_GITHUB_DELIVERY_OUTCOMES, "skipped");
+  return [isUnknownName(WORKFLOW_GITHUB_SKIP_REASONS, outcome.reason) ? { ...outcome, reason: null } : outcome];
+};
+
+const githubHistory = onRecord((record) =>
+  Array.isArray(record.deliveries) ? { ...record, deliveries: record.deliveries.flatMap(githubDelivery) } : record,
+);
+
+/** The `workflows-github-v1` event history of a workflow, newest first. */
+export const decodeRemoteWorkflowGitHubHistory = mapped(
+  githubHistory,
+  guardedDecoder(isWorkflowGitHubHistory, "remote workflow GitHub history"),
+);
+/** The `workflows-github-v1` catalog of the host's GitHub connection. */
+export const decodeRemoteWorkflowGitHubCatalog = guardedDecoder(
+  isWorkflowGitHubCatalog,
+  "remote workflow GitHub catalog",
+);
+/** The `workflows-github-v1` labels and people of one repository. */
+export const decodeRemoteWorkflowGitHubOptions = guardedDecoder(
+  isWorkflowGitHubRepositoryOptions,
+  "remote workflow GitHub options",
+);
