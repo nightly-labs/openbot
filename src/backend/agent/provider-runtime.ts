@@ -32,6 +32,7 @@ import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { isOpenCodeInternalFailure } from "./../acp-flavor-opencode";
 import { startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -3445,6 +3446,10 @@ export class ProviderRuntime implements ProviderPort {
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
                   return this.#showStartStopped(provider);
               }
+              // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
+              // the provider stayed off until the user refreshed it (#4237).
+              if (provider === "opencode" && isOpenCodeInternalFailure(failed))
+                this.#retryAfterTimeout(provider, !disposed());
               return message;
             }),
           ),
@@ -3827,8 +3832,9 @@ export class ProviderRuntime implements ProviderPort {
   }, Effect.uninterruptible);
 
   /**
-   * Starts a provider whose CLI did not answer in time again later, with the backoff and the attempt
-   * count of `#handleExit`. Answers the status message: whether OpenBot tries again, or the user has to.
+   * Starts a provider whose CLI did not answer in time, or whose start OpenCode failed, again later,
+   * with the backoff and the attempt count of `#handleExit`. Answers the status message for a
+   * timeout: whether OpenBot tries again, or the user has to.
    */
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
     const attempts = this.#restartAttempts.get(provider) ?? 0;

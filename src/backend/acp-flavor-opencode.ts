@@ -25,8 +25,9 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 /**
  * OpenCode 2.1.3's wrapper error for any failure that it has no ACP error for. Its data names only
  * the JavaScript error class, so the user read the generic text with no provider name (#2850).
+ * A start can get it too, when the probe `session/new` fails on a slow computer; a later start works (#4237).
  */
-function isOpenCodeInternalFailure(error: unknown): boolean {
+export function isOpenCodeInternalFailure(error: unknown): boolean {
   return (
     error instanceof RequestError &&
     error.code === -32603 &&
