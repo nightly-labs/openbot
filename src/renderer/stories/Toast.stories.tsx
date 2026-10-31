@@ -1,6 +1,9 @@
+import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup, type ParentProps } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { createIdleRestartToast } from "../src/features/updates/idle-restart-toast";
+import { createScheduledUpdateToast } from "../src/features/updates/scheduled-update-toast";
 
 const meta = {
   title: "Foundations/Toast",
@@ -125,6 +128,69 @@ export const Gallery: Story = {
       </div>
     </ToastStory>
   ),
+};
+
+export const PersistentRestartNotices: Story = {
+  render: () => {
+    const ready: UpdateStatus = {
+      phase: "ready",
+      currentVersion: "0.1.0",
+      availableVersion: "0.2.0",
+      progress: null,
+      checkedAt: null,
+      message: null,
+      errorCode: null,
+    };
+    const [status, setStatus] = createSignal<UpdateStatus>({
+      ...ready,
+      scheduledRestart: { requestedBy: null, mode: "when-idle", waitingFor: ["agent-turn"] },
+    });
+    const cancel = async (): Promise<void> => {
+      setStatus(ready);
+    };
+    createScheduledUpdateToast({ status, cancel });
+    createIdleRestartToast({ status, cancel });
+    return (
+      <ToastStory>
+        <Heading as="h1" size="lg">
+          Persistent restart notices
+        </Heading>
+        <Text role="status">
+          {status().scheduledRestart || status().idleRestart ? "Restart pending" : "No restart pending"}
+        </Text>
+        <div class="foundation-story-row">
+          <Button
+            variant="outline"
+            onClick={() =>
+              setStatus({
+                ...ready,
+                scheduledRestart: { requestedBy: null, mode: "when-idle", waitingFor: ["agent-turn"] },
+              })
+            }
+          >
+            Schedule update
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setStatus({ ...ready, idleRestart: { target: "relaunch", waitingFor: ["agent-turn"] } })}
+          >
+            Wait to restart
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setStatus({ ...ready, idleRestart: { target: "relaunch", waitingFor: [], error: "Restart failed" } })
+            }
+          >
+            Fail restart
+          </Button>
+          <Button variant="outline" onClick={() => setStatus((current) => ({ ...current, phase: "installing" }))}>
+            Start restart
+          </Button>
+        </div>
+      </ToastStory>
+    );
+  },
 };
 
 export const WithAction: Story = {
