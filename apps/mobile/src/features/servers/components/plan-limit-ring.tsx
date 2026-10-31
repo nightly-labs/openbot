@@ -110,7 +110,8 @@ export function PlanLimitRing({
             {windows.map((window, index) => {
               const radius = outer - index * spacing;
               return (
-                <G key={planLimitWindowKey(window, index)}>
+                // The key is of the reading order, so a window keeps its ring when another window comes or goes.
+                <G key={planLimitWindowKey(window, windows.length - 1 - index)}>
                   <Circle
                     cx={center}
                     cy={center}
