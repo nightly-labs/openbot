@@ -103,6 +103,10 @@ Channel history keeps its existing membership and task checks. Messaging history
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.
 
+When a message has attached images, OpenBot sends their bytes to the selected provider. When the
+agent reports that it takes audio, such as Gemini CLI, attached audio and video files are also sent,
+up to 10 MB in each message. Other files, and media for other agents, are sent as a local path only.
+
 ## Local scripts
 
 Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user

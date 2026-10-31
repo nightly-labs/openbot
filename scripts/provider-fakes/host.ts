@@ -71,7 +71,7 @@ const TURN_TIMEOUT_MS = 300_000;
 export async function runTurn(
   client: AgentClient,
   thread: string,
-  options: { model?: string; text?: string; timeoutMs?: number } = {},
+  options: { model?: string; text?: string; timeoutMs?: number; attachments?: readonly object[] } = {},
 ): Promise<TurnResult> {
   const result: TurnResult = { reply: "", error: null, status: null };
   let finished = false;
@@ -100,7 +100,7 @@ export async function runTurn(
   // `turn/start` can fail first; then nothing awaits `done`.
   done.catch(() => undefined);
   try {
-    const input = [{ type: "text", text: options.text ?? "hello", text_elements: [] }];
+    const input = [{ type: "text", text: options.text ?? "hello", text_elements: [] }, ...(options.attachments ?? [])];
     await runCauseEffect(
       client.request(
         "turn/start",

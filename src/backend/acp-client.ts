@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import {
   type ClientSideConnection,
   type ContentBlock,
@@ -11,6 +12,7 @@ import {
   type LoadSessionRequest,
   type LoadSessionResponse,
   type PermissionOption,
+  type PromptCapabilities,
   type PromptResponse,
   RequestError,
   type RequestPermissionRequest,
@@ -1084,7 +1086,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // as a turn of its own, which OpenBot did not start. The message then waits in the queue.
         if (!thread || !turn || turn.id !== getString(params, "expectedTurnId") || turn.stopped || turn.completing)
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
-        const blocks = yield* promptBlocksEffect(params);
+        const blocks = yield* promptBlocksEffect(params, this.#initialization?.agentCapabilities?.promptCapabilities);
         yield* steer(this.#sessionConnection(thread), {
           sessionId: threadId,
           messageId: getString(params, "clientUserMessageId"),
@@ -1949,7 +1951,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
     const turnId = getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID();
-    const blocks = yield* promptBlocksEffect(params);
+    const blocks = yield* promptBlocksEffect(params, this.#initialization?.agentCapabilities?.promptCapabilities);
     yield* providerSync(() => this.#requireServedModel(thread));
     // The session keeps the instructions in its context, so a prompt carries them only when the
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
@@ -2976,13 +2978,49 @@ function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
   );
 }
 
-const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown) {
+/**
+ * The audio and video bytes that one prompt can carry. Gemini refuses a request with more than 20 MB
+ * of inline data, and base64 makes the bytes a third larger. A larger file goes as its path only.
+ */
+const INLINE_MEDIA_BYTES = 10 * 1024 * 1024;
+
+/**
+ * An attached audio or video file goes to the model itself when the agent takes it (#4210). ACP has
+ * an audio block but no video block, so a video is an embedded resource. Only an agent that takes
+ * audio gets a video: an agent with embedded context alone, such as OpenCode, expects text files and
+ * can give the bytes to a model that refuses them. The path stays in the prompt for the agent's tools.
+ */
+const mediaBlockEffect = Effect.fn("AcpAgentClient.mediaBlock")(function* (
+  path: string,
+  capabilities: PromptCapabilities | undefined,
+  budget: { bytes: number },
+) {
+  const mimeType = attachmentMimeTypeForName(path);
+  const audio = mimeType.startsWith("audio/");
+  if (!capabilities?.audio || !(audio || (mimeType.startsWith("video/") && capabilities.embeddedContext))) return null;
+  const size = (yield* providerCall(() => stat(path))).size;
+  if (size > budget.bytes) return null;
+  budget.bytes -= size;
+  const data = (yield* providerCall(() => readFile(path))).toString("base64");
+  const block: ContentBlock = audio
+    ? { type: "audio", data, mimeType }
+    : { type: "resource", resource: { uri: pathToFileURL(path).href, mimeType, blob: data } };
+  return block;
+});
+
+const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (
+  params: unknown,
+  capabilities: PromptCapabilities | undefined,
+) {
   const blocks: ContentBlock[] = [];
+  const budget = { bytes: INLINE_MEDIA_BYTES };
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
     if (item.type === "mention" && isString(item.path)) {
       blocks.push({ type: "text", text: `Attached local file: ${item.path}` });
+      const media = yield* mediaBlockEffect(item.path, capabilities, budget);
+      if (media) blocks.push(media);
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;

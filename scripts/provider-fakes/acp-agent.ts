@@ -12,7 +12,13 @@ export interface AcpParams {
   cwd?: string;
   additionalDirectories?: string[];
   mcpServers?: { name: string }[];
-  prompt?: { type: string; text?: string }[];
+  prompt?: {
+    type: string;
+    text?: string;
+    data?: string;
+    mimeType?: string;
+    resource?: { uri?: string; mimeType?: string; blob?: string };
+  }[];
   configId?: string;
   value?: string;
   /** `_x.ai/interject` of Grok. */

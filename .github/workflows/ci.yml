@@ -648,6 +648,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
 
+      - name: Run the ACP media input E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-media-input
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
@@ -716,6 +720,7 @@ jobs:
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/acp-instructions-once-e2e/
+            .openbot-build/acp-media-input-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/
