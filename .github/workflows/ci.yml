@@ -263,12 +263,17 @@ jobs:
       - name: Run the Local scripts CLI E2E test
         run: bun run test:automation-cli
 
+      - name: Run the Pagey plugin E2E test
+        run: bun scripts/pagey-plugin-e2e.ts
+
       - name: Upload the Local scripts CLI E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: automation-cli-e2e
-          path: .openbot-build/automation-cli-e2e/
+          path: |
+            .openbot-build/automation-cli-e2e/
+            .openbot-build/pagey-plugin/report.json
           if-no-files-found: ignore
 
   team-api-routes-e2e:

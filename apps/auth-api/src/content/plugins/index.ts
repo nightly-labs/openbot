@@ -13,6 +13,7 @@ import { LINEAR_PLUGIN_GUIDE } from "./linear";
 import { NEON_PLUGIN_GUIDE } from "./neon";
 import { NETLIFY_PLUGIN_GUIDE } from "./netlify";
 import { NOTION_PLUGIN_GUIDE } from "./notion";
+import { PAGEY_PLUGIN_GUIDE } from "./pagey";
 import { PAPER_PLUGIN_GUIDE } from "./paper";
 import type { PluginGuide } from "./plugin-guide";
 import { POSTHOG_PLUGIN_GUIDE } from "./posthog";
@@ -41,6 +42,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   firecrawl: FIRECRAWL_PLUGIN_GUIDE,
   linear: LINEAR_PLUGIN_GUIDE,
   notion: NOTION_PLUGIN_GUIDE,
+  pagey: PAGEY_PLUGIN_GUIDE,
   paper: PAPER_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,

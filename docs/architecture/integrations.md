@@ -310,6 +310,11 @@ is one folder per plugin in [`marketplace/plugin-catalog/`](../../marketplace/pl
    (`calendar`, `contacts`, `mail`, `notes`, `reminders`, `messages`, `safari`). On a Mac that runs
    the server, the listing page can then ask macOS for each app at install
    ([`mac-automation.ts`](../../src/main/mac-automation.ts)). The mobile copy leaves the field out.
+   A standalone adapter can ship with the catalog, as the
+   [Pagey plugin](../../marketplace/plugin-catalog/plugins/pagey/README.md) does. Set
+   `embeddedScript: "server.mjs"`, command `bun`, and empty `args`. The builder embeds that
+   reviewed source in the command. It accepts no other script path or runtime and caps its
+   size for Windows command lines. The existing managed Bun runtime starts it.
 3. Never put a secret in the catalog. The user types it in the connect dialog.
 4. Build and check the generated files:
    ```sh

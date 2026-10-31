@@ -296,6 +296,15 @@ example-prompt: Turn the latest commits into release notes.
 
 The skill preview shows this text. **Try skill** appends it and a skill reference to the selected agent's draft. It does not send the message. The field accepts up to 1,000 characters after trimming. Missing or invalid values use a default example. No new package format or database migration is required.
 
+### Free static publishing with Pagey Site
+
+The [Pagey Site app](marketplace/plugin-catalog/plugins/pagey/README.md) publishes a static build
+folder, HTML file, or ZIP from an OpenBot conversation and returns an HTTPS link. Hosting is free,
+with no total site cap; a free account can create 25 new sites per UTC day. Connect your Pagey API
+token in **Marketplace > Apps > Pagey Site**, then ask the agent to publish your build. Existing
+sites can be updated at the same address. Pagey also includes analytics, private sharing, a file
+browser, AI site building, and forms with a built-in backend, all free within usage allowances.
+
 ## Local skills
 
 Ask an agent to create a skill from a reusable workflow. It prepares a folder with `SKILL.md` and calls `create_skill`. The skill is saved in a shared local library and enabled for that agent. Other agents can add it through **Settings → Skills → Local skills**.

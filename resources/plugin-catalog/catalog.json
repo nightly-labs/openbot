@@ -117,6 +117,12 @@
       "detailSha256": "45de8c7034470431121185d60752738dd8b3113fe9b651d57f8a03e11c9ae79f"
     },
     {
+      "slug": "pagey",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "390ae18aae1378b4484b1100024355fc03996d62d0a22c04e060198714212bb6"
+    },
+    {
       "slug": "railway",
       "version": "1.0.0",
       "featured": false,

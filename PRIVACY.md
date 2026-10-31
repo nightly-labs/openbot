@@ -789,6 +789,11 @@ Network traffic can also occur when:
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
 - a locally installed Codex plugin connects to its service;
+- the Pagey Site app sends the static build files that the user asks to publish, plus the selected
+  title, subdomain, and expiry, to `pagey.site`. Its local adapter checks files before upload and
+  uses the user's Pagey API token in an Authorization header. Site updates, metadata changes,
+  maintenance controls, and analytics requests also go to Pagey. Previewing an upload sends no
+  files. Disconnecting the app does not remove sites from Pagey;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
   the grant the browser returns, and to renew the token. When the user signs out of the server or

@@ -1,6 +1,16 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("marketplace", {
+  // Pagey Site. Other languages use the English source until translated.
+  "marketplace.plugin.pagey.tagline": "Free static hosting, with no total site cap",
+  "marketplace.plugin.pagey.description":
+    "Pagey Site lets agents publish an HTML file, ZIP archive, or static build folder and return a live HTTPS link. Hosting is free, with no subscription, credit card, or total site cap; registered accounts can create 25 new sites per UTC day. Preview files, update a site at the same address, choose a custom Pagey subdomain, control maintenance, and read analytics from chat. The Pagey dashboard also provides password protection, secure sharing, a file browser, an AI site builder, and a custom form builder with a built-in backend. All features are free for registered accounts; usage limits apply.",
+  "marketplace.plugin.pagey.app":
+    "Publish static sites for free, preview build files, and manage your Pagey sites with your API token.",
+  "marketplace.plugin.pagey.prompt.publish": "Publish this static build folder to Pagey Site and give me the link.",
+  "marketplace.plugin.pagey.prompt.update": "Update my existing Pagey site with this build and keep its address.",
+  "marketplace.plugin.pagey.prompt.sites": "List my Pagey sites and show their visitor analytics for the last week.",
+
   // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "Coding",
   "marketplace.category.design": "Design",

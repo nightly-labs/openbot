@@ -21,6 +21,16 @@ interface PluginTextKeys {
  * keys here. A listing that is not here shows its catalog text.
  */
 const PLUGIN_TEXT = {
+  pagey: {
+    tagline: "marketplace.plugin.pagey.tagline",
+    description: "marketplace.plugin.pagey.description",
+    apps: { "app-pagey-mcp": "marketplace.plugin.pagey.app" },
+    prompts: {
+      "prompt-publish": "marketplace.plugin.pagey.prompt.publish",
+      "prompt-update": "marketplace.plugin.pagey.prompt.update",
+      "prompt-sites": "marketplace.plugin.pagey.prompt.sites",
+    },
+  },
   aave: {
     tagline: "marketplace.plugin.aave.tagline",
     description: "marketplace.plugin.aave.description",

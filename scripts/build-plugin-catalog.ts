@@ -185,7 +185,33 @@ export async function loadPluginCatalog(
   if (missing.length > 0) throw new Error(`Plugin catalog order lists missing directories: ${missing.join(", ")}.`);
   const plugins: PluginDetail[] = [];
   for (const slug of spec.order) {
-    const raw = JSON.parse(await readFile(join(sourceRoot, "plugins", slug, "plugin.json"), "utf8"));
+    let raw = JSON.parse(await readFile(join(sourceRoot, "plugins", slug, "plugin.json"), "utf8"));
+    // A standalone adapter can ship as catalog data. Its reviewed source is pinned with the
+    // listing; no program is fetched at launch and no application path enters a saved MCP row.
+    if (isDynamicRecord(raw) && Array.isArray(raw.apps)) {
+      const apps = [];
+      for (const app of raw.apps) {
+        if (!isDynamicRecord(app) || !isDynamicRecord(app.server) || app.server.embeddedScript === undefined) {
+          apps.push(app);
+          continue;
+        }
+        const server = app.server;
+        if (
+          server.embeddedScript !== "server.mjs" ||
+          server.transport !== "stdio" ||
+          server.command !== "bun" ||
+          !Array.isArray(server.args) ||
+          server.args.length !== 0
+        ) {
+          throw new Error(`Plugin ${slug} embedded adapter needs bun, empty args, and server.mjs.`);
+        }
+        const script = await readFile(join(sourceRoot, "plugins", slug, "server.mjs"), "utf8");
+        // Leave space for Windows command-line quoting and the executable path.
+        if (JSON.stringify(script).length > 28_000) throw new Error(`Plugin ${slug} embedded adapter is too large.`);
+        apps.push({ ...app, server: { ...server, args: ["--eval", script] } });
+      }
+      raw = { ...raw, apps };
+    }
     plugins.push(validatePlugin(slug, raw, spec.featured.includes(slug), spec.updatedAt));
   }
   return { spec, plugins };
