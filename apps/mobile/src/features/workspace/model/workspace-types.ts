@@ -1,5 +1,6 @@
 import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
+  AddAgentFolderInput,
   AddedAgent,
   AddMessagingOrchestratorResult,
   AgentAccessChange,
@@ -7,6 +8,11 @@ import type {
   AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
+  AgentExclusionChange,
+  AgentFolderBrowse,
+  AgentFolderChange,
+  AgentFolderInput,
+  AgentFolderList,
   AgentHostSettings,
   AgentMemory,
   AgentMemorySelectionState,
@@ -583,6 +589,18 @@ export interface MobileWorkspaceContextValue {
   loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
   setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
+  canManageAgentFolders: (serverId: string) => boolean;
+  /** The folders that the agent can change besides its workspace. Owners and admins only. */
+  loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
+  /** With `replace`, the folder takes the place of a folder that was moved. */
+  addAgentFolder: (input: AddAgentFolderInput, serverId: string) => Promise<AgentFolderChange>;
+  removeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentFolderChange>;
+  /** A folder in the agent's folders that it must not change. */
+  excludeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
+  includeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
+  /** The folders in one folder of the host computer; `path` null is the home folder. */
+  browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
@@ -793,6 +811,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentHostSettings"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
+  | "canManageAgentFolders"
   | "canPublishAgent";
 
 /**

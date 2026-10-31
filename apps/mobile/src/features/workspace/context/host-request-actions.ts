@@ -27,6 +27,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
   AGENT_HOST_SETTINGS_CAPABILITY,
@@ -90,7 +91,9 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  addAgentFolder,
   bitwardenConnectorRequest,
+  browseAgentFolders,
   cancelHostUpdate,
   cancelSignInRelay,
   checkHostForUpdate,
@@ -100,6 +103,7 @@ import {
   deleteHostedSite,
   deleteHostVaultItem,
   deleteSharedTable,
+  excludeAgentFolder,
   getHostAgentAccess,
   getHostAgentMemoryLimit,
   getHostReleaseStatus,
@@ -109,6 +113,7 @@ import {
   githubConnectorRepositories,
   githubConnectorRequest,
   importHostVaultCsv,
+  includeAgentFolder,
   installAgentSkill,
   installAgentTemplate,
   installMarketplaceAgent,
@@ -134,7 +139,9 @@ import {
   onePasswordConnectorRequest,
   previewAgentTemplate,
   publishAgentTemplate,
+  readAgentFolders,
   readAgentSessionSettings,
+  removeAgentFolder,
   removeMcpServer,
   resetAgentSessionSetting,
   rotateEventRoutineSecret,
@@ -268,6 +275,12 @@ type HostRequestActions = Pick<
   | "setAgentProviderAccount"
   | "startNewChat"
   | "loadAgentSessionSettings"
+  | "loadAgentFolders"
+  | "addAgentFolder"
+  | "removeAgentFolder"
+  | "excludeAgentFolder"
+  | "includeAgentFolder"
+  | "browseAgentFolders"
   | "loadServerTimezone"
   | "setServerTimezone"
   | "loadAgentMemoryLimit"
@@ -404,6 +417,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_SESSION_SETTINGS_CAPABILITY, "mobile.agent.session.unsupported");
+  const foldersAdmin = (serverId: string) =>
+    capabilityApi(serverId, AGENT_FOLDERS_CAPABILITY, "mobile.agent.folders.unsupported");
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
@@ -575,6 +590,13 @@ export function createHostRequestActions({
       has(serverId, AGENT_SESSION_SETTINGS_CAPABILITY)
         ? runTeamRequest(readAgentSessionSettings(sessionSettingsAdmin(serverId), agentId))
         : null,
+    loadAgentFolders: async (agentId, serverId) => runTeamRequest(readAgentFolders(foldersAdmin(serverId), agentId)),
+    addAgentFolder: async (input, serverId) => runTeamRequest(addAgentFolder(foldersAdmin(serverId), input)),
+    removeAgentFolder: async (input, serverId) => runTeamRequest(removeAgentFolder(foldersAdmin(serverId), input)),
+    excludeAgentFolder: async (input, serverId) => runTeamRequest(excludeAgentFolder(foldersAdmin(serverId), input)),
+    includeAgentFolder: async (input, serverId) => runTeamRequest(includeAgentFolder(foldersAdmin(serverId), input)),
+    browseAgentFolders: async (agentId, path, serverId) =>
+      runTeamRequest(browseAgentFolders(foldersAdmin(serverId), { agentId, path })),
     setAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(setAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     resetAgentSessionSetting: async (input, serverId) =>

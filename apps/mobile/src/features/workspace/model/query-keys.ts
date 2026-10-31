@@ -7,13 +7,27 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 export type QueryScope = readonly [apiUrl: string | null | undefined, userId: string | undefined, sessionScope: number];
 
 /** The agent records that a single-part key ends in. */
-type AgentRecordPart = "memories" | "memory-selection" | "routines" | "storage" | "admin" | "host" | "publish";
+type AgentRecordPart =
+  | "memories"
+  | "memory-selection"
+  | "routines"
+  | "storage"
+  | "admin"
+  | "host"
+  | "publish"
+  | "folders";
 
 /**
  * The last parts of the agent records that are not in the agent summary. The host sends
  * `agents-changed` when one of them changes, so an open settings page reads them again.
  */
-export const AGENT_SETTINGS_PARTS: readonly string[] = ["admin", "host", "session-settings", "provider-accounts"];
+export const AGENT_SETTINGS_PARTS: readonly string[] = [
+  "admin",
+  "host",
+  "session-settings",
+  "provider-accounts",
+  "folders",
+];
 
 /**
  * Every query key of the app. The host events invalidate them by prefix, so a key that a reader
@@ -76,6 +90,14 @@ export const queryKeys = {
     provider: AgentProviderId | undefined,
     model: string | undefined,
   ) => [...queryKeys.agentInfo(scope, serverId, agentId), provider, model, "session-settings"],
+  /** One folder of the host computer, to pick an agent folder from. Not an agent record: agent events leave it. */
+  agentFolderBrowse: (scope: QueryScope, serverId: string, agentId: string, path: string | null) => [
+    "agent-folder-browse",
+    ...scope,
+    serverId,
+    agentId,
+    path,
+  ],
   /** Under the server's agent records, so the host's agent events refresh it. */
   sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
   /** The settings of a channel. Its memory and routine events invalidate the part they change. */

@@ -200,3 +200,90 @@ export function parseAgentFolderInput(value: unknown): AgentFolderInput {
   if (value.path.length === 0) throw new Error("Invalid agent folder input.");
   return { agentId: value.agentId, path: value.path };
 }
+
+/** The most folders that one browse lists, as `agent-folders-v1` permits. */
+export const AGENT_FOLDER_BROWSE_LIMIT = 500;
+
+/** One folder of the host computer, to pick a folder for an agent from another device. */
+export interface AgentFolderBrowseEntry {
+  name: string;
+  path: string;
+}
+
+/** The folders in one folder of the host computer. Files and hidden folders are not in it. */
+export interface AgentFolderBrowse {
+  path: string;
+  /** Null at a disk root. */
+  parentPath: string | null;
+  entries: AgentFolderBrowseEntry[];
+  /** There were more than `AGENT_FOLDER_BROWSE_LIMIT` folders. */
+  truncated: boolean;
+  /** The home folder of the host computer. */
+  home: string;
+  /** The disks of the host computer, with the start disk first. */
+  volumes: AgentFolderBrowseEntry[];
+}
+
+/** The most disks that one browse names, as `agent-folders-v1` permits. */
+export const AGENT_FOLDER_VOLUME_LIMIT = 32;
+
+/** `path` null lists the home folder of the host computer. */
+export interface BrowseAgentFoldersInput {
+  agentId: string;
+  path: string | null;
+}
+
+/** With `replace`, the folder takes the place of that one, for a folder that was moved. */
+export interface AddAgentFolderInput extends AgentFolderInput {
+  replace?: string;
+}
+
+function isAgentFolderBrowseEntry(value: unknown): value is AgentFolderBrowseEntry {
+  return (
+    isDynamicRecord(value) &&
+    isBoundedString(value.name, INPUT_LIMITS.path) &&
+    isBoundedString(value.path, INPUT_LIMITS.path)
+  );
+}
+
+export function decodeAgentFolderBrowse(value: unknown): AgentFolderBrowse {
+  if (
+    !isDynamicRecord(value) ||
+    !isBoundedString(value.path, INPUT_LIMITS.path) ||
+    !(value.parentPath === null || isBoundedString(value.parentPath, INPUT_LIMITS.path)) ||
+    !Array.isArray(value.entries) ||
+    value.entries.length > AGENT_FOLDER_BROWSE_LIMIT ||
+    !value.entries.every(isAgentFolderBrowseEntry) ||
+    !isBoolean(value.truncated) ||
+    !isBoundedString(value.home, INPUT_LIMITS.path) ||
+    !Array.isArray(value.volumes) ||
+    value.volumes.length > AGENT_FOLDER_VOLUME_LIMIT ||
+    !value.volumes.every(isAgentFolderBrowseEntry)
+  )
+    throw new Error("Invalid agent folder browse.");
+  return {
+    path: value.path,
+    parentPath: value.parentPath,
+    entries: value.entries,
+    truncated: value.truncated,
+    home: value.home,
+    volumes: value.volumes,
+  };
+}
+
+export function parseBrowseAgentFoldersInput(value: unknown): BrowseAgentFoldersInput {
+  if (
+    !isDynamicRecord(value) ||
+    !isIdentifier(value.agentId) ||
+    !(value.path === null || (isBoundedString(value.path, INPUT_LIMITS.path) && value.path.length > 0))
+  )
+    throw new Error("Invalid agent folder input.");
+  return { agentId: value.agentId, path: value.path };
+}
+
+export function parseAddAgentFolderInput(value: unknown): AddAgentFolderInput {
+  const input = parseAgentFolderInput(value);
+  if (!isDynamicRecord(value) || value.replace === undefined) return input;
+  if (!isBoundedString(value.replace, INPUT_LIMITS.path)) throw new Error("Invalid agent folder input.");
+  return { ...input, replace: value.replace };
+}

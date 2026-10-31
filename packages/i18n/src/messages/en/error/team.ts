@@ -90,6 +90,8 @@ export const messages = defineMessages("error.team", {
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
   "error.team.routineResultsUnsupported": "Routine destinations are not supported by this connection.",
   "error.team.agentMemoryLimitUnsupported": "The agent memory limit is not supported by this connection.",
+  "error.team.agentFoldersUnsupported": "The agent folders are not supported by this connection.",
+  "error.team.folderUnavailable": "This folder is not available on the host computer.",
   "error.team.memoryReviewUnsupported": "The memory review is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
