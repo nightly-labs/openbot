@@ -143,7 +143,9 @@ export function collectProviderUsage(
   // types across session" and "Total input tokens across all turns". So one counter per session,
   // like Codex, and the first report of a session that predates collection is a baseline: it
   // carries tokens spent before analytics existed. `usage_update.cost` is the session's total too,
-  // and this counter is per session, so its checkpoint keeps the cost with the tokens.
+  // and this counter is per session, so its checkpoint keeps the cost with the tokens. A session
+  // saved before costs were kept starts from its first cost report, like the guard in `record`
+  // against billing that earlier use a second time.
   usage.record({
     agentId: agent.id,
     sessionId: session.id,
