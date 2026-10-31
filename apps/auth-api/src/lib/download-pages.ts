@@ -9,10 +9,10 @@ import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_DOWNL
 import { MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "./mobile-apps";
 import {
   OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
-  OPENBOT_SOCIAL_IMAGE_URL,
+  OPENBOT_SOCIAL_IMAGE_TAGS,
   OPENBOT_X_HANDLE,
+  type PageSocialImage,
+  pageSocialImageMeta,
 } from "./site-metadata";
 import { OPENBOT_SOFTWARE_APPLICATION } from "./software-application";
 
@@ -394,6 +394,12 @@ export const DOWNLOAD_HUB = {
     "Free for Mac, Windows and Linux, with apps for iPhone and Android. Get the installer for this computer, or choose a system below for its requirements and install steps.",
 } as const;
 
+/** The hub's own social card. The page of each system keeps the site's card. */
+const DOWNLOAD_HUB_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/download.jpg",
+  alt: "Teamwork. Now installing. OpenBot agents around a glass ring",
+};
+
 export function downloadPagePath(platform: DownloadPagePlatform | "hub"): string {
   return OPENBOT_DOWNLOAD_PAGE_LINKS[platform];
 }
@@ -444,6 +450,7 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
         downloadUrl: page.installers.map((installer) => new URL(installer.href, siteUrl).toString()),
       }
     : OPENBOT_SOFTWARE_APPLICATION;
+  const image = page ? OPENBOT_SOCIAL_IMAGE_TAGS : pageSocialImageMeta(DOWNLOAD_HUB_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -455,13 +462,12 @@ export function downloadPageHead(platform: DownloadPagePlatform | "hub", siteUrl
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
       { "script:ld+json": application },
       { "script:ld+json": breadcrumbData(platform, siteUrl) },
       ...(page ? [{ "script:ld+json": faqData(page.faq) }] : []),
