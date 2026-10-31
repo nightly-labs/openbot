@@ -106,7 +106,7 @@ export const FILE_TYPE_FILTERS: ReadonlyArray<{ value: FileTypeFilter; label: Ap
   { value: "other", label: "files.type.other" },
 ];
 
-const DOCUMENT_EXTENSIONS = new Set(["doc", "docx", "md", "odt", "pdf", "ppt", "pptx", "rtf", "txt"]);
+const DOCUMENT_EXTENSIONS = new Set(["doc", "docx", "markdown", "md", "odt", "pdf", "ppt", "pptx", "rtf", "txt"]);
 const CODE_EXTENSIONS = new Set([
   "c",
   "cc",
