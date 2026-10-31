@@ -146,6 +146,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "Bu sunucudaki herkes için kapalı",
   "mobile.settings.notifications.turnOn": "Aç",
   "mobile.settings.notifications.turnOnFor": "Bu sunucudaki herkes için {name} bildirimlerini aç",
+  "mobile.settings.notifications.chooseAgent": "Bir ajan için seç",
+  "mobile.settings.notifications.chooseAnotherAgent": "Başka bir ajan seç",
   "mobile.settings.notifications.levelsFooter": "Sunucuyu izlemesi için bir ajanın düzeyine yeniden dokun.",
   "mobile.settings.notifications.agentsUnsupported": "Ajanları seçmek için bu sunucudaki OpenBot’u güncelle.",
   "mobile.settings.notifications.agentsOffline": "Bu sunucu çevrimiçi olduğunda ajanlar görünür.",

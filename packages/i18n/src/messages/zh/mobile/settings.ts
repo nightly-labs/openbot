@@ -137,6 +137,8 @@ export const messages = {
   "mobile.settings.notifications.offForEveryone": "对此服务器上的所有人关闭",
   "mobile.settings.notifications.turnOn": "开启",
   "mobile.settings.notifications.turnOnFor": "为此服务器上的所有人开启 {name} 的通知",
+  "mobile.settings.notifications.chooseAgent": "为单个助手选择",
+  "mobile.settings.notifications.chooseAnotherAgent": "选择其他助手",
   "mobile.settings.notifications.levelsFooter": "再次轻点助手的级别，即可改为跟随服务器。",
   "mobile.settings.notifications.agentsUnsupported": "在此服务器上更新 OpenBot 后即可选择助手。",
   "mobile.settings.notifications.agentsOffline": "此服务器在线时会显示助手。",

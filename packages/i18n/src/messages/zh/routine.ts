@@ -153,8 +153,6 @@ export const messages = {
   "routine.card.saved": "已保存",
   "routine.card.saveFailed": "无法保存计划。",
   "routine.card.deleted": "该自动化任务已被删除。",
-  "routine.card.changedLater": "稍后在该对话中被修改。",
-  "routine.card.showLatest": "显示最新",
   "routine.card.created": "创建了自动化任务",
   "routine.card.updated": "更新了自动化任务",
   "routine.card.open": "打开自动化任务 {name}",

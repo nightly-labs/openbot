@@ -141,8 +141,6 @@ export const messages = {
   "routine.card.saved": "Opgeslagen",
   "routine.card.saveFailed": "Kan het schema niet opslaan.",
   "routine.card.deleted": "Deze routine is verwijderd.",
-  "routine.card.changedLater": "Later gewijzigd in deze chat.",
-  "routine.card.showLatest": "Nieuwste tonen",
   "routine.card.created": "Routine gemaakt",
   "routine.card.updated": "Routine bijgewerkt",
   "routine.card.open": "Routine {name} openen",

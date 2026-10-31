@@ -155,8 +155,6 @@ export const messages = {
   "routine.card.saved": "Enregistrée",
   "routine.card.saveFailed": "Impossible d’enregistrer la planification.",
   "routine.card.deleted": "Cette routine a été supprimée.",
-  "routine.card.changedLater": "Modifiée plus tard dans cette discussion.",
-  "routine.card.showLatest": "Dernière version",
   "routine.card.created": "Routine créée",
   "routine.card.updated": "Routine mise à jour",
   "routine.card.open": "Ouvrir la routine {name}",

@@ -6,11 +6,14 @@ import Copy from "lucide-react-native/icons/copy";
 import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import Plus from "lucide-react-native/icons/plus";
 import Reply from "lucide-react-native/icons/reply";
+import Square from "lucide-react-native/icons/square";
 import TextSelect from "lucide-react-native/icons/square-dashed-text";
+import Volume2 from "lucide-react-native/icons/volume-2";
 import { type PropsWithChildren, useMemo, useState } from "react";
 import { type AccessibilityState, Pressable, View } from "react-native";
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { toggleReadAloud, useReadingAloud } from "@/features/voice/model/message-reading";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -24,7 +27,7 @@ const PRESSED = { transform: [{ scale: 0.94 }] };
 
 /**
  * A button of the row under a message, with the size and look of a small ghost HeroUI `Button`. It
- * is a plain pressable: each message in the chat has four of these, and each HeroUI button mounts an
+ * is a plain pressable: each message in the chat has up to five of these, and each HeroUI button mounts an
  * animated pressable with about nine shared values and four animated styles, which made the chat
  * lag while it scrolled. The press shows at once, without an animation.
  */
@@ -61,9 +64,38 @@ function ActionButton({
   );
 }
 
+/** Reads the message aloud with the reply voice from the settings. A second tap stops it. */
+function ReadAloudButton({
+  messageId,
+  text,
+  color,
+  selectedColor,
+}: {
+  messageId: string;
+  text: string;
+  color: string;
+  selectedColor: string;
+}) {
+  const { t } = useText();
+  const reading = useReadingAloud(messageId);
+  return (
+    <ActionButton
+      selected={reading}
+      accessibilityLabel={reading ? t("mobile.chat.message.stopReading") : t("mobile.chat.message.readAloud")}
+      accessibilityState={{ selected: reading }}
+      onPress={() => {
+        void haptics.selection();
+        toggleReadAloud(messageId, text);
+      }}
+    >
+      {reading ? <Square size={ICON_SIZE} color={selectedColor} /> : <Volume2 size={ICON_SIZE} color={color} />}
+    </ActionButton>
+  );
+}
+
 /**
- * The row under a message: its reactions, Copy, React, Reply, Select text and the time. A phone has
- * no hover, so the row always shows, and each action takes one tap.
+ * The row under a message: its reactions, Copy, Read aloud, React, Reply, Select text and the time. A
+ * phone has no hover, so the row always shows, and each action takes one tap.
  */
 export function ChatMessageActions({
   align,
@@ -75,6 +107,7 @@ export function ChatMessageActions({
   onReply,
   onSelectText,
   selecting = false,
+  readAloudId,
 }: {
   align: "start" | "end";
   /** The text that Copy puts on the clipboard. Empty for a message of files only. */
@@ -88,6 +121,8 @@ export function ChatMessageActions({
   /** Starts the selection of the text in the bubble, or ends it while `selecting`. */
   onSelectText?: () => void;
   selecting?: boolean;
+  /** The message that Read aloud reads. Unset where the app cannot read aloud. */
+  readAloudId?: string;
 }) {
   const { t, format } = useText();
   const [mutedColor, foregroundColor] = useThemeColor(["muted", "foreground"]);
@@ -171,6 +206,14 @@ export function ChatMessageActions({
           >
             {copied ? <Check size={ICON_SIZE} color={muted} /> : <Copy size={ICON_SIZE} color={muted} />}
           </ActionButton>
+        ) : null}
+        {readAloudId && copyText ? (
+          <ReadAloudButton
+            messageId={readAloudId}
+            text={copyText}
+            color={muted}
+            selectedColor={String(foregroundColor)}
+          />
         ) : null}
         {onReact ? (
           <ActionButton

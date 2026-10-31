@@ -153,8 +153,6 @@ export const messages = {
   "routine.card.saved": "Guardada",
   "routine.card.saveFailed": "No se pudo guardar la programación.",
   "routine.card.deleted": "Esta rutina se eliminó.",
-  "routine.card.changedLater": "Se modificó más adelante en este chat.",
-  "routine.card.showLatest": "Ver la última",
   "routine.card.created": "Rutina creada",
   "routine.card.updated": "Rutina actualizada",
   "routine.card.open": "Abrir la rutina {name}",

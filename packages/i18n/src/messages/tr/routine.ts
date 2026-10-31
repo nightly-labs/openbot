@@ -153,8 +153,6 @@ export const messages = {
   "routine.card.saved": "Kaydedildi",
   "routine.card.saveFailed": "Zamanlama kaydedilemedi.",
   "routine.card.deleted": "Bu rutin silindi.",
-  "routine.card.changedLater": "Daha sonra bu sohbette değiştirildi.",
-  "routine.card.showLatest": "Sonuncuyu göster",
   "routine.card.created": "Rutin oluşturuldu",
   "routine.card.updated": "Rutin güncellendi",
   "routine.card.open": "{name} rutinini aç",

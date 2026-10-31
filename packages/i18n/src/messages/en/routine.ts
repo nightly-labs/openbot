@@ -152,8 +152,6 @@ export const messages = defineMessages("routine", {
   "routine.card.saved": "Saved",
   "routine.card.saveFailed": "Could not save the schedule.",
   "routine.card.deleted": "This routine was deleted.",
-  "routine.card.changedLater": "Changed later in this chat.",
-  "routine.card.showLatest": "Show latest",
   "routine.card.created": "Created routine",
   "routine.card.updated": "Updated routine",
   "routine.card.open": "Open routine {name}",

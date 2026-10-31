@@ -141,8 +141,6 @@ export const messages = {
   "routine.card.saved": "Salva",
   "routine.card.saveFailed": "Não foi possível salvar o agendamento.",
   "routine.card.deleted": "Esta rotina foi excluída.",
-  "routine.card.changedLater": "Alterada mais adiante neste chat.",
-  "routine.card.showLatest": "Ver a mais recente",
   "routine.card.created": "Rotina criada",
   "routine.card.updated": "Rotina atualizada",
   "routine.card.open": "Abrir rotina {name}",
