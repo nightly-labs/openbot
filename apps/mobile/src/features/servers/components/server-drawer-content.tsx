@@ -61,7 +61,7 @@ const HEADER_AVATAR_SIZE = 48;
 // header's bottom and goes on this far below it.
 const HEADER_FADE_START = 16;
 const HEADER_EDGE = 16;
-// The first row starts below the blur, so it is clear when the list is at the top.
+// The first row's text starts below the blur, so it is clear when the list is at the top.
 const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
@@ -365,17 +365,17 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
       <View className="flex-1">
         <View
           className="absolute top-0 right-0 left-0 z-20 pr-3 pb-1"
+          pointerEvents="box-none"
           style={{ paddingTop: Math.max(topInset, 16) }}
           onLayout={(event) => {
             const measured = event.nativeEvent.layout.height;
             setHeaderHeight((current) => (current === measured ? current : measured));
           }}
         >
-          <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3">
+          <View className="min-h-14 flex-row items-center justify-between gap-2 pl-3" pointerEvents="box-none">
             {activeServer ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={subtitle ? `${activeServer.name}, ${subtitle}` : activeServer.name}
                 accessibilityHint={t("mobile.server.drawer.serverListHint")}
                 accessibilityState={{ expanded: showsList }}
                 className="min-w-0 shrink flex-row items-center gap-3"
@@ -457,7 +457,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
           contentContainerStyle={{ paddingTop: headerHeight + LIST_TOP_GAP }}
           contentInsetAdjustmentBehavior="never"
           scrollEnabled={!dragging}
-          scrollIndicatorInsets={{ top: headerHeight }}
           showsVerticalScrollIndicator={false}
         >
           <ServerListCollapse open={showsList} reducedMotion={reducedMotion}>

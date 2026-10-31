@@ -91,6 +91,8 @@ function CropArea({
   extent: number;
   readCrop: { current: (() => AvatarCrop) | null };
 }) {
+  // A circle keeps its circular corners; a rounded square uses the smooth corners of the avatar.
+  const borderCurve = cornerRadius * 2 < side ? "continuous" : "circular";
   const { t } = useText();
   // At scale 1 the photo just covers the shape's square.
   const base = side / Math.max(Math.min(source.width, source.height), 1);
@@ -222,7 +224,7 @@ function CropArea({
             top: centerY - side / 2 - extent,
             width: side + extent * 2,
             height: side + extent * 2,
-            borderCurve: "continuous",
+            borderCurve,
             borderRadius: cornerRadius + extent,
             borderWidth: extent,
           }}
@@ -236,7 +238,7 @@ function CropArea({
             top: centerY - side / 2,
             width: side,
             height: side,
-            borderCurve: "continuous",
+            borderCurve,
             borderRadius: cornerRadius,
             borderWidth: StyleSheet.hairlineWidth,
           }}
