@@ -148,7 +148,15 @@ if [ "$mode" = hosted ]; then
 fi
 
 # The outer xvfb-run starts the agent display, at the display size. The inner one starts the OpenBot
-# display and adds its key to the same authority file.
+# display and adds its key to the same authority file. The agent display gets a grey background and
+# openbox, as on the boat desktop, so remote desktop does not show a black screen and agent windows
+# get a frame and the focus on a click. openbox is not the parent of OpenBot, so `--stop` does not
+# wait for it. An update continues without a package that the system does not have.
 exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp" \
-  bash -c 'export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
+  bash -c 'export OPENBOT_AGENT_DISPLAY=$DISPLAY
+    if command -v openbox >/dev/null; then
+      xsetroot -solid "#3a3a3c"
+      (openbox >/dev/null 2>&1 &)
+    fi
+    exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
   openbot-hosted-server "${openbot[@]}"

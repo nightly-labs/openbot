@@ -74,7 +74,9 @@ changing provider sessions.
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
-`OPENBOT_AGENT_DISPLAY`. A boat hosted server names its desktop `:0`, and OpenBot runs on an Xvfb
+`OPENBOT_AGENT_DISPLAY`. The agent display gets a grey background and openbox, the window manager
+of the boat desktop: a bare Xvfb root shows black in remote desktop, and its windows have no frame
+and get no focus on a click. A boat hosted server names its desktop `:0`, and OpenBot runs on an Xvfb
 display. Electron keeps its own `DISPLAY`: the built-in browser draws its tabs in
 the OpenBot window, and under Xvfb a hidden view gives no capture and no clicks, so OpenBot cannot
 only hide its window. On Linux, `agent-display.ts` sets `DISPLAY` to the agent display for the

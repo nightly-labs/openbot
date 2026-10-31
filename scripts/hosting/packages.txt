@@ -12,6 +12,9 @@ openssl
 x11-utils
 xauth
 xvfb
+# The window manager and the background of the agent display on a self-hosted server.
+openbox
+x11-xserver-utils
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
 # Electron.

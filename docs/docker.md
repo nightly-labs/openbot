@@ -479,7 +479,8 @@ the images to GHCR only after the GitHub Release is published.
 that it can make a user namespace, starts D-Bus, two virtual displays and the keyring, and then
 becomes OpenBot with `OPENBOT_SERVER=1`. OpenBot shows its windows on `:0`, at 1280x800. The agents
 work on `:1`, at the size of `OPENBOT_DISPLAY_SIZE`, which the script names in
-`OPENBOT_AGENT_DISPLAY`. Computer Use and remote desktop use `:1`, so they do not show the OpenBot
+`OPENBOT_AGENT_DISPLAY`. `:1` has a grey background and openbox, as the boat desktop, so remote
+desktop does not show a black screen. Computer Use and remote desktop use `:1`, so they do not show the OpenBot
 window. On a stop, tini gives the signal to OpenBot and waits for it.
 `/opt/OpenBot/hosted/mode` is `container`, so the `openbot` command talks to the control socket and
 does not use systemd.
@@ -510,7 +511,8 @@ does not use systemd.
   Tailscale tailnet. This was not tested here. On a public Ubuntu 24.04 VPS with Docker 29, the
   bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.
 - The two displays of the entrypoint were tested with a stand-in for OpenBot: `:0` is 1280x800 and
-  `:1` has the display size. Computer Use and remote desktop on `:1` were not tested.
+  `:1` has the display size. Computer Use and remote desktop on `:1` were not tested, and neither was
+  openbox on `:1`.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in
   bubblewrap, which mounts its root in a user namespace. The seccomp profile allows `mount` only with
   `CAP_SYS_ADMIN` and always refuses `pivot_root`, and the `docker-default` AppArmor profile refuses

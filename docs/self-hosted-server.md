@@ -245,7 +245,9 @@ Xvfb with `OPENBOT_SERVER=1`. Main (`src/main/server-mode.ts`) then opens the co
 
 The server has two Xvfb displays, one in each of two nested `xvfb-run` commands that share one
 authority file. The outer one starts the agent display, at the [display size](#display-size), and
-the script names it in `OPENBOT_AGENT_DISPLAY`. The inner one starts the display that OpenBot shows
+the script names it in `OPENBOT_AGENT_DISPLAY`. The script sets a grey background on the agent
+display and starts openbox there, as on the boat desktop, so remote desktop does not show a black
+screen and agent windows get a frame and the focus on a click. The inner one starts the display that OpenBot shows
 its windows on, at 1280x800. Main gives that display to Computer Use, to remote desktop and to the agent
 processes, so an agent's screenshot and remote desktop do not show the OpenBot window. See
 [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server).
