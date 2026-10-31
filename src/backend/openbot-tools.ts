@@ -665,7 +665,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    description: `Call this when the user asks to connect or use a service in this list and you have no tools for it: ${MARKETPLACE_APP_IDS.join(", ")}. It shows the user a card in this conversation to connect the app; nothing connects without the user. For an app that is already installed, it tests the app and returns what the user must do, such as a Sign in card or setup steps. Keep your normal answer.`,
+    description: `Call this when the user asks to connect or use a service in this list and you have no tools for it, or when its server fails to connect: ${MARKETPLACE_APP_IDS.join(", ")}. It shows the user a card in this conversation to connect the app; nothing connects without the user. For an app that is already installed, it tests the app and returns what the user must do, such as a Sign in card or setup steps. Keep your normal answer.`,
     shape: {
       app: z
         .string()
