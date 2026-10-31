@@ -11,16 +11,6 @@ the [root changelog](../../CHANGELOG.md).
 
 ### Added
 
-- Tap the activity row of a working agent to open a sheet with each thought of the turn in full and the progress lines between them. The sheet updates live and keeps the newest text in view until you scroll up; "Latest" goes back to it.
-- A finished turn shows a row above its answer with how long the agent thought and its step count. Tap it to open the same sheet for that turn.
-- iPad support. The app fills the iPad screen in portrait and landscape.
-- On a wide screen, such as iPad, an open iPhone Duo or an open Android foldable, the chat list stays beside the open chat.
-- On a wide screen, you can drag the edge of the chat list to make it wider or narrower. Drag it to the left to show only avatars.
-- iPhone Duo support. When you open iPhone Duo, the chat list and the chat show on each side of the fold. When you fold it, the open chat stays open.
-- When a new version of the app is available, home shows a header with the OpenBot eyes. Tap Update to open the store page, or Later to hide it until the next version.
-- An update that does not need the store installs in the app: Update restarts OpenBot with the new version.
-- Tap What's new under the update buttons to read the release notes of each new version. The notes slide down from under the header, over the chat list.
-- Settings › Notifications is now the one place for notifications: choose a server, then All, Needs me, or Off for the whole server and for each of its agents. These choices apply on all your devices, and a change shows at once on the others; a mute applies to this phone only. The agent screen shows the level and opens Settings › Notifications; the server settings no longer have a Notifications row. The agent screen no longer has its own Notifications switch, and "Notify me about" opens the Notifications view inside the agent sheet. An agent that was switched off for everyone shows "Turn on". The server needs the latest OpenBot.
 - The server plans show how many hosted sites each plan has.
 - Owners and admins can set how many threads of an agent run at the same time in **Agent info → Advanced → Parallel threads**, as on desktop. **Default (2)** uses the host default. When the provider runs one turn at a time, the control shows 1, and the threads of the agent wait for each other.
 - Agent info › Advanced now has **Agent starts new chats**, as on desktop. When it is on, the agent starts a new chat when its chat gets long, and saves notes first. Only an owner or admin of the server sees it, and the server's computer must have the latest OpenBot version. A change on the phone shows at once on the computer, and a change on the computer shows at once on the phone.
@@ -52,10 +42,6 @@ the [root changelog](../../CHANGELOG.md).
 
 ### Changed
 
-- "Waiting for replies" shows when a teammate waits for your approval, your answer or you in the browser, with the command or the question. Review, Answer or Take over opens the teammate's chat.
-- Code blocks in chat now wrap long lines, so you can read an email draft or a long command without scrolling sideways. Line breaks and Copy do not change.
-- The MCP server screen now says that Claude and Codex agents get a server that has a working directory.
-- The Live Activity shows the first sentences of a reply, without code blocks, headings or mail headers, and hides secrets and email addresses as "•••". Approve shows only for a command that it shows in full.
 - When the connection service restarts, each app waits a random 0.5 to 4 seconds before it connects again. Before, all apps connected again in the same half second, and many of them had to try again. Open chats and connections to your servers stay up while the app waits.
 - Your analytics answer follows your account. When you change **Settings → Privacy → Share product analytics**, the account keeps your answer, and your other devices use it after sign-in. When you agree on desktop or web, the phone turns analytics on after sign-in. An older choice from a phone that was offline does not replace a newer one.
 - If you turned analytics off before this version, an analytics answer from another device does not turn it on again on that device. Only a change on that device turns it on.
@@ -72,6 +58,48 @@ the [root changelog](../../CHANGELOG.md).
 - A tap on an agent row in the server Usage screen opens the usage of that agent. The agent filter
   is removed. The agent Usage page shows the agent name in its title.
 - Keep the values of the two Usage summary cards on the same line when a label wraps.
+
+### Fixed
+
+- Connect to your server again within about 30 seconds after the server comes back. Before, the
+  app could wait up to 2 minutes after five failed attempts.
+- When you open the thinking of a running reply and its steps are short, the steps now show below the sheet title. Before, they started under the title, and you had to scroll to see them.
+- A long thread title no longer pushes the chevron in the thread header against the edge of the title button.
+- After a server changed its key, the app used the previous key until it restarted, so it could not
+  connect. Now it connects with the new key when it loads the server list.
+- The server key section shows a key change from another device when you open Server settings.
+  Before, it showed the change only after the app restarted.
+- When you crop a server logo, the crop area has the rounded-square shape of the logo, not a circle.
+- Keep the plan-limit rings in the home header when the host reports the usage of one provider. Before,
+  the rings of the other providers went away for a moment. A new reading now moves the ring fill.
+
+### Security
+
+- The app keeps the first key that it sees for each server, also for a server that you joined on
+  another device. A later key change is used only when the previous key signed a handover to it.
+  Otherwise only the connection to that server fails, and the other servers stay available.
+
+## [1.4.4] - 2026-10-31
+
+### Added
+
+- Tap the activity row of a working agent to open a sheet with each thought of the turn in full and the progress lines between them. The sheet updates live and keeps the newest text in view until you scroll up; "Latest" goes back to it.
+- A finished turn shows a row above its answer with how long the agent thought and its step count. Tap it to open the same sheet for that turn.
+- iPad support. The app fills the iPad screen in portrait and landscape.
+- On a wide screen, such as iPad, an open iPhone Duo or an open Android foldable, the chat list stays beside the open chat.
+- On a wide screen, you can drag the edge of the chat list to make it wider or narrower. Drag it to the left to show only avatars.
+- iPhone Duo support. When you open iPhone Duo, the chat list and the chat show on each side of the fold. When you fold it, the open chat stays open.
+- When a new version of the app is available, home shows a header with the OpenBot eyes. Tap Update to open the store page, or Later to hide it until the next version.
+- An update that does not need the store installs in the app: Update restarts OpenBot with the new version.
+- Tap What's new under the update buttons to read the release notes of each new version. The notes slide down from under the header, over the chat list.
+- Settings › Notifications is now the one place for notifications: choose a server, then All, Needs me, or Off for the whole server and for each of its agents. These choices apply on all your devices, and a change shows at once on the others; a mute applies to this phone only. The agent screen shows the level and opens Settings › Notifications; the server settings no longer have a Notifications row. The agent screen no longer has its own Notifications switch, and "Notify me about" opens the Notifications view inside the agent sheet. An agent that was switched off for everyone shows "Turn on". The server needs the latest OpenBot.
+
+### Changed
+
+- "Waiting for replies" shows when a teammate waits for your approval, your answer or you in the browser, with the command or the question. Review, Answer or Take over opens the teammate's chat.
+- Code blocks in chat now wrap long lines, so you can read an email draft or a long command without scrolling sideways. Line breaks and Copy do not change.
+- The MCP server screen now says that Claude and Codex agents get a server that has a working directory.
+- The Live Activity shows the first sentences of a reply, without code blocks, headings or mail headers, and hides secrets and email addresses as "•••". Approve shows only for a command that it shows in full.
 
 ### Fixed
 
@@ -94,23 +122,6 @@ the [root changelog](../../CHANGELOG.md).
 - Notifications start to work when Apple or Google gave no push token at the first try. Before, the phone got no notifications until you opened the app again.
 - Notifications and Live Activity updates reach an iPhone app that is not from the App Store, such as a build that Xcode installs or an ad hoc build. Before, the app could name the wrong Apple push environment, and Apple refused every notification and update for it.
 - Show the full names in the chat + menu. Before, a long name, such as "Use skill or app" in Polish, was cut off.
-- Connect to your server again within about 30 seconds after the server comes back. Before, the
-  app could wait up to 2 minutes after five failed attempts.
-- When you open the thinking of a running reply and its steps are short, the steps now show below the sheet title. Before, they started under the title, and you had to scroll to see them.
-- A long thread title no longer pushes the chevron in the thread header against the edge of the title button.
-- After a server changed its key, the app used the previous key until it restarted, so it could not
-  connect. Now it connects with the new key when it loads the server list.
-- The server key section shows a key change from another device when you open Server settings.
-  Before, it showed the change only after the app restarted.
-- When you crop a server logo, the crop area has the rounded-square shape of the logo, not a circle.
-- Keep the plan-limit rings in the home header when the host reports the usage of one provider. Before,
-  the rings of the other providers went away for a moment. A new reading now moves the ring fill.
-
-### Security
-
-- The app keeps the first key that it sees for each server, also for a server that you joined on
-  another device. A later key change is used only when the previous key signed a handover to it.
-  Otherwise only the connection to that server fails, and the other servers stay available.
 
 ## [1.4.3] - 2026-10-29 (iOS), 2026-10-31 (Android)
 

@@ -1,10 +1,10 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "highlights": [
-    "Talk with an agent by voice: tap the microphone in a chat or a channel, and the agent listens, answers aloud and listens again.",
-    "Workflows on the phone: see runs, approve or retry steps, pin a workflow to the sidebar, and edit or make workflows.",
-    "Agent chats have threads, as on desktop. Start, rename, archive and send files in a thread from the agent's name.",
-    "Share to an agent from any iPhone app without opening OpenBot.",
-    "Manage a server's Vault and connect Bitwarden or Vaultwarden, plus a Dutch interface and new Marketplace apps."
+    "The app now works on iPad, iPhone Duo and Android foldables. On a wide screen, the chat list stays beside the open chat.",
+    "Tap the activity row of a working agent to read each thought of the turn in full, live.",
+    "Settings › Notifications is the one place for notifications: choose All, Needs me or Off for each server and agent, on all your devices.",
+    "When a new version is available, home shows an update header, and What's new shows the release notes.",
+    "Code blocks in chat wrap long lines, so you can read a long command without scrolling sideways."
   ]
 }
