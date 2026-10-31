@@ -60,9 +60,16 @@ export function agentInstructionsIpcHandlers({
       ),
       saveAgentInstructions: payloadHandler(parseSaveAgentInstructionsInput, ({ agentId, text, expected }) =>
         oneAtATime(agentId, async () => {
-          const file = await run(saveAgentInstructionsFile(workspace(agentId), text, expected));
-          service.instructionsSaved(agentId, file.text);
-          return file;
+          const path = workspace(agentId);
+          const done = service.instructionsSaving(agentId, text);
+          let written = false;
+          try {
+            const file = await run(saveAgentInstructionsFile(path, text, expected));
+            written = true;
+            return file;
+          } finally {
+            done(written);
+          }
         }),
       ),
     },

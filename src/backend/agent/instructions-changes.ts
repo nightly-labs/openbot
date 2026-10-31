@@ -16,6 +16,8 @@ interface Baseline {
   /** Null when the file could not be read. */
   text: string | null;
   turns: Set<string>;
+  /** Counts the user's saves, so a turn end that reads during a save does not record it. */
+  saves: number;
 }
 
 /** The text of the file, empty when there is none, or null when it cannot be read. */
@@ -32,6 +34,8 @@ const currentText = (workspace: string) =>
  */
 export class InstructionsChanges {
   readonly #agents = new Map<string, Baseline>();
+  /** The text of a user's save that is in progress. Main runs one save at a time for each agent. */
+  readonly #saving = new Map<string, string>();
 
   readonly startTurn = Effect.fn("InstructionsChanges.startTurn")(function* (
     this: InstructionsChanges,
@@ -44,7 +48,7 @@ export class InstructionsChanges {
       known.turns.add(turnId);
       return;
     }
-    const baseline: Baseline = { text: null, turns: new Set([turnId]) };
+    const baseline: Baseline = { text: null, turns: new Set([turnId]), saves: 0 };
     this.#agents.set(agentId, baseline);
     const text = yield* currentText(workspace);
     baseline.text ??= text;
@@ -63,9 +67,16 @@ export class InstructionsChanges {
       this.dropTurn(agentId, turnId);
       return null;
     }
+    const saves = baseline.saves;
     const after = yield* currentText(workspace);
     baseline.turns.delete(turnId);
     if (baseline.turns.size === 0) this.#agents.delete(agentId);
+    // The user saved during the read, or wrote the file and did not report it yet: not the agent's.
+    if (baseline.saves !== saves) return null;
+    if (after !== null && after === this.#saving.get(agentId)) {
+      baseline.text = after;
+      return null;
+    }
     const before = baseline.text;
     if (after !== null) baseline.text = after;
     return before === null || after === null || before === after
@@ -80,10 +91,19 @@ export class InstructionsChanges {
     this.#agents.delete(agentId);
   }
 
-  /** The user saved the file: the next turn end compares with this text. */
-  saved(agentId: string, text: string): void {
-    const baseline = this.#agents.get(agentId);
-    if (baseline) baseline.text = text;
+  /**
+   * The user starts to save `text`. Call the result when the save ends; with `written`, the next
+   * turn end compares with this text.
+   */
+  saving(agentId: string, text: string): (written: boolean) => void {
+    this.#saving.set(agentId, text);
+    return (written) => {
+      this.#saving.delete(agentId);
+      const baseline = this.#agents.get(agentId);
+      if (!written || !baseline) return;
+      baseline.text = text;
+      baseline.saves += 1;
+    };
   }
 }
 

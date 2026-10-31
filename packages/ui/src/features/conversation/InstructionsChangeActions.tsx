@@ -24,11 +24,14 @@ export function InstructionsChangeActions(props: {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let closed = false;
+  /** A read that ends after a save, or after a later read, does not replace the newer text. */
+  let request = 0;
 
   async function refresh(): Promise<void> {
+    const mine = ++request;
     try {
       const file = await props.calls.read(props.agentId);
-      if (!closed) setCurrent(file.text);
+      if (!closed && mine === request) setCurrent(file.text);
     } catch {
       // Undo stays hidden. View still opens the editor, which shows its own read error.
     }
@@ -37,7 +40,9 @@ export function InstructionsChangeActions(props: {
   onSettled(() => {
     void refresh();
     const stop = props.calls.watch((agentId, file) => {
-      if (agentId === props.agentId) setCurrent(file.text);
+      if (agentId !== props.agentId) return;
+      ++request;
+      setCurrent(file.text);
     });
     return () => {
       closed = true;

@@ -1721,9 +1721,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return reasons;
   }
 
-  /** The user saved the agent's instruction file: a turn that runs now does not show it as the agent's change. */
-  instructionsSaved(agentId: string, text: string): void {
-    this.#instructionChanges.saved(agentId, text);
+  /**
+   * The user starts to save the agent's instruction file: a turn that runs now does not show the
+   * save as the agent's change. Call the result when the save ends.
+   */
+  instructionsSaving(agentId: string, text: string): (written: boolean) => void {
+    return this.#instructionChanges.saving(agentId, text);
   }
 
   listMemories(agentId: string): AgentMemory[] {
