@@ -42,12 +42,12 @@ interface ClientEvents {
 }
 
 /**
- * A stderr record that reports an error: Codex's own `ERROR` or `FATAL` level, as in
- * `2026-10-31T16:34:28Z ERROR codex_app_server: …`, a Rust panic, or a launcher's `Error: …`,
- * `fatal: …`.
+ * A stderr record that says why a process stopped: a Rust panic, a `FATAL` record, or what a `main`
+ * that returned an error prints (`Error: …`, `fatal: …`). Codex's `ERROR` level does not count. Codex
+ * also writes it at each start for things that do not stop it, such as a folder that is not trusted
+ * (#4265), and such a record is not the reason for a later exit.
  */
-const ERROR_RECORD =
-  /^(?:\S+\s+)?(?:ERROR|FATAL)\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S|\bpanicked at\b/u;
+const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 /** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
 const STDERR_END_WAIT_MS = 250;
 
@@ -122,14 +122,14 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
 
     // Whole records only. A chunk ends wherever the pipe filled up, and half a record is neither
     // readable nor reliably redactable.
-    // The runtime only logs these records. An exit names the last error record, or the last record.
+    // The runtime only logs these records. An exit names the last crash record, or the last record.
     let lastRecord: string | null = null;
-    let lastError: string | null = null;
+    let lastCrash: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: redactDiagnostic,
       emit: (message) => {
         lastRecord = message;
-        if (ERROR_RECORD.test(message)) lastError = message;
+        if (CRASH_RECORD.test(message)) lastCrash = message;
         this.emit("diagnostic", message);
       },
     });
@@ -144,7 +144,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       if (signal) return this.#fail(new Error(`Codex App Server exited with signal ${signal}.`), child);
       if (code === 0) return this.#fail(new Error("Codex App Server exited with code 0."), child);
       const fail = () => {
-        const detail = (lastError ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
+        const detail = (lastCrash ?? lastRecord)?.replace(LOG_TIMESTAMP_PREFIX, "") ?? null;
         this.#fail(new AgentProcessExitError(`Codex App Server exited with code ${code ?? "unknown"}.`, detail), child);
       };
       // Node can send `exit` before stderr is read to its end, and a CLI that fails writes the
