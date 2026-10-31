@@ -131,6 +131,7 @@ export function ChannelAboveComposer(props: { channelId: string }) {
       taskId,
       recipientAgentId: null,
     });
+  const onCancel = () => (channels.taskCancelSupported() ? cancelTask : undefined);
   return (
     <Show when={page()}>
       {(current) => (
@@ -140,7 +141,7 @@ export function ChannelAboveComposer(props: { channelId: string }) {
             members={current().channel.members}
             name={name}
             onResume={resumeTask}
-            onCancel={channels.taskCancelSupported() ? cancelTask : undefined}
+            onCancel={onCancel()}
           />
           <Show when={!current().channel.archived && !current().channel.members.length}>
             <p>{t("channel.conversation.noMembers")}</p>
