@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { sourceText } from "@openbot/i18n/source";
+import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
@@ -94,12 +95,21 @@ export function ServerImportGuideScreen() {
     setPhase("reading");
     setError(null);
     setProgress(null);
+    let upload: RemoteFileUpload | null;
     try {
-      const upload = await pickZipUpload(AGENT_IMPORT_UPLOAD_BYTES, sourceText("error.import.remoteZipTooLarge"));
-      if (!upload) {
-        setPhase(open ? "review" : "guide");
-        return;
-      }
+      upload = await pickZipUpload(AGENT_IMPORT_UPLOAD_BYTES, sourceText("error.import.remoteZipTooLarge"));
+    } catch (caught) {
+      // Nothing went to the host, so the open export stays open.
+      setPhase(open ? "review" : "guide");
+      setError(errorMessage(caught, t("mobile.server.import.readFailed")));
+      void haptics.notification("error");
+      return;
+    }
+    if (!upload) {
+      setPhase(open ? "review" : "guide");
+      return;
+    }
+    try {
       // A new export releases the earlier one on the host.
       const next = await stageAgentImport(upload, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
       if (closed.current) {
@@ -160,6 +170,7 @@ export function ServerImportGuideScreen() {
           reading={phase === "reading"}
           importing={phase === "importing"}
           progress={progress}
+          error={error}
           onChoose={() => void choose()}
           onImport={(keys, channelKeys) => void apply(keys, channelKeys)}
         />
@@ -247,6 +258,7 @@ function ImportReview({
   reading,
   importing,
   progress,
+  error,
   onChoose,
   onImport,
 }: {
@@ -255,6 +267,7 @@ function ImportReview({
   reading: boolean;
   importing: boolean;
   progress: number | null;
+  error: string | null;
   onChoose: () => void;
   onImport: (keys: string[], channelKeys: string[]) => void;
 }) {
@@ -327,7 +340,10 @@ function ImportReview({
         pendingLabel={t("mobile.server.import.importing")}
         onSave={confirmAndStart}
       />
-      <SettingsSection title={t("mobile.server.import.reviewTitle", { source: sourceName })} footer={importLabel}>
+      <SettingsSection
+        title={t("mobile.server.import.reviewTitle", { source: sourceName })}
+        footer={error ?? importLabel}
+      >
         <SettingsRow disclosure={false} supportingText={caption}>
           <Typography.Paragraph>{importCount(t, "agent", preview.agents.length)}</Typography.Paragraph>
         </SettingsRow>
