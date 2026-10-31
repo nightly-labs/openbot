@@ -7,7 +7,7 @@
       {
         "type": "added",
         "items": [
-          "Branch a conversation: right-click an agent message and select Branch from here. A new thread opens with the conversation up to that message.",
+          "Branch a conversation: right-click the last agent message of a turn and select Branch from here. A new thread opens with the conversation up to that message.",
           "Agent settings have an Instructions page that shows the agent's AGENTS.md file. When the agent changes its instructions, the chat shows the change with Undo.",
           "The Marketplace is on openbot.run. Each agent and skill has its own page, and Copy link shares it.",
           "An agent can answer a website's alert or confirmation that its own browser action opened.",

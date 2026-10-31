@@ -1,7 +1,7 @@
 {
   "version": "0.57.0",
   "highlights": [
-    "Branch a conversation from any agent reply: right-click the message and select Branch from here.",
+    "Branch a conversation from the last agent reply of a turn: right-click the reply and select Branch from here.",
     "Each agent has an Instructions page that shows its AGENTS.md file, and you can undo a change that the agent makes to its instructions.",
     "The Marketplace is on openbot.run, with a page and a share link for each agent and skill.",
     "Agents send fewer tokens with every provider, and idle browser tabs use much less memory.",
