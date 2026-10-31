@@ -15,6 +15,7 @@ export const TRANSLATED_LOCALES = [
   "ru",
   "tr",
   "zh",
+  "zh-TW",
 ] as const;
 
 export type TranslatedLocale = (typeof TRANSLATED_LOCALES)[number];

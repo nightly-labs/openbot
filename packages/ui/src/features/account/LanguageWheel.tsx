@@ -45,6 +45,7 @@ const FLAG_REGION: Record<TranslatedLocale, string> = {
   ru: "RU",
   tr: "TR",
   zh: "CN",
+  "zh-TW": "TW",
 };
 
 /**
