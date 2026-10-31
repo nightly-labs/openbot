@@ -373,6 +373,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Не удалось начать новый чат",
   "mobile.agent.newChat.failedBody": "Хосту не удалось начать новый чат.",
   "mobile.agent.newChat.unsupported": "Этот хост не позволяет начать новый чат с удалённого устройства.",
+  "mobile.agent.agentNewChat.title": "Агент начинает новые чаты",
+  "mobile.agent.agentNewChat.footer":
+    "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "mobile.agent.tables.title": "Таблицы",
   "mobile.agent.tables.loading": "Загрузка таблиц…",
   "mobile.agent.tables.reconnect": "Переподключитесь, чтобы загрузить таблицы.",

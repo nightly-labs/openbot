@@ -22,7 +22,11 @@ import {
 } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentNewChatSection, AgentNotificationLevelRow } from "@/features/agents/components/agent-chat-settings";
-import { AgentBusyMessageField, AgentHostPermissionFields } from "@/features/agents/components/agent-host-fields";
+import {
+  AgentBusyMessageField,
+  AgentHostPermissionFields,
+  AgentNewChatAllowedField,
+} from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentPublish } from "@/features/agents/components/agent-publish";
@@ -109,6 +113,7 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentNewChat,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
   } = useMobileWorkspace();
@@ -120,7 +125,10 @@ function AgentForm({
   // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
   const showAdvanced =
-    Boolean(agent.workspacePath) || canStartNewChat(agent.serverId) || canManageAgentHostSettings(agent.serverId);
+    Boolean(agent.workspacePath) ||
+    canStartNewChat(agent.serverId) ||
+    canManageAgentHostSettings(agent.serverId) ||
+    canManageAgentNewChat(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -390,6 +398,7 @@ function AgentForm({
             </SettingsSection>
           ) : null}
           {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
+          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
         </>
       ) : null}
       {page === "tables" ? <AgentSharedTables agent={agent} available={available} /> : null}

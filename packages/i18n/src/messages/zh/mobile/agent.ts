@@ -333,6 +333,8 @@ export const messages = {
   "mobile.agent.newChat.failed": "无法开始新对话",
   "mobile.agent.newChat.failedBody": "主机无法开始新对话。",
   "mobile.agent.newChat.unsupported": "这台主机不支持从远程设备开始新对话。",
+  "mobile.agent.agentNewChat.title": "助手自行开始新对话",
+  "mobile.agent.agentNewChat.footer": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "mobile.agent.tables.title": "表格",
   "mobile.agent.tables.loading": "正在加载表格…",
   "mobile.agent.tables.reconnect": "请重新连接以加载表格。",

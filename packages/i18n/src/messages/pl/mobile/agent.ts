@@ -372,6 +372,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Nie udało się rozpocząć nowego czatu",
   "mobile.agent.newChat.failedBody": "Host nie mógł rozpocząć nowego czatu.",
   "mobile.agent.newChat.unsupported": "Ten host nie może rozpocząć nowego czatu ze zdalnego urządzenia.",
+  "mobile.agent.agentNewChat.title": "Agent rozpoczyna nowe czaty",
+  "mobile.agent.agentNewChat.footer":
+    "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "mobile.agent.tables.title": "Tabele",
   "mobile.agent.tables.loading": "Wczytywanie tabel…",
   "mobile.agent.tables.reconnect": "Połącz ponownie, aby wczytać tabele.",

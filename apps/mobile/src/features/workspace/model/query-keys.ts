@@ -7,13 +7,27 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 export type QueryScope = readonly [apiUrl: string | null | undefined, userId: string | undefined, sessionScope: number];
 
 /** The agent records that a single-part key ends in. */
-type AgentRecordPart = "memories" | "memory-selection" | "routines" | "storage" | "admin" | "host" | "publish";
+type AgentRecordPart =
+  | "memories"
+  | "memory-selection"
+  | "routines"
+  | "storage"
+  | "admin"
+  | "host"
+  | "new-chat"
+  | "publish";
 
 /**
  * The last parts of the agent records that are not in the agent summary. The host sends
  * `agents-changed` when one of them changes, so an open settings page reads them again.
  */
-export const AGENT_SETTINGS_PARTS: readonly string[] = ["admin", "host", "session-settings", "provider-accounts"];
+export const AGENT_SETTINGS_PARTS: readonly string[] = [
+  "admin",
+  "host",
+  "new-chat",
+  "session-settings",
+  "provider-accounts",
+];
 
 /**
  * Every query key of the app. The host events invalidate them by prefix, so a key that a reader

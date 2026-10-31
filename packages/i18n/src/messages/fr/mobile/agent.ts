@@ -361,6 +361,9 @@ export const messages = {
   "mobile.agent.newChat.failedBody": "L’hôte n’a pas pu commencer une nouvelle discussion.",
   "mobile.agent.newChat.unsupported":
     "Cet hôte ne peut pas commencer une nouvelle discussion depuis un appareil distant.",
+  "mobile.agent.agentNewChat.title": "L’agent démarre de nouvelles discussions",
+  "mobile.agent.agentNewChat.footer":
+    "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "mobile.agent.tables.title": "Tables",
   "mobile.agent.tables.loading": "Chargement des tables…",
   "mobile.agent.tables.reconnect": "Reconnectez-vous pour charger les tables.",

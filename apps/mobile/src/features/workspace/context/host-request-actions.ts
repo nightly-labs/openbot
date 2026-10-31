@@ -5,6 +5,7 @@ import {
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentHostSettings,
+  decodeAgentNewChatSettings,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
@@ -35,6 +36,7 @@ import {
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -263,6 +265,8 @@ type HostRequestActions = Pick<
   | "updateAgentAdminSettings"
   | "loadAgentHostSettings"
   | "updateAgentHostSettings"
+  | "loadAgentNewChat"
+  | "updateAgentNewChat"
   | "loadProviderAccounts"
   | "loadPlanLimits"
   | "setAgentProviderAccount"
@@ -806,6 +810,14 @@ export function createHostRequestActions({
     updateAgentHostSettings: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_HOST_SETTINGS_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_HOST_SETTINGS_ROUTES.update, decodeAgentHostSettings, { ...input }, serverId);
+    },
+    loadAgentNewChat: async (agentId, serverId) =>
+      has(serverId, AGENT_NEW_CHAT_CAPABILITY)
+        ? request("POST", AGENT_NEW_CHAT_ROUTES.settings, decodeAgentNewChatSettings, { agentId }, serverId)
+        : null,
+    updateAgentNewChat: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_NEW_CHAT_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_NEW_CHAT_ROUTES.update, decodeAgentNewChatSettings, { ...input }, serverId);
     },
     loadProviderAccounts: async (serverId) =>
       has(serverId, PROVIDER_ACCOUNTS_CAPABILITY) ? runTeamRequest(listProviderAccounts(teamApi(serverId))) : null,

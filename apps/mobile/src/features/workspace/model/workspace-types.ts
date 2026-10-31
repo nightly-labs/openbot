@@ -12,6 +12,7 @@ import type {
   AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
+  AgentNewChatSettings,
   AgentNotificationLevelsSnapshot,
   AgentProviderId,
   AgentReasoningEffort,
@@ -93,6 +94,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
+  UpdateAgentNewChatInput,
   UpdateRestartMode,
   UpdateRoutineInput,
   VaultHostImportResult,
@@ -558,6 +560,15 @@ export interface MobileWorkspaceContextValue {
   loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** An owner or admin of an online host that serves `agent-new-chat-v1`. The host checks the role again. */
+  canManageAgentNewChat: (serverId: string) => boolean;
+  /**
+   * Whether the agent starts a new chat itself when its chat gets long. Null when the host does not
+   * advertise `agent-new-chat-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentNewChat: (agentId: string, serverId: string) => Promise<AgentNewChatSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
+  updateAgentNewChat: (input: UpdateAgentNewChatInput, serverId: string) => Promise<AgentNewChatSettings>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -791,6 +802,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentSkills"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
+  | "canManageAgentNewChat"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canPublishAgent";

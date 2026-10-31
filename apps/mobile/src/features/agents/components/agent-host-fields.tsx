@@ -1,5 +1,6 @@
 import {
   type AgentHostSettings,
+  type AgentNewChatSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
@@ -172,6 +173,68 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
           }
         >
           <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
+ * Agent info > Advanced: whether the agent starts a new chat itself when its chat gets long, as on
+ * desktop. Only an owner or admin sees it, and only when the host serves `agent-new-chat-v1`. The
+ * host's `agents-changed` event reads it again, so a change on desktop shows here while the page is
+ * open, and a change here shows on desktop at once. The switch saves at once and goes back on a failure.
+ */
+export function AgentNewChatAllowedField({ agent, server, available }: AgentHostFieldsProps) {
+  const { t, errorMessage } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canAdminister = canAdministerServer(server?.role);
+  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "new-chat");
+  const settings = useQuery({
+    queryKey,
+    queryFn: () => workspace.loadAgentNewChat(agent.id, agent.serverId),
+    enabled: available && canAdminister,
+    retry: false,
+    staleTime: 0,
+  });
+  const current = canAdminister ? (settings.data ?? null) : null;
+  if (!current) return null;
+
+  async function save(previous: AgentNewChatSettings, allowNewChat: boolean) {
+    setSaving(true);
+    setError(null);
+    const next: AgentNewChatSettings = { ...previous, allowNewChat };
+    queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, next);
+    try {
+      const saved = await workspace.updateAgentNewChat({ agentId: agent.id, allowNewChat }, agent.serverId);
+      queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, saved);
+      void haptics.notification("success");
+    } catch (cause) {
+      queryClient.setQueryData<AgentNewChatSettings | null>(queryKey, previous);
+      void haptics.notification("error");
+      setError(errorMessage(cause, t("mobile.agent.host.failed")));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection footer={t("mobile.agent.agentNewChat.footer")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={current.allowNewChat}
+            disabled={!available || saving}
+            label={t("mobile.agent.agentNewChat.title")}
+            dark={theme === "dark"}
+            onValueChange={(allowNewChat) => void save(current, allowNewChat)}
+          />
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

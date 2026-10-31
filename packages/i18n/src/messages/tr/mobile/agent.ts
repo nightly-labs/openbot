@@ -361,6 +361,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Yeni bir sohbet başlatılamadı",
   "mobile.agent.newChat.failedBody": "Ana makine yeni bir sohbet başlatamadı.",
   "mobile.agent.newChat.unsupported": "Bu ana makine uzak bir cihazdan yeni sohbet başlatamaz.",
+  "mobile.agent.agentNewChat.title": "Ajan yeni sohbetler başlatır",
+  "mobile.agent.agentNewChat.footer":
+    "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "mobile.agent.tables.title": "Tablolar",
   "mobile.agent.tables.loading": "Tablolar yükleniyor…",
   "mobile.agent.tables.reconnect": "Tabloları yüklemek için yeniden bağlanın.",
