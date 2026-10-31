@@ -2875,8 +2875,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ...(failingOver ? { cause: "provider-error" as const } : {}),
           })
         : undefined;
+    // An explicit effort change on a backup model is also the effort to use after the return. A
+    // model, provider or account move keeps the existing return behavior below.
+    const updatedReturn =
+      !moved && input.reasoningEffort !== undefined && previous?.usageLimitReturn
+        ? { ...previous.usageLimitReturn, reasoningEffort: input.reasoningEffort }
+        : returnTo;
     const usageLimitReturn =
-      returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
+      returning || (updatedReturn && nextChoice && sameAgentModelChoice(updatedReturn, nextChoice))
+        ? null
+        : updatedReturn;
     const agent = yield* this.#store.updateAgent(
       {
         ...input,
