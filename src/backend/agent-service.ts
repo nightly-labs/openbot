@@ -413,6 +413,9 @@ export type AgentUpdate = UpdateAgentInput & {
   excludedFolders?: string[];
 };
 
+/** Room for the fixed subscribers of the main process, with a margin. */
+const AGENT_SERVICE_MAX_LISTENERS = 32;
+
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
   readonly messaging: MessagingThreads;
@@ -482,6 +485,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   constructor(options: AgentServiceOptions) {
     super();
+    // The main process subscribes one listener for each service that follows agent events: about 15,
+    // each removed when its service stops. Node warns at 10, so every start logged a
+    // MaxListenersExceededWarning. A count over this limit still warns, and is a leak.
+    this.setMaxListeners(AGENT_SERVICE_MAX_LISTENERS);
     const {
       store,
       mailbox,
