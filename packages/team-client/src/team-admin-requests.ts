@@ -1,11 +1,22 @@
 import {
+  type AddAgentFolderInput,
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentExclusionChange,
+  type AgentFolderBrowse,
+  type AgentFolderChange,
+  type AgentFolderInput,
+  type AgentFolderList,
   type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
+  type BrowseAgentFoldersInput,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
+  decodeAgentExclusionChangeFromMain,
+  decodeAgentFolderBrowse,
+  decodeAgentFolderChangeFromMain,
+  decodeAgentFolderListFromMain,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
   type HostSetDiscordAccessInput,
@@ -21,6 +32,7 @@ import {
   type SetOwnServerNotificationLevelInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
@@ -1221,6 +1233,49 @@ export function resetAgentSessionSetting(
   input: ResetAgentSessionSettingInput,
 ): Effect.Effect<AgentSessionSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_SESSION_SETTINGS_ROUTES.reset, decodeSessionSettings, { ...input }));
+}
+
+/** The folders of one agent, on a host that advertises `agent-folders-v1`. Owners and admins only. */
+export function readAgentFolders(
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.Effect<AgentFolderList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.read, decodeAgentFolderListFromMain, { agentId }));
+}
+export function addAgentFolder(
+  request: TeamApiRequest,
+  input: AddAgentFolderInput,
+): Effect.Effect<AgentFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.add, decodeAgentFolderChangeFromMain, { ...input }));
+}
+export function removeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.remove, decodeAgentFolderChangeFromMain, { ...input }));
+}
+export function excludeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentExclusionChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_FOLDERS_ROUTES.exclude, decodeAgentExclusionChangeFromMain, { ...input }),
+  );
+}
+export function includeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentExclusionChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_FOLDERS_ROUTES.include, decodeAgentExclusionChangeFromMain, { ...input }),
+  );
+}
+/** The folders in one folder of the host computer, to pick a folder from. */
+export function browseAgentFolders(
+  request: TeamApiRequest,
+  input: BrowseAgentFoldersInput,
+): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
 }
 
 function decodeHiddenAgents(value: unknown): HiddenAgentsSnapshot {

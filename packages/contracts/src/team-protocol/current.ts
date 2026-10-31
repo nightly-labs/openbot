@@ -6,6 +6,7 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "./agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
@@ -144,6 +145,7 @@ export {
   AGENT_ACCESS_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
@@ -362,6 +364,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_PROFILES_EVENTS_CAPABILITY,
   AGENT_PLAN_CARD_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  AGENT_FOLDERS_CAPABILITY,
   HOST_KEY_ROTATION_CAPABILITY,
 ] as const;
 
@@ -501,6 +504,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_PROFILES_EVENTS_CAPABILITY &&
     capability !== AGENT_PLAN_CARD_CAPABILITY &&
     capability !== TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY &&
+    capability !== AGENT_FOLDERS_CAPABILITY &&
     capability !== HOST_KEY_ROTATION_CAPABILITY,
 );
 /**
@@ -515,6 +519,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_PROFILES_EVENTS_CAPABILITY,
   AGENT_PLAN_CARD_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  AGENT_FOLDERS_CAPABILITY,
   HOST_KEY_ROTATION_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -612,6 +617,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_PROFILES_EVENTS_CAPABILITY &&
       capability !== AGENT_PLAN_CARD_CAPABILITY &&
       capability !== TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY &&
+      capability !== AGENT_FOLDERS_CAPABILITY &&
       capability !== HOST_KEY_ROTATION_CAPABILITY &&
       capability !== TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   );

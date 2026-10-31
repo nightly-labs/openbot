@@ -44,6 +44,8 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="backup-models" options={{ title: t("mobile.agent.backupModels.title") }} />
       <Stack.Screen name="backup-model-picker" options={{ title: t("mobile.agent.backupModels.add") }} />
       <Stack.Screen name="permissions" options={{ title: t("mobile.agent.permissions.title") }} />
+      <Stack.Screen name="folders" options={{ title: t("mobile.agent.folders.title") }} />
+      <Stack.Screen name="folder-browser" options={{ title: t("mobile.agent.folders.browseTitle") }} />
       <Stack.Screen name="advanced" options={{ title: t("mobile.agent.advanced.title") }} />
       <Stack.Screen name="browser-profile" options={{ title: t("mobile.agent.browserProfile.label") }} />
       <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />

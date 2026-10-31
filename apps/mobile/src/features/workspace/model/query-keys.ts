@@ -19,7 +19,8 @@ type AgentRecordPart =
   | "new-chat"
   | "plan-card"
   | "publish"
-  | "browser-profile";
+  | "browser-profile"
+  | "folders";
 
 /**
  * The last parts of the agent records that are not in the agent summary. The host sends
@@ -35,6 +36,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "session-settings",
   "provider-accounts",
   "browser-profile",
+  "folders",
 ];
 
 /**
@@ -98,6 +100,14 @@ export const queryKeys = {
     provider: AgentProviderId | undefined,
     model: string | undefined,
   ) => [...queryKeys.agentInfo(scope, serverId, agentId), provider, model, "session-settings"],
+  /** One folder of the host computer, to pick an agent folder from. Not an agent record: agent events leave it. */
+  agentFolderBrowse: (scope: QueryScope, serverId: string, agentId: string, path: string | null) => [
+    "agent-folder-browse",
+    ...scope,
+    serverId,
+    agentId,
+    path,
+  ],
   /** Under the server's agent records, so the host's agent events refresh it. */
   sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
   /** The settings of a channel. Its memory and routine events invalidate the part they change. */

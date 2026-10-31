@@ -13,6 +13,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
@@ -158,7 +159,7 @@ import {
   serverKind,
   showsOnline,
 } from "@/features/workspace/model/server-status";
-import { withoutTaskTurns } from "@/features/workspace/model/task-cache";
+import { taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
@@ -1111,9 +1112,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
-      if (chatEvent?.type === "turn-progress") {
-        const { agentId, turnId, detail } = chatEvent;
-        const after = latestThoughtId(conversationStore.get(agentId)?.messages ?? [], turnId);
+      // The lines of a task turn too: the thread's thinking sheet shows them. Turn ids are unique, so
+      // the agent's chat shows none of them.
+      if (event.type === "turn-progress") {
+        const { agentId, threadId, turnId, detail } = event;
+        const messages =
+          taskThreadMessages(queryClient, queryScope, serverId, agentId, threadId) ??
+          conversationStore.get(agentId)?.messages ??
+          [];
+        const after = latestThoughtId(messages, turnId);
         liveState.update("turnLinesByServer", (current) => {
           const previous = current[serverId] ?? {};
           const next = appendTurnStepLine(previous, turnId, detail, after);
@@ -1810,6 +1817,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       canManageRoutineResults: (serverId) => administers(serverId, ROUTINE_RESULTS_CAPABILITY),
       canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       canManageSharedTables: (serverId) => administers(serverId, SHARED_TABLES_CAPABILITY),
+      canManageAgentFolders: (serverId) => administers(serverId, AGENT_FOLDERS_CAPABILITY),
       canManageAgentAccess: (serverId) => administers(serverId, AGENT_ADMIN_CAPABILITY),
       canManageAgentHostSettings: (serverId) => administers(serverId, AGENT_HOST_SETTINGS_CAPABILITY),
       canManageAgentBackupModels: (serverId) => administers(serverId, AGENT_BACKUP_MODELS_CAPABILITY),

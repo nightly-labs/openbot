@@ -89,6 +89,8 @@ export const messages = {
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
   "error.team.agentMemoryLimitUnsupported": "当前连接不支持助手记忆上限。",
+  "error.team.agentFoldersUnsupported": "当前连接不支持助手的文件夹。",
+  "error.team.folderUnavailable": "此文件夹在主机电脑上不可用。",
   "error.team.memoryReviewUnsupported": "当前连接不支持记忆整理。",
   "error.team.promptCacheTtlUnsupported": "当前连接不支持提示缓存时间。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",

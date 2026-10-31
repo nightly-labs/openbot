@@ -92,6 +92,8 @@ export const messages = {
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",
   "error.team.agentMemoryLimitUnsupported": "To połączenie nie obsługuje limitu wspomnień agentów.",
+  "error.team.agentFoldersUnsupported": "To połączenie nie obsługuje folderów agentów.",
+  "error.team.folderUnavailable": "Ten folder nie jest dostępny na komputerze hosta.",
   "error.team.memoryReviewUnsupported": "To połączenie nie obsługuje przeglądu wspomnień.",
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",

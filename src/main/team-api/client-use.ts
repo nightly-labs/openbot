@@ -1,6 +1,7 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import {
   AGENT_MEMORIES_PAGE_ROUTE,
@@ -81,6 +82,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_TASK_LIMIT_ROUTES.settings,
   AGENT_NEW_CHAT_ROUTES.settings,
   AGENT_PLAN_CARD_ROUTES.settings,
+  AGENT_FOLDERS_ROUTES.read,
+  AGENT_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,
   BROWSER_PROFILES_ROUTES.agent,
   BROWSER_PROFILES_ROUTES.tabs,

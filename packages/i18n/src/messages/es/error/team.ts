@@ -93,6 +93,8 @@ export const messages = {
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexión no admite el límite de recuerdos de los agentes.",
+  "error.team.agentFoldersUnsupported": "Esta conexión no admite las carpetas de los agentes.",
+  "error.team.folderUnavailable": "Esta carpeta no está disponible en el ordenador anfitrión.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",

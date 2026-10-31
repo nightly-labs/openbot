@@ -3,6 +3,7 @@ import type { ChannelService } from "../../backend/channel-service";
 import type { AcpRegistry } from "../acp-registry";
 import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentFolders } from "../agent-folders";
 import type { AgentHostSettingsService } from "../agent-host-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
@@ -360,6 +361,8 @@ export interface TeamApiAdmin {
    * `agent-plan-card-v1`: whether it shows its plan card before a long task.
    */
   agentHost?: AgentHostSettingsService;
+  /** `agent-folders-v1`: the folders that one agent can change besides its workspace. */
+  folders?: Omit<AgentFolders, "requireAgent">;
   sessionSettings?: Pick<
     AgentService,
     "readAgentSessionSettings" | "setAgentSessionSetting" | "resetAgentSessionSetting"

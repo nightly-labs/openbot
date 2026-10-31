@@ -91,6 +91,8 @@ export const messages = {
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",
   "error.team.agentMemoryLimitUnsupported": "이 연결에서는 에이전트 메모리 한도를 지원하지 않아요.",
+  "error.team.agentFoldersUnsupported": "이 연결에서는 에이전트 폴더를 지원하지 않아요.",
+  "error.team.folderUnavailable": "이 폴더는 호스트 컴퓨터에서 사용할 수 없어요.",
   "error.team.memoryReviewUnsupported": "이 연결에서는 메모리 검토를 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
