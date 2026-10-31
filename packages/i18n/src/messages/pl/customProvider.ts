@@ -34,6 +34,8 @@ export const messages = {
   "customProvider.error.modelIdInvalid":
     "Tego ID modelu nie można użyć. Usuń spacje, cudzysłowy i inne znaki interpunkcyjne.",
   "customProvider.error.contextWindowInvalid": "Wpisz liczbę całkowitą tokenów od {min} do {max}.",
+  "customProvider.error.maxOutputInvalid": "Wpisz liczbę całkowitą tokenów od {min} do {max}.",
+  "customProvider.error.maxOutputNeedsWindow": "Maksymalne wyjście wymaga okna kontekstu.",
   "customProvider.error.headerNameRequired": "Wpisz nazwę nagłówka.",
   "customProvider.error.headerNameInvalid": "Użyj prawidłowej nazwy nagłówka HTTP.",
   "customProvider.error.headerDuplicate": "Ten dostawca już ustawia {name}.",
@@ -75,6 +77,8 @@ export const messages = {
   "customProvider.model.namePlaceholder": "Nazwa wyświetlana",
   "customProvider.model.contextWindow": "Okno kontekstu modelu {number}",
   "customProvider.model.contextWindowPlaceholder": "Tokeny",
+  "customProvider.model.maxOutput": "Maksymalne wyjście modelu {number}",
+  "customProvider.model.maxOutputPlaceholder": "Tokeny",
   "customProvider.model.remove": "Usuń model {number}",
   "customProvider.model.add": "Dodaj model",
   "customProvider.headers": "Nagłówki",

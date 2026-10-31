@@ -317,7 +317,7 @@ function releasedSaveBody({ harness: _harness, ...body }: DynamicRecord): Dynami
     ...body,
     models: body.models.map((model: unknown) => {
       if (!isObject(model)) return model;
-      const { contextWindow: _contextWindow, ...released } = model;
+      const { contextWindow: _contextWindow, maxOutput: _maxOutput, ...released } = model;
       return released;
     }),
   };

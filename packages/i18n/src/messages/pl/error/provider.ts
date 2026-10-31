@@ -103,6 +103,7 @@ export const messages = {
   "error.provider.modelIdCharacter": "ID modelu zawiera niedozwolony znak.",
   "error.provider.modelIdDuplicate": "Dwa modele mają to samo ID.",
   "error.provider.contextWindowInvalid": "Okno kontekstu modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
+  "error.provider.maxOutputInvalid": "Maksymalne wyjście modelu musi być liczbą całkowitą tokenów od {min} do {max}.",
   "error.provider.headersTooMany": "Jest za dużo nagłówków.",
   "error.provider.headerNameCharacter": "Nazwa nagłówka zawiera znak niedozwolony w HTTP.",
   "error.provider.headerNameTooLong": "Nazwa nagłówka jest za długa.",

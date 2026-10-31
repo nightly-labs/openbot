@@ -17,6 +17,7 @@ import {
   isAgentModel,
   isCustomProviderContextWindow,
   isCustomProviderHeaderName,
+  isCustomProviderMaxOutput,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { currentText } from "../../text";
@@ -26,6 +27,8 @@ export interface CustomModelDraft {
   name: string;
   /** Tokens, as typed. Blank keeps OpenCode's default. */
   contextWindow?: string;
+  /** The largest completion, as typed. Blank keeps the guess from the context window. */
+  maxOutput?: string;
 }
 
 export interface CustomHeaderDraft {
@@ -92,6 +95,7 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
             id: model.id,
             name: model.name,
             contextWindow: model.contextWindow?.toString() ?? "",
+            maxOutput: model.maxOutput?.toString() ?? "",
           }))
         : [{ id: "", name: "" }],
     headers: savedHeaderDrafts(provider.headerNames),
@@ -101,20 +105,28 @@ export function savedCustomProviderDraft(provider: CustomProviderSummary): Custo
 
 /** A row the user has not filled in yet: carried by the form, ignored by validation and submit. */
 export function blankModel(model: CustomModelDraft): boolean {
-  return !model.id.trim() && !model.name.trim() && !model.contextWindow?.trim();
+  return !model.id.trim() && !model.name.trim() && !model.contextWindow?.trim() && !model.maxOutput?.trim();
 }
 
 /**
- * The typed context window: undefined when blank, null when it is not a usable token count. The text
- * is plain digits, or groups of three digits with one separator, so `128,000`, `128 000` and `128.000`
- * are all 128000. A decimal such as `200000.0` or `1300.5` is refused, not read as a larger number.
+ * A typed token count: undefined when blank, null when it is not a usable count. The text is plain
+ * digits, or groups of three digits with one separator, so `128,000`, `128 000` and `128.000` are
+ * all 128000. A decimal such as `200000.0` or `1300.5` is refused, not read as a larger number.
  */
+function tokenCount(text: string | undefined, inRange: (value: number) => boolean): number | null | undefined {
+  const typed = text?.trim() ?? "";
+  if (!typed) return undefined;
+  if (!/^(?:\d+|\d{1,3}(?:([\s,._'’])\d{3})(?:\1\d{3})*)$/u.test(typed)) return null;
+  const value = Number(typed.replace(/\D/gu, ""));
+  return inRange(value) ? value : null;
+}
+
 function contextWindowValue(model: CustomModelDraft): number | null | undefined {
-  const text = model.contextWindow?.trim() ?? "";
-  if (!text) return undefined;
-  if (!/^(?:\d+|\d{1,3}(?:([\s,._'’])\d{3})(?:\1\d{3})*)$/u.test(text)) return null;
-  const value = Number(text.replace(/\D/gu, ""));
-  return isCustomProviderContextWindow(value) ? value : null;
+  return tokenCount(model.contextWindow, isCustomProviderContextWindow);
+}
+
+function maxOutputValue(model: CustomModelDraft): number | null | undefined {
+  return tokenCount(model.maxOutput, isCustomProviderMaxOutput);
 }
 
 function blankHeader(header: CustomHeaderDraft): boolean {
@@ -199,6 +211,19 @@ export function validateCustomProvider(
       });
       return;
     }
+    if (maxOutputValue(model) === null) {
+      errors.modelRows[index] = t("customProvider.error.maxOutputInvalid", {
+        min: format.number(CUSTOM_PROVIDER_LIMITS.maxOutputMin),
+        max: format.number(CUSTOM_PROVIDER_LIMITS.maxOutputMax),
+      });
+      return;
+    }
+    if (model.maxOutput?.trim() && contextWindowValue(model) === undefined) {
+      // The backend writes a saved output cap into the same `limit` as the window, so a cap with no
+      // window has nowhere to land and would be stored and silently ignored.
+      errors.modelRows[index] = t("customProvider.error.maxOutputNeedsWindow");
+      return;
+    }
     // OpenCode reports this model as `<provider id>/<model id>`, and both the IPC and Team API list
     // decoders fail closed on the whole array when one id is malformed - which empties the picker
     // rather than hiding one row. So the composed id is checked here, where the user can still fix it.
@@ -281,7 +306,13 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
       const id = model.id.trim();
       const name = model.name.trim() || id;
       const contextWindow = contextWindowValue(model);
-      return typeof contextWindow === "number" ? { id, name, contextWindow } : { id, name };
+      const maxOutput = maxOutputValue(model);
+      return {
+        id,
+        name,
+        ...(typeof contextWindow === "number" ? { contextWindow } : {}),
+        ...(typeof maxOutput === "number" ? { maxOutput } : {}),
+      };
     });
   return {
     id: draft.providerId.trim(),

@@ -125,6 +125,11 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) auto;
 }
 
+/* Two token counts are short, so both share the narrow columns and the ID and name keep their room. */
+.custom-provider-row-inputs.custom-provider-row-quad {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) minmax(0, 0.6fr) auto;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {
