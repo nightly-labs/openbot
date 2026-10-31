@@ -1,7 +1,8 @@
 import { Effect, Semaphore } from "effect";
 import { ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
-// The user's own ACP agents: list, save, remove and check. This computer only: no Team API route
-// reaches these, because an agent is a command that runs here.
+// The user's own ACP agents: list, save, remove and check. An agent is a command that runs here. An
+// owner or admin of this server can list, save and remove them through `custom-agents-v1`
+// (`team-api/route-custom-agents.ts`), where `requireAdmin` is the gate; the check stays local.
 //
 // This module owns the order of the writes, so the backend never has to know that a store exists:
 // it is given a getter, and reads it again when an agent's process starts.
