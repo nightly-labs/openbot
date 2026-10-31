@@ -509,8 +509,9 @@ export class RemoteTeamDirectoryClient {
 
   /**
    * The key to use for a listed host. A pinned key is replaced only when a signed handover chain leads
-   * from it to the advertised key; otherwise a changed key fails as before. A host with no pin is
-   * pinned to the key seen first, as desktop does, so a later key change also needs a handover.
+   * from it to the advertised key. Otherwise the pinned key stays, so only the connection to that host
+   * fails, not the whole list, as on desktop. A host with no pin is pinned to the key seen first, so a
+   * later key change also needs a handover.
    */
   #trustedHostKey(
     hostId: string,
@@ -533,7 +534,7 @@ export class RemoteTeamDirectoryClient {
           handovers,
           verify: this.#verifyHostKeySignature,
         });
-        if (!followed) return yield* directoryFailure(sourceText("error.remote.serverIdentityChanged"));
+        if (!followed) return pinnedKey;
         yield* directoryIO(() => this.#hostKeys.set(hostId, advertisedPublicKey));
         return advertisedPublicKey;
       }),

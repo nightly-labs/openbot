@@ -121,7 +121,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.serverDisconnected": "The server disconnected.",
   "error.remote.preferencesUnreadable": "The saved chat preferences could not be read.",
   "error.remote.accountAuthRequired": "Account authentication is required.",
-  "error.remote.serverIdentityChanged": "The server identity changed. Refusing to replace the trusted host key.",
   "error.remote.pairedIdentityChanged":
     "The paired desktop identity is missing or changed. Scan a new code from that desktop.",
   "error.remote.permanentInviteNoEmail": "Permanent invitations cannot be sent by email.",

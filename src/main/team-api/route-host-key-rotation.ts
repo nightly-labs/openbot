@@ -2,7 +2,7 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
-import { sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -28,7 +28,7 @@ export async function routeHostKeyRotation(
     return json(200, await runCauseEffect(hostKey.rotate()));
   } catch (error) {
     // A signed-out host or a refused handover is a sentence for the owner, not a host fault.
-    if (error instanceof Error) throw new HttpError(409, error.message);
+    if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }
 }
