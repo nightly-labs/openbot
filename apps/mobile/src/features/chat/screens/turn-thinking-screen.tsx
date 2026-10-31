@@ -4,7 +4,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
+import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
@@ -177,19 +177,40 @@ export function TurnThinkingScreen() {
     following.current = atEnd;
     if (atEnd) setBehind(false);
   }, []);
+  // iOS `scrollToEnd` sets an offset of 0 when the content is shorter than the sheet, and that puts
+  // the content under the transparent header. Content that fits stays where the inset puts it.
+  // The sheet and the content can measure in either order, so both run the same check.
+  const viewportHeight = useRef(0);
+  const contentHeight = useRef(0);
   // A finished turn opens at its first thought. A running turn opens at its newest text.
   const opened = useRef(false);
-  const onContentSizeChange = useCallback(() => {
-    const first = !opened.current;
-    if (first) {
-      opened.current = true;
-      following.current = running;
-    }
-    if (!running) return;
+  const placed = useRef(false);
+  const follow = useCallback(() => {
+    if (!running || viewportHeight.current === 0 || contentHeight.current <= viewportHeight.current) return;
     // The first scroll puts the sheet at the end at once. After it, a new step slides into view.
+    const first = !placed.current;
+    placed.current = true;
     if (following.current) scroll.current?.scrollToEnd({ animated: !first && !reducedMotion });
     else setBehind(true);
   }, [running, reducedMotion]);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeight.current = event.nativeEvent.layout.height;
+      if (following.current) follow();
+    },
+    [follow],
+  );
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeight.current = height;
+      if (!opened.current) {
+        opened.current = true;
+        following.current = running;
+      }
+      follow();
+    },
+    [running, follow],
+  );
   const toLatest = useCallback(() => {
     following.current = true;
     setBehind(false);
@@ -210,7 +231,7 @@ export function TurnThinkingScreen() {
     : stepCount;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onLayout={onLayout}>
       <Stack.Screen options={{ title }} />
       <SheetScrollView
         scrollRef={scroll}
