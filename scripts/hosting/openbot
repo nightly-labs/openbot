@@ -232,7 +232,7 @@ mobile_connect_command() {
   echo "In the OpenBot phone app, select Scan QR code and scan this code."
   # A phone that shows this terminal cannot scan its own screen. An older server sends no link.
   if [ -n "$(value url)" ]; then
-    echo "Is this terminal on the phone? Tap this link, or copy it into Safari or Chrome, to open it in OpenBot:"
+    echo "Is this terminal on the phone? Tap this link to open it in OpenBot. On an iPhone, you can also copy it into Safari:"
     echo "  $(value url)"
   fi
   echo "It works for one sign-in and expires in $((expires_at / 1000 - $(date +%s))) seconds. Run the command again for a new code."
