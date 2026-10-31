@@ -373,12 +373,70 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de tijdzone te wijzigen.",
   "mobile.server.settings.timezoneUnsupported": "Werk OpenBot bij op deze server om de tijdzone hier te wijzigen.",
+  "mobile.server.settings.keySection": "Serversleutel",
+  "mobile.server.settings.keyChanged": "Laatste wijziging",
+  "mobile.server.settings.keyChange": "Sleutel wijzigen",
+  "mobile.server.settings.keyChanging": "Sleutel wijzigen…",
+  "mobile.server.settings.keyConfirmTitle": "Sleutel van {name} wijzigen?",
+  "mobile.server.settings.keyConfirmBody":
+    "De server maakt een nieuwe sleutel. De huidige en de nieuwe sleutel ondertekenen allebei de wijziging, dus gekoppelde apps blijven gekoppeld en gaan bij de volgende verbinding over op de nieuwe sleutel. Mobile Connect-links van vóór de wijziging werken niet meer. Doe dit als het sleutelbestand van de server is gekopieerd of gelekt.",
+  "mobile.server.settings.keyConfirm": "Wijzigen",
+  "mobile.server.settings.keyDescription":
+    "Wijzig de sleutel als het sleutelbestand van de server is gekopieerd of gelekt. Leden blijven gekoppeld.",
+  "mobile.server.settings.keySigned": "De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
+  "mobile.server.settings.keyChangedNow":
+    "Serversleutel gewijzigd. Apps van leden gaan bij de volgende verbinding over op de nieuwe sleutel.",
+  "mobile.server.settings.keyFollowing":
+    "De server gebruikt de nieuwe sleutel. Deze app gaat erop over als de serverlijst opnieuw laadt.",
+  "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
+  "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.route.browserProfiles": "Browserprofielen",
+  "mobile.server.browserProfiles.unavailable":
+    "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",
+  "mobile.server.browserProfiles.unsupported":
+    "Werk OpenBot op deze server bij om de browserprofielen hier te beheren.",
+  "mobile.server.browserProfiles.loading": "Browserprofielen laden…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot kon de browserprofielen niet laden.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot kon het browserprofiel niet wijzigen.",
+  "mobile.server.browserProfiles.description":
+    "Elk profiel heeft eigen aanmeldingen, cookies en sitegegevens op de computer waarop de server draait. Agents met hetzelfde profiel delen de aanmeldingen.",
+  "mobile.server.browserProfiles.shared": "Gedeeld",
+  "mobile.server.browserProfiles.sharedHint": "Een agent zonder profiel met een naam gebruikt het gedeelde profiel.",
+  "mobile.server.browserProfiles.title": "Profielen",
+  "mobile.server.browserProfiles.add": "Profiel toevoegen",
+  "mobile.server.browserProfiles.addConfirm": "Toevoegen",
+  "mobile.server.browserProfiles.limit": "Een server kan maximaal {limit} profielen hebben.",
+  "mobile.server.browserProfiles.agents": { one: "{count} agent", other: "{count} agents" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} open tabblad", other: "{count} open tabbladen" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Dit profiel staat niet meer op de server.",
+  "mobile.server.browserProfiles.new": "Nieuw profiel",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "De agent gebruikt het nieuwe profiel zodra je het toevoegt. De open tabbladen sluiten.",
+  "mobile.server.browserProfiles.name": "Naam",
+  "mobile.server.browserProfiles.color": "Kleur",
+  "mobile.server.browserProfiles.agentsTitle": "Agents",
+  "mobile.server.browserProfiles.addAgents": "Agents toevoegen",
+  "mobile.server.browserProfiles.agentsHint":
+    "Een tik geeft de agent dit profiel of zet hem terug naar het gedeelde profiel. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.server.browserProfiles.clear": "Gegevens wissen",
+  "mobile.server.browserProfiles.clearTitle": "Gegevens van {name} wissen?",
+  "mobile.server.browserProfiles.clearBody":
+    "Dit meldt dit profiel af bij alle sites en verwijdert de cookies en sitegegevens. De open tabbladen sluiten.",
+  "mobile.server.browserProfiles.clearHint":
+    "Gegevens wissen meldt het profiel af bij alle sites. Verwijderen zet ook de agents over naar het gedeelde profiel.",
+  "mobile.server.browserProfiles.delete": "Profiel verwijderen",
+  "mobile.server.browserProfiles.deleteTitle": "{name} verwijderen?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Dit verwijdert de aanmeldingen, cookies en sitegegevens van het profiel. De open tabbladen sluiten.",
+  "mobile.server.browserProfiles.deleteAgents": "Deze agents gaan naar het gedeelde profiel: {agents}.",
   "mobile.server.route.connectors": "Connectors",
   "mobile.server.settings.connectors": "Connectors",
   "mobile.server.connectors.unavailable":

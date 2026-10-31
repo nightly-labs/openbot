@@ -369,6 +369,24 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
   "mobile.server.settings.timezoneUnavailable": "Connect to this server as an owner or admin to change its timezone.",
   "mobile.server.settings.timezoneUnsupported": "Update OpenBot on this server to change its timezone here.",
+  "mobile.server.settings.keySection": "Server key",
+  "mobile.server.settings.keyChanged": "Last change",
+  "mobile.server.settings.keyChange": "Change key",
+  "mobile.server.settings.keyChanging": "Changing key…",
+  "mobile.server.settings.keyConfirmTitle": "Change the key of {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "The server makes a new key. The current key and the new key both sign the change, so paired apps stay paired and change to the new key when they connect again. Mobile Connect links from before the change stop working. Do this if the key file of the server was copied or exposed.",
+  "mobile.server.settings.keyConfirm": "Change key",
+  "mobile.server.settings.keyDescription":
+    "Change the key if the key file of the server was copied or exposed. Members stay paired.",
+  "mobile.server.settings.keySigned": "The previous key and the new key both signed this change.",
+  "mobile.server.settings.keyChangedNow":
+    "Server key changed. Apps of members change to the new key when they connect again.",
+  "mobile.server.settings.keyFollowing":
+    "The server uses the new key. This app changes to it when the server list loads again.",
+  "mobile.server.settings.keyChangeFailed": "Could not change the server key. Try again.",
+  "mobile.server.settings.keyOwnerOnly": "Only the owner can change the server key.",
+  "mobile.server.settings.keyUnsupported": "Update OpenBot on this server to change its key here.",
   "mobile.server.settings.memoryLimit": "Memories per agent",
   "mobile.server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "mobile.server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
@@ -376,6 +394,45 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.memoryLimitUnsupported": "Update OpenBot on this server to change its memory limit here.",
   // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
   // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
+  "mobile.server.route.browserProfiles": "Browser profiles",
+  "mobile.server.browserProfiles.unavailable":
+    "Only an owner or admin of an online server can manage its browser profiles.",
+  "mobile.server.browserProfiles.unsupported": "Update OpenBot on this server to manage its browser profiles here.",
+  "mobile.server.browserProfiles.loading": "Loading browser profiles…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot could not load the browser profiles.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot could not change the browser profile.",
+  "mobile.server.browserProfiles.description":
+    "Each profile keeps its own sign-ins, cookies and site data on the computer that runs the server. The agents that use one profile share its sign-ins.",
+  "mobile.server.browserProfiles.shared": "Shared",
+  "mobile.server.browserProfiles.sharedHint": "An agent without a named profile uses the shared profile.",
+  "mobile.server.browserProfiles.title": "Profiles",
+  "mobile.server.browserProfiles.add": "Add profile",
+  "mobile.server.browserProfiles.addConfirm": "Add",
+  "mobile.server.browserProfiles.limit": "A server can have at most {limit} profiles.",
+  "mobile.server.browserProfiles.agents": { one: "{count} agent", other: "{count} agents" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} open tab", other: "{count} open tabs" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "This profile is no longer on the server.",
+  "mobile.server.browserProfiles.new": "New profile",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "The agent uses the new profile after you add it. Its open tabs close.",
+  "mobile.server.browserProfiles.name": "Name",
+  "mobile.server.browserProfiles.color": "Color",
+  "mobile.server.browserProfiles.agentsTitle": "Agents",
+  "mobile.server.browserProfiles.addAgents": "Add agents",
+  "mobile.server.browserProfiles.agentsHint":
+    "A tap gives the agent this profile, or moves it back to the shared profile. A change closes the agent's open tabs.",
+  "mobile.server.browserProfiles.clear": "Clear data",
+  "mobile.server.browserProfiles.clearTitle": "Clear the data of {name}?",
+  "mobile.server.browserProfiles.clearBody":
+    "This signs out of all sites in this profile and deletes its cookies and site data. Its open tabs close.",
+  "mobile.server.browserProfiles.clearHint":
+    "Clear data signs the profile out of all sites. Delete also moves its agents to the shared profile.",
+  "mobile.server.browserProfiles.delete": "Delete profile",
+  "mobile.server.browserProfiles.deleteTitle": "Delete {name}?",
+  "mobile.server.browserProfiles.deleteBody":
+    "This deletes the sign-ins, cookies and site data of the profile. Its open tabs close.",
+  "mobile.server.browserProfiles.deleteAgents": "These agents change to the shared profile: {agents}.",
   "mobile.server.route.vault": "Vault",
   "mobile.server.settings.vault": "Vault",
   "mobile.server.vault.unavailable": "Connect to this server as an owner or admin to manage its Vault.",

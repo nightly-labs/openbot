@@ -578,6 +578,7 @@ function registerIpcHandlers({
   approvalAutomation,
   agentAdminSettings,
   agentHostSettings,
+  agentFolders,
   browserProfiles,
   language,
   logoColor,
@@ -697,8 +698,7 @@ function registerIpcHandlers({
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
-      service,
-      userDataPath: app.getPath("userData"),
+      folders: agentFolders,
       getMainWindow: getDialogParent,
       translate: language.translate,
     }),

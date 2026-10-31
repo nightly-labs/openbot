@@ -8,6 +8,7 @@ import Ellipsis from "lucide-react-native/icons/ellipsis";
 import EllipsisVertical from "lucide-react-native/icons/ellipsis-vertical";
 import Layers3 from "lucide-react-native/icons/layers";
 import MessagesSquare from "lucide-react-native/icons/messages-square";
+import PanelLeft from "lucide-react-native/icons/panel-left";
 import WifiOff from "lucide-react-native/icons/wifi-off";
 import {
   memo,
@@ -631,7 +632,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         glass={buttonGlass}
         onPress={openDrawer}
       >
-        <Layers3 color={iconColor} size={22} strokeWidth={2} />
+        <PanelLeft color={iconColor} size={22} strokeWidth={2} />
       </HeaderIconButton>
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
@@ -691,7 +692,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           glass={buttonGlass}
           onPress={openDrawer}
         >
-          <Layers3 color={iconColor} size={22} strokeWidth={2} />
+          <PanelLeft color={iconColor} size={22} strokeWidth={2} />
         </HeaderIconButton>
       }
       pinnedAgents={pinnedAgents}
@@ -920,7 +921,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <>
           <Stack.Toolbar placement="left">
             {/* The search takes the screen, so the bar buttons go while it is open. */}
-            <Stack.Toolbar.Button icon="square.stack.3d.up.fill" hidden={search.open} onPress={openDrawer} />
+            <Stack.Toolbar.Button icon="sidebar.leading" hidden={search.open} onPress={openDrawer} />
             <Stack.Toolbar.View hidesSharedBackground hidden={search.open}>
               <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
             </Stack.Toolbar.View>

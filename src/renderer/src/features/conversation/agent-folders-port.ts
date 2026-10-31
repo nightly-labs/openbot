@@ -1,5 +1,6 @@
 // The bridge calls behind an agent's Folders row, the Folders page, the chat's folder drop and the
-// Instructions page. Only the local server has them: the Team API does not carry them.
+// Instructions page. Only the local server has them here. The mobile app changes the folders of a
+// joined server through `agent-folders-v1`; the desktop does not use it yet.
 
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
 import type {

@@ -373,6 +373,9 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyConfirmDescription":
     "The current key and the new key both sign a handover. Apps of members change to the new key when they connect again. Do this if the key file was copied or exposed.",
   "server.settings.hostKeyRotated": "Server key changed",
+  "server.settings.hostKeyChanged": "Last change",
+  // {date} is the date and time of the change.
+  "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
   "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":

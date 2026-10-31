@@ -336,6 +336,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La clé actuelle et la nouvelle clé signent une passation. Les apps des membres passent à la nouvelle clé à leur prochaine connexion. Faites-le si le fichier de clé a été copié ou exposé.",
   "server.settings.hostKeyRotated": "Clé du serveur changée",
+  "server.settings.hostKeyChanged": "Dernier changement",
+  "server.settings.hostKeyChangedDescription": "{date}. L’ancienne clé et la nouvelle clé ont signé ce changement.",
   "server.settings.hostKeyLocalOnly": "Ici, seul le serveur de cet ordinateur peut changer sa clé.",
   "server.settings.removeTitle": "Supprimer le serveur",
   "server.settings.removeDescription":

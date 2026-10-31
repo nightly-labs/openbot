@@ -376,12 +376,70 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conéctate a este servidor como propietario o administrador para cambiar su zona horaria.",
   "mobile.server.settings.timezoneUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí su zona horaria.",
+  "mobile.server.settings.keySection": "Clave del servidor",
+  "mobile.server.settings.keyChanged": "Último cambio",
+  "mobile.server.settings.keyChange": "Cambiar clave",
+  "mobile.server.settings.keyChanging": "Cambiando la clave…",
+  "mobile.server.settings.keyConfirmTitle": "¿Cambiar la clave de {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "El servidor crea una clave nueva. La clave actual y la nueva firman el cambio, así que las apps vinculadas siguen vinculadas y pasan a la clave nueva al volver a conectarse. Los enlaces de Mobile Connect de antes del cambio dejan de funcionar. Hazlo si el archivo de clave del servidor se copió o quedó expuesto.",
+  "mobile.server.settings.keyConfirm": "Cambiar",
+  "mobile.server.settings.keyDescription":
+    "Cambia la clave si el archivo de clave del servidor se copió o quedó expuesto. Los miembros siguen vinculados.",
+  "mobile.server.settings.keySigned": "La clave anterior y la clave nueva firmaron este cambio.",
+  "mobile.server.settings.keyChangedNow":
+    "Clave del servidor cambiada. Las apps de los miembros pasan a la clave nueva al volver a conectarse.",
+  "mobile.server.settings.keyFollowing":
+    "El servidor usa la clave nueva. Esta app pasa a ella cuando se vuelva a cargar la lista de servidores.",
+  "mobile.server.settings.keyChangeFailed": "No se pudo cambiar la clave del servidor. Inténtalo de nuevo.",
+  "mobile.server.settings.keyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
+  "mobile.server.settings.keyUnsupported": "Actualiza OpenBot en este servidor para cambiar su clave aquí.",
   "mobile.server.settings.memoryLimit": "Recuerdos por agente",
   "mobile.server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "mobile.server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",
   "mobile.server.settings.memoryLimitSaveFailed": "No se pudo guardar el límite de recuerdos. Inténtalo de nuevo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Actualiza OpenBot en este servidor para cambiar aquí su límite de recuerdos.",
+  "mobile.server.route.browserProfiles": "Perfiles del navegador",
+  "mobile.server.browserProfiles.unavailable":
+    "Solo el propietario o un administrador de un servidor en línea puede gestionar sus perfiles del navegador.",
+  "mobile.server.browserProfiles.unsupported":
+    "Actualiza OpenBot en este servidor para gestionar sus perfiles del navegador aquí.",
+  "mobile.server.browserProfiles.loading": "Cargando perfiles del navegador…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot no pudo cargar los perfiles del navegador.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot no pudo cambiar el perfil del navegador.",
+  "mobile.server.browserProfiles.description":
+    "Cada perfil guarda sus propios inicios de sesión, cookies y datos de sitios en el ordenador que ejecuta el servidor. Los agentes que usan un mismo perfil comparten sus inicios de sesión.",
+  "mobile.server.browserProfiles.shared": "Compartido",
+  "mobile.server.browserProfiles.sharedHint": "Un agente sin un perfil con nombre usa el perfil compartido.",
+  "mobile.server.browserProfiles.title": "Perfiles",
+  "mobile.server.browserProfiles.add": "Añadir perfil",
+  "mobile.server.browserProfiles.addConfirm": "Añadir",
+  "mobile.server.browserProfiles.limit": "Un servidor puede tener como máximo {limit} perfiles.",
+  "mobile.server.browserProfiles.agents": { one: "{count} agente", other: "{count} agentes" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} pestaña abierta", other: "{count} pestañas abiertas" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Este perfil ya no está en el servidor.",
+  "mobile.server.browserProfiles.new": "Nuevo perfil",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "El agente usará el nuevo perfil cuando lo añadas. Sus pestañas abiertas se cerrarán.",
+  "mobile.server.browserProfiles.name": "Nombre",
+  "mobile.server.browserProfiles.color": "Color",
+  "mobile.server.browserProfiles.agentsTitle": "Agentes",
+  "mobile.server.browserProfiles.addAgents": "Añadir agentes",
+  "mobile.server.browserProfiles.agentsHint":
+    "Un toque da este perfil al agente o lo devuelve al perfil compartido. Un cambio cierra las pestañas abiertas del agente.",
+  "mobile.server.browserProfiles.clear": "Borrar datos",
+  "mobile.server.browserProfiles.clearTitle": "¿Borrar los datos de {name}?",
+  "mobile.server.browserProfiles.clearBody":
+    "Esto cierra la sesión de todos los sitios en este perfil y borra sus cookies y datos de sitios. Sus pestañas abiertas se cerrarán.",
+  "mobile.server.browserProfiles.clearHint":
+    "Borrar datos cierra la sesión del perfil en todos los sitios. Eliminar también pasa sus agentes al perfil compartido.",
+  "mobile.server.browserProfiles.delete": "Eliminar perfil",
+  "mobile.server.browserProfiles.deleteTitle": "¿Eliminar {name}?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Esto elimina los inicios de sesión, las cookies y los datos de sitios del perfil. Sus pestañas abiertas se cerrarán.",
+  "mobile.server.browserProfiles.deleteAgents": "Estos agentes pasan al perfil compartido: {agents}.",
   "mobile.server.route.connectors": "Conectores",
   "mobile.server.settings.connectors": "Conectores",
   "mobile.server.connectors.unavailable":

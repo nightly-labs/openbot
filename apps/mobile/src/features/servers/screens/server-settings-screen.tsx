@@ -10,6 +10,7 @@ import Camera from "lucide-react-native/icons/camera";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { confirmOwner } from "@/features/app-lock/model/app-lock";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { ServerAvatar } from "@/features/servers/components/server-avatar";
@@ -17,6 +18,7 @@ import { ServerStatusLabel } from "@/features/servers/components/server-status-l
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
+import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
@@ -53,6 +55,7 @@ export function ServerSettingsScreen() {
     canManageOnePasswordConnector,
     canManageBitwardenConnector,
     canManageVault,
+    canManageBrowserProfiles,
     canReadServerStorage,
     canManageProviders,
     canManageMcpServers,
@@ -153,6 +156,7 @@ export function ServerSettingsScreen() {
         ) : null}
       </SettingsSection>
       <ServerGeneralSettings serverId={serverId} />
+      <ServerKeySettings server={server} />
       {/* A section shows only when the host serves one of its pages to this role. */}
       {canManageProviders(serverId) || canManageMcpServers(serverId) || connectors ? (
         <SettingsSection title={t("mobile.server.settings.aiSection")}>
@@ -165,13 +169,17 @@ export function ServerSettingsScreen() {
           ) : null}
         </SettingsSection>
       ) : null}
-      {canManageVault(serverId) || canViewHostedSites(serverId) || canReadServerStorage(serverId) ? (
+      {canManageVault(serverId) ||
+      canManageBrowserProfiles(serverId) ||
+      canViewHostedSites(serverId) ||
+      canReadServerStorage(serverId) ? (
         <SettingsSection title={t("mobile.server.settings.dataSection")}>
           {canManageVault(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/vault", params: { serverId } })}>
               <Typography.Paragraph>{t("mobile.server.settings.vault")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
+          {canManageBrowserProfiles(serverId) ? <ServerBrowserProfilesRow serverId={serverId} /> : null}
           {canViewHostedSites(serverId) ? <ServerSitesRow serverId={serverId} /> : null}
           {canReadServerStorage(serverId) ? (
             <SettingsRow onPress={() => router.push({ pathname: "/server-settings/storage", params: { serverId } })}>
@@ -412,6 +420,101 @@ function ServerGeneralSettings({ serverId }: { serverId: string }) {
   );
 }
 
+/**
+ * The server key. Every member sees when the host last changed it. The owner can change it on a host
+ * that serves `host-key-rotation-v1`: the host signs a handover with the current and the new key, and
+ * this app trusts the new key only when the server list brings that handover. The host checks the
+ * role again; the app lock, when it is on, confirms the owner first.
+ */
+function ServerKeySettings({ server }: { server: MobileServer }) {
+  const { t, format } = useText();
+  const { canRotateServerKey } = useMobileWorkspace();
+  const { rotateServerKey, reloadServerList } = useMobileWorkspaceActions();
+  const locked = useRef(false);
+  const [changing, setChanging] = useState(false);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const canRotate = canRotateServerKey(server.id);
+  // A change from another device arrives with the server list. Read it once when the settings open.
+  const reload = useRef(reloadServerList);
+  useEffect(() => {
+    void reload.current().catch(() => undefined);
+  }, []);
+  if (!canRotate && server.keyChangedAt === undefined && newKey === null) return null;
+
+  async function change() {
+    if (locked.current) return;
+    locked.current = true;
+    try {
+      if (!(await confirmOwner())) return;
+      setChanging(true);
+      setError(null);
+      setNewKey(null);
+      const rotated = await rotateServerKey(server.id);
+      setNewKey(rotated.publicKey);
+      void haptics.notification("success");
+    } catch (caught) {
+      setError(currentText().errorMessage(caught, currentText().t("mobile.server.settings.keyChangeFailed")));
+      void haptics.notification("error");
+    } finally {
+      locked.current = false;
+      setChanging(false);
+    }
+  }
+
+  // Until the server list brings the handover, this app still connects with the previous key.
+  const footer =
+    error ??
+    (changing
+      ? undefined
+      : newKey !== null
+        ? newKey === server.publicKey
+          ? t("mobile.server.settings.keyChangedNow")
+          : t("mobile.server.settings.keyFollowing")
+        : canRotate
+          ? t("mobile.server.settings.keyDescription")
+          : t("mobile.server.settings.keySigned"));
+  return (
+    <SettingsSection title={t("mobile.server.settings.keySection")} footer={footer}>
+      {server.keyChangedAt === undefined ? null : (
+        <SettingsRow
+          trailing={
+            <Typography.Paragraph className="text-grouped-secondary">
+              {format.date(new Date(server.keyChangedAt), { dateStyle: "medium", timeStyle: "short" })}
+            </Typography.Paragraph>
+          }
+        >
+          <Typography.Paragraph>{t("mobile.server.settings.keyChanged")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
+      {canRotate ? (
+        <SettingsRow
+          disclosure={false}
+          disabled={changing}
+          onPress={() =>
+            Alert.alert(
+              t("mobile.server.settings.keyConfirmTitle", { name: server.name }),
+              t("mobile.server.settings.keyConfirmBody"),
+              [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                  text: t("mobile.server.settings.keyConfirm"),
+                  style: "destructive",
+                  onPress: () => void change(),
+                },
+              ],
+            )
+          }
+        >
+          <Typography.Paragraph className="text-accent">
+            {changing ? t("mobile.server.settings.keyChanging") : t("mobile.server.settings.keyChange")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
 /** Opens the OpenBot update of the host. The value is the version that runs there, or a new one. */
 function ServerUpdatesRow({ serverId, update }: { serverId: string; update: ReturnType<typeof useServerUpdate> }) {
   const { t } = useText();
@@ -472,6 +575,20 @@ function ServerMcpRow({ serverId }: { serverId: string }) {
       onPress={() => router.push({ pathname: "/server-settings/mcp", params: { serverId } })}
     >
       <Typography.Paragraph>{t("mobile.server.settings.mcp")}</Typography.Paragraph>
+    </SettingsRow>
+  );
+}
+
+/** The Browser profiles row, for an owner or admin of a host that serves `browser-profiles-v1`. */
+function ServerBrowserProfilesRow({ serverId }: { serverId: string }) {
+  const { t } = useText();
+  const { profiles } = useServerBrowserProfiles(serverId);
+  return (
+    <SettingsRow
+      trailing={profiles ? <TrailingValue value={String(profiles.length)} /> : undefined}
+      onPress={() => router.push({ pathname: "/server-settings/browser-profiles", params: { serverId } })}
+    >
+      <Typography.Paragraph>{t("mobile.server.route.browserProfiles")}</Typography.Paragraph>
     </SettingsRow>
   );
 }

@@ -46,3 +46,24 @@ export const followHostKeyHandovers = Effect.fn("HostKeyHandover.follow")(functi
   }
   return current === target;
 });
+
+/**
+ * When the host changed to `publicKey`: the time of the handover step that leads to it. A step
+ * counts only when the key before it and its own key both signed it; otherwise this is null.
+ */
+export const hostKeyChangedAt = Effect.fn("HostKeyHandover.changedAt")(function* (input: {
+  hostId: string;
+  publicKey: string;
+  handovers: readonly HostKeyHandover[];
+  verify: HostKeySignatureCheck;
+}): Effect.fn.Return<number | null> {
+  const target = remoteHostFingerprint(input.publicKey);
+  const handover = [...input.handovers]
+    .reverse()
+    .find((step) => step.hostId === input.hostId && remoteHostFingerprint(step.publicKey) === target);
+  if (!handover) return null;
+  const statement = new TextEncoder().encode(hostKeyHandoverStatement(handover));
+  const signedByPrevious = yield* input.verify(handover.previousSignature, statement, handover.previousPublicKey);
+  const signedByNext = signedByPrevious && (yield* input.verify(handover.signature, statement, handover.publicKey));
+  return signedByNext ? handover.issuedAt : null;
+});

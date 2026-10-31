@@ -429,12 +429,80 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.keySection": "Ключ сервера",
+  "mobile.server.settings.keyChanged": "Последнее изменение",
+  "mobile.server.settings.keyChange": "Сменить ключ",
+  "mobile.server.settings.keyChanging": "Смена ключа…",
+  "mobile.server.settings.keyConfirmTitle": "Сменить ключ сервера {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "Сервер создаст новый ключ. Текущий и новый ключ оба подпишут изменение, поэтому связанные приложения останутся связанными и перейдут на новый ключ при следующем подключении. Ссылки Mobile Connect, созданные до изменения, перестанут работать. Сделайте это, если файл ключа сервера был скопирован или раскрыт.",
+  "mobile.server.settings.keyConfirm": "Сменить",
+  "mobile.server.settings.keyDescription":
+    "Смените ключ, если файл ключа сервера был скопирован или раскрыт. Участники останутся связанными.",
+  "mobile.server.settings.keySigned": "Предыдущий и новый ключи подписали это изменение.",
+  "mobile.server.settings.keyChangedNow":
+    "Ключ сервера изменён. Приложения участников перейдут на новый ключ при следующем подключении.",
+  "mobile.server.settings.keyFollowing":
+    "Сервер использует новый ключ. Приложение перейдёт на него, когда список серверов загрузится снова.",
+  "mobile.server.settings.keyChangeFailed": "Не удалось сменить ключ сервера. Попробуйте ещё раз.",
+  "mobile.server.settings.keyOwnerOnly": "Сменить ключ сервера может только владелец.",
+  "mobile.server.settings.keyUnsupported": "Обновите OpenBot на этом сервере, чтобы сменить его ключ здесь.",
   "mobile.server.settings.memoryLimit": "Записей памяти на агента",
   "mobile.server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "mobile.server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",
   "mobile.server.settings.memoryLimitSaveFailed": "Не удалось сохранить лимит воспоминаний. Повторите попытку.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его лимит воспоминаний.",
+  "mobile.server.route.browserProfiles": "Профили браузера",
+  "mobile.server.browserProfiles.unavailable":
+    "Управлять профилями браузера сервера в сети может только владелец или администратор.",
+  "mobile.server.browserProfiles.unsupported":
+    "Обновите OpenBot на этом сервере, чтобы управлять его профилями браузера здесь.",
+  "mobile.server.browserProfiles.loading": "Загрузка профилей браузера…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot не удалось загрузить профили браузера.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot не удалось изменить профиль браузера.",
+  "mobile.server.browserProfiles.description":
+    "Каждый профиль хранит свои входы, файлы cookie и данные сайтов на компьютере, где работает сервер. Агенты с одним профилем используют общие входы.",
+  "mobile.server.browserProfiles.shared": "Общий",
+  "mobile.server.browserProfiles.sharedHint": "Агент без именованного профиля использует общий профиль.",
+  "mobile.server.browserProfiles.title": "Профили",
+  "mobile.server.browserProfiles.add": "Добавить профиль",
+  "mobile.server.browserProfiles.addConfirm": "Добавить",
+  "mobile.server.browserProfiles.limit": "У сервера может быть не более {limit} профилей.",
+  "mobile.server.browserProfiles.agents": {
+    one: "{count} агент",
+    few: "{count} агента",
+    many: "{count} агентов",
+    other: "{count} агента",
+  },
+  "mobile.server.browserProfiles.tabs": {
+    one: "{count} открытая вкладка",
+    few: "{count} открытые вкладки",
+    many: "{count} открытых вкладок",
+    other: "{count} открытой вкладки",
+  },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Этого профиля больше нет на сервере.",
+  "mobile.server.browserProfiles.new": "Новый профиль",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "Агент начнёт использовать новый профиль, как только вы его добавите. Его открытые вкладки закроются.",
+  "mobile.server.browserProfiles.name": "Название",
+  "mobile.server.browserProfiles.color": "Цвет",
+  "mobile.server.browserProfiles.agentsTitle": "Агенты",
+  "mobile.server.browserProfiles.addAgents": "Добавить агентов",
+  "mobile.server.browserProfiles.agentsHint":
+    "Нажатие назначает агенту этот профиль или возвращает его в общий профиль. Изменение закрывает открытые вкладки агента.",
+  "mobile.server.browserProfiles.clear": "Очистить данные",
+  "mobile.server.browserProfiles.clearTitle": "Очистить данные профиля {name}?",
+  "mobile.server.browserProfiles.clearBody":
+    "Профиль выйдет из всех сайтов, а его файлы cookie и данные сайтов будут удалены. Его открытые вкладки закроются.",
+  "mobile.server.browserProfiles.clearHint":
+    "«Очистить данные» выходит из всех сайтов в профиле. «Удалить» также переводит его агентов в общий профиль.",
+  "mobile.server.browserProfiles.delete": "Удалить профиль",
+  "mobile.server.browserProfiles.deleteTitle": "Удалить {name}?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Будут удалены входы, файлы cookie и данные сайтов профиля. Его открытые вкладки закроются.",
+  "mobile.server.browserProfiles.deleteAgents": "Эти агенты перейдут в общий профиль: {agents}.",
   "mobile.server.route.connectors": "Коннекторы",
   "mobile.server.settings.connectors": "Коннекторы",
   "mobile.server.connectors.unavailable":

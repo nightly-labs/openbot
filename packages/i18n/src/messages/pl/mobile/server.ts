@@ -429,12 +429,80 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.keySection": "Klucz serwera",
+  "mobile.server.settings.keyChanged": "Ostatnia zmiana",
+  "mobile.server.settings.keyChange": "Zmień klucz",
+  "mobile.server.settings.keyChanging": "Zmienianie klucza…",
+  "mobile.server.settings.keyConfirmTitle": "Zmienić klucz serwera {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "Serwer tworzy nowy klucz. Obecny i nowy klucz podpisują zmianę, więc sparowane aplikacje pozostają sparowane i przechodzą na nowy klucz przy następnym połączeniu. Linki Mobile Connect sprzed zmiany przestają działać. Zrób to, jeśli plik klucza serwera został skopiowany lub ujawniony.",
+  "mobile.server.settings.keyConfirm": "Zmień",
+  "mobile.server.settings.keyDescription":
+    "Zmień klucz, jeśli plik klucza serwera został skopiowany lub ujawniony. Członkowie pozostają sparowani.",
+  "mobile.server.settings.keySigned": "Poprzedni i nowy klucz podpisały tę zmianę.",
+  "mobile.server.settings.keyChangedNow":
+    "Klucz serwera zmieniony. Aplikacje członków przechodzą na nowy klucz przy następnym połączeniu.",
+  "mobile.server.settings.keyFollowing":
+    "Serwer używa nowego klucza. Ta aplikacja przejdzie na niego po ponownym wczytaniu listy serwerów.",
+  "mobile.server.settings.keyChangeFailed": "Nie udało się zmienić klucza serwera. Spróbuj ponownie.",
+  "mobile.server.settings.keyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
+  "mobile.server.settings.keyUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego klucz.",
   "mobile.server.settings.memoryLimit": "Wspomnienia na agenta",
   "mobile.server.settings.memoryLimitDescription": "Ile wspomnień może przechowywać każdy agent na tym serwerze.",
   "mobile.server.settings.memoryLimitLoadFailed": "Nie udało się wczytać limitu wspomnień tego serwera.",
   "mobile.server.settings.memoryLimitSaveFailed": "Nie udało się zapisać limitu wspomnień. Spróbuj ponownie.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wspomnień.",
+  "mobile.server.route.browserProfiles": "Profile przeglądarki",
+  "mobile.server.browserProfiles.unavailable":
+    "Tylko właściciel lub administrator serwera online może zarządzać jego profilami przeglądarki.",
+  "mobile.server.browserProfiles.unsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tu jego profilami przeglądarki.",
+  "mobile.server.browserProfiles.loading": "Wczytywanie profili przeglądarki…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot nie mógł wczytać profili przeglądarki.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki.",
+  "mobile.server.browserProfiles.description":
+    "Każdy profil ma własne logowania, pliki cookie i dane witryn na komputerze, na którym działa serwer. Agenci z tym samym profilem dzielą jego logowania.",
+  "mobile.server.browserProfiles.shared": "Wspólny",
+  "mobile.server.browserProfiles.sharedHint": "Agent bez nazwanego profilu używa profilu wspólnego.",
+  "mobile.server.browserProfiles.title": "Profile",
+  "mobile.server.browserProfiles.add": "Dodaj profil",
+  "mobile.server.browserProfiles.addConfirm": "Dodaj",
+  "mobile.server.browserProfiles.limit": "Serwer może mieć najwyżej {limit} profili.",
+  "mobile.server.browserProfiles.agents": {
+    one: "{count} agent",
+    few: "{count} agentów",
+    many: "{count} agentów",
+    other: "{count} agenta",
+  },
+  "mobile.server.browserProfiles.tabs": {
+    one: "{count} otwarta karta",
+    few: "{count} otwarte karty",
+    many: "{count} otwartych kart",
+    other: "{count} otwartej karty",
+  },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Tego profilu nie ma już na serwerze.",
+  "mobile.server.browserProfiles.new": "Nowy profil",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "Agent użyje nowego profilu, gdy go dodasz. Jego otwarte karty zostaną zamknięte.",
+  "mobile.server.browserProfiles.name": "Nazwa",
+  "mobile.server.browserProfiles.color": "Kolor",
+  "mobile.server.browserProfiles.agentsTitle": "Agenci",
+  "mobile.server.browserProfiles.addAgents": "Dodaj agentów",
+  "mobile.server.browserProfiles.agentsHint":
+    "Dotknięcie daje agentowi ten profil lub przenosi go z powrotem do profilu wspólnego. Zmiana zamyka otwarte karty agenta.",
+  "mobile.server.browserProfiles.clear": "Wyczyść dane",
+  "mobile.server.browserProfiles.clearTitle": "Wyczyścić dane profilu {name}?",
+  "mobile.server.browserProfiles.clearBody":
+    "To wylogowuje ten profil ze wszystkich witryn i usuwa jego pliki cookie oraz dane witryn. Jego otwarte karty zostaną zamknięte.",
+  "mobile.server.browserProfiles.clearHint":
+    "Wyczyść dane wylogowuje profil ze wszystkich witryn. Usuń przenosi też jego agentów do profilu wspólnego.",
+  "mobile.server.browserProfiles.delete": "Usuń profil",
+  "mobile.server.browserProfiles.deleteTitle": "Usunąć {name}?",
+  "mobile.server.browserProfiles.deleteBody":
+    "To usuwa logowania, pliki cookie i dane witryn profilu. Jego otwarte karty zostaną zamknięte.",
+  "mobile.server.browserProfiles.deleteAgents": "Ci agenci przejdą do profilu wspólnego: {agents}.",
   "mobile.server.route.connectors": "Konektory",
   "mobile.server.settings.connectors": "Konektory",
   "mobile.server.connectors.unavailable":

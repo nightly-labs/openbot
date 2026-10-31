@@ -379,12 +379,69 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.keySection": "Sunucu anahtarı",
+  "mobile.server.settings.keyChanged": "Son değişiklik",
+  "mobile.server.settings.keyChange": "Anahtarı değiştir",
+  "mobile.server.settings.keyChanging": "Anahtar değiştiriliyor…",
+  "mobile.server.settings.keyConfirmTitle": "{name} anahtarı değiştirilsin mi?",
+  "mobile.server.settings.keyConfirmBody":
+    "Sunucu yeni bir anahtar oluşturur. Geçerli anahtar ve yeni anahtar değişikliği birlikte imzalar; bu yüzden eşlenmiş uygulamalar eşli kalır ve yeniden bağlandıklarında yeni anahtara geçer. Değişiklikten önceki Mobile Connect bağlantıları çalışmaz. Sunucunun anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
+  "mobile.server.settings.keyConfirm": "Değiştir",
+  "mobile.server.settings.keyDescription":
+    "Sunucunun anahtar dosyası kopyalandıysa veya açığa çıktıysa anahtarı değiştirin. Üyeler eşli kalır.",
+  "mobile.server.settings.keySigned": "Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
+  "mobile.server.settings.keyChangedNow":
+    "Sunucu anahtarı değiştirildi. Üyelerin uygulamaları yeniden bağlandıklarında yeni anahtara geçer.",
+  "mobile.server.settings.keyFollowing":
+    "Sunucu yeni anahtarı kullanıyor. Sunucu listesi yeniden yüklendiğinde bu uygulama da ona geçer.",
+  "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
+  "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
   "mobile.server.settings.memoryLimitSaveFailed": "Anı sınırı kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Anı sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.route.browserProfiles": "Tarayıcı profilleri",
+  "mobile.server.browserProfiles.unavailable":
+    "Çevrimiçi bir sunucunun tarayıcı profillerini yalnızca sahibi veya bir yönetici yönetebilir.",
+  "mobile.server.browserProfiles.unsupported":
+    "Tarayıcı profillerini burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.browserProfiles.loading": "Tarayıcı profilleri yükleniyor…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot tarayıcı profillerini yükleyemedi.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot tarayıcı profilini değiştiremedi.",
+  "mobile.server.browserProfiles.description":
+    "Her profil kendi oturum açma bilgilerini, çerezlerini ve site verilerini sunucuyu çalıştıran bilgisayarda tutar. Aynı profili kullanan ajanlar oturumlarını paylaşır.",
+  "mobile.server.browserProfiles.shared": "Ortak",
+  "mobile.server.browserProfiles.sharedHint": "Adlandırılmış profili olmayan bir ajan ortak profili kullanır.",
+  "mobile.server.browserProfiles.title": "Profiller",
+  "mobile.server.browserProfiles.add": "Profil ekle",
+  "mobile.server.browserProfiles.addConfirm": "Ekle",
+  "mobile.server.browserProfiles.limit": "Bir sunucuda en fazla {limit} profil olabilir.",
+  "mobile.server.browserProfiles.agents": { one: "{count} ajan", other: "{count} ajan" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} açık sekme", other: "{count} açık sekme" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Bu profil artık sunucuda değil.",
+  "mobile.server.browserProfiles.new": "Yeni profil",
+  "mobile.server.browserProfiles.newForAgentHint": "Eklediğinizde ajan yeni profili kullanır. Açık sekmeleri kapanır.",
+  "mobile.server.browserProfiles.name": "Ad",
+  "mobile.server.browserProfiles.color": "Renk",
+  "mobile.server.browserProfiles.agentsTitle": "Ajanlar",
+  "mobile.server.browserProfiles.addAgents": "Ajan ekle",
+  "mobile.server.browserProfiles.agentsHint":
+    "Dokunmak ajana bu profili verir veya onu ortak profile geri taşır. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.server.browserProfiles.clear": "Verileri temizle",
+  "mobile.server.browserProfiles.clearTitle": "{name} verileri temizlensin mi?",
+  "mobile.server.browserProfiles.clearBody":
+    "Bu, profilde tüm sitelerden çıkış yapar ve çerezlerini ve site verilerini siler. Açık sekmeleri kapanır.",
+  "mobile.server.browserProfiles.clearHint":
+    "Verileri temizle profilde tüm sitelerden çıkış yapar. Sil ayrıca ajanlarını ortak profile taşır.",
+  "mobile.server.browserProfiles.delete": "Profili sil",
+  "mobile.server.browserProfiles.deleteTitle": "{name} silinsin mi?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Bu, profilin oturum açma bilgilerini, çerezlerini ve site verilerini siler. Açık sekmeleri kapanır.",
+  "mobile.server.browserProfiles.deleteAgents": "Bu ajanlar ortak profile geçer: {agents}.",
   "mobile.server.route.connectors": "Bağlayıcılar",
   "mobile.server.settings.connectors": "Bağlayıcılar",
   "mobile.server.connectors.unavailable":

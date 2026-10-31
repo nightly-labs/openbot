@@ -11,10 +11,10 @@
 // codes. Writes .openbot-build/team-api-routes-e2e/report.json.
 // Run: `bun run test:team-api-routes` (the preload gives the server's import graph an `electron`).
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -41,11 +41,17 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_FOLDERS_CAPABILITY, AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PLAN_CARD_CAPABILITY,
+  AGENT_PLAN_CARD_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -67,6 +73,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  HOST_KEY_ROTATION_CAPABILITY,
+  HOST_KEY_ROTATION_ROUTES,
+} from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
@@ -112,6 +122,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
 import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
@@ -119,6 +130,7 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -222,6 +234,12 @@ function field(value: Json | undefined, ...path: (string | number)[]): Json | un
 
 function list(value: Json | undefined): Json[] {
   return Array.isArray(value) ? value : [];
+}
+
+/** The disks of a browse name the disk of the home folder. */
+function startDisk(volumes: Json | undefined): boolean {
+  const root = parse(realpathSync(homedir())).root;
+  return list(volumes).some((volume) => field(volume, "path") === root);
 }
 
 function unused(name: string): () => never {
@@ -605,6 +623,9 @@ const machineMetrics = {
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
+const ROTATED_HOST_KEY = "-----BEGIN PUBLIC KEY-----\nrotated-e2e\n-----END PUBLIC KEY-----\n";
+/** The account service refuses the next handover, as when it holds another key for the host. */
+let refuseHostKeyRotation = false;
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
@@ -694,6 +715,23 @@ try {
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      // The real folder checks on temporary folders, over an agent writer that records each change.
+      folders: createAgentFolders({
+        service: {
+          listAgents: () => agents,
+          sharedRoot: join(root, "OpenBot", "Shared"),
+          updateAgent: (input) =>
+            Effect.sync(() => {
+              record("updateAgentFolders", input);
+              const target = agents.find((item) => item.id === input.agentId);
+              if (!target) throw new Error("Agent not found.");
+              if (input.additionalFolders) target.additionalFolders = input.additionalFolders;
+              if (input.excludedFolders) target.excludedFolders = input.excludedFolders;
+              return target;
+            }),
+        },
+        userDataPath: join(root, "user-data"),
+      }),
       agentHost: createAgentHostSettings({
         agents: {
           listAgents: () => agents,
@@ -706,6 +744,11 @@ try {
               else if (input.backupModels) target.backupModels = input.backupModels;
               if (input.taskLimit === null) delete target.taskLimit;
               else if (input.taskLimit !== undefined) target.taskLimit = input.taskLimit;
+              if (input.allowNewChat === null) delete target.allowNewChat;
+              else if (input.allowNewChat !== undefined) target.allowNewChat = input.allowNewChat;
+              if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
+              else if (input.quickAcknowledgement !== undefined)
+                target.quickAcknowledgement = input.quickAcknowledgement;
               return target;
             }),
         },
@@ -713,6 +756,17 @@ try {
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
       }),
       memoryReview,
+      // A stand-in for `HostService.rotateIdentityKey`; `host-key-rotation-e2e.ts` checks the real
+      // signing. This checks the gate and that a refused request never reaches the host.
+      hostKey: {
+        rotate: () =>
+          refuseHostKeyRotation
+            ? Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) }))
+            : Effect.sync(() => {
+                record("rotateHostKey");
+                return { publicKey: ROTATED_HOST_KEY };
+              }),
+      },
       // The setup file in memory. The host writes it and tells the agent service, as `saveSetup` does.
       defaultProvider: {
         get: () => Effect.sync(() => providerDefault),
@@ -1681,6 +1735,416 @@ try {
     );
   }
 
+  // ---- Agent folders (agent-folders-v1) ----
+  {
+    const capabilities = [AGENT_FOLDERS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const projects = join(root, "projects");
+    mkdirSync(join(projects, "app", "build"), { recursive: true });
+    mkdirSync(join(projects, ".hidden"), { recursive: true });
+    mkdirSync(join(root, "workspaces", "agent-ada"), { recursive: true });
+    mkdirSync(join(root, "OpenBot", "Shared"), { recursive: true });
+    writeFileSync(join(projects, "notes.txt"), "not a folder\n");
+    const app = realpathSync(join(projects, "app"));
+    const build = realpathSync(join(projects, "app", "build"));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-folders-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_FOLDERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_FOLDERS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const writes = callsOf("updateAgentFolders").length;
+    const unsupported = await call("POST", AGENT_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the folder routes without the capability get 400 agentFoldersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentFoldersUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_FOLDERS_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      ...v9,
+    });
+    const memberBrowse = await call("POST", AGENT_FOLDERS_ROUTES.browse, {
+      token: bobToken,
+      json: { agentId: "agent-ada", path: null },
+      ...v9,
+    });
+    const memberAdd = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: bobToken,
+      json: { agentId: "agent-ada", path: app },
+      ...v9,
+    });
+    check(
+      "a member cannot read, browse or change the folders of an agent",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberBrowse, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberAdd, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgentFolders").length === writes,
+      [summary(memberRead), summary(memberBrowse), summary(memberAdd)],
+    );
+    const browse = await call("POST", AGENT_FOLDERS_ROUTES.browse, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: projects },
+      ...v9,
+    });
+    check(
+      "an admin lists the folders in a host folder, without files and hidden folders",
+      browse.status === 200 &&
+        field(browse.body, "path") === realpathSync(projects) &&
+        field(browse.body, "parentPath") === realpathSync(root) &&
+        isDeepStrictEqual(field(browse.body, "entries"), [{ name: "app", path: app }]) &&
+        field(browse.body, "truncated") === false,
+      summary(browse),
+    );
+    const home = await call("POST", AGENT_FOLDERS_ROUTES.browse, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: null },
+      ...v9,
+    });
+    const gone = await call("POST", AGENT_FOLDERS_ROUTES.browse, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: join(projects, "gone") },
+      ...v9,
+    });
+    check(
+      "a browse without a path lists the home folder, names the home folder and the start disk, and a missing folder gets 404 folderUnavailable",
+      home.status === 200 &&
+        field(home.body, "path") === realpathSync(homedir()) &&
+        field(home.body, "home") === realpathSync(homedir()) &&
+        startDisk(field(home.body, "volumes")) &&
+        errorIs(gone, 404, sourceText("error.team.folderUnavailable")),
+      [summary(home).status, field(home.body, "volumes"), summary(gone)],
+    );
+    const added = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: app },
+      ...v9,
+    });
+    const readBack = await call("POST", AGENT_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v9,
+    });
+    check(
+      "an admin adds a host folder through the agent writer and reads it back",
+      added.status === 200 &&
+        field(added.body, "outcome") === "added" &&
+        isDeepStrictEqual(field(readBack.body, "folders"), [{ path: app, found: true }]) &&
+        isDeepStrictEqual(callsOf("updateAgentFolders").at(-1), [{ agentId: "agent-ada", additionalFolders: [app] }]),
+      [summary(added), summary(readBack)],
+    );
+    const covered = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: build },
+      ...v9,
+    });
+    const userData = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: join(root, "user-data") },
+      ...v9,
+    });
+    const file = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: join(projects, "notes.txt") },
+      ...v9,
+    });
+    check(
+      "the host does not add a folder in an added folder, the app data, or a file, and writes nothing",
+      field(covered.body, "outcome") === "covered" &&
+        field(covered.body, "coverage", "reason") === "in-folder" &&
+        field(userData.body, "refusal") === "protected" &&
+        field(file.body, "refusal") === "missing" &&
+        callsOf("updateAgentFolders").length === writes + 1,
+      [summary(covered), summary(userData), summary(file)],
+    );
+    const excluded = await call("POST", AGENT_FOLDERS_ROUTES.exclude, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: build },
+      ...v9,
+    });
+    const outside = await call("POST", AGENT_FOLDERS_ROUTES.exclude, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: projects },
+      ...v9,
+    });
+    const included = await call("POST", AGENT_FOLDERS_ROUTES.include, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: build },
+      ...v9,
+    });
+    check(
+      "an admin excludes a folder in an added folder and includes it again; a folder outside is refused",
+      field(excluded.body, "outcome") === "excluded" &&
+        isDeepStrictEqual(field(excluded.body, "list", "excluded"), [build]) &&
+        field(outside.body, "refusal") === "outside" &&
+        field(included.body, "outcome") === "included" &&
+        isDeepStrictEqual(field(included.body, "list", "excluded"), []),
+      [summary(excluded), summary(outside), summary(included)],
+    );
+    const removed = await call("POST", AGENT_FOLDERS_ROUTES.remove, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: app },
+      ...v9,
+    });
+    check(
+      "an admin removes the added folder",
+      field(removed.body, "outcome") === "removed" &&
+        isDeepStrictEqual(field(removed.body, "list", "folders"), []) &&
+        isDeepStrictEqual(callsOf("updateAgentFolders").at(-1), [{ agentId: "agent-ada", additionalFolders: [] }]),
+      summary(removed),
+    );
+    const missing = await call("POST", AGENT_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      ...v9,
+    });
+    const hidden = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-pi", path: app },
+      capabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404, and the host writes nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgentFolders").length === writes + 4,
+      [summary(missing), summary(hidden)],
+    );
+    const emptyPath = await call("POST", AGENT_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { agentId: "agent-ada", path: "" },
+      ...v9,
+    });
+    check(
+      "an empty folder path gets 400, and the host writes nothing",
+      emptyPath.status === 400 && callsOf("updateAgentFolders").length === writes + 4,
+      summary(emptyPath),
+    );
+  }
+
+  // ---- Agent new chats (agent-new-chat-v1) ----
+  {
+    const newChatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_NEW_CHAT_CAPABILITY];
+    const writes = callsOf("updateAgent").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-new-chat-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const adminRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "an admin reads the host default for an agent without its own choice",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { allowNewChat: DEFAULT_AGENT_DEFAULTS.allowNewChat }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the new-chat routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", allowNewChat: true },
+      capabilities: newChatCapabilities,
+    });
+    const invalid = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", allowNewChat: null },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "a member cannot read or set new chats, a value that is not a boolean gets 400, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const results: boolean[] = [];
+    for (const allowNewChat of [true, false]) {
+      const adminSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+        token: adaToken,
+        json: { agentId: "agent-ada", allowNewChat },
+        capabilities: newChatCapabilities,
+      });
+      const readBack = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+        token: adaToken,
+        json: { agentId: "agent-ada" },
+        capabilities: newChatCapabilities,
+      });
+      results.push(
+        adminSet.status === 200 &&
+          isDeepStrictEqual(adminSet.body, { allowNewChat }) &&
+          isDeepStrictEqual(readBack.body, { allowNewChat }) &&
+          isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", allowNewChat }]),
+      );
+    }
+    check(
+      "an admin turns new chats on and off through the agent writer and reads each value back",
+      results.every(Boolean),
+      results,
+    );
+    const missing = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: newChatCapabilities,
+    });
+    const hiddenSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", allowNewChat: true },
+      capabilities: newChatCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(missing), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Plan card before long tasks (agent-plan-card-v1) ----
+  {
+    const planCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_PLAN_CARD_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-plan-card-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_PLAN_CARD_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const adminRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin reads the host default plan card setting of an agent without its own",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { quickAcknowledgement: DEFAULT_AGENT_DEFAULTS.quickAcknowledgement }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the plan card routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    check(
+      "a member cannot read or set the plan card",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet)],
+    );
+    const notBoolean = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: null },
+      capabilities: planCapabilities,
+    });
+    check(
+      "the host refuses a plan card value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const adminOn = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+    });
+    const readOn = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns on the plan card through the agent writer and reads it back",
+      adminOn.status === 200 &&
+        isDeepStrictEqual(adminOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(readOn.body, { quickAcknowledgement: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", quickAcknowledgement: true }]),
+      [summary(adminOn), summary(readOn)],
+    );
+    const adminOff = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", quickAcknowledgement: false },
+      capabilities: planCapabilities,
+    });
+    const missing = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: planCapabilities,
+    });
+    check(
+      "an admin turns off the plan card, and an unknown agent gets 404",
+      adminOff.status === 200 &&
+        isDeepStrictEqual(adminOff.body, { quickAcknowledgement: false }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(adminOff), summary(missing)],
+    );
+    const hiddenRead = await call("POST", AGENT_PLAN_CARD_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-pi" },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    const hiddenSet = await call("POST", AGENT_PLAN_CARD_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", quickAcknowledgement: true },
+      capabilities: planCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an admin cannot read or set the plan card of an agent that the client protocol does not show",
+      errorIs(hiddenRead, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
   // ---- Memory review (memory-review-v1) ----
   {
     const capabilities = [MEMORY_REVIEW_CAPABILITY];
@@ -1746,6 +2210,66 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Server key change (host-key-rotation-v1) ----
+  {
+    const capabilities = [HOST_KEY_ROTATION_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-key-rotation-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_KEY_ROTATION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_KEY_ROTATION_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, { token: owner.sessionToken, json: {} });
+    check(
+      "the server key route without the capability gets 400 hostKeyRotationUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.hostKeyRotationUnsupported")),
+      summary(unsupported),
+    );
+    const adminRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const memberRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin and a member cannot change the server key, and the host does not start a change",
+      errorIs(adminRotate, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(memberRotate, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("rotateHostKey").length === 0,
+      [summary(adminRotate), summary(memberRotate)],
+    );
+    const ownerRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "the owner changes the server key and gets only the new public key",
+      ownerRotate.status === 200 &&
+        isDeepStrictEqual(ownerRotate.body, { publicKey: ROTATED_HOST_KEY }) &&
+        callsOf("rotateHostKey").length === 1,
+      summary(ownerRotate),
+    );
+    refuseHostKeyRotation = true;
+    const refusedRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    refuseHostKeyRotation = false;
+    check(
+      "a refused key change gives the owner 409 with the reason, not a host fault",
+      errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
+      summary(refusedRotate),
     );
   }
 

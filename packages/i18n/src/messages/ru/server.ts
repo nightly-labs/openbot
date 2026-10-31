@@ -342,6 +342,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Текущий и новый ключи подписывают передачу. Приложения участников перейдут на новый ключ при следующем подключении. Сделайте это, если файл ключа был скопирован или раскрыт.",
   "server.settings.hostKeyRotated": "Ключ сервера изменён",
+  "server.settings.hostKeyChanged": "Последнее изменение",
+  "server.settings.hostKeyChangedDescription": "{date}. Предыдущий и новый ключи подписали это изменение.",
   "server.settings.hostKeyLocalOnly": "Здесь ключ может сменить только сервер на этом компьютере.",
   "server.settings.removeTitle": "Удалить сервер",
   "server.settings.removeDescription":

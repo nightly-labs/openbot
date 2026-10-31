@@ -368,12 +368,71 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.keySection": "サーバーキー",
+  "mobile.server.settings.keyChanged": "最終変更",
+  "mobile.server.settings.keyChange": "キーを変更",
+  "mobile.server.settings.keyChanging": "キーを変更しています…",
+  "mobile.server.settings.keyConfirmTitle": "{name} のキーを変更しますか？",
+  "mobile.server.settings.keyConfirmBody":
+    "サーバーが新しいキーを作成します。現在のキーと新しいキーの両方が変更に署名するため、ペアリング済みのアプリはペアリングを保ったまま、次に接続したときに新しいキーへ切り替わります。変更前の Mobile Connect リンクは使えなくなります。サーバーのキーファイルがコピーまたは漏えいした場合に実行してください。",
+  "mobile.server.settings.keyConfirm": "変更",
+  "mobile.server.settings.keyDescription":
+    "サーバーのキーファイルがコピーまたは漏えいした場合はキーを変更してください。メンバーのペアリングは保たれます。",
+  "mobile.server.settings.keySigned": "以前のキーと新しいキーの両方がこの変更に署名しました。",
+  "mobile.server.settings.keyChangedNow":
+    "サーバーキーを変更しました。メンバーのアプリは次に接続したときに新しいキーへ切り替わります。",
+  "mobile.server.settings.keyFollowing":
+    "サーバーは新しいキーを使っています。サーバー一覧を再読み込みすると、このアプリも切り替わります。",
+  "mobile.server.settings.keyChangeFailed": "サーバーキーを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.keyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
+  "mobile.server.settings.keyUnsupported":
+    "ここでキーを変更するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.settings.memoryLimit": "エージェントごとのメモリー数",
   "mobile.server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "mobile.server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.route.browserProfiles": "ブラウザープロファイル",
+  "mobile.server.browserProfiles.unavailable":
+    "オンラインのサーバーのオーナーまたは管理者だけが、そのブラウザープロファイルを管理できます。",
+  "mobile.server.browserProfiles.unsupported":
+    "ここでブラウザープロファイルを管理するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.browserProfiles.loading": "ブラウザープロファイルを読み込み中…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot はブラウザープロファイルを読み込めませんでした。",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot はブラウザープロファイルを変更できませんでした。",
+  "mobile.server.browserProfiles.description":
+    "各プロファイルは、サーバーを実行するコンピューターに独自のサインイン、Cookie、サイトデータを保持します。同じプロファイルを使うエージェントはサインインを共有します。",
+  "mobile.server.browserProfiles.shared": "共有",
+  "mobile.server.browserProfiles.sharedHint": "名前付きプロファイルのないエージェントは共有プロファイルを使います。",
+  "mobile.server.browserProfiles.title": "プロファイル",
+  "mobile.server.browserProfiles.add": "プロファイルを追加",
+  "mobile.server.browserProfiles.addConfirm": "追加",
+  "mobile.server.browserProfiles.limit": "1 つのサーバーに作れるプロファイルは最大 {limit} 個です。",
+  "mobile.server.browserProfiles.agents": { other: "エージェント {count} 人" },
+  "mobile.server.browserProfiles.tabs": { other: "開いているタブ {count} 個" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "このプロファイルはサーバーにありません。",
+  "mobile.server.browserProfiles.new": "新しいプロファイル",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "追加すると、エージェントは新しいプロファイルを使います。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.name": "名前",
+  "mobile.server.browserProfiles.color": "色",
+  "mobile.server.browserProfiles.agentsTitle": "エージェント",
+  "mobile.server.browserProfiles.addAgents": "エージェントを追加",
+  "mobile.server.browserProfiles.agentsHint":
+    "タップすると、エージェントにこのプロファイルを割り当てるか、共有プロファイルに戻します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.server.browserProfiles.clear": "データを消去",
+  "mobile.server.browserProfiles.clearTitle": "{name} のデータを消去しますか?",
+  "mobile.server.browserProfiles.clearBody":
+    "このプロファイルですべてのサイトからサインアウトし、Cookie とサイトデータを削除します。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.clearHint":
+    "「データを消去」はすべてのサイトからサインアウトします。「削除」はエージェントを共有プロファイルにも移します。",
+  "mobile.server.browserProfiles.delete": "プロファイルを削除",
+  "mobile.server.browserProfiles.deleteTitle": "{name} を削除しますか?",
+  "mobile.server.browserProfiles.deleteBody":
+    "プロファイルのサインイン、Cookie、サイトデータを削除します。開いているタブは閉じます。",
+  "mobile.server.browserProfiles.deleteAgents": "これらのエージェントは共有プロファイルに変わります: {agents}。",
   "mobile.server.route.connectors": "コネクター",
   "mobile.server.settings.connectors": "コネクター",
   "mobile.server.connectors.unavailable":

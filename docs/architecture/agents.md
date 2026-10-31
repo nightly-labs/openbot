@@ -255,7 +255,9 @@ the Browser profiles section of the settings of the agent's server (`ServerBrows
 renames, changes the color of, clears and deletes the named profiles. It lists Shared first, with
 its agent count and no actions. A joined server without the capability has no section. The select, the browser toolbar and the tabs show the color of a named profile. A delete moves
 the profile's agents to Shared. The agent has no tool to change its profile, and tool results do not
-name it. See [Browser sessions](browser.md#browser-sessions) for the storage and the partitions.
+name it. The phone shows the choice in Agent info > Advanced > Browser profile, with "New profile",
+which adds a profile and gives it to the agent, and "Manage profiles". The desktop, the web client and
+the phone read the profiles again on `browser-profiles-changed` (`browser-profiles-events-v1`). See [Browser sessions](browser.md#browser-sessions) for the storage and the partitions.
 
 ## Agent threads
 
