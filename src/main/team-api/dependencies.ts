@@ -9,6 +9,7 @@ import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { AgentTemplateService } from "../agent-template-service";
 import type { BrowserProfileService } from "../browser-profile-service";
+import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
@@ -350,6 +351,8 @@ export interface TeamApiAdmin {
       AcpRegistry[Method]
     >;
   };
+  /** `custom-agents-v1`: the custom ACP agents of this host. */
+  customAgents?: Pick<CustomAgentChanges, "list" | "save" | "remove">;
   /** Read-only release discovery, independent of permission to install. */
   release?: Pick<HostReleaseService, "snapshot" | "check">;
   /** `agent-admin-v1`: access and auto-approve of one agent. */

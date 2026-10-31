@@ -51,6 +51,13 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="sites" options={{ title: t("mobile.server.route.sites") }} />
       <Stack.Screen name="providers" options={{ title: t("mobile.server.route.providers") }} />
       <Stack.Screen name="provider" options={{ title: t("mobile.server.route.provider") }} />
+      {/* The page names its account. */}
+      <Stack.Screen name="provider-account" options={{ title: t("mobile.server.route.provider") }} />
+      <Stack.Screen name="acp-registry" options={{ title: t("mobile.server.route.acpRegistry") }} />
+      {/* The page names its agent, or says Add custom agent. */}
+      <Stack.Screen name="custom-agent" options={{ title: t("mobile.server.route.provider") }} />
+      {/* The page names its endpoint, or says Add custom provider. */}
+      <Stack.Screen name="custom-provider" options={{ title: t("mobile.server.route.provider") }} />
       <Stack.Screen name="mcp" options={{ title: t("mobile.server.route.mcp") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
       <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
