@@ -72,7 +72,7 @@ function RoutinesStory(props: {
   return (
     <main style={{ width: "380px", height: "720px", overflow: "auto", background: "var(--openbot-bg-canvas)" }}>
       <AgentRoutinesSettings
-        port={agentRoutinesPort("chief", false, props.localHost === true)}
+        port={agentRoutinesPort("chief", false, props.localHost === true, mock.api.agent)}
         onCountChange={fn()}
         onBack={fn()}
         onClose={fn()}
@@ -184,7 +184,7 @@ function FullSettingsPanelStory() {
 const meta = {
   title: "Settings/Agent Routines",
   component: AgentRoutinesSettings,
-  args: { port: agentRoutinesPort("chief"), onCountChange: fn() },
+  args: { port: agentRoutinesPort("chief", false, false, createMockOpenBot().api.agent), onCountChange: fn() },
   parameters: { layout: "centered", a11y: { test: "error" } },
 } satisfies Meta<typeof AgentRoutinesSettings>;
 
