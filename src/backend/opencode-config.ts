@@ -44,14 +44,14 @@ interface OpenCodeProviderOptions {
 }
 
 /**
- * One model of an endpoint. OpenCode refuses a `limit` without `output`, and then lists none of the
- * endpoint's models. `output: 0` keeps OpenCode's own output budget, which it also cuts to the room
- * the context leaves. Checked in OpenCode 2.1.4: a model with no `limit` reports 200K context, and
- * `{ context: 32768, output: 0 }` sent `max_completion_tokens: 21071`.
+ * One model of an endpoint. OpenCode expects `limit: { context, output }`.
+ * When output is capped by the model's context window, output is derived safely
+ * to avoid exceeding upstream provider output limits (e.g. 16K models rejected
+ * by 32000 max_completion_tokens).
  */
 interface OpenCodeModelEntry {
   readonly name: string;
-  readonly limit?: { readonly context: number; readonly output: 0 };
+  readonly limit?: { readonly context: number; readonly output: number };
 }
 
 /** One entry under OpenCode's own `provider` key, keyed there by the endpoint's id. */
@@ -177,9 +177,19 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
 }
 
 function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
-  return model.contextWindow === undefined
-    ? { name: model.name }
-    : { name: model.name, limit: { context: model.contextWindow, output: 0 } };
+  if (model.contextWindow === undefined) {
+    return { name: model.name };
+  }
+  // When context window is small (e.g. 16K or less), cap output tokens safely
+  // so requests do not trigger upstream rejection (e.g. max_completion_tokens: 32000).
+  const derivedOutput = model.contextWindow < 32000
+    ? Math.max(1, Math.floor(model.contextWindow / 2))
+    : 0;
+
+  return {
+    name: model.name,
+    limit: { context: model.contextWindow, output: derivedOutput },
+  };
 }
 
 /**
