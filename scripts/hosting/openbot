@@ -216,7 +216,8 @@ login_command() {
   show_status
   if [ "$(value server)" = online ]; then
     echo "Sign in to OpenBot with $email on your computer or https://openbot.run/app to use this server."
-    echo "To use it from your phone, run: openbot mobile-connect"
+    echo "On your phone, sign in to the OpenBot app with $email: the server shows there with no QR code."
+    echo "To connect the phone without that sign-in, run: openbot mobile-connect"
   fi
 }
 
@@ -229,6 +230,11 @@ mobile_connect_command() {
   [[ $expires_at =~ ^[0-9]+$ ]] || fail "OpenBot sent an invalid Mobile Connect code."
   value qr | base64 -d
   echo "In the OpenBot phone app, select Scan QR code and scan this code."
+  # A phone that shows this terminal cannot scan its own screen. An older server sends no link.
+  if [ -n "$(value url)" ]; then
+    echo "Is this terminal on the phone? Tap this link, or copy it into Safari or Chrome, to open it in OpenBot:"
+    echo "  $(value url)"
+  fi
   echo "It works for one sign-in and expires in $((expires_at / 1000 - $(date +%s))) seconds. Run the command again for a new code."
 }
 

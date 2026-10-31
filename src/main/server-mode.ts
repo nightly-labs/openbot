@@ -340,7 +340,12 @@ export class ServerMode {
     yield* this.publish();
     const ticket = yield* createHostedMobileConnect(this.#options).pipe(toRemoteWorkflowError);
     const qr = yield* remoteCall(() => QRCode.toString(ticket.qrData, { type: "terminal", small: true }));
-    return { status: 200, lines: { qr: Buffer.from(qr).toString("base64"), expires_at: ticket.expiresAt } };
+    // The link is the content of the QR code. A phone that shows this terminal cannot scan it, so the
+    // command prints the link too, for a tap or a copy on that phone.
+    return {
+      status: 200,
+      lines: { qr: Buffer.from(qr).toString("base64"), url: ticket.qrData, expires_at: ticket.expiresAt },
+    };
   });
 
   readonly #rename = Effect.fn("ServerMode.rename")(function* (
