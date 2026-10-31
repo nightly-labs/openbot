@@ -404,6 +404,7 @@
     "@tanstack/virtual-core": "catalog:",
     "class-variance-authority": "catalog:",
     "cuelume": "0.2.8",
+    "dompurify": "3.4.17",
     "effect": "catalog:",
     "electron-updater": "6.8.11",
     "fflate": "catalog:",
