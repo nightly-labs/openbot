@@ -334,6 +334,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Añadir modelo de respaldo",
   "mobile.agent.backupModels.search": "Buscar modelos",
   "mobile.agent.backupModels.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "mobile.agent.backupModels.readFailed": "No se pudieron leer los modelos de respaldo.",
   "mobile.agent.backupModels.moveUp": "Subir {model}",
   "mobile.agent.backupModels.moveDown": "Bajar {model}",
   "mobile.agent.backupModels.remove": "Quitar {model}",

@@ -339,6 +339,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Adicionar modelo de reserva",
   "mobile.agent.backupModels.search": "Buscar modelos",
   "mobile.agent.backupModels.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "mobile.agent.backupModels.readFailed": "Não foi possível ler os modelos de reserva.",
   "mobile.agent.backupModels.moveUp": "Mover {model} para cima",
   "mobile.agent.backupModels.moveDown": "Mover {model} para baixo",
   "mobile.agent.backupModels.remove": "Remover {model}",

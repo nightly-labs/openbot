@@ -326,6 +326,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.add": "Add backup model",
   "mobile.agent.backupModels.search": "Search models",
   "mobile.agent.backupModels.noMatches": "No models match your search.",
+  "mobile.agent.backupModels.readFailed": "Could not read backup models.",
   "mobile.agent.backupModels.moveUp": "Move {model} up",
   "mobile.agent.backupModels.moveDown": "Move {model} down",
   "mobile.agent.backupModels.remove": "Remove {model}",

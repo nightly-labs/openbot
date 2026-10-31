@@ -363,6 +363,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Добавить резервную модель",
   "mobile.agent.backupModels.search": "Поиск моделей",
   "mobile.agent.backupModels.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.backupModels.readFailed": "Не удалось прочитать резервные модели.",
   "mobile.agent.backupModels.moveUp": "Переместить {model} вверх",
   "mobile.agent.backupModels.moveDown": "Переместить {model} вниз",
   "mobile.agent.backupModels.remove": "Убрать {model}",

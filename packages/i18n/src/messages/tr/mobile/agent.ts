@@ -345,6 +345,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Yedek model ekle",
   "mobile.agent.backupModels.search": "Modellerde ara",
   "mobile.agent.backupModels.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.backupModels.readFailed": "Yedek modeller okunamadı.",
   "mobile.agent.backupModels.moveUp": "{model} modelini yukarı taşı",
   "mobile.agent.backupModels.moveDown": "{model} modelini aşağı taşı",
   "mobile.agent.backupModels.remove": "{model} modelini kaldır",

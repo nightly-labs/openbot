@@ -335,6 +335,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Reservemodel toevoegen",
   "mobile.agent.backupModels.search": "Modellen zoeken",
   "mobile.agent.backupModels.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.backupModels.readFailed": "Kan de reservemodellen niet lezen.",
   "mobile.agent.backupModels.moveUp": "{model} omhoog",
   "mobile.agent.backupModels.moveDown": "{model} omlaag",
   "mobile.agent.backupModels.remove": "{model} verwijderen",

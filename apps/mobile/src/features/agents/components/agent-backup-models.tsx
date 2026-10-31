@@ -11,12 +11,12 @@ import {
 } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Plus from "lucide-react-native/icons/plus";
 import Trash2 from "lucide-react-native/icons/trash";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { useProviderAccountName, useProviderAccounts } from "@/features/agents/components/agent-runtime-fields";
@@ -62,7 +62,13 @@ export function useAgentBackupModels(agent: MobileAgent, enabled: boolean) {
     // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
-  return { queryKey, canManage, settings: canManage ? (settings.data ?? null) : null };
+  return {
+    queryKey,
+    canManage,
+    settings: canManage ? (settings.data ?? null) : null,
+    failed: settings.isError,
+    retry: () => void settings.refetch(),
+  };
 }
 
 function useBackupModelSummary() {
@@ -76,15 +82,18 @@ function useBackupModelSummary() {
   };
 }
 
-/** Agent info > Brain: the row that opens the backup models page. Hidden for a member and an older host. */
+/**
+ * Agent info > Brain: the row that opens the backup models page. Hidden for a member and an older host.
+ * It shows before the host answers, so the section does not move; the summary shows when it answers.
+ */
 export function AgentBackupModelsRow({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
   const summary = useBackupModelSummary();
   const { canManage, settings } = useAgentBackupModels(agent, available);
-  if (!canManage || !settings) return null;
+  if (!canManage) return null;
   return (
     <SettingsRow
-      supportingText={summary(settings.backupModels)}
+      supportingText={settings ? summary(settings.backupModels) : undefined}
       onPress={() =>
         router.push({
           pathname: "/agent-info/[agentId]/backup-models",
@@ -131,9 +140,12 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
               account: accountName(account, accountIndex),
             })
           : modelName,
+      // Until the host answers with its models and accounts, a saved entry does not show as skipped.
       ready:
-        model !== undefined &&
-        (providerAccounts === undefined ? accountId === DEFAULT_PROVIDER_ACCOUNT_ID : account?.state === "connected"),
+        (models === undefined || model !== undefined) &&
+        (providerAccounts !== undefined
+          ? account?.state === "connected"
+          : accounts === null || accountId === DEFAULT_PROVIDER_ACCOUNT_ID),
     };
   };
   const all = (exclude: readonly AgentModelChoice[]): BackupModelOption[] =>
@@ -162,7 +174,7 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const { queryKey, canManage, settings } = useAgentBackupModels(agent, available);
+  const { queryKey, canManage, settings, failed, retry } = useAgentBackupModels(agent, available);
   const { accounts } = useProviderAccounts(agent, available);
   const models = useQuery({
     queryKey: queryKeys.agentModels(queryScope, agent.serverId),
@@ -173,7 +185,9 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
   const { option, all } = useBackupModelOptions(models.data, accounts);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!canManage || !settings) return { canManage, editor: null };
+  // A second tap can come before the render that disables the controls, and it would save from the same order.
+  const pending = useRef(false);
+  if (!canManage || !settings) return { canManage, failed, retry, editor: null };
 
   const current = settings;
   const automatic = current.backupModels?.automatic === true;
@@ -199,8 +213,12 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
   async function save(next: AgentBackupModels): Promise<boolean> {
     // Null returns the agent to the default: ask, with no saved order.
     const backupModels = next.automatic || next.order.length > 0 ? next : null;
+    if (pending.current) return false;
+    pending.current = true;
     setSaving(true);
     setError(null);
+    // A read that an `agents-changed` event started must not put the old value back after the save.
+    await queryClient.cancelQueries({ queryKey, exact: true });
     const optimistic: AgentBackupModelSettings = { ...current, backupModels };
     queryClient.setQueryData<AgentBackupModelSettings | null>(queryKey, optimistic);
     try {
@@ -210,16 +228,21 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
       return true;
     } catch (cause) {
       queryClient.setQueryData<AgentBackupModelSettings | null>(queryKey, current);
+      // Another device can have changed the settings meanwhile, so the host answers what is saved now.
+      void queryClient.invalidateQueries({ queryKey, exact: true });
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.host.failed")));
       return false;
     } finally {
+      pending.current = false;
       setSaving(false);
     }
   }
 
   return {
     canManage,
+    failed,
+    retry,
     editor: {
       automatic,
       order,
@@ -227,14 +250,37 @@ function useBackupModelEditor(agent: MobileAgent, available: boolean) {
       entries: order.map(option),
       addable: all(own ? [own, ...order] : order).filter((candidate) => candidate.ready),
       enabled: available && !saving,
+      models: { pending: models.isPending, failed: models.isError, retry: () => void models.refetch() },
       error,
       save,
     },
   };
 }
 
-function EditorStatus({ canManage, available }: { canManage: boolean; available: boolean }) {
+function EditorStatus({
+  canManage,
+  available,
+  failed,
+  retry,
+}: {
+  canManage: boolean;
+  available: boolean;
+  failed: boolean;
+  retry: () => void;
+}) {
   const { t } = useText();
+  if (failed && canManage) {
+    return (
+      <>
+        <Typography.Paragraph accessibilityRole="alert">
+          {t("mobile.agent.backupModels.readFailed")}
+        </Typography.Paragraph>
+        <Button variant="ghost" onPress={retry}>
+          <Button.Label>{t("common.retry")}</Button.Label>
+        </Button>
+      </>
+    );
+  }
   return (
     <Typography.Paragraph>
       {t(available && canManage ? "mobile.agent.edit.loading" : "mobile.agent.host.unsupported")}
@@ -255,8 +301,8 @@ export function AgentBackupModelsPage({ agent, available }: { agent: MobileAgent
   const { t } = useText();
   const { theme } = useUniwind();
   const [muted, danger] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-danger-text"]);
-  const { canManage, editor } = useBackupModelEditor(agent, available);
-  if (!editor) return <EditorStatus canManage={canManage} available={available} />;
+  const { canManage, failed, retry, editor } = useBackupModelEditor(agent, available);
+  if (!editor) return <EditorStatus canManage={canManage} available={available} failed={failed} retry={retry} />;
   const { automatic, order, ownModel, entries, addable, enabled, error, save } = editor;
 
   const iconButton = (label: string, disabled: boolean, onPress: () => void, icon: ReactNode) => (
@@ -375,9 +421,9 @@ export function AgentBackupModelsPage({ agent, available }: { agent: MobileAgent
 export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
   const [query, setQuery] = useState("");
-  const { canManage, editor } = useBackupModelEditor(agent, available);
-  if (!editor) return <EditorStatus canManage={canManage} available={available} />;
-  const { automatic, order, addable, enabled, error, save } = editor;
+  const { canManage, failed, retry, editor } = useBackupModelEditor(agent, available);
+  if (!editor) return <EditorStatus canManage={canManage} available={available} failed={failed} retry={retry} />;
+  const { automatic, order, addable, enabled, models, error, save } = editor;
   const words = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   // The search also reads the provider and the model id, as on desktop.
   const matches = addable.filter((candidate) => {
@@ -390,6 +436,7 @@ export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgen
 
   return (
     <>
+      <SaveError error={error} />
       <SheetFormField
         label={t("mobile.agent.backupModels.search")}
         hideLabel
@@ -401,7 +448,15 @@ export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgen
         value={query}
         onChangeText={setQuery}
       />
-      {matches.length === 0 ? (
+      {models.failed ? (
+        <Button variant="ghost" onPress={models.retry}>
+          <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>
+        </Button>
+      ) : models.pending ? (
+        <Typography.Paragraph className="px-4 text-grouped-secondary">
+          {t("mobile.agent.runtime.loadingModels")}
+        </Typography.Paragraph>
+      ) : matches.length === 0 ? (
         <Typography.Paragraph className="px-4 text-grouped-secondary">
           {t("mobile.agent.backupModels.noMatches")}
         </Typography.Paragraph>
@@ -427,7 +482,6 @@ export function AgentBackupModelPicker({ agent, available }: { agent: MobileAgen
             ))}
         </SettingsSection>
       ))}
-      <SaveError error={error} />
     </>
   );
 }

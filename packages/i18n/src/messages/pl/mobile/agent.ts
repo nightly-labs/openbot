@@ -361,6 +361,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Dodaj model zapasowy",
   "mobile.agent.backupModels.search": "Szukaj modeli",
   "mobile.agent.backupModels.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.backupModels.readFailed": "Nie udało się odczytać modeli zapasowych.",
   "mobile.agent.backupModels.moveUp": "Przesuń {model} w górę",
   "mobile.agent.backupModels.moveDown": "Przesuń {model} w dół",
   "mobile.agent.backupModels.remove": "Usuń {model}",

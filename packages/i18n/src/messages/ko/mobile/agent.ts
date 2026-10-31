@@ -329,6 +329,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "백업 모델 추가",
   "mobile.agent.backupModels.search": "모델 검색",
   "mobile.agent.backupModels.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.backupModels.readFailed": "백업 모델을 읽을 수 없어요.",
   "mobile.agent.backupModels.moveUp": "{model} 위로 이동",
   "mobile.agent.backupModels.moveDown": "{model} 아래로 이동",
   "mobile.agent.backupModels.remove": "{model} 삭제",

@@ -336,6 +336,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "バックアップモデルを追加",
   "mobile.agent.backupModels.search": "モデルを検索",
   "mobile.agent.backupModels.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.backupModels.readFailed": "バックアップモデルを読み取れませんでした。",
   "mobile.agent.backupModels.moveUp": "{model} を上へ移動",
   "mobile.agent.backupModels.moveDown": "{model} を下へ移動",
   "mobile.agent.backupModels.remove": "{model} を削除",

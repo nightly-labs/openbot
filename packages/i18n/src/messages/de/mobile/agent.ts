@@ -342,6 +342,7 @@ export const messages = {
   "mobile.agent.backupModels.add": "Ersatzmodell hinzufügen",
   "mobile.agent.backupModels.search": "Modelle suchen",
   "mobile.agent.backupModels.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "mobile.agent.backupModels.readFailed": "Die Ersatzmodelle konnten nicht gelesen werden.",
   "mobile.agent.backupModels.moveUp": "{model} nach oben",
   "mobile.agent.backupModels.moveDown": "{model} nach unten",
   "mobile.agent.backupModels.remove": "{model} entfernen",
