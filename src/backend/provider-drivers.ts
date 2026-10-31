@@ -804,7 +804,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // A stalled or refused turn on a custom endpoint names the endpoint, not OpenCode (#3234).
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
-          return endpoint ? { name: endpoint.name, hasApiKey: Boolean(endpoint.apiKey) } : null;
+          return endpoint
+            ? { name: endpoint.name, hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0 }
+            : null;
         },
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,

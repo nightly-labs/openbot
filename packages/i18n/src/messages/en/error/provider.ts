@@ -188,9 +188,9 @@ export const messages = defineMessages("error.provider", {
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode has no sign-in for the provider of this model. Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.",
   "error.provider.customEndpointKeyRefused":
-    'The endpoint "{provider}" refused its API key. In Settings, open Providers, edit the custom provider and enter the key again. Then try again.',
+    'The endpoint "{provider}" refused its API key or headers. Enter them again in Server settings → Providers, then try again.',
   "error.provider.customEndpointKeyMissing":
-    'The endpoint "{provider}" needs an API key. In Settings, open Providers, edit the custom provider and enter its key. Then try again.',
+    'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeServiceFailure":

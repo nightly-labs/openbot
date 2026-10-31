@@ -2,8 +2,8 @@
 // OpenAI-compatible server with two models, as a llama-swap user has them: the user's own OpenCode
 // config names one as `model` and `small_model`, and the agent runs on the other. A local server like llama-swap loads
 // the model that each request names, so every request must name the agent's model.
-// A second endpoint needs an API key: a turn must send the saved key, and a key that the endpoint
-// refuses must name the endpoint, not an OpenCode sign-in.
+// A second endpoint needs an API key: a turn must send the saved key, and a refused or missing key
+// must name the endpoint, not an OpenCode sign-in.
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
@@ -201,7 +201,7 @@ try {
   assert.deepEqual(others, [], "Each request must name the agent's model.");
 
   const keyedModel = `${KEYED_ENDPOINT}/${AGENT_MODEL}`;
-  const keyedTurn = async (apiKey: string) => {
+  const keyedTurn = async (apiKey: string | null) => {
     const keyed = requireProviderDriver("opencode").createClient(cli, 60_000, {
       apiKey: () => null,
       customProviders: () => [
@@ -225,6 +225,8 @@ try {
   );
   const refused = await keyedTurn("e2e-refused-key");
   assert.equal(refused.error, sourceText("error.provider.customEndpointKeyRefused", { provider: "Vault" }));
+  const missing = await keyedTurn(null);
+  assert.equal(missing.error, sourceText("error.provider.customEndpointKeyMissing", { provider: "Vault" }));
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

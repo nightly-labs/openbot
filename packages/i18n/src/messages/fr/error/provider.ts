@@ -211,9 +211,9 @@ export const messages = {
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode n’a pas de connexion pour le fournisseur de ce modèle. Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
   "error.provider.customEndpointKeyRefused":
-    "Le point de terminaison « {provider} » a refusé sa clé d’API. Dans les réglages, ouvrez Fournisseurs, modifiez le fournisseur personnalisé et saisissez de nouveau la clé. Réessayez ensuite.",
+    "Le point de terminaison « {provider} » a refusé sa clé d’API ou ses en-têtes. Saisissez-les de nouveau dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.customEndpointKeyMissing":
-    "Le point de terminaison « {provider} » a besoin d’une clé d’API. Dans les réglages, ouvrez Fournisseurs, modifiez le fournisseur personnalisé et saisissez sa clé. Réessayez ensuite.",
+    "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeServiceFailure":

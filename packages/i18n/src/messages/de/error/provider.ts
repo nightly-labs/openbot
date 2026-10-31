@@ -205,9 +205,9 @@ export const messages = {
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode hat keine Anmeldung für den Anbieter dieses Modells. Wähle ein Modell mit der Markierung „Kostenlos“ oder verbinde den Anbieter: Füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein oder führe `opencode auth login` in einem Terminal aus. Versuche es dann erneut.",
   "error.provider.customEndpointKeyRefused":
-    "Der Endpunkt „{provider}“ hat seinen API-Schlüssel abgelehnt. Öffne in den Einstellungen „Anbieter“, bearbeite den benutzerdefinierten Anbieter und gib den Schlüssel erneut ein. Versuche es dann erneut.",
+    "Der Endpunkt „{provider}“ hat seinen API-Schlüssel oder seine Header abgelehnt. Gib sie in Servereinstellungen → Anbieter erneut ein und versuche es dann erneut.",
   "error.provider.customEndpointKeyMissing":
-    "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Öffne in den Einstellungen „Anbieter“, bearbeite den benutzerdefinierten Anbieter und gib seinen Schlüssel ein. Versuche es dann erneut.",
+    "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeServiceFailure":

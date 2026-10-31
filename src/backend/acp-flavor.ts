@@ -3,10 +3,11 @@ import type { RequestError } from "@agentclientprotocol/sdk";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { isRecord } from "./protocol";
 
-/** The custom endpoint that serves a model, as a turn's error names it. Never the key itself. */
+/** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
   readonly name: string;
-  readonly hasApiKey: boolean;
+  /** Whether the endpoint has a saved API key or header. */
+  readonly hasCredentials: boolean;
 }
 
 /**

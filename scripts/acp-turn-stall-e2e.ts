@@ -136,7 +136,7 @@ try {
   // OpenCode serves a custom endpoint, and the user knows that turn by the endpoint's name. The fake
   // agent's one model stands for an endpoint model here.
   const endpoint = await open("opencode", OPENCODE_ACP_FLAVOR, join(root, "endpoint.jsonl"), {}, (modelId) =>
-    modelId === "fake-alpha" ? { name: "My Lab", hasApiKey: false } : null,
+    modelId === "fake-alpha" ? { name: "My Lab", hasCredentials: false } : null,
   );
   const endpointThread = await startThread(endpoint, { cwd: workspace });
   const endpointStall = await runTurn(endpoint, endpointThread, { text: "hang", timeoutMs: STALL_MS * 10 });

@@ -48,7 +48,7 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
-      endpoint.hasApiKey ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
+      endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";

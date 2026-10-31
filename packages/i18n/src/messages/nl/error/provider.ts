@@ -196,9 +196,9 @@ export const messages = {
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyRefused":
-    "Het endpoint “{provider}” heeft zijn API-sleutel geweigerd. Open in Instellingen Aanbieders, bewerk de aangepaste aanbieder en voer de sleutel opnieuw in. Probeer het daarna opnieuw.",
+    "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
-    "Het endpoint “{provider}” heeft een API-sleutel nodig. Open in Instellingen Aanbieders, bewerk de aangepaste aanbieder en voer de sleutel in. Probeer het daarna opnieuw.",
+    "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":
