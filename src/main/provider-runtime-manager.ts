@@ -11,6 +11,7 @@ import {
   type AgentProviderId,
   type AgentProviderRef,
   agentProviderDescriptor,
+  type CustomProviderHarness,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -35,6 +36,7 @@ import {
   configuredCliPath,
   isVersion,
   olderVersion,
+  resolveOpencodeCli,
   resolvePiCli,
 } from "../backend/cli";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -829,6 +831,18 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           Effect.map((snapshot) => ["downloading", "finishing"].includes(snapshot.providers.pi.phase)),
         ),
       ),
+    );
+  }
+  /**
+   * Starts the download of the provider that runs a saved custom endpoint, when that provider cannot
+   * start. The endpoint form saves on OpenCode by default and nothing else downloads it, so the
+   * endpoint stayed out of every model list. Does not wait: the model picker shows the download.
+   */
+  startCustomProviderHarness(harness: CustomProviderHarness): Effect.Effect<void> {
+    const resolveCli = harness === "pi" ? resolvePiCli : resolveOpencodeCli;
+    return resolveCli({ bundledExecutable: this.executablePath(harness) }).pipe(
+      Effect.asVoid,
+      Effect.catch(() => this.download(harness).pipe(Effect.ignore)),
     );
   }
   cancel(runtime: ManagedRuntimeId): Effect.Effect<ProviderRuntimeSnapshot, ProviderRuntimeFailure> {

@@ -2207,7 +2207,7 @@ export async function createApplicationServices({
     browser,
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders });
+  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),
