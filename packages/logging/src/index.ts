@@ -113,6 +113,13 @@ const UNSERIALIZABLE = "[unserializable]";
 // as `password` or `Authorization`, may be the label or header name that hides the next value, so
 // its marker is itself a secret label that ends in `authorization`.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
+// A one-character secret such as `e` cannot be masked by exact text. Growing the match to the
+// whole token around it turned every word that held the letter into `[redacted]`, and the chat that
+// receives the answer showed `her şey` as `[redacted]` mid-sentence. The length limit above exists
+// for this, but `allowShort` bypassed it: a vault login saved with a one-letter password, or an
+// imported CSV of them, registered `e` and `a`, and every log line, trace and outgoing chat answer
+// lost those letters with it. Short values are registered only when they cannot erase prose.
+const MIN_UNCONDITIONAL_SECRET_LENGTH = 4;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
 // The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
@@ -137,8 +144,11 @@ export function registerSecretValue(value: string, options: { allowShort?: boole
 /** `registerSecretValue` for many values, such as an imported password list, with one pattern rebuild. */
 export function registerSecretValues(values: Iterable<string>, options: { allowShort?: boolean } = {}): void {
   const size = registeredSecrets.size;
+  // `allowShort` lowers the floor for a known password, but it never removes it: one letter would
+  // erase that letter from every line, and the masking is worse than the leak.
+  const floor = options.allowShort ? MIN_UNCONDITIONAL_SECRET_LENGTH : MIN_REGISTERED_SECRET_LENGTH;
   for (const value of values) {
-    if (!value || (!options.allowShort && value.length < MIN_REGISTERED_SECRET_LENGTH)) continue;
+    if (!value || value.length < floor) continue;
     for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
       if (form !== null) registeredSecrets.add(form);
     }
