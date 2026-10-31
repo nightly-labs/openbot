@@ -35,6 +35,34 @@ export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
 ] as const;
 
+/** A page's own social card: a 1600x900 JPEG in `public/social/`, the size of the site's card. */
+export interface PageSocialImage {
+  /** The path from the site root, for example `/social/teams.jpg`. */
+  path: string;
+  alt: string;
+}
+
+/**
+ * The Open Graph and X tags of a page's own social card. The image URL uses the site that
+ * serves the page, so a pull-request preview names an image that it has.
+ */
+export function pageSocialImageMeta(image: PageSocialImage, siteUrl: string) {
+  const url = new URL(image.path, siteUrl).toString();
+  return {
+    openGraph: [
+      { property: "og:image", content: url },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1600" },
+      { property: "og:image:height", content: "900" },
+      { property: "og:image:alt", content: image.alt },
+    ],
+    twitter: [
+      { name: "twitter:image", content: url },
+      { name: "twitter:image:alt", content: image.alt },
+    ],
+  } as const;
+}
+
 // The hosts production answers on. Both serve the same pages, and those pages go by
 // openbot.run.
 const OPENBOT_PRODUCTION_HOSTS = new Set(["openbot.run", "api.openbot.run"]);
