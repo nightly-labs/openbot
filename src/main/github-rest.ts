@@ -4,6 +4,7 @@
 
 import type {
   WorkflowGitHubCatalog,
+  WorkflowGitHubCloseReason,
   WorkflowGitHubEvent,
   WorkflowGitHubLabel,
   WorkflowGitHubRepositoryOptions,
@@ -33,6 +34,11 @@ const RECENT_LIMIT = 30;
 const RECENT_DETAIL_LIMIT = 10;
 /** The longest GitHub message that a failure keeps. */
 const DETAIL_LIMIT = 300;
+/** The `state_reason` that GitHub accepts for each saved close reason. */
+const GITHUB_STATE_REASONS: Record<WorkflowGitHubCloseReason, string> = {
+  completed: "completed",
+  notPlanned: "not_planned",
+};
 
 /** The tokens for one repository: the user's, and the app's where the user can push. */
 interface GitHubRepositoryTokens {
@@ -183,7 +189,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         return { created: { kind: "review", id: answer.id }, url: answer.html_url ?? itemUrl };
       }
       case "close":
-        yield* call(token, "PATCH", item, { state: "closed", state_reason: change.reason });
+        yield* call(token, "PATCH", item, { state: "closed", state_reason: GITHUB_STATE_REASONS[change.reason] });
         return done();
       case "reopen":
         yield* call(token, "PATCH", item, { state: "open" });
