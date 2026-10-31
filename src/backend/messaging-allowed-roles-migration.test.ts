@@ -70,7 +70,7 @@ function roleTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 48 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 49 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -92,6 +92,9 @@ describe("messaging allowed roles migration", () => {
         projection_messaging_allowed_roles: [],
         browser_profiles: [],
         workflow_edges: [],
+        workflow_github_actions: [],
+        workflow_github_deliveries: [],
+        workflow_github_runs: [],
         workflow_nodes: [],
         workflow_output_deliveries: [],
         workflow_runs: [],
@@ -124,6 +127,9 @@ describe("messaging allowed roles migration", () => {
       projection_messaging_allowed_roles: [],
       browser_profiles: [],
       workflow_edges: [],
+      workflow_github_actions: [],
+      workflow_github_deliveries: [],
+      workflow_github_runs: [],
       workflow_nodes: [],
       workflow_output_deliveries: [],
       workflow_runs: [],
@@ -141,9 +147,9 @@ describe("messaging allowed roles migration", () => {
     const db = databaseAt(43);
     seed(db, 43);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(49,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(50,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=49; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=50; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(roleTables(db)).toEqual([]);
