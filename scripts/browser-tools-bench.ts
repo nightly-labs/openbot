@@ -982,6 +982,9 @@ async function main(): Promise<void> {
       lessonCalendarServer.once("error", rejectListen);
       lessonCalendarServer.listen(0, "127.0.0.1", resolveListen);
     });
+    // The setup below runs before the try that closes the server. If it fails, the server must not
+    // keep the process alive.
+    lessonCalendarServer.unref();
     const address = lessonCalendarServer.address();
     if (address === null || typeof address === "string") throw new Error("The lesson calendar has no port.");
     lessonCalendarUrl = `http://127.0.0.1:${address.port}/calendar`;
