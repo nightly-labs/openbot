@@ -194,6 +194,10 @@ export const messages = {
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyRefused":
+    "Endpoint „{provider}” odrzucił swój klucz API. W Ustawieniach otwórz Dostawców, edytuj własnego dostawcę i wpisz klucz ponownie. Potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyMissing":
+    "Endpoint „{provider}” wymaga klucza API. W Ustawieniach otwórz Dostawców, edytuj własnego dostawcę i wpisz jego klucz. Potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":

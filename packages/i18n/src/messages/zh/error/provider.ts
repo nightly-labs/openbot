@@ -171,6 +171,10 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.customEndpointKeyRefused":
+    "端点“{provider}”拒绝了它的 API 密钥。请在设置中打开“服务商”，编辑自定义服务商并重新输入密钥。然后重试。",
+  "error.provider.customEndpointKeyMissing":
+    "端点“{provider}”需要 API 密钥。请在设置中打开“服务商”，编辑自定义服务商并输入其密钥。然后重试。",
   "error.provider.opencodeKeyExpired":
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeServiceFailure":

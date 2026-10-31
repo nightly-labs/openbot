@@ -191,6 +191,10 @@ export const messages = {
     'OpenCode에 모델 제공자 "{provider}"의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode에 이 모델 제공자의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.customEndpointKeyRefused":
+    '엔드포인트 "{provider}"이(가) API 키를 거부했어요. 설정에서 제공자를 열고 사용자 지정 제공자를 편집해 키를 다시 입력하세요. 그런 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointKeyMissing":
+    '엔드포인트 "{provider}"에는 API 키가 필요해요. 설정에서 제공자를 열고 사용자 지정 제공자를 편집해 키를 입력하세요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":

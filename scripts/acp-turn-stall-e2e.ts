@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import { type AcpCustomEndpoint, type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "../src/backend/acp-flavor-opencode";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -57,7 +57,7 @@ async function open(
   flavor: AcpFlavor,
   log: string,
   env: Readonly<Record<string, string>> = {},
-  providerName?: (modelId: string | null) => string | null,
+  customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -73,7 +73,7 @@ async function open(
     env: {},
     signInMessage: "Sign in to the fake agent.",
     turnStallMs: STALL_MS,
-    ...(providerName ? { providerName } : {}),
+    ...(customEndpoint ? { customEndpoint } : {}),
   });
   clients.push(client);
   client.start();
@@ -136,7 +136,7 @@ try {
   // OpenCode serves a custom endpoint, and the user knows that turn by the endpoint's name. The fake
   // agent's one model stands for an endpoint model here.
   const endpoint = await open("opencode", OPENCODE_ACP_FLAVOR, join(root, "endpoint.jsonl"), {}, (modelId) =>
-    modelId === "fake-alpha" ? "My Lab" : null,
+    modelId === "fake-alpha" ? { name: "My Lab", hasApiKey: false } : null,
   );
   const endpointThread = await startThread(endpoint, { cwd: workspace });
   const endpointStall = await runTurn(endpoint, endpointThread, { text: "hang", timeoutMs: STALL_MS * 10 });

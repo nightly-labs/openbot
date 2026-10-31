@@ -196,6 +196,10 @@ export const messages = {
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.customEndpointKeyRefused":
+    "\"{provider}\" uç noktası API anahtarını reddetti. Ayarlar'da Sağlayıcılar'ı açın, özel sağlayıcıyı düzenleyin ve anahtarı yeniden girin. Ardından tekrar deneyin.",
+  "error.provider.customEndpointKeyMissing":
+    "\"{provider}\" uç noktası bir API anahtarı gerektiriyor. Ayarlar'da Sağlayıcılar'ı açın, özel sağlayıcıyı düzenleyin ve anahtarını girin. Ardından tekrar deneyin.",
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeServiceFailure":
