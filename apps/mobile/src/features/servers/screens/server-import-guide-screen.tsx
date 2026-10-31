@@ -1,8 +1,11 @@
 import {
+  AGENT_IMPORT_EXPORT_AGENT_NAME,
+  AGENT_IMPORT_PROMPT,
   type AgentImportPreview,
   type AgentImportPreviewChannel,
   GROK_BOT_EXPORT_URL,
-  HERMES_EXPORT_SKILL_ID,
+  HERMES_EXPORT_PROMPT,
+  HERMES_SKILL_COMMAND,
   parseAgentImportSkillSource,
   type RemoteAgentImportResult,
 } from "@openbot/contracts/ipc";
@@ -34,14 +37,6 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** What the user says to the Grok Bot export agent, and what runs the Hermes export skill. */
-const GROK_PROMPT = "Export my agents for OpenBot";
-const HERMES_PROMPT = "/openbot-export";
-/** What the user types in a Hermes chat to install the export skill. */
-const HERMES_COMMAND = `/skills install ${HERMES_EXPORT_SKILL_ID}`;
-/** The name of the export agent on its Grok Bot page. */
-const EXPORT_AGENT_NAME = "OpenBot export";
-
 type Phase = "guide" | "reading" | "review" | "importing" | "done";
 
 /**
@@ -64,15 +59,18 @@ export function ServerImportGuideScreen() {
   const [copied, setCopied] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  // The open token, for the release when the screen closes.
+  // The open token, for the release when the screen closes. A token that comes back after that is
+  // released when it arrives.
   const token = useRef<string | null>(null);
   token.current = preview?.token ?? null;
-  useEffect(
-    () => () => {
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
       if (token.current) void discardAgentImport(token.current, serverId).catch(() => undefined);
-    },
-    [discardAgentImport, serverId],
-  );
+    };
+  }, [discardAgentImport, serverId]);
 
   if (!canImportAgents(serverId))
     return (
@@ -104,6 +102,10 @@ export function ServerImportGuideScreen() {
       }
       // A new export releases the earlier one on the host.
       const next = await stageAgentImport(upload, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
+      if (closed.current) {
+        void discardAgentImport(next.token, serverId).catch(() => undefined);
+        return;
+      }
       setPreview(next);
       setPhase("review");
     } catch (caught) {
@@ -164,7 +166,7 @@ export function ServerImportGuideScreen() {
       </>
     );
 
-  const prompt = hermes ? HERMES_PROMPT : GROK_PROMPT;
+  const prompt = hermes ? HERMES_EXPORT_PROMPT : AGENT_IMPORT_PROMPT;
   const copyTrailing = (text: string) => (
     <Typography.Paragraph className="text-accent">
       {copied === text ? t("mobile.server.import.copied") : t("mobile.server.import.copy")}
@@ -178,11 +180,11 @@ export function ServerImportGuideScreen() {
         <SettingsSection title={t("mobile.server.import.hermesStep1")} footer={t("mobile.server.import.commandNote")}>
           <SettingsRow
             disclosure={false}
-            trailing={copyTrailing(HERMES_COMMAND)}
-            accessibilityLabel={t("mobile.server.import.copyLabel", { text: HERMES_COMMAND })}
-            onPress={() => void copy(HERMES_COMMAND)}
+            trailing={copyTrailing(HERMES_SKILL_COMMAND)}
+            accessibilityLabel={t("mobile.server.import.copyLabel", { text: HERMES_SKILL_COMMAND })}
+            onPress={() => void copy(HERMES_SKILL_COMMAND)}
           >
-            <Typography.Paragraph selectable>{HERMES_COMMAND}</Typography.Paragraph>
+            <Typography.Paragraph selectable>{HERMES_SKILL_COMMAND}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : (
@@ -199,7 +201,7 @@ export function ServerImportGuideScreen() {
               );
             }}
           >
-            <Typography.Paragraph>{EXPORT_AGENT_NAME}</Typography.Paragraph>
+            <Typography.Paragraph>{AGENT_IMPORT_EXPORT_AGENT_NAME}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       )}

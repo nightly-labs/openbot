@@ -39,6 +39,40 @@ export function agentContents(
   return parts.join(" · ");
 }
 
+/** What a transfer file holds with the chosen agents, one item for each line or part. */
+export function transferContents(
+  t: MobileText["t"],
+  format: AppFormat,
+  agents: readonly { skillCount: number; routineCount: number; memoryCount: number }[],
+  fileBytes: number,
+  settings: boolean,
+): string[] {
+  const sum = (count: (agent: (typeof agents)[number]) => number) =>
+    agents.reduce((total, agent) => total + count(agent), 0);
+  return [
+    importCount(t, "agent", agents.length),
+    importCount(
+      t,
+      "skill",
+      sum((agent) => agent.skillCount),
+    ),
+    importCount(
+      t,
+      "routine",
+      sum((agent) => agent.routineCount),
+    ),
+    importCount(
+      t,
+      "memory",
+      sum((agent) => agent.memoryCount),
+    ),
+    fileBytes > 0
+      ? t("mobile.server.transfer.filesSize", { size: format.fileSize(fileBytes) })
+      : t("mobile.server.transfer.noFiles"),
+    settings ? t("mobile.server.transfer.settings") : t("mobile.server.transfer.noSettings"),
+  ];
+}
+
 /** The date an export was made. A value that is not a date shows as it is. */
 export function exportDate(value: string, format: AppFormat): string {
   const date = new Date(value);

@@ -9,9 +9,9 @@ import {
   agentContents,
   exportDate,
   IncludeRow,
-  importCount,
   NotesSection,
   toggledKeys,
+  transferContents,
 } from "@/features/servers/components/import-parts";
 import { pickZipUpload } from "@/features/servers/model/transfer-file";
 import {
@@ -43,15 +43,18 @@ export function ServerTransferImportScreen() {
   const [preview, setPreview] = useState<InstanceTransferPreview | null>(null);
   const [result, setResult] = useState<RemoteInstanceTransferResult | null>(null);
 
-  // The open token, for the release when the page closes.
+  // The open token, for the release when the page closes. A token that comes back after that is
+  // released when it arrives.
   const token = useRef<string | null>(null);
   token.current = preview?.token ?? null;
-  useEffect(
-    () => () => {
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
       if (token.current) void discardInstanceTransfer(token.current, serverId).catch(() => undefined);
-    },
-    [discardInstanceTransfer, serverId],
-  );
+    };
+  }, [discardInstanceTransfer, serverId]);
 
   if (!canTransferServer(serverId))
     return (
@@ -76,6 +79,10 @@ export function ServerTransferImportScreen() {
       }
       const next = await stageInstanceTransfer(upload, serverId, (fraction) => setProgress(Math.floor(fraction * 100)));
       if (open) void discardInstanceTransfer(open.token, serverId).catch(() => undefined);
+      if (closed.current) {
+        void discardInstanceTransfer(next.token, serverId).catch(() => undefined);
+        return;
+      }
       setPreview(next);
       setPhase("review");
     } catch (caught) {
@@ -171,28 +178,7 @@ function TransferReview({
         date: exportDate(preview.exportedAt, format),
       })
     : t("mobile.server.transfer.sourceNoDate", { version: preview.appVersion });
-  const contents = [
-    importCount(t, "agent", selected.length),
-    importCount(
-      t,
-      "skill",
-      selected.reduce((total, agent) => total + agent.skillCount, 0),
-    ),
-    importCount(
-      t,
-      "routine",
-      selected.reduce((total, agent) => total + agent.routineCount, 0),
-    ),
-    importCount(
-      t,
-      "memory",
-      selected.reduce((total, agent) => total + agent.memoryCount, 0),
-    ),
-    fileBytes > 0
-      ? t("mobile.server.transfer.filesSize", { size: format.fileSize(fileBytes) })
-      : t("mobile.server.transfer.noFiles"),
-    settings ? t("mobile.server.transfer.settings") : t("mobile.server.transfer.noSettings"),
-  ].join(" · ");
+  const contents = transferContents(t, format, selected, fileBytes, settings).join(" · ");
   const label =
     selected.length > 0
       ? t("mobile.server.transfer.submit", { count: selected.length })

@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { agentContents, IncludeRow, importCount, toggledKeys } from "@/features/servers/components/import-parts";
+import { agentContents, IncludeRow, toggledKeys, transferContents } from "@/features/servers/components/import-parts";
 import { keepTransferFile, shareTransferFile } from "@/features/servers/model/transfer-file";
 import {
   SettingsContent,
@@ -45,9 +45,17 @@ export function ServerTransferExportScreen() {
   // The kept file. The host sends the file only, with no warnings.
   const [saved, setSaved] = useState<string | null>(null);
 
-  // The file holds memories and workspace files, so it leaves this phone with the page.
+  // The file holds memories and workspace files, so it leaves this phone with the page. A file that
+  // arrives after the page closes is not kept.
   const release = useRef<(() => void) | null>(null);
-  useEffect(() => () => release.current?.(), []);
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      release.current?.();
+    };
+  }, []);
 
   if (!available)
     return (
@@ -119,28 +127,7 @@ export function ServerTransferExportScreen() {
 
   const selected = data.agents.filter((agent) => !excluded.has(agent.id));
   const fileBytes = files ? selected.reduce((total, agent) => total + agent.fileBytes, 0) : 0;
-  const contents = [
-    importCount(t, "agent", selected.length),
-    importCount(
-      t,
-      "skill",
-      selected.reduce((total, agent) => total + agent.skillCount, 0),
-    ),
-    importCount(
-      t,
-      "routine",
-      selected.reduce((total, agent) => total + agent.routineCount, 0),
-    ),
-    importCount(
-      t,
-      "memory",
-      selected.reduce((total, agent) => total + agent.memoryCount, 0),
-    ),
-    fileBytes > 0
-      ? t("mobile.server.transfer.filesSize", { size: format.fileSize(fileBytes) })
-      : t("mobile.server.transfer.noFiles"),
-    settings ? t("mobile.server.transfer.settings") : t("mobile.server.transfer.noSettings"),
-  ];
+  const contents = transferContents(t, format, selected, fileBytes, settings);
 
   async function exportFile() {
     setExporting(true);
@@ -150,6 +137,7 @@ export function ServerTransferExportScreen() {
         { agentIds: selected.map((agent) => agent.id), includeFiles: files, includeSettings: settings },
         serverId,
       );
+      if (closed.current) return;
       const kept = keepTransferFile(download);
       release.current?.();
       release.current = kept.release;

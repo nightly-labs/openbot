@@ -158,7 +158,7 @@ export const RemoteTeamTransport = memo(
                   upload: next.upload,
                   // The transfer file is the one answer larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
-                    ? { downloadMaxBytes: INSTANCE_TRANSFER_REMOTE_BYTES }
+                    ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
                     : {}),
                 }
               : { id, type: "disconnect" };

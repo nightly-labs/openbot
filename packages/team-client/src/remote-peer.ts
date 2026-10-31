@@ -84,6 +84,13 @@ import {
 } from "./remote-path-check";
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
+
+// A type, not an interface: the command crosses the native/DOM bridge as JSON.
+export type RemoteLargeDownload = {
+  maxBytes: number;
+  mimeType: string;
+};
+
 export type RemoteTeamCommand =
   | { id: string; type: "connect"; hostId: string; hostPublicKey: string }
   | { id: string; type: "disconnect" }
@@ -96,7 +103,7 @@ export type RemoteTeamCommand =
       upload?: RemoteFileUpload | undefined;
       timeoutMs?: number | undefined;
       /** A larger cap for the one file that answers this request, such as a transfer file. */
-      downloadMaxBytes?: number | undefined;
+      largeDownload?: RemoteLargeDownload | undefined;
     };
 
 export interface RemoteTeamBootstrapPayload {
@@ -174,6 +181,11 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
  * Reads a command that crossed the native/DOM bridge as JSON. `command` is null when the value is not
  * a command; `commandId` is then its ID when it has one, so the page can still answer it.
  */
+function decodeRemoteLargeDownload(value: unknown): RemoteLargeDownload | null {
+  if (!isDynamicRecord(value) || !isNumber(value.maxBytes) || !isString(value.mimeType)) return null;
+  return { maxBytes: value.maxBytes, mimeType: value.mimeType };
+}
+
 export function decodeRemoteTeamCommand(value: unknown): {
   command: RemoteTeamCommand | null;
   commandId: string | null;
@@ -189,8 +201,8 @@ export function decodeRemoteTeamCommand(value: unknown): {
   if (value.type !== "request" || !isString(value.method) || !isString(value.path)) return invalid;
   const timeoutMs = value.timeoutMs;
   if (!(timeoutMs === undefined || isNumber(timeoutMs))) return invalid;
-  const downloadMaxBytes = value.downloadMaxBytes;
-  if (!(downloadMaxBytes === undefined || isNumber(downloadMaxBytes))) return invalid;
+  const largeDownload = value.largeDownload === undefined ? undefined : decodeRemoteLargeDownload(value.largeDownload);
+  if (largeDownload === null) return invalid;
   const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
   if (upload === null) return invalid;
   let body: TeamProtocolV2Json;
@@ -208,7 +220,7 @@ export function decodeRemoteTeamCommand(value: unknown): {
       body,
       ...(upload ? { upload } : {}),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
-      ...(downloadMaxBytes === undefined ? {} : { downloadMaxBytes }),
+      ...(largeDownload ? { largeDownload } : {}),
     },
     commandId: id,
   };
@@ -753,7 +765,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
             ).catch(() => undefined);
           },
           command.timeoutMs,
-          command.downloadMaxBytes,
+          command.largeDownload,
         );
         return { commandId: command.id, ok: true, status: response.status, body: response.body };
       }).pipe(Effect.result);
@@ -1283,12 +1295,15 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
           pending.reject(new Error("The host returned an invalid response."));
         } else if (isDynamicRecord(frame.result.file) && isString(frame.result.file.transferId)) {
           // The RPC response arrived; the file receiver now owns the inactivity
-          // deadline. A download failure rejects this request, not the peer.
+          // deadline. A download failure rejects this request, not the peer. The host answers when
+          // the file starts, and a transfer file can take minutes, so other answers on this channel
+          // do not wait for it.
           clearTimeout(pending.timer);
-          const transferId = frame.result.file.transferId;
-          const file = yield* downloads.take(transferId).pipe(Effect.result);
-          if (Result.isSuccess(file)) pending.resolve({ status: frame.result.status, body: { ...file.success } });
-          else pending.reject(file.failure);
+          const status = frame.result.status;
+          void runPeerEffect(downloads.take(frame.result.file.transferId)).then(
+            (file) => pending.resolve({ status, body: { ...file } }),
+            (error: unknown) => pending.reject(error instanceof Error ? error : peerError(error)),
+          );
         } else {
           const sideRoute = teamSideRouteCodec(pending.path);
           const status = frame.result.status;
@@ -1419,7 +1434,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     upload?: RemoteFileUpload,
     onUploadProgress?: (sent: number, total: number) => void,
     timeoutMs = REQUEST_TIMEOUT_MS,
-    downloadMaxBytes?: number,
+    largeDownload?: RemoteLargeDownload,
   ) {
     return Effect.fn("RemotePeer.request")(function* () {
       const state = peer;
@@ -1435,9 +1450,9 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         yield* Deferred.await(state.hostProtocolRead);
       const delivery = upload && onUploadProgress ? trackUploadDelivery(state, onUploadProgress) : null;
       const releaseDownload =
-        downloadMaxBytes === undefined
+        largeDownload === undefined
           ? null
-          : downloads.allow(Math.min(downloadMaxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES));
+          : downloads.allow(Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES), largeDownload.mimeType);
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
         if (peer !== state || !isPeerOnline(state))
