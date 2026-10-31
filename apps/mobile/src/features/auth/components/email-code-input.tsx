@@ -40,8 +40,8 @@ interface EmailCodeInputProps {
 const GROUP_SIZE = 4;
 // Slots rise in one after another: the last one starts 240 ms after the first.
 const SLOT_STAGGER_MS = 30;
-// The email shows the code as `XXXX-XXXX`. Paste and autofill keep the dash and can add words around
-// the code, and a paste into a field that has part of a code adds to that part. The native field
+// The email shows the code as `XXXX-XXXX`. Paste and autofill keep the dash,
+// and a paste into a field that has part of a code adds to that part. The native field
 // takes all of it, and the code is read from it below. A native limit of the code length cut the text
 // before that read. HeroUI `InputOTP` fixes the native length at the code length and cuts the pasted
 // code short, so this field draws its own slots.
