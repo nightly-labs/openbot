@@ -96,6 +96,23 @@ const withExtensionProject = (config) =>
     });
     if (!groupKey) throw new Error(`The Xcode project has no ${TARGET_NAME} group.`);
     const group = objects.PBXGroup[groupKey];
+    // expo-sharing and expo-widgets both add a reference to an `Info.plist`. The xcode package gives
+    // the second one the reference of the first, and Xcode cannot open a project with one reference in
+    // two groups. The extension gets its own reference; its build settings name the file already.
+    for (const child of group.children) {
+      if (unquoted(objects.PBXFileReference[child.value]?.path) !== "Info.plist") continue;
+      const shared = Object.keys(objects.PBXGroup).some(
+        (key) =>
+          key !== groupKey &&
+          typeof objects.PBXGroup[key] === "object" &&
+          objects.PBXGroup[key].children?.some((/** @type {{ value: string }} */ other) => other.value === child.value),
+      );
+      if (!shared) continue;
+      const fileRef = project.generateUuid();
+      objects.PBXFileReference[fileRef] = { ...objects.PBXFileReference[child.value] };
+      objects.PBXFileReference[`${fileRef}_comment`] = "Info.plist";
+      child.value = fileRef;
+    }
     /** @param {string} section @param {string} name */
     const phaseOf = (section, name) => {
       const phase = target.buildPhases.find(
