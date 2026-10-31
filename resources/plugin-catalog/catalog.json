@@ -165,6 +165,12 @@
       "detailSha256": "c82e20182383885515660dd72b85ec638d4ad7143f4fd04a5f950440c875ecbb"
     },
     {
+      "slug": "spicrawl",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b5a4040ba0e809f21318bacf7428a0a99407f8419270dfcfb66a521b5cac146e"
+    },
+    {
       "slug": "brave-search",
       "version": "1.0.0",
       "featured": false,

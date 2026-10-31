@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "v1",
-  "updatedAt": "2026-09-30T00:00:00.000Z",
+  "updatedAt": "2026-10-30T00:00:00.000Z",
   "order": [
     "aave",
     "canva",
@@ -30,6 +30,7 @@
     "posthog",
     "airtable",
     "firecrawl",
+    "spicrawl",
     "brave-search",
     "resend",
     "composio"
