@@ -128,8 +128,6 @@ export const messages = {
   "error.remote.serverDisconnected": "Le serveur s’est déconnecté.",
   "error.remote.preferencesUnreadable": "Impossible de lire les préférences de discussion enregistrées.",
   "error.remote.accountAuthRequired": "L’authentification du compte est requise.",
-  "error.remote.serverIdentityChanged":
-    "L’identité du serveur a changé. La clé d’hôte de confiance n’est pas remplacée.",
   "error.remote.pairedIdentityChanged":
     "L’identité de l’ordinateur associé est absente ou a changé. Scannez un nouveau code depuis cet ordinateur.",
   "error.remote.permanentInviteNoEmail": "Les invitations permanentes ne peuvent pas être envoyées par e-mail.",

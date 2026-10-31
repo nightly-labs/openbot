@@ -74,6 +74,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  HOST_KEY_ROTATION_CAPABILITY,
+  HOST_KEY_ROTATION_ROUTES,
+} from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
   type MachineAlertEvent,
@@ -126,6 +130,7 @@ import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import type { TeamApiAgents, TeamApiBrowser, TeamApiMailbox } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { TeamApiServer } from "../src/main/team-api-server";
@@ -618,6 +623,9 @@ const machineMetrics = {
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
 // The real memory review store on a temporary file, as the host keeps it.
 const memoryReviewFile = join(root, "memory-review.json");
+const ROTATED_HOST_KEY = "-----BEGIN PUBLIC KEY-----\nrotated-e2e\n-----END PUBLIC KEY-----\n";
+/** The account service refuses the next handover, as when it holds another key for the host. */
+let refuseHostKeyRotation = false;
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
 // The real store of the levels that each member chose for each agent, on a temporary file.
 const agentLevelsFile = join(root, "agent-notification-levels.json");
@@ -748,6 +756,17 @@ try {
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
       }),
       memoryReview,
+      // A stand-in for `HostService.rotateIdentityKey`; `host-key-rotation-e2e.ts` checks the real
+      // signing. This checks the gate and that a refused request never reaches the host.
+      hostKey: {
+        rotate: () =>
+          refuseHostKeyRotation
+            ? Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) }))
+            : Effect.sync(() => {
+                record("rotateHostKey");
+                return { publicKey: ROTATED_HOST_KEY };
+              }),
+      },
       // The setup file in memory. The host writes it and tells the agent service, as `saveSetup` does.
       defaultProvider: {
         get: () => Effect.sync(() => providerDefault),
@@ -2191,6 +2210,66 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Server key change (host-key-rotation-v1) ----
+  {
+    const capabilities = [HOST_KEY_ROTATION_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-key-rotation-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_KEY_ROTATION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_KEY_ROTATION_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, { token: owner.sessionToken, json: {} });
+    check(
+      "the server key route without the capability gets 400 hostKeyRotationUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.hostKeyRotationUnsupported")),
+      summary(unsupported),
+    );
+    const adminRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const memberRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: bobToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin and a member cannot change the server key, and the host does not start a change",
+      errorIs(adminRotate, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(memberRotate, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("rotateHostKey").length === 0,
+      [summary(adminRotate), summary(memberRotate)],
+    );
+    const ownerRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "the owner changes the server key and gets only the new public key",
+      ownerRotate.status === 200 &&
+        isDeepStrictEqual(ownerRotate.body, { publicKey: ROTATED_HOST_KEY }) &&
+        callsOf("rotateHostKey").length === 1,
+      summary(ownerRotate),
+    );
+    refuseHostKeyRotation = true;
+    const refusedRotate = await call("POST", HOST_KEY_ROTATION_ROUTES.rotate, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    refuseHostKeyRotation = false;
+    check(
+      "a refused key change gives the owner 409 with the reason, not a host fault",
+      errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
+      summary(refusedRotate),
     );
   }
 

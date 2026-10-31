@@ -92,6 +92,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Diese Verbindung unterstützt keine Änderungen der Serveridentität.",
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
+  "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
   "error.team.routineResultsUnsupported": "Diese Verbindung unterstützt keine Ziele für Routinen.",
   "error.team.agentMemoryLimitUnsupported": "Diese Verbindung unterstützt das Erinnerungslimit der Agenten nicht.",
   "error.team.agentFoldersUnsupported": "Diese Verbindung unterstützt die Ordner der Agenten nicht.",
@@ -131,6 +132,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Dieser Client unterstützt keine sichere Authentifizierung.",
   "error.team.agentSettingsUnsupported": "Diese Verbindung unterstützt keine Agenteneinstellungen.",
   "error.team.adminRequired": "Administratorzugriff ist erforderlich.",
+  "error.team.ownerRequired": "Nur der Eigentümer dieses Servers kann das tun.",
   "error.team.requestTooLarge": "Der Anfragetext ist zu groß.",
   "error.team.signInRelayUnsupported":
     "Dieser Server kann keine Anmeldungen weiterleiten. Aktualisiere OpenBot auf dem Host.",

@@ -79,7 +79,7 @@ interface ServerGeneralSection {
 
 /** The General section: server identity, agent settings, and leaving a joined server. */
 export function createServerGeneralSection(host: ServerSettingsSectionHost): ServerGeneralSection {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, format } = useText();
   const { props, local, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<GeneralPanels>({
     confirmLeave: false,
@@ -120,6 +120,8 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
   /** The key handover goes through the account service, so the server must be published. */
   const canRotateKey = () => Boolean(props.onRotateHostKey) && local() && published();
+  /** The last key change that the previous and the new key both signed. Every member sees it. */
+  const keyChangedAt = () => props.server.keyChangedAt;
   const identityDirty = () =>
     canEditIdentity() &&
     (trimmedName() !== panels.identity.savedName ||
@@ -430,30 +432,44 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
             </ItemGroup>
           </SettingsSection>
         </Show>
-        <Show when={canRotateKey()}>
+        <Show when={canRotateKey() || keyChangedAt() !== undefined}>
           <SettingsSection title={t("server.settings.hostKeyTitle")}>
             <ItemGroup class="settings-modal-card">
-              <Item>
-                <ItemContent>
-                  <ItemTitle>{t("server.settings.hostKeyRotate")}</ItemTitle>
-                  <ItemDescription>{t("server.settings.hostKeyDescription")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={Boolean(busy())}
-                    onClick={() =>
-                      setPanels((state) => {
-                        state.confirmRotateKey = true;
-                      })
-                    }
-                  >
-                    {t("server.settings.hostKeyRotateAction")}
-                  </Button>
-                </ItemActions>
-              </Item>
+              <Show when={keyChangedAt() !== undefined}>
+                <Item>
+                  <ItemContent>
+                    <ItemTitle>{t("server.settings.hostKeyChanged")}</ItemTitle>
+                    <ItemDescription>
+                      {t("server.settings.hostKeyChangedDescription", {
+                        date: format.date(new Date(keyChangedAt() ?? 0), { dateStyle: "medium", timeStyle: "short" }),
+                      })}
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
+              </Show>
+              <Show when={canRotateKey()}>
+                <Item>
+                  <ItemContent>
+                    <ItemTitle>{t("server.settings.hostKeyRotate")}</ItemTitle>
+                    <ItemDescription>{t("server.settings.hostKeyDescription")}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={Boolean(busy())}
+                      onClick={() =>
+                        setPanels((state) => {
+                          state.confirmRotateKey = true;
+                        })
+                      }
+                    >
+                      {t("server.settings.hostKeyRotateAction")}
+                    </Button>
+                  </ItemActions>
+                </Item>
+              </Show>
             </ItemGroup>
           </SettingsSection>
         </Show>

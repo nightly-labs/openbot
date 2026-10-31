@@ -94,6 +94,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
@@ -133,6 +134,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L'autenticazione sicura non è supportata da questo client.",
   "error.team.agentSettingsUnsupported": "Le impostazioni dell'agente non sono supportate da questa connessione.",
   "error.team.adminRequired": "Serve l'accesso come amministratore.",
+  "error.team.ownerRequired": "Solo il proprietario di questo server può farlo.",
   "error.team.requestTooLarge": "Il corpo della richiesta è troppo grande.",
   "error.team.signInRelayUnsupported": "Questo server non può inoltrare gli accessi. Aggiorna OpenBot sull'host.",
   "error.team.connectorsUnsupported":

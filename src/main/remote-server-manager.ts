@@ -113,7 +113,12 @@ import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { RemoteEventRefresh } from "./remote-server-event-refresh";
 import { RemoteEventStream } from "./remote-server-event-stream";
-import { followedHostKeyHandovers, reconcileWebRtcHosts, verifyHostKeySignature } from "./remote-server-host-directory";
+import {
+  followedHostKeyHandovers,
+  hostKeyChangeTimes,
+  reconcileWebRtcHosts,
+  verifyHostKeySignature,
+} from "./remote-server-host-directory";
 import { requestJson, throwRemoteResponseError } from "./remote-server-http";
 import { RemotePresenceCache } from "./remote-server-presence";
 import { RemoteServerStore, type TokenCipher } from "./remote-server-store";
@@ -267,6 +272,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #getLocalHostId: () => string | null;
   /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
   #localMemberLimit: number | null = null;
+  /** When each listed host last changed its key, by server id. The local host is `LOCAL_SERVER_ID`. */
+  #keyChangedAt = new Map<string, number>();
   /** The local servers that this app runs as its child processes. See `local-servers/`. */
   #thisComputerServers: ReadonlySet<string> = new Set();
   readonly #hostedServers: HostedServerWakeHooks | null;
@@ -603,6 +610,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       (serverId) => this.#connections.statusFor(serverId),
       this.#localMemberLimit,
       (serverId) => this.#thisComputerServers.has(serverId),
+      (serverId) => this.#keyChangedAt.get(serverId),
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
       return {
@@ -692,6 +700,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     yield* this.#events.retryOfflineHosts();
     this.emit("directoryInvalidated");
   }).bind(this);
+
+  /** Reads the server list again, for example after this computer's host changed its key. */
+  requestDirectoryRefresh(): void {
+    this.emit("directoryInvalidated");
+  }
 
   /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   readonly setAppFocused = Effect.fn("RemoteManager.setAppFocused")(function* (
@@ -2229,6 +2242,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       isThisComputer: (serverId) => this.#thisComputerServers.has(serverId),
     });
     for (const { hostId, publicKey } of pinnedKeys) transport.pinHostKey(hostId, publicKey);
+    // This computer's own host uses the key that it lists. A joined host uses the key that is pinned.
+    const keys = new Map(servers.map((server) => [server.id, server.publicKey]));
+    const changeTimes = yield* hostKeyChangeTimes(hosts, (host) =>
+      host.hostId === localHostId ? host.devicePublicKey : keys.get(host.hostId),
+    );
+    this.#keyChangedAt = new Map(
+      [...changeTimes].map(([hostId, changedAt]) => [hostId === localHostId ? LOCAL_SERVER_ID : hostId, changedAt]),
+    );
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);

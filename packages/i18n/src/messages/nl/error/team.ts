@@ -90,6 +90,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Deze verbinding ondersteunt het wijzigen van de serveridentiteit niet.",
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
+  "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
   "error.team.routineResultsUnsupported": "Deze verbinding ondersteunt geen bestemmingen voor routines.",
   "error.team.agentMemoryLimitUnsupported": "Deze verbinding ondersteunt de geheugenlimiet van agents niet.",
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",
@@ -133,6 +134,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Deze client ondersteunt geen beveiligde verificatie.",
   "error.team.agentSettingsUnsupported": "Deze verbinding ondersteunt geen instellingen van agents.",
   "error.team.adminRequired": "Beheerderstoegang is verplicht.",
+  "error.team.ownerRequired": "Alleen de eigenaar van deze server kan dit doen.",
   "error.team.requestTooLarge": "De inhoud van het verzoek is te groot.",
   "error.team.signInRelayUnsupported": "Deze server kan geen inlogs doorgeven. Werk OpenBot bij op de host.",
   "error.team.connectorsUnsupported":

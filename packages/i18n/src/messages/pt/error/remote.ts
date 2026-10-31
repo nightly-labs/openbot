@@ -129,8 +129,6 @@ export const messages = {
   "error.remote.serverDisconnected": "O servidor se desconectou.",
   "error.remote.preferencesUnreadable": "Não foi possível ler as preferências salvas do chat.",
   "error.remote.accountAuthRequired": "É necessário autenticar a conta.",
-  "error.remote.serverIdentityChanged":
-    "A identidade do servidor mudou. A chave confiável do computador anfitrião não será substituída.",
   "error.remote.pairedIdentityChanged":
     "A identidade do computador pareado está ausente ou mudou. Leia um novo código desse computador.",
   "error.remote.permanentInviteNoEmail": "Convites permanentes não podem ser enviados por e-mail.",

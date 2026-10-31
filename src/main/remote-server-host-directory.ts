@@ -26,7 +26,11 @@
 
 import { verify } from "node:crypto";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import { followHostKeyHandovers, type HostKeySignatureCheck } from "@openbot/team-client/host-key-handover";
+import {
+  followHostKeyHandovers,
+  type HostKeySignatureCheck,
+  hostKeyChangedAt,
+} from "@openbot/team-client/host-key-handover";
 import { Effect } from "effect";
 import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
@@ -123,6 +127,30 @@ export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedH
       followed.add(host.hostId);
   }
   return followed;
+});
+
+/**
+ * When each host last changed its key: the handover to the key that this computer uses for it, with
+ * both signatures checked. A host without such a handover has no entry. `trustedKey` gives the key
+ * that this computer uses, or null for a host it does not use.
+ */
+export const hostKeyChangeTimes = Effect.fn("RemoteHostDirectory.hostKeyChangeTimes")(function* (
+  hosts: readonly RemoteHostSummary[],
+  trustedKey: (host: RemoteHostSummary) => string | null | undefined,
+) {
+  const times = new Map<string, number>();
+  for (const host of hosts) {
+    const publicKey = trustedKey(host);
+    if (!publicKey || host.keyHandovers.length === 0) continue;
+    const changedAt = yield* hostKeyChangedAt({
+      hostId: host.hostId,
+      publicKey,
+      handovers: host.keyHandovers,
+      verify: verifyHostKeySignature,
+    });
+    if (changedAt !== null) times.set(host.hostId, changedAt);
+  }
+  return times;
 });
 
 export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebRtcHostReconciliation {

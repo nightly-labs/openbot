@@ -383,6 +383,26 @@ export const messages = {
     "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Zeitzone zu ändern.",
   "mobile.server.settings.timezoneUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seine Zeitzone hier zu ändern.",
+  "mobile.server.settings.keySection": "Serverschlüssel",
+  "mobile.server.settings.keyChanged": "Letzte Änderung",
+  "mobile.server.settings.keyChange": "Schlüssel ändern",
+  "mobile.server.settings.keyChanging": "Schlüssel wird geändert…",
+  "mobile.server.settings.keyConfirmTitle": "Schlüssel von {name} ändern?",
+  "mobile.server.settings.keyConfirmBody":
+    "Der Server erstellt einen neuen Schlüssel. Der aktuelle und der neue Schlüssel signieren beide die Änderung. Gekoppelte Apps bleiben gekoppelt und wechseln beim nächsten Verbinden zum neuen Schlüssel. Mobile-Connect-Links von vor der Änderung funktionieren nicht mehr. Tu das, wenn die Schlüsseldatei des Servers kopiert oder offengelegt wurde.",
+  "mobile.server.settings.keyConfirm": "Ändern",
+  "mobile.server.settings.keyDescription":
+    "Ändere den Schlüssel, wenn die Schlüsseldatei des Servers kopiert oder offengelegt wurde. Mitglieder bleiben gekoppelt.",
+  "mobile.server.settings.keySigned": "Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
+  "mobile.server.settings.keyChangedNow":
+    "Serverschlüssel geändert. Die Apps der Mitglieder wechseln beim nächsten Verbinden zum neuen Schlüssel.",
+  "mobile.server.settings.keyFollowing":
+    "Der Server nutzt den neuen Schlüssel. Diese App wechselt dazu, wenn die Serverliste neu lädt.",
+  "mobile.server.settings.keyChangeFailed":
+    "Der Serverschlüssel konnte nicht geändert werden. Versuche es noch einmal.",
+  "mobile.server.settings.keyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
+  "mobile.server.settings.keyUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seinen Schlüssel hier zu ändern.",
   "mobile.server.settings.memoryLimit": "Erinnerungen pro Agent",
   "mobile.server.settings.memoryLimitDescription":
     "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",

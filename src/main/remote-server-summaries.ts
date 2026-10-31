@@ -18,7 +18,10 @@ export function remoteServerSummaries(
   localMemberLimit: number | null = null,
   /** The local servers that this app runs as its child processes. */
   isThisComputer: (serverId: string) => boolean = () => false,
+  /** When a host last changed its key with a verified handover. The local server is `LOCAL_SERVER_ID`. */
+  keyChangedAt: (serverId: string) => number | undefined = () => undefined,
 ): ServerSummary[] {
+  const localKeyChangedAt = keyChangedAt(LOCAL_SERVER_ID);
   return [
     // Always present and always reachable: it is this computer. It has no host to be incompatible
     // with and no connection to fail, which is why its status fields are literals rather than looked
@@ -37,11 +40,13 @@ export function remoteServerSummaries(
       role: null,
       active: activeServerId === LOCAL_SERVER_ID,
       ...(localMemberLimit === null ? {} : { memberLimit: localMemberLimit }),
+      ...(localKeyChangedAt === undefined ? {} : { keyChangedAt: localKeyChangedAt }),
       compatibility: null,
       issue: null,
     },
     ...servers.map((server) => {
       const status = statusFor(server.id);
+      const changedAt = keyChangedAt(server.id);
       return {
         id: server.id,
         notificationsMuted: false,
@@ -59,6 +64,7 @@ export function remoteServerSummaries(
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
+        ...(changedAt === undefined ? {} : { keyChangedAt: changedAt }),
         ...(isThisComputer(server.id) ? { thisComputer: true as const } : {}),
         compatibility: status.compatibility,
         issue: status.issue,

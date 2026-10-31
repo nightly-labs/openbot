@@ -368,6 +368,25 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.keySection": "サーバーキー",
+  "mobile.server.settings.keyChanged": "最終変更",
+  "mobile.server.settings.keyChange": "キーを変更",
+  "mobile.server.settings.keyChanging": "キーを変更しています…",
+  "mobile.server.settings.keyConfirmTitle": "{name} のキーを変更しますか？",
+  "mobile.server.settings.keyConfirmBody":
+    "サーバーが新しいキーを作成します。現在のキーと新しいキーの両方が変更に署名するため、ペアリング済みのアプリはペアリングを保ったまま、次に接続したときに新しいキーへ切り替わります。変更前の Mobile Connect リンクは使えなくなります。サーバーのキーファイルがコピーまたは漏えいした場合に実行してください。",
+  "mobile.server.settings.keyConfirm": "変更",
+  "mobile.server.settings.keyDescription":
+    "サーバーのキーファイルがコピーまたは漏えいした場合はキーを変更してください。メンバーのペアリングは保たれます。",
+  "mobile.server.settings.keySigned": "以前のキーと新しいキーの両方がこの変更に署名しました。",
+  "mobile.server.settings.keyChangedNow":
+    "サーバーキーを変更しました。メンバーのアプリは次に接続したときに新しいキーへ切り替わります。",
+  "mobile.server.settings.keyFollowing":
+    "サーバーは新しいキーを使っています。サーバー一覧を再読み込みすると、このアプリも切り替わります。",
+  "mobile.server.settings.keyChangeFailed": "サーバーキーを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.keyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
+  "mobile.server.settings.keyUnsupported":
+    "ここでキーを変更するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.settings.memoryLimit": "エージェントごとのメモリー数",
   "mobile.server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "mobile.server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",

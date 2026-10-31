@@ -373,6 +373,24 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de tijdzone te wijzigen.",
   "mobile.server.settings.timezoneUnsupported": "Werk OpenBot bij op deze server om de tijdzone hier te wijzigen.",
+  "mobile.server.settings.keySection": "Serversleutel",
+  "mobile.server.settings.keyChanged": "Laatste wijziging",
+  "mobile.server.settings.keyChange": "Sleutel wijzigen",
+  "mobile.server.settings.keyChanging": "Sleutel wijzigen…",
+  "mobile.server.settings.keyConfirmTitle": "Sleutel van {name} wijzigen?",
+  "mobile.server.settings.keyConfirmBody":
+    "De server maakt een nieuwe sleutel. De huidige en de nieuwe sleutel ondertekenen allebei de wijziging, dus gekoppelde apps blijven gekoppeld en gaan bij de volgende verbinding over op de nieuwe sleutel. Mobile Connect-links van vóór de wijziging werken niet meer. Doe dit als het sleutelbestand van de server is gekopieerd of gelekt.",
+  "mobile.server.settings.keyConfirm": "Wijzigen",
+  "mobile.server.settings.keyDescription":
+    "Wijzig de sleutel als het sleutelbestand van de server is gekopieerd of gelekt. Leden blijven gekoppeld.",
+  "mobile.server.settings.keySigned": "De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
+  "mobile.server.settings.keyChangedNow":
+    "Serversleutel gewijzigd. Apps van leden gaan bij de volgende verbinding over op de nieuwe sleutel.",
+  "mobile.server.settings.keyFollowing":
+    "De server gebruikt de nieuwe sleutel. Deze app gaat erop over als de serverlijst opnieuw laadt.",
+  "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
+  "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",

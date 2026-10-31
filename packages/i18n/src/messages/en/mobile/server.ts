@@ -369,6 +369,24 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
   "mobile.server.settings.timezoneUnavailable": "Connect to this server as an owner or admin to change its timezone.",
   "mobile.server.settings.timezoneUnsupported": "Update OpenBot on this server to change its timezone here.",
+  "mobile.server.settings.keySection": "Server key",
+  "mobile.server.settings.keyChanged": "Last change",
+  "mobile.server.settings.keyChange": "Change key",
+  "mobile.server.settings.keyChanging": "Changing key…",
+  "mobile.server.settings.keyConfirmTitle": "Change the key of {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "The server makes a new key. The current key and the new key both sign the change, so paired apps stay paired and change to the new key when they connect again. Mobile Connect links from before the change stop working. Do this if the key file of the server was copied or exposed.",
+  "mobile.server.settings.keyConfirm": "Change key",
+  "mobile.server.settings.keyDescription":
+    "Change the key if the key file of the server was copied or exposed. Members stay paired.",
+  "mobile.server.settings.keySigned": "The previous key and the new key both signed this change.",
+  "mobile.server.settings.keyChangedNow":
+    "Server key changed. Apps of members change to the new key when they connect again.",
+  "mobile.server.settings.keyFollowing":
+    "The server uses the new key. This app changes to it when the server list loads again.",
+  "mobile.server.settings.keyChangeFailed": "Could not change the server key. Try again.",
+  "mobile.server.settings.keyOwnerOnly": "Only the owner can change the server key.",
+  "mobile.server.settings.keyUnsupported": "Update OpenBot on this server to change its key here.",
   "mobile.server.settings.memoryLimit": "Memories per agent",
   "mobile.server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "mobile.server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",

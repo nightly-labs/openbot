@@ -179,6 +179,7 @@
     "./team-protocol/host-release-v1": "./src/team-protocol/host-release-v1.ts",
     "./team-protocol/host-member-update-v1": "./src/team-protocol/host-member-update-v1.ts",
     "./team-protocol/focus-use-v1": "./src/team-protocol/focus-use-v1.ts",
+    "./team-protocol/host-key-rotation-v1": "./src/team-protocol/host-key-rotation-v1.ts",
     "./team-protocol/host-timezone-v1": "./src/team-protocol/host-timezone-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",

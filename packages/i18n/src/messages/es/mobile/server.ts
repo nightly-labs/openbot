@@ -376,6 +376,24 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conéctate a este servidor como propietario o administrador para cambiar su zona horaria.",
   "mobile.server.settings.timezoneUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí su zona horaria.",
+  "mobile.server.settings.keySection": "Clave del servidor",
+  "mobile.server.settings.keyChanged": "Último cambio",
+  "mobile.server.settings.keyChange": "Cambiar clave",
+  "mobile.server.settings.keyChanging": "Cambiando la clave…",
+  "mobile.server.settings.keyConfirmTitle": "¿Cambiar la clave de {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "El servidor crea una clave nueva. La clave actual y la nueva firman el cambio, así que las apps vinculadas siguen vinculadas y pasan a la clave nueva al volver a conectarse. Los enlaces de Mobile Connect de antes del cambio dejan de funcionar. Hazlo si el archivo de clave del servidor se copió o quedó expuesto.",
+  "mobile.server.settings.keyConfirm": "Cambiar",
+  "mobile.server.settings.keyDescription":
+    "Cambia la clave si el archivo de clave del servidor se copió o quedó expuesto. Los miembros siguen vinculados.",
+  "mobile.server.settings.keySigned": "La clave anterior y la clave nueva firmaron este cambio.",
+  "mobile.server.settings.keyChangedNow":
+    "Clave del servidor cambiada. Las apps de los miembros pasan a la clave nueva al volver a conectarse.",
+  "mobile.server.settings.keyFollowing":
+    "El servidor usa la clave nueva. Esta app pasa a ella cuando se vuelva a cargar la lista de servidores.",
+  "mobile.server.settings.keyChangeFailed": "No se pudo cambiar la clave del servidor. Inténtalo de nuevo.",
+  "mobile.server.settings.keyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
+  "mobile.server.settings.keyUnsupported": "Actualiza OpenBot en este servidor para cambiar su clave aquí.",
   "mobile.server.settings.memoryLimit": "Recuerdos por agente",
   "mobile.server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "mobile.server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",
