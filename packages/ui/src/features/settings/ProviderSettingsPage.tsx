@@ -1025,13 +1025,16 @@ function LowUsageBadge(props: { reading: AccountUsageProviderRow; name: string; 
 function SignInSection(props: SectionProps & { keyShown: boolean }) {
   const { t, format, sourceText, errorMessage } = useText();
   const row = () => props.row;
-  /** A saved OpenBot key keeps the provider connected; the key dialog removes it. */
+  /**
+   * A saved OpenBot key keeps the provider connected; the key dialog removes it. Muse offers
+   * Disconnect only where its key status is known, on this computer.
+   */
   const disconnectOffered = () =>
     Boolean(props.accountActions?.signOut) &&
     SIGN_OUT_PROVIDERS.has(props.option.id) &&
     row().available() &&
     !row().connecting() &&
-    props.option.keyStatus !== "saved";
+    (props.option.id === "muse" ? props.option.keyStatus === "missing" : props.option.keyStatus !== "saved");
   const [disconnecting, setDisconnecting] = createSignal(false);
   const [disconnectError, setDisconnectError] = createSignal<string | null>(null);
   const disconnect = () => {

@@ -65,7 +65,7 @@ export interface AgentProviderStatus {
   /**
    * A saved API key serves the provider's turns in place of the plan sign-in, so the plan's usage
    * does not apply. Gemini: its saved key comes before the Google account. Codex: its own login is
-   * an OpenAI API key. Local only: released Team API adapters omit it.
+   * an OpenAI API key. Muse: OpenBot's saved key. Local only: released Team API adapters omit it.
    */
   apiKeyInUse?: boolean;
   /**

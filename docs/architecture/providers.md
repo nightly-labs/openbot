@@ -928,8 +928,8 @@ Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own s
 Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
 (`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
 Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
-for the own sign-in only. Muse offers it only with no OpenBot key saved: the key keeps Muse
-connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
 `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
