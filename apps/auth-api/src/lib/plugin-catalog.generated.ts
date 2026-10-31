@@ -198,6 +198,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f",
     },
+    {
+      slug: "hindsight",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "5ed407f928bc86b3e24130059c8835d2b163dc2cbbd6af93314eba1ee509d2be",
+    },
   ],
 };
 
@@ -1402,6 +1408,67 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://composio.dev",
     privacyPolicyUrl: "https://composio.dev/privacy-policy",
     termsUrl: "https://composio.dev/terms-of-service",
+    skills: [],
+  },
+  hindsight: {
+    slug: "hindsight",
+    name: "Hindsight",
+    tagline: "Long-term memory your agents share",
+    description:
+      "Hindsight gives every agent persistent, searchable long-term memory — facts, experiences and synthesized mental models — that outlives a single thread and is shared across your whole team. Agents recall what matters before they answer and retain new facts as they work. Connect your Hindsight bank's MCP URL and API key; point it at Hindsight Cloud or a self-hosted server.",
+    category: "productivity",
+    creatorName: "Vectorize",
+    iconUrl: "https://hindsight.vectorize.io/img/icons/hindsight.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "What do you remember about this project and my preferences?" },
+      { id: "prompt-retain", text: "Remember that we decided to standardize on Postgres for all new services." },
+      { id: "prompt-reflect", text: "Based on everything you've learned about me, how should you approach this task?" },
+    ],
+    apps: [
+      {
+        id: "app-hindsight-mcp",
+        name: "Hindsight",
+        description:
+          "Persistent long-term memory (recall, retain, reflect and mental models), over the Hindsight MCP server with your bank URL and API key.",
+        iconUrl: "https://hindsight.vectorize.io/img/icons/hindsight.png",
+        server: {
+          name: "hindsight",
+          transport: "http",
+          url: "https://api.hindsight.vectorize.io/mcp/default/",
+          auth: [
+            {
+              id: "hindsight-key",
+              kind: "key",
+              label: "Bank URL and API key",
+              fields: [
+                {
+                  id: "url",
+                  label: "MCP URL",
+                  url: true,
+                  placeholder: "https://api.hindsight.vectorize.io/mcp/<bank>/",
+                  hint: "Your bank's single-bank MCP endpoint. Use http://localhost:8888/mcp/<bank>/ for a self-hosted server.",
+                },
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "hsk_…",
+                  hint: "Required for Hindsight Cloud (Settings → API keys). Leave blank for a self-hosted server with no auth.",
+                  optional: true,
+                },
+              ],
+              docsUrl: "https://hindsight.vectorize.io/developer/mcp-server",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://hindsight.vectorize.io",
+    privacyPolicyUrl: "https://hindsight.vectorize.io/privacy",
+    termsUrl: "https://hindsight.vectorize.io/terms",
     skills: [],
   },
 };
