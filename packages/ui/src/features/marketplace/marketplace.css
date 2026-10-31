@@ -148,9 +148,10 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   scrollbar-gutter: stable;
 }
 
-/* Each list and page has one width, so the content does not move when a page opens. */
+/* Each list and page has one width, so the content does not move when a page opens. The large list title needs more
+   space below the top bar than the inset gives. */
 .marketplace-frame {
-  padding: var(--openbot-space-6) var(--marketplace-inset) var(--openbot-space-8);
+  padding: calc(var(--openbot-space-8) + var(--openbot-space-2)) var(--marketplace-inset) var(--openbot-space-8);
 }
 
 .marketplace-frame > * {
