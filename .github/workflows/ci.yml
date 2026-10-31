@@ -628,6 +628,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
 
+      - name: Run the Antigravity tool filter E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-tool-filter
+
       - name: Run the ACP additional directories E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-directories
@@ -715,6 +719,7 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
