@@ -151,6 +151,16 @@ try {
     return { deliveryId: delivery.id };
   });
 
+  await step("A note over the limit is refused with the limit, not as a missing note", async () => {
+    const long = call(worker.id, AWAIT_EVENT_TOOL, { note: "x".repeat(INPUT_LIMITS.agentWaitNote + 1) });
+    assert.equal(long.success, false);
+    assert.match(String(long.value.error), new RegExp(String(INPUT_LIMITS.agentWaitNote)));
+    const empty = call(worker.id, AWAIT_EVENT_TOOL, { note: " " });
+    assert.equal(empty.success, false);
+    assert.doesNotMatch(String(empty.value.error), new RegExp(String(INPUT_LIMITS.agentWaitNote)));
+    return { long: long.value.error, empty: empty.value.error };
+  });
+
   const opened = await step("await_event reports the count and warns near the limit", async () => {
     const ids: string[] = [];
     const answers: DynamicRecord[] = [];
