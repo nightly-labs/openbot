@@ -2332,7 +2332,8 @@ fieldset.wfn-picker-group {
  * Content that scrolls fades out at an edge where more of it is. Each fade grows over the first or the
  * last fade size of the scroll, so an edge at the start or the end stays sharp. The ranges are lengths,
  * not parts of the scroll range: content that fits gets no fade, also where the engine puts a timeline
- * with no scroll range at its end.
+ * with no scroll range at its end. A browser without scroll timelines shows no fade: there the animation
+ * runs on the clock, ends at once, and keeps the start fade on content that does not scroll.
  */
 @property --wfn-fade-start {
   syntax: "<length>";
@@ -2346,32 +2347,34 @@ fieldset.wfn-picker-group {
   initial-value: 0px;
 }
 
-.wfn-node :is(textarea, .wfn-field-result p),
-.wfn-strip-list {
-  --wfn-fade-size: var(--openbot-space-4);
-  --wfn-fade-side: to bottom;
+@supports (animation-timeline: scroll()) {
+  .wfn-node :is(textarea, .wfn-field-result p),
+  .wfn-strip-list {
+    --wfn-fade-size: var(--openbot-space-4);
+    --wfn-fade-side: to bottom;
 
-  mask-image: linear-gradient(
-    var(--wfn-fade-side),
-    transparent,
-    var(--openbot-text-primary) var(--wfn-fade-start),
-    var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
-    transparent
-  );
-  animation:
-    wfn-fade-start linear both,
-    wfn-fade-end linear both;
-  animation-timeline: scroll(self block), scroll(self block);
-  animation-range:
-    0 var(--wfn-fade-size),
-    calc(100% - var(--wfn-fade-size)) 100%;
-}
+    mask-image: linear-gradient(
+      var(--wfn-fade-side),
+      transparent,
+      var(--openbot-text-primary) var(--wfn-fade-start),
+      var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
+      transparent
+    );
+    animation:
+      wfn-fade-start linear both,
+      wfn-fade-end linear both;
+    animation-timeline: scroll(self block), scroll(self block);
+    animation-range:
+      0 var(--wfn-fade-size),
+      calc(100% - var(--wfn-fade-size)) 100%;
+  }
 
-.wfn-strip-list {
-  --wfn-fade-size: var(--openbot-space-6);
-  --wfn-fade-side: to right;
+  .wfn-strip-list {
+    --wfn-fade-size: var(--openbot-space-6);
+    --wfn-fade-side: to right;
 
-  animation-timeline: scroll(self inline), scroll(self inline);
+    animation-timeline: scroll(self inline), scroll(self inline);
+  }
 }
 
 @keyframes wfn-fade-start {
@@ -2752,11 +2755,8 @@ fieldset.wfn-picker-group {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
 }
 
-/* A required input with no line stays visible in the warning colour. */
+/* A required input with no line stays visible, in the colour of the other ports. */
 .wfn-stage .wfn-port[data-missing]:not([data-target], [data-armed]) {
-  background: var(--openbot-warning-soft);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
-  color: var(--openbot-warning-text);
   opacity: 1;
 }
 
