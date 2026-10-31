@@ -14,15 +14,15 @@ export const messages = {
   "sitePage.join.invalid": "이 초대 링크가 올바르지 않거나 완전하지 않아요. 서버 소유자에게 새 초대를 요청해 주세요.",
   "sitePage.join.open": "OpenBot 열기",
   "sitePage.join.browser": "브라우저에서 열기",
-  "sitePage.join.download": "OpenBot 다운로드",
+  "sitePage.join.noApp": "앱이 없나요? {browser} 또는 {download}",
+  "sitePage.join.noAppMobile": "앱이 없나요? {browser}",
+  "sitePage.join.browserLink": "이 브라우저에서 참여",
+  "sitePage.join.downloadLink": "OpenBot 다운로드",
   "sitePage.join.notOpened":
-    "OpenBot이 열리지 않았다면 {download}에서 설치하거나, 초대 링크를 열 수 있도록 OpenBot을 한 번 실행해 주세요. {browser}도 사용할 수 있어요.",
+    "이 컴퓨터에 OpenBot이 설치되어 있지 않거나 아직 시작되지 않았어요. 설치한 다음 {open}을(를) 다시 눌러 주세요. 이 브라우저에서 참여할 수도 있어요.",
   "sitePage.join.mobile":
     "OpenBot이 설치되어 있다면 {open}을(를) 탭해 주세요. 앱의 서버 추가에 이 링크를 붙여넣을 수도 있어요.",
-  "sitePage.join.singleUse":
-    "일회용 링크는 한 번만 사용할 수 있고 이후 만료돼요. 영구 링크는 소유자가 취소할 때까지 사용할 수 있어요. 참여하기 전에 OpenBot에서 만료 시간을 보여줘요.",
   "sitePage.join.email": "초대를 이메일로 받았다면 해당 이메일 주소로 OpenBot에 로그인해 주세요.",
-  "sitePage.join.share": "이 링크로 서버에 접근할 수 있어요. 초대하려는 사람에게만 공유해 주세요.",
   "sitePage.connect.title": "OpenBot으로 돌아가기",
   "sitePage.connect.failedTitle": "연결을 완료하지 못했어요",
   "sitePage.connect.openApp": "OpenBot 열기",

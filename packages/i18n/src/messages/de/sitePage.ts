@@ -16,16 +16,15 @@ export const messages = {
     "Dieser Einladungslink ist ungültig oder unvollständig. Bitte den Server-Inhaber um eine neue Einladung.",
   "sitePage.join.open": "OpenBot öffnen",
   "sitePage.join.browser": "Im Browser öffnen",
-  "sitePage.join.download": "OpenBot laden",
+  "sitePage.join.noApp": "Keine App? {browser} oder {download}.",
+  "sitePage.join.noAppMobile": "Keine App? {browser}.",
+  "sitePage.join.browserLink": "Im Browser beitreten",
+  "sitePage.join.downloadLink": "OpenBot laden",
   "sitePage.join.notOpened":
-    "Wenn OpenBot sich nicht geöffnet hat, installiere es mit {download} oder starte OpenBot einmal, damit es Einladungslinks öffnen kann. Du kannst auch {browser} verwenden.",
+    "OpenBot ist auf diesem Computer nicht installiert oder noch nicht gestartet. Installiere es und klicke dann noch einmal auf {open}. Du kannst auch im Browser beitreten.",
   "sitePage.join.mobile":
     "Wenn OpenBot installiert ist, tippe auf {open}. Du kannst diesen Link auch in der App unter Server hinzufügen einfügen.",
-  "sitePage.join.singleUse":
-    "Ein Einmal-Link funktioniert einmal und läuft dann ab. Ein dauerhafter Link funktioniert, bis der Inhaber ihn widerruft. OpenBot zeigt das Ablaufdatum, bevor du beitrittst.",
   "sitePage.join.email": "Wenn die Einladung per E-Mail kam, melde dich mit dieser E-Mail-Adresse bei OpenBot an.",
-  "sitePage.join.share":
-    "Dieser Link gibt Zugang zu einem Server. Teile ihn nur mit Personen, die du einladen möchtest.",
   "sitePage.connect.title": "Zurück zu OpenBot",
   "sitePage.connect.failedTitle": "Die Verbindung wurde nicht abgeschlossen",
   "sitePage.connect.openApp": "OpenBot öffnen",

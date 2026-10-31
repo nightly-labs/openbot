@@ -16,15 +16,15 @@ export const messages = {
     "Este link de convite não é válido ou está incompleto. Peça um novo convite ao proprietário do servidor.",
   "sitePage.join.open": "Abrir OpenBot",
   "sitePage.join.browser": "Abrir no navegador",
-  "sitePage.join.download": "Baixar OpenBot",
+  "sitePage.join.noApp": "Não tem o app? {browser} ou {download}.",
+  "sitePage.join.noAppMobile": "Não tem o app? {browser}.",
+  "sitePage.join.browserLink": "Entre por este navegador",
+  "sitePage.join.downloadLink": "baixe o OpenBot",
   "sitePage.join.notOpened":
-    "Se o OpenBot não abriu, instale-o com {download} ou inicie o OpenBot uma vez para que ele possa abrir links de convite. Você também pode usar {browser}.",
+    "O OpenBot não está instalado neste computador ou ainda não foi iniciado. Instale-o e clique em {open} de novo. Você também pode entrar por este navegador.",
   "sitePage.join.mobile":
     "Se o OpenBot estiver instalado, toque em {open}. Você também pode colar este link em Adicionar servidor no app.",
-  "sitePage.join.singleUse":
-    "Um link de uso único funciona uma vez e depois expira. Um link permanente funciona até o proprietário revogá-lo. O OpenBot mostra a validade antes de você entrar.",
   "sitePage.join.email": "Se o convite chegou por e-mail, entre no OpenBot com esse endereço de e-mail.",
-  "sitePage.join.share": "Este link dá acesso a um servidor. Compartilhe-o apenas com pessoas que você quer convidar.",
   "sitePage.connect.title": "Voltar ao OpenBot",
   "sitePage.connect.failedTitle": "A conexão não foi concluída",
   "sitePage.connect.openApp": "Abrir OpenBot",

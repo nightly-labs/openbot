@@ -1,5 +1,6 @@
 import type { WebMessagingInstallPlatform } from "@openbot/contracts/web-messaging-install";
 import type { AppTranslate } from "@openbot/i18n";
+import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "../../lib/download-platforms";
 import type { FailureKind } from "./MessagingConnectPage";
 
 /*
@@ -10,10 +11,31 @@ import type { FailureKind } from "./MessagingConnectPage";
 
 const PROVIDER_NAMES: Record<WebMessagingInstallPlatform, string> = { slack: "Slack", discord: "Discord" };
 
+/** Private-use characters that mark where the two links go in the "No app?" sentence. */
+const JOIN_LINK_MARKERS = { browser: "", download: "" } as const;
+
+export type JoinLink = keyof typeof JOIN_LINK_MARKERS;
+
+/** One part of a sentence with links: plain text, or the text of the link that `link` names. */
+export interface JoinTextPart {
+  text: string;
+  link?: JoinLink;
+}
+
+function joinTextParts(sentence: string, links: Record<JoinLink, string>): JoinTextPart[] {
+  return sentence
+    .split(/([])/u)
+    .filter((part) => part !== "")
+    .map((part) => {
+      if (part === JOIN_LINK_MARKERS.browser) return { text: links.browser, link: "browser" };
+      if (part === JOIN_LINK_MARKERS.download) return { text: links.download, link: "download" };
+      return { text: part };
+    });
+}
+
 export function joinPageText(t: AppTranslate) {
   const open = t("sitePage.join.open");
-  const browser = t("sitePage.join.browser");
-  const download = t("sitePage.join.download");
+  const links = { browser: t("sitePage.join.browserLink"), download: t("sitePage.join.downloadLink") };
   return {
     eyebrow: t("sitePage.join.eyebrow"),
     title: t("sitePage.join.title"),
@@ -22,15 +44,12 @@ export function joinPageText(t: AppTranslate) {
     intro: t("sitePage.join.intro"),
     invalid: t("sitePage.join.invalid"),
     open,
-    browser,
-    download,
-    notOpened: t("sitePage.join.notOpened", { download, browser }),
+    noApp: joinTextParts(t("sitePage.join.noApp", JOIN_LINK_MARKERS), links),
+    /** Phones get no download link: the desktop download does not install there. */
+    noAppMobile: joinTextParts(t("sitePage.join.noAppMobile", { browser: JOIN_LINK_MARKERS.browser }), links),
     mobile: t("sitePage.join.mobile", { open }),
-    // The link carries no expiry, use limit or email, and the page does not send the token anywhere to
-    // ask. So these notes give the rules, and the app shows the details before the visitor joins.
-    singleUse: t("sitePage.join.singleUse"),
     email: t("sitePage.join.email"),
-    share: t("sitePage.join.share"),
+    openAppFallback: openAppFallbackText(t, t("sitePage.join.notOpened", { open })),
   };
 }
 
@@ -73,7 +92,15 @@ export type MessagingConnectText = ReturnType<typeof messagingConnectText>;
 
 /** The "Nothing opened?" dialog. `body` says what to do on this page. */
 function openAppFallbackText(t: AppTranslate, body: string) {
-  return { title: t("sitePage.openApp.title"), body, dismiss: t("sitePage.openApp.dismiss") };
+  /** The label of the download button, by platform. The page finds the visitor's platform. */
+  const downloadFor = (id: DownloadPlatform) =>
+    t("sitePage.marketplace.downloadFor", { platform: DOWNLOAD_PLATFORMS[id].label });
+  const download: Record<DownloadPlatform, string> = {
+    macos: downloadFor("macos"),
+    windows: downloadFor("windows"),
+    linux: downloadFor("linux"),
+  };
+  return { title: t("sitePage.openApp.title"), body, dismiss: t("sitePage.openApp.dismiss"), download };
 }
 
 export type OpenAppFallbackText = ReturnType<typeof openAppFallbackText>;

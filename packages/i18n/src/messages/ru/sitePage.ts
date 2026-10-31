@@ -16,15 +16,15 @@ export const messages = {
     "Эта ссылка-приглашение недействительна или неполна. Попросите владельца сервера о новом приглашении.",
   "sitePage.join.open": "Открыть OpenBot",
   "sitePage.join.browser": "Открыть в браузере",
-  "sitePage.join.download": "Скачать OpenBot",
+  "sitePage.join.noApp": "Нет приложения? {browser} или {download}.",
+  "sitePage.join.noAppMobile": "Нет приложения? {browser}.",
+  "sitePage.join.browserLink": "Присоединитесь в этом браузере",
+  "sitePage.join.downloadLink": "скачайте OpenBot",
   "sitePage.join.notOpened":
-    "Если OpenBot не открылся, установите его кнопкой «{download}» или запустите OpenBot один раз, чтобы он мог открывать ссылки-приглашения. Также можно использовать кнопку «{browser}».",
+    "OpenBot не установлен на этом компьютере или ещё не запущен. Установите его, затем снова нажмите «{open}». Также можно присоединиться в этом браузере.",
   "sitePage.join.mobile":
     "Если OpenBot установлен, нажмите «{open}». Также можно вставить эту ссылку в «Добавить сервер» в приложении.",
-  "sitePage.join.singleUse":
-    "Одноразовая ссылка работает один раз, затем истекает. Постоянная ссылка работает, пока владелец её не отзовёт. OpenBot показывает срок действия до того, как вы присоединитесь.",
   "sitePage.join.email": "Если приглашение пришло по электронной почте, войдите в OpenBot с этим адресом.",
-  "sitePage.join.share": "Эта ссылка даёт доступ к серверу. Делитесь ею только с теми, кого хотите пригласить.",
   "sitePage.connect.title": "Вернуться в OpenBot",
   "sitePage.connect.failedTitle": "Подключение не завершено",
   "sitePage.connect.openApp": "Открыть OpenBot",

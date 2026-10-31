@@ -16,16 +16,15 @@ export const messages = {
     "Ce lien d’invitation n’est pas valide ou est incomplet. Demandez une nouvelle invitation au propriétaire du serveur.",
   "sitePage.join.open": "Ouvrir OpenBot",
   "sitePage.join.browser": "Ouvrir dans le navigateur",
-  "sitePage.join.download": "Télécharger OpenBot",
+  "sitePage.join.noApp": "Pas d’app ? {browser} ou {download}.",
+  "sitePage.join.noAppMobile": "Pas d’app ? {browser}.",
+  "sitePage.join.browserLink": "Rejoignez dans ce navigateur",
+  "sitePage.join.downloadLink": "téléchargez OpenBot",
   "sitePage.join.notOpened":
-    "Si OpenBot ne s’est pas ouvert, installez-le avec {download}, ou lancez OpenBot une fois pour qu’il puisse ouvrir les liens d’invitation. Vous pouvez aussi utiliser {browser}.",
+    "OpenBot n’est pas installé sur cet ordinateur ou n’a pas encore démarré. Installez-le, puis cliquez à nouveau sur {open}. Vous pouvez aussi rejoindre dans ce navigateur.",
   "sitePage.join.mobile":
     "Si OpenBot est installé, touchez {open}. Vous pouvez aussi coller ce lien dans Ajouter un serveur dans l’app.",
-  "sitePage.join.singleUse":
-    "Un lien à usage unique fonctionne une fois puis expire. Un lien permanent fonctionne jusqu’à ce que le propriétaire le révoque. OpenBot affiche l’expiration avant que vous ne rejoigniez.",
   "sitePage.join.email": "Si l’invitation est arrivée par e-mail, connectez-vous à OpenBot avec cette adresse e-mail.",
-  "sitePage.join.share":
-    "Ce lien donne accès à un serveur. Partagez-le uniquement avec les personnes que vous voulez inviter.",
   "sitePage.connect.title": "Revenir à OpenBot",
   "sitePage.connect.failedTitle": "La connexion n’a pas abouti",
   "sitePage.connect.openApp": "Ouvrir OpenBot",

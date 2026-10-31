@@ -14,15 +14,15 @@ export const messages = {
   "sitePage.join.invalid": "この招待リンクは無効か、不完全です。サーバーのオーナーに新しい招待を依頼してください。",
   "sitePage.join.open": "OpenBot を開く",
   "sitePage.join.browser": "ブラウザーで開く",
-  "sitePage.join.download": "OpenBot をダウンロード",
+  "sitePage.join.noApp": "アプリがない場合は、{browser}するか、{download}してください。",
+  "sitePage.join.noAppMobile": "アプリがない場合は、{browser}してください。",
+  "sitePage.join.browserLink": "このブラウザーで参加",
+  "sitePage.join.downloadLink": "OpenBot をダウンロード",
   "sitePage.join.notOpened":
-    "OpenBot が開かなかった場合は、{download} からインストールするか、OpenBot を一度起動して招待リンクを開けるようにしてください。{browser} も使えます。",
+    "このコンピューターに OpenBot がインストールされていないか、まだ起動していません。インストールしてから、もう一度 {open} を押してください。このブラウザーで参加することもできます。",
   "sitePage.join.mobile":
     "OpenBot がインストールされている場合は、{open} をタップしてください。このリンクをアプリの「サーバーを追加」に貼り付けることもできます。",
-  "sitePage.join.singleUse":
-    "1 回限りのリンクは 1 回だけ使え、その後は期限切れになります。無期限のリンクは、オーナーが取り消すまで使えます。OpenBot は参加前に有効期限を表示します。",
   "sitePage.join.email": "招待がメールで届いた場合は、そのメールアドレスで OpenBot にサインインしてください。",
-  "sitePage.join.share": "このリンクでサーバーにアクセスできます。招待したい人とだけ共有してください。",
   "sitePage.connect.title": "OpenBot に戻る",
   "sitePage.connect.failedTitle": "接続が完了しませんでした",
   "sitePage.connect.openApp": "OpenBot を開く",

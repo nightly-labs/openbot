@@ -13,16 +13,15 @@ export const messages = {
   "sitePage.join.invalid": "该邀请链接无效或不完整。请向服务器所有者索取新的邀请。",
   "sitePage.join.open": "打开 OpenBot",
   "sitePage.join.browser": "在浏览器中打开",
-  "sitePage.join.download": "下载 OpenBot",
-  // {download} and {browser} are the labels of the two buttons above this note.
+  "sitePage.join.noApp": "没有应用？{browser}或{download}。",
+  "sitePage.join.noAppMobile": "没有应用？{browser}。",
+  "sitePage.join.browserLink": "在此浏览器中加入",
+  "sitePage.join.downloadLink": "下载 OpenBot",
   "sitePage.join.notOpened":
-    "如果 OpenBot 没有打开，请通过“{download}”安装，或先启动一次 OpenBot，使它能打开邀请链接。你也可以使用“{browser}”。",
+    "此电脑上没有安装 OpenBot，或它尚未启动。请先安装，然后再次点击“{open}”。你也可以在此浏览器中加入。",
   // {open} is the label of the button above this note.
   "sitePage.join.mobile": "如果已安装 OpenBot，请点按“{open}”。你也可以把该链接粘贴到应用的“添加服务器”中。",
-  "sitePage.join.singleUse":
-    "一次性链接只能使用一次，之后即失效。永久链接在所有者撤销之前一直有效。加入前，OpenBot 会显示有效期。",
   "sitePage.join.email": "如果邀请是通过电子邮件发来的，请用该邮箱地址登录 OpenBot。",
-  "sitePage.join.share": "该链接可访问服务器。只分享给你想邀请的人。",
   // {name} is Slack or Discord on all the connect keys.
   "sitePage.connect.title": "返回 OpenBot",
   "sitePage.connect.failedTitle": "连接未完成",

@@ -1023,28 +1023,6 @@ a {
   box-shadow: 0 24px 80px var(--openbot-glass-shadow);
 }
 
-.join-card-signal {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 26px;
-}
-
-.join-card-signal span {
-  height: 1px;
-  background: var(--openbot-border-strong);
-}
-
-.join-card-signal i {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-logo-production);
-  box-shadow: 0 0 0 6px var(--openbot-accent-strong);
-}
-
 .join-card-logo {
   width: 64px;
   height: 64px;
@@ -1089,6 +1067,26 @@ a {
   justify-content: center;
 }
 
+/* The one action on the join page fills the card. */
+.join-card-actions-full {
+  grid-template-columns: 1fr;
+}
+
+/* The line under the join action: the browser and the download, as links in a sentence. */
+.join-card-alternatives {
+  margin: 16px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.join-card-alternatives a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-text-muted);
+  text-underline-offset: 3px;
+}
+
 .join-card-error {
   margin: 26px 0 0;
   color: var(--openbot-text-primary);
@@ -1099,10 +1097,6 @@ a {
   color: var(--openbot-text-muted);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.join-card-status-empty {
-  margin: 0;
 }
 
 @media (max-width: 520px) {
@@ -11534,17 +11528,6 @@ a {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-}
-
-.transactional-notes {
-  display: grid;
-  gap: 6px;
-  margin: 24px 0 0;
-  padding: 0;
-  color: var(--openbot-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  list-style: none;
 }
 
 /* The brand page --------------------------------------------------------- */

@@ -15,15 +15,15 @@ export const messages = {
   "sitePage.join.invalid": "Bu davet bağlantısı geçerli değil veya eksik. Sunucu sahibinden yeni bir davet isteyin.",
   "sitePage.join.open": "OpenBot'u aç",
   "sitePage.join.browser": "Tarayıcıda aç",
-  "sitePage.join.download": "OpenBot'u indir",
+  "sitePage.join.noApp": "Uygulama yok mu? {browser} veya {download}.",
+  "sitePage.join.noAppMobile": "Uygulama yok mu? {browser}.",
+  "sitePage.join.browserLink": "Bu tarayıcıda katılın",
+  "sitePage.join.downloadLink": "OpenBot'u indirin",
   "sitePage.join.notOpened":
-    "OpenBot açılmadıysa {download} ile yükleyin veya davet bağlantılarını açabilmesi için OpenBot'u bir kez başlatın. {browser} seçeneğini de kullanabilirsiniz.",
+    "OpenBot bu bilgisayarda yüklü değil veya henüz başlamadı. Yükleyin, ardından {open} öğesine yeniden basın. Bu tarayıcıda da katılabilirsiniz.",
   "sitePage.join.mobile":
     "OpenBot yüklüyse {open} öğesine dokunun. Bu bağlantıyı uygulamadaki Sunucu ekle bölümüne de yapıştırabilirsiniz.",
-  "sitePage.join.singleUse":
-    "Tek kullanımlık bağlantı bir kez çalışır ve sonra süresi dolar. Kalıcı bağlantı, sahibi iptal edene kadar çalışır. OpenBot, katılmadan önce son kullanma tarihini gösterir.",
   "sitePage.join.email": "Davet e-postayla geldiyse OpenBot'ta o e-posta adresiyle oturum açın.",
-  "sitePage.join.share": "Bu bağlantı bir sunucuya erişim sağlar. Yalnızca davet etmek istediğiniz kişilerle paylaşın.",
   "sitePage.connect.title": "OpenBot'a dön",
   "sitePage.connect.failedTitle": "Bağlantı tamamlanmadı",
   "sitePage.connect.openApp": "OpenBot'u aç",

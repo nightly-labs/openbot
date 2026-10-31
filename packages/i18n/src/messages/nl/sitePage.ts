@@ -16,15 +16,15 @@ export const messages = {
     "Deze uitnodigingslink is ongeldig of onvolledig. Vraag de eigenaar van de server om een nieuwe uitnodiging.",
   "sitePage.join.open": "OpenBot openen",
   "sitePage.join.browser": "Openen in browser",
-  "sitePage.join.download": "OpenBot downloaden",
+  "sitePage.join.noApp": "Geen app? {browser} of {download}.",
+  "sitePage.join.noAppMobile": "Geen app? {browser}.",
+  "sitePage.join.browserLink": "Word lid via deze browser",
+  "sitePage.join.downloadLink": "download OpenBot",
   "sitePage.join.notOpened":
-    "Is OpenBot niet geopend? Installeer het met {download}, of start OpenBot één keer zodat het uitnodigingslinks kan openen. Je kunt ook {browser} gebruiken.",
+    "OpenBot is niet geïnstalleerd op deze computer, of is nog niet gestart. Installeer het en klik dan opnieuw op {open}. Je kunt ook lid worden via deze browser.",
   "sitePage.join.mobile":
     "Is OpenBot geïnstalleerd? Tik dan op {open}. Je kunt deze link ook plakken bij Server toevoegen in de app.",
-  "sitePage.join.singleUse":
-    "Een eenmalige link werkt één keer en verloopt daarna. Een permanente link werkt totdat de eigenaar hem intrekt. OpenBot toont de vervaldatum voordat je lid wordt.",
   "sitePage.join.email": "Kwam de uitnodiging per e-mail? Log dan in bij OpenBot met dat e-mailadres.",
-  "sitePage.join.share": "Deze link geeft toegang tot een server. Deel hem alleen met mensen die je wilt uitnodigen.",
   "sitePage.connect.title": "Terug naar OpenBot",
   "sitePage.connect.failedTitle": "De verbinding is niet voltooid",
   "sitePage.connect.openApp": "OpenBot openen",

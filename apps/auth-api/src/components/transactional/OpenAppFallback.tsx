@@ -1,6 +1,7 @@
 import { Portal } from "@solidjs/web";
 import { type Accessor, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
-import { DOWNLOAD_PLATFORMS, detectDownloadPlatform } from "../../lib/download-platforms";
+import { detectDownloadPlatform } from "../../lib/download-platforms";
+import { OPENBOT_DOWNLOAD_LINKS } from "../../lib/landing-links";
 import { Button } from "../ui/button";
 import type { OpenAppFallbackText } from "./page-text";
 
@@ -58,7 +59,7 @@ export function createOpenAppFallback(): OpenAppFallback {
 export function OpenAppFallbackDialog(props: { fallback: OpenAppFallback; text: OpenAppFallbackText }) {
   const titleId = createUniqueId();
   let dialog: HTMLDialogElement | undefined;
-  const platform = () => DOWNLOAD_PLATFORMS[detectDownloadPlatform(globalThis.navigator ?? {}) ?? "macos"];
+  const platform = () => detectDownloadPlatform(globalThis.navigator ?? {}) ?? "macos";
 
   // A `ref` runs before the element is in the document, and a detached dialog cannot open as modal.
   const openDialog = (element: HTMLDialogElement) => {
@@ -85,8 +86,8 @@ export function OpenAppFallbackDialog(props: { fallback: OpenAppFallback; text: 
             <button class="plugin-dialog-dismiss" type="button" onClick={() => dialog?.close()}>
               {props.text.dismiss}
             </button>
-            <Button autofocus href={platform().href} variant="primary" size="sm" icon="download">
-              {platform().action}
+            <Button autofocus href={OPENBOT_DOWNLOAD_LINKS[platform()]} variant="primary" size="sm" icon="download">
+              {props.text.download[platform()]}
             </Button>
           </div>
         </dialog>

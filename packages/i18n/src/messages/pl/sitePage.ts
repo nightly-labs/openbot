@@ -15,15 +15,15 @@ export const messages = {
     "Ten link z zaproszeniem jest nieprawidłowy lub niekompletny. Poproś właściciela serwera o nowe zaproszenie.",
   "sitePage.join.open": "Otwórz OpenBot",
   "sitePage.join.browser": "Otwórz w przeglądarce",
-  "sitePage.join.download": "Pobierz OpenBot",
+  "sitePage.join.noApp": "Nie masz aplikacji? {browser} albo {download}.",
+  "sitePage.join.noAppMobile": "Nie masz aplikacji? {browser}.",
+  "sitePage.join.browserLink": "Dołącz w tej przeglądarce",
+  "sitePage.join.downloadLink": "pobierz OpenBot",
   "sitePage.join.notOpened":
-    "Jeśli OpenBot się nie otworzył, zainstaluj go przyciskiem {download} albo uruchom OpenBot raz, aby mógł otwierać linki z zaproszeniami. Możesz też użyć przycisku {browser}.",
+    "OpenBot nie jest zainstalowany na tym komputerze albo jeszcze się nie uruchomił. Zainstaluj go, a potem kliknij {open} jeszcze raz. Możesz też dołączyć w tej przeglądarce.",
   "sitePage.join.mobile":
     "Jeśli OpenBot jest zainstalowany, stuknij {open}. Możesz też wkleić ten link w Dodaj serwer w aplikacji.",
-  "sitePage.join.singleUse":
-    "Link jednorazowy działa raz, a potem wygasa. Link stały działa, dopóki właściciel go nie unieważni. OpenBot pokazuje datę wygaśnięcia, zanim dołączysz.",
   "sitePage.join.email": "Jeśli zaproszenie przyszło e-mailem, zaloguj się do OpenBot tym adresem e-mail.",
-  "sitePage.join.share": "Ten link daje dostęp do serwera. Udostępniaj go tylko osobom, które chcesz zaprosić.",
   "sitePage.connect.title": "Wróć do OpenBot",
   "sitePage.connect.failedTitle": "Połączenie nie zostało zakończone",
   "sitePage.connect.openApp": "Otwórz OpenBot",

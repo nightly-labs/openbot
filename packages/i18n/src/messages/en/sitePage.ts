@@ -20,17 +20,18 @@ export const messages = defineMessages("sitePage", {
     "This invitation link is not valid or is not complete. Ask the server owner for a new invitation.",
   "sitePage.join.open": "Open OpenBot",
   "sitePage.join.browser": "Open in browser",
-  "sitePage.join.download": "Download OpenBot",
-  // {download} and {browser} are the labels of the two buttons above this note.
+  // {browser} and {download} are links. Their text is browserLink and downloadLink.
+  "sitePage.join.noApp": "No app? {browser} or {download}.",
+  "sitePage.join.noAppMobile": "No app? {browser}.",
+  "sitePage.join.browserLink": "Join in this browser",
+  "sitePage.join.downloadLink": "download OpenBot",
+  // {open} is the label of the button that did not open OpenBot.
   "sitePage.join.notOpened":
-    "If OpenBot did not open, install it with {download}, or start OpenBot once so that it can open invitation links. You can also use {browser}.",
+    "OpenBot is not installed on this computer, or it has not started yet. Install it, then press {open} again. You can also join in this browser.",
   // {open} is the label of the button above this note.
   "sitePage.join.mobile":
     "If OpenBot is installed, tap {open}. You can also paste this link into Add server in the app.",
-  "sitePage.join.singleUse":
-    "A single-use link works one time and then expires. A permanent link works until the owner revokes it. OpenBot shows the expiry before you join.",
   "sitePage.join.email": "If the invitation came by email, sign in to OpenBot with that email address.",
-  "sitePage.join.share": "This link gives access to a server. Share it only with people you want to invite.",
   // {name} is Slack or Discord on all the connect keys.
   "sitePage.connect.title": "Return to OpenBot",
   "sitePage.connect.failedTitle": "The connection did not finish",
