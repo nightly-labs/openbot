@@ -1,4 +1,5 @@
 import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostService } from "../host-service";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
@@ -153,7 +154,10 @@ export function teamIpcHandlers({
       getStatus: handler(() => host.getStatus()),
       configure: payloadHandler(parseHostConfig, (config) => runCauseEffect(host.configure(config))),
       updateIdentity: payloadHandler(parseHostIdentity, (identity) => runCauseEffect(host.updateIdentity(identity))),
-      rotateIdentityKey: handler(() => runCauseEffect(host.rotateIdentityKey())),
+      // The server list carries the signed handover and its time; read it again.
+      rotateIdentityKey: handler(() =>
+        runCauseEffect(host.rotateIdentityKey().pipe(Effect.tap(() => remoteServers.invalidateDirectory()))),
+      ),
       getPresence: handler(() => host.getPresence()),
       start: handler(() => runCauseEffect(host.start())),
       stop: handler(() => runCauseEffect(host.stop())),

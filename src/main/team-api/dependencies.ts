@@ -381,6 +381,8 @@ export interface TeamApiAdmin {
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */
+  hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */

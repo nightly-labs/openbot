@@ -92,6 +92,11 @@ export interface ServerSummary {
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
   /**
+   * When the host last changed its key, in milliseconds since the epoch. Only a change that both the
+   * previous and the new key signed. Absent when the server list has no such change.
+   */
+  keyChangedAt?: number;
+  /**
    * A local server: a second server on this computer, which this app runs as its child process. It
    * is reached as a joined server, so `kind` stays `"remote"`. Absent for every other server.
    */

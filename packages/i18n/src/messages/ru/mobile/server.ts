@@ -429,6 +429,25 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.keySection": "Ключ сервера",
+  "mobile.server.settings.keyChanged": "Последнее изменение",
+  "mobile.server.settings.keyChange": "Сменить ключ",
+  "mobile.server.settings.keyChanging": "Смена ключа…",
+  "mobile.server.settings.keyConfirmTitle": "Сменить ключ сервера {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "Сервер создаст новый ключ. Текущий и новый ключ оба подпишут изменение, поэтому связанные приложения останутся связанными и перейдут на новый ключ при следующем подключении. Ссылки Mobile Connect, созданные до изменения, перестанут работать. Сделайте это, если файл ключа сервера был скопирован или раскрыт.",
+  "mobile.server.settings.keyConfirm": "Сменить",
+  "mobile.server.settings.keyDescription":
+    "Смените ключ, если файл ключа сервера был скопирован или раскрыт. Участники останутся связанными.",
+  "mobile.server.settings.keySigned":
+    "Предыдущий ключ подписал это изменение, поэтому приложение доверяет новому ключу.",
+  "mobile.server.settings.keyChangedNow":
+    "Ключ сервера изменён. Приложения участников перейдут на новый ключ при следующем подключении.",
+  "mobile.server.settings.keyFollowing":
+    "Сервер использует новый ключ. Приложение перейдёт на него, когда список серверов загрузится снова.",
+  "mobile.server.settings.keyChangeFailed": "Не удалось сменить ключ сервера. Попробуйте ещё раз.",
+  "mobile.server.settings.keyOwnerOnly": "Сменить ключ сервера может только владелец.",
+  "mobile.server.settings.keyUnsupported": "Обновите OpenBot на этом сервере, чтобы сменить его ключ здесь.",
   "mobile.server.settings.memoryLimit": "Записей памяти на агента",
   "mobile.server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "mobile.server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",

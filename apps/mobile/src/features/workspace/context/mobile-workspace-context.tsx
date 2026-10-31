@@ -23,6 +23,7 @@ import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-prot
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
@@ -64,7 +65,7 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { updateHostIdentity } from "@openbot/team-client/team-admin-requests";
+import { rotateHostKey, updateHostIdentity } from "@openbot/team-client/team-admin-requests";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -1375,6 +1376,23 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         // reads again after it. The change is saved, so a failed read must not report a failure.
         await refreshMemberships().catch(() => undefined);
       },
+      rotateServerKey: async (serverId) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (server?.role !== "owner") throw new Error(currentText().t("mobile.server.settings.keyOwnerOnly"));
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          HOST_KEY_ROTATION_CAPABILITY,
+          "mobile.server.settings.keyUnsupported",
+        );
+        const rotated = await runTeamRequest(rotateHostKey(teamApi(serverId)));
+        // The answer does not make the new key trusted. The server list carries the handover that
+        // the previous key signed, and the directory follows it. The key is changed, so a failed
+        // read must not report a failure: the next read follows it.
+        await refreshMemberships().catch(() => undefined);
+        return rotated;
+      },
+      reloadServerList: () => refreshHosts(),
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
@@ -1735,6 +1753,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         !hostHiddenIds.includes(agentId) ||
         hostOwnsHide(serverCapabilities.current.get(activeServer.id), activeServer.role),
       canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+      canRotateServerKey: (serverId) =>
+        servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
+        administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
       canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
       canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
       canManageServerRoles: (serverId) => administers(serverId, AGENT_ACCESS_CAPABILITY),

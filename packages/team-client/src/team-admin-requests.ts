@@ -27,6 +27,7 @@ import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protoc
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
+import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
@@ -36,7 +37,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
-// the server timezone, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
+// the server timezone, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
 // them through their own transport, so the path, body and decoding of each request are here once.
@@ -172,7 +173,13 @@ import {
   type VaultSaveInput,
   type VaultState,
 } from "@openbot/contracts/ipc";
-import { decodeRecord, guardedListDecoder, nullableString, requiredBoolean } from "@openbot/contracts/ipc-decoding";
+import {
+  decodeRecord,
+  guardedListDecoder,
+  nullableString,
+  requiredBoolean,
+  requiredString,
+} from "@openbot/contracts/ipc-decoding";
 import {
   decodeEventActivity,
   decodeEventRoutineRuns,
@@ -547,6 +554,22 @@ export function setHostTimezone(
   timezone: string | null,
 ): Effect.Effect<HostTimezoneSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
+}
+
+/**
+ * Asks the host to change its key (`host-key-rotation-v1`). Only the owner can. Resolves with the new
+ * public key after the account service accepted the signed handover. The caller still trusts the key
+ * only through the handover that the server list carries.
+ */
+export function rotateHostKey(request: TeamApiRequest): Effect.Effect<{ publicKey: string }, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      HOST_KEY_ROTATION_ROUTES.rotate,
+      (value) => ({ publicKey: requiredString(decodeRecord(value, "host key"), "publicKey") }),
+      {},
+    ),
+  );
 }
 
 /** The host's enabled messaging connections with their places. Only a host with `routine-results-v1` answers it. */

@@ -89,6 +89,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
   "error.team.agentMemoryLimitUnsupported": "この接続はエージェントのメモリー上限に対応していません。",
   "error.team.memoryReviewUnsupported": "この接続はメモリーの見直しに対応していません。",
@@ -126,6 +127,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "このクライアントは安全な認証に対応していません。",
   "error.team.agentSettingsUnsupported": "この接続ではエージェントの設定を利用できません。",
   "error.team.adminRequired": "管理者のアクセス権が必要です。",
+  "error.team.ownerRequired": "この操作ができるのはこのサーバーのオーナーだけです。",
   "error.team.requestTooLarge": "リクエストの本文が大きすぎます。",
   "error.team.signInRelayUnsupported":
     "このサーバーはサインインを中継できません。ホストの OpenBot を更新してください。",

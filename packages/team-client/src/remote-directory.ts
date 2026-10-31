@@ -16,7 +16,12 @@ import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { runTeamEffect } from "./effect-boundary";
-import { followHostKeyHandovers, type HostKeySignatureCheck, remoteHostFingerprint } from "./host-key-handover";
+import {
+  followHostKeyHandovers,
+  type HostKeySignatureCheck,
+  hostKeyChangedAt,
+  remoteHostFingerprint,
+} from "./host-key-handover";
 import type { TeamClientFetch } from "./index";
 
 export interface RemoteTeamHost {
@@ -32,6 +37,11 @@ export interface RemoteTeamHost {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /**
+   * When the host last changed its key, from a handover that both keys signed. Absent when the host
+   * kept its first key or the account service sends no handovers.
+   */
+  keyChangedAt?: number;
 }
 
 export interface RemoteTeamMember {
@@ -196,6 +206,14 @@ export class RemoteTeamDirectoryClient {
             const handovers = optionalHostKeyHandovers(candidate.keyHandovers);
             handoversByHost.set(hostId, handovers);
             const devicePublicKey = yield* this.#trustedHostKey(hostId, candidate.devicePublicKey, handovers);
+            const keyChangedAt = handovers.length
+              ? yield* hostKeyChangedAt({
+                  hostId,
+                  publicKey: devicePublicKey,
+                  handovers,
+                  verify: this.#verifyHostKeySignature,
+                })
+              : null;
             return [
               {
                 hostId: candidate.hostId,
@@ -207,6 +225,7 @@ export class RemoteTeamDirectoryClient {
                 ...(memberLimit === undefined ? {} : { memberLimit }),
                 // A bad value drops only the flag, so the server stays in the list.
                 ...(isBoolean(hosted) ? { hosted } : {}),
+                ...(keyChangedAt === null ? {} : { keyChangedAt }),
               },
             ];
           }),

@@ -95,6 +95,7 @@ export const messages = {
     "Les modifications de l’identité du serveur ne sont pas prises en charge par cette connexion.",
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
+  "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",
   "error.team.agentMemoryLimitUnsupported": "Cette connexion ne prend pas en charge la limite de souvenirs des agents.",
   "error.team.memoryReviewUnsupported": "Cette connexion ne prend pas en charge la revue des souvenirs.",
@@ -133,6 +134,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L’authentification sécurisée n’est pas prise en charge par ce client.",
   "error.team.agentSettingsUnsupported": "Les réglages des agents ne sont pas pris en charge par cette connexion.",
   "error.team.adminRequired": "Un accès administrateur est requis.",
+  "error.team.ownerRequired": "Seul le propriétaire de ce serveur peut faire cela.",
   "error.team.requestTooLarge": "Le corps de la requête est trop volumineux.",
   "error.team.signInRelayUnsupported":
     "Ce serveur ne peut pas relayer les connexions. Mettez à jour OpenBot sur l’hôte.",

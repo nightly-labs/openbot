@@ -89,6 +89,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
@@ -125,6 +126,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Güvenli kimlik doğrulaması bu istemci tarafından desteklenmiyor.",
   "error.team.agentSettingsUnsupported": "Ajan ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.adminRequired": "Yönetici erişimi gereklidir.",
+  "error.team.ownerRequired": "Bunu yalnızca bu sunucunun sahibi yapabilir.",
   "error.team.requestTooLarge": "İstek gövdesi çok büyük.",
   "error.team.signInRelayUnsupported": "Bu sunucu oturum açmaları aktaramaz. Ana makinedeki OpenBot'u güncelleyin.",
   "error.team.connectorsUnsupported":

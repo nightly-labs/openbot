@@ -445,6 +445,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
@@ -501,6 +502,16 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+
+`host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
+as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
+The host makes the new key, signs one handover with the current and the new key, and answers with the
+new public key only after the account service accepts the handover. No private key leaves the host.
+The client does not trust the answer: it reads the server list again and follows the signed handover
+from the key that it trusts. The desktop and mobile apps show the time of the last verified handover
+to every member, in Server settings → Server key (`hostKeyChangedAt`, `ServerSummary.keyChangedAt` on
+desktop). The mobile app reads the server list again when Server settings opens. The host advertises the capability only when it can send a
+handover to the account service.
 
 `agent-memory-limit-v1` reads and sets how many memories each agent of the host can keep. It is the
 same value as "Memories per agent" in the host's own Server settings. The snapshot gives the limit and

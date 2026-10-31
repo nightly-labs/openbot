@@ -377,6 +377,25 @@ export const messages = {
     "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer son fuseau horaire.",
   "mobile.server.settings.timezoneUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son fuseau horaire ici.",
+  "mobile.server.settings.keySection": "Clé du serveur",
+  "mobile.server.settings.keyChanged": "Dernier changement",
+  "mobile.server.settings.keyChange": "Changer la clé",
+  "mobile.server.settings.keyChanging": "Changement de la clé…",
+  "mobile.server.settings.keyConfirmTitle": "Changer la clé de {name} ?",
+  "mobile.server.settings.keyConfirmBody":
+    "Le serveur crée une nouvelle clé. La clé actuelle et la nouvelle signent toutes deux le changement : les apps associées restent associées et passent à la nouvelle clé à leur prochaine connexion. Les liens Mobile Connect d’avant le changement ne fonctionnent plus. Faites-le si le fichier de clé du serveur a été copié ou exposé.",
+  "mobile.server.settings.keyConfirm": "Changer",
+  "mobile.server.settings.keyDescription":
+    "Changez la clé si le fichier de clé du serveur a été copié ou exposé. Les membres restent associés.",
+  "mobile.server.settings.keySigned":
+    "L’ancienne clé a signé ce changement, donc cette app fait confiance à la nouvelle clé.",
+  "mobile.server.settings.keyChangedNow":
+    "Clé du serveur changée. Les apps des membres passent à la nouvelle clé à leur prochaine connexion.",
+  "mobile.server.settings.keyFollowing":
+    "Le serveur utilise la nouvelle clé. Cette app y passe au prochain chargement de la liste des serveurs.",
+  "mobile.server.settings.keyChangeFailed": "Impossible de changer la clé du serveur. Réessayez.",
+  "mobile.server.settings.keyOwnerOnly": "Seul le propriétaire peut changer la clé du serveur.",
+  "mobile.server.settings.keyUnsupported": "Mettez à jour OpenBot sur ce serveur pour changer sa clé ici.",
   "mobile.server.settings.memoryLimit": "Souvenirs par agent",
   "mobile.server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",

@@ -379,6 +379,25 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.keySection": "Sunucu anahtarı",
+  "mobile.server.settings.keyChanged": "Son değişiklik",
+  "mobile.server.settings.keyChange": "Anahtarı değiştir",
+  "mobile.server.settings.keyChanging": "Anahtar değiştiriliyor…",
+  "mobile.server.settings.keyConfirmTitle": "{name} anahtarı değiştirilsin mi?",
+  "mobile.server.settings.keyConfirmBody":
+    "Sunucu yeni bir anahtar oluşturur. Geçerli anahtar ve yeni anahtar değişikliği birlikte imzalar; bu yüzden eşlenmiş uygulamalar eşli kalır ve yeniden bağlandıklarında yeni anahtara geçer. Değişiklikten önceki Mobile Connect bağlantıları çalışmaz. Sunucunun anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
+  "mobile.server.settings.keyConfirm": "Değiştir",
+  "mobile.server.settings.keyDescription":
+    "Sunucunun anahtar dosyası kopyalandıysa veya açığa çıktıysa anahtarı değiştirin. Üyeler eşli kalır.",
+  "mobile.server.settings.keySigned":
+    "Önceki anahtar bu değişikliği imzaladı, bu yüzden bu uygulama yeni anahtara güveniyor.",
+  "mobile.server.settings.keyChangedNow":
+    "Sunucu anahtarı değiştirildi. Üyelerin uygulamaları yeniden bağlandıklarında yeni anahtara geçer.",
+  "mobile.server.settings.keyFollowing":
+    "Sunucu yeni anahtarı kullanıyor. Sunucu listesi yeniden yüklendiğinde bu uygulama da ona geçer.",
+  "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
+  "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",

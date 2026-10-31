@@ -333,6 +333,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "A chave atual e a nova assinam uma transferência. Os apps dos membros mudam para a nova chave na próxima conexão. Faça isso se o arquivo da chave foi copiado ou exposto.",
   "server.settings.hostKeyRotated": "Chave do servidor alterada",
+  "server.settings.hostKeyChanged": "Última alteração",
+  "server.settings.hostKeyChangedDescription": "{date}. A chave anterior e a chave nova assinaram esta alteração.",
   "server.settings.hostKeyLocalOnly": "Aqui só o servidor deste computador pode alterar a chave.",
   "server.settings.removeTitle": "Remover servidor",
   "server.settings.removeDescription":

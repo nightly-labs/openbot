@@ -425,10 +425,15 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
-      // from a joined admin runs every step a local one does.
+      // from a joined admin runs every step a local one does. The key route runs the steps of Server
+      // settings on this computer, and only where they can run: a host with no account service has
+      // nothing to accept the handover.
       admin: {
         ...options.admin,
         identity: { updateIdentity: (input) => this.updateIdentity(input).pipe(Effect.asVoid) },
+        ...(options.handOverRemoteHostKey && options.registerRemoteHost
+          ? { hostKey: { rotate: () => this.#rotateIdentityKeyForOwner() } }
+          : {}),
       },
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
@@ -807,6 +812,17 @@ export class HostService extends EventEmitter<HostEvents> {
     },
     (operation) => this.#provide(operation),
   ).bind(this);
+
+  /** `host-key-rotation-v1`: the owner asked from another device. The answer names the new public key. */
+  readonly #rotateIdentityKeyForOwner = Effect.fn("HostService.rotateIdentityKeyForOwner")(function* (
+    this: HostService,
+  ): Effect.fn.Return<{ publicKey: string }, RemoteWorkflowError> {
+    yield* this.rotateIdentityKey();
+    const publicKey = this.#options.store.getIdentity()?.publicKey;
+    if (!publicKey)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) });
+    return { publicKey };
+  });
 
   /**
    * Sends a handover that is still pending, for example after a restart or a lost answer. This

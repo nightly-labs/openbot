@@ -376,6 +376,24 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conecte-se a este servidor como proprietário ou admin para alterar o fuso horário.",
   "mobile.server.settings.timezoneUnsupported": "Atualize o OpenBot neste servidor para alterar o fuso horário aqui.",
+  "mobile.server.settings.keySection": "Chave do servidor",
+  "mobile.server.settings.keyChanged": "Última alteração",
+  "mobile.server.settings.keyChange": "Alterar chave",
+  "mobile.server.settings.keyChanging": "Alterando a chave…",
+  "mobile.server.settings.keyConfirmTitle": "Alterar a chave de {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "O servidor cria uma chave nova. A chave atual e a nova assinam a alteração, então os apps pareados continuam pareados e passam para a chave nova ao se conectar de novo. Links do Mobile Connect de antes da alteração param de funcionar. Faça isso se o arquivo de chave do servidor foi copiado ou exposto.",
+  "mobile.server.settings.keyConfirm": "Alterar",
+  "mobile.server.settings.keyDescription":
+    "Altere a chave se o arquivo de chave do servidor foi copiado ou exposto. Os membros continuam pareados.",
+  "mobile.server.settings.keySigned": "A chave anterior assinou esta alteração, então este app confia na chave nova.",
+  "mobile.server.settings.keyChangedNow":
+    "Chave do servidor alterada. Os apps dos membros passam para a chave nova ao se conectar de novo.",
+  "mobile.server.settings.keyFollowing":
+    "O servidor usa a chave nova. Este app passa para ela quando a lista de servidores carregar de novo.",
+  "mobile.server.settings.keyChangeFailed": "Não foi possível alterar a chave do servidor. Tente de novo.",
+  "mobile.server.settings.keyOwnerOnly": "Só o proprietário pode alterar a chave do servidor.",
+  "mobile.server.settings.keyUnsupported": "Atualize o OpenBot neste servidor para alterar a chave dele aqui.",
   "mobile.server.settings.memoryLimit": "Memórias por agente",
   "mobile.server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "mobile.server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",

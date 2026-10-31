@@ -337,6 +337,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Der aktuelle und der neue Schlüssel signieren beide eine Übergabe. Die Apps der Mitglieder wechseln beim nächsten Verbinden zum neuen Schlüssel. Tu das, wenn die Schlüsseldatei kopiert oder offengelegt wurde.",
   "server.settings.hostKeyRotated": "Serverschlüssel geändert",
+  "server.settings.hostKeyChanged": "Letzte Änderung",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
   "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":

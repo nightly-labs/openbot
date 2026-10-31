@@ -371,6 +371,25 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Connettiti a questo server come proprietario o admin per cambiarne il fuso orario.",
   "mobile.server.settings.timezoneUnsupported": "Aggiorna OpenBot su questo server per cambiarne qui il fuso orario.",
+  "mobile.server.settings.keySection": "Chiave del server",
+  "mobile.server.settings.keyChanged": "Ultima modifica",
+  "mobile.server.settings.keyChange": "Cambia chiave",
+  "mobile.server.settings.keyChanging": "Cambio della chiave…",
+  "mobile.server.settings.keyConfirmTitle": "Cambiare la chiave di {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "Il server crea una nuova chiave. La chiave attuale e quella nuova firmano entrambe la modifica, quindi le app associate restano associate e passano alla nuova chiave alla prossima connessione. I link Mobile Connect di prima della modifica smettono di funzionare. Fallo se il file della chiave del server è stato copiato o esposto.",
+  "mobile.server.settings.keyConfirm": "Cambia",
+  "mobile.server.settings.keyDescription":
+    "Cambia la chiave se il file della chiave del server è stato copiato o esposto. I membri restano associati.",
+  "mobile.server.settings.keySigned":
+    "La chiave precedente ha firmato questa modifica, quindi questa app si fida della nuova chiave.",
+  "mobile.server.settings.keyChangedNow":
+    "Chiave del server cambiata. Le app dei membri passano alla nuova chiave alla prossima connessione.",
+  "mobile.server.settings.keyFollowing":
+    "Il server usa la nuova chiave. Questa app ci passa quando l’elenco dei server si ricarica.",
+  "mobile.server.settings.keyChangeFailed": "Impossibile cambiare la chiave del server. Riprova.",
+  "mobile.server.settings.keyOwnerOnly": "Solo il proprietario può cambiare la chiave del server.",
+  "mobile.server.settings.keyUnsupported": "Aggiorna OpenBot su questo server per cambiare qui la sua chiave.",
   "mobile.server.settings.memoryLimit": "Memorie per agente",
   "mobile.server.settings.memoryLimitDescription": "Quante memorie può conservare ogni agente su questo server.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossibile caricare il limite di memorie di questo server.",

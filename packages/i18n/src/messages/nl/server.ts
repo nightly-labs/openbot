@@ -346,6 +346,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "De huidige en de nieuwe sleutel ondertekenen allebei een overdracht. Apps van leden gaan over op de nieuwe sleutel wanneer ze opnieuw verbinden. Doe dit als het sleutelbestand is gekopieerd of uitgelekt.",
   "server.settings.hostKeyRotated": "Serversleutel gewijzigd",
+  "server.settings.hostKeyChanged": "Laatste wijziging",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
   "server.settings.hostKeyLocalOnly": "Alleen de server op deze computer kan hier zijn sleutel wijzigen.",
   "server.settings.removeTitle": "Server verwijderen",
   "server.settings.removeDescription":

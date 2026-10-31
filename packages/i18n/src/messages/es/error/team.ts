@@ -90,6 +90,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexión no admite cambios en la identidad del servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexión no admite actualizaciones del host.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
+  "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
   "error.team.routineResultsUnsupported": "Esta conexión no admite destinos de rutinas.",
   "error.team.agentMemoryLimitUnsupported": "Esta conexión no admite el límite de recuerdos de los agentes.",
   "error.team.memoryReviewUnsupported": "Esta conexión no admite la revisión de recuerdos.",
@@ -127,6 +128,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente no admite autenticación segura.",
   "error.team.agentSettingsUnsupported": "Esta conexión no admite ajustes de agentes.",
   "error.team.adminRequired": "Se requiere acceso de administrador.",
+  "error.team.ownerRequired": "Solo el propietario de este servidor puede hacer esto.",
   "error.team.requestTooLarge": "El cuerpo de la solicitud es demasiado grande.",
   "error.team.signInRelayUnsupported":
     "Este servidor no puede retransmitir inicios de sesión. Actualiza OpenBot en el host.",

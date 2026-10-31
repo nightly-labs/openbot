@@ -35,6 +35,7 @@ import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
+import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
@@ -99,6 +100,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_KEY_ROTATION_CODECS,
   ...AGENT_MEMORY_LIMIT_CODECS,
   ...MEMORY_REVIEW_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,

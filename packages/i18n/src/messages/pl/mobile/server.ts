@@ -429,6 +429,24 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.keySection": "Klucz serwera",
+  "mobile.server.settings.keyChanged": "Ostatnia zmiana",
+  "mobile.server.settings.keyChange": "Zmień klucz",
+  "mobile.server.settings.keyChanging": "Zmienianie klucza…",
+  "mobile.server.settings.keyConfirmTitle": "Zmienić klucz serwera {name}?",
+  "mobile.server.settings.keyConfirmBody":
+    "Serwer tworzy nowy klucz. Obecny i nowy klucz podpisują zmianę, więc sparowane aplikacje pozostają sparowane i przechodzą na nowy klucz przy następnym połączeniu. Linki Mobile Connect sprzed zmiany przestają działać. Zrób to, jeśli plik klucza serwera został skopiowany lub ujawniony.",
+  "mobile.server.settings.keyConfirm": "Zmień",
+  "mobile.server.settings.keyDescription":
+    "Zmień klucz, jeśli plik klucza serwera został skopiowany lub ujawniony. Członkowie pozostają sparowani.",
+  "mobile.server.settings.keySigned": "Poprzedni klucz podpisał tę zmianę, więc ta aplikacja ufa nowemu kluczowi.",
+  "mobile.server.settings.keyChangedNow":
+    "Klucz serwera zmieniony. Aplikacje członków przechodzą na nowy klucz przy następnym połączeniu.",
+  "mobile.server.settings.keyFollowing":
+    "Serwer używa nowego klucza. Ta aplikacja przejdzie na niego po ponownym wczytaniu listy serwerów.",
+  "mobile.server.settings.keyChangeFailed": "Nie udało się zmienić klucza serwera. Spróbuj ponownie.",
+  "mobile.server.settings.keyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
+  "mobile.server.settings.keyUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego klucz.",
   "mobile.server.settings.memoryLimit": "Wspomnienia na agenta",
   "mobile.server.settings.memoryLimitDescription": "Ile wspomnień może przechowywać każdy agent na tym serwerze.",
   "mobile.server.settings.memoryLimitLoadFailed": "Nie udało się wczytać limitu wspomnień tego serwera.",

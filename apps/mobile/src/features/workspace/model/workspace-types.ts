@@ -162,6 +162,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
+  keyChangedAt?: number;
 }
 
 export interface MobileAgent {
@@ -331,6 +333,15 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { serverName?: string; logo?: AvatarImageInput | null },
   ) => Promise<void>;
+  /** The owner of an online host that serves `host-key-rotation-v1`. The host checks the role again. */
+  canRotateServerKey: (serverId: string) => boolean;
+  /**
+   * Asks the host to change its key, then reads the server list, which carries the signed handover.
+   * Resolves with the new public key; the server's `publicKey` changes to it when this app follows it.
+   */
+  rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
+  /** Reads the server list again, with its signed key changes. It does not connect again. */
+  reloadServerList: () => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
@@ -765,6 +776,7 @@ type MobileWorkspaceStateKey =
   | "hidesAgentsOnServer"
   | "canUnhideAgent"
   | "canEditServerIdentity"
+  | "canRotateServerKey"
   | "canManageServerTimezone"
   | "canManageAgentMemoryLimit"
   | "canManageServerRoles"

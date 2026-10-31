@@ -338,6 +338,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Mevcut anahtar ve yeni anahtar bir devri birlikte imzalar. Üyelerin uygulamaları yeniden bağlandığında yeni anahtara geçer. Anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
+  "server.settings.hostKeyChanged": "Son değişiklik",
+  "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
   "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":
