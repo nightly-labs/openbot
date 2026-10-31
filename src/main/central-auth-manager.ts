@@ -645,7 +645,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   /**
    * A Signal ticket for this host. Without `home`, the ticket is for the entry Signal, which also
-   * carries the chat app and webhook traffic. With `home`, the account service picks the Signal
+   * carries the chat app and webhook traffic, and the account service keeps the host's home. With `home`, the account service picks the Signal
    * machine where this host and its devices meet; `failedSignalUrl` names a home that did not answer,
    * so the account service moves the host to another machine.
    */
@@ -662,7 +662,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
             signalHome: true,
             ...(home.failedSignalUrl === undefined ? {} : { failedSignalUrl: home.failedSignalUrl }),
           }
-        : { machineToken };
+        : // `false` keeps the stored home: the host peer of this build still connects to it.
+          { machineToken, signalHome: false };
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },

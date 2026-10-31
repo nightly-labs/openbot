@@ -1,3 +1,4 @@
+import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime, Scope } from "effect";
@@ -114,6 +115,9 @@ export class TeamWebRtcHostGateway {
   // Set when the hidden window ends the host peer for good during a move, as it does after
   // `authentication_required` or close code 4000.
   #signalEnded = false;
+  // The host's ticket names a home Signal machine. Only then can a move find another machine; the entry
+  // Signal moves by DNS, and the hidden window keeps the device peers while it connects again.
+  #signalHomed = false;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
@@ -154,6 +158,7 @@ export class TeamWebRtcHostGateway {
     this.#lastSignalEnd = null;
     this.#signalUrl = input.signalUrl;
     this.#signalEnded = false;
+    this.#signalHomed = ticketNamesSignalHome(input.ticket);
     this.#localApiPort = input.localApiPort;
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
@@ -304,7 +309,7 @@ export class TeamWebRtcHostGateway {
 
   // One timer for each outage: a later close does not start the time again.
   #scheduleSignalMove(): void {
-    if (this.#signalMoveTimer !== null || !this.#hostId || !this.#options.renewSignal) return;
+    if (this.#signalMoveTimer !== null || !this.#hostId || !this.#signalHomed || !this.#options.renewSignal) return;
     this.#signalMoveTimer = setTimeout(this.#moveSignal, SIGNAL_MOVE_AFTER_MS);
   }
 
@@ -391,11 +396,14 @@ export class TeamWebRtcHostGateway {
     if (!renew) return;
     const bootstrap = yield* renew(hostId, failedSignalUrl);
     if (this.#hostId !== hostId) return;
+    // No other machine is configured. The device peers stay, and the hidden window connects again.
+    if (failedSignalUrl !== undefined && bootstrap.signalUrl === failedSignalUrl && !this.#signalEnded) return;
     yield* this.#clearPeers();
     yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
     if (this.#hostId !== hostId) return;
     this.#signalUrl = bootstrap.signalUrl;
     this.#signalEnded = false;
+    this.#signalHomed = ticketNamesSignalHome(bootstrap.ticket);
     yield* HostSignal.use((signal) => signal.connect(hostId, bootstrap.signalUrl, bootstrap.ticket));
     if (this.#hostId !== hostId)
       yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));

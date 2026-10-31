@@ -178,6 +178,8 @@ change, and each one needs its own approval.
 5. Worker variables, after step 4:
    `REMOTE_SIGNAL_HOMES=a=wss://signal1.openbot.run/v1/signal,b=wss://signal2.openbot.run/v1/signal` and
    `REMOTE_AUTH_WEBHOOK_URLS=https://signal1.openbot.run/internal/auth-events,https://signal2.openbot.run/internal/auth-events`.
+   Set both in the same deploy: with homes and no `REMOTE_AUTH_WEBHOOK_URLS`, a revoke reaches only
+   the entry machine, and revoked devices on the other home keep their sockets.
    Apply D1 migration `0044_remote_signal_homes.sql` before the Worker deploy. Until a desktop release
    that asks for a home, all hosts stay on the entry.
 6. Entry failover: set the TTL of the `signal.openbot.run` A record to 60 seconds (it is 300). Make a

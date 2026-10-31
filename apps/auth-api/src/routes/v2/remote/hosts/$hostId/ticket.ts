@@ -25,11 +25,11 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
               (body.failedSignalUrl !== undefined && !isString(body.failedSignalUrl))
             )
               return apiError(400, "invalid_remote_request", "The Signal home request is invalid.");
-            const signalHome = body.signalHome === true;
+            const signalHome = isBoolean(body.signalHome) ? body.signalHome : null;
             return json(
               yield* requestRemoteControlPlane().issueHostTicket(params.hostId, body.machineToken, {
                 signalHome,
-                failedSignalUrl: signalHome && isString(body.failedSignalUrl) ? body.failedSignalUrl : null,
+                failedSignalUrl: signalHome === true && isString(body.failedSignalUrl) ? body.failedSignalUrl : null,
               }),
             );
           }),

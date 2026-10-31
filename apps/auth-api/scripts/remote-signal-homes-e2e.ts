@@ -109,7 +109,7 @@ function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = EN
 async function hostTicket(
   remote: RemoteControlPlane,
   hostId: string,
-  placement?: { signalHome: boolean; failedSignalUrl: string | null },
+  placement?: { signalHome: boolean | null; failedSignalUrl: string | null },
 ) {
   const answer = await Effect.runPromise(remote.issueHostTicket(hostId, machineToken(hostId), placement));
   return { signalUrl: answer.signalUrl, signal: await signalClaim(answer.ticket) };
@@ -154,9 +154,9 @@ async function aHostGetsKeepsAndMovesItsHome() {
     otherFailed.signal === expected && storedHome(database, "host-1") === expected,
     { otherFailed },
   );
-  const plain = await hostTicket(remote, "host-1");
+  const plain = await hostTicket(remote, "host-1", { signalHome: false, failedSignalUrl: null });
   check(
-    "a host ticket without signalHome names the entry Signal, no claim, and keeps the stored home",
+    "a host ticket with signalHome false names the entry Signal, no claim, and keeps the stored home",
     plain.signal === "none" && plain.signalUrl === ENTRY_URL && storedHome(database, "host-1") === expected,
     { plain, stored: storedHome(database, "host-1") },
   );
@@ -195,6 +195,18 @@ async function aHostGetsKeepsAndMovesItsHome() {
     "a host whose home is no longer configured gets a configured home",
     replaced.signal === expected && storedHome(database, "host-1") === expected,
     { replaced, stored: storedHome(database, "host-1") },
+  );
+
+  const released = await hostTicket(remote, "host-1");
+  const releasedMember = await sessionTicket(remote, "host-1");
+  check(
+    "a released host build that sends no signalHome removes the stored home, and its members use the entry Signal",
+    released.signal === "none" &&
+      released.signalUrl === ENTRY_URL &&
+      storedHome(database, "host-1") === "none" &&
+      releasedMember.signal === "none" &&
+      releasedMember.signalUrl === ENTRY_URL,
+    { released, releasedMember, stored: storedHome(database, "host-1") },
   );
 }
 
@@ -241,6 +253,12 @@ async function anInvalidHomeListFailsClosed() {
       { host, member },
     );
   }
+  const invalidEntry = await outcome(
+    plane(database, `a=${HOME_URLS.a}`, "signal.test").issueHostTicket("host-1", machineToken("host-1"), asks()),
+  );
+  check("an entry URL that does not parse fails with remote_not_configured", invalidEntry === "remote_not_configured", {
+    invalidEntry,
+  });
   const wrongToken = await outcome(plane(database, "a").issueHostTicket("host-1", "wrong", asks()));
   check("a wrong host credential still fails first", wrongToken === "host_unauthorized", { wrongToken });
   const local = plane(database, "a=ws://127.0.0.1:8082/v1/signal", "ws://127.0.0.1:8081/v1/signal");

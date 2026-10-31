@@ -2006,22 +2006,34 @@ export class RemoteControlPlane {
   ).bind(this);
 
   /**
-   * A host socket ticket and the Signal URL for it. Only the host peer gateway sends `signalHome`: with
-   * homes configured, its ticket names the home of the host. Ingress, the webhook relay and released
-   * hosts get the entry Signal and no `signal` claim. Their requests keep the stored home, because the
-   * members of the host still connect to it.
+   * A host socket ticket and the Signal URL for it. Only the host peer gateway sends `signalHome: true`:
+   * with homes configured, its ticket names the home of the host. Ingress and the webhook relay send
+   * `signalHome: false` and get the entry Signal and no `signal` claim. Their requests keep the stored
+   * home, because the members of the host still connect to it. A released host build sends no
+   * `signalHome` (`null`) and connects only to the entry Signal, so its request removes the stored
+   * home: else the members of a host that went back to a released build wait on the old home.
    */
   readonly issueHostTicket = Effect.fn("RemoteControlPlane.issueHostTicket")(
     function* (
       this: RemoteControlPlane,
       hostId: string,
       machineToken: string,
-      placement: { signalHome: boolean; failedSignalUrl: string | null } = { signalHome: false, failedSignalUrl: null },
+      placement: { signalHome: boolean | null; failedSignalUrl: string | null } = {
+        signalHome: null,
+        failedSignalUrl: null,
+      },
     ) {
       const dependencies = yield* RemoteDependencies;
       const host = yield* this.authenticateHost(hostId, machineToken);
       const signal = dependencies.signal;
       if (!signal) return yield* remoteSignalNotConfigured();
+      if (placement.signalHome === null && host.signal_home !== null)
+        yield* remoteCall(() =>
+          dependencies.database
+            .prepare("UPDATE remote_hosts SET signal_home = NULL WHERE host_id = ?")
+            .bind(hostId)
+            .run(),
+        );
       const home = placement.signalHome ? yield* this.#placeHost(host, signal, placement.failedSignalUrl) : null;
       const issued = yield* dependencies.signer.issue({
         sessionId: `host-${hostId}`,
@@ -3187,16 +3199,18 @@ function remoteSignalNotConfigured(): RemoteControlPlaneError {
 }
 
 /**
- * The Signal URLs of the tickets, or null when `REMOTE_SIGNAL_URL` is not set or `REMOTE_SIGNAL_HOMES`
- * is invalid. A ticket request then fails with 503 and does not send a host to a wrong machine.
+ * The Signal URLs of the tickets, or null when `REMOTE_SIGNAL_URL` is not a ws or wss URL or
+ * `REMOTE_SIGNAL_HOMES` is invalid. A ticket request then fails with 503 and does not send a host to a wrong machine.
  */
 export function remoteSignalPlan(
   bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES">,
 ): RemoteSignalPlan | null {
   const entryUrl = bindings.REMOTE_SIGNAL_URL?.trim();
   if (!entryUrl) return null;
+  const entryProtocol = urlProtocol(entryUrl);
+  if (entryProtocol !== "wss:" && entryProtocol !== "ws:") return null;
   // Only a local development entry Signal without TLS permits homes without TLS.
-  const permitsWs = urlProtocol(entryUrl) === "ws:";
+  const permitsWs = entryProtocol === "ws:";
   const homes = new Map<string, string>();
   for (const entry of (bindings.REMOTE_SIGNAL_HOMES ?? "").split(",")) {
     if (!entry.trim()) continue;
