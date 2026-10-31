@@ -496,6 +496,29 @@ Migrations 17, 22, 23, 24 and 26 widen the table's provider `CHECK`. Migration 2
 new provider needs no table rebuild. `ProviderSessions.bindProviderSession` and the thread replay
 accept only `AGENT_PROVIDERS` and reject other values before they write an event or a row.
 
+### OpenCode configuration layers
+
+The OpenCode that OpenBot runs reads the normal OpenCode config files. OpenBot adds its own layer on
+top and does not change the files of the user. The layers merge in the order of the OpenCode
+documentation, and a later layer wins for a key that two layers set:
+
+1. The global config `~/.config/opencode/opencode.json`. It is shared with a personal OpenCode.
+2. The project config `opencode.json`. OpenCode looks for it in the working directory and then up,
+   to the nearest git root. The sessions that OpenBot starts use the agent workspace as the working
+   directory, so an `opencode.json` in `~/OpenBot` covers every workspace under `~/OpenBot/Agents`,
+   and an `opencode.json` in one workspace covers only that agent. A file in the workspace wins over
+   the shared file for the keys that both set, and keeps the other keys of the shared file. A git
+   root between the workspace and the file stops the search, so an agent workspace that is its own
+   git repository needs its own `opencode.json`.
+3. The inline config `OPENCODE_CONFIG_CONTENT`. `opencode-config.ts` writes it at each spawn: the
+   custom providers, the stored OpenCode Go key, and the permission layer of profile generation. It
+   sets no other key, so a user config keeps its `default_agent`, `model` and other settings.
+
+`opencode debug config` prints the resolved config and the path of each file layer. Checked with
+OpenCode 2.1.4: a project file two levels under the config file is found, a project file outside a
+git root is not, a workspace `default_agent` replaces the shared one, and a `model` that only the
+shared file sets stays in the merged result.
+
 ### Gemini
 
 The Gemini provider (id `antigravity`) starts Google's Antigravity ACP server

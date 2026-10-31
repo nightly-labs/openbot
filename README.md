@@ -171,6 +171,37 @@ keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select
 outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
 show these agents.
 
+You can change the settings of the OpenCode that OpenBot runs. Put an `opencode.json` file in
+`~/OpenBot`: OpenCode loads it for every workspace under `~/OpenBot/Agents`. To configure one agent
+only, put the file in that agent's workspace instead. A file in the workspace wins over the shared
+file for the keys that both set, and keeps the other keys of the shared file.
+
+For example, this shared file starts chats with the build agent and not with the plan agent:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "build"
+}
+```
+
+and this file in `~/OpenBot/Agents/<agent-id>` starts the chats of that one agent with the plan
+agent:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "plan"
+}
+```
+
+A git repository in an agent workspace stops the search above that workspace: the shared file in
+`~/OpenBot` then no longer applies to that agent, and it needs its own `opencode.json`. A git
+repository in `~/OpenBot` itself is fine: the search covers everything from the workspace up to
+that root. These files do not change your global OpenCode config in `~/.config/opencode`. See
+[OpenCode and ACP](docs/architecture/providers.md#opencode-and-acp) for
+the order of the config layers.
+
 Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity ACP server on
 this computer when you select Download on the Gemini row, because Google's license does not let
 OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
