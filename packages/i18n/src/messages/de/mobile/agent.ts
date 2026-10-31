@@ -328,6 +328,28 @@ export const messages = {
     "Skripten auf dem Host erlauben, Nachrichten zu senden, Routinen auszuführen, Fragen zu beantworten und Anfragen zu genehmigen oder abzulehnen",
   "mobile.agent.host.failed": "Diese Einstellung konnte nicht geändert werden.",
   "mobile.agent.host.unsupported": "Dieser Host kann diese Einstellungen nicht von einem Remote-Gerät aus ändern.",
+  "mobile.agent.backupModels.title": "Ersatzmodelle",
+  "mobile.agent.backupModels.valueAsk": "Erst fragen",
+  "mobile.agent.backupModels.valueAutomatic": "Automatisch",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Wenn {model} sein Nutzungslimit erreicht, bevor {name} zu schreiben beginnt, fragt {name} dich, welches Modell verwendet werden soll.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Wenn {model} sein Nutzungslimit erreicht oder mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge.",
+  "mobile.agent.backupModels.ask": "Vor dem Wechsel fragen",
+  "mobile.agent.backupModels.order": "Reihenfolge",
+  "mobile.agent.backupModels.empty": "Keine Reihenfolge festgelegt. {name} bietet jedes verfügbare Modell an.",
+  "mobile.agent.backupModels.add": "Ersatzmodell hinzufügen",
+  "mobile.agent.backupModels.search": "Modelle suchen",
+  "mobile.agent.backupModels.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "mobile.agent.backupModels.readFailed": "Die Ersatzmodelle konnten nicht gelesen werden.",
+  "mobile.agent.backupModels.moveUp": "{model} nach oben",
+  "mobile.agent.backupModels.moveDown": "{model} nach unten",
+  "mobile.agent.backupModels.remove": "{model} entfernen",
+  "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} wechselt nie, nachdem das Schreiben begonnen hat. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
   "mobile.agent.busyMessage.footer":
     "Was mit einer Nachricht passiert, die du sendest, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",
@@ -337,6 +359,23 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host-Standard (Steuern)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchlauf nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
+  "mobile.agent.taskLimit.label": "Parallele Threads",
+  "mobile.agent.taskLimit.footer": "Threads, die gleichzeitig laufen",
+  "mobile.agent.taskLimit.default": "Standard ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} führt immer nur einen Durchlauf aus. Die Threads dieses Agenten warten aufeinander.",
+  "mobile.agent.browserProfile.label": "Browser-Profil",
+  "mobile.agent.browserProfile.shared": "Gemeinsam",
+  "mobile.agent.browserProfile.own": "Nur dieser Agent",
+  "mobile.agent.browserProfile.missing": "Gelöschtes Profil",
+  "mobile.agent.browserProfile.new": "Neues Profil",
+  "mobile.agent.browserProfile.manage": "Profile verwalten",
+  "mobile.agent.browserProfile.footer":
+    "Jedes Profil hat eigene Anmeldungen und Cookies. Eine Änderung schließt die offenen Tabs des Agenten.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot konnte das Browser-Profil des Agenten nicht ändern.",
+  "mobile.agent.planCard.label": "Plan vor langen Aufgaben zeigen",
+  "mobile.agent.planCard.footer":
+    "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
   "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.notifications.failed": "Benachrichtigungen konnten nicht geändert werden",
@@ -357,6 +396,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden",
   "mobile.agent.newChat.failedBody": "Der Host konnte keinen neuen Chat starten.",
   "mobile.agent.newChat.unsupported": "Dieser Host kann keinen neuen Chat von einem Remote-Gerät aus starten.",
+  "mobile.agent.agentNewChat.title": "Agent startet neue Chats",
+  "mobile.agent.agentNewChat.footer":
+    "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "mobile.agent.tables.title": "Tabellen",
   "mobile.agent.tables.loading": "Tabellen werden geladen…",
   "mobile.agent.tables.reconnect": "Verbinde dich erneut, um die Tabellen zu laden.",

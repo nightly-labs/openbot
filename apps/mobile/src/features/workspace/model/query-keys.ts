@@ -14,7 +14,12 @@ type AgentRecordPart =
   | "storage"
   | "admin"
   | "host"
+  | "backup-models"
+  | "task-limit"
+  | "new-chat"
+  | "plan-card"
   | "publish"
+  | "browser-profile"
   | "folders";
 
 /**
@@ -24,8 +29,13 @@ type AgentRecordPart =
 export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "admin",
   "host",
+  "backup-models",
+  "task-limit",
+  "new-chat",
+  "plan-card",
   "session-settings",
   "provider-accounts",
+  "browser-profile",
   "folders",
 ];
 
@@ -130,6 +140,8 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
+  serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],

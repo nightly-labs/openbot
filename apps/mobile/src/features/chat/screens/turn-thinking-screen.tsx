@@ -1,10 +1,11 @@
 import { Stack, useLocalSearchParams } from "expo-router";
+import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
   Easing,
@@ -19,6 +20,7 @@ import { useTurnStepLines } from "@/features/workspace/components/use-agent-acti
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ChatMarkdown } from "../components/chat-markdown";
 import { turnDuration } from "../components/chat-turn-steps-row";
@@ -177,19 +179,44 @@ export function TurnThinkingScreen() {
     following.current = atEnd;
     if (atEnd) setBehind(false);
   }, []);
+  // iOS `scrollToEnd` sets an offset of 0 when the content is shorter than the sheet, and that puts
+  // the content under the transparent header. Content that fits below the header stays where the
+  // inset puts it. The sheet and the content can measure in either order, so both run the same check.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  // iOS: the transparent header covers the top of the sheet. Android: the header is above the sheet.
+  const coveredTop = isIOS ? headerHeight : 0;
+  const viewportHeight = useRef(0);
+  const contentHeight = useRef(0);
   // A finished turn opens at its first thought. A running turn opens at its newest text.
   const opened = useRef(false);
-  const onContentSizeChange = useCallback(() => {
-    const first = !opened.current;
-    if (first) {
-      opened.current = true;
-      following.current = running;
-    }
-    if (!running) return;
-    // The first scroll puts the sheet at the end at once. After it, a new step slides into view.
+  const placed = useRef(false);
+  const follow = useCallback(() => {
+    if (!running || viewportHeight.current === 0 || contentHeight.current === 0) return;
+    // The first measured pass puts the sheet at the end at once. After it, a new step slides into view.
+    const first = !placed.current;
+    placed.current = true;
+    if (contentHeight.current <= viewportHeight.current - coveredTop) return;
     if (following.current) scroll.current?.scrollToEnd({ animated: !first && !reducedMotion });
     else setBehind(true);
-  }, [running, reducedMotion]);
+  }, [running, reducedMotion, coveredTop]);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeight.current = event.nativeEvent.layout.height;
+      if (following.current) follow();
+    },
+    [follow],
+  );
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeight.current = height;
+      if (!opened.current) {
+        opened.current = true;
+        following.current = running;
+      }
+      follow();
+    },
+    [running, follow],
+  );
   const toLatest = useCallback(() => {
     following.current = true;
     setBehind(false);
@@ -210,7 +237,7 @@ export function TurnThinkingScreen() {
     : stepCount;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onLayout={onLayout}>
       <Stack.Screen options={{ title }} />
       <SheetScrollView
         scrollRef={scroll}

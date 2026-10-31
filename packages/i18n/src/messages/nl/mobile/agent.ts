@@ -321,6 +321,28 @@ export const messages = {
     "Laat scripts op de host berichten sturen, routines uitvoeren, vragen beantwoorden en goedkeuringen accepteren of weigeren",
   "mobile.agent.host.failed": "Kan deze instelling niet wijzigen.",
   "mobile.agent.host.unsupported": "Deze host kan deze instellingen niet wijzigen vanaf een extern apparaat.",
+  "mobile.agent.backupModels.title": "Reservemodellen",
+  "mobile.agent.backupModels.valueAsk": "Eerst vragen",
+  "mobile.agent.backupModels.valueAutomatic": "Automatisch",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "Als {model} de gebruikslimiet bereikt voordat {name} begint te schrijven, vraagt {name} je welk model het moet gebruiken.",
+  "mobile.agent.backupModels.introAutomatic":
+    "Als {model} de gebruikslimiet bereikt of een fout van de aanbieder geeft voordat {name} begint te schrijven, schakelt {name} over op het eerste beschikbare model in de volgorde.",
+  "mobile.agent.backupModels.ask": "Vragen voor overschakelen",
+  "mobile.agent.backupModels.order": "Volgorde",
+  "mobile.agent.backupModels.empty": "Geen volgorde ingesteld. {name} biedt elk beschikbaar model aan.",
+  "mobile.agent.backupModels.add": "Reservemodel toevoegen",
+  "mobile.agent.backupModels.search": "Modellen zoeken",
+  "mobile.agent.backupModels.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.backupModels.readFailed": "Kan de reservemodellen niet lezen.",
+  "mobile.agent.backupModels.moveUp": "{model} omhoog",
+  "mobile.agent.backupModels.moveDown": "{model} omlaag",
+  "mobile.agent.backupModels.remove": "{model} verwijderen",
+  "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} schakelt nooit over nadat het begint te schrijven. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
   "mobile.agent.busyMessage.footer":
     "Wat een bericht doet als je het stuurt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",
@@ -330,6 +352,23 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Hoststandaard (Bijsturen)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
+  "mobile.agent.taskLimit.label": "Parallelle threads",
+  "mobile.agent.taskLimit.footer": "Threads die tegelijk draaien",
+  "mobile.agent.taskLimit.default": "Standaard ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
+  "mobile.agent.browserProfile.label": "Browserprofiel",
+  "mobile.agent.browserProfile.shared": "Gedeeld",
+  "mobile.agent.browserProfile.own": "Alleen deze agent",
+  "mobile.agent.browserProfile.missing": "Verwijderd profiel",
+  "mobile.agent.browserProfile.new": "Nieuw profiel",
+  "mobile.agent.browserProfile.manage": "Profielen beheren",
+  "mobile.agent.browserProfile.footer":
+    "Elk profiel heeft eigen aanmeldingen en cookies. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot kon het browserprofiel van de agent niet wijzigen.",
+  "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
+  "mobile.agent.planCard.footer":
+    "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.notifications.failed": "Kan meldingen niet wijzigen",
@@ -350,6 +389,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Kan geen nieuwe chat starten",
   "mobile.agent.newChat.failedBody": "De host kan geen nieuwe chat starten.",
   "mobile.agent.newChat.unsupported": "Deze host kan geen nieuwe chat starten vanaf een extern apparaat.",
+  "mobile.agent.agentNewChat.title": "Agent start nieuwe chats",
+  "mobile.agent.agentNewChat.footer":
+    "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "mobile.agent.tables.title": "Tabellen",
   "mobile.agent.tables.loading": "Tabellen laden…",
   "mobile.agent.tables.reconnect": "Maak opnieuw verbinding om tabellen te laden.",

@@ -2185,7 +2185,12 @@ export async function createApplicationServices({
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
-  const browserProfiles = createBrowserProfileService({ store: browserProfileStore, agents: service, browser });
+  const browserProfiles = createBrowserProfileService({
+    store: browserProfileStore,
+    agents: service,
+    browser,
+    onChanged: () => service.notifyBrowserProfilesChanged(),
+  });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({

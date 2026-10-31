@@ -48,7 +48,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
-// the server timezone, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
+// the server timezone, the browser profiles, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
 // them through their own transport, so the path, body and decoding of each request are here once.
@@ -61,6 +61,7 @@ import {
   type AddedAgent,
   type AddMessagingOrchestratorResult,
   type AgentAdminSettings,
+  type AgentBrowserProfile,
   type AgentModelId,
   type AgentProviderId,
   type AgentStatus,
@@ -69,7 +70,10 @@ import {
   assertStorageUsageScope,
   type BitwardenConnectorStatus,
   type BitwardenHostConnectInput,
+  type BrowserProfileList,
+  type BrowserProfileSummary,
   type CancelMcpSignInInput,
+  type ClearBrowserDataInput,
   type ClearStorageInput,
   type ConnectProviderAccountInput,
   type CustomProviderResult,
@@ -77,6 +81,9 @@ import {
   type DeleteCustomProviderInput,
   type DeleteStoredFileInput,
   decodeAgentAdminSettings,
+  decodeAgentBrowserProfile,
+  decodeBrowserProfileList,
+  decodeBrowserProfileSummary,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostAddedAgent,
@@ -178,6 +185,8 @@ import {
   type TestMcpServerInput,
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
+  type UpdateAgentBrowserProfileInput,
+  type UpdateBrowserProfileInput,
   type UpdateHostIdentityInput,
   type UpdateRestartMode,
   type VaultHostImportResult,
@@ -212,6 +221,7 @@ import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-ins
 import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -1388,6 +1398,64 @@ export function importHostVaultCsv(
   csv: string,
 ): Effect.Effect<VaultHostImportResult, TeamAdminRequestError> {
   return adminCall(() => request("POST", VAULT_IMPORT_ROUTES.import, decodeHostVaultImport, { csv }));
+}
+
+/** The named browser profiles of the host, and the agents of its shared profile (`browser-profiles-v1`). */
+export function listHostBrowserProfiles(
+  request: TeamApiRequest,
+): Effect.Effect<BrowserProfileList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.list, decodeBrowserProfileList, {}));
+}
+
+export function createHostBrowserProfile(
+  request: TeamApiRequest,
+  name: string,
+): Effect.Effect<BrowserProfileSummary, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.create, decodeBrowserProfileSummary, { name }));
+}
+
+/** A new name, a new color, or both. Sign-ins and tabs stay. */
+export function updateHostBrowserProfile(
+  request: TeamApiRequest,
+  input: UpdateBrowserProfileInput,
+): Effect.Effect<BrowserProfileSummary, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.update, decodeBrowserProfileSummary, { ...input }));
+}
+
+/** Closes the tabs of the profile or the agent session and signs it out of every site. */
+export function clearHostBrowserData(
+  request: TeamApiRequest,
+  input: ClearBrowserDataInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.clear, ignoreResponse, { ...input }));
+}
+
+/** Deletes the profile and its data. Its agents change to the shared profile. */
+export function deleteHostBrowserProfile(
+  request: TeamApiRequest,
+  profileId: string,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.delete, ignoreResponse, { profileId }));
+}
+
+export function getHostAgentBrowserProfile(
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.Effect<AgentBrowserProfile, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.agent, decodeAgentBrowserProfile, { agentId }));
+}
+
+/** The host closes the open tabs of the agent. */
+export function updateHostAgentBrowserProfile(
+  request: TeamApiRequest,
+  input: UpdateAgentBrowserProfileInput,
+): Effect.Effect<AgentBrowserProfile, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", BROWSER_PROFILES_ROUTES.updateAgent, decodeAgentBrowserProfile, {
+      agentId: input.agentId,
+      profile: { ...input.profile },
+    }),
+  );
 }
 
 /** The host's Slack workspaces, Discord servers or Telegram chats (`connectors-v1`). */

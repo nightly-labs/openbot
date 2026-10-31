@@ -331,6 +331,28 @@ export const messages = {
     "Ana makinedeki betiklerin mesaj göndermesine, rutinleri çalıştırmasına, soruları yanıtlamasına ve onay isteklerini kabul etmesine veya reddetmesine izin verin",
   "mobile.agent.host.failed": "Bu ayar değiştirilemedi.",
   "mobile.agent.host.unsupported": "Bu ana makine bu ayarları uzak bir cihazdan değiştiremez.",
+  "mobile.agent.backupModels.title": "Yedek modeller",
+  "mobile.agent.backupModels.valueAsk": "Önce sor",
+  "mobile.agent.backupModels.valueAutomatic": "Otomatik",
+  "mobile.agent.backupModels.valueCount": { one: "{mode} · {count}", other: "{mode} · {count}" },
+  "mobile.agent.backupModels.intro":
+    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa {name} hangi modelin kullanılacağını size sorar.",
+  "mobile.agent.backupModels.introAutomatic":
+    "{model}, {name} yazmaya başlamadan önce kullanım sınırına ulaşırsa veya bir sağlayıcı hatasıyla başarısız olursa {name} sıradaki ilk uygun modele geçer.",
+  "mobile.agent.backupModels.ask": "Değiştirmeden önce sor",
+  "mobile.agent.backupModels.order": "Sıra",
+  "mobile.agent.backupModels.empty": "Sıra ayarlanmadı. {name} uygun her modeli sunar.",
+  "mobile.agent.backupModels.add": "Yedek model ekle",
+  "mobile.agent.backupModels.search": "Modellerde ara",
+  "mobile.agent.backupModels.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.backupModels.readFailed": "Yedek modeller okunamadı.",
+  "mobile.agent.backupModels.moveUp": "{model} modelini yukarı taşı",
+  "mobile.agent.backupModels.moveDown": "{model} modelini aşağı taşı",
+  "mobile.agent.backupModels.remove": "{model} modelini kaldır",
+  "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
+  "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.note":
+    "{name} yazmaya başladıktan sonra asla model değiştirmez. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
     "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
@@ -340,6 +362,23 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Ana makine varsayılanı (Yönlendir)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
+  "mobile.agent.taskLimit.label": "Paralel mesaj dizileri",
+  "mobile.agent.taskLimit.footer": "Aynı anda çalışan mesaj dizileri",
+  "mobile.agent.taskLimit.default": "Varsayılan ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
+  "mobile.agent.browserProfile.label": "Tarayıcı profili",
+  "mobile.agent.browserProfile.shared": "Ortak",
+  "mobile.agent.browserProfile.own": "Yalnızca bu ajan",
+  "mobile.agent.browserProfile.missing": "Silinmiş profil",
+  "mobile.agent.browserProfile.new": "Yeni profil",
+  "mobile.agent.browserProfile.manage": "Profilleri yönet",
+  "mobile.agent.browserProfile.footer":
+    "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
+  "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
+  "mobile.agent.planCard.footer":
+    "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.notifications.failed": "Bildirimler değiştirilemedi",
@@ -361,6 +400,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Yeni bir sohbet başlatılamadı",
   "mobile.agent.newChat.failedBody": "Ana makine yeni bir sohbet başlatamadı.",
   "mobile.agent.newChat.unsupported": "Bu ana makine uzak bir cihazdan yeni sohbet başlatamaz.",
+  "mobile.agent.agentNewChat.title": "Ajan yeni sohbetler başlatır",
+  "mobile.agent.agentNewChat.footer":
+    "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "mobile.agent.tables.title": "Tablolar",
   "mobile.agent.tables.loading": "Tablolar yükleniyor…",
   "mobile.agent.tables.reconnect": "Tabloları yüklemek için yeniden bağlanın.",

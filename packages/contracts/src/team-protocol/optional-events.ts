@@ -5,6 +5,7 @@ import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./age
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
+import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 // Events that optional capabilities add outside the frozen base event vocabularies. The base event
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
@@ -23,6 +24,7 @@ export type OptionalTeamEvent =
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | BrowserPageStateEvent
+  | BrowserProfilesEvent
   | BrowserUserControlEvent
   | AgentTasksEvent
   | ChannelEvent
@@ -50,6 +52,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     browserPageStateEvent(value) ??
+    browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
     channelEvent(value) ??

@@ -75,6 +75,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.question.privateAnswer": "Private answer",
   "mobile.chat.question.answerForm": "Answer form",
   "mobile.chat.question.answersSent": "Answers sent",
+  "mobile.chat.question.autoAction": "{action} · {seconds} s",
+  "mobile.chat.question.autoAnswered": "{outcome} (nobody answered in time)",
   "mobile.chat.question.formCancelled": "Form cancelled",
   "mobile.chat.question.formExpired": "Form expired",
   "mobile.chat.question.form": "Question form",

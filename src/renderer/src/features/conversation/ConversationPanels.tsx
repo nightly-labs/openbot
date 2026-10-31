@@ -495,7 +495,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local"}
-              quickAcknowledgementEditable={props.server?.kind === "local"}
+              quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
