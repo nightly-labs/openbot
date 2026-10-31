@@ -783,7 +783,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                   when={routines().length > 0}
                   fallback={<p class="agent-routines-empty">{t("routine.settings.empty")}</p>}
                 >
-                  <HostedUpsellRoutinesNotice count={routines().filter((routine) => routine.active).length} />
                   <div class="agent-routines-list">
                     <For each={routines()}>
                       {(routine) => (
@@ -1130,6 +1129,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           )}
         </Show>
       </div>
+      {/* Out of the scroll area, so the offer stays at the bottom of the panel. */}
+      <Show when={!draft() && !loading()}>
+        <div class="agent-routines-footer">
+          <HostedUpsellRoutinesNotice count={routines().filter((routine) => routine.active).length} />
+        </div>
+      </Show>
       <ConfirmDialog
         open={pendingExit() !== null}
         onCancel={() => setPendingExit(null)}

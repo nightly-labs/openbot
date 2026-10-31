@@ -282,6 +282,15 @@
   display: none;
 }
 
+.agent-routines-footer {
+  flex: none;
+  padding: 0 15px 15px;
+}
+
+.agent-routines-footer:empty {
+  display: none;
+}
+
 .agent-routine-editor {
   display: grid;
   gap: 14px;
