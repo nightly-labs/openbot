@@ -125,16 +125,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT is gedownload, maar kon niet worden gestart. Download het opnieuw in OpenBot.",
   "error.provider.codexMissing": "ChatGPT is niet gedownload. Download het in OpenBot om door te gaan.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd: {settings}. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd: {settings}. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex heeft {count} instelling in de configuratie genegeerd. Corrigeer of verwijder deze, of werk Codex bij.",
-    other:
-      "Codex heeft {count} instellingen in de configuratie genegeerd. Corrigeer of verwijder ze, of werk Codex bij.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} is te oud. OpenBot vereist 2.1.232 of nieuwer.",
   "error.provider.claudeNotStarted": "Claude CLI is gevonden, maar kon niet worden gestart.",
   "error.provider.claudeNotStartedHint":
@@ -195,6 +185,10 @@ export const messages = {
     "OpenCode heeft geen inlog voor de modelaanbieder “{provider}”. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
+  "error.provider.customEndpointKeyRefused":
+    "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointKeyMissing":
+    "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":

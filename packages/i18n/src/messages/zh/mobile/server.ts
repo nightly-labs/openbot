@@ -799,9 +799,8 @@ export const messages = {
   "mobile.server.usage.agents": "助手",
   "mobile.server.usage.agentLine": "{tokens} 个 token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "该时间范围内没有助手用量记录。",
-  "mobile.server.usage.allAgents": "全部助手",
-  "mobile.server.usage.agent": "助手",
   "mobile.server.usage.unsupported": "这台主机不支持用量分析。请更新主机后使用该视图。",
+  "mobile.server.usage.planLimitsNote": "各提供商的当前限额。下方的时间范围不会改变它们。",
   // The plan limits of the host's providers: the rings in the home header and their sheet. {time} is a date.
   "mobile.server.planLimits.title": "套餐额度",
   "mobile.server.planLimits.button": "套餐额度：{summary}",

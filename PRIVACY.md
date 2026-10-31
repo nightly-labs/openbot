@@ -71,6 +71,11 @@ Stripe reports, the place in the app where the plans were opened, the server siz
 and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
+When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
+is cancelled or resumed), the account service also sets your normalized account email on the OpenPanel
+profile of your account ID, as the apps do at sign-in. It does this also when product analytics is
+off on your devices, so that the paid account is not anonymous in the sales data. The email is not
+copied into the events.
 
 For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
 message or a welcome email), it sends OpenPanel one event with the kind of email and the result of the send. This

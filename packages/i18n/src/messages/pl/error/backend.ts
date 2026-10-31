@@ -67,6 +67,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
   "error.backend.channelTaskComplete": "To zadanie jest już ukończone.",
+  "error.backend.channelTaskNotStopped": "Anulować można tylko zatrzymane lub nieudane zadanie.",
   "error.backend.channelSelectAgent": "Wybierz agenta.",
   "error.backend.channelLeadRequired": "Wybierz dostępnego lidera kanału lub przydziel to zadanie członkowi.",
   "error.backend.channelRoutingTooLong":

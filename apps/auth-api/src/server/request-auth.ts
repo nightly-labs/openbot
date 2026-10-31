@@ -47,6 +47,7 @@ function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input, init) => fetch(input, init),
     schedule,
+    database: bindings.DB,
   });
 }
 

@@ -89,6 +89,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Bitiş tarihi",
   "mobile.agent.usage.unsupported": "Bu ana makine ajan analizlerini desteklemiyor.",
   "mobile.agent.info.usage.title": "Kullanım",
+  "mobile.agent.info.usage.agentTitle": "Kullanım · {name}",
   "mobile.agent.info.usage.loading": "Kullanım yükleniyor…",
   "mobile.agent.info.usage.reconnect": "Kullanımı yüklemek için yeniden bağlanın.",
   "mobile.agent.info.usage.failed": "Kullanım yüklenemedi.",

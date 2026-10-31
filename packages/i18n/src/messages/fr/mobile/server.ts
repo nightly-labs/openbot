@@ -874,10 +874,10 @@ export const messages = {
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "Jetons : {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Aucune utilisation d’agent enregistrée sur cette période.",
-  "mobile.server.usage.allAgents": "Tous les agents",
-  "mobile.server.usage.agent": "Agent",
   "mobile.server.usage.unsupported":
     "Cet hôte ne prend pas en charge les statistiques d’utilisation. Mettez à jour l’hôte pour utiliser cette vue.",
+  "mobile.server.usage.planLimitsNote":
+    "Les limites actuelles de chaque fournisseur. La période ci-dessous ne les change pas.",
   "mobile.server.planLimits.title": "Limites du forfait",
   "mobile.server.planLimits.button": "Limites du forfait : {summary}",
   "mobile.server.planLimits.left": "{percent} % restants",

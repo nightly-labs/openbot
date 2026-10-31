@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import {
   type ClientSideConnection,
   type ContentBlock,
@@ -36,7 +36,7 @@ import {
   sessionSettingsSnapshot,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpFlavor } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor } from "./acp-flavor";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { type AgentProvider, type DiagnosticOrigin, ProviderTurnActiveError } from "./agent-client";
@@ -103,6 +103,13 @@ const SESSION_LIST_PAGES = 50;
 
 /** Maximum replay work waiting for the storage consumer before the import fails safely. */
 const ACP_HISTORY_REPLAY_QUEUE_LIMIT = 256;
+
+/**
+ * The base64 audio characters one prompt sends inline to an agent that advertises audio input.
+ * Gemini takes about 20 MB a request, text included, so 1 MB stays free for the prompt text.
+ * Audio over the limit reaches the agent as its path only.
+ */
+const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
 
 /**
  * How long a turn may send nothing, with no tool call open and no question to the user, before
@@ -341,8 +348,8 @@ export interface AcpProviderOptions {
   additionalModels?: () => Effect.Effect<AcpModel[]>;
   /** The name to show for a listed model, from its id and the name that the agent sent. */
   modelName?: (id: string, name: string) => string;
-  /** The name to show for the provider of a model, when it is not this agent's own (a custom endpoint). */
-  providerName?: (modelId: string | null) => string | null;
+  /** The custom endpoint that serves a model, when the provider is not this agent's own. */
+  customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null;
   /**
    * Values to mask in every diagnostic and error this client emits, read at each use: the custom
    * agent's environment values, which have no secret name that `redactText` could know them by.
@@ -878,7 +885,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const connection = yield* providerSync(() => this.#requireConnection());
     if (this.#privateSession?.connection !== connection) {
       const { sessionId } = yield* providerCall(() =>
-        connection.newSession({ cwd: this.options.discoveryCwd?.() ?? process.cwd(), mcpServers: [] }),
+        connection.newSession({
+          cwd: this.options.discoveryCwd?.() ?? process.cwd(),
+          mcpServers: [],
+          ...(this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {}),
+        }),
       );
       this.#privateSession = { connection, sessionId };
     }
@@ -1084,7 +1095,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // as a turn of its own, which OpenBot did not start. The message then waits in the queue.
         if (!thread || !turn || turn.id !== getString(params, "expectedTurnId") || turn.stopped || turn.completing)
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
-        const blocks = yield* promptBlocksEffect(params);
+        const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
         yield* steer(this.#sessionConnection(thread), {
           sessionId: threadId,
           messageId: getString(params, "clientUserMessageId"),
@@ -1361,6 +1372,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization?.agentCapabilities?.loadSession === true;
   }
 
+  /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
+  get #acceptsAudio(): boolean {
+    return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
+  }
+
   /** Whether the agent can resume without replaying its transcript. */
   get #supportsSessionResume(): boolean {
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
@@ -1478,6 +1494,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             // Sent only to an agent that advertises them: Grok 1.0.60 refuses them on every session
             // request, so each new Grok session failed.
             const directories = this.#acceptsAdditionalDirectories ? { additionalDirectories } : {};
+            const meta = this.#flavor.sessionMeta ? { _meta: this.#flavor.sessionMeta } : {};
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
@@ -1517,7 +1534,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 yield* Effect.result(
                   this.#restoreSessionEffect(
                     connection,
-                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers },
+                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
                     this.#supportsSessionResume ? "resume" : "load",
                   ),
                 ),
@@ -1527,7 +1544,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId = currentModelFromSessionSetup(response);
             } else {
               const response = providerResult(
-                yield* Effect.result(providerCall(() => connection().newSession({ cwd, ...directories, mcpServers }))),
+                yield* Effect.result(
+                  providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
+                ),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -1556,7 +1575,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               agentId,
               idleRelease: null,
               idleSince: 0,
-              restore: { cwd, ...directories, mcpServers },
+              restore: { cwd, ...directories, mcpServers, ...meta },
               shownIds: new Set(),
               backgroundUntil: 0,
               backgroundUpdatedAt: null,
@@ -1949,7 +1968,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#applyTurnSettings(thread, params);
     this.#publishSessionSettings(thread);
     const turnId = getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID();
-    const blocks = yield* promptBlocksEffect(params);
+    const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
     yield* providerSync(() => this.#requireServedModel(thread));
     // The session keeps the instructions in its context, so a prompt carries them only when the
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
@@ -2509,7 +2528,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn,
         "failed",
         sourceText("error.agent.turnStalled", {
-          provider: this.options.providerName?.(thread.currentModelId) ?? this.#label,
+          provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
         }),
       );
     }
@@ -2788,6 +2807,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (text) => this.#redact(text),
           (text) => this.emit("diagnostic", this.#redact(text)),
           thread.currentModelId,
+          this.options.customEndpoint?.(thread.currentModelId) ?? null,
         ) ?? detail;
       this.emit("notification", {
         method: "error",
@@ -2976,13 +2996,26 @@ function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
   );
 }
 
-const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown) {
+/**
+ * The ACP blocks of a prompt. An agent that advertises audio input also gets attached audio as an
+ * audio block, so the model hears it. The path stays in the prompt for the agent's tools.
+ */
+const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (params: unknown, acceptsAudio: boolean) {
   const blocks: ContentBlock[] = [];
+  let audioBase64Bytes = 0;
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
     if (item.type === "mention" && isString(item.path)) {
-      blocks.push({ type: "text", text: `Attached local file: ${item.path}` });
+      const path = item.path;
+      blocks.push({ type: "text", text: `Attached local file: ${path}` });
+      const mimeType = attachmentMimeTypeForName(path);
+      if (!acceptsAudio || !mimeType.startsWith("audio/")) continue;
+      const { size } = yield* providerCall(() => stat(path));
+      if (audioBase64Bytes + Math.ceil(size / 3) * 4 > ACP_PROMPT_AUDIO_BASE64_BYTES) continue;
+      const data = (yield* providerCall(() => readFile(path))).toString("base64");
+      audioBase64Bytes += data.length;
+      blocks.push({ type: "audio", data, mimeType });
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;

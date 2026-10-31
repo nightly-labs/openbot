@@ -546,6 +546,7 @@ import type {
   LicenseState,
   LicenseUsersRequest,
 } from "./license";
+import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
 
 declare const payloadType: unique symbol;
@@ -927,6 +928,8 @@ export const IPC_ENDPOINTS = {
 
     list: request<MarketplaceSkillQuery | undefined, MarketplaceSkillPage>()("skills:list"),
     get: request<string, MarketplaceSkillDetail>()("skills:get"),
+    // The skill a shared link names, by its slug.
+    getBySlug: request<string, MarketplaceSkillDetail>()("skills:get-by-slug"),
     listMine: request<undefined, SkillSubmission[]>()("skills:list-mine"),
     choosePackage: request<undefined, SkillPackagePreview | null>()("skills:choose-package"),
     submit: request<SubmitSkillInput, SkillSubmission>()("skills:submit"),
@@ -1278,6 +1281,9 @@ export const IPC_ENDPOINTS = {
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
     get: request<string, MarketplaceAgentDetail>()("marketplace-agents:get"),
+    // The agent a shared link names: the approved version, else the one that waits for its first
+    // review, with `pending`. Only a link opens it; the catalog reads `get`.
+    getListing: request<string, MarketplaceAgentDetail>()("marketplace-agents:get-listing"),
     listMine: request<undefined, AgentSubmission[]>()("marketplace-agents:list-mine"),
     preview: request<string, AgentPublicationPreview>()("marketplace-agents:preview"),
     submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()("marketplace-agents:submit"),
@@ -1807,6 +1813,12 @@ export const IPC_ENDPOINTS = {
     takePendingListing: request<undefined, string | null>()("plugins:take-pending-listing"),
     openListing: event<string>()("plugins:open-listing"),
   },
+  // The Marketplace agent and skill deep link, as `plugins`: the registrar holds the pending link.
+  // There is no endpoint that adds from a link; adding is still a press of Add on the listing page.
+  marketplace: {
+    takePendingListing: request<undefined, MarketplaceListingLink | null>()("marketplace:take-pending-listing"),
+    openListing: event<MarketplaceListingLink>()("marketplace:open-listing"),
+  },
   host: {
     getStatus: request<undefined, HostStatus>()("host:get-status"),
     configure: request<ConfigureHostInput, HostStatus>()("host:configure"),
@@ -1927,6 +1939,7 @@ export const IPC_GROUP_PATHS = {
   agentImport: "agentImport",
   instanceTransfer: "instanceTransfer",
   plugins: "plugins",
+  marketplace: "marketplace",
   host: "host",
   events: "events",
   remoteDesktop: "remoteDesktop",

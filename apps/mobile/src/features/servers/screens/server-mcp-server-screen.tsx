@@ -1,14 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { McpKeyValue, McpServerConfig, McpTestResult, McpTransport } from "@openbot/contracts/ipc";
+import type { McpServerConfig, McpTestResult, McpTransport } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { Button, Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import X from "lucide-react-native/icons/x";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Alert, type TextInputProps, View } from "react-native";
+import { Typography } from "heroui-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { ListField, PairField } from "@/features/servers/components/repeatable-fields";
 import {
   type McpServerDraft,
   mcpServerConfig,
@@ -251,7 +250,7 @@ function McpServerForm({
             hint={t("mobile.server.mcp.commandHint")}
             onChangeText={(command) => edit({ command })}
           />
-          <McpListField
+          <ListField
             title={t("mobile.server.mcp.arguments")}
             footer={t("mobile.server.mcp.argumentsHint")}
             items={draft.args}
@@ -263,13 +262,15 @@ function McpServerForm({
             disabled={locked}
             onChange={(args) => edit({ args })}
           />
-          <McpPairField
+          <PairField
             title={t("mobile.server.mcp.environment")}
             footer={t("mobile.server.mcp.environmentHint")}
             items={draft.env}
             maxItems={INPUT_LIMITS.mcpEnvVariables}
             maxKeyLength={INPUT_LIMITS.mcpEnvName}
             maxValueLength={INPUT_LIMITS.mcpEnvValue}
+            keyPlaceholder={t("mobile.server.mcp.key")}
+            valuePlaceholder={t("mobile.server.mcp.value")}
             addLabel={t("mobile.server.mcp.addVariable")}
             keyLabel={(position) => t("mobile.server.mcp.variableKey", { position })}
             valueLabel={(position) => t("mobile.server.mcp.variableValue", { position })}
@@ -277,7 +278,7 @@ function McpServerForm({
             disabled={locked}
             onChange={(env) => edit({ env })}
           />
-          <McpListField
+          <ListField
             title={t("mobile.server.mcp.passthrough")}
             footer={t("mobile.server.mcp.passthroughHint", { server: mcp.server?.name ?? "" })}
             items={draft.envPassthrough}
@@ -317,13 +318,15 @@ function McpServerForm({
             hint={draft.url.trim() && errors.url ? t("mobile.server.mcp.urlInvalid") : undefined}
             onChangeText={(url) => edit({ url })}
           />
-          <McpPairField
+          <PairField
             title={t("mobile.server.mcp.headers")}
             footer={t("mobile.server.mcp.headersHint")}
             items={draft.headers}
             maxItems={INPUT_LIMITS.mcpHeaders}
             maxKeyLength={INPUT_LIMITS.mcpEnvName}
             maxValueLength={INPUT_LIMITS.mcpHeaderValue}
+            keyPlaceholder={t("mobile.server.mcp.key")}
+            valuePlaceholder={t("mobile.server.mcp.value")}
             addLabel={t("mobile.server.mcp.addHeader")}
             keyLabel={(position) => t("mobile.server.mcp.headerName", { position })}
             valueLabel={(position) => t("mobile.server.mcp.headerValue", { position })}
@@ -405,215 +408,5 @@ function McpServerForm({
         </SettingsSection>
       ) : null}
     </SettingsContent>
-  );
-}
-
-/**
- * The row keys of a list that the user edits. The list changes only through its field, so the keys
- * follow each add and remove, and a field keeps its focus when a row above it goes.
- */
-function useRowKeys(count: number) {
-  const next = useRef(count);
-  const [keys, setKeys] = useState(() => Array.from({ length: count }, (_, index) => index));
-  return {
-    keys,
-    add: () => setKeys((current) => [...current, next.current++]),
-    remove: (index: number) => setKeys((current) => current.filter((_, position) => position !== index)),
-  };
-}
-
-/** One item of a list field: its inputs and the remove button. */
-function McpListRow({
-  removeLabel,
-  disabled,
-  onRemove,
-  children,
-}: {
-  removeLabel: string;
-  disabled: boolean;
-  onRemove: () => void;
-  children: ReactNode;
-}) {
-  const muted = useThemeColor("muted");
-  return (
-    <View className="flex-row items-center pr-2">
-      <View className="min-w-0 flex-1 flex-row items-center">{children}</View>
-      <Button
-        isIconOnly
-        variant="ghost"
-        size="sm"
-        isDisabled={disabled}
-        accessibilityLabel={removeLabel}
-        onPress={() => {
-          void haptics.selection();
-          onRemove();
-        }}
-      >
-        <X color={String(muted)} size={18} />
-      </Button>
-    </View>
-  );
-}
-
-/** The last row of a list field. */
-function McpAddRow({ label, disabled, onPress }: { label: string; disabled: boolean; onPress: () => void }) {
-  return (
-    <SettingsRow disclosure={false} disabled={disabled} onPress={onPress}>
-      <Typography.Paragraph className="text-accent">{label}</Typography.Paragraph>
-    </SettingsRow>
-  );
-}
-
-/** A list of single values, as the desktop form has: one field for each item. */
-function McpListField({
-  title,
-  footer,
-  items,
-  maxItems,
-  maxLength,
-  autoCapitalize = "none",
-  addLabel,
-  itemLabel,
-  removeLabel,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  footer: string;
-  items: string[];
-  maxItems: number;
-  maxLength: number;
-  autoCapitalize?: TextInputProps["autoCapitalize"];
-  addLabel: string;
-  itemLabel: (position: number) => string;
-  removeLabel: (position: number) => string;
-  disabled: boolean;
-  onChange: (items: string[]) => void;
-}) {
-  const rows = useRowKeys(items.length);
-  return (
-    <SettingsSection title={title} footer={footer}>
-      {items.map((value, index) => (
-        <McpListRow
-          key={rows.keys[index]}
-          removeLabel={removeLabel(index + 1)}
-          disabled={disabled}
-          onRemove={() => {
-            rows.remove(index);
-            onChange(items.filter((_, position) => position !== index));
-          }}
-        >
-          <View className="min-w-0 flex-1">
-            <SheetFormField
-              hideLabel
-              appearance="soft"
-              label={itemLabel(index + 1)}
-              placeholder={itemLabel(index + 1)}
-              autoCapitalize={autoCapitalize}
-              autoCorrect={false}
-              maxLength={maxLength}
-              editable={!disabled}
-              value={value}
-              onChangeText={(next) => onChange(items.map((item, position) => (position === index ? next : item)))}
-            />
-          </View>
-        </McpListRow>
-      ))}
-      <McpAddRow
-        label={addLabel}
-        disabled={disabled || items.length >= maxItems}
-        onPress={() => {
-          rows.add();
-          onChange([...items, ""]);
-        }}
-      />
-    </SettingsSection>
-  );
-}
-
-/** A list of name and value pairs, as the desktop form has: two fields for each item. */
-function McpPairField({
-  title,
-  footer,
-  items,
-  maxItems,
-  maxKeyLength,
-  maxValueLength,
-  addLabel,
-  keyLabel,
-  valueLabel,
-  removeLabel,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  footer: string;
-  items: McpKeyValue[];
-  maxItems: number;
-  maxKeyLength: number;
-  maxValueLength: number;
-  addLabel: string;
-  keyLabel: (position: number) => string;
-  valueLabel: (position: number) => string;
-  removeLabel: (position: number) => string;
-  disabled: boolean;
-  onChange: (items: McpKeyValue[]) => void;
-}) {
-  const { t } = useText();
-  const rows = useRowKeys(items.length);
-  const change = (index: number, part: Partial<McpKeyValue>) =>
-    onChange(items.map((item, position) => (position === index ? { ...item, ...part } : item)));
-  return (
-    <SettingsSection title={title} footer={footer}>
-      {items.map((pair, index) => (
-        <McpListRow
-          key={rows.keys[index]}
-          removeLabel={removeLabel(index + 1)}
-          disabled={disabled}
-          onRemove={() => {
-            rows.remove(index);
-            onChange(items.filter((_, position) => position !== index));
-          }}
-        >
-          <View className="min-w-0 flex-1">
-            <SheetFormField
-              hideLabel
-              appearance="soft"
-              label={keyLabel(index + 1)}
-              placeholder={t("mobile.server.mcp.key")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={maxKeyLength}
-              editable={!disabled}
-              value={pair.key}
-              onChangeText={(key) => change(index, { key })}
-            />
-          </View>
-          <View className="h-6 w-px bg-grouped-border" />
-          <View className="min-w-0 flex-1">
-            <SheetFormField
-              hideLabel
-              appearance="soft"
-              label={valueLabel(index + 1)}
-              placeholder={t("mobile.server.mcp.value")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={maxValueLength}
-              editable={!disabled}
-              value={pair.value}
-              onChangeText={(value) => change(index, { value })}
-            />
-          </View>
-        </McpListRow>
-      ))}
-      <McpAddRow
-        label={addLabel}
-        disabled={disabled || items.length >= maxItems}
-        onPress={() => {
-          rows.add();
-          onChange([...items, { key: "", value: "" }]);
-        }}
-      />
-    </SettingsSection>
   );
 }

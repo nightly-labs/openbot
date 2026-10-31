@@ -67,6 +67,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "参照先のチャンネルメッセージを使用できません。",
   "error.backend.channelTaskNotFound": "チャンネルのタスクが見つかりません。",
   "error.backend.channelTaskComplete": "このタスクはすでに完了しています。",
+  "error.backend.channelTaskNotStopped": "キャンセルできるのは、停止したタスクか失敗したタスクだけです。",
   "error.backend.channelSelectAgent": "エージェントを選択してください。",
   "error.backend.channelLeadRequired":
     "使用できるチャンネルリードを選択するか、このタスクをメンバーに割り当ててください。",

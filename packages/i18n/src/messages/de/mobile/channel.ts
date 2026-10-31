@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "Pausiert",
   "mobile.channel.task.resume": "Fortsetzen",
   "mobile.channel.task.reassign": "Neu zuweisen",
+  "mobile.channel.task.cancel": "Aufgabe abbrechen",
   "mobile.channel.loadFailed": "Die Kanäle konnten nicht geladen werden. Versuche es erneut.",
   "mobile.channel.actions.historyStale":
     "Die Aufgabe wurde geändert, aber der Chatverlauf konnte nicht aktualisiert werden.",

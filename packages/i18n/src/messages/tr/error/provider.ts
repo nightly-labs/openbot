@@ -126,15 +126,6 @@ export const messages = {
     "Codex CLI bulundu ancak başlatılamadı. Yeni bir terminalde `codex --version` komutunu çalıştırın.",
   "error.provider.codexManagedNotStarted": "ChatGPT indirildi ancak başlatılamadı. OpenBot içinde yeniden indirin.",
   "error.provider.codexMissing": "ChatGPT indirilmedi. Devam etmek için OpenBot içinde indirin.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other:
-      "Codex yapılandırmasındaki {count} ayarı yok saydı: {settings}. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-    other: "Codex yapılandırmasındaki {count} ayarı yok saydı. Düzeltin veya kaldırın ya da Codex'i güncelleyin.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} çok eski. OpenBot 2.1.232 veya daha yenisini gerektirir.",
   "error.provider.claudeNotStarted": "Claude CLI bulundu ancak başlatılamadı.",
   "error.provider.claudeNotStartedHint":
@@ -196,6 +187,10 @@ export const messages = {
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.customEndpointKeyRefused":
+    '"{provider}" uç noktası API anahtarını veya başlıklarını reddetti. Bunları Sunucu ayarları → Sağlayıcılar bölümünde yeniden girin, ardından tekrar deneyin.',
+  "error.provider.customEndpointKeyMissing":
+    '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeServiceFailure":

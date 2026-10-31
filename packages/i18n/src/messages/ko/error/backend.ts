@@ -65,6 +65,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
   "error.backend.channelTaskNotFound": "채널 작업을 찾을 수 없어요.",
   "error.backend.channelTaskComplete": "이 작업은 이미 완료되었어요.",
+  "error.backend.channelTaskNotStopped": "중지되었거나 실패한 작업만 취소할 수 있어요.",
   "error.backend.channelSelectAgent": "에이전트를 선택하세요.",
   "error.backend.channelLeadRequired": "사용 가능한 채널 리더를 선택하거나 이 작업을 멤버에게 배정하세요.",
   "error.backend.channelRoutingTooLong":

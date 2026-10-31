@@ -28,6 +28,7 @@ import {
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
@@ -289,5 +290,40 @@ describe("app decoding", () => {
 
   it.each(malformed)("rejects %s", (_name, decode, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
+  });
+});
+
+const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+// A Marketplace link began in a URL a web page chose. Only an agent id or a skill slug of the right
+// form reaches the renderer, with no other field; anything else is no link at all.
+describe("pending Marketplace listing", () => {
+  it.each([
+    ["an agent", { kind: "agent", id: AGENT_ID }],
+    ["a skill", { kind: "skill", id: "release-notes" }],
+  ])("keeps %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toEqual(value);
+  });
+
+  it("drops a field main did not name", () => {
+    expect(decodePendingMarketplaceListing({ kind: "skill", id: "release-notes", install: true })).toEqual({
+      kind: "skill",
+      id: "release-notes",
+    });
+  });
+
+  it.each([
+    ["no link", null],
+    ["a bare slug", "release-notes"],
+    ["an unknown kind", { kind: "plugin", id: "release-notes" }],
+    ["an agent with a slug", { kind: "agent", id: "release-notes" }],
+    ["an agent id in upper case", { kind: "agent", id: AGENT_ID.toUpperCase() }],
+    ["a skill with a path", { kind: "skill", id: "../account" }],
+    ["a skill with a dot", { kind: "skill", id: "notes.md" }],
+    ["a skill slug over 64 characters", { kind: "skill", id: "a".repeat(65) }],
+    ["an empty id", { kind: "skill", id: "" }],
+    ["an id that is not text", { kind: "agent", id: 42 }],
+  ])("refuses %s", (_name, value) => {
+    expect(decodePendingMarketplaceListing(value)).toBeNull();
   });
 });

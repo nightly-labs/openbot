@@ -99,4 +99,5 @@ export const messages = defineMessages("account", {
   "account.language.previous": "Previous language",
   "account.language.next": "Next language",
   "account.language.continue": "Continue",
+  "account.language.change": "Change language",
 });

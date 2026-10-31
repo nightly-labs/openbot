@@ -66,6 +66,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
+  "error.backend.channelTaskNotStopped": "Yalnızca durdurulmuş veya başarısız bir görev iptal edilebilir.",
   "error.backend.channelSelectAgent": "Bir ajan seçin.",
   "error.backend.channelLeadRequired": "Kullanılabilir bir kanal lideri seçin veya bu görevi bir üyeye atayın.",
   "error.backend.channelRoutingTooLong":

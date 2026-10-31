@@ -67,6 +67,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
   "error.backend.channelTaskNotFound": "No se encontró la tarea del canal.",
   "error.backend.channelTaskComplete": "Esta tarea ya está completada.",
+  "error.backend.channelTaskNotStopped": "Solo se puede cancelar una tarea detenida o fallida.",
   "error.backend.channelSelectAgent": "Selecciona un agente.",
   "error.backend.channelLeadRequired": "Elige un coordinador de canal disponible o asigna esta tarea a un miembro.",
   "error.backend.channelRoutingTooLong":

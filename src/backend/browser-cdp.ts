@@ -296,7 +296,7 @@ export class BrowserCdpEngine {
   /** The page sizes of the open views that asked for one. The newest one applies. */
   readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
-  readonly #cardScrub = new CardValueScrub();
+  readonly #cardScrub: CardValueScrub;
 
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
     this: BrowserCdpEngine,
@@ -685,8 +685,9 @@ export class BrowserCdpEngine {
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
 
-  constructor(contents: WebContents) {
+  constructor(contents: WebContents, cardScrub = new CardValueScrub()) {
     this.#contents = contents;
+    this.#cardScrub = cardScrub;
     contents.once("close", () => {
       // Native teardown can start before isDestroyed() becomes true. Detaching a debugger
       // during that interval can crash Electron; Chromium will dispose it with the page.
@@ -1819,6 +1820,11 @@ export class BrowserCdpEngine {
   /** `value` without the card values that `fillCard` typed in this tab, for a title or a URL. */
   scrubText(value: string): string {
     return this.#cardScrub.text(value);
+  }
+
+  /** The engine of a new view of the same tab. The card values typed in the tab stay hidden. */
+  forContents(contents: WebContents): BrowserCdpEngine {
+    return new BrowserCdpEngine(contents, this.#cardScrub);
   }
 
   /** A target or a wait that names a typed card value would tell the agent whether the page holds it. */

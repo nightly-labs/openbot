@@ -99,6 +99,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Конец",
   "mobile.agent.usage.unsupported": "Этот хост не поддерживает аналитику агентов.",
   "mobile.agent.info.usage.title": "Использование",
+  "mobile.agent.info.usage.agentTitle": "Использование · {name}",
   "mobile.agent.info.usage.loading": "Загрузка данных об использовании…",
   "mobile.agent.info.usage.reconnect": "Переподключитесь, чтобы загрузить данные об использовании.",
   "mobile.agent.info.usage.failed": "Не удалось загрузить данные об использовании.",

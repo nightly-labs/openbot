@@ -29,10 +29,14 @@ export interface MarketplaceCatalog {
   skills: {
     list: (query?: MarketplaceSkillQuery) => Effect.Effect<MarketplaceSkillPage, MarketplaceCatalogError>;
     get: (skillId: string) => Effect.Effect<MarketplaceSkillDetail, MarketplaceCatalogError>;
+    /** The skill a shared link names, by its slug. */
+    getBySlug: (slug: string) => Effect.Effect<MarketplaceSkillDetail, MarketplaceCatalogError>;
   };
   agents: {
     list: (query?: MarketplaceAgentQuery) => Effect.Effect<MarketplaceAgentPage, MarketplaceCatalogError>;
     get: (listingId: string) => Effect.Effect<MarketplaceAgentDetail, MarketplaceCatalogError>;
+    /** The agent a shared link names: approved, or waiting for its first review with `pending`. */
+    getListing: (agentId: string) => Effect.Effect<MarketplaceAgentDetail, MarketplaceCatalogError>;
   };
   /** A shared agent template, by the id its link names. */
   templates: { get: (templateId: string) => Effect.Effect<AgentTemplateDetail, MarketplaceCatalogError> };
@@ -62,11 +66,14 @@ export function createMarketplaceCatalog(request: typeof fetch): MarketplaceCata
     skills: {
       list: (query = {}) => read(`/v1/skills/?${marketplaceQueryParams(query)}`, decodeMarketplaceSkillPage),
       get: (skillId) => read(`/v1/skills/${encodeURIComponent(skillId)}`, decodeMarketplaceSkillDetail),
+      getBySlug: (slug) => read(`/v1/skills/slug/${encodeURIComponent(slug)}`, decodeMarketplaceSkillDetail),
     },
     agents: {
       list: (query = {}) =>
         read(`/v1/marketplace/agents/?${marketplaceQueryParams(query)}`, decodeMarketplaceAgentPage),
       get: (listingId) => read(`/v1/marketplace/agents/${encodeURIComponent(listingId)}`, decodeMarketplaceAgentDetail),
+      getListing: (agentId) =>
+        read(`/v1/marketplace/agents/${encodeURIComponent(agentId)}/listing`, decodeMarketplaceAgentDetail),
     },
     templates: {
       get: (templateId) =>

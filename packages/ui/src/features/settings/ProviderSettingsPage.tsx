@@ -19,7 +19,7 @@ import {
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -564,7 +564,27 @@ function AlternativeItem(props: { row: ProviderRow }) {
 /* ---------------------------------------------- Accounts */
 
 /** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
-const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex"]);
+const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex", "grok", "muse", "cursor"]);
+
+/** The confirmation text of a Disconnect of the provider's own sign-in. */
+function disconnectDescription(
+  t: AppTranslate,
+  format: AppFormat,
+  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+): string {
+  const { provider, usedBy } = options;
+  return [
+    options.local
+      ? t("provider.settings.disconnectLocal", { provider })
+      : t("provider.settings.disconnectHost", { provider }),
+    usedBy.length > 0
+      ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
+      : t("provider.settings.removeUnused"),
+    options.otherAccounts ? t("provider.settings.disconnectOthers", { provider }) : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
@@ -639,22 +659,6 @@ function AccountsSection(props: SectionProps) {
         ? t("provider.settings.removeMoves", { agents: format.list(agents), name: firstName })
         : t("provider.settings.removeUnused");
     return `${move} ${t("provider.settings.removeCredentials")}`;
-  };
-  const disconnectDescription = (account: ProviderPickerAccount | null) => {
-    if (!account) return "";
-    const provider = props.option.name;
-    const agents = account.usedBy ?? [];
-    return [
-      props.accountActions?.local
-        ? t("provider.settings.disconnectLocal", { provider })
-        : t("provider.settings.disconnectHost", { provider }),
-      agents.length > 0
-        ? t("provider.settings.accountBlocked", { agents: format.list(agents) })
-        : t("provider.settings.removeUnused"),
-      accounts().length > 1 ? t("provider.settings.disconnectOthers", { provider }) : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
   };
   return (
     <SettingsSection
@@ -743,7 +747,16 @@ function AccountsSection(props: SectionProps) {
         title={t("provider.settings.disconnectTitle", {
           name: disconnecting() ? providerAccountName(t, accounts(), disconnecting()?.id ?? "") : "",
         })}
-        description={disconnectDescription(disconnecting())}
+        description={
+          disconnecting()
+            ? disconnectDescription(t, format, {
+                provider: props.option.name,
+                local: Boolean(props.accountActions?.local),
+                usedBy: disconnecting()?.usedBy ?? [],
+                otherAccounts: accounts().length > 1,
+              })
+            : ""
+        }
         confirmLabel={t("provider.account.disconnect")}
         onCancel={() => setDisconnecting(null)}
         onConfirm={() => {
@@ -1010,8 +1023,27 @@ function LowUsageBadge(props: { reading: AccountUsageProviderRow; name: string; 
 
 /** The provider's one sign-in: the same buttons that its onboarding row has, on a card. */
 function SignInSection(props: SectionProps & { keyShown: boolean }) {
-  const { t, format, sourceText } = useText();
+  const { t, format, sourceText, errorMessage } = useText();
   const row = () => props.row;
+  /**
+   * A saved OpenBot key keeps the provider connected; the key dialog removes it. Muse offers
+   * Disconnect only where its key status is known, on this computer.
+   */
+  const disconnectOffered = () =>
+    Boolean(props.accountActions?.signOut) &&
+    SIGN_OUT_PROVIDERS.has(props.option.id) &&
+    row().available() &&
+    !row().connecting() &&
+    (props.option.id === "muse" ? props.option.keyStatus === "missing" : props.option.keyStatus !== "saved");
+  const [disconnecting, setDisconnecting] = createSignal(false);
+  const [disconnectError, setDisconnectError] = createSignal<string | null>(null);
+  const disconnect = () => {
+    setDisconnecting(false);
+    setDisconnectError(null);
+    void Promise.resolve(props.accountActions?.signOut?.(props.option.id)).catch((failure: unknown) =>
+      setDisconnectError(errorMessage(failure, t("provider.account.actionFailed", { name: props.option.name }))),
+    );
+  };
   /** Download, its cancel and its retry are on the Version row. */
   const connectAction = () => {
     const action = row().runtimeAction();
@@ -1028,7 +1060,10 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
       row().hostSignInHint() ? t("provider.gemini.hostSignIn") : null,
       row().signingIn() ? t("provider.connecting.browserHint") : null,
     ].filter((text): text is string => Boolean(text));
-  const error = () => row().connectError() ?? (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
+  const error = () =>
+    row().connectError() ??
+    disconnectError() ??
+    (row().statusMessage() ? sourceText(row().statusMessage() ?? "") : null);
   return (
     <SettingsSection title={t("provider.settings.signIn")}>
       <ItemGroup class="settings-modal-card">
@@ -1042,6 +1077,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                   class={{
                     "provider-settings-error":
                       Boolean(row().connectError()) ||
+                      Boolean(disconnectError()) ||
                       row().state() === "error" ||
                       row().runtimeStatus()?.phase === "download-error",
                   }}
@@ -1128,7 +1164,7 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 {t("provider.action.signIn")}
               </Button>
             </Show>
-            <Show when={row().alternative()}>
+            <Show when={row().alternative() || disconnectOffered()}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <MenuTrigger
                   label={t("provider.aria.moreActions", { name: props.option.name })}
@@ -1137,6 +1173,15 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
                 <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                   <DropdownMenu.Content>
                     <AlternativeItem row={row()} />
+                    <Show when={disconnectOffered()}>
+                      <Show when={row().alternative()}>
+                        <DropdownMenu.Separator />
+                      </Show>
+                      <DropdownMenu.Item onSelect={() => setDisconnecting(true)}>
+                        <LogOut aria-hidden="true" />
+                        {t("provider.account.disconnect")}
+                      </DropdownMenu.Item>
+                    </Show>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
@@ -1144,6 +1189,20 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
           </ItemActions>
         </Item>
       </ItemGroup>
+      <ConfirmDialog
+        open={disconnecting()}
+        tone="destructive"
+        title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
+        description={disconnectDescription(t, format, {
+          provider: props.option.name,
+          local: Boolean(props.accountActions?.local),
+          usedBy: props.option.usedBy ?? [],
+          otherAccounts: false,
+        })}
+        confirmLabel={t("provider.account.disconnect")}
+        onCancel={() => setDisconnecting(false)}
+        onConfirm={disconnect}
+      />
     </SettingsSection>
   );
 }

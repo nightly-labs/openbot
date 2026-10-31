@@ -628,6 +628,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-mcp-load-failure
 
+      - name: Run the Antigravity tool filter E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-tool-filter
+
       - name: Run the ACP additional directories E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-directories
@@ -647,6 +651,10 @@ jobs:
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
+
+      - name: Run the ACP audio input E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-audio-input
 
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
@@ -711,11 +719,13 @@ jobs:
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
+            .openbot-build/antigravity-tool-filter-e2e/
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/acp-instructions-once-e2e/
+            .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/

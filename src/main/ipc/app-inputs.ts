@@ -352,10 +352,13 @@ export function parseMarketplaceAgentQuery(input: unknown): MarketplaceAgentQuer
   if (!isObject(input)) throw new Error("Invalid agent marketplace query.");
   const category = input.category;
   if (category !== undefined && !isSkillCategory(category)) throw new Error("Unknown agent category.");
+  const verified = input.verified;
+  if (verified !== undefined && !isBoolean(verified)) throw new Error("Invalid agent source filter.");
   return {
     ...parseMarketplaceQueryFields(input),
     ...parseMarketplaceSort(input.sort, ["installs"] as const, "Unknown agent sort order."),
     ...(category ? { category } : {}),
+    ...(verified === undefined ? {} : { verified }),
   };
 }
 

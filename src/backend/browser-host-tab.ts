@@ -81,7 +81,7 @@ export interface BrowserHostTab {
    */
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
   /**
-   * An idle agent tab whose page was unloaded to free its renderer's memory. The title and the last
+   * An idle agent tab whose page and renderer process were closed to free memory. The title and the last
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;

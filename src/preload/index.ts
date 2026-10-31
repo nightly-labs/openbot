@@ -166,6 +166,7 @@ import {
   decodeOnePasswordConnectorStatus,
   decodePendingAgentTemplate,
   decodePendingListing,
+  decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
@@ -833,6 +834,7 @@ const openbotApi: OpenBotDesktopApi = {
     localInstall: decodeInstalledSkill,
     list: decodeSkillPage,
     get: decodeSkillDetail,
+    getBySlug: decodeSkillDetail,
     listMine: decodeSubmissions,
     choosePackage: decodeSkillPreview,
     submit: decodeSubmission,
@@ -1074,6 +1076,7 @@ const openbotApi: OpenBotDesktopApi = {
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,
     get: decodeMarketplaceAgentDetail,
+    getListing: decodeMarketplaceAgentDetail,
     listMine: decodeAgentSubmissions,
     preview: decodeAgentPublicationPreview,
     submit: decodeAgentSubmission,
@@ -1294,6 +1297,10 @@ const openbotApi: OpenBotDesktopApi = {
   plugins: bridgeGroup(IPC_ENDPOINTS.plugins, {
     takePendingListing: decodePendingListing,
     openListing: dropInvalid(decodePendingListing),
+  }),
+  marketplace: bridgeGroup(IPC_ENDPOINTS.marketplace, {
+    takePendingListing: decodePendingMarketplaceListing,
+    openListing: dropInvalid(decodePendingMarketplaceListing),
   }),
   host: bridgeGroup(IPC_ENDPOINTS.host, {
     getStatus: decodeHostStatus,

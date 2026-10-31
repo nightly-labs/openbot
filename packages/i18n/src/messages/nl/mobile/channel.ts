@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "Gepauzeerd",
   "mobile.channel.task.resume": "Hervatten",
   "mobile.channel.task.reassign": "Opnieuw toewijzen",
+  "mobile.channel.task.cancel": "Taak annuleren",
   "mobile.channel.loadFailed": "Kan kanalen niet laden. Probeer opnieuw.",
   "mobile.channel.actions.historyStale": "De taak is gewijzigd, maar de chatgeschiedenis kan niet worden vernieuwd.",
   "mobile.channel.actions.refreshFailed": "Kan de taakgeschiedenis niet vernieuwen. Probeer opnieuw.",

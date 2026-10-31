@@ -924,9 +924,13 @@ uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](ser
 
 ### Disconnect the own sign-in
 
-Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude and
-Codex (issue #3487). These drivers have an `accounts.signOut` command (`claude auth logout`,
-`codex logout`). `ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
+Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
+Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+(`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
+Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+`ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
 sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
 On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
 the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
@@ -1049,8 +1053,10 @@ remain valid; the names are reserved only for new custom-agent creation.
 
 Optional `providers-v5` routes include the new runtimes and write-only provider keys.
 `agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
-`acp-registry-v1` adds registry administration. Each administrative route checks the host role;
-clients hide unsupported controls. MCP-over-ACP transport is outside this change.
+`acp-registry-v1` adds registry administration. `custom-agents-v1` lists, adds, replaces and removes
+the host's custom agents with the parsers and change service of the local Settings; the trial start
+and the usage answers stay local. Each administrative route checks the host role; clients hide
+unsupported controls. MCP-over-ACP transport is outside this change.
 
 ## Local context indication
 

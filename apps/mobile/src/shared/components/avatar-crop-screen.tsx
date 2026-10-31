@@ -21,7 +21,7 @@ const MARGIN = 16;
 const MAX_SCALE = 5;
 const SETTLE_SPRING = { damping: 34, stiffness: 320, mass: 1 } as const;
 
-/** Move and scale a picked photo inside a circle, as the avatar will show it. */
+/** Move and scale a picked photo inside the avatar's shape, as the avatar will show it. */
 export function AvatarCropScreen() {
   const { t } = useText();
   const [request] = useState(currentAvatarCropRequest);
@@ -62,6 +62,7 @@ export function AvatarCropScreen() {
         <CropArea
           source={request.source}
           side={side}
+          cornerRadius={side * request.cornerRatio}
           centerX={area.width / 2}
           centerY={top + area.height / 2}
           extent={area.width + area.height + top}
@@ -75,6 +76,7 @@ export function AvatarCropScreen() {
 function CropArea({
   source,
   side,
+  cornerRadius,
   centerX,
   centerY,
   extent,
@@ -82,14 +84,17 @@ function CropArea({
 }: {
   source: AvatarCropSource;
   side: number;
+  cornerRadius: number;
   centerX: number;
   centerY: number;
-  /** Wide enough for the dimmed ring around the circle to reach every corner of the screen. */
+  /** Wide enough for the dimmed ring around the shape to reach every corner of the screen. */
   extent: number;
   readCrop: { current: (() => AvatarCrop) | null };
 }) {
+  // A circle keeps its circular corners; a rounded square uses the smooth corners of the avatar.
+  const borderCurve = cornerRadius * 2 < side ? "continuous" : "circular";
   const { t } = useText();
-  // At scale 1 the photo just covers the circle's square.
+  // At scale 1 the photo just covers the shape's square.
   const base = side / Math.max(Math.min(source.width, source.height), 1);
   const shown = { width: source.width * base, height: source.height * base };
   const scale = useSharedValue(1);
@@ -209,7 +214,7 @@ function CropArea({
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
-        {/* A thick round border leaves a clear circle and dims the rest of the photo. */}
+        {/* A thick border leaves the avatar's shape clear and dims the rest of the photo. */}
         <View
           pointerEvents="none"
           className="border-black/60"
@@ -219,7 +224,8 @@ function CropArea({
             top: centerY - side / 2 - extent,
             width: side + extent * 2,
             height: side + extent * 2,
-            borderRadius: side / 2 + extent,
+            borderCurve,
+            borderRadius: cornerRadius + extent,
             borderWidth: extent,
           }}
         />
@@ -232,7 +238,8 @@ function CropArea({
             top: centerY - side / 2,
             width: side,
             height: side,
-            borderRadius: side / 2,
+            borderCurve,
+            borderRadius: cornerRadius,
             borderWidth: StyleSheet.hairlineWidth,
           }}
         />

@@ -59,7 +59,7 @@ const meta = {
   },
   argTypes: {
     action: { control: "inline-radio", options: ["created", "updated"] },
-    state: { control: "select", options: ["idle", "saving", "saved", "error", "deleted", "superseded"] },
+    state: { control: "select", options: ["idle", "saving", "saved", "error", "deleted"] },
   },
   parameters: { layout: "centered", a11y: { test: "error" } },
 } satisfies Meta<CardArgs>;
@@ -81,11 +81,6 @@ export const UpdatedEditing: Story = {
 export const Saving: Story = { args: { state: "saving" } };
 
 export const Saved: Story = { args: { action: "updated", state: "saved" } };
-
-/** A later card changed this routine. This one keeps the old schedule as a record only. */
-export const Superseded: Story = {
-  args: { state: "superseded", nextRunLabel: undefined, onShowLatest: fn() },
-};
 
 /** The routine runs in a zone that is not the viewer's, for example a teammate's computer. */
 export const OtherTimeZone: Story = { args: { timeZoneLabel: "Warsaw time" } };

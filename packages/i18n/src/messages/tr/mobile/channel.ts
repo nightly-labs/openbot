@@ -24,6 +24,7 @@ export const messages = {
   "mobile.channel.task.paused": "Duraklatıldı",
   "mobile.channel.task.resume": "Sürdür",
   "mobile.channel.task.reassign": "Yeniden ata",
+  "mobile.channel.task.cancel": "Görevi iptal et",
   "mobile.channel.loadFailed": "Kanallar yüklenemedi. Tekrar deneyin.",
   "mobile.channel.actions.historyStale": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
   "mobile.channel.actions.refreshFailed": "Görev geçmişi yenilenemedi. Tekrar deneyin.",

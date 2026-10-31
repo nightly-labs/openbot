@@ -2,13 +2,14 @@ import type { ChannelTask } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { channelTaskCancelCards } from "@/features/channels/model/channel-task-actions";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import { useText } from "@/shared/lib/text";
 
-type TaskCommand = (taskId: string, type: "resume" | "reassign", recipientAgentId?: string | null) => void;
+type TaskCommand = (taskId: string, type: "resume" | "reassign" | "cancel", recipientAgentId?: string | null) => void;
 
 export function ChannelTaskActions({
   tasks,
@@ -16,6 +17,7 @@ export function ChannelTaskActions({
   online,
   pending,
   archived,
+  canCancel,
   onCommand,
 }: {
   tasks: ChannelTask[];
@@ -23,8 +25,10 @@ export function ChannelTaskActions({
   online: boolean;
   pending: boolean;
   archived: boolean;
+  canCancel: boolean;
   onCommand: TaskCommand;
 }) {
+  const cancelCards = channelTaskCancelCards(tasks);
   return (
     <>
       {tasks.map((task) => (
@@ -33,6 +37,7 @@ export function ChannelTaskActions({
           task={task}
           members={members}
           disabled={!online || pending || archived}
+          canCancel={canCancel && cancelCards.has(task.id)}
           onCommand={onCommand}
         />
       ))}
@@ -44,11 +49,13 @@ function TaskActionCard({
   task,
   members,
   disabled,
+  canCancel,
   onCommand,
 }: {
   task: ChannelTask;
   members: MobileAgent[];
   disabled: boolean;
+  canCancel: boolean;
   onCommand: TaskCommand;
 }) {
   const { t, sourceText } = useText();
@@ -113,6 +120,17 @@ function TaskActionCard({
             </CoveringMenuView>
           </View>
         </View>
+        {canCancel ? (
+          <Button
+            className="min-h-11"
+            size="sm"
+            variant="ghost"
+            isDisabled={disabled}
+            onPress={() => onCommand(task.id, "cancel")}
+          >
+            <Button.Label>{t("mobile.channel.task.cancel")}</Button.Label>
+          </Button>
+        ) : null}
       </View>
     </SettingsSection>
   );

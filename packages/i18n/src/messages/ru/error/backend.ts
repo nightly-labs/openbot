@@ -65,6 +65,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",
   "error.backend.channelTaskComplete": "Эта задача уже выполнена.",
+  "error.backend.channelTaskNotStopped": "Отменить можно только остановленную или неудавшуюся задачу.",
   "error.backend.channelSelectAgent": "Выберите агента.",
   "error.backend.channelLeadRequired": "Выберите доступного ведущего канала или назначьте эту задачу участнику.",
   "error.backend.channelRoutingTooLong":

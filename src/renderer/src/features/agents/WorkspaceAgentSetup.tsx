@@ -3,7 +3,6 @@ import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "@openbot/ui/features/a
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useProviders } from "../../providers";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
-import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -31,9 +30,6 @@ export function WorkspaceAgentSetup() {
   } = useAgents();
   const { createAgent } = useAgentActions();
   const { setupState } = useSetup();
-  // Not gated on the server: the picker needs these IDs to label a model it is already showing,
-  // and a remote server's OpenCode has its own catalogue. Only the write paths are local-only.
-  const { customProviders } = useCustomProviders();
   const { customAgents } = useCustomAgents();
   const { activeServer, activeServerSupportsCapability } = useServers();
   const {
@@ -43,6 +39,7 @@ export function WorkspaceAgentSetup() {
     cancelProviderRuntimeDownload,
     connectProvider,
     providerAdminServerId,
+    activeCustomProviders,
   } = useProviders();
   const { openServerSettings } = useServerSettings();
   /** Provider downloads are the local machine's business, never a remote host's. */
@@ -108,7 +105,7 @@ export function WorkspaceAgentSetup() {
       modelOptions={createModelSupported() ? modelOptions() : undefined}
       agentStatus={agentStatus()}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
-      customProviders={customProviders()}
+      customProviders={activeCustomProviders()}
       // The custom agents are this computer's. A joined host's picker counts its own from its models.
       customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}

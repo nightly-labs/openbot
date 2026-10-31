@@ -81,6 +81,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "종료일",
   "mobile.agent.usage.unsupported": "이 호스트는 에이전트 분석을 지원하지 않아요.",
   "mobile.agent.info.usage.title": "사용량",
+  "mobile.agent.info.usage.agentTitle": "사용량 · {name}",
   "mobile.agent.info.usage.loading": "사용량 불러오는 중…",
   "mobile.agent.info.usage.reconnect": "사용량을 불러오려면 다시 연결해 주세요.",
   "mobile.agent.info.usage.failed": "사용량을 불러올 수 없어요.",

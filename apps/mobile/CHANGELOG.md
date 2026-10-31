@@ -7,7 +7,79 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
-## [1.4.4] - In review
+## [1.4.5] - In review
+
+### Added
+
+- The server plans show how many hosted sites each plan has.
+- Owners and admins can set how many threads of an agent run at the same time in **Agent info → Advanced → Parallel threads**, as on desktop. **Default (2)** uses the host default. When the provider runs one turn at a time, the control shows 1, and the threads of the agent wait for each other.
+- Agent info › Advanced now has **Agent starts new chats**, as on desktop. When it is on, the agent starts a new chat when its chat gets long, and saves notes first. Only an owner or admin of the server sees it, and the server's computer must have the latest OpenBot version. A change on the phone shows at once on the computer, and a change on the computer shows at once on the phone.
+- Manage the browser profiles of a server in Server settings > Browser profiles: add a profile with
+  its name and color, rename it, change the color, choose its agents, clear the data and delete it.
+- Choose the browser profile of an agent in Agent info > Advanced > Browser profile, or add a new
+  profile for the agent there. A change made on the desktop or another device shows at once.
+- Agent settings have a **Backup models** page, as on desktop. An owner or admin of a server sets the ordered list of models that the agent moves to when a usage limit stops it, and chooses if the agent asks first or switches by itself. Changes from the phone show on desktop at once, and changes from desktop show on the phone while the page is open.
+- An owner or admin can now turn "Show the plan before long tasks" on or off for an agent, in Agent
+  info > Advanced. The server must run the latest desktop version.
+- In a thread, tap "Thinking…" or the steps row above an answer to see the agent's thoughts and progress steps, as in an agent's chat.
+- **Agent settings → Folders** shows the folders that the agent can change besides its workspace.
+  An owner or admin can add a folder of the host computer, remove it, exclude a folder in it, or
+  include it again. The folder browser goes to the home folder or to a disk in one step, and the
+  page opens Permissions. Changes from the desktop show at once. The host needs the latest OpenBot.
+- **Server settings → Server key** shows when the server last changed its key. The owner can change
+  the key there, after the app lock when it is on. The server signs the change with the current key
+  and the new key, and the app uses the new key only after it checks both signatures.
+- Server settings has an Import agents page. Any member can bring agents from a Grok Bot or Hermes Agent export: the page shows how to make the export, sends the .zip file from your phone to the server, and lists its agents and channels before anything changes.
+- Server settings has a Transfer page for an owner or admin. Export the server's agents and server settings to a transfer file and share it from your phone, or import a transfer file from another OpenBot server. A file from a phone must be under 100 MB.
+- A speaker button under each agent message reads the message aloud with the reply voice from Settings > Voice. Tap it again to stop. When another message starts or a voice conversation opens, the reading stops.
+- Show provider plan limits on the server Usage screen: how much of each limit window is left, when
+  it resets, and the provider's rings.
+- Show each agent's avatar with a provider badge in the agent rows of the server Usage screen.
+- Add a custom provider to a server from the mobile app: Server settings > Providers > Add custom provider. Start from Ollama, LM Studio or any OpenAI-compatible endpoint, then give its address, an optional API key, its models and headers. You can also see and remove the custom providers of the server.
+- Install, update and remove agents from the ACP registry on a server from the mobile app: Server settings > Providers > ACP registry.
+- Manage the accounts of a provider that can hold more than one: add an account, sign it in again, rename it or remove it on the provider's page in Server settings > Providers.
+- Add, change and remove the custom ACP agents of a server: Server settings > Providers > Agents. Start from Goose, Qwen Code, GitHub Copilot or Oh My Pi, or give your own command, arguments and environment variables. The server must run the newest OpenBot.
+
+### Changed
+
+- When the connection service restarts, each app waits a random 0.5 to 4 seconds before it connects again. Before, all apps connected again in the same half second, and many of them had to try again. Open chats and connections to your servers stay up while the app waits.
+- Your analytics answer follows your account. When you change **Settings → Privacy → Share product analytics**, the account keeps your answer, and your other devices use it after sign-in. When you agree on desktop or web, the phone turns analytics on after sign-in. An older choice from a phone that was offline does not replace a newer one.
+- If you turned analytics off before this version, an analytics answer from another device does not turn it on again on that device. Only a change on that device turns it on.
+- The button that opens the server list now shows a sidebar icon, not a stack of layers.
+- The plan that an agent shows before a long task is easier to read. Its steps show as a numbered
+  list, and its choices show as pills under the plan. The start button counts down to the time when
+  the work starts by itself, as on desktop. After the answer, the card shows the choice, or says
+  that nobody answered in time. The countdown needs the latest desktop version on the server.
+- In agent settings, the field that teammates read to choose who does a task is now named
+  Description.
+- Chat messages in the mobile app use more of the screen width. Agent replies, approvals, questions and your messages now use up to 92% of the width, up from 88%.
+- The notification settings show only the agents that have their own level, with their avatars, as on desktop. Use "Choose for one agent" to give one more agent its own level. Tap an agent’s level again to follow the server, and its row closes smoothly. A long list of agents no longer fills the screen.
+- The server menu shows the logo of the open server at the left of its name. The menu items scroll under the header, which blurs them as the other screens do.
+- A tap on an agent row in the server Usage screen opens the usage of that agent. The agent filter
+  is removed. The agent Usage page shows the agent name in its title.
+- Keep the values of the two Usage summary cards on the same line when a label wraps.
+
+### Fixed
+
+- Connect to your server again within about 30 seconds after the server comes back. Before, the
+  app could wait up to 2 minutes after five failed attempts.
+- When you open the thinking of a running reply and its steps are short, the steps now show below the sheet title. Before, they started under the title, and you had to scroll to see them.
+- A long thread title no longer pushes the chevron in the thread header against the edge of the title button.
+- After a server changed its key, the app used the previous key until it restarted, so it could not
+  connect. Now it connects with the new key when it loads the server list.
+- The server key section shows a key change from another device when you open Server settings.
+  Before, it showed the change only after the app restarted.
+- When you crop a server logo, the crop area has the rounded-square shape of the logo, not a circle.
+- Keep the plan-limit rings in the home header when the host reports the usage of one provider. Before,
+  the rings of the other providers went away for a moment. A new reading now moves the ring fill.
+
+### Security
+
+- The app keeps the first key that it sees for each server, also for a server that you joined on
+  another device. A later key change is used only when the previous key signed a handover to it.
+  Otherwise only the connection to that server fails, and the other servers stay available.
+
+## [1.4.4] - 2026-10-31
 
 ### Added
 

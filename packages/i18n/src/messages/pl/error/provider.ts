@@ -125,19 +125,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT został pobrany, ale nie udało się go uruchomić. Pobierz go ponownie w OpenBot.",
   "error.provider.codexMissing": "ChatGPT nie jest pobrany. Pobierz go w OpenBot, aby kontynuować.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex zignorował {count} ustawienie w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    few: "Codex zignorował {count} ustawienia w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    many: "Codex zignorował {count} ustawień w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-    other:
-      "Codex zignorował {count} ustawienia w swojej konfiguracji: {settings}. Popraw je lub usuń albo zaktualizuj Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex zignorował {count} ustawienie w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    few: "Codex zignorował {count} ustawienia w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    many: "Codex zignorował {count} ustawień w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-    other: "Codex zignorował {count} ustawienia w swojej konfiguracji. Popraw je lub usuń albo zaktualizuj Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} jest za stary. OpenBot wymaga wersji 2.1.232 lub nowszej.",
   "error.provider.claudeNotStarted": "Znaleziono Claude CLI, ale nie udało się go uruchomić.",
   "error.provider.claudeNotStartedHint":
@@ -194,6 +181,10 @@ export const messages = {
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyRefused":
+    "Endpoint „{provider}” odrzucił swój klucz API lub nagłówki. Wpisz je ponownie w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
+  "error.provider.customEndpointKeyMissing":
+    "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":

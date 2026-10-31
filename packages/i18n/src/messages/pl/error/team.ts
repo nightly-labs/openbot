@@ -58,6 +58,7 @@ export const messages = {
   "error.team.providerNotManaged": "OpenBot nie zarządza CLI tego dostawcy.",
   "error.team.channelsUnsupported": "To połączenie nie obsługuje czatów kanałów.",
   "error.team.channelDeleteUnsupported": "To połączenie nie obsługuje usuwania kanałów.",
+  "error.team.channelTaskCancelUnsupported": "To połączenie nie obsługuje anulowania zadań kanałów.",
   "error.team.membersCannotDeleteChannels": "Członkowie nie mogą usuwać kanałów.",
   "error.team.membersCannotArchiveChannels": "Członkowie nie mogą archiwizować kanałów.",
   "error.team.membersCannotRestoreChannels": "Członkowie nie mogą przywracać kanałów.",

@@ -45,6 +45,7 @@ export function createHostedBilling(
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input, init) => fetch(input, init),
     schedule: options.schedule,
+    database: bindings.DB,
   });
   const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
   const sales =

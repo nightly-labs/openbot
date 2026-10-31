@@ -132,14 +132,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT se descargó, pero no se pudo iniciar. Vuelve a descargarlo en OpenBot.",
   "error.provider.codexMissing": "ChatGPT no está descargado. Descárgalo en OpenBot para continuar.",
-  "error.provider.codexConfigIgnored": {
-    one: "Codex ignoró {count} ajuste de su configuración: {settings}. Corrígelo, elimínalo o actualiza Codex.",
-    other: "Codex ignoró {count} ajustes de su configuración: {settings}. Corrígelos, elimínalos o actualiza Codex.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    one: "Codex ignoró {count} ajuste de su configuración. Corrígelo, elimínalo o actualiza Codex.",
-    other: "Codex ignoró {count} ajustes de su configuración. Corrígelos, elimínalos o actualiza Codex.",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} es demasiado antiguo. OpenBot requiere 2.1.232 o posterior.",
   "error.provider.claudeNotStarted": "Se encontró Claude CLI, pero no se pudo iniciar.",
   "error.provider.claudeNotStartedHint":
@@ -200,6 +192,10 @@ export const messages = {
     "OpenCode no tiene una sesión para el proveedor del modelo «{provider}». Elige un modelo con la etiqueta Gratis o conecta el proveedor: pega una clave de OpenCode Go en los ajustes de OpenCode o ejecuta `opencode auth login` en un terminal. Luego inténtalo de nuevo.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode no tiene una sesión para el proveedor de este modelo. Elige un modelo con la etiqueta Gratis o conecta el proveedor: pega una clave de OpenCode Go en los ajustes de OpenCode o ejecuta `opencode auth login` en un terminal. Luego inténtalo de nuevo.",
+  "error.provider.customEndpointKeyRefused":
+    "El endpoint «{provider}» rechazó su clave de API o sus encabezados. Vuelve a introducirlos en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
+  "error.provider.customEndpointKeyMissing":
+    "El endpoint «{provider}» necesita una clave de API. Añade la clave en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyExpired":
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeServiceFailure":

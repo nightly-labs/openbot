@@ -125,13 +125,6 @@ export const messages = {
   "error.provider.codexManagedNotStarted":
     "ChatGPT를 다운로드했지만 시작할 수 없었어요. OpenBot에서 다시 다운로드하세요.",
   "error.provider.codexMissing": "ChatGPT가 다운로드되지 않았어요. 계속하려면 OpenBot에서 다운로드하세요.",
-  "error.provider.codexConfigIgnored": {
-    other:
-      "Codex가 구성에서 설정 {count}개를 무시했어요: {settings}. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    other: "Codex가 구성에서 설정 {count}개를 무시했어요. 수정하거나 제거하고, 아니면 Codex를 업데이트하세요.",
-  },
   "error.provider.claudeOutdated":
     "Claude Code {version}이(가) 너무 오래되었어요. OpenBot에는 2.1.232 이상이 필요해요.",
   "error.provider.claudeNotStarted": "Claude CLI를 찾았지만 시작할 수 없었어요.",
@@ -191,6 +184,10 @@ export const messages = {
     'OpenCode에 모델 제공자 "{provider}"의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode에 이 모델 제공자의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.customEndpointKeyRefused":
+    '엔드포인트 "{provider}"이(가) API 키 또는 헤더를 거부했어요. 서버 설정 → 제공자에서 다시 입력한 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointKeyMissing":
+    '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":

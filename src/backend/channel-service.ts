@@ -659,6 +659,29 @@ export class ChannelService {
     const selected = tasks.find((task) => task.id === command.taskId);
     if (!selected) return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotFound")));
     if (terminal(selected)) return yield* channelFailure(new Error(sourceText("error.backend.channelTaskComplete")));
+    // `cancel` ends the whole run of the task, from its root: a parent waits for each task it
+    // delegated, so a parent of a cancelled child would wait for ever. The messages stay.
+    if (command.type === "cancel") {
+      // Cancel is the way out of a stopped run; Stop is the one for active work.
+      if (selected.state !== "paused" && selected.state !== "failed")
+        return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
+      const cancelled = descendants(tasks, selected.rootTaskId);
+      const result = yield* channelSync(() =>
+        this.store.update(
+          channel,
+          {
+            tasks: cancelled.map(
+              (task): ChannelTask => ({ ...task, state: "cancelled", error: null, revision: task.revision + 1 }),
+            ),
+          },
+          operationId,
+        ),
+      );
+      this.publish(channel.id);
+      yield* this.interruptTasks(channel.id, cancelled);
+      yield* this.wake(channel.id);
+      return result;
+    }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
         return yield* channelFailure(new Error(sourceText("error.backend.channelSelectAgent")));

@@ -407,13 +407,13 @@ export function ConversationTimeline() {
    * An agent's record of a routine it created or changed is a card whose schedule the person can
    * change. Only a record from an agent turn has a `turnId`. A change the person made in the app
    * keeps the plain marker, so an edit on a card does not add a second card that replaces it. A
-   * deleted routine also keeps the plain marker, because its schedule is not known.
+   * deleted routine also keeps the plain marker, because its schedule is not known. Only the newest
+   * record of a routine is a card: each card shows the routine as it is now, so an older card would
+   * repeat it. An older record keeps the plain marker.
    */
   const routineCardMarker = (message: AgentMessage | undefined, marker: ChatActionMarkerModel | undefined) =>
     message?.turnId && marker?.kind === "routine-lifecycle" ? marker : undefined;
-  // "Show latest" moves focus to this card. The list mounts it only after the scroll.
-  const [routineCardFocus, setRoutineCardFocus] = createSignal<string | null>(null);
-  // The newest agent record of each routine is the one card that still edits it.
+  // The newest agent record of each routine is its one card.
   const latestRoutineMessageIds = createMemo(() => {
     const latest = new Map<string, string>();
     for (const message of timelineMessages()) {
@@ -425,7 +425,8 @@ export function ConversationTimeline() {
   const routineCard = (message: AgentMessage | undefined, marker: ChatActionMarkerModel) => {
     const agentId = props.agent?.id;
     const cardMarker = routineCardMarker(message, marker);
-    if (!cardMarker || cardMarker.action === "deleted" || !agentId) return undefined;
+    if (!message || !cardMarker || cardMarker.action === "deleted" || !agentId) return undefined;
+    if (latestRoutineMessageIds().get(cardMarker.routineId) !== message.id) return undefined;
     const routine = props.routines?.find((candidate) => candidate.id === cardMarker.routineId);
     return routine && { action: cardMarker.action, routine, agentId };
   };
@@ -877,31 +878,14 @@ export function ConversationTimeline() {
                                   </Show>
                                 }
                               >
-                                {(card) => {
-                                  const latestMessageId = () => latestRoutineMessageIds().get(card().routine.id);
-                                  const rowMessageId = () => message()?.id ?? initialMessage.id;
-                                  return (
-                                    <RoutineChatCard
-                                      action={card().action}
-                                      routine={card().routine}
-                                      agentId={card().agentId}
-                                      latest={latestMessageId() === rowMessageId()}
-                                      onOpenRoutine={openRoutineSettings}
-                                      onShowLatest={
-                                        props.onOpenSearchMessage
-                                          ? () => {
-                                              const messageId = latestMessageId();
-                                              if (!messageId) return;
-                                              setRoutineCardFocus(messageId);
-                                              void props.onOpenSearchMessage?.(messageId);
-                                            }
-                                          : undefined
-                                      }
-                                      focusRequested={routineCardFocus() === rowMessageId()}
-                                      onFocusHandled={() => setRoutineCardFocus(null)}
-                                    />
-                                  );
-                                }}
+                                {(card) => (
+                                  <RoutineChatCard
+                                    action={card().action}
+                                    routine={card().routine}
+                                    agentId={card().agentId}
+                                    onOpenRoutine={openRoutineSettings}
+                                  />
+                                )}
                               </Show>
                             )}
                           </Show>

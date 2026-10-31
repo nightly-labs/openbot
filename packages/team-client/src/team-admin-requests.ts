@@ -37,6 +37,7 @@ import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidd
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
@@ -77,6 +78,8 @@ import {
   type ClearBrowserDataInput,
   type ClearStorageInput,
   type ConnectProviderAccountInput,
+  type CustomAgentResult,
+  type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   type DeleteCustomProviderInput,
@@ -85,6 +88,8 @@ import {
   decodeAgentBrowserProfile,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
+  decodeCustomAgentResult,
+  decodeCustomAgentSummaries,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostAddedAgent,
@@ -171,6 +176,7 @@ import {
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
   type RoutineResultRoutineInput,
+  type SaveCustomAgentInput,
   type SaveCustomProviderInput,
   type SaveMcpServerInput,
   type SaveMcpSignInAppInput,
@@ -1202,6 +1208,37 @@ export function deleteCustomProvider(
   routes: CustomProviderRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<CustomProviderResult, TeamAdminRequestError> {
   return adminCall(() => request("POST", routes.customDelete, decodeCustomProviderResult, { id: input.id }));
+}
+
+/**
+ * `custom-agents-v1`: the custom ACP agents of a host. An environment value goes only in a save body,
+ * and `value: null` keeps the value that the host holds.
+ */
+export function listCustomAgents(request: TeamApiRequest): Effect.Effect<CustomAgentSummary[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", CUSTOM_AGENTS_ROUTES.list, decodeCustomAgentSummaries, {}));
+}
+
+export function saveCustomAgent(
+  request: TeamApiRequest,
+  input: SaveCustomAgentInput,
+): Effect.Effect<CustomAgentResult, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CUSTOM_AGENTS_ROUTES.save, decodeCustomAgentResult, {
+      id: input.id,
+      name: input.name,
+      command: input.command,
+      args: [...input.args],
+      env: input.env.map(({ name, value }) => ({ name, value })),
+      usagePrompt: input.usagePrompt,
+    }),
+  );
+}
+
+export function deleteCustomAgent(
+  request: TeamApiRequest,
+  id: string,
+): Effect.Effect<CustomAgentResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CUSTOM_AGENTS_ROUTES.delete, decodeCustomAgentResult, { id }));
 }
 
 export function getHostReleaseStatus(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {

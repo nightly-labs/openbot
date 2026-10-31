@@ -152,6 +152,12 @@ export const queryKeys = {
     serverId,
     provider,
   ],
+  /** The accounts of a host's providers (`provider-accounts-v1`). */
+  providerAccounts: (scope: QueryScope, serverId: string) => ["provider-accounts", ...scope, serverId],
+  /** The custom ACP agents of a host. A save or a removal answers with the whole list. */
+  customAgents: (scope: QueryScope, serverId: string) => ["custom-agents", ...scope, serverId],
+  /** The custom endpoints of a host. A save or a removal answers with the whole list. */
+  customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
   serverLogo: (scope: QueryScope, serverId: string, ...logo: [] | [logoKey: string | null]) => [
@@ -162,13 +168,7 @@ export const queryKeys = {
   ],
   /** The plan limits of a server's providers. The host's `usage-changed` event writes the providers' own sign-ins. */
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
-  serverUsage: (scope: QueryScope, serverId: string, range: unknown, agentId: string | undefined) => [
-    "server-usage",
-    ...scope,
-    serverId,
-    range,
-    agentId,
-  ],
+  serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   /** The routine calendar of a server. Its routine and turn events invalidate the prefix. */
   serverRoutines: (scope: QueryScope, serverId: string, ...range: [] | [from: string, to: string]) => [
     "server-routines",

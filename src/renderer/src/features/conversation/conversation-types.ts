@@ -162,8 +162,8 @@ export interface ConversationProps {
   accountUsage?: AccountUsage | null | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /**
-   * The endpoints the user named, so both model pickers can tell a custom model from an OpenCode
-   * one. It travels as a prop rather than through `useCustomProviders()`, the same
+   * The endpoints of the active server, so both model pickers can tell a custom model from an
+   * OpenCode one. It travels as a prop rather than through `useCustomProviders()`, the same
    * path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[] | undefined;

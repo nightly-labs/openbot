@@ -1,5 +1,5 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
-import { type PlanLimits, withSignInUsage } from "@openbot/team-client/plan-limits";
+import { type PlanLimits, withUsageEvent } from "@openbot/team-client/plan-limits";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
@@ -59,7 +59,7 @@ export function syncEventQueries(
   applyTaskEvent(queryClient, scope, serverId, event);
   if (event.type === "usage-changed") {
     queryClient.setQueryData<PlanLimits>(queryKeys.planLimits(scope, serverId), (current) =>
-      current ? { ...current, usage: withSignInUsage(current.usage, event.usage) } : current,
+      current ? { ...current, usage: withUsageEvent(current.usage, event.usage) } : current,
     );
     return;
   }

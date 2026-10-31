@@ -27,7 +27,7 @@ export const OPENBOT_LOGO_URL = `${OPENBOT_SITE_URL}icon-512x512.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
 
 /** The Open Graph tags of the site's own social card, which is 1600x900. */
-const OPENBOT_SOCIAL_IMAGE_META = [
+export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
   { property: "og:image:type", content: "image/png" },
   { property: "og:image:width", content: "1600" },

@@ -195,6 +195,8 @@ linux:
         - arm64
 dmg:
   title: ${productName} ${version}
+  # The art is 478 pt high, so it fills the window when Finder shows only the title bar.
+  # With the tab bar and status bar, the window shows the top 410 pt.
   background: build/dmg-background.png
   iconSize: 128
   iconTextSize: 14

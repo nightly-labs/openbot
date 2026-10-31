@@ -117,6 +117,11 @@ export class ProviderAccounts {
     return provider === "acp" ? undefined : requireProviderDriver(provider).accounts;
   }
 
+  /** The command that signs the provider's own sign-in out, or undefined when its CLI has none. */
+  static signOutCommand(provider: AgentProviderId): ProviderAccountSupport["signOut"] {
+    return ProviderAccounts.support(provider)?.signOut ?? requireProviderDriver(provider).signOut;
+  }
+
   /** The stored account an agent names, or null for the provider's own sign-in or a removed account. */
   account(provider: AgentProviderId, accountId: string | undefined): StoredProviderAccount | null {
     if (!accountId || accountId === DEFAULT_PROVIDER_ACCOUNT_ID || !ProviderAccounts.support(provider)) return null;
@@ -652,7 +657,7 @@ export class ProviderAccounts {
     this: ProviderAccounts,
     provider: AgentProviderId,
   ) {
-    const command = ProviderAccounts.support(provider)?.signOut;
+    const command = ProviderAccounts.signOutCommand(provider);
     const cli = this.#host.cli(provider);
     if (!command || !cli)
       return yield* accountFailure(

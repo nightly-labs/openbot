@@ -1,3 +1,4 @@
+import { agentTemplateShareOrigin } from "@openbot/contracts/agent-template-links";
 import { sourceText } from "@openbot/i18n";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
@@ -43,11 +44,14 @@ export function createWebMarketplaceCalls(
     skills: {
       list: (query) => runTeamEffect(catalog.skills.list(query)),
       get: (id) => runTeamEffect(catalog.skills.get(id)),
+      getBySlug: (slug) => runTeamEffect(catalog.skills.getBySlug(slug)),
     },
     agents: {
       list: (query) => runTeamEffect(catalog.agents.list(query)),
       get: (id) => runTeamEffect(catalog.agents.get(id)),
+      getListing: (id) => runTeamEffect(catalog.agents.getListing(id)),
     },
+    shareOrigin: agentTemplateShareOrigin(window.location.origin),
     agentSkills: (serverId) => ({
       listInstalled: async (agentId) =>
         runTeamEffect(listAgentSkills(request(serverId), agentId).pipe(Effect.mapError((error) => error.cause))),

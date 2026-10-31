@@ -8,6 +8,7 @@ export const messages = {
   "channel.stoppedTask.label": "Остановленная задача: {name}",
   "channel.stoppedTask.reassignLabel": "Переназначить остановленную задачу {name}",
   "channel.stoppedTask.reassign": "Переназначить",
+  "channel.stoppedTask.cancel": "Отменить задачу",
   "channel.conversation.noMembers": "Добавьте агентов в настройках канала, чтобы начать работу.",
   "channel.conversation.archivedNotice": "Канал удалён. Только просмотр.",
   "channel.composer.label": "Сообщение в канал",

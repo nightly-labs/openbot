@@ -1,0 +1,240 @@
+/* The share card prototype. The card is 1200 × 630 and scales with its frame: every length is in
+   `--px`, one pixel of the 1200-wide card. The card is the container, so the `cqw` in it resolves
+   against the card wherever a child uses it. */
+
+.marketplace-share-card {
+  --px: calc(100cqw / 1200);
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  background: var(--openbot-bg-canvas);
+  color: #fff;
+  font-family: var(--openbot-font-sans);
+}
+
+.marketplace-share-avatar {
+  position: absolute;
+  display: block;
+}
+
+.marketplace-share-brand {
+  position: absolute;
+  top: calc(48 * var(--px));
+  left: calc(56 * var(--px));
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--px));
+  font-size: calc(32 * var(--px));
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.marketplace-share-logo {
+  width: calc(48 * var(--px));
+  height: calc(48 * var(--px));
+}
+
+.marketplace-share-copy {
+  position: absolute;
+  display: grid;
+  gap: calc(14 * var(--px));
+}
+
+.marketplace-share-name {
+  font-size: calc(92 * var(--px));
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+/* In the line of the name, after its last word, as the agent page shows it. */
+.marketplace-share-shield {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.16em;
+  vertical-align: -0.04em;
+}
+
+.marketplace-share-role {
+  font-size: calc(40 * var(--px));
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.marketplace-share-source {
+  margin-top: calc(10 * var(--px));
+  font-size: calc(30 * var(--px));
+  font-weight: 500;
+}
+
+/* The avatar on the left, without a plate; the mark heads the text column beside it. */
+.marketplace-share-avatar {
+  top: 50%;
+  left: calc(24 * var(--px));
+  width: calc(540 * var(--px));
+  height: calc(540 * var(--px));
+  transform: translateY(-50%);
+}
+
+.marketplace-share-brand {
+  top: calc(96 * var(--px));
+  left: calc(590 * var(--px));
+}
+
+.marketplace-share-copy {
+  top: 50%;
+  left: calc(590 * var(--px));
+  max-width: calc(560 * var(--px));
+  transform: translateY(-38%);
+}
+
+.marketplace-share-role,
+.marketplace-share-source,
+.marketplace-share-shield {
+  color: var(--openbot-text-secondary);
+}
+
+/* The story page. */
+.marketplace-share-page {
+  min-height: 100vh;
+  background: #000;
+  padding: 32px;
+  color: var(--openbot-text-primary);
+}
+
+.marketplace-share-heading {
+  margin: 0 0 12px;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.marketplace-share-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 1376px;
+  margin-bottom: 48px;
+}
+
+.marketplace-share-cards .marketplace-share-card {
+  border-radius: 16px;
+}
+
+.marketplace-share-frames {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 40px;
+}
+
+.marketplace-share-frames > section {
+  display: grid;
+  gap: 12px;
+}
+
+/* The frames, in each app's own dark colours: the frame is theirs, not OpenBot's. */
+.marketplace-share-x,
+.marketplace-share-messages,
+.marketplace-share-slack {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.marketplace-share-x {
+  width: 506px;
+}
+
+.marketplace-share-x-media {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #2f3336;
+  border-radius: 16px;
+}
+
+.marketplace-share-x-title {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 77%);
+  padding: 0 4px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketplace-share-x-source {
+  margin-top: 4px;
+  color: #71767b;
+  font-size: 13px;
+}
+
+.marketplace-share-messages {
+  width: 300px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #262628;
+}
+
+.marketplace-share-messages-text {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px 11px;
+}
+
+.marketplace-share-messages-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.marketplace-share-messages-host {
+  color: #98989f;
+  font-size: 13px;
+}
+
+.marketplace-share-slack {
+  display: grid;
+  gap: 2px;
+  width: 400px;
+  border-left: 4px solid #4a4d55;
+  border-radius: 2px;
+  background: #1a1d21;
+  padding: 2px 0 2px 12px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.marketplace-share-slack-site {
+  color: #d1d2d3;
+  font-weight: 700;
+}
+
+.marketplace-share-slack-title {
+  color: #1d9bd1;
+  font-weight: 700;
+}
+
+.marketplace-share-slack-description {
+  color: #d1d2d3;
+}
+
+.marketplace-share-slack-media {
+  overflow: hidden;
+  max-width: 360px;
+  margin-top: 6px;
+  border-radius: 8px;
+}

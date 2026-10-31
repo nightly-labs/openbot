@@ -81,6 +81,7 @@ export const messages = {
   "mobile.agent.usage.endDate": "Data de fim",
   "mobile.agent.usage.unsupported": "Este computador anfitrião não oferece análises dos agentes.",
   "mobile.agent.info.usage.title": "Uso",
+  "mobile.agent.info.usage.agentTitle": "Uso · {name}",
   "mobile.agent.info.usage.loading": "Carregando uso…",
   "mobile.agent.info.usage.reconnect": "Reconecte-se para carregar o uso.",
   "mobile.agent.info.usage.failed": "Não foi possível carregar o uso.",

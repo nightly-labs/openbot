@@ -149,13 +149,69 @@ export interface McpServerToolCall {
  * Runs one MCP tool. A failure is a result the agent can correct, such as a name in use or an
  * argument out of range, with the MCP secrets masked.
  */
-export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) => {
+export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) =>
+  asToolResult(servers, runMcpServerTool(servers, call));
+
+/** A saved server that a Marketplace app installs, with the listing's steps to start a local one. */
+export interface MarketplaceAppServer {
+  config: McpServerConfig;
+  setupSteps: readonly string[];
+}
+
+/**
+ * The state of a Marketplace app that is already saved, for an agent that would suggest it. Its
+ * card would only say Connected, so the agent gets what the user must do: a sign-in puts its card in
+ * the conversation, and a local server that does not answer comes with the listing's steps.
+ */
+export const marketplaceAppStatus = (
+  servers: AgentMcpServers,
+  app: MarketplaceAppServer,
+  requestSignIn: McpServerToolCall["requestSignIn"],
+) => asToolResult(servers, runMarketplaceAppStatus(servers, app, requestSignIn));
+
+const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")(function* (
+  servers: AgentMcpServers,
+  { config, setupSteps }: MarketplaceAppServer,
+  requestSignIn: McpServerToolCall["requestSignIn"],
+) {
+  const server = describeServer(config, servers.signIns());
+  if (!config.enabled)
+    return openBotToolResult({
+      status: "disabled",
+      server,
+      next: "The app is installed and turned off. Tell the user to turn it on in Server settings, MCP, or call openbot.set_mcp_server_enabled when the user asks.",
+    });
+  const outcome = yield* servers.inspect(config);
+  if (outcome.error === null)
+    return openBotToolResult({
+      status: "ready",
+      server,
+      toolCount: outcome.toolCount,
+      tools: outcome.tools,
+      next: "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.",
+    });
+  if (outcome.needs === null && setupSteps.length > 0)
+    return openBotToolResult({
+      status: "not_running",
+      server,
+      error: servers.redact(outcome.error),
+      setupSteps,
+      next: "Give the user these steps, end your turn, and call openbot.test_mcp_server when the user says it is done.",
+    });
+  return yield* report(servers, { requestSignIn }, config, outcome, false);
+});
+
+/** A failure is a result the agent can correct, with the MCP secrets masked. */
+function asToolResult(
+  servers: AgentMcpServers,
+  effect: Effect.Effect<OpenBotToolResponse, ToolOperationFailed>,
+): Effect.Effect<OpenBotToolResponse> {
   const failed = (error: unknown) => Effect.succeed(openBotToolFailure(servers.redact(profileToolErrorMessage(error))));
-  return runMcpServerTool(servers, call).pipe(
+  return effect.pipe(
     Effect.catch((failure) => failed(failure.cause)),
     Effect.catchDefect(failed),
   );
-};
+}
 
 const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
   servers: AgentMcpServers,
@@ -265,7 +321,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
 /** What a test found, in words the agent acts on. A sign-in also puts its card in the conversation. */
 const report = Effect.fnUntraced(function* (
   servers: AgentMcpServers,
-  call: McpServerToolCall,
+  call: Pick<McpServerToolCall, "requestSignIn">,
   config: McpServerConfig,
   outcome: McpProbeOutcome,
   /** The server was just saved, so the agents get it from their next turn. */

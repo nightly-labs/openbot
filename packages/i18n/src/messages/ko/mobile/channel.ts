@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "일시 정지됨",
   "mobile.channel.task.resume": "재개",
   "mobile.channel.task.reassign": "다시 할당",
+  "mobile.channel.task.cancel": "작업 취소",
   "mobile.channel.loadFailed": "채널을 불러올 수 없어요. 다시 시도해 주세요.",
   "mobile.channel.actions.historyStale": "작업은 변경됐지만 채팅 기록을 새로 고칠 수 없었어요.",
   "mobile.channel.actions.refreshFailed": "작업 기록을 새로 고칠 수 없어요. 다시 시도해 주세요.",

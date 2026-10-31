@@ -130,14 +130,6 @@ export const messages = {
     "ChatGPT はダウンロード済みですが、起動できませんでした。OpenBot でもう一度ダウンロードしてください。",
   "error.provider.codexMissing":
     "ChatGPT はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
-  "error.provider.codexConfigIgnored": {
-    other:
-      "Codex は設定ファイルの {count} 件の設定を無視しました: {settings}。設定を修正または削除するか、Codex を更新してください。",
-  },
-  "error.provider.codexConfigIgnoredUnnamed": {
-    other:
-      "Codex は設定ファイルの {count} 件の設定を無視しました。設定を修正または削除するか、Codex を更新してください。",
-  },
   "error.provider.claudeOutdated": "Claude Code {version} は古すぎます。OpenBot には 2.1.232 以降が必要です。",
   "error.provider.claudeNotStarted": "Claude CLI は見つかりましたが、起動できませんでした。",
   "error.provider.claudeNotStartedHint":
@@ -199,6 +191,10 @@ export const messages = {
     "OpenCode はモデルプロバイダー「{provider}」にサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode はこのモデルのプロバイダーにサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
+  "error.provider.customEndpointKeyRefused":
+    "エンドポイント「{provider}」が API キーまたはヘッダーを拒否しました。サーバー設定 → プロバイダーでもう一度入力してから、もう一度お試しください。",
+  "error.provider.customEndpointKeyMissing":
+    "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeServiceFailure":

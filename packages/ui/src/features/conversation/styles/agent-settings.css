@@ -77,36 +77,44 @@
 }
 
 .agent-routines-list {
-  gap: 0;
+  gap: var(--openbot-space-2);
 }
 
+/* One card for each routine: the row opens the routine, and the switch at the end pauses it. */
 .agent-routine-list-item {
   display: grid;
+  min-height: 52px;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px;
+  gap: var(--openbot-space-3);
   align-items: center;
+  padding-inline-end: var(--openbot-space-4);
 }
 
 .agent-routine-row {
   display: grid;
   width: 100%;
-  min-height: 48px;
+  height: auto;
+  align-self: stretch;
   grid-template-columns: 16px minmax(0, 1fr);
-  gap: 9px;
+  gap: var(--openbot-space-3);
   align-items: center;
-  border: 1px solid transparent;
-  border-radius: var(--openbot-radius-md);
+  border: 0;
+  border-radius: 0;
   background: transparent;
-  padding: 5px 7px;
+  padding: var(--openbot-space-2) 0 var(--openbot-space-2) var(--openbot-space-4);
   text-align: left;
-  transition:
-    border-color var(--openbot-duration-hover) ease,
-    background-color var(--openbot-duration-hover) ease;
 }
 
 .agent-routine-row:focus-visible {
+  outline: none;
+}
+
+.agent-routine-card {
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.agent-routine-card:has(.agent-routine-row:focus-visible) {
   border-color: var(--openbot-border-strong);
-  background: var(--openbot-hover);
 }
 
 .agent-routine-row > span:nth-child(2) {
@@ -155,14 +163,14 @@
 
 .agent-routine-status-icon-active > svg,
 .agent-routine-status-icon-paused > svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   stroke-width: var(--openbot-icon-stroke);
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .agent-routine-card:has(.agent-routine-row:hover),
   .agent-routine-row:hover {
-    border-color: var(--openbot-border);
     background: var(--openbot-hover);
   }
 }

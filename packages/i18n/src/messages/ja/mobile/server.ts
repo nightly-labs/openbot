@@ -829,10 +829,9 @@ export const messages = {
   "mobile.server.usage.agents": "エージェント",
   "mobile.server.usage.agentLine": "トークン数 {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "この期間にはエージェントの使用量が記録されていません。",
-  "mobile.server.usage.allAgents": "すべてのエージェント",
-  "mobile.server.usage.agent": "エージェント",
   "mobile.server.usage.unsupported":
     "このホストは使用量の分析に対応していません。この画面を使うには、ホストを更新してください。",
+  "mobile.server.usage.planLimitsNote": "各プロバイダーの現在の上限です。下の期間では変わりません。",
   "mobile.server.planLimits.title": "プランの上限",
   "mobile.server.planLimits.button": "プランの上限: {summary}",
   "mobile.server.planLimits.left": "残り {percent}%",

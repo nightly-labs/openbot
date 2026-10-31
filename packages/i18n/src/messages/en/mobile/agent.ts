@@ -80,6 +80,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.usage.endDate": "End date",
   "mobile.agent.usage.unsupported": "This host does not support agent analytics.",
   "mobile.agent.info.usage.title": "Usage",
+  "mobile.agent.info.usage.agentTitle": "Usage · {name}",
   "mobile.agent.info.usage.loading": "Loading usage…",
   "mobile.agent.info.usage.reconnect": "Reconnect to load usage.",
   "mobile.agent.info.usage.failed": "Could not load usage.",

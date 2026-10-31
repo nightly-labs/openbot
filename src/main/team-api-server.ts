@@ -61,6 +61,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
@@ -121,6 +122,7 @@ import {
   WEBHOOK_TESTS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import {
@@ -233,6 +235,7 @@ import { routeChannels } from "./team-api/route-channels";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
+import { routeCustomAgents } from "./team-api/route-custom-agents";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
 import { routeEvents } from "./team-api/route-events";
@@ -994,6 +997,7 @@ export class TeamApiServer {
       if ((await routeAgentInstall(context, this.#options.admin, hidden, newAgentHidden)) === "handled") return;
       if ((await routeAgentPublish(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAcpRegistry(context, this.#options.admin)) === "handled") return;
+      if ((await routeCustomAgents(context, this.#options.admin)) === "handled") return;
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
@@ -2021,7 +2025,11 @@ export class TeamApiServer {
       capabilities: teamCapabilitiesVisibleToProtocol(TEAM_CURRENT_CAPABILITIES, protocol ?? TEAM_PROTOCOL_V1).filter(
         (capability) => {
           if (!expanded && !legacyTeamCapabilities([capability]).length) return false;
-          if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
+          if (
+            capability === "channel-chats-v1" ||
+            capability === CHANNEL_DELETE_CAPABILITY ||
+            capability === CHANNEL_TASK_CANCEL_CAPABILITY
+          )
             return this.#options.channels !== undefined;
           // Advertised only when this host can serve it: a client that negotiated it gets a route,
           // and one that did not never shows the panel.
@@ -2060,6 +2068,7 @@ export class TeamApiServer {
           if (capability === HOSTED_SITES_CAPABILITY) return this.#options.hostedSites !== undefined;
           if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
           if (capability === ACP_REGISTRY_CAPABILITY) return this.#options.admin?.acpRegistry !== undefined;
+          if (capability === CUSTOM_AGENTS_CAPABILITY) return this.#options.admin?.customAgents !== undefined;
           if (capability === AGENT_SESSION_SETTINGS_CAPABILITY)
             return this.#options.admin?.sessionSettings !== undefined;
           if (capability === AGENT_FOLDERS_CAPABILITY) return this.#options.admin?.folders !== undefined;

@@ -68,6 +68,7 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
   "error.backend.channelTaskComplete": "Cette tâche est déjà terminée.",
+  "error.backend.channelTaskNotStopped": "Seule une tâche arrêtée ou en échec peut être annulée.",
   "error.backend.channelSelectAgent": "Sélectionnez un agent.",
   "error.backend.channelLeadRequired":
     "Choisissez un responsable de canal disponible ou attribuez cette tâche à un membre.",

@@ -151,7 +151,12 @@ export class ChannelClient {
     });
   }
 
-  taskCommand(type: "stop" | "resume" | "reassign", channelId: string, taskId: string, recipientAgentId = null) {
+  taskCommand(
+    type: "stop" | "resume" | "reassign" | "cancel",
+    channelId: string,
+    taskId: string,
+    recipientAgentId = null,
+  ) {
     return this.command({ type, operationId: crypto.randomUUID(), channelId, taskId, recipientAgentId });
   }
 

@@ -66,12 +66,19 @@ be mixed into current conversion or reliability metrics.
 - Clients observing a remote host do not re-emit host lifecycle.
 - Landing, invitation, and pre-authentication events are anonymous.
 - The account service (`account_api`) sends account, billing and hosted server events from the
-  Worker, with the account ID as `profileId`. It never sends an email, a Stripe ID, a server ID, a name or an
+  Worker, with the account ID as `profileId`. Its events never contain an email, a Stripe ID, a server ID, a name or an
   amount in another currency. It uses an OpenPanel server client (`OPENPANEL_CLIENT_ID` and
   `OPENPANEL_CLIENT_SECRET`) of the same project, and only production has these secrets. The desktop
   analytics preference does not apply to these events: the account service records a payment or a
   server change, not a UI action on the computer. `email_sent` has no account, so it has no
   `profileId`, as `billing_snapshot`.
+- A paying account is not anonymous. With a `billing_action` of `plan_started`, `plan_changed`,
+  `cancel_scheduled` or `cancel_withdrawn`, and with each payment (`payment_succeeded` and `revenue`
+  from the sales ledger, once per account in a drain), for a server plan or a license, the account
+  service sends an OpenPanel `identify` with the account ID and the normalized account email from D1.
+  The app analytics preference does not stop it. The email stays a profile trait and is not in the
+  event. An account that paid before this change gets its email at its next payment or plan change;
+  the identity backfill below can set it earlier. `bun run test:paid-account-identity` checks this in `check:api`.
 - The Signal host (`signal`) sends `signal_capacity` from its capacity reporter, with the same server
   client and no `profileId`. It has counts only: no account, address, session or room.
 - OpenPanel receives the central account ID as `profileId` and the normalized account email as the

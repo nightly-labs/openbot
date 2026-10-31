@@ -148,9 +148,10 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   scrollbar-gutter: stable;
 }
 
-/* Each list and page has one width, so the content does not move when a page opens. */
+/* Each list and page has one width, so the content does not move when a page opens. The large list title needs more
+   space below the top bar than the inset gives. */
 .marketplace-frame {
-  padding: var(--openbot-space-6) var(--marketplace-inset) var(--openbot-space-8);
+  padding: calc(var(--openbot-space-8) + var(--openbot-space-2)) var(--marketplace-inset) var(--openbot-space-8);
 }
 
 .marketplace-frame > * {
@@ -268,27 +269,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-4);
 }
 
-.marketplace-head-actions {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  min-width: 0;
-  max-width: 50%;
-  gap: var(--openbot-space-1);
-}
-
-.marketplace-head-copy {
-  display: grid;
-  flex: 1;
-  gap: var(--openbot-space-1);
-  min-width: 0;
-}
-
-.marketplace-page-title {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
 .marketplace-command {
   overflow-wrap: anywhere;
   color: var(--openbot-text-primary);
@@ -329,24 +309,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 .marketplace-search {
   position: relative;
   flex: 1;
-  min-width: 0;
-}
-
-.marketplace-block {
-  display: grid;
-  gap: var(--openbot-space-2);
-}
-
-.marketplace-block-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--openbot-space-2);
-}
-
-.marketplace-block-copy {
-  display: grid;
-  gap: var(--openbot-space-0-5);
   min-width: 0;
 }
 
@@ -566,32 +528,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   color: var(--marketplace-done-mark, currentColor);
 }
 
-/* ---------------------------------------------------------------- rows */
-
-.marketplace-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.marketplace-row {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  min-height: 52px;
-  padding: var(--openbot-space-1-5) var(--openbot-space-2);
-  border-radius: var(--openbot-radius-md);
-}
-
-.marketplace-row-copy {
-  display: grid;
-  flex: 1;
-  gap: var(--openbot-space-0-5);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 /* ---------------------------------------------------------------- app list */
 
 .marketplace-app-group {
@@ -714,20 +650,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 }
 
 /* ---------------------------------------------------------------- pages */
-
-.marketplace-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: var(--openbot-space-8);
-  align-items: start;
-}
-
-.marketplace-side {
-  position: sticky;
-  top: var(--openbot-space-6);
-  padding-left: var(--openbot-space-6);
-  border-left: 1px solid var(--openbot-border);
-}
 
 /* `dt` and `dd` are direct children of the list, so each fact is one pair of grid rows. */
 .marketplace-props {
@@ -1148,6 +1070,74 @@ label.marketplace-skill-picker-row:hover {
   vertical-align: text-bottom;
 }
 
+/* ---------------------------------------------------------------- agents */
+
+/* A featured agent: avatar and action, name and creator, two lines of text, then what it brings. The
+   avatar carries the color, so the card has no artwork. Its own stack keeps "Add" under the sticky bar. */
+.marketplace-agent-feature {
+  isolation: isolate;
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.marketplace-agent-feature .marketplace-card-head {
+  justify-content: space-between;
+}
+
+.marketplace-agent-feature-copy {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+}
+
+/* The two lines of text keep their room, so the last line lines up across a row of cards. */
+.marketplace-agent-feature .marketplace-card-body {
+  align-self: start;
+  min-height: 2lh;
+}
+
+.marketplace-agent-feature .marketplace-skill-verified {
+  display: inline-block;
+  margin-inline-start: var(--openbot-space-1);
+  vertical-align: text-bottom;
+}
+
+/* The creator after the name and the shield. It shrinks first, so the name stays. */
+.marketplace-agent-by {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The name and the creator share a baseline; the shield stays centred on the name. */
+.marketplace-agent-row .marketplace-skill-name {
+  align-items: baseline;
+}
+
+.marketplace-agent-row .marketplace-app-row-name {
+  min-width: 0;
+}
+
+.marketplace-agent-row .marketplace-skill-verified {
+  align-self: center;
+}
+
+/* Who made the agent and whether OpenBot reviewed it, under the page header. */
+.marketplace-agent-trust {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.marketplace-agent-trust svg {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
 /* ---------------------------------------------------------------- view transitions */
 
 /* View changes run in a view transition (`moveView`). The page slides a little in the way the
@@ -1326,17 +1316,6 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
 @media (max-width: 860px) {
   .skills-marketplace {
     --marketplace-inset: var(--openbot-space-4);
-  }
-
-  .marketplace-page {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .marketplace-side {
-    position: static;
-    padding: var(--openbot-space-4) 0 0;
-    border-top: 1px solid var(--openbot-border);
-    border-left: 0;
   }
 
   .marketplace-head {
