@@ -358,6 +358,8 @@ export const messages = {
   "mobile.agent.newChat.failed": "새 채팅을 시작할 수 없어요",
   "mobile.agent.newChat.failedBody": "호스트가 새 채팅을 시작하지 못했어요.",
   "mobile.agent.newChat.unsupported": "이 호스트는 원격 기기에서 새 채팅을 시작할 수 없어요.",
+  "mobile.agent.agentNewChat.title": "에이전트가 새 채팅 시작",
+  "mobile.agent.agentNewChat.footer": "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "mobile.agent.tables.title": "테이블",
   "mobile.agent.tables.loading": "테이블 불러오는 중…",
   "mobile.agent.tables.reconnect": "테이블을 불러오려면 다시 연결해 주세요.",

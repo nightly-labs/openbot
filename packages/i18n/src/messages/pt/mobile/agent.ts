@@ -369,6 +369,9 @@ export const messages = {
   "mobile.agent.newChat.failedBody": "O computador anfitrião não conseguiu iniciar um novo chat.",
   "mobile.agent.newChat.unsupported":
     "Este computador anfitrião não pode iniciar um novo chat a partir de um dispositivo remoto.",
+  "mobile.agent.agentNewChat.title": "O agente inicia novos chats",
+  "mobile.agent.agentNewChat.footer":
+    "Permite que o agente inicie um novo chat quando o chat dele ficar longo. Ele salva notas antes.",
   "mobile.agent.tables.title": "Tabelas",
   "mobile.agent.tables.loading": "Carregando tabelas…",
   "mobile.agent.tables.reconnect": "Reconecte-se para carregar as tabelas.",

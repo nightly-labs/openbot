@@ -364,6 +364,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Kan geen nieuwe chat starten",
   "mobile.agent.newChat.failedBody": "De host kan geen nieuwe chat starten.",
   "mobile.agent.newChat.unsupported": "Deze host kan geen nieuwe chat starten vanaf een extern apparaat.",
+  "mobile.agent.agentNewChat.title": "Agent start nieuwe chats",
+  "mobile.agent.agentNewChat.footer":
+    "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "mobile.agent.tables.title": "Tabellen",
   "mobile.agent.tables.loading": "Tabellen laden…",
   "mobile.agent.tables.reconnect": "Maak opnieuw verbinding om tabellen te laden.",

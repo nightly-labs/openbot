@@ -2,6 +2,7 @@ import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
   type AgentHostSettings,
+  type AgentNewChatSettings,
   type AgentTaskLimitSettings,
   agentProviderDescriptor,
   agentProviderName,
@@ -60,7 +61,7 @@ interface AgentHostFieldsProps {
  */
 function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
-  part: "host" | "task-limit",
+  part: "host" | "task-limit" | "new-chat",
   load: (agentId: string, serverId: string) => Promise<Settings | null>,
   update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
 ) {
@@ -254,6 +255,40 @@ export function AgentTaskLimitField(props: AgentHostFieldsProps) {
           }
         >
           <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
+ * Agent info > Advanced: whether the agent starts a new chat itself when its chat gets long, as on
+ * desktop. Only an owner or admin sees it, and only when the host serves `agent-new-chat-v1`. A
+ * change on desktop shows here while the page is open, and a change here shows on desktop at once.
+ */
+export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const { current, enabled, error, save } = useAgentHostRecord<AgentNewChatSettings, AgentNewChatSettings>(
+    props,
+    "new-chat",
+    workspace.loadAgentNewChat,
+    workspace.updateAgentNewChat,
+  );
+  if (!current) return null;
+  return (
+    <>
+      <SettingsSection footer={t("mobile.agent.agentNewChat.footer")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={current.allowNewChat}
+            disabled={!enabled}
+            label={t("mobile.agent.agentNewChat.title")}
+            dark={theme === "dark"}
+            onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
+          />
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

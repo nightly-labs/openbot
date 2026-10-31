@@ -366,6 +366,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "新しいチャットを始められませんでした",
   "mobile.agent.newChat.failedBody": "ホストは新しいチャットを始められませんでした。",
   "mobile.agent.newChat.unsupported": "このホストでは、リモートデバイスから新しいチャットを始められません。",
+  "mobile.agent.agentNewChat.title": "エージェントが新しいチャットを開始",
+  "mobile.agent.agentNewChat.footer":
+    "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "mobile.agent.tables.title": "テーブル",
   "mobile.agent.tables.loading": "テーブルを読み込んでいます…",
   "mobile.agent.tables.reconnect": "テーブルを読み込むには再接続してください。",

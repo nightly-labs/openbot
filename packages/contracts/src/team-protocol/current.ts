@@ -12,6 +12,7 @@ import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
+import { AGENT_NEW_CHAT_CAPABILITY } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
@@ -146,6 +147,7 @@ export {
   AGENT_INSTALL_CAPABILITY,
   AGENT_MEMORIES_CAPABILITY,
   AGENT_MEMORY_LIMIT_CAPABILITY,
+  AGENT_NEW_CHAT_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
@@ -350,6 +352,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  AGENT_NEW_CHAT_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
 ] as const;
 
@@ -485,6 +488,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
     capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&
+    capability !== AGENT_NEW_CHAT_CAPABILITY &&
     capability !== BROWSER_PROFILES_EVENTS_CAPABILITY,
 );
 /**
@@ -495,6 +499,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_NEW_CHAT_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -588,6 +593,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_NOTIFICATION_LEVELS_CAPABILITY &&
       capability !== PROVIDER_SIGN_OUT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CAPABILITY &&
+      capability !== AGENT_NEW_CHAT_CAPABILITY &&
       capability !== BROWSER_PROFILES_EVENTS_CAPABILITY &&
       capability !== TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   );

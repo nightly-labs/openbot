@@ -371,6 +371,9 @@ export const messages = {
   "mobile.agent.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden",
   "mobile.agent.newChat.failedBody": "Der Host konnte keinen neuen Chat starten.",
   "mobile.agent.newChat.unsupported": "Dieser Host kann keinen neuen Chat von einem Remote-Gerät aus starten.",
+  "mobile.agent.agentNewChat.title": "Agent startet neue Chats",
+  "mobile.agent.agentNewChat.footer":
+    "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "mobile.agent.tables.title": "Tabellen",
   "mobile.agent.tables.loading": "Tabellen werden geladen…",
   "mobile.agent.tables.reconnect": "Verbinde dich erneut, um die Tabellen zu laden.",

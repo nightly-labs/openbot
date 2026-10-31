@@ -42,6 +42,7 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
+import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import {
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_ROUTES,
@@ -706,6 +707,8 @@ try {
               else if (input.backupModels) target.backupModels = input.backupModels;
               if (input.taskLimit === null) delete target.taskLimit;
               else if (input.taskLimit !== undefined) target.taskLimit = input.taskLimit;
+              if (input.allowNewChat === null) delete target.allowNewChat;
+              else if (input.allowNewChat !== undefined) target.allowNewChat = input.allowNewChat;
               return target;
             }),
         },
@@ -1678,6 +1681,105 @@ try {
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,
       [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Agent new chats (agent-new-chat-v1) ----
+  {
+    const newChatCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_NEW_CHAT_CAPABILITY];
+    const writes = callsOf("updateAgent").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-new-chat-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_NEW_CHAT_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const adminRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "an admin reads the host default for an agent without its own choice",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(adminRead.body, { allowNewChat: DEFAULT_AGENT_DEFAULTS.allowNewChat }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the new-chat routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: newChatCapabilities,
+    });
+    const memberSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", allowNewChat: true },
+      capabilities: newChatCapabilities,
+    });
+    const invalid = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", allowNewChat: null },
+      capabilities: newChatCapabilities,
+    });
+    check(
+      "a member cannot read or set new chats, a value that is not a boolean gets 400, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        invalid.status === 400 &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet), summary(invalid)],
+    );
+    const results: boolean[] = [];
+    for (const allowNewChat of [true, false]) {
+      const adminSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+        token: adaToken,
+        json: { agentId: "agent-ada", allowNewChat },
+        capabilities: newChatCapabilities,
+      });
+      const readBack = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+        token: adaToken,
+        json: { agentId: "agent-ada" },
+        capabilities: newChatCapabilities,
+      });
+      results.push(
+        adminSet.status === 200 &&
+          isDeepStrictEqual(adminSet.body, { allowNewChat }) &&
+          isDeepStrictEqual(readBack.body, { allowNewChat }) &&
+          isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", allowNewChat }]),
+      );
+    }
+    check(
+      "an admin turns new chats on and off through the agent writer and reads each value back",
+      results.every(Boolean),
+      results,
+    );
+    const missing = await call("POST", AGENT_NEW_CHAT_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      capabilities: newChatCapabilities,
+    });
+    const hiddenSet = await call("POST", AGENT_NEW_CHAT_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-pi", allowNewChat: true },
+      capabilities: newChatCapabilities,
+      protocol: 6,
+    });
+    check(
+      "an unknown agent and an agent that the client protocol does not show get 404",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === writes + 2,
+      [summary(missing), summary(hiddenSet)],
     );
   }
 

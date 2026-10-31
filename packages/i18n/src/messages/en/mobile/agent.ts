@@ -355,6 +355,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.newChat.failed": "Could not start a new chat",
   "mobile.agent.newChat.failedBody": "The host could not start a new chat.",
   "mobile.agent.newChat.unsupported": "This host cannot start a new chat from a remote device.",
+  "mobile.agent.agentNewChat.title": "Agent starts new chats",
+  "mobile.agent.agentNewChat.footer": "Let the agent start a new chat when its chat gets long. It saves notes first.",
   "mobile.agent.tables.title": "Tables",
   "mobile.agent.tables.loading": "Loading tables…",
   "mobile.agent.tables.reconnect": "Reconnect to load tables.",

@@ -1,18 +1,21 @@
 import { Effect, Schema } from "effect";
-// Computer Use, local scripts, the busy-message mode, the backup models and the task limit of one
-// agent, as this computer holds them. The `agent-host-settings-v1`, `agent-backup-models-v1` and
-// `agent-task-limit-v1` host routes use this, and they write through `AgentService.updateAgent`, the
+// Computer Use, local scripts, the busy-message mode, the backup models, the task limit and the
+// agent's own new chats of one agent, as this computer holds them. The `agent-host-settings-v1`,
+// `agent-backup-models-v1`, `agent-task-limit-v1` and `agent-new-chat-v1` host routes use this, and they write through `AgentService.updateAgent`, the
 // writer of the local window, so a remote admin changes the same state.
 
 import {
   type AgentBackupModelSettings,
   type AgentHostSettings,
+  type AgentNewChatSettings,
   type AgentSummary,
   type AgentTaskLimitSettings,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentNewChatAllowed,
   type UpdateAgentBackupModelsInput,
   type UpdateAgentHostSettingsInput,
+  type UpdateAgentNewChatInput,
   type UpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -37,6 +40,8 @@ export interface AgentHostSettingsService {
   ): Effect.Effect<AgentBackupModelSettings, AgentHostSettingsFailure>;
   readTaskLimit(agentId: string): AgentTaskLimitSettings;
   updateTaskLimit(input: UpdateAgentTaskLimitInput): Effect.Effect<AgentTaskLimitSettings, AgentHostSettingsFailure>;
+  readNewChat(agentId: string): AgentNewChatSettings;
+  updateNewChat(input: UpdateAgentNewChatInput): Effect.Effect<AgentNewChatSettings, AgentHostSettingsFailure>;
 }
 
 export function createAgentHostSettings({
@@ -95,6 +100,20 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, taskLimit: next }).pipe(toAgentHostSettingsFailure);
     return taskLimit(agent);
   });
+  const newChat = (agent: AgentSummary): AgentNewChatSettings => ({
+    allowNewChat: agentNewChatAllowed(agent, agentDefaults.get()),
+  });
+  const updateNewChat = Effect.fn("AgentHostSettings.updateNewChat")(function* ({
+    agentId,
+    allowNewChat,
+  }: UpdateAgentNewChatInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, allowNewChat }).pipe(toAgentHostSettingsFailure);
+    return newChat(agent);
+  });
   return {
     read: (agentId) => settings(requireAgent(agentId)),
     update: (input) => update(input).pipe(Effect.uninterruptible),
@@ -102,6 +121,8 @@ export function createAgentHostSettings({
     updateBackupModels: (input) => updateBackupModels(input).pipe(Effect.uninterruptible),
     readTaskLimit: (agentId) => taskLimit(requireAgent(agentId)),
     updateTaskLimit: (input) => updateTaskLimit(input).pipe(Effect.uninterruptible),
+    readNewChat: (agentId) => newChat(requireAgent(agentId)),
+    updateNewChat: (input) => updateNewChat(input).pipe(Effect.uninterruptible),
   };
 }
 

@@ -15,6 +15,7 @@ type AgentRecordPart =
   | "admin"
   | "host"
   | "task-limit"
+  | "new-chat"
   | "publish"
   | "browser-profile";
 
@@ -26,6 +27,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "admin",
   "host",
   "task-limit",
+  "new-chat",
   "session-settings",
   "provider-accounts",
   "browser-profile",

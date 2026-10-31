@@ -13,6 +13,7 @@ import type {
   AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
+  AgentNewChatSettings,
   AgentNotificationLevelsSnapshot,
   AgentProviderId,
   AgentReasoningEffort,
@@ -99,6 +100,7 @@ import type {
   UpdateAgentBrowserProfileInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
+  UpdateAgentNewChatInput,
   UpdateAgentTaskLimitInput,
   UpdateBrowserProfileInput,
   UpdateRestartMode,
@@ -592,6 +594,15 @@ export interface MobileWorkspaceContextValue {
   loadAgentTaskLimit: (agentId: string, serverId: string) => Promise<AgentTaskLimitSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the limit the host saved. */
   updateAgentTaskLimit: (input: UpdateAgentTaskLimitInput, serverId: string) => Promise<AgentTaskLimitSettings>;
+  /** An owner or admin of an online host that serves `agent-new-chat-v1`. The host checks the role again. */
+  canManageAgentNewChat: (serverId: string) => boolean;
+  /**
+   * Whether the agent starts a new chat itself when its chat gets long. Null when the host does not
+   * advertise `agent-new-chat-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentNewChat: (agentId: string, serverId: string) => Promise<AgentNewChatSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
+  updateAgentNewChat: (input: UpdateAgentNewChatInput, serverId: string) => Promise<AgentNewChatSettings>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -827,6 +838,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
   | "canManageAgentTaskLimit"
+  | "canManageAgentNewChat"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
   | "canPublishAgent";

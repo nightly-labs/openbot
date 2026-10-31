@@ -238,6 +238,30 @@ export function parseUpdateAgentTaskLimitInput(value: unknown): UpdateAgentTaskL
   return { agentId: value.agentId, taskLimit: decodeTaskLimit(value.taskLimit) };
 }
 
+/**
+ * Whether the agent may start a new chat itself when its chat gets long. The read gives the value
+ * that applies: the agent's own choice, else the host default. A change saves the agent's own choice.
+ */
+export interface AgentNewChatSettings {
+  allowNewChat: boolean;
+}
+
+export interface UpdateAgentNewChatInput {
+  agentId: string;
+  allowNewChat: boolean;
+}
+
+export function decodeAgentNewChatSettings(value: unknown): AgentNewChatSettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat setting.");
+  return { allowNewChat: value.allowNewChat };
+}
+
+export function parseUpdateAgentNewChatInput(value: unknown): UpdateAgentNewChatInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.allowNewChat))
+    throw new Error("Invalid new chat setting.");
+  return { agentId: value.agentId, allowNewChat: value.allowNewChat };
+}
+
 /** The agent a host added from a marketplace listing or a shared template. The agent list has the rest. */
 export interface AddedAgent {
   id: string;
