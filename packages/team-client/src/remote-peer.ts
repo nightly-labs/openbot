@@ -1068,8 +1068,14 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
   function handleSignal(state: PeerState, message: SignalServerMessage, actions: ActionsRef) {
     return Effect.fn("RemotePeer.handleSignal")(function* () {
       if (state.closed || peer !== state) return;
-      // Webhook frames are for the desktop host's ingress socket, never for a team client.
-      if (message.type === "webhook-ready" || message.type === "webhook-delivery") return;
+      // Webhook and GitHub frames are for the desktop host's ingress socket, never for a team client.
+      if (
+        message.type === "webhook-ready" ||
+        message.type === "webhook-delivery" ||
+        message.type === "github-ready" ||
+        message.type === "github-delivery"
+      )
+        return;
       if (message.type === "account-profile-changed") {
         // Profile refresh failure must never break the RTC connection.
         yield* notify(peerCall(() => actions.current.onAccountProfileChanged?.()));

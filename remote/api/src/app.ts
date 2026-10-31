@@ -7,6 +7,16 @@ import {
 } from "@openbot/contracts/signal-protocol/discord-api";
 import { DISCORD_API_PATH } from "@openbot/contracts/signal-protocol/discord-route";
 import {
+  GITHUB_DELIVERY_BODY_BYTES_LIMIT,
+  GITHUB_DELIVERY_HEADER,
+  GITHUB_DELIVERY_ID_PATTERN,
+  GITHUB_EVENT_HEADER,
+  GITHUB_EVENT_PATTERN,
+  GITHUB_EVENTS_PATH,
+  GITHUB_SIGNATURE_HEADER,
+  GITHUB_SIGNATURE_PATTERN,
+} from "@openbot/contracts/signal-protocol/github-route";
+import {
   WEBHOOK_DELIVERY_BODY_BYTES_LIMIT,
   type WebhookDeliveryStatus,
 } from "@openbot/contracts/signal-protocol/messages";
@@ -41,7 +51,7 @@ import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
-import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import { verifyGitHubSignature, verifySlackSignature, verifyWebhookSignature } from "./tokens";
 import type { TurnRelays } from "./turn-relays";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -53,6 +63,12 @@ const DISCORD_JSON_BODY_BYTES_LIMIT = 64 * 1024;
 const DISCORD_UPLOAD_BODY_BYTES_LIMIT = DISCORD_UPLOAD_BYTES_LIMIT + 64 * 1024;
 // An account event is one small JSON object.
 const AUTH_EVENT_BODY_BYTES_LIMIT = 64 * 1024;
+
+// The only parts of a GitHub event that Signal reads: they pick the hosts.
+const githubRequestSchema = z.object({
+  installation: z.object({ id: z.int().positive() }),
+  repository: z.object({ id: z.int().positive() }),
+});
 
 const slackRequestSchema = z.object({
   type: z.string().optional(),
@@ -292,6 +308,54 @@ export function createRemoteApiApp(
       },
       { parse: "none" },
     )
+    // The OpenBot GitHub App's one webhook URL, for the events of every installation. Signal checks
+    // the App's signature, reads only the installation and repository IDs, and passes the exact body
+    // to the ingress socket of every host whose GitHub route names the repository. Nothing here
+    // stores or logs the body.
+    .post(
+      GITHUB_EVENTS_PATH,
+      async ({ request, server }) => {
+        const secret = config.githubWebhookSecret;
+        if (!secret || !entry.isEntry) return emptyResponse(503);
+        const declaredLength = Number(request.headers.get("content-length") ?? "0");
+        if (!Number.isFinite(declaredLength) || declaredLength > GITHUB_DELIVERY_BODY_BYTES_LIMIT) {
+          await request.body?.cancel();
+          return emptyResponse(413);
+        }
+        const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") return emptyResponse(415);
+        const event = request.headers.get(GITHUB_EVENT_HEADER) ?? "";
+        const deliveryId = request.headers.get(GITHUB_DELIVERY_HEADER) ?? "";
+        const signature = request.headers.get(GITHUB_SIGNATURE_HEADER) ?? "";
+        const address = () =>
+          signalClientIp(
+            server?.requestIP(request)?.address,
+            request.headers.get("x-forwarded-for"),
+            config.trustProxy,
+          );
+        if (
+          !GITHUB_EVENT_PATTERN.test(event) ||
+          !GITHUB_DELIVERY_ID_PATTERN.test(deliveryId) ||
+          !GITHUB_SIGNATURE_PATTERN.test(signature)
+        ) {
+          await request.body?.cancel();
+          return emptyResponse(signal.acceptGitHubRequest(`address:${address()}`) ? 401 : 429);
+        }
+        const body = await readBounded(request, GITHUB_DELIVERY_BODY_BYTES_LIMIT);
+        if (!body) return emptyResponse(413);
+        if (!verifyGitHubSignature(body, signature, secret))
+          return emptyResponse(signal.acceptGitHubRequest(`address:${address()}`) ? 401 : 429);
+        // `ping` and the events of an installation itself name no repository: nothing to pass on.
+        const github = githubRequest(body);
+        if (!github) return emptyResponse(204);
+        if (!signal.acceptGitHubRequest(`installation:${github.installationId}`)) return emptyResponse(429);
+        const result = await runtime.runPromise(signal.deliverGitHub({ ...github, event, deliveryId, body }), {
+          signal: request.signal,
+        });
+        return emptyResponse(result.status);
+      },
+      { parse: "none" },
+    )
     // The Discord calls of a host, with the `discord-session` token of its `ingress` socket. Signal makes
     // each call with the bot token, only in a guild routed to that socket. Nothing here stores or logs
     // the body or Discord's answer.
@@ -497,6 +561,20 @@ function slackRequest(
     : null;
 }
 
+/** The installation and repository of a signed GitHub event, or `null` when it names none. */
+function githubRequest(body: Uint8Array): { installationId: number; repositoryId: number } | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return null;
+  }
+  const parsed = githubRequestSchema.safeParse(value);
+  return parsed.success
+    ? { installationId: parsed.data.installation.id, repositoryId: parsed.data.repository.id }
+    : null;
+}
+
 function slackResponse(response: SlackDeliveryResponse | { status: 413 | 415 | 429 | 401 | 400 | 503 }): Response {
   const headers: Record<string, string> = { "Cache-Control": "no-store" };
   if ("contentType" in response && response.contentType && response.body !== undefined) {
@@ -696,6 +774,10 @@ export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays,
     `openbot_remote_slack_deliveries_total ${metrics.slackDeliveries}`,
     "# TYPE openbot_remote_slack_deliveries_unavailable_total counter",
     `openbot_remote_slack_deliveries_unavailable_total ${metrics.slackDeliveriesUnavailable}`,
+    "# TYPE openbot_remote_github_deliveries_total counter",
+    `openbot_remote_github_deliveries_total ${metrics.githubDeliveries}`,
+    "# TYPE openbot_remote_github_deliveries_unavailable_total counter",
+    `openbot_remote_github_deliveries_unavailable_total ${metrics.githubDeliveriesUnavailable}`,
     "# TYPE openbot_remote_telegram_deliveries_total counter",
     `openbot_remote_telegram_deliveries_total ${metrics.telegramDeliveries}`,
     "# TYPE openbot_remote_telegram_deliveries_unrouted_total counter",

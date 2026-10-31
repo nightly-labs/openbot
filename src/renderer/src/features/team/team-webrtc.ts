@@ -362,7 +362,7 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
 }
 
 async function handleSignal(state: PeerState, message: SignalServerMessage): Promise<void> {
-  // Signal sends Slack, Discord, webhook and Telegram messages only to the main process's `ingress`
+  // Signal sends Slack, Discord, webhook, GitHub and Telegram messages only to the main process's `ingress`
   // socket, never to this peer. `host-waiting` answers only a hello with `waitForHost`, which this
   // peer does not send.
   if (
@@ -372,6 +372,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     message.type === "discord-delivery" ||
     message.type === "webhook-ready" ||
     message.type === "webhook-delivery" ||
+    message.type === "github-ready" ||
+    message.type === "github-delivery" ||
     message.type === "telegram-delivery" ||
     message.type === "telegram-call-result" ||
     message.type === "queued-delivery"

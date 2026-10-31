@@ -13,6 +13,11 @@ import {
   DISCORD_ROUTE_TTL_SECONDS,
   type DiscordRouteGuild,
 } from "@openbot/contracts/signal-protocol/discord-route";
+import {
+  GITHUB_ROUTE_AUDIENCE,
+  GITHUB_ROUTE_TTL_SECONDS,
+  type GitHubRouteRepository,
+} from "@openbot/contracts/signal-protocol/github-route";
 import type { IngressRoute } from "@openbot/contracts/signal-protocol/ingress-queue";
 import {
   SLACK_ROUTE_AUDIENCE,
@@ -55,6 +60,7 @@ import {
   SERVER_MEMBER_LIMIT_SQL,
 } from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
+import type { GitHubInstallationTokensError, GitHubRepositoryRoute } from "./github-installation-tokens";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -381,6 +387,27 @@ export class RemoteTicketSigner {
         .setIssuedAt(issuedAt)
         .setExpirationTime(issuedAt + WEBHOOK_ROUTE_TTL_SECONDS)
         .setAudience(WEBHOOK_ROUTE_AUDIENCE)
+        .sign(signingKey),
+    );
+  }).bind(this);
+
+  /** Signs the GitHub repositories that one host watches, as `issueWebhookRoute` signs its routes. */
+  readonly issueGitHubRoute = Effect.fn("RemoteTicketSigner.issueGitHubRoute")(function* (
+    this: RemoteTicketSigner,
+    input: { hostId: string; repositories: GitHubRouteRepository[]; now: number },
+  ) {
+    const signingKey = yield* this.#signingKey();
+    const issuedAt = Math.floor(input.now / 1_000);
+    const repositories = input.repositories.map((repository) => ({
+      id: repository.id,
+      installationId: repository.installationId,
+    }));
+    return yield* remoteCall(() =>
+      new SignJWT({ hid: input.hostId, repositories })
+        .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(issuedAt + GITHUB_ROUTE_TTL_SECONDS)
+        .setAudience(GITHUB_ROUTE_AUDIENCE)
         .sign(signingKey),
     );
   }).bind(this);
@@ -2218,6 +2245,33 @@ export class RemoteControlPlane {
       return {
         ticket: yield* dependencies.signer.issueWebhookRoute({ hostId, routes, now: dependencies.now() }),
         routes: routes.map((route) => route.id),
+      };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * The route ticket that the host's Signal ingress socket presents for GitHub events. D1 keeps no
+   * GitHub route: `repositories` checks, with the host's GitHub sign-in, which repositories it can
+   * see, and runs only after the host credential, so an unknown caller cannot make GitHub calls.
+   */
+  readonly issueGitHubRoute = Effect.fn("RemoteControlPlane.issueGitHubRoute")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+      repositories: Effect.Effect<GitHubRepositoryRoute[], GitHubInstallationTokensError>,
+    ): Effect.fn.Return<
+      { ticket: string; repositories: GitHubRepositoryRoute[] },
+      RemoteFailure | GitHubInstallationTokensError,
+      RemoteDependencies
+    > {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.authenticateHost(hostId, machineToken);
+      const routes = yield* repositories;
+      return {
+        ticket: yield* dependencies.signer.issueGitHubRoute({ hostId, repositories: routes, now: dependencies.now() }),
+        repositories: routes,
       };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),

@@ -54,6 +54,23 @@ must be in the ticket JWKS that Signal loads (`REMOTE_TICKET_PUBLIC_JWKS` on the
 `REMOTE_TICKET_PUBLIC_KEYS` here). Signal does not store or log the body. Without
 `SLACK_SIGNING_SECRET`, the Slack route answers 503.
 
+## GitHub events
+
+The OpenBot GitHub App sends the events of every installation to one webhook URL,
+`https://signal.openbot.run/v1/github/events`. Signal checks GitHub's `X-Hub-Signature-256` with the
+App's webhook secret (`GITHUB_WEBHOOK_SECRET`, at least 32 bytes), and reads only the event name, the
+delivery ID, the installation ID and the repository ID. Then it passes the exact body to the `ingress`
+socket of every host whose GitHub route names the repository, at the same time. It answers 202 when a
+host saved the event, 204 when no host watches the repository or every host refused it, and 503 when a
+host did not answer. A body larger than 64 KiB gets 413. GitHub does not send an event again by itself:
+an event for a host that is offline is lost, and the host shows the gap in its event history.
+
+An `ingress` socket names its repositories with a GitHub route ticket: an ES256 JWT with the audience
+`openbot-github-route`, signed by the Worker with the remote ticket key, for 5 minutes. The Worker
+checks, with the host's GitHub sign-in, which of the repositories that the host's GitHub triggers watch
+the sign-in can see through an installation of the App. D1 keeps none of it. Signal does not store or
+log the body. Without `GITHUB_WEBHOOK_SECRET`, the GitHub route answers 503.
+
 ## Discord
 
 The OpenBot Discord bot is one bot for every guild that installs it. Signal holds its bot token
@@ -224,13 +241,13 @@ the entry:
 - A ticket or resume token without a `signal` claim gets close 1013 and no error frame. The peer
   connects again through the entry name. When the machine stops being the entry, it closes these
   sockets (host, client and `ingress`) with 1013.
-- The Slack, Telegram and generic webhook routes answer 503.
+- The Slack, Telegram, GitHub and generic webhook routes answer 503.
 - The Discord Gateway is stopped, and `/v1/discord/api` answers 503 (`unavailable`). The Gateway starts
   again when the machine becomes the entry again.
 
-Set `TELEGRAM_WEBHOOK_ORIGIN` and the Slack and webhook URLs to the entry name.
+Set `TELEGRAM_WEBHOOK_ORIGIN` and the Slack, GitHub and webhook URLs to the entry name.
 
-On failover, the entry name moves. With it move the bots (Slack, Telegram, Discord, webhooks), the
+On failover, the entry name moves. With it move the bots (Slack, Telegram, Discord, GitHub, webhooks), the
 `ingress` sockets, and the hosts and clients whose tickets have no `signal` claim. A peer whose ticket
 names a machine stays on that machine, and needs a new ticket to move.
 

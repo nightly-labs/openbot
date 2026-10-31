@@ -1,5 +1,6 @@
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { GITHUB_REPOSITORY_NAME_PATTERN } from "./signal-protocol/github-route";
 
 /**
  * GitHub triggers and outputs of workflows. A GitHub trigger starts a run when the OpenBot GitHub App
@@ -70,12 +71,9 @@ export function workflowListField(value: unknown): string[] {
     .filter(Boolean);
 }
 
-/** The longest `owner/name`: 39 characters of owner and 100 of name. */
-const REPOSITORY_NAME = 140;
-
 /** `owner/name`, in the characters that GitHub allows. */
 export function isGitHubRepositoryName(value: unknown): value is string {
-  return isBoundedString(value, REPOSITORY_NAME) && /^[A-Za-z0-9](?:[A-Za-z0-9-]*)\/[A-Za-z0-9._-]+$/u.test(value);
+  return isString(value) && GITHUB_REPOSITORY_NAME_PATTERN.test(value);
 }
 
 /** An issue or a pull request. */

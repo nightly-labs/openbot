@@ -195,6 +195,7 @@ import {
 import { githubAppConfig } from "./github-connector-config";
 import { GitHubConnectorService } from "./github-connector-service";
 import { GitHubConnectorStore } from "./github-connector-store";
+import { GitHubRelay } from "./github-relay";
 import { HermesImportService } from "./hermes-import-service";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService } from "./host-events-service";
@@ -672,6 +673,8 @@ interface MessagingServicesContext {
   sidebarLayout: SidebarLayoutStore;
   /** Read on each call: the team store that names this host is built after messaging. */
   readHostId: () => string | null;
+  /** The GitHub route ticket of the ingress socket; the GitHub relay holds the repository list. */
+  issueGitHubRoute: (hostId: string) => Effect.Effect<string, RemoteWorkflowError>;
   openLink: (url: string) => Promise<void>;
 }
 
@@ -686,6 +689,7 @@ async function createMessagingServices({
   service,
   sidebarLayout,
   readHostId,
+  issueGitHubRoute,
   openLink,
 }: MessagingServicesContext): Promise<{ messaging: MessagingService; signalIngress: SignalIngress }> {
   /*
@@ -718,6 +722,7 @@ async function createMessagingServices({
     issueDiscordRoute: (hostId) => centralAuth.issueDiscordRoute(hostId).pipe(toRemoteWorkflowError),
     issueWebhookRoute: (hostId) => centralAuth.issueWebhookRoute(hostId).pipe(toRemoteWorkflowError),
     issueTelegramRoute: (hostId) => centralAuth.issueTelegramRoute(hostId).pipe(toRemoteWorkflowError),
+    issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
   });
   teardown.push(TEARDOWN_ORDER.signalIngress, "the Signal ingress socket", () =>
@@ -1929,6 +1934,13 @@ export async function createApplicationServices({
   // it starts as "no name yet".
   let ingressHostId: () => string | null = () => null;
   performance.mark("openbot:services.routines");
+  // The repositories that the saved GitHub triggers watch. It holds the GitHub route of the ingress
+  // socket, which is made next.
+  const githubRelay = new GitHubRelay({
+    account: centralAuth,
+    githubToken: () => githubConnector.accessToken(),
+    ingress: () => signalIngress,
+  });
   const { messaging, signalIngress } = await createMessagingServices({
     teardown,
     secretCipher,
@@ -1936,6 +1948,7 @@ export async function createApplicationServices({
     service,
     sidebarLayout,
     readHostId: () => ingressHostId(),
+    issueGitHubRoute: (hostId) => githubRelay.issueRoute(hostId),
     openLink,
   });
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
@@ -2133,6 +2146,7 @@ export async function createApplicationServices({
   signalIngress.handleWebhooks((input) => events.receive(input));
   teardown.push(TEARDOWN_ORDER.hostEvents, "the event service", async () => {
     webhookRelay.stop();
+    githubRelay.stop();
     await Effect.runPromise(eventsRuntime.stop());
   });
   // After `teamStore.initialize()` and before `HostService`, which reads the account it activates.

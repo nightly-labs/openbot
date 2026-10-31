@@ -106,7 +106,8 @@ Keep the private JWK secret. With it, a person can open each host that uses your
    - `REMOTE_TICKET_JWKS_URL`: `https://api.example.com/.well-known/jwks.json`.
    - `REMOTE_CONTROL_PLANE_URL`: `https://api.example.com`.
    - The Signal secrets from step 1.
-   - Leave `SLACK_SIGNING_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and the `TELEGRAM_*` values empty.
+   - Leave `SLACK_SIGNING_SECRET`, `GITHUB_WEBHOOK_SECRET`, `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID` and the
+     `TELEGRAM_*` values empty.
 
    If a reverse proxy already uses port 443, also set the values in
    [the reverse proxy notes](../remote/README.md#production-requirements).

@@ -31,6 +31,9 @@ export interface RemoteApiConfig {
   // The signing secret of each OpenBot Slack app, production and development, which share this
   // Signal. A request must name the app whose secret signed it. Without one, the Slack route answers 503.
   slackSigningSecrets: SlackSigningSecret[];
+  // The webhook secret of the OpenBot GitHub App (`GITHUB_WEBHOOK_SECRET`). Without it, or with a weak
+  // one, the GitHub route answers 503.
+  githubWebhookSecret: string | null;
   // The OpenBot Telegram bots, production and development, which share this Signal. Without them,
   // the Telegram routes answer 404 and `ready` names no `telegram` capability.
   telegram: TelegramConfig | null;
@@ -190,6 +193,7 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     trustProxy: environment.REMOTE_TRUST_PROXY === "true",
     sourceCommit: optional(environment.OPENBOT_SOURCE_COMMIT) ?? "unknown",
     slackSigningSecrets: readSlackSigningSecrets(environment.SLACK_SIGNING_SECRET),
+    githubWebhookSecret: readGitHubWebhookSecret(environment.GITHUB_WEBHOOK_SECRET),
     telegram: readTelegramConfig(environment),
     discord: readDiscordBot(
       environment.DISCORD_BOT_TOKEN,
@@ -199,6 +203,17 @@ export function readRemoteApiConfig(environment: Record<string, string | undefin
     signalId: readSignalId(environment.SIGNAL_ID),
     entry: readEntryConfig(environment),
   };
+}
+
+/** A missing or weak secret turns off only the GitHub route: the remote sessions keep running. */
+function readGitHubWebhookSecret(value: string | undefined): string | null {
+  const secret = value?.trim() ?? "";
+  if (!secret) return null;
+  if (new TextEncoder().encode(secret).byteLength < 32) {
+    console.error("GITHUB_WEBHOOK_SECRET must contain at least 32 bytes. The GitHub route is off.");
+    return null;
+  }
+  return secret;
 }
 
 function readSignalId(value: string | undefined): string | null {

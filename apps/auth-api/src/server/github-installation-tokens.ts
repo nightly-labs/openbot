@@ -1,3 +1,8 @@
+import {
+  GITHUB_ROUTE_EVENTS,
+  GITHUB_ROUTE_REPOSITORIES_LIMIT,
+  type GitHubRouteRepository,
+} from "@openbot/contracts/signal-protocol/github-route";
 import { Effect, Result, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
 
@@ -23,6 +28,14 @@ export interface GitHubInstallationToken {
   expiresAt: string;
   /** `owner/name`, as GitHub spells it. */
   repositories: string[];
+}
+
+/** A repository that a GitHub trigger of a host watches, as the Signal route ticket names it. */
+export interface GitHubRepositoryRoute extends GitHubRouteRepository {
+  /** `owner/name`, as GitHub spells it. */
+  fullName: string;
+  /** Whether the installation sends every event in `GITHUB_ROUTE_EVENTS`. */
+  events: boolean;
 }
 
 export interface GitHubInstallationTokensOptions {
@@ -56,7 +69,12 @@ const MAX_REPOSITORIES_PER_TOKEN = 500;
 const appSchema = Schema.Struct({ id: Schema.Number });
 const installationsSchema = Schema.Struct({
   installations: Schema.Array(
-    Schema.Struct({ id: Schema.Number, app_id: Schema.Number, account: Schema.Struct({ login: Schema.String }) }),
+    Schema.Struct({
+      id: Schema.Number,
+      app_id: Schema.Number,
+      account: Schema.Struct({ login: Schema.String }),
+      events: Schema.optional(Schema.Array(Schema.String)),
+    }),
   ),
 });
 const repositoriesSchema = Schema.Struct({
@@ -118,6 +136,41 @@ export class GitHubInstallationTokens {
     return tokens;
   }).bind(this);
 
+  /**
+   * The repositories of `names` that this user can see through an installation of the app. A name
+   * that the user cannot see, or that no installation holds, is not in the answer.
+   */
+  readonly repositoryRoutes = Effect.fn("GitHubInstallationTokens.repositoryRoutes")(function* (
+    this: GitHubInstallationTokens,
+    userToken: string,
+    names: readonly string[],
+  ): Effect.fn.Return<GitHubRepositoryRoute[], GitHubInstallationTokensError> {
+    const wanted = new Set(names.slice(0, GITHUB_ROUTE_REPOSITORIES_LIMIT).map((name) => name.toLowerCase()));
+    if (wanted.size === 0) return [];
+    const appId = yield* this.#readAppId();
+    const user: Credential = { kind: "user", token: userToken };
+    const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
+    const routes: GitHubRepositoryRoute[] = [];
+    for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
+      if (wanted.size === 0) break;
+      // GitHub names the events of an installation; an answer without them does not block a route.
+      const events = installation.events
+        ? GITHUB_ROUTE_EVENTS.every((event) => installation.events?.includes(event))
+        : true;
+      const result = yield* Effect.result(
+        this.#eachRepository(installation.id, user, (repository) => {
+          const name = repository.full_name.toLowerCase();
+          if (!wanted.delete(name)) return wanted.size > 0;
+          routes.push({ id: repository.id, installationId: installation.id, fullName: repository.full_name, events });
+          return wanted.size > 0;
+        }),
+      );
+      // A suspended installation or SAML SSO refusal must not block the others.
+      if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
+    }
+    return routes;
+  }).bind(this);
+
   readonly #issueForInstallation = Effect.fn("GitHubInstallationTokens.issueForInstallation")(function* (
     this: GitHubInstallationTokens,
     installationId: number,
@@ -151,21 +204,32 @@ export class GitHubInstallationTokens {
     user: Credential,
   ): Effect.fn.Return<WritableRepository[], GitHubInstallationTokensError> {
     const writable: WritableRepository[] = [];
+    yield* this.#eachRepository(installationId, user, (repository) => {
+      const permissions = repository.permissions;
+      if (permissions?.push || permissions?.maintain || permissions?.admin) {
+        writable.push({ id: repository.id, fullName: repository.full_name });
+      }
+      return true;
+    });
+    return writable;
+  });
+
+  /** Reads the repositories of an installation that the user can see, page by page, until `visit` returns false. */
+  readonly #eachRepository = Effect.fn("GitHubInstallationTokens.eachRepository")(function* (
+    this: GitHubInstallationTokens,
+    installationId: number,
+    user: Credential,
+    visit: (repository: (typeof repositoriesSchema.Type)["repositories"][number]) => boolean,
+  ): Effect.fn.Return<void, GitHubInstallationTokensError> {
     for (let page = 1; page <= MAX_REPOSITORY_PAGES; page += 1) {
       const answer = yield* this.#get(
         `/user/installations/${installationId}/repositories?per_page=${PAGE_SIZE}&page=${page}`,
         user,
         repositoriesSchema,
       );
-      for (const repository of answer.repositories) {
-        const permissions = repository.permissions;
-        if (permissions?.push || permissions?.maintain || permissions?.admin) {
-          writable.push({ id: repository.id, fullName: repository.full_name });
-        }
-      }
-      if (answer.repositories.length < PAGE_SIZE || page * PAGE_SIZE >= answer.total_count) break;
+      for (const repository of answer.repositories) if (!visit(repository)) return;
+      if (answer.repositories.length < PAGE_SIZE || page * PAGE_SIZE >= answer.total_count) return;
     }
-    return writable;
   });
 
   readonly #readAppId = Effect.fn("GitHubInstallationTokens.readAppId")(function* (
