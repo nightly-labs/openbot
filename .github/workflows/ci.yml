@@ -443,6 +443,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-channel-manage
 
+      - name: Run the channel handoff validation E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:channel-handoff-validation
+
       - name: Run the agent profile accounts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-profile-accounts
@@ -567,6 +571,7 @@ jobs:
             .openbot-build/routine-report-failure-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
+            .openbot-build/channel-handoff-validation-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/

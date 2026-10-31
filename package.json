@@ -263,6 +263,7 @@
     "test:routine-report-failure": "bun scripts/routine-report-failure-e2e.ts",
     "test:agent-webhook-routine": "bun scripts/agent-webhook-routine-e2e.ts",
     "test:agent-channel-manage": "bun scripts/agent-channel-manage-e2e.ts",
+    "test:channel-handoff-validation": "bun scripts/channel-handoff-validation-e2e.ts",
     "test:agent-profile-accounts": "bun scripts/agent-profile-accounts-e2e.ts",
     "test:claude-usage-resume": "bun scripts/claude-usage-resume-e2e.ts",
     "test:claude-late-steer": "bun scripts/claude-late-steer-e2e.ts",
