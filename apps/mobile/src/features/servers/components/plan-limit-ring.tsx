@@ -1,7 +1,8 @@
 import type { PlanLimitRow, PlanLimitTone } from "@openbot/team-client/plan-limits";
 import { useThemeColor } from "heroui-native/hooks";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { View } from "react-native";
+import Animated, { Easing, ReduceMotion, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import Svg, { Circle, Defs, G, Mask, Rect } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
@@ -18,6 +19,52 @@ export const PLAN_LIMIT_TONE_TEXT = {
   warning: "text-warning-text",
   critical: "text-danger-text",
 } as const satisfies Record<PlanLimitTone, string>;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** How long an arc takes to move to a new reading. */
+const FILL_DURATION_MS = 600;
+
+/**
+ * The arc of what is left of one window. A new reading moves the arc from its last value; the first
+ * reading draws it at once, so the header does not animate each time it shows.
+ */
+function RingArc({
+  center,
+  radius,
+  stroke,
+  color,
+  remainingPercent,
+}: {
+  center: number;
+  radius: number;
+  stroke: number;
+  color: string;
+  remainingPercent: number;
+}) {
+  const circumference = 2 * Math.PI * radius;
+  const remaining = useSharedValue(remainingPercent);
+  useEffect(() => {
+    remaining.set(
+      withTiming(remainingPercent, { duration: FILL_DURATION_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }),
+    );
+  }, [remaining, remainingPercent]);
+  const props = useAnimatedProps(() => ({
+    strokeDashoffset: (circumference * (100 - remaining.get())) / 100,
+  }));
+  return (
+    <AnimatedCircle
+      cx={center}
+      cy={center}
+      r={radius}
+      stroke={color}
+      strokeWidth={stroke}
+      strokeDasharray={`${circumference} ${circumference}`}
+      fill="none"
+      animatedProps={props}
+    />
+  );
+}
 
 function useToneColors(): Record<PlanLimitTone, string> {
   const [success, warning, danger] = useCSSVariable(["--openbot-success", "--openbot-warning", "--openbot-danger"]);
@@ -62,7 +109,6 @@ export function PlanLimitRing({
           <G rotation={-90} origin={`${center}, ${center}`}>
             {windows.map((window, index) => {
               const radius = outer - index * spacing;
-              const circumference = 2 * Math.PI * radius;
               return (
                 <G key={planLimitWindowKey(window, index)}>
                   <Circle
@@ -74,14 +120,12 @@ export function PlanLimitRing({
                     strokeWidth={stroke}
                     fill="none"
                   />
-                  <Circle
-                    cx={center}
-                    cy={center}
-                    r={radius}
-                    stroke={tones[window.tone]}
-                    strokeWidth={stroke}
-                    strokeDasharray={`${(circumference * window.remainingPercent) / 100} ${circumference}`}
-                    fill="none"
+                  <RingArc
+                    center={center}
+                    radius={radius}
+                    stroke={stroke}
+                    color={tones[window.tone]}
+                    remainingPercent={window.remainingPercent}
                   />
                 </G>
               );

@@ -156,9 +156,12 @@ export function planLimitResetDate(window: PlanLimitWindow): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** The identity of a window in a reading. Cursor reports two windows of the same length, so the position is part of it. */
+/**
+ * The identity of a window in a reading. Cursor reports two windows of the same length, so the position is
+ * part of it. The reset time is not: a window that resets keeps its ring, which fills again in place.
+ */
 export function planLimitWindowKey(window: PlanLimitWindow, index: number): string {
-  return `${index}-${window.durationMins ?? "limit"}-${window.resetsAt ?? ""}`;
+  return `${index}-${window.durationMins ?? "limit"}`;
 }
 
 /** The name of a limit window, as desktop names it: 5-hour, Weekly, Monthly. */
