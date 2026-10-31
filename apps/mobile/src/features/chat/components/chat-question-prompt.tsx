@@ -76,9 +76,15 @@ function ConfirmPlanBody({ plan, compact = false }: { plan: ConfirmPlan; compact
 function useSecondsLeft(at: string | undefined): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!at) return;
+    const deadline = at ? Date.parse(at) : Number.NaN;
+    if (!Number.isFinite(deadline)) return;
     setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    // The timer stops at the deadline: after it the label shows the plain action until the host answers.
+    const timer = setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= deadline) clearInterval(timer);
+    }, 1_000);
     return () => clearInterval(timer);
   }, [at]);
   return at ? Math.max(0, Math.ceil((Date.parse(at) - now) / 1_000)) : 0;

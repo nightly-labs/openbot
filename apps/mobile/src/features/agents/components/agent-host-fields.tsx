@@ -209,6 +209,8 @@ export function AgentPlanCardField({ agent, server, available }: AgentHostFields
   async function save(quickAcknowledgement: boolean) {
     setSaving(true);
     setError(null);
+    // A read that the host's change event started must not put the old value back during the save.
+    await queryClient.cancelQueries({ queryKey });
     const previous = queryClient.getQueryData<AgentPlanCardSettings | null>(queryKey) ?? null;
     const optimistic: AgentPlanCardSettings = { quickAcknowledgement };
     queryClient.setQueryData<AgentPlanCardSettings | null>(queryKey, optimistic);

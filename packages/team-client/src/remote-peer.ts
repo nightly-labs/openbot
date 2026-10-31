@@ -30,7 +30,7 @@ import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -1303,6 +1303,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
                 )
               : yield* peerDecode(() =>
                   withWireAutoAnswers(
+                    state,
                     decodeTeamProtocolV9WebRtcHttpResponse(pending.method, pending.path, status, body),
                     body,
                   ),
@@ -1350,7 +1351,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       state.lastEventSequence = frame.sequence;
       if (decoded.status === "known") {
         // The frozen event codec leaves the automatic answer of a block out; the wire frame has it.
-        addUiBlockAutoAnswers(decoded.event, frame.payload);
+        if (sendsAutoAnswers(state)) addUiBlockAutoAnswers(decoded.event, frame.payload);
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
       yield* sendEventAckEffect(state);
@@ -1970,10 +1971,18 @@ function signalErrorCode(data: string): string | null {
 }
 
 /**
+ * Whether the host can send `ui-block-auto-answer-v1`: the client advertises it only on protocol 9,
+ * so the walk is skipped for every older host.
+ */
+function sendsAutoAnswers(state: PeerState): boolean {
+  return (state.hostProtocol ?? 0) >= TEAM_PROTOCOL_V9;
+}
+
+/**
  * A decoded response with the automatic answer of each block, which the frozen response codec leaves
  * out. Only a host that the client told `ui-block-auto-answer-v1` puts it on the wire.
  */
-function withWireAutoAnswers<T>(decoded: T, wire: unknown): T {
-  if (decoded !== null && typeof decoded === "object") addUiBlockAutoAnswers(decoded, wire);
+function withWireAutoAnswers<T>(state: PeerState, decoded: T, wire: unknown): T {
+  if (sendsAutoAnswers(state) && decoded !== null && typeof decoded === "object") addUiBlockAutoAnswers(decoded, wire);
   return decoded;
 }

@@ -9,7 +9,7 @@ import { decodeTeamProtocolV2Json } from "./v2";
  * client counts down to `at`, and after the host answered, says that nobody answered in time. The
  * host adds the key only for a client that advertises this capability, and only to a message whose
  * block `ui-blocks-v1` already sends: the key is copied from the stored block with the same message
- * id. The `ui-blocks-v1` codecs leave it out in both directions, so a client copies it back from the
+ * id and block id. The `ui-blocks-v1` codecs leave it out in both directions, so a client copies it back from the
  * wire value after it decodes. A protocol 9 capability only. Widening any of it needs a second
  * capability string.
  */
@@ -17,6 +17,11 @@ export const TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY = "ui-block-auto-answer-v1";
 
 /** Deeper than any conversation snapshot, page or event of the Team API. */
 const MAXIMUM_DEPTH = 12;
+
+/** A message and its block: a task conversation and the main one can hold the same message id. */
+function blockKey(messageId: string, blockId: string): string {
+  return `${messageId}\n${blockId}`;
+}
 
 function collect(value: unknown, into: Map<string, UiBlockAutoAnswer>, depth: number): void {
   if (depth > MAXIMUM_DEPTH) return;
@@ -27,8 +32,8 @@ function collect(value: unknown, into: Map<string, UiBlockAutoAnswer>, depth: nu
   if (!isDynamicRecord(value)) return;
   if (isString(value.id) && value.uiBlock !== undefined) {
     // A block that the contract refuses carries no automatic answer.
-    const autoAnswer = normalizeConversationUiBlock(value.uiBlock)?.state.autoAnswer;
-    if (autoAnswer) into.set(value.id, autoAnswer);
+    const block = normalizeConversationUiBlock(value.uiBlock);
+    if (block?.state.autoAnswer) into.set(blockKey(value.id, block.blockId), block.state.autoAnswer);
   }
   for (const child of Object.values(value)) collect(child, into, depth + 1);
 }
@@ -40,9 +45,13 @@ function apply(value: unknown, autoAnswers: ReadonlyMap<string, UiBlockAutoAnswe
     return;
   }
   if (!isDynamicRecord(value)) return;
-  const autoAnswer = isString(value.id) ? autoAnswers.get(value.id) : undefined;
-  if (autoAnswer && isDynamicRecord(value.uiBlock) && isDynamicRecord(value.uiBlock.state))
-    Object.assign(value.uiBlock.state, { autoAnswer: { ...autoAnswer } });
+  const block = value.uiBlock;
+  const autoAnswer =
+    isString(value.id) && isDynamicRecord(block) && isString(block.blockId)
+      ? autoAnswers.get(blockKey(value.id, block.blockId))
+      : undefined;
+  if (autoAnswer && isDynamicRecord(block) && isDynamicRecord(block.state))
+    Object.assign(block.state, { autoAnswer: { ...autoAnswer } });
   for (const child of Object.values(value)) apply(child, autoAnswers, depth + 1);
 }
 
