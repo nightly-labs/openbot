@@ -53,41 +53,45 @@ interface AgentHostFieldsProps {
 }
 
 /**
- * Computer Use, local scripts and the busy-message mode of an agent, read from and saved on its host.
- * Only an owner or admin sees them, and only when the host serves `agent-host-settings-v1`. The host
- * checks the role again on every call. A change saves at once, as on desktop, and does not wait for
- * the sheet's Save action. The control shows the new value during the save and goes back on a failure.
+ * One agent setting that is read from and saved on the agent's host. Only an owner or admin sees
+ * it, and only when the host serves its capability. The host checks the role again on every call.
+ * A change saves at once, as on desktop, and does not wait for the sheet's Save action. The control
+ * shows the new value during the save and goes back on a failure.
  */
-function useAgentHostSettings({ agent, server, available }: AgentHostFieldsProps) {
+function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
+  { agent, server, available }: AgentHostFieldsProps,
+  part: "host" | "task-limit",
+  load: (agentId: string, serverId: string) => Promise<Settings | null>,
+  update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
+) {
   const { t, errorMessage } = useText();
-  const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canAdminister = canAdministerServer(server?.role);
-  // Under "agent-info" and ending in "host": the host's `agents-changed` event reads it again, so a
-  // change made on another device shows here while the page is open.
-  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "host");
+  // Under "agent-info" and ending in an `AGENT_SETTINGS_PARTS` part: the host's `agents-changed`
+  // event reads it again, so a change made on another device shows here while the page is open.
+  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, part);
   const settings = useQuery({
     queryKey,
-    queryFn: () => workspace.loadAgentHostSettings(agent.id, agent.serverId),
+    queryFn: () => load(agent.id, agent.serverId),
     enabled: available && canAdminister,
     retry: false,
     // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
 
-  async function save(current: AgentHostSettings, input: Omit<UpdateAgentHostSettingsInput, "agentId">) {
+  async function save(current: Settings, input: Input) {
     setSaving(true);
     setError(null);
-    queryClient.setQueryData<AgentHostSettings | null>(queryKey, { ...current, ...input });
+    queryClient.setQueryData<Settings | null>(queryKey, { ...current, ...input });
     try {
-      const saved = await workspace.updateAgentHostSettings({ agentId: agent.id, ...input }, agent.serverId);
-      queryClient.setQueryData<AgentHostSettings | null>(queryKey, saved);
+      const saved = await update({ ...input, agentId: agent.id }, agent.serverId);
+      queryClient.setQueryData<Settings | null>(queryKey, saved);
       void haptics.notification("success");
     } catch (cause) {
-      queryClient.setQueryData<AgentHostSettings | null>(queryKey, current);
+      queryClient.setQueryData<Settings | null>(queryKey, current);
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.host.failed")));
     } finally {
@@ -98,6 +102,17 @@ function useAgentHostSettings({ agent, server, available }: AgentHostFieldsProps
   // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
   const current = canAdminister ? (settings.data ?? null) : null;
   return { current, enabled: available && !saving, error, save };
+}
+
+/** Computer Use, local scripts and the busy-message mode of an agent, from `agent-host-settings-v1`. */
+function useAgentHostSettings(props: AgentHostFieldsProps) {
+  const workspace = useMobileWorkspaceActions();
+  return useAgentHostRecord<AgentHostSettings, Omit<UpdateAgentHostSettingsInput, "agentId">>(
+    props,
+    "host",
+    workspace.loadAgentHostSettings,
+    workspace.updateAgentHostSettings,
+  );
 }
 
 function SaveError({ error }: { error: string | null }) {
@@ -193,44 +208,18 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
  * Agent info > Advanced: how many threads of the agent run at the same time. Only an owner or admin
  * sees it, and only when the host serves `agent-task-limit-v1`. It saves at once, as the fields above.
  */
-export function AgentTaskLimitField({ agent, server, available }: AgentHostFieldsProps) {
-  const { t, format, errorMessage } = useText();
+export function AgentTaskLimitField(props: AgentHostFieldsProps) {
+  const { t, format } = useText();
   const { theme } = useUniwind();
   const workspace = useMobileWorkspaceActions();
-  const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const canAdminister = canAdministerServer(server?.role);
-  // Under "agent-info" and ending in "task-limit": the host's `agents-changed` event reads it again.
-  const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "task-limit");
-  const settings = useQuery({
-    queryKey,
-    queryFn: () => workspace.loadAgentTaskLimit(agent.id, agent.serverId),
-    enabled: available && canAdminister,
-    retry: false,
-    staleTime: 0,
-  });
-  const current = canAdminister ? (settings.data ?? null) : null;
+  const { current, enabled, error, save } = useAgentHostRecord<AgentTaskLimitSettings, AgentTaskLimitSettings>(
+    props,
+    "task-limit",
+    workspace.loadAgentTaskLimit,
+    workspace.updateAgentTaskLimit,
+  );
   if (!current) return null;
-
-  async function save(previous: AgentTaskLimitSettings, taskLimit: number | null) {
-    setSaving(true);
-    setError(null);
-    const optimistic: AgentTaskLimitSettings = { taskLimit };
-    queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, optimistic);
-    try {
-      const saved = await workspace.updateAgentTaskLimit({ agentId: agent.id, taskLimit }, agent.serverId);
-      queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, saved);
-      void haptics.notification("success");
-    } catch (cause) {
-      queryClient.setQueryData<AgentTaskLimitSettings | null>(queryKey, previous);
-      void haptics.notification("error");
-      setError(errorMessage(cause, t("mobile.agent.host.failed")));
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { agent } = props;
 
   // A provider that runs one turn at a time runs one thread, whatever the limit.
   const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
@@ -255,11 +244,11 @@ export function AgentTaskLimitField({ agent, server, available }: AgentHostField
                     ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
                     : format.number(value),
               }))}
-              enabled={available && !saving && !oneTurnAtATime}
+              enabled={enabled && !oneTurnAtATime}
               dark={theme === "dark"}
               label={t("mobile.agent.taskLimit.footer")}
               onChange={(next) => {
-                if (next !== choice) void save(current, next === "default" ? null : next);
+                if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
               }}
             />
           }
