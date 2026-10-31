@@ -381,6 +381,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "계속하려면 Inception API 키를 추가하세요.",
   "error.provider.deepseekSignIn": "계속하려면 DeepSeek API 키를 추가하세요.",
   "error.provider.openrouterSignIn": "계속하려면 OpenRouter API 키를 추가하세요.",
+  "error.provider.opperSignIn": "계속하려면 Opper API 키를 추가하세요.",
   "error.provider.terminalLoginFailed":
     "로그인 터미널을 열 수 없었어요. 이 호스트에서 제공자 CLI를 열어 로그인한 후 제공자를 새로 고치세요.",
   "error.provider.nativeArchiveInvalid": "제공자 다운로드에 올바른 설치 파일이 없어요.",

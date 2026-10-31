@@ -388,6 +388,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Чтобы продолжить, добавьте ключ API Inception.",
   "error.provider.deepseekSignIn": "Добавьте ключ API DeepSeek, чтобы продолжить.",
   "error.provider.openrouterSignIn": "Добавьте ключ API OpenRouter, чтобы продолжить.",
+  "error.provider.opperSignIn": "Добавьте ключ API Opper, чтобы продолжить.",
   "error.provider.terminalLoginFailed":
     "Не удалось открыть терминал для входа. Откройте CLI провайдера на этом хосте, войдите там, затем обновите список провайдеров.",
   "error.provider.nativeArchiveInvalid": "Загруженный файл провайдера не содержит корректной установки.",

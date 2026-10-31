@@ -344,6 +344,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "请添加 Inception API 密钥以继续。",
   "error.provider.deepseekSignIn": "请添加 DeepSeek API 密钥以继续。",
   "error.provider.openrouterSignIn": "请添加 OpenRouter API 密钥以继续。",
+  "error.provider.opperSignIn": "请添加 Opper API 密钥以继续。",
   "error.provider.terminalLoginFailed": "无法打开登录终端。请在这台主机上打开服务商 CLI 并在那里登录，然后刷新服务商。",
   "error.provider.nativeArchiveInvalid": "服务商下载内容中不包含有效的安装。",
   "error.provider.nativeChecksum": "服务商安装未通过完整性校验。",

@@ -32,6 +32,7 @@ export const AGENT_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "opper",
   "acp",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
@@ -461,6 +462,31 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  // Opper's models run in the Pi CLI that OpenBot downloads for Pi, with a key the user saves here. Pi
+  // has no built-in Opper provider, so OpenBot registers one, as for Inception. Pi's own sign-in and
+  // models stay on the Pi row.
+  opper: {
+    id: "opper",
+    displayName: "Opper",
+    cliName: "Pi CLI",
+    onboardingDescription: "Many models with an Opper API key",
+    signInMessage: "Add an Opper API key to continue.",
+    installGuideLink: null,
+    defaultModel: "claude-sonnet-5-5",
+    legacyModelPrefix: null,
+    authKind: "opper",
+    pickerOrder: 12,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
   // provider CHECK lists grow by one word only once.
@@ -549,8 +575,8 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 
 /**
  * The providers that only newer Team API protocols carry: Gemini and custom ACP agents from protocol
- * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek and OpenRouter
- * from protocol 8.
+ * 5, Cursor and Cline from protocol 6, Pi and Muse from protocol 7, Inception, DeepSeek, OpenRouter
+ * and Opper from protocol 8.
  * A joined server's settings list one only when the host's status names it.
  */
 export const LOCAL_ONLY_PROVIDERS = [
@@ -562,6 +588,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "opper",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 
@@ -573,7 +600,12 @@ export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
  * The providers that sign in only with an API key that the user saves in OpenBot. They run in the Pi
  * CLI, so their Connect and Reconnect open the key dialog.
  */
-export const KEY_ONLY_PROVIDERS = ["inception", "deepseek", "openrouter"] as const satisfies readonly AgentProviderId[];
+export const KEY_ONLY_PROVIDERS = [
+  "inception",
+  "deepseek",
+  "openrouter",
+  "opper",
+] as const satisfies readonly AgentProviderId[];
 export type KeyOnlyProviderId = (typeof KEY_ONLY_PROVIDERS)[number];
 
 export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOnlyProviderId {
