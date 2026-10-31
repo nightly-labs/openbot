@@ -585,15 +585,19 @@ export class BrowserHost {
     engine.releaseDialogs();
     yield* engine.destroy();
     yield* browserSync(() => {
+      // The tab can close, or the host stop, while the engine stops. Their own cleanup closes the old view.
+      if (tab.closing || this.#destroying || this.#tabs.get(tab.id) !== tab) return;
       const next = this.#createView(undefined, this.#tabSession(tab));
       this.#mountView(next);
       next.setBounds(view.getBounds());
       tab.view = next;
       tab.contents = next.webContents;
-      tab.engine = new BrowserCdpEngine(next.webContents);
+      tab.engine = engine.forContents(next.webContents);
       this.#bindTabEvents(tab);
       this.#unmountView(view);
       if (!contents.isDestroyed()) contents.close();
+      // A person can open the tab while the engine stops, which shows the old view.
+      this.#syncAttachedView();
     });
   });
 
