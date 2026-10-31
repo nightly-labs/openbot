@@ -80,6 +80,8 @@ export const messages = {
   "mobile.chat.question.privateAnswer": "Личный ответ",
   "mobile.chat.question.answerForm": "Форма ответа",
   "mobile.chat.question.answersSent": "Ответы отправлены",
+  "mobile.chat.question.autoAction": "{action} · {seconds} с",
+  "mobile.chat.question.autoAnswered": "{outcome} (никто не ответил вовремя)",
   "mobile.chat.question.formCancelled": "Форма отменена",
   "mobile.chat.question.formExpired": "Срок формы истёк",
   "mobile.chat.question.form": "Форма с вопросами",

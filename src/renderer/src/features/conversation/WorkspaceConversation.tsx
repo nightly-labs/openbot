@@ -242,6 +242,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
+    const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     return agent
       ? {
           ...agent,
@@ -251,6 +252,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
+          ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
         }
       : agent;
   });
@@ -624,6 +626,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
+        remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
         remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
         onUpdateAgentPermissions={permissionsEditable() ? writeAgentPermissions : undefined}
         defaultBusyMessageMode={

@@ -382,6 +382,46 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Não foi possível salvar o limite de memórias. Tente de novo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Atualize o OpenBot neste servidor para alterar o limite de memórias aqui.",
+  "mobile.server.route.browserProfiles": "Perfis do navegador",
+  "mobile.server.browserProfiles.unavailable":
+    "Só o proprietário ou um administrador de um servidor online pode gerenciar os perfis do navegador dele.",
+  "mobile.server.browserProfiles.unsupported":
+    "Atualize o OpenBot neste servidor para gerenciar os perfis do navegador aqui.",
+  "mobile.server.browserProfiles.loading": "Carregando perfis do navegador…",
+  "mobile.server.browserProfiles.loadFailed": "O OpenBot não conseguiu carregar os perfis do navegador.",
+  "mobile.server.browserProfiles.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador.",
+  "mobile.server.browserProfiles.description":
+    "Cada perfil guarda seus próprios logins, cookies e dados de sites no computador que executa o servidor. Os agentes que usam o mesmo perfil compartilham os logins.",
+  "mobile.server.browserProfiles.shared": "Compartilhado",
+  "mobile.server.browserProfiles.sharedHint": "Um agente sem um perfil com nome usa o perfil compartilhado.",
+  "mobile.server.browserProfiles.title": "Perfis",
+  "mobile.server.browserProfiles.add": "Adicionar perfil",
+  "mobile.server.browserProfiles.addConfirm": "Adicionar",
+  "mobile.server.browserProfiles.limit": "Um servidor pode ter no máximo {limit} perfis.",
+  "mobile.server.browserProfiles.agents": { one: "{count} agente", other: "{count} agentes" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} aba aberta", other: "{count} abas abertas" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Este perfil não está mais no servidor.",
+  "mobile.server.browserProfiles.new": "Novo perfil",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "O agente usa o novo perfil assim que você o adiciona. As abas abertas dele fecham.",
+  "mobile.server.browserProfiles.name": "Nome",
+  "mobile.server.browserProfiles.color": "Cor",
+  "mobile.server.browserProfiles.agentsTitle": "Agentes",
+  "mobile.server.browserProfiles.addAgents": "Adicionar agentes",
+  "mobile.server.browserProfiles.agentsHint":
+    "Um toque dá este perfil ao agente ou o devolve ao perfil compartilhado. Uma alteração fecha as abas abertas do agente.",
+  "mobile.server.browserProfiles.clear": "Apagar dados",
+  "mobile.server.browserProfiles.clearTitle": "Apagar os dados de {name}?",
+  "mobile.server.browserProfiles.clearBody":
+    "Isso sai de todos os sites neste perfil e apaga os cookies e dados de sites dele. As abas abertas dele fecham.",
+  "mobile.server.browserProfiles.clearHint":
+    "Apagar dados sai de todos os sites no perfil. Excluir também move os agentes dele para o perfil compartilhado.",
+  "mobile.server.browserProfiles.delete": "Excluir perfil",
+  "mobile.server.browserProfiles.deleteTitle": "Excluir {name}?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Isso exclui os logins, cookies e dados de sites do perfil. As abas abertas dele fecham.",
+  "mobile.server.browserProfiles.deleteAgents": "Estes agentes passam para o perfil compartilhado: {agents}.",
   "mobile.server.route.connectors": "Conectores",
   "mobile.server.settings.connectors": "Conectores",
   "mobile.server.connectors.unavailable":

@@ -76,6 +76,8 @@ export const messages = {
   "mobile.chat.question.privateAnswer": "Gizli yanıt",
   "mobile.chat.question.answerForm": "Yanıt formu",
   "mobile.chat.question.answersSent": "Yanıtlar gönderildi",
+  "mobile.chat.question.autoAction": "{action} · {seconds} sn",
+  "mobile.chat.question.autoAnswered": "{outcome} (kimse zamanında yanıtlamadı)",
   "mobile.chat.question.formCancelled": "Form iptal edildi",
   "mobile.chat.question.formExpired": "Formun süresi doldu",
   "mobile.chat.question.form": "Soru formu",

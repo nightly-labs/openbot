@@ -63,6 +63,10 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="transfer" options={{ title: t("mobile.server.route.transfer") }} />
       <Stack.Screen name="transfer-export" options={{ title: t("mobile.server.route.transferExport") }} />
       <Stack.Screen name="transfer-import" options={{ title: t("mobile.server.route.transferImport") }} />
+      <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      {/* The page names its profile. */}
+      <Stack.Screen name="browser-profile" options={{ title: t("mobile.server.route.browserProfiles") }} />
+      <Stack.Screen name="browser-profile-agents" options={{ title: t("mobile.server.browserProfiles.agentsTitle") }} />
     </Stack>
   );
 }

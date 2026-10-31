@@ -23,6 +23,7 @@ import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
+import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
 import { type BrowserProfileService, createBrowserProfileService } from "./browser-profile-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
@@ -560,6 +561,8 @@ export interface ApplicationServices {
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
   agentHostSettings: AgentHostSettingsService;
+  /** The folders each agent can change besides its workspace, for the desktop settings and `agent-folders-v1`. */
+  agentFolders: AgentFolders;
   browserProfiles: BrowserProfileService;
   language: LanguageService;
   logoColor: LogoColorService;
@@ -2181,7 +2184,13 @@ export async function createApplicationServices({
   );
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
-  const browserProfiles = createBrowserProfileService({ store: browserProfileStore, agents: service, browser });
+  const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
+  const browserProfiles = createBrowserProfileService({
+    store: browserProfileStore,
+    agents: service,
+    browser,
+    onChanged: () => service.notifyBrowserProfilesChanged(),
+  });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
@@ -2380,6 +2389,7 @@ export async function createApplicationServices({
     admin: {
       agents: agentAdminSettings,
       agentHost: agentHostSettings,
+      folders: agentFolders,
       sessionSettings: service,
       acpRegistry,
       skills,
@@ -3202,6 +3212,7 @@ export async function createApplicationServices({
     approvalAutomation,
     agentAdminSettings,
     agentHostSettings,
+    agentFolders,
     browserProfiles,
     language,
     logoColor,

@@ -383,6 +383,46 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Impossible d’enregistrer la limite de souvenirs. Réessayez.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer sa limite de souvenirs ici.",
+  "mobile.server.route.browserProfiles": "Profils de navigateur",
+  "mobile.server.browserProfiles.unavailable":
+    "Seul le propriétaire ou un administrateur d’un serveur en ligne peut gérer ses profils de navigateur.",
+  "mobile.server.browserProfiles.unsupported":
+    "Mettez à jour OpenBot sur ce serveur pour gérer ses profils de navigateur ici.",
+  "mobile.server.browserProfiles.loading": "Chargement des profils de navigateur…",
+  "mobile.server.browserProfiles.loadFailed": "OpenBot n’a pas pu charger les profils de navigateur.",
+  "mobile.server.browserProfiles.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur.",
+  "mobile.server.browserProfiles.description":
+    "Chaque profil garde ses propres connexions, cookies et données de sites sur l’ordinateur qui exécute le serveur. Les agents qui utilisent le même profil partagent ses connexions.",
+  "mobile.server.browserProfiles.shared": "Partagé",
+  "mobile.server.browserProfiles.sharedHint": "Un agent sans profil nommé utilise le profil partagé.",
+  "mobile.server.browserProfiles.title": "Profils",
+  "mobile.server.browserProfiles.add": "Ajouter un profil",
+  "mobile.server.browserProfiles.addConfirm": "Ajouter",
+  "mobile.server.browserProfiles.limit": "Un serveur peut avoir au plus {limit} profils.",
+  "mobile.server.browserProfiles.agents": { one: "{count} agent", other: "{count} agents" },
+  "mobile.server.browserProfiles.tabs": { one: "{count} onglet ouvert", other: "{count} onglets ouverts" },
+  "mobile.server.browserProfiles.usage": "{agents} · {tabs}",
+  "mobile.server.browserProfiles.gone": "Ce profil n’est plus sur le serveur.",
+  "mobile.server.browserProfiles.new": "Nouveau profil",
+  "mobile.server.browserProfiles.newForAgentHint":
+    "L’agent utilise le nouveau profil dès que vous l’ajoutez. Ses onglets ouverts se ferment.",
+  "mobile.server.browserProfiles.name": "Nom",
+  "mobile.server.browserProfiles.color": "Couleur",
+  "mobile.server.browserProfiles.agentsTitle": "Agents",
+  "mobile.server.browserProfiles.addAgents": "Ajouter des agents",
+  "mobile.server.browserProfiles.agentsHint":
+    "Un appui donne ce profil à l’agent ou le remet dans le profil partagé. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.server.browserProfiles.clear": "Effacer les données",
+  "mobile.server.browserProfiles.clearTitle": "Effacer les données de {name} ?",
+  "mobile.server.browserProfiles.clearBody":
+    "Cela déconnecte ce profil de tous les sites et supprime ses cookies et données de sites. Ses onglets ouverts se ferment.",
+  "mobile.server.browserProfiles.clearHint":
+    "Effacer les données déconnecte le profil de tous les sites. Supprimer passe aussi ses agents au profil partagé.",
+  "mobile.server.browserProfiles.delete": "Supprimer le profil",
+  "mobile.server.browserProfiles.deleteTitle": "Supprimer {name} ?",
+  "mobile.server.browserProfiles.deleteBody":
+    "Cela supprime les connexions, cookies et données de sites du profil. Ses onglets ouverts se ferment.",
+  "mobile.server.browserProfiles.deleteAgents": "Ces agents passent au profil partagé : {agents}.",
   "mobile.server.route.connectors": "Connecteurs",
   "mobile.server.settings.connectors": "Connecteurs",
   "mobile.server.connectors.unavailable":

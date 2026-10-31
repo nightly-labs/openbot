@@ -167,6 +167,9 @@ export function ChatHeader({
     onBack();
   };
 
+  // The row's side padding, and on the drawn header the gap after the pill and a 48 pt button with its
+  // 8 pt gap for Back and for the trailing button. The vertical bar has these buttons in the native bar.
+  const titleReserve = verticalBar ? 32 : 40 + (splitDetailRoot ? 0 : 56) + (actionsMenu === null ? 0 : 56);
   const titlePill = (
     <GlassView
       glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}
@@ -190,7 +193,8 @@ export function ChatHeader({
           onPressAction={({ nativeEvent }) => threadMenu.onPressAction(nativeEvent.event)}
           style={{ alignSelf: "stretch" }}
         >
-          {/* The native menu sizes its trigger to the content, so the title gets the width it can use. */}
+          {/* The native menu sizes its trigger to the content, so the title gets the width it can use. A
+            wider trigger goes under the pill's edge and cuts the chevron. */}
           <View
             accessible
             accessibilityRole="button"
@@ -200,7 +204,7 @@ export function ChatHeader({
                 : t("mobile.chat.threads.menu", { name: target.name })
             }
             className="h-12 min-w-0 flex-row items-center gap-2 pr-3 pl-2.5"
-            style={{ maxWidth: kicker ? width - insets.left - insets.right - 144 : 220 }}
+            style={{ maxWidth: kicker ? width - insets.left - insets.right - titleReserve : 220 }}
           >
             {identity}
             <ChevronDown color={iconColor} size={16} strokeWidth={2.5} />

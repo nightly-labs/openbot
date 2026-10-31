@@ -1,5 +1,6 @@
 import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
+  AddAgentFolderInput,
   AddedAgent,
   AddMessagingOrchestratorResult,
   AgentAccessChange,
@@ -7,18 +8,28 @@ import type {
   AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
+  AgentBackupModelSettings,
+  AgentBrowserProfile,
+  AgentExclusionChange,
+  AgentFolderBrowse,
+  AgentFolderChange,
+  AgentFolderInput,
+  AgentFolderList,
   AgentHostSettings,
   AgentImportPreview,
   AgentMemory,
   AgentMemorySelectionState,
   AgentModelId,
   AgentModelOption,
+  AgentNewChatSettings,
   AgentNotificationLevelsSnapshot,
+  AgentPlanCardSettings,
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
   AgentTask,
   AgentTaskInput,
+  AgentTaskLimitSettings,
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTemplatePreview,
@@ -29,7 +40,10 @@ import type {
   AvatarImageInput,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
+  BrowserProfileList,
+  BrowserProfileSummary,
   ClearableStorageCategory,
+  ClearBrowserDataInput,
   ConversationFileSearchPage,
   ConversationSearchPage,
   ConversationSnapshot,
@@ -99,8 +113,14 @@ import type {
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
+  UpdateAgentBackupModelsInput,
+  UpdateAgentBrowserProfileInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
+  UpdateAgentNewChatInput,
+  UpdateAgentPlanCardInput,
+  UpdateAgentTaskLimitInput,
+  UpdateBrowserProfileInput,
   UpdateRestartMode,
   UpdateRoutineInput,
   VaultHostImportResult,
@@ -383,6 +403,11 @@ export interface MobileWorkspaceContextValue {
   canTransferServer: (serverId: string) => boolean;
   /** The same for API keys in the Vault (`vault-v2`). */
   canManageVaultApiKeys: (serverId: string) => boolean;
+  /**
+   * True for an owner or admin of a host that serves its named browser profiles and the profile of
+   * each agent (`browser-profiles-v1`). The host checks the role again.
+   */
+  canManageBrowserProfiles: (serverId: string) => boolean;
   /** Reads or changes the host's GitHub connection. The answer names the GitHub pages that the phone opens. */
   githubConnector: (route: GitHubConnectorRoute, serverId: string) => Promise<HostGitHubConnectorStatus>;
   /** The repositories where the host's GitHub App is installed. The host reads them from GitHub. */
@@ -428,6 +453,18 @@ export interface MobileWorkspaceContextValue {
   /** Creates the chosen agents and adds the settings. The token is spent, also when the import fails. */
   applyInstanceTransfer: (input: ApplyInstanceTransferInput, serverId: string) => Promise<RemoteInstanceTransferResult>;
   discardInstanceTransfer: (token: string, serverId: string) => Promise<void>;
+  /** The named browser profiles of the host, and the agents of its shared profile. */
+  loadBrowserProfiles: (serverId: string) => Promise<BrowserProfileList>;
+  createBrowserProfile: (name: string, serverId: string) => Promise<BrowserProfileSummary>;
+  /** A new name, a new color, or both. Sign-ins and tabs stay. */
+  updateBrowserProfile: (input: UpdateBrowserProfileInput, serverId: string) => Promise<BrowserProfileSummary>;
+  /** Closes the open tabs of the profile and signs it out of every site. */
+  clearBrowserData: (input: ClearBrowserDataInput, serverId: string) => Promise<void>;
+  /** Deletes the profile and its data. Its agents change to the shared profile. */
+  deleteBrowserProfile: (profileId: string, serverId: string) => Promise<void>;
+  loadAgentBrowserProfile: (agentId: string, serverId: string) => Promise<AgentBrowserProfile>;
+  /** The host closes the open tabs of the agent. */
+  updateAgentBrowserProfile: (input: UpdateAgentBrowserProfileInput, serverId: string) => Promise<AgentBrowserProfile>;
   loadMessagingConnections: (platform: MessagingPlatform, serverId: string) => Promise<MessagingOverview>;
   /** The platform's page that the phone opens. The host opens no page. */
   connectMessaging: (input: HostMessagingConnectInput, serverId: string) => Promise<MessagingConnectorPage>;
@@ -595,6 +632,42 @@ export interface MobileWorkspaceContextValue {
   loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** An owner or admin of an online host that serves `agent-backup-models-v1`. The host checks the role again. */
+  canManageAgentBackupModels: (serverId: string) => boolean;
+  /**
+   * The backup models of an agent, and the model it left for a usage limit. Null when the host does
+   * not advertise `agent-backup-models-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentBackupModels: (agentId: string, serverId: string) => Promise<AgentBackupModelSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
+  updateAgentBackupModels: (input: UpdateAgentBackupModelsInput, serverId: string) => Promise<AgentBackupModelSettings>;
+  /** An owner or admin of an online host that serves `agent-task-limit-v1`. The host checks the role again. */
+  canManageAgentTaskLimit: (serverId: string) => boolean;
+  /**
+   * How many threads of the agent run at the same time. Null when the host does not advertise
+   * `agent-task-limit-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentTaskLimit: (agentId: string, serverId: string) => Promise<AgentTaskLimitSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the limit the host saved. */
+  updateAgentTaskLimit: (input: UpdateAgentTaskLimitInput, serverId: string) => Promise<AgentTaskLimitSettings>;
+  /** An owner or admin of an online host that serves `agent-new-chat-v1`. The host checks the role again. */
+  canManageAgentNewChat: (serverId: string) => boolean;
+  /**
+   * Whether the agent starts a new chat itself when its chat gets long. Null when the host does not
+   * advertise `agent-new-chat-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentNewChat: (agentId: string, serverId: string) => Promise<AgentNewChatSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
+  updateAgentNewChat: (input: UpdateAgentNewChatInput, serverId: string) => Promise<AgentNewChatSettings>;
+  /** An owner or admin of an online host that serves `agent-plan-card-v1`. The host checks the role again. */
+  canManageAgentPlanCard: (serverId: string) => boolean;
+  /**
+   * Whether the agent shows its plan card before a long task, as it applies on the host. Null when the
+   * host does not advertise `agent-plan-card-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
+  updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
   /** An owner or admin of an online host that serves `provider-accounts-v1`. The host checks the role again. */
   canManageProviderAccounts: (serverId: string) => boolean;
   /**
@@ -620,6 +693,18 @@ export interface MobileWorkspaceContextValue {
   loadAgentSessionSettings: (agentId: string, serverId: string) => Promise<AgentSessionSettings | null>;
   setAgentSessionSetting: (input: SetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
   resetAgentSessionSetting: (input: ResetAgentSessionSettingInput, serverId: string) => Promise<AgentSessionSettings>;
+  /** An owner or admin of an online host that serves `agent-folders-v1`. The host checks the role again. */
+  canManageAgentFolders: (serverId: string) => boolean;
+  /** The folders that the agent can change besides its workspace. Owners and admins only. */
+  loadAgentFolders: (agentId: string, serverId: string) => Promise<AgentFolderList>;
+  /** With `replace`, the folder takes the place of a folder that was moved. */
+  addAgentFolder: (input: AddAgentFolderInput, serverId: string) => Promise<AgentFolderChange>;
+  removeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentFolderChange>;
+  /** A folder in the agent's folders that it must not change. */
+  excludeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
+  includeAgentFolder: (input: AgentFolderInput, serverId: string) => Promise<AgentExclusionChange>;
+  /** The folders in one folder of the host computer; `path` null is the home folder. */
+  browseAgentFolders: (agentId: string, path: string | null, serverId: string) => Promise<AgentFolderBrowse>;
   startNewChat: (agentId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
@@ -814,6 +899,7 @@ type MobileWorkspaceStateKey =
   | "canImportAgents"
   | "canTransferServer"
   | "canManageVaultApiKeys"
+  | "canManageBrowserProfiles"
   | "serverUpdateAccess"
   | "canReadServerRelease"
   | "canViewHostedSites"
@@ -830,8 +916,13 @@ type MobileWorkspaceStateKey =
   | "canManageAgentSkills"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
+  | "canManageAgentBackupModels"
+  | "canManageAgentTaskLimit"
+  | "canManageAgentNewChat"
+  | "canManageAgentPlanCard"
   | "canManageProviderAccounts"
   | "canManageSharedTables"
+  | "canManageAgentFolders"
   | "canPublishAgent";
 
 /**

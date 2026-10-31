@@ -142,7 +142,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   // A remote agent's host resolves its settings, so the account defaults of this computer do not apply.
   const localAgentDefaults = () => (props.server?.kind === "local" ? props.agentDefaults : undefined);
   const folderCalls = agentFolderCalls();
-  /** An agent's folders are on the computer that runs it, and the Team API does not carry them. */
+  /** An agent's folders are on the computer that runs it. The desktop does not use `agent-folders-v1` yet. */
   const localFolderCalls = () => (props.server?.kind === "local" && !props.runtime ? folderCalls : undefined);
   const canPublish = () =>
     props.runtime
@@ -495,7 +495,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local"}
-              quickAcknowledgementEditable={props.server?.kind === "local"}
+              quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
               taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
