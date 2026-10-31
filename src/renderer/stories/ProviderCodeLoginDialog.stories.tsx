@@ -187,3 +187,33 @@ export const HostPageOpening: Story = {
     state: { phase: "page", hostName: "Office server", page: null },
   },
 };
+
+/**
+ * ChatGPT on a joined server: the user signs in on a device page in their own browser, and the
+ * host's CLI sees it by itself. There is no field, so the note sits under the button.
+ */
+export const RelayDevice: Story = {
+  args: {
+    state: {
+      phase: "relay",
+      hostName: "Cloud server",
+      page: { authorizeHost: "auth.openai.com", listening: false, pasteable: false },
+    },
+    onOpenRelayPage: fn(),
+    onPasteRelayAddress: fn(),
+  },
+};
+
+/** A relayed sign-in that this computer cannot take back by itself, so the user pastes the address. */
+export const RelayPaste: Story = {
+  args: {
+    providerName: "Claude",
+    state: {
+      phase: "relay",
+      hostName: "Cloud server",
+      page: { authorizeHost: "claude.com", listening: false, pasteable: true },
+    },
+    onOpenRelayPage: fn(),
+    onPasteRelayAddress: fn(),
+  },
+};
