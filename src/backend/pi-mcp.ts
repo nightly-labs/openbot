@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isStandardProcessVariable } from "@openbot/logging";
 import { Effect } from "effect";
 import type { LocalMcpSession } from "./local-mcp-bridge";
 import type { ClaudeMcpServer } from "./mcp-provider-shapes";
@@ -49,7 +50,9 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
       Object.entries(pairs).map(([key, value]) => {
         if (value === "") return [key, ""];
         const variable = `OPENBOT_PI_MCP_VALUE_${secrets.length}`;
-        secrets.push(value);
+        // The environment a stdio server is started with also carries USER, HOME and PATH. They are
+        // not credentials, and a value the redactor knows is masked in every line an agent writes.
+        if (!isStandardProcessVariable(key)) secrets.push(value);
         environment[variable] = value;
         // Pi expands one environment reference. A literal beginning with ! must never become a
         // configuration shell command, and literal ${...} must not read another environment value.

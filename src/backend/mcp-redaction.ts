@@ -1,5 +1,12 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isSecretName, type LogValue, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import {
+  isSecretName,
+  isStandardProcessVariable,
+  type LogValue,
+  redactText,
+  registerSecretValue,
+  toLogValue,
+} from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -82,11 +89,18 @@ export function registerMcpSecretValues(config: McpServerConfig): void {
  * The environment is read from `mcpEnvironment`, not from `config.env`, because that is what the
  * server is actually started with: a credential named by `envPassthrough` is inherited from this
  * machine and never appears in `config.env`, so reading the stored pairs alone would let it out.
+ *
+ * A standard process variable is not a secret. A stdio server may be configured with `USER`, `HOME`
+ * and `PATH`, so `USER` holds an account name and `HOME` a path; masking `USER=openbot` hides that
+ * name in every line an agent writes, while `DATABASE_URL` and other unlabelled credentials stay
+ * masked because their names are not on the list.
  */
 export function mcpSecretValues(configs: readonly McpServerConfig[]): string[] {
   const values = new Set<string>();
   for (const config of configs) {
-    for (const value of Object.values(mcpEnvironment(config))) values.add(value);
+    for (const [name, value] of Object.entries(mcpEnvironment(config))) {
+      if (!isStandardProcessVariable(name)) values.add(value);
+    }
     for (const pair of config.headers) values.add(pair.value);
     for (const value of urlQueryValues(config.url)) values.add(value);
   }
