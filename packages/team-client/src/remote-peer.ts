@@ -1983,6 +1983,6 @@ function sendsAutoAnswers(state: PeerState): boolean {
  * out. Only a host that the client told `ui-block-auto-answer-v1` puts it on the wire.
  */
 function withWireAutoAnswers<T>(state: PeerState, decoded: T, wire: unknown): T {
-  if (sendsAutoAnswers(state) && decoded !== null && typeof decoded === "object") addUiBlockAutoAnswers(decoded, wire);
+  if (sendsAutoAnswers(state)) addUiBlockAutoAnswers(decoded, wire);
   return decoded;
 }

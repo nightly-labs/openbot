@@ -1196,6 +1196,6 @@ class GatewayError extends Error {
 
 /** A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`. */
 function withAutoAnswers(enabled: boolean, source: unknown, encoded: TeamProtocolV2Json): TeamProtocolV2Json {
-  if (enabled && encoded !== null && typeof encoded === "object") addUiBlockAutoAnswers(encoded, source);
+  if (enabled) addUiBlockAutoAnswers(encoded, source);
   return encoded;
 }

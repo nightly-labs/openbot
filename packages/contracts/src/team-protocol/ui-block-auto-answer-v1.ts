@@ -60,7 +60,7 @@ function apply(value: unknown, autoAnswers: ReadonlyMap<string, UiBlockAutoAnswe
  * `source`. `target` is a value that its caller owns, such as a fresh encoder or decoder result: it
  * changes in place. A block that `target` does not send stays out.
  */
-export function addUiBlockAutoAnswers(target: object, source: unknown): void {
+export function addUiBlockAutoAnswers(target: unknown, source: unknown): void {
   const autoAnswers = new Map<string, UiBlockAutoAnswer>();
   collect(source, autoAnswers, 0);
   if (autoAnswers.size > 0) apply(target, autoAnswers, 0);
