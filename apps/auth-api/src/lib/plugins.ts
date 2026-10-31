@@ -40,10 +40,15 @@ export const PLUGIN_DETAIL_ROUTE = "/plugins/$slug";
 export const PLUGINS_TITLE = "OpenBot Plugins: Apps and Tools for Your AI Agents";
 export const PLUGINS_DESCRIPTION =
   "Apps and skills an OpenBot agent can use. Open a plugin in the app, and decide there what it connects to.";
-/** The index's own social card. The page of each plugin keeps the site's card. */
+/** The index's own social card. */
 export const PLUGINS_SOCIAL_IMAGE: PageSocialImage = {
   path: "/social/plugins.jpg",
   alt: "Your kind of team. Four OpenBot agents in front of a rainbow",
+};
+/** One social card for the page of every plugin. */
+export const PLUGIN_PAGE_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/plugin.jpg",
+  alt: "Plant an idea. Your agents do the rest. OpenBot agents among paper trees",
 };
 
 /** Newest listing first is not a thing here: the order is the order the index declares. */

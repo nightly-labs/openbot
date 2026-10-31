@@ -18,6 +18,7 @@ import {
   collectionIndexUrl,
 } from "./content-collection";
 import {
+  PLUGIN_PAGE_SOCIAL_IMAGE,
   PLUGINS_DESCRIPTION,
   PLUGINS_SOCIAL_IMAGE,
   PLUGINS_TITLE,
@@ -30,10 +31,7 @@ import {
   OPENBOT_LOGO_URL,
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
-  OPENBOT_SOCIAL_IMAGE_ALT,
-  OPENBOT_SOCIAL_IMAGE_META,
   OPENBOT_SOCIAL_IMAGE_TAGS,
-  OPENBOT_SOCIAL_IMAGE_URL,
   OPENBOT_X_HANDLE,
   pageSocialImageMeta,
 } from "./site-metadata";
@@ -300,6 +298,7 @@ export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;
   const description = searchDescription(plugin.description);
+  const image = pageSocialImageMeta(PLUGIN_PAGE_SOCIAL_IMAGE, siteUrl);
 
   return {
     meta: [
@@ -312,13 +311,12 @@ export function pluginHead(plugin: SitePlugin, siteUrl: string) {
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
     ],
     links: [{ rel: "canonical", href: url }],
   };
