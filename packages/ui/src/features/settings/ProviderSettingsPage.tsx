@@ -19,7 +19,7 @@ import {
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
 } from "@openbot/contracts/ipc";
-import type { AppTextKey } from "@openbot/i18n";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -566,6 +566,26 @@ function AlternativeItem(props: { row: ProviderRow }) {
 /** The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`). */
 const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(["claude", "codex", "grok", "muse", "cursor"]);
 
+/** The confirmation text of a Disconnect of the provider's own sign-in. */
+function disconnectDescription(
+  t: AppTranslate,
+  format: AppFormat,
+  options: { provider: string; local: boolean; usedBy: readonly string[]; otherAccounts: boolean },
+): string {
+  const { provider, usedBy } = options;
+  return [
+    options.local
+      ? t("provider.settings.disconnectLocal", { provider })
+      : t("provider.settings.disconnectHost", { provider }),
+    usedBy.length > 0
+      ? t("provider.settings.accountBlocked", { agents: format.list(usedBy) })
+      : t("provider.settings.removeUnused"),
+    options.otherAccounts ? t("provider.settings.disconnectOthers", { provider }) : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const accounts = () => props.option.accounts ?? [];
@@ -639,22 +659,6 @@ function AccountsSection(props: SectionProps) {
         ? t("provider.settings.removeMoves", { agents: format.list(agents), name: firstName })
         : t("provider.settings.removeUnused");
     return `${move} ${t("provider.settings.removeCredentials")}`;
-  };
-  const disconnectDescription = (account: ProviderPickerAccount | null) => {
-    if (!account) return "";
-    const provider = props.option.name;
-    const agents = account.usedBy ?? [];
-    return [
-      props.accountActions?.local
-        ? t("provider.settings.disconnectLocal", { provider })
-        : t("provider.settings.disconnectHost", { provider }),
-      agents.length > 0
-        ? t("provider.settings.accountBlocked", { agents: format.list(agents) })
-        : t("provider.settings.removeUnused"),
-      accounts().length > 1 ? t("provider.settings.disconnectOthers", { provider }) : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
   };
   return (
     <SettingsSection
@@ -743,7 +747,16 @@ function AccountsSection(props: SectionProps) {
         title={t("provider.settings.disconnectTitle", {
           name: disconnecting() ? providerAccountName(t, accounts(), disconnecting()?.id ?? "") : "",
         })}
-        description={disconnectDescription(disconnecting())}
+        description={
+          disconnecting()
+            ? disconnectDescription(t, format, {
+                provider: props.option.name,
+                local: Boolean(props.accountActions?.local),
+                usedBy: disconnecting()?.usedBy ?? [],
+                otherAccounts: accounts().length > 1,
+              })
+            : ""
+        }
         confirmLabel={t("provider.account.disconnect")}
         onCancel={() => setDisconnecting(null)}
         onConfirm={() => {
@@ -1021,18 +1034,6 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
     props.option.keyStatus !== "saved";
   const [disconnecting, setDisconnecting] = createSignal(false);
   const [disconnectError, setDisconnectError] = createSignal<string | null>(null);
-  const disconnectDescription = () => {
-    const provider = props.option.name;
-    const agents = props.option.usedBy ?? [];
-    return [
-      props.accountActions?.local
-        ? t("provider.settings.disconnectLocal", { provider })
-        : t("provider.settings.disconnectHost", { provider }),
-      agents.length > 0
-        ? t("provider.settings.accountBlocked", { agents: format.list(agents) })
-        : t("provider.settings.removeUnused"),
-    ].join(" ");
-  };
   const disconnect = () => {
     setDisconnecting(false);
     setDisconnectError(null);
@@ -1189,7 +1190,12 @@ function SignInSection(props: SectionProps & { keyShown: boolean }) {
         open={disconnecting()}
         tone="destructive"
         title={t("provider.settings.disconnectTitle", { name: props.option.email ?? props.option.name })}
-        description={disconnectDescription()}
+        description={disconnectDescription(t, format, {
+          provider: props.option.name,
+          local: Boolean(props.accountActions?.local),
+          usedBy: props.option.usedBy ?? [],
+          otherAccounts: false,
+        })}
         confirmLabel={t("provider.account.disconnect")}
         onCancel={() => setDisconnecting(false)}
         onConfirm={disconnect}

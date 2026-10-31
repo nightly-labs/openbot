@@ -1656,9 +1656,10 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
-    // A provider with one account, such as Muse, can sign out too: `signOutDefault` checks the command.
+    // A provider with one account, such as Muse, can sign out too. A CLI with no sign-out is refused
+    // before a sign-in is cancelled.
     const accounts = this.#providerAccounts;
-    if (!accounts)
+    if (!accounts || !ProviderAccounts.signOutCommand(provider))
       return yield* new ProviderOperationFailed({
         cause: new Error(sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) })),
       });
