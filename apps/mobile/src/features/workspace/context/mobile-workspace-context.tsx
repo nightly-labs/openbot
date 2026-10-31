@@ -157,7 +157,7 @@ import {
   serverKind,
   showsOnline,
 } from "@/features/workspace/model/server-status";
-import { withoutTaskTurns } from "@/features/workspace/model/task-cache";
+import { taskThreadMessages, withoutTaskTurns } from "@/features/workspace/model/task-cache";
 import { applyBrowserEvent, syncEventQueries } from "@/features/workspace/model/team-events";
 import { runTeamRequest } from "@/features/workspace/model/team-request";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
@@ -1110,9 +1110,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
-      if (chatEvent?.type === "turn-progress") {
-        const { agentId, turnId, detail } = chatEvent;
-        const after = latestThoughtId(conversationStore.get(agentId)?.messages ?? [], turnId);
+      // The lines of a task turn too: the thread's thinking sheet shows them. Turn ids are unique, so
+      // the agent's chat shows none of them.
+      if (event.type === "turn-progress") {
+        const { agentId, threadId, turnId, detail } = event;
+        const messages =
+          taskThreadMessages(queryClient, queryScope, serverId, agentId, threadId) ??
+          conversationStore.get(agentId)?.messages ??
+          [];
+        const after = latestThoughtId(messages, turnId);
         liveState.update("turnLinesByServer", (current) => {
           const previous = current[serverId] ?? {};
           const next = appendTurnStepLine(previous, turnId, detail, after);

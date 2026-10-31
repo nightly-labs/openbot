@@ -190,7 +190,9 @@ export function ChatHeader({
           onPressAction={({ nativeEvent }) => threadMenu.onPressAction(nativeEvent.event)}
           style={{ alignSelf: "stretch" }}
         >
-          {/* The native menu sizes its trigger to the content, so the title gets the width it can use. */}
+          {/* The native menu sizes its trigger to the content, so the title gets the width it can use: the
+            row less its side padding, the Back button, the trailing button and the three gaps. A wider
+            trigger goes under the pill's edge and cuts the chevron. */}
           <View
             accessible
             accessibilityRole="button"
@@ -200,7 +202,7 @@ export function ChatHeader({
                 : t("mobile.chat.threads.menu", { name: target.name })
             }
             className="h-12 min-w-0 flex-row items-center gap-2 pr-3 pl-2.5"
-            style={{ maxWidth: kicker ? width - insets.left - insets.right - 144 : 220 }}
+            style={{ maxWidth: kicker ? width - insets.left - insets.right - (splitDetailRoot ? 96 : 152) : 220 }}
           >
             {identity}
             <ChevronDown color={iconColor} size={16} strokeWidth={2.5} />

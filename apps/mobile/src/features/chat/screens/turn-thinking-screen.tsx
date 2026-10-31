@@ -1,3 +1,5 @@
+import type { AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
@@ -16,8 +18,10 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
@@ -140,17 +144,11 @@ function TimelineStep({
 }
 
 /**
- * Each thought of one turn in full, with the progress lines between them, in the order they came.
- * While the turn runs, the sheet shows new text as it comes and keeps the newest text in view,
- * until the reader scrolls up. "Latest" then goes back to it.
+ * The messages and the running turn of the agent's chat, or of one thread with `taskId`. The thread
+ * screen under the sheet loads the thread and keeps it current, so the sheet only reads its cache.
  */
-export function TurnThinkingScreen() {
-  const text = useText();
-  const { t } = text;
-  const params = useLocalSearchParams<{ agentId: string; turnId: string }>();
-  const agentId = firstParam(params.agentId) ?? "";
-  const turnId = firstParam(params.turnId) ?? "";
-  const agent = useMobileWorkspaceSelector((current) => current.agents.find((candidate) => candidate.id === agentId));
+function useTurnConversation(agentId: string, serverId: string, taskId: string | undefined) {
+  const queryScope = useQueryScope();
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const subscribe = useCallback(
     (notify: () => void) => conversationStore.subscribe(agentId, notify),
@@ -160,11 +158,46 @@ export function TurnThinkingScreen() {
     subscribe,
     useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
   );
-  const messages = conversation?.messages ?? NO_MESSAGES;
-  const lines = useTurnStepLines(agent?.serverId ?? "")[turnId];
+  const taskConversation = useQuery<ConversationSnapshot>({
+    queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId ?? ""),
+    queryFn: skipToken,
+  });
+  const tasks = useQuery<AgentTasksSnapshot>({
+    queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
+    queryFn: skipToken,
+  });
+  if (taskId === undefined)
+    return { messages: conversation?.messages ?? NO_MESSAGES, activeTurnId: conversation?.activeTurnId ?? null };
+  return {
+    messages: taskConversation.data?.messages ?? NO_MESSAGES,
+    activeTurnId: tasks.data?.tasks.find((task) => task.id === taskId)?.activeTurnId ?? null,
+  };
+}
+
+/**
+ * Each thought of one turn in full, with the progress lines between them, in the order they came.
+ * While the turn runs, the sheet shows new text as it comes and keeps the newest text in view,
+ * until the reader scrolls up. "Latest" then goes back to it.
+ */
+export function TurnThinkingScreen() {
+  const text = useText();
+  const { t } = text;
+  const params = useLocalSearchParams<{ agentId: string; turnId: string; serverId?: string; taskId?: string }>();
+  const agentId = firstParam(params.agentId) ?? "";
+  const turnId = firstParam(params.turnId) ?? "";
+  const taskId = firstParam(params.taskId);
+  const serverParam = firstParam(params.serverId);
+  const agent = useMobileWorkspaceSelector((current) =>
+    current.agents.find(
+      (candidate) => candidate.id === agentId && (serverParam === undefined || candidate.serverId === serverParam),
+    ),
+  );
+  const serverId = serverParam ?? agent?.serverId ?? "";
+  const { messages, activeTurnId } = useTurnConversation(agentId, serverId, taskId);
+  const lines = useTurnStepLines(serverId)[turnId];
   const steps = useMemo(() => turnThinkingSteps(messages, turnId, lines), [messages, turnId, lines]);
   const times = useMemo(() => turnTimes(messages, turnId), [messages, turnId]);
-  const running = conversation?.activeTurnId === turnId;
+  const running = activeTurnId === turnId;
   const elapsed = useElapsedSeconds(times?.startedAt ?? null, running);
   const seconds = running ? elapsed : times ? Math.round((times.endedAt - times.startedAt) / 1000) : null;
   const reducedMotion = useReducedMotion();
