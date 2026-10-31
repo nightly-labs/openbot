@@ -147,6 +147,12 @@ const CLAUDE_NATIVE_SCHEDULING = [
   "Skill(schedule)",
   "Skill(loop)",
 ];
+/**
+ * Claude tools that duplicate an OpenBot feature, which OpenBot does not show: `ListAgents` finds the
+ * user's other Claude sessions for `SendMessage`, past the teammate rules, and `Workflow` runs a
+ * background agent fleet. Their schemas cost about 1.9k tokens in each request.
+ */
+const CLAUDE_DUPLICATE_TOOLS = ["ListAgents", "Workflow"];
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -891,7 +897,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(claudeTakesPromptSnapshotFlag(this.#cli.version)
             ? { extraArgs: { "system-prompt-snapshot": "off" } }
             : {}),
-          ...(config.profileGeneration ? { tools: [] } : { disallowedTools: CLAUDE_NATIVE_SCHEDULING }),
+          ...(config.profileGeneration
+            ? { tools: [] }
+            : { disallowedTools: [...CLAUDE_NATIVE_SCHEDULING, ...CLAUDE_DUPLICATE_TOOLS] }),
           settingSources: config.profileGeneration
             ? []
             : config.workspaceOnly
@@ -932,6 +940,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
+            // OpenBot memory is the agent's memory, shown and edited in the app. Claude's auto memory
+            // kept a second store under `~/.claude/projects` that the app cannot see, and its rules
+            // took about 0.7k tokens in each request. The files stay on disk.
+            CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
           },
         },
       }),
