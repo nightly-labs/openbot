@@ -29,10 +29,10 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
-  PROVIDER_ACCOUNT_RELAY_CAPABILITY,
-  PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+  CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
@@ -42,6 +42,10 @@ import {
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
   PROVIDER_HOST_SIGN_IN_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import {
+  PROVIDER_SIGN_OUT_CAPABILITY,
+  PROVIDER_SIGN_OUT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
@@ -87,6 +91,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  signInCodexWithApiKey,
 } from "./provider-handlers";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString } from "./validation";
@@ -109,6 +114,7 @@ interface ProviderAdminIpcDependencies {
     | "cancelProviderCodeLogin"
     | "changeProviderCredential"
     | "clearProviderCredential"
+    | "signInCodexWithApiKey"
   >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<
@@ -281,6 +287,13 @@ export function providerAdminIpcHandlers({
     if (running) await Effect.runPromise(Fiber.interrupt(running.fiber));
   }
 
+  /** `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does not. */
+  function customRoutes(serverId: string) {
+    return remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+      ? CUSTOM_PROVIDER_HARNESS_ROUTES
+      : PROVIDERS_ADMIN_ROUTES;
+  }
+
   /** `providers-v8` lists the runtimes as rows; the older route sets give the IPC record. */
   function runtimeDecoder(serverId: string) {
     return remoteServers.supportsCapability(serverId, PROVIDERS_V8_CAPABILITY)
@@ -355,17 +368,31 @@ export function providerAdminIpcHandlers({
         PROVIDER_USAGE_RESET_ROUTES.consume,
         decodeProviderUsageResetOutcomeFromHost,
       ),
+      // This computer's own sign-in goes through `providers`.
+      signOut: scopedHandler(parseProviderId, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (provider, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_SIGN_OUT_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, PROVIDER_SIGN_OUT_ROUTES.signOut, acceptEmpty, {
+              method: "POST",
+              body: { provider },
+            }),
+          );
+        },
+      }),
       startRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => {
         requireRelay(serverId, provider);
         return startRelay(serverId, provider, SIGN_IN_RELAY_ROUTES.providerStart, { provider });
       }),
       startAccountRelaySignIn: relaySignIn(parseConnectProviderAccountInput, ({ provider, accountId }, serverId) => {
-        if (
-          !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_RELAY_CAPABILITY) ||
-          !PROVIDER_ACCOUNT_RELAY_PROVIDERS.some((candidate) => candidate === provider)
-        )
+        const accountRelay = providerAccountRelay((capability) =>
+          remoteServers.supportsCapability(serverId, capability),
+        );
+        if (!accountRelay?.providers.some((candidate) => candidate === provider))
           throw new Error(sourceText("error.team.providersUnsupported"));
-        return startRelay(serverId, provider, PROVIDER_ACCOUNT_RELAY_ROUTES.start, { provider, accountId });
+        return startRelay(serverId, provider, accountRelay.start, { provider, accountId });
       }),
       relaySignInStatus: relaySignIn(parseProviderId, (provider, serverId): ProviderRelaySignInStatus => {
         const key = relayKey(serverId, provider);
@@ -392,6 +419,7 @@ export function providerAdminIpcHandlers({
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
         local: async ({ provider, key }) => {
+          if (provider === "codex") return signInCodexWithApiKey(service, key);
           await runCauseEffect(runtimes.ensureKeyProviderCli(provider));
           return runCauseEffect(
             service.changeProviderCredential(provider, () =>
@@ -440,17 +468,17 @@ export function providerAdminIpcHandlers({
       }),
       listCustomProviders: scopedQueryHandler({
         local: () => customProviders.list(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeCustomProviderSummaries),
+        remote: (serverId) => remote(serverId, customRoutes(serverId).customList, {}, decodeCustomProviderSummaries),
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
         local: (input) => runCauseEffect(customProviders.save(input)),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeCustomProviderResult),
+          remote(serverId, customRoutes(serverId).customSave, input, decodeCustomProviderResult),
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
         local: ({ id }) => runCauseEffect(customProviders.remove(id)),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeCustomProviderResult),
+          remote(serverId, customRoutes(serverId).customDelete, input, decodeCustomProviderResult),
       }),
     },
   };

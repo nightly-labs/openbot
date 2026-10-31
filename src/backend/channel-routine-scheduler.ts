@@ -88,6 +88,9 @@ function channelRunStatusForTasks(
   // owner, the assignment limit, an unconfirmed turn, or an explicit Stop.
   const paused = tasks.find((task) => task.state === "paused");
   if (paused) return { status: "needs-attention", error: paused.error };
+  // A person cancelled the run from its stopped task: it did not succeed.
+  if (tasks.some((task) => task.parentTaskId === null && task.state === "cancelled"))
+    return { status: "cancelled", error: null };
   // Every task is completed or cancelled. This includes the lead judging that no work was needed.
   return { status: "succeeded", error: null };
 }

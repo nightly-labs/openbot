@@ -65,6 +65,21 @@ export const resolveHostedSiteScope = Effect.fn("HostedSites.resolveScope")(func
   return { kind: "server", userId, serverId: hostId };
 });
 
+/**
+ * The SQL condition that the `hosted_sites` row `alias` holds a slot of its bucket. Bind `now` two times. A new
+ * site holds a slot only while its upload is live: the list does not show an abandoned upload, so no count may
+ * include one before the cleanup removes it. Every slot count uses this condition, so that the list, a new
+ * site, an activation and an adoption agree.
+ */
+export function holdsSiteSlotSql(alias: string): string {
+  return `${alias}.status IN ('uploading', 'active', 'blocked')
+    AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > ?)
+    AND (${alias}.status != 'uploading' OR EXISTS (
+      SELECT 1 FROM site_deployments d
+      WHERE d.site_id = ${alias}.id AND d.status IN ('uploading', 'activating') AND d.upload_expires_at > ?
+    ))`;
+}
+
 /** The active-site limit of a server's plan, or of the unlinked bucket. Plan limits read only the entitlement. */
 
 export const hostedSiteLimit = Effect.fn("HostedSites.limit")(function* (
@@ -75,6 +90,43 @@ export const hostedSiteLimit = Effect.fn("HostedSites.limit")(function* (
   if (serverId === null) return HOSTED_SITE_UNLINKED_LIMIT;
   const entitlement = yield* getServerEntitlement(database, serverId, now).pipe(Effect.mapError(siteFailure));
   return siteLimitForPlan(entitlement?.plan ?? null);
+});
+
+/**
+ * Moves the owner's unlinked sites into a self-hosted server that has just registered, up to the free slots of
+ * its plan. A computer that publishes before it is a registered server puts its sites in the unlinked bucket,
+ * and the server's own list never showed them. Only sites created before the server first registered move, so
+ * a later site of another unregistered computer of the account stays unlinked. A hosted server never moves
+ * sites: it registers at its first start, so an unlinked site is from another computer. Active sites only: an
+ * upload in progress keeps the bucket it started in.
+ */
+export const adoptUnlinkedHostedSites = Effect.fn("HostedSites.adoptUnlinked")(function* (
+  database: D1Database,
+  userId: string,
+  serverId: string,
+  now: number,
+) {
+  const siteLimit = yield* hostedSiteLimit(database, serverId, now);
+  const result = yield* siteCall(() =>
+    database
+      .prepare(
+        `UPDATE hosted_sites SET server_id = ?
+         WHERE id IN (
+           SELECT s.id FROM hosted_sites s
+           WHERE s.user_id = ? AND s.server_id IS NULL AND s.status = 'active' AND s.expires_at > ?
+             AND s.created_at <= (SELECT h.created_at FROM remote_hosts h WHERE h.host_id = ? AND h.owner_user_id = ?)
+             AND NOT EXISTS (SELECT 1 FROM hosted_servers hs WHERE hs.server_id = ?)
+           ORDER BY s.updated_at DESC
+           LIMIT max(0, ? - (
+             SELECT COUNT(*) FROM hosted_sites x
+             WHERE x.user_id = ? AND x.server_id = ? AND ${holdsSiteSlotSql("x")}
+           ))
+         )`,
+      )
+      .bind(serverId, userId, now, serverId, userId, serverId, siteLimit, userId, serverId, now, now)
+      .run(),
+  );
+  return result.meta.changes ?? 0;
 });
 
 function hostUnauthorized(): HostedSiteInputError {

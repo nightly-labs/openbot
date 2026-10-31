@@ -9,6 +9,7 @@ import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChat
 import { AgentStepsDisclosure, type AgentStepsTrace } from "@openbot/ui/features/conversation/AgentSteps";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { UsageLimitAskCard } from "@openbot/ui/features/conversation/BackupModels";
+import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
@@ -41,12 +42,14 @@ import {
   toggleRecording,
   toggleSpokenReply,
 } from "../speech/speech-replies";
+import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
+import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
@@ -121,6 +124,7 @@ export function ConversationTimeline() {
     closeChatSearch,
     composerHasContent,
     copiedMessageId,
+    branchThread,
     dismissPendingSend,
     downloadMessageImageFile,
     editingDeliveryId,
@@ -146,6 +150,7 @@ export function ConversationTimeline() {
     openReactionMessageId,
     openRoutineSettings,
     openSkillSettings,
+    openInstructionsSettings,
     openSharedFile,
     openWorkspaceFile,
     openQuote,
@@ -182,6 +187,7 @@ export function ConversationTimeline() {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     shownSubagentId,
     toggleSubagentPanel,
@@ -204,6 +210,21 @@ export function ConversationTimeline() {
       onToggle: () =>
         toggleReadAloud({ serverId: props.server?.id ?? "local", agentId, messageId: message.id }, message.body),
     };
+  };
+  /** A message that counts as unread in an agent chat can be marked unread, with the messages after it. */
+  const markUnreadAction = (message: AgentMessage) => {
+    const onMarkUnread = props.onMarkUnread;
+    if (channel || !onMarkUnread || !isIncomingAgentMessage(message) || message.streaming) return;
+    return () => void onMarkUnread(message.id);
+  };
+  /** The answers of the agent that end a finished turn. Each one offers a branch. */
+  const branchPoints = createMemo(() =>
+    channel ? new Set<string>() : branchPointIds(timelineMessages(), props.activeTurnId),
+  );
+  /** Copies the agent's own chat through the answer into a new thread. A channel has no branch. */
+  const branchAction = (message: AgentMessage) => {
+    if (channel || !props.threads?.onBranch || !branchPoints().has(message.id)) return;
+    return () => void branchThread(null, message.id);
   };
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
   const spokenReplyIds = createMemo(() => {
@@ -275,6 +296,10 @@ export function ConversationTimeline() {
   const runtime = conversationRuntime(props);
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const loadImageFile = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
+  const instructionsCalls = agentInstructionsCalls();
+  /** View and Undo on an instructions change line: the file is in the workspace on this computer. */
+  const localInstructionsCalls = () =>
+    props.server?.kind === "local" && !props.runtime ? instructionsCalls : undefined;
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
   /**
@@ -382,13 +407,13 @@ export function ConversationTimeline() {
    * An agent's record of a routine it created or changed is a card whose schedule the person can
    * change. Only a record from an agent turn has a `turnId`. A change the person made in the app
    * keeps the plain marker, so an edit on a card does not add a second card that replaces it. A
-   * deleted routine also keeps the plain marker, because its schedule is not known.
+   * deleted routine also keeps the plain marker, because its schedule is not known. Only the newest
+   * record of a routine is a card: each card shows the routine as it is now, so an older card would
+   * repeat it. An older record keeps the plain marker.
    */
   const routineCardMarker = (message: AgentMessage | undefined, marker: ChatActionMarkerModel | undefined) =>
     message?.turnId && marker?.kind === "routine-lifecycle" ? marker : undefined;
-  // "Show latest" moves focus to this card. The list mounts it only after the scroll.
-  const [routineCardFocus, setRoutineCardFocus] = createSignal<string | null>(null);
-  // The newest agent record of each routine is the one card that still edits it.
+  // The newest agent record of each routine is its one card.
   const latestRoutineMessageIds = createMemo(() => {
     const latest = new Map<string, string>();
     for (const message of timelineMessages()) {
@@ -400,7 +425,8 @@ export function ConversationTimeline() {
   const routineCard = (message: AgentMessage | undefined, marker: ChatActionMarkerModel) => {
     const agentId = props.agent?.id;
     const cardMarker = routineCardMarker(message, marker);
-    if (!cardMarker || cardMarker.action === "deleted" || !agentId) return undefined;
+    if (!message || !cardMarker || cardMarker.action === "deleted" || !agentId) return undefined;
+    if (latestRoutineMessageIds().get(cardMarker.routineId) !== message.id) return undefined;
     const routine = props.routines?.find((candidate) => candidate.id === cardMarker.routineId);
     return routine && { action: cardMarker.action, routine, agentId };
   };
@@ -754,6 +780,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -799,6 +826,12 @@ export function ConversationTimeline() {
                                                 onToggleRoutineRun={toggleRoutineRun}
                                                 onToggleAgentMessage={toggleAgentMessage}
                                                 agentMessageText={agentMessageText}
+                                                instructions={localInstructionsCalls()}
+                                                onOpenInstructions={
+                                                  channel || !localInstructionsCalls()
+                                                    ? undefined
+                                                    : openInstructionsSettings
+                                                }
                                               />
                                             }
                                           >
@@ -845,31 +878,14 @@ export function ConversationTimeline() {
                                   </Show>
                                 }
                               >
-                                {(card) => {
-                                  const latestMessageId = () => latestRoutineMessageIds().get(card().routine.id);
-                                  const rowMessageId = () => message()?.id ?? initialMessage.id;
-                                  return (
-                                    <RoutineChatCard
-                                      action={card().action}
-                                      routine={card().routine}
-                                      agentId={card().agentId}
-                                      latest={latestMessageId() === rowMessageId()}
-                                      onOpenRoutine={openRoutineSettings}
-                                      onShowLatest={
-                                        props.onOpenSearchMessage
-                                          ? () => {
-                                              const messageId = latestMessageId();
-                                              if (!messageId) return;
-                                              setRoutineCardFocus(messageId);
-                                              void props.onOpenSearchMessage?.(messageId);
-                                            }
-                                          : undefined
-                                      }
-                                      focusRequested={routineCardFocus() === rowMessageId()}
-                                      onFocusHandled={() => setRoutineCardFocus(null)}
-                                    />
-                                  );
-                                }}
+                                {(card) => (
+                                  <RoutineChatCard
+                                    action={card().action}
+                                    routine={card().routine}
+                                    agentId={card().agentId}
+                                    onOpenRoutine={openRoutineSettings}
+                                  />
+                                )}
                               </Show>
                             )}
                           </Show>
@@ -919,6 +935,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -970,6 +987,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1010,6 +1028,7 @@ export function ConversationTimeline() {
                     >
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1073,6 +1092,7 @@ export function ConversationTimeline() {
                       </Show>
                       <Show when={message()?.id === unreadBoundaryMessageId()}>
                         <UnreadMessagesDivider
+                          animateIn={unreadDividerArrives}
                           elementRef={(element) => {
                             setUnreadMessagesDividerElement(element);
                             scheduleUnreadDividerVisibilityUpdate();
@@ -1156,6 +1176,7 @@ export function ConversationTimeline() {
                     </Show>
                     <Show when={message()?.id === unreadBoundaryMessageId()}>
                       <UnreadMessagesDivider
+                        animateIn={unreadDividerArrives}
                         elementRef={(element) => {
                           setUnreadMessagesDividerElement(element);
                           scheduleUnreadDividerVisibilityUpdate();
@@ -1274,6 +1295,8 @@ export function ConversationTimeline() {
                                     }}
                                     {...messageActions}
                                     readAloud={messageReadAloud()}
+                                    onBranch={branchAction(message() ?? initialMessage)}
+                                    branchDisabled={Boolean(props.activeTurnId)}
                                   />
                                 </Show>
                               </>
@@ -1288,6 +1311,9 @@ export function ConversationTimeline() {
                                       authorName={channel ? author().name : undefined}
                                       {...messageActions}
                                       readAloud={messageReadAloud()}
+                                      onMarkUnread={markUnreadAction(message() ?? initialMessage)}
+                                      onBranch={branchAction(message() ?? initialMessage)}
+                                      branchDisabled={Boolean(props.activeTurnId)}
                                     />
                                   )
                             }

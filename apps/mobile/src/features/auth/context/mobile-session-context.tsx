@@ -11,7 +11,12 @@ import {
   useState,
 } from "react";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { loadAnalyticsPreference } from "@/features/analytics/preference";
+import {
+  followAccountAnalytics,
+  loadAnalyticsPreference,
+  type SendAnalyticsChoice,
+  sendAnalyticsChoice,
+} from "@/features/analytics/preference";
 import {
   logoutMobileSession,
   type MobileProfileChange,
@@ -38,7 +43,9 @@ interface MobileSessionContextValue {
   handleSessionError: (error: unknown, initiatingSession: MobileSession) => void;
   connect: (session: MobileSession) => void;
   signOut: () => Promise<void>;
-  updateProfile: (change: MobileProfileChange) => Promise<void>;
+  updateProfile: (change: MobileProfileChange) => Promise<MobileSession>;
+  /** Sends this phone's unsent analytics choice to the account. */
+  sendAnalyticsChoice: () => Promise<void>;
 }
 
 const MobileSessionContext = createContext<MobileSessionContextValue | null>(null);
@@ -148,7 +155,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       const current = sessionRef.current;
       if (!current) throw new MobileSessionExpiredError();
       try {
-        await updateMobileProfile(current, change, (updated) => {
+        return await updateMobileProfile(current, change, (updated) => {
           const next = resolveSessionValidation(sessionRef.current, current, updated);
           if (next !== sessionRef.current) setCurrentSession(next);
         });
@@ -160,6 +167,21 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     [handleSessionError, setCurrentSession],
   );
 
+  const sendAnalytics = useCallback<SendAnalyticsChoice>(
+    async (enabled, ageMs) => (await updateProfile({ analyticsEnabled: enabled, ageMs })).user.analyticsEnabled ?? null,
+    [updateProfile],
+  );
+  const sendUnsentAnalytics = useCallback(() => sendAnalyticsChoice(sendAnalytics), [sendAnalytics]);
+
+  // The account keeps the user's latest analytics answer. This phone sends its unsent choice, or
+  // follows the account. A failed send stays marked for the next profile refresh.
+  const accountAnalytics = sessionState?.user.analyticsEnabled;
+  const signedIn = Boolean(sessionState);
+  useEffect(() => {
+    if (!signedIn) return;
+    void followAccountAnalytics(accountAnalytics, sendAnalytics).catch(() => undefined);
+  }, [signedIn, accountAnalytics, sendAnalytics]);
+
   const value = useMemo<MobileSessionContextValue>(
     () => ({
       loading: sessionState === undefined,
@@ -170,8 +192,9 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       connect: setCurrentSession,
       signOut,
       updateProfile,
+      sendAnalyticsChoice: sendUnsentAnalytics,
     }),
-    [sessionState, setCurrentSession, signOut, updateProfile, handleSessionError, refreshProfile],
+    [sessionState, setCurrentSession, signOut, updateProfile, sendUnsentAnalytics, handleSessionError, refreshProfile],
   );
 
   return <MobileSessionContext.Provider value={value}>{children}</MobileSessionContext.Provider>;

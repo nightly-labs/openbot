@@ -58,6 +58,11 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
   }
   open.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   archived.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const sources = new Map<string, string>();
+  for (const task of input.tasks) {
+    const sourceId = task.branch?.sourceTaskId;
+    if (sourceId) sources.set(task.id, sourceId);
+  }
   const tabs: ThreadItem[] = [];
   for (const id of input.open) {
     const item = items.get(id);
@@ -71,7 +76,57 @@ export function threadLists(input: ThreadListsInput): ThreadLists {
       updatedAt: input.mainUpdatedAt,
       status: { kind: "idle" },
     });
-  return { threads: open, tabs, archived };
+  return { threads: nestedBranches(open, (id) => sources.get(id)), tabs, archived };
+}
+
+/**
+ * The deepest level of the tree lines in the thread menu. A deeper branch shows at this level, below
+ * its source, so that its title stays readable in the menu.
+ */
+const BRANCH_LEVELS = 4;
+
+/**
+ * Puts each branch under the open thread that it came from, with tree lines before its title. A
+ * branch whose source is archived or deleted, or of the agent's own chat, stays at the top. Each
+ * level keeps the order of `items`. The items of the tabs do not change.
+ */
+function nestedBranches(items: readonly ThreadItem[], sourceOf: (id: string) => string | undefined): ThreadItem[] {
+  const ids = new Set(items.map((item) => item.id));
+  const parent = (item: ThreadItem): string | null => {
+    const sourceId = sourceOf(item.id);
+    return sourceId !== undefined && sourceId !== item.id && ids.has(sourceId) ? sourceId : null;
+  };
+  const children = new Map<string | null, ThreadItem[]>();
+  for (const item of items) {
+    const key = parent(item);
+    children.set(key, [...(children.get(key) ?? []), item]);
+  }
+  const placed = new Set<string>();
+  const walk = (id: string | null, level: number): { item: ThreadItem; level: number }[] =>
+    (children.get(id) ?? []).flatMap((item) => {
+      if (placed.has(item.id)) return [];
+      placed.add(item.id);
+      return [{ item, level }, ...walk(item.id, Math.min(level + 1, BRANCH_LEVELS))];
+    });
+  const rows = walk(null, 0);
+  // The line of a level continues down to the next row on that level, if no row above it comes first.
+  const continues = (from: number, level: number) => {
+    for (const row of rows.slice(from + 1)) if (row.level <= level) return row.level === level;
+    return false;
+  };
+  const nested = rows.map(({ item, level }, index) =>
+    level === 0
+      ? item
+      : {
+          ...item,
+          stem: {
+            through: Array.from({ length: level - 1 }, (_, outer) => continues(index, outer + 1)),
+            last: !continues(index, level),
+          },
+        },
+  );
+  // A loop of sources has no top. Its threads still show, at the top.
+  return [...nested, ...items.filter((item) => !placed.has(item.id))];
 }
 
 /** The open tab, or the agent's own chat when it is open or the open tab no longer shows. */

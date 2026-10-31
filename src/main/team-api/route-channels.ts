@@ -1,6 +1,7 @@
 import {
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelCommand,
   canAdministerServer,
   isReleasedRoutineSchedule,
@@ -85,6 +86,8 @@ export async function routeChannels(
   // A restore undoes a delete, so only the people who can delete a channel can restore it.
   if (input.type === "restore" && !canAdministerServer(member.role))
     throw new HttpError(403, sourceText("error.team.membersCannotRestoreChannels"));
+  if (input.type === "cancel" && !capabilities.has(CHANNEL_TASK_CANCEL_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.channelTaskCancelUnsupported"));
   if (input.type === "save") requireChatForAddedAgents(context, input, channels, hiddenAgentIds);
   return json(
     200,

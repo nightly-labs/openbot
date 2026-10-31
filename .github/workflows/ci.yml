@@ -182,6 +182,12 @@ jobs:
       - name: Run the agent browser session E2E
         run: xvfb-run -a bun run test:browser-agent-session
 
+      - name: Run the browser steps E2E
+        run: xvfb-run -a bun run test:browser-steps
+
+      - name: Run the browser dialogs E2E
+        run: xvfb-run -a bun run test:browser-dialogs
+
   tests-desktop:
     # ubuntu-latest gives 4 vCPUs, so vitest runs 3 workers and the job is
     # CPU-bound. The suite is split across shards that run as their own
@@ -337,6 +343,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:desktop-notifications
 
+      - name: Run the phone notification away and Live Activity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:push-notification-away
+
+      - name: Run the notification summary E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:notification-summary
+
       - name: Run the routine pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-pause-resume
@@ -408,6 +422,10 @@ jobs:
       - name: Run the Codex usage reset E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
+
+      - name: Run the usage read pacing E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:usage-read-pacing
 
       - name: Run the routine session E2E test
         if: ${{ !cancelled() }}
@@ -501,6 +519,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
 
+      - name: Run the OpenCode Go usage E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:opencode-go-usage
+
       - name: Run the Pi sign-in outside OpenBot E2E test
         if: ${{ !cancelled() }}
         run: bun run test:pi-sign-in-watch
@@ -521,6 +543,8 @@ jobs:
             .openbot-build/sign-in-relay-replay-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
+            .openbot-build/push-notification-away-e2e/
+            .openbot-build/notification-summary-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
@@ -538,6 +562,7 @@ jobs:
             .openbot-build/codex-missing-rollout-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
+            .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
             .openbot-build/agent-webhook-routine-e2e/
@@ -560,6 +585,7 @@ jobs:
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
             .openbot-build/cursor-usage-e2e/
+            .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
             .openbot-build/agent-api-keys-e2e/
           if-no-files-found: ignore
@@ -621,6 +647,10 @@ jobs:
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
+
+      - name: Run the ACP audio input E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-audio-input
 
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
@@ -690,6 +720,7 @@ jobs:
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/acp-instructions-once-e2e/
+            .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/pi-steer-e2e/
             .openbot-build/muse-instructions-once-e2e/
@@ -930,6 +961,10 @@ jobs:
 
       - name: Build production Worker
         run: bun run api:build
+
+      # A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
+      - name: Keep the code files of earlier builds
+        run: bun apps/auth-api/scripts/keep-previous-assets.ts
 
       - name: Prepare runtime secrets
         id: runtime-secrets

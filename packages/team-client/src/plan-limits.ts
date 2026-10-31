@@ -132,6 +132,31 @@ export function withSignInUsage(current: AccountUsage | null | undefined, signIn
   };
 }
 
+function usageLimitKey(limit: AccountUsageLimit): string {
+  return JSON.stringify([limit.id, limit.accountId ?? null]);
+}
+
+/**
+ * The reading after a host's `usage-changed` event. The host sends one provider, or the providers it
+ * has read so far, so each limit of the event replaces only its own, as on desktop. A limit with no
+ * window keeps the windows it had, so its ring does not go and come back. An empty event clears the
+ * provider's own sign-ins, as on desktop.
+ */
+export function withUsageEvent(current: AccountUsage | null | undefined, event: AccountUsage): AccountUsage {
+  if (event.limits.length === 0) return withSignInUsage(current, event);
+  const limits = new Map((current?.limits ?? []).map((limit) => [usageLimitKey(limit), limit]));
+  for (const limit of event.limits) {
+    const kept = limits.get(usageLimitKey(limit));
+    limits.set(
+      usageLimitKey(limit),
+      limit.primary || limit.secondary || !kept
+        ? limit
+        : { ...limit, primary: kept.primary, secondary: kept.secondary },
+    );
+  }
+  return { limits: [...limits.values()] };
+}
+
 function decodeAccountUsage(value: unknown): AccountUsage {
   if (!isAccountUsage(value)) throw new Error("The server returned invalid usage limits.");
   return value;

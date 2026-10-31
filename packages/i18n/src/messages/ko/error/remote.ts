@@ -121,7 +121,6 @@ export const messages = {
   "error.remote.serverDisconnected": "서버 연결이 끊어졌어요.",
   "error.remote.preferencesUnreadable": "저장된 채팅 환경설정을 읽을 수 없어요.",
   "error.remote.accountAuthRequired": "계정 인증이 필요해요.",
-  "error.remote.serverIdentityChanged": "서버 ID가 변경되었어요. 신뢰하는 호스트 키를 교체하지 않아요.",
   "error.remote.pairedIdentityChanged":
     "페어링된 데스크톱 ID가 없거나 변경되었어요. 해당 데스크톱에서 새 코드를 스캔해 주세요.",
   "error.remote.permanentInviteNoEmail": "영구 초대는 이메일로 보낼 수 없어요.",

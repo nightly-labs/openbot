@@ -108,8 +108,21 @@ export const messages = {
   "server.add.custom.description":
     "Erhalte eigene Infrastruktur, zusätzlichen Speicher oder Funktionen, die auf deine Arbeitsweise zugeschnitten sind.",
   "server.add.custom.action": "Kontaktiere uns",
-  "server.add.join.title": "Hast du eine Einladung?",
   "server.add.join.action": "Server beitreten",
+  "server.add.otherOptions": "Weitere Optionen",
+  "server.local.createTitle": "Neuer Server auf diesem Computer",
+  "server.local.createDescription": "Der Server hat eigene Agenten, Chats und Dateien. Er läuft auf diesem Computer.",
+  "server.local.nameLabel": "Servername",
+  "server.local.create": "Server erstellen",
+  "server.local.creating": "Server wird erstellt…",
+  "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
+  "server.local.limitReached":
+    "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
+  "server.local.deleteConfirmTitle": "{name} löschen?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stoppt den Server und verschiebt seine Agenten, Chats und Dateien in den Papierkorb.",
+  "server.local.deleting": "Server wird gelöscht…",
+  "server.local.deletedTitle": "{name} gelöscht",
   "server.add.limit.title": "Dieses Konto hat die maximale Anzahl von Servern",
   "server.add.limit.description": {
     one: "Ein Konto kann {count} kostenpflichtigen Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",
@@ -178,6 +191,7 @@ export const messages = {
   "server.rail.addRemote": "Remote-Server hinzufügen",
   "server.rail.add": "Server hinzufügen",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "auf diesem Computer",
   "server.rail.notificationsMuted": "Benachrichtigungen stummgeschaltet",
   "server.rail.actions": "Serveraktionen",
   "server.rail.unmute": "Stummschaltung aufheben",
@@ -188,6 +202,8 @@ export const messages = {
   "server.rail.restart": "Server neu starten",
   "server.rail.leave": "Server verlassen",
   "server.rail.delete": "Server löschen",
+  "server.rail.hide": "Server ausblenden",
+  "server.rail.showLocal": "{name} anzeigen",
   "server.select.failedTitle": "Server konnte nicht ausgewählt werden",
   "server.select.failedDescription": "Der Server konnte nicht gewechselt werden. Versuche es erneut.",
   "server.select.openAgentFailed": "{name} konnte nicht geöffnet werden. Suche ihn in der Seitenleiste.",
@@ -291,13 +307,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Sieh und steuere diesen Mac von einem anderen Computer aus.",
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
-  "server.settings.notifications": "Benachrichtigungen",
-  "server.settings.muteNotifications": "Benachrichtigungen stummschalten",
-  "server.settings.muteDescription":
-    "Deaktiviere Desktop-Benachrichtigungen, Töne und MacBook-Notch-Aktualisierungen von diesem Server.",
-  "server.settings.mutedUntilDescription": "{until}. Deaktiviere diese Option, um die Stummschaltung jetzt aufzuheben.",
-  "server.settings.notifyAbout": "Benachrichtige mich über",
-  "server.settings.notifyAboutDescription": "Welche Agentenereignisse eine Desktop-Benachrichtigung anzeigen.",
   "server.settings.agents": "Agenten",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
@@ -328,6 +337,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Der aktuelle und der neue Schlüssel signieren beide eine Übergabe. Die Apps der Mitglieder wechseln beim nächsten Verbinden zum neuen Schlüssel. Tu das, wenn die Schlüsseldatei kopiert oder offengelegt wurde.",
   "server.settings.hostKeyRotated": "Serverschlüssel geändert",
+  "server.settings.hostKeyChanged": "Letzte Änderung",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
   "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":

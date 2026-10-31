@@ -28,7 +28,8 @@
  * The license tiers have their own scenarios:
  * - `license-prices`: the 8 license lookup keys give active Prices with the tier, the interval, the bundle
  *   flag and the amounts of `LICENSE_PLAN_PRICES` in EUR, USD and PLN. No license key is a server plan key.
- * - `license-starter`: a Starter license is 1 user at €10. It cannot change its users, and no member joins.
+ * - `license-starter`: a Starter license is 1 user at €10. It cannot change its users, its server with no
+ *   plan shows a member limit of 1, and no member joins.
  * - `license-bundle-align`: an account with a server plan buys the Starter license at the bundle price
  *   (€8). When the server plan ends, the license moves to the Starter price, and the next renewal is €10.
  * - `order-bundle`: a server create with a license order gives one Checkout page with the server Price and
@@ -41,6 +42,10 @@
  * - `license-member-limits`: a new Starter hosted server takes 1 member (the owner), and a new Standard
  *   server takes 5. A server made before these limits (`legacy_member_limits = 1`) takes 3 on Starter and
  *   10 on Standard.
+ * - `license-self-hosted-limit`: a server with no plan takes 3 members with no license, the users of a
+ *   Team license while it is active, and 3 again when it ends. Members who are active stay. A custom limit
+ *   above the license users shows the license users, and a plan from before the license gives way to more
+ *   license users.
  *
  * The license promotion (`LICENSE_TRIAL_END`, in `wrangler.jsonc`) has its own scenarios. They run only
  * when the Worker sells the free trial, and `order-bundle` runs only when it does not. To run
@@ -66,6 +71,7 @@ import {
   memberLimitForPlan,
   parseBillingLookupKey,
 } from "@openbot/contracts/billing";
+import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
   LICENSE_INCLUDED_USERS,
   LICENSE_LOOKUP_KEYS,
@@ -125,6 +131,7 @@ const SCENARIOS = [
   "license-upgrade",
   "license-legacy-request",
   "license-member-limits",
+  "license-self-hosted-limit",
   "license-trial",
   "order-trial",
 ] as const;
@@ -2171,8 +2178,8 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-limit"(account) {
-    // Servers with no plan take 3 active members, so each has the owner and one member: the license
-    // stops a join before the member limit does. The owner and a, b, c, lab use all 5 users.
+    // Servers with no plan take as many active members as the license has users, so the count across
+    // the owner's servers stops a join. The owner and a, b, c, lab use all 5 users.
     account.addServers([
       { name: "Office", members: [{ key: "a" }] },
       { name: "Studio", members: [{ key: "b" }, { key: "gone", active: false }] },
@@ -2448,7 +2455,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-starter"(account) {
-    // A server with no plan takes 3 members, so only the license can stop a join.
+    // A server with no plan takes as many members as the license has users: here only the owner.
     account.addServers([{ name: "Solo", members: [] }]);
     const sub = await account.buyLicense(1, "eur", STARTER_MONTH);
     const bought = await licenseWhere(account, "license active", (state) => state.license?.status === "active");
@@ -2482,11 +2489,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: more.status, code: more.code, users: after.license?.users },
     );
     const refused = await account.memberJoins("new", 0);
+    const memberLimit = await hostMemberLimit(account, `e2e-${account.scenario}-0`);
     record(
       "license-starter",
-      "1 of 1 users: a member cannot join the owner's server, 409 license_users_full",
-      refused.status === 409 && refused.code === "license_users_full",
-      { status: refused.status, code: refused.code },
+      "1 of 1 users: the host list shows 1, and a member cannot join the owner's server, 409 license_users_full",
+      memberLimit === 1 && refused.status === 409 && refused.code === "license_users_full",
+      { memberLimit, status: refused.status, code: refused.code },
     );
   },
 
@@ -2952,6 +2960,120 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         memberLimit: legacyStandardLimit,
         joins: legacyJoins.map((join) => ({ status: join.status, code: join.code })),
       },
+    );
+  },
+
+  async "license-self-hosted-limit"(account) {
+    account.addServers([{ name: "VPS", members: [{ key: "gone", active: false }] }]);
+    const hostId = `e2e-${account.scenario}-0`;
+    const outcome = (join: { status: number; code: string | null }) => ({ status: join.status, code: join.code });
+    const free = [];
+    for (const key of ["a", "b", "c"]) free.push(await account.memberJoins(key, 0));
+    const freeLimit = await hostMemberLimit(account, hostId);
+    record(
+      "license-self-hosted-limit",
+      `no license: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, 2 members join next to the owner, and the third gets 409 member_limit_reached`,
+      freeLimit === DEFAULT_TEAM_MEMBER_LIMIT &&
+        free[0]?.status === 200 &&
+        free[1]?.status === 200 &&
+        free[2]?.status === 409 &&
+        free[2].code === "member_limit_reached",
+      { memberLimit: freeLimit, joins: free.map(outcome) },
+    );
+
+    const sub = await account.buyLicense(5);
+    await licenseWhere(account, "license active", (state) => state.license?.status === "active");
+    const licensedLimit = await waitFor("host list shows the license users", async () => {
+      const limit = await hostMemberLimit(account, hostId);
+      return limit === 5 ? limit : null;
+    });
+    const licensed = [];
+    for (const key of ["c", "d", "e"]) licensed.push(await account.memberJoins(key, 0));
+    record(
+      "license-self-hosted-limit",
+      "a Team license of 5: the host list shows 5, 2 more members join, and the next gets 409 license_users_full",
+      licensedLimit === 5 &&
+        licensed[0]?.status === 200 &&
+        licensed[1]?.status === 200 &&
+        licensed[2]?.status === 409 &&
+        licensed[2].code === "license_users_full",
+      { memberLimit: licensedLimit, joins: licensed.map(outcome) },
+    );
+
+    const more = await account.request("POST", "v1/me/license/users", { users: 6 });
+    const sixth = await account.memberJoins("e", 0);
+    const sixLimit = await hostMemberLimit(account, hostId);
+    record(
+      "license-self-hosted-limit",
+      "after the owner adds a user to the license, the host list shows 6 and one more member joins",
+      more.status === 200 && sixth.status === 200 && sixLimit === 6,
+      { users: more.status, join: outcome(sixth), memberLimit: sixLimit },
+    );
+
+    // A custom limit comes before the license, but the license still refuses a join after its users.
+    const now = Date.now();
+    d1(
+      `INSERT INTO server_member_limits(server_id, owner_user_id, member_limit, created_at, updated_at)
+       VALUES (${quote(hostId)}, ${quote(userId(account.scenario))}, 10, ${now}, ${now})`,
+      z.unknown(),
+    );
+    const customLimit = await hostMemberLimit(account, hostId);
+    const overCustom = await account.memberJoins("custom", 0);
+    d1(`DELETE FROM server_member_limits WHERE server_id = ${quote(hostId)}`, z.unknown());
+    record(
+      "license-self-hosted-limit",
+      "a custom limit of 10 and a license of 6 users: the host list shows 6, and a join gets 409 license_users_full",
+      customLimit === 6 && overCustom.status === 409 && overCustom.code === "license_users_full",
+      { memberLimit: customLimit, join: outcome(overCustom) },
+    );
+
+    // A self-hosted host can keep a plan from before the license. With no hosted row, Starter has its
+    // legacy limit of 3, and the larger license gives the limit.
+    const legacyPlan = `sub_e2e_${account.scenario}_legacy`;
+    d1(
+      `INSERT INTO billing_subscriptions(stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval,
+         currency, status, current_period_end, updated_at)
+       VALUES (${quote(legacyPlan)}, ${quote(userId(account.scenario))}, 'cus_e2e', ${quote(hostId)}, 'starter',
+         'month', 'eur', 'active', ${now + 30 * DAY * 1_000}, ${now})`,
+      z.unknown(),
+    );
+    const planLimit = await hostMemberLimit(account, hostId);
+    const overPlan = await account.memberJoins("custom", 0);
+    d1(`DELETE FROM billing_subscriptions WHERE stripe_subscription_id = ${quote(legacyPlan)}`, z.unknown());
+    record(
+      "license-self-hosted-limit",
+      "a Starter plan from before the license (3) and a license of 6 users: the host list shows 6, and a join gets 409 license_users_full",
+      planLimit === 6 && overPlan.status === 409 && overPlan.code === "license_users_full",
+      { memberLimit: planLimit, join: outcome(overPlan) },
+    );
+
+    await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
+    await licenseWhere(account, "license ended", (state) => state.license?.status === "canceled", 120_000);
+    const endedLimit = await hostMemberLimit(account, hostId);
+    const [counted] = d1(
+      `SELECT COUNT(*) AS active FROM remote_memberships WHERE host_id = ${quote(hostId)} AND status = 'active'`,
+      z.object({ active: z.number() }),
+    );
+    const late = await account.memberJoins("late", 0);
+    const [gone] = d1(
+      `SELECT membership_id FROM remote_memberships
+        WHERE host_id = ${quote(hostId)} AND user_id = ${quote(account.memberId("gone"))}`,
+      z.object({ membership_id: z.string() }),
+    );
+    const reactivated = await account.request("PATCH", `v2/remote/hosts/${hostId}/members/${gone?.membership_id}`, {
+      role: "member",
+      reactivate: true,
+    });
+    record(
+      "license-self-hosted-limit",
+      `the license ends: the host list shows ${DEFAULT_TEAM_MEMBER_LIMIT}, the 6 active members stay, and a join and a reactivation get 409 member_limit_reached`,
+      endedLimit === DEFAULT_TEAM_MEMBER_LIMIT &&
+        counted?.active === 6 &&
+        late.status === 409 &&
+        late.code === "member_limit_reached" &&
+        reactivated.status === 409 &&
+        reactivated.code === "member_limit_reached",
+      { memberLimit: endedLimit, active: counted?.active, join: outcome(late), reactivation: outcome(reactivated) },
     );
   },
 

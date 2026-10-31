@@ -31,7 +31,7 @@ export const messages = {
   "provider.status.checking": "Controleren",
   "provider.status.off": "Uit",
   "provider.gemini.hostSignIn":
-    "Om Gemini te verbinden, open je OpenBot op de host en kies je Verbinden in Instellingen > Aanbieders. Inloggen bij Google vereist een browser op die host. Op afstand inloggen wordt niet ondersteund.",
+    "Om Gemini te verbinden, open je OpenBot op de host en kies je Verbinden in Serverinstellingen > Aanbieders. Inloggen bij Google vereist een browser op die host. Op afstand inloggen wordt niet ondersteund.",
   "provider.key.free": "Gratis",
   "provider.action.connect": "Verbinden",
   "provider.action.reconnect": "Opnieuw verbinden",
@@ -177,6 +177,7 @@ export const messages = {
   "provider.account.cancelSignIn": "Inloggen annuleren",
   "provider.account.finishSignIn": "Rond het inloggen af in de browser.",
   "provider.account.remove": "Account verwijderen",
+  "provider.account.disconnect": "Verbreken",
   "provider.account.actionFailed": "Kan het account van {name} niet wijzigen.",
   "provider.account.resetUsage": "Gebruik resetten",
   "provider.account.resetUsageTitle": "Gebruik van {name} resetten?",
@@ -217,6 +218,11 @@ export const messages = {
   "provider.settings.removeMoves": "{agents} gaat {name} gebruiken.",
   "provider.settings.removeUnused": "Geen agent gebruikt dit account.",
   "provider.settings.removeCredentials": "OpenBot verwijdert de inloggegevens van dit account van deze computer.",
+  "provider.settings.disconnectTitle": "{name} verbreken?",
+  "provider.settings.disconnectOthers": "De andere {provider}-accounts wachten tot je {provider} opnieuw verbindt.",
+  "provider.settings.disconnectLocal":
+    "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal wordt ook afgemeld.",
+  "provider.settings.disconnectHost": "OpenBot meldt {provider} af op de server.",
   "provider.settings.usageLow": "{percent} over · {window}",
   "provider.settings.usageOf": "Gebruik van {name}",
   "provider.settings.signIn": "Inloggen",

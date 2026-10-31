@@ -1,26 +1,46 @@
 import {
+  type AddAgentFolderInput,
   type AgentAccessChange,
   type AgentAccessSnapshot,
+  type AgentExclusionChange,
+  type AgentFolderBrowse,
+  type AgentFolderChange,
+  type AgentFolderInput,
+  type AgentFolderList,
+  type AgentNotificationLevelsSnapshot,
   type AgentSessionSettings,
+  type BrowseAgentFoldersInput,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
+  decodeAgentExclusionChangeFromMain,
+  decodeAgentFolderBrowse,
+  decodeAgentFolderChangeFromMain,
+  decodeAgentFolderListFromMain,
   type HiddenAgentsSnapshot,
   type HostDiscordAccessInput,
   type HostSetDiscordAccessInput,
+  isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isDiscordAccess,
   isDiscordRoleList,
   isHiddenAgentsSnapshot,
   type ResetAgentSessionSettingInput,
   type SetAgentHiddenInput,
+  type SetAgentNotificationLevelInput,
   type SetAgentSessionSettingInput,
+  type SetOwnServerNotificationLevelInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
+import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_MEMORY_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { AGENT_NOTIFICATION_LEVELS_ROUTES } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_SESSION_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
+import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
+import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
@@ -30,7 +50,7 @@ import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provid
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 // Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
-// the server timezone, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
+// the server timezone, the browser profiles, the server key, the agent memory limit, the memory review, the prompt cache time, the default provider, the Discord roles that can use OpenBot, the app update, MCP servers, storage, hosted sites and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
 // them through their own transport, so the path, body and decoding of each request are here once.
@@ -43,6 +63,7 @@ import {
   type AddedAgent,
   type AddMessagingOrchestratorResult,
   type AgentAdminSettings,
+  type AgentBrowserProfile,
   type AgentModelId,
   type AgentProviderId,
   type AgentStatus,
@@ -51,14 +72,24 @@ import {
   assertStorageUsageScope,
   type BitwardenConnectorStatus,
   type BitwardenHostConnectInput,
+  type BrowserProfileList,
+  type BrowserProfileSummary,
   type CancelMcpSignInInput,
+  type ClearBrowserDataInput,
   type ClearStorageInput,
   type ConnectProviderAccountInput,
+  type CustomAgentResult,
+  type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   type DeleteCustomProviderInput,
   type DeleteStoredFileInput,
   decodeAgentAdminSettings,
+  decodeAgentBrowserProfile,
+  decodeBrowserProfileList,
+  decodeBrowserProfileSummary,
+  decodeCustomAgentResult,
+  decodeCustomAgentSummaries,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostAddedAgent,
@@ -145,6 +176,7 @@ import {
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
   type RoutineResultRoutineInput,
+  type SaveCustomAgentInput,
   type SaveCustomProviderInput,
   type SaveMcpServerInput,
   type SaveMcpSignInAppInput,
@@ -160,13 +192,21 @@ import {
   type TestMcpServerInput,
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
+  type UpdateAgentBrowserProfileInput,
+  type UpdateBrowserProfileInput,
   type UpdateHostIdentityInput,
   type UpdateRestartMode,
   type VaultHostImportResult,
   type VaultSaveInput,
   type VaultState,
 } from "@openbot/contracts/ipc";
-import { decodeRecord, guardedListDecoder, nullableString, requiredBoolean } from "@openbot/contracts/ipc-decoding";
+import {
+  decodeRecord,
+  guardedListDecoder,
+  nullableString,
+  requiredBoolean,
+  requiredString,
+} from "@openbot/contracts/ipc-decoding";
 import {
   decodeEventActivity,
   decodeEventRoutineRuns,
@@ -194,6 +234,7 @@ import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-ins
 import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
@@ -203,12 +244,13 @@ import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sig
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
-import {
-  type PROVIDER_ACCOUNT_RELAY_PROVIDERS,
-  PROVIDER_ACCOUNT_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-account-relay-v1";
+import type {
+  ProviderAccountRelay,
+  ProviderAccountRelayProvider,
+} from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
@@ -542,6 +584,22 @@ export function setHostTimezone(
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
 }
 
+/**
+ * Asks the host to change its key (`host-key-rotation-v1`). Only the owner can. Resolves with the new
+ * public key after the account service accepted the signed handover. The caller still trusts the key
+ * only through the handover that the server list carries.
+ */
+export function rotateHostKey(request: TeamApiRequest): Effect.Effect<{ publicKey: string }, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      HOST_KEY_ROTATION_ROUTES.rotate,
+      (value) => ({ publicKey: requiredString(decodeRecord(value, "host key"), "publicKey") }),
+      {},
+    ),
+  );
+}
+
 /** The host's enabled messaging connections with their places. Only a host with `routine-results-v1` answers it. */
 export function listRoutineResultOptions(
   request: TeamApiRequest,
@@ -740,12 +798,13 @@ export function startProviderSignInRelay(
   return adminCall(() => request("POST", SIGN_IN_RELAY_ROUTES.providerStart, decodeSignInRelayFlow, { provider }));
 }
 
-/** A relayed sign-in of an account after the first (`provider-account-relay-v1`). */
+/** A relayed sign-in of an account after the first, on the route of the host's account relay. */
 export function startProviderAccountSignInRelay(
   request: TeamApiRequest,
-  input: { provider: (typeof PROVIDER_ACCOUNT_RELAY_PROVIDERS)[number]; accountId: string | null },
+  relay: ProviderAccountRelay,
+  input: { provider: ProviderAccountRelayProvider; accountId: string | null },
 ): Effect.Effect<{ flowId: string }, TeamAdminRequestError> {
-  return adminCall(() => request("POST", PROVIDER_ACCOUNT_RELAY_ROUTES.start, decodeSignInRelayFlow, { ...input }));
+  return adminCall(() => request("POST", relay.start, decodeSignInRelayFlow, { ...input }));
 }
 
 /** A relayed sign-in of a link that an agent of the host printed (`sign-in-relay-v1`). */
@@ -1019,6 +1078,14 @@ export function resetProviderUsage(
   );
 }
 
+/** `provider-sign-out-v1`: signs the host's own sign-in of a provider out. */
+export function signOutProvider(
+  request: TeamApiRequest,
+  provider: AgentProviderId,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_SIGN_OUT_ROUTES.signOut, ignoreResponse, { provider }));
+}
+
 /** Moves the agent to an account of its provider; null is the provider's own sign-in. */
 export function setAgentProviderAccount(
   request: TeamApiRequest,
@@ -1108,18 +1175,26 @@ export function checkProviderRuntimeUpdates(
   return adminCall(() => request("POST", routes.runtimesCheck, runtimeDecoder(routes), {}));
 }
 
+/**
+ * The custom endpoint routes of a host: `custom-provider-harness-v1` names the harness of each
+ * endpoint, and `providers-v1` does not. The caller picks by the host's capabilities.
+ */
+export type CustomProviderRoutes = typeof CUSTOM_PROVIDER_HARNESS_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+
 export function listCustomProviders(
   request: TeamApiRequest,
+  routes: CustomProviderRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<CustomProviderSummary[], TeamAdminRequestError> {
-  return adminCall(() => request("POST", PROVIDERS_ADMIN_ROUTES.customList, decodeCustomProviderSummaries, {}));
+  return adminCall(() => request("POST", routes.customList, decodeCustomProviderSummaries, {}));
 }
 
 export function saveCustomProvider(
   request: TeamApiRequest,
   input: SaveCustomProviderInput,
+  routes: CustomProviderRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<CustomProviderResult, TeamAdminRequestError> {
   return adminCall(() =>
-    request("POST", PROVIDERS_ADMIN_ROUTES.customSave, decodeCustomProviderResult, {
+    request("POST", routes.customSave, decodeCustomProviderResult, {
       ...input,
       models: input.models.map(({ id, name }) => ({ id, name })),
       headers: input.headers.map(({ name, value }) => ({ name, value })),
@@ -1130,10 +1205,40 @@ export function saveCustomProvider(
 export function deleteCustomProvider(
   request: TeamApiRequest,
   input: DeleteCustomProviderInput,
+  routes: CustomProviderRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Effect.Effect<CustomProviderResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", routes.customDelete, decodeCustomProviderResult, { id: input.id }));
+}
+
+/**
+ * `custom-agents-v1`: the custom ACP agents of a host. An environment value goes only in a save body,
+ * and `value: null` keeps the value that the host holds.
+ */
+export function listCustomAgents(request: TeamApiRequest): Effect.Effect<CustomAgentSummary[], TeamAdminRequestError> {
+  return adminCall(() => request("POST", CUSTOM_AGENTS_ROUTES.list, decodeCustomAgentSummaries, {}));
+}
+
+export function saveCustomAgent(
+  request: TeamApiRequest,
+  input: SaveCustomAgentInput,
+): Effect.Effect<CustomAgentResult, TeamAdminRequestError> {
   return adminCall(() =>
-    request("POST", PROVIDERS_ADMIN_ROUTES.customDelete, decodeCustomProviderResult, { id: input.id }),
+    request("POST", CUSTOM_AGENTS_ROUTES.save, decodeCustomAgentResult, {
+      id: input.id,
+      name: input.name,
+      command: input.command,
+      args: [...input.args],
+      env: input.env.map(({ name, value }) => ({ name, value })),
+      usagePrompt: input.usagePrompt,
+    }),
   );
+}
+
+export function deleteCustomAgent(
+  request: TeamApiRequest,
+  id: string,
+): Effect.Effect<CustomAgentResult, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CUSTOM_AGENTS_ROUTES.delete, decodeCustomAgentResult, { id }));
 }
 
 export function getHostReleaseStatus(request: TeamApiRequest): Effect.Effect<HostReleaseStatus, TeamAdminRequestError> {
@@ -1167,6 +1272,49 @@ export function resetAgentSessionSetting(
   return adminCall(() => request("POST", AGENT_SESSION_SETTINGS_ROUTES.reset, decodeSessionSettings, { ...input }));
 }
 
+/** The folders of one agent, on a host that advertises `agent-folders-v1`. Owners and admins only. */
+export function readAgentFolders(
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.Effect<AgentFolderList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.read, decodeAgentFolderListFromMain, { agentId }));
+}
+export function addAgentFolder(
+  request: TeamApiRequest,
+  input: AddAgentFolderInput,
+): Effect.Effect<AgentFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.add, decodeAgentFolderChangeFromMain, { ...input }));
+}
+export function removeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.remove, decodeAgentFolderChangeFromMain, { ...input }));
+}
+export function excludeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentExclusionChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_FOLDERS_ROUTES.exclude, decodeAgentExclusionChangeFromMain, { ...input }),
+  );
+}
+export function includeAgentFolder(
+  request: TeamApiRequest,
+  input: AgentFolderInput,
+): Effect.Effect<AgentExclusionChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_FOLDERS_ROUTES.include, decodeAgentExclusionChangeFromMain, { ...input }),
+  );
+}
+/** The folders in one folder of the host computer, to pick a folder from. */
+export function browseAgentFolders(
+  request: TeamApiRequest,
+  input: BrowseAgentFoldersInput,
+): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
+}
+
 function decodeHiddenAgents(value: unknown): HiddenAgentsSnapshot {
   if (!isHiddenAgentsSnapshot(value)) throw new Error("Invalid hidden agents response.");
   return value;
@@ -1181,6 +1329,38 @@ export function setAgentHidden(
 ): Effect.Effect<HiddenAgentsSnapshot, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", AGENT_HIDDEN_ROUTES.set, decodeHiddenAgents, { agentId: input.agentId, hidden: input.hidden }),
+  );
+}
+
+function decodeAgentNotificationLevels(value: unknown): AgentNotificationLevelsSnapshot {
+  if (!isAgentNotificationLevelsSnapshot(value)) throw new Error("Invalid agent notification levels response.");
+  return value;
+}
+/** The member's own level for each agent, on a host that advertises `agent-notification-levels-v1`. */
+export function listAgentNotificationLevels(
+  request: TeamApiRequest,
+): Effect.Effect<AgentNotificationLevelsSnapshot, TeamAdminRequestError> {
+  return adminCall(() => request("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.read, decodeAgentNotificationLevels, {}));
+}
+export function setAgentNotificationLevel(
+  request: TeamApiRequest,
+  input: SetAgentNotificationLevelInput,
+): Effect.Effect<AgentNotificationLevelsSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.set, decodeAgentNotificationLevels, {
+      agentId: input.agentId,
+      level: input.level,
+    }),
+  );
+}
+
+/** The member's own level of the whole server, for all of their devices. `null` gives each device its own level. */
+export function setOwnServerNotificationLevel(
+  request: TeamApiRequest,
+  level: SetOwnServerNotificationLevelInput["level"],
+): Effect.Effect<AgentNotificationLevelsSnapshot, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", AGENT_NOTIFICATION_LEVELS_ROUTES.server, decodeAgentNotificationLevels, { level }),
   );
 }
 
@@ -1278,6 +1458,64 @@ export function importHostVaultCsv(
   csv: string,
 ): Effect.Effect<VaultHostImportResult, TeamAdminRequestError> {
   return adminCall(() => request("POST", VAULT_IMPORT_ROUTES.import, decodeHostVaultImport, { csv }));
+}
+
+/** The named browser profiles of the host, and the agents of its shared profile (`browser-profiles-v1`). */
+export function listHostBrowserProfiles(
+  request: TeamApiRequest,
+): Effect.Effect<BrowserProfileList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.list, decodeBrowserProfileList, {}));
+}
+
+export function createHostBrowserProfile(
+  request: TeamApiRequest,
+  name: string,
+): Effect.Effect<BrowserProfileSummary, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.create, decodeBrowserProfileSummary, { name }));
+}
+
+/** A new name, a new color, or both. Sign-ins and tabs stay. */
+export function updateHostBrowserProfile(
+  request: TeamApiRequest,
+  input: UpdateBrowserProfileInput,
+): Effect.Effect<BrowserProfileSummary, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.update, decodeBrowserProfileSummary, { ...input }));
+}
+
+/** Closes the tabs of the profile or the agent session and signs it out of every site. */
+export function clearHostBrowserData(
+  request: TeamApiRequest,
+  input: ClearBrowserDataInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.clear, ignoreResponse, { ...input }));
+}
+
+/** Deletes the profile and its data. Its agents change to the shared profile. */
+export function deleteHostBrowserProfile(
+  request: TeamApiRequest,
+  profileId: string,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.delete, ignoreResponse, { profileId }));
+}
+
+export function getHostAgentBrowserProfile(
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.Effect<AgentBrowserProfile, TeamAdminRequestError> {
+  return adminCall(() => request("POST", BROWSER_PROFILES_ROUTES.agent, decodeAgentBrowserProfile, { agentId }));
+}
+
+/** The host closes the open tabs of the agent. */
+export function updateHostAgentBrowserProfile(
+  request: TeamApiRequest,
+  input: UpdateAgentBrowserProfileInput,
+): Effect.Effect<AgentBrowserProfile, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", BROWSER_PROFILES_ROUTES.updateAgent, decodeAgentBrowserProfile, {
+      agentId: input.agentId,
+      profile: { ...input.profile },
+    }),
+  );
 }
 
 /** The host's Slack workspaces, Discord servers or Telegram chats (`connectors-v1`). */

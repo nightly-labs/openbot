@@ -1,3 +1,4 @@
+import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime, Scope } from "effect";
@@ -6,7 +7,11 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { type IncomingConnection, TeamWebRtcHostPeer, type TeamWebRtcHostPeerOptions } from "./team-webrtc-host-peer";
 
 interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
-  renewSignal?: (hostId: string) => Effect.Effect<{ signalUrl: string; ticket: string }, RemoteWorkflowError>;
+  /** A new ticket for the host's home Signal. `failedSignalUrl` names a home that did not answer. */
+  renewSignal?: (
+    hostId: string,
+    failedSignalUrl?: string,
+  ) => Effect.Effect<{ signalUrl: string; ticket: string }, RemoteWorkflowError>;
   /** `reason` names the last Signal close or error code for the log, never its text. */
   onSignalRecoveryFailure?: (error: Error, reason: string) => void;
   /** Whether devices may connect only over a private network, such as the Wi-Fi or Tailscale. */
@@ -14,6 +19,10 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
 }
 
 const logger = createOpenBotLogger("team-webrtc-host");
+
+// How long the host's Signal socket can stay closed before the host asks for another Signal machine.
+// The time starts at the first close and stops when Signal accepts the host again.
+const SIGNAL_MOVE_AFTER_MS = 20_000;
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -100,6 +109,15 @@ export class TeamWebRtcHostGateway {
   // The last close or error code of the host's own Signal socket, such as `close 4000`.
   #lastSignalEnd: string | null = null;
   #localApiPort: number | null = null;
+  // The Signal URL of the host's registration, which a move names as the failed one.
+  #signalUrl: string | null = null;
+  #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
+  // Set when the hidden window ends the host peer for good during a move, as it does after
+  // `authentication_required` or close code 4000.
+  #signalEnded = false;
+  // The host's ticket names a home Signal machine. Only then can a move find another machine; the entry
+  // Signal moves by DNS, and the hidden window keeps the device peers while it connects again.
+  #signalHomed = false;
   #connecting: Fiber.Fiber<void, RemoteWorkflowError> | null = null;
   #signalRecovery: Fiber.Fiber<void> | null = null;
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
@@ -120,6 +138,7 @@ export class TeamWebRtcHostGateway {
     this.#bridge.on("disconnected", this.#onDisconnected);
     this.#bridge.on("error", this.#onError);
     this.#bridge.on("signalClosed", this.#onSignalClosed);
+    this.#bridge.on("signalReady", this.#onSignalReady);
   }
 
   #provide<A>(operation: Effect.Effect<A, RemoteWorkflowError, HostSignal>): Effect.Effect<A, RemoteWorkflowError> {
@@ -137,6 +156,9 @@ export class TeamWebRtcHostGateway {
   ) {
     this.#hostId = input.hostId;
     this.#lastSignalEnd = null;
+    this.#signalUrl = input.signalUrl;
+    this.#signalEnded = false;
+    this.#signalHomed = ticketNamesSignalHome(input.ticket);
     this.#localApiPort = input.localApiPort;
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
@@ -161,6 +183,8 @@ export class TeamWebRtcHostGateway {
       const hostId = this.#hostId;
       this.#hostId = null;
       this.#localApiPort = null;
+      this.#signalUrl = null;
+      this.#cancelSignalMove();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
       if (this.#signalRecovery) yield* Fiber.interrupt(this.#signalRecovery);
       yield* this.#clearPeers();
@@ -204,6 +228,7 @@ export class TeamWebRtcHostGateway {
           this.#bridge.off("disconnected", this.#onDisconnected);
           this.#bridge.off("error", this.#onError);
           this.#bridge.off("signalClosed", this.#onSignalClosed);
+          this.#bridge.off("signalReady", this.#onSignalReady);
           yield* Fiber.awaitAll([...this.#operations]);
           yield* Scope.close(this.#connectionScope, Exit.void);
           yield* this.#runtime.disposeEffect;
@@ -245,6 +270,8 @@ export class TeamWebRtcHostGateway {
 
   readonly #onDisconnected = (peerId: string): void => {
     if (peerId === this.#hostId) {
+      this.#signalEnded = true;
+      this.#cancelSignalMove();
       const fiber = this.#runtime.runFork(this.#clearPeers());
       this.#operations.add(fiber);
       fiber.addObserver(() => this.#operations.delete(fiber));
@@ -267,8 +294,64 @@ export class TeamWebRtcHostGateway {
   readonly #onSignalClosed = (peerId: string, code: string, terminal: boolean): void => {
     if (peerId !== this.#hostId) return;
     this.#lastSignalEnd = `close ${code}`;
-    if (terminal) logger.warn(`Host Signal socket closed with code ${code}; it does not connect again.`);
-    else logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
+    if (terminal) {
+      logger.warn(`Host Signal socket closed with code ${code}; it does not connect again.`);
+      this.#cancelSignalMove();
+    } else {
+      logger.info(`Host Signal socket closed with code ${code}; it connects again.`);
+      this.#scheduleSignalMove();
+    }
+  };
+
+  readonly #onSignalReady = (peerId: string): void => {
+    if (peerId === this.#hostId) this.#cancelSignalMove();
+  };
+
+  // One timer for each outage: a later close does not start the time again.
+  #scheduleSignalMove(): void {
+    if (this.#signalMoveTimer !== null || !this.#hostId || !this.#signalHomed || !this.#options.renewSignal) return;
+    this.#signalMoveTimer = setTimeout(this.#moveSignal, SIGNAL_MOVE_AFTER_MS);
+  }
+
+  #cancelSignalMove(): void {
+    if (this.#signalMoveTimer !== null) clearTimeout(this.#signalMoveTimer);
+    this.#signalMoveTimer = null;
+  }
+
+  // The home Signal machine did not accept the host again in time. The account service gets its URL
+  // as the failed one and can give the host another home. When the ticket request or the new
+  // connection fails, the hidden window continues to connect and the host tries again later.
+  readonly #moveSignal = (): void => {
+    this.#signalMoveTimer = null;
+    const hostId = this.#hostId;
+    if (!hostId) return;
+    if (this.#connecting || this.#signalRecovery) {
+      this.#scheduleSignalMove();
+      return;
+    }
+    logger.warn(`Host Signal socket is not ready after ${this.#lastSignalEnd ?? "a close"}; it asks for a new home.`);
+    const fiber = this.#runtime.runFork(
+      this.#recoverSignal(hostId, this.#signalUrl ?? undefined).pipe(
+        Effect.catch(({ cause }) =>
+          Effect.sync(() => {
+            if (this.#hostId !== hostId) return;
+            if (this.#signalEnded) {
+              this.#options.onSignalRecoveryFailure?.(
+                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+                `move failed after ${this.#lastSignalEnd ?? "a Signal close"}`,
+              );
+              return;
+            }
+            logger.warn("Host Signal move failed; the host tries again later.");
+            this.#scheduleSignalMove();
+          }),
+        ),
+      ),
+    );
+    this.#signalRecovery = fiber;
+    fiber.addObserver(() => {
+      if (this.#signalRecovery === fiber) this.#signalRecovery = null;
+    });
   };
 
   readonly #onError = (peerId: string, code: string, _message: string, terminal = false): void => {
@@ -307,14 +390,20 @@ export class TeamWebRtcHostGateway {
   readonly #recoverSignal = Effect.fn("HostGateway.recoverSignal")(function* (
     this: TeamWebRtcHostGateway,
     hostId: string,
+    failedSignalUrl?: string,
   ): Effect.fn.Return<void, RemoteWorkflowError, HostSignal> {
     const renew = this.#options.renewSignal;
     if (!renew) return;
-    const bootstrap = yield* renew(hostId);
+    const bootstrap = yield* renew(hostId, failedSignalUrl);
     if (this.#hostId !== hostId) return;
+    // No other machine is configured. The device peers stay, and the hidden window connects again.
+    if (failedSignalUrl !== undefined && bootstrap.signalUrl === failedSignalUrl && !this.#signalEnded) return;
     yield* this.#clearPeers();
     yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
     if (this.#hostId !== hostId) return;
+    this.#signalUrl = bootstrap.signalUrl;
+    this.#signalEnded = false;
+    this.#signalHomed = ticketNamesSignalHome(bootstrap.ticket);
     yield* HostSignal.use((signal) => signal.connect(hostId, bootstrap.signalUrl, bootstrap.ticket));
     if (this.#hostId !== hostId)
       yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));

@@ -15,7 +15,7 @@ import { sourceText } from "@openbot/i18n/source";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { FILES_ROWS } from "./files-fixtures";
-import { STORY_AGENTS, STORY_MODELS, STORY_TEAM_MEMBERS } from "./fixtures";
+import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_TEAM_MEMBERS } from "./fixtures";
 
 /** The images of the story files. An image step draws them in turn. */
 export const STORY_IMAGES = FILES_ROWS.filter((file) => file.previewKind === "image" && file.previewUrl);
@@ -25,6 +25,7 @@ const STORY_CONNECTION = "story-team";
 export const STORY_CATALOGS: WorkflowCatalogs = {
   agents: STORY_AGENTS,
   models: STORY_MODELS,
+  status: STORY_AGENT_STATUS,
   places: ["market", "general", "research"].map((placeId) => ({
     connectionId: STORY_CONNECTION,
     placeId,
@@ -38,9 +39,6 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
   files: FILES_ROWS,
   self: STORY_TEAM_MEMBERS.find((member) => member.id === "member-self")?.name ?? undefined,
 };
-
-/** The catalogs as the board reads them. */
-export const storyCatalogs = () => STORY_CATALOGS;
 
 /** A time today, as an ISO string, for the results that a story opens with. */
 export function todayAt(hours: number, minutes: number): string {

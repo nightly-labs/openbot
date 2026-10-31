@@ -80,7 +80,9 @@ interface UsageLimit extends UsageLimitKey {
  *
  * The entry ends at the reported reset, after a usage read that finds no spent window, or when a
  * turn on that provider and model completes. It is kept in memory only: after a restart the first
- * refused turn closes the gate again.
+ * refused turn closes the gate again. A message from the user lets its agent try one turn before
+ * that: the user can have signed the provider in to another account, or bought more usage, and no
+ * reading shows that before the reset.
  *
  * It also owns the models that failed a turn with a provider error. They hold no queue: they only
  * move agents set to switch without asking to a backup, and keep them there for a while.
@@ -94,6 +96,8 @@ export class UsageLimitGate {
   /** Providers the user was told about in this limit, so a limit that closes again is not announced twice. */
   readonly #announced = new Set<AgentProvider>();
   readonly #failures = new Map<string, ProviderFailure>();
+  /** The agents that may start one turn while their limit holds, with that limit's key. */
+  readonly #tries = new Map<string, string>();
 
   constructor(options: UsageLimitGateOptions) {
     this.#store = options.store;
@@ -103,6 +107,32 @@ export class UsageLimitGate {
   mayDrain(agentId: string): boolean {
     const agent = this.#agent(agentId);
     return !agent || !this.#limits.has(limitKey(providerForAgent(agent), accountOf(agent), agent.model));
+  }
+
+  /**
+   * The user sent this agent a message while a limit holds it, so the agent may start one turn. The
+   * try ends when that turn starts: a refused turn queues its messages again, and a completed one
+   * ends the limit.
+   */
+  retry(agentId: string): void {
+    const agent = this.#agent(agentId);
+    if (!agent) return;
+    const key = limitKey(providerForAgent(agent), accountOf(agent), agent.model);
+    if (this.#limits.has(key)) this.#tries.set(agentId, key);
+  }
+
+  /** Whether the agent may start a turn that its limit holds, because the user sent it a message. */
+  mayTry(agentId: string): boolean {
+    const agent = this.#agent(agentId);
+    return (
+      agent !== undefined &&
+      this.#tries.get(agentId) === limitKey(providerForAgent(agent), accountOf(agent), agent.model)
+    );
+  }
+
+  /** A turn of this agent starts, so a try that let it start ends. */
+  tryStarted(agentId: string): void {
+    this.#tries.delete(agentId);
   }
 
   /** Whether a limit holds this provider account and model. */
@@ -247,6 +277,7 @@ export class UsageLimitGate {
     this.#limits.clear();
     for (const failure of this.#failures.values()) clearTimeout(failure.timer);
     this.#failures.clear();
+    this.#tries.clear();
     this.#announced.clear();
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -336,6 +367,7 @@ export class UsageLimitGate {
     if (!limit) return;
     if (limit.timer) clearTimeout(limit.timer);
     this.#limits.delete(key);
+    for (const [agentId, tryKey] of this.#tries) if (tryKey === key) this.#tries.delete(agentId);
     if (reset && ![...this.#limits.values()].some((other) => other.provider === limit.provider))
       this.#announced.delete(limit.provider);
     this.#hooks.emitRuntimeSnapshot();

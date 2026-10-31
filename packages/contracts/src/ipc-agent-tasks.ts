@@ -1,6 +1,6 @@
 import { type AgentProviderId, agentProviderDescriptor } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import { integerInRange, isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { integerInRange, isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { type ConversationReadState, isConversationReadState } from "./ipc-conversations";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
@@ -85,6 +85,26 @@ export interface AgentTask {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
+  /**
+   * Set when the thread is a branch: a copy of another conversation of the agent up to one turn.
+   * Absent from a server that cannot branch, and never sent on the frozen `agent-tasks-v1` routes.
+   */
+  branch?: AgentTaskBranch | null;
+}
+
+/** Where a branch was copied from. */
+export interface AgentTaskBranch {
+  /** The source side thread, or null for the agent's own chat. The id stays when the source is deleted. */
+  sourceTaskId: string | null;
+  /**
+   * The title of the source side thread when the host read the link. Null for the agent's own chat and
+   * for a deleted source. The task list can leave out an archived source, so its title comes from here.
+   */
+  sourceTitle: string | null;
+  /** The message in the source that the person branched from. */
+  sourceMessageId: string;
+  /** The last copied message in the branch. The copied history ends after it. */
+  throughMessageId: string;
 }
 
 export interface AgentTasksSnapshot {
@@ -111,6 +131,19 @@ export interface RunQueuedMessageAsTaskInput {
 export interface AgentTaskInput {
   agentId: string;
   taskId: string;
+}
+
+/**
+ * Makes a side thread with a copy of a conversation of the agent through the turn of `messageId`, the
+ * last agent message of a finished turn. The source must have no running turn.
+ */
+export interface BranchAgentTaskInput {
+  agentId: string;
+  /** The source side thread, or null for the agent's own chat. */
+  taskId: string | null;
+  messageId: string;
+  /** A new id for each branch action. A retry with the same id returns the same branch. */
+  requestId: string;
 }
 
 /** A person's new title for a side thread. */
@@ -169,7 +202,18 @@ export function isAgentTask(value: unknown): value is AgentTask {
     value.queuedMessages.every(isAgentTaskQueuedMessage) &&
     isBoundedString(value.createdAt, 160) &&
     isBoundedString(value.updatedAt, 160) &&
-    (value.closedAt === null || isBoundedString(value.closedAt, 160))
+    (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
+    (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch))
+  );
+}
+
+export function isAgentTaskBranch(value: unknown): value is AgentTaskBranch {
+  return (
+    isDynamicRecord(value) &&
+    (value.sourceTaskId === null || isIdentifier(value.sourceTaskId)) &&
+    isNullableBoundedString(value.sourceTitle, INPUT_LIMITS.agentTaskTitle) &&
+    isIdentifier(value.sourceMessageId) &&
+    isIdentifier(value.throughMessageId)
   );
 }
 

@@ -1,9 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AGENT_TASK_OUTCOMES, type AgentTaskOutcome } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
+import {
+  AGENT_TASK_OUTCOMES,
+  type AgentTaskOutcome,
+  type AttachmentSummary,
+  type ConversationMessage,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { ORDER_KEY_DESC } from "../database/conversation-queries";
 import { deleteAggregateHistory, deleteThreadAttachments } from "../database/database-core";
-import { databaseRow, databaseRows, optionalStringColumn, requiredStringColumn } from "../database/database-rows";
+import {
+  databaseRow,
+  databaseRows,
+  decodeConversationMessageJson,
+  optionalStringColumn,
+  requiredStringColumn,
+} from "../database/database-rows";
+import { refreshThreadOrder } from "../database/thread-message-order";
 import type { OpenBotDatabase } from "../openbot-database";
 
 const AGENT_THREAD_ORIGINS = ["user", "agent"] as const;
@@ -34,6 +47,30 @@ export interface AgentThreadRecord {
   updatedAt: string;
   /** An archived thread takes no message until it is restored. */
   closedAt: string | null;
+  /** Where a branch was copied from. Null for a thread that is not a branch. */
+  branch: AgentThreadBranch | null;
+}
+
+/** The `branch_*` columns: all three are set, or the thread is not a branch. */
+interface AgentThreadBranch {
+  /** The agent's own chat or a side thread. The id stays when the source is deleted. */
+  sourceThreadId: string;
+  /** The message in the source that the person chose. */
+  sourceMessageId: string;
+  /** The last copied row in the branch, by the shown order. */
+  throughMessageId: string;
+}
+
+/** A branch and its copied conversation, which `copyBranchMessages` made. */
+export interface AgentThreadBranchInput {
+  agentId: string;
+  /** The person's id for this branch action. A retry with the same id gets the same branch. */
+  requestId: string;
+  threadId: string;
+  title: string;
+  sourceThreadId: string;
+  sourceMessageId: string;
+  messages: readonly ConversationMessage[];
 }
 
 export interface AgentThreadInput {
@@ -132,6 +169,173 @@ export class AgentThreadStore {
         .prepare("SELECT thread_id FROM projection_agent_threads WHERE agent_id = ?")
         .all(agentId),
     ).map((row) => requiredStringColumn(row, "thread_id"));
+  }
+
+  /** The titles of all threads of this agent, open and archived. */
+  titles(agentId: string): string[] {
+    return databaseRows(
+      this.#database.connection.prepare("SELECT title FROM projection_agent_threads WHERE agent_id = ?").all(agentId),
+    ).map((row) => requiredStringColumn(row, "title"));
+  }
+
+  /** The branch that an earlier call with this request id made, while it exists. */
+  branchFor(agentId: string, requestId: string): AgentThreadRecord | null {
+    const result = this.#database.commandResult(branchCommandId(agentId, requestId));
+    if (!isDynamicRecord(result) || !isString(result.threadId)) return null;
+    const thread = this.taskForThread(result.threadId);
+    return thread?.agentId === agentId ? thread : null;
+  }
+
+  /**
+   * The rows of a thread that a branch from `messageId` copies, in stored order: every group (a turn,
+   * or a message alone) up to and with the chosen message's group. Null when the message is not a
+   * finished message of the agent in this thread.
+   */
+  branchSource(threadId: string, messageId: string): ConversationMessage[] | null {
+    const db = this.#database.connection;
+    const chosen = databaseRow(
+      db
+        .prepare(
+          `SELECT 1 FROM projection_thread_messages
+           WHERE thread_id = ? AND message_id = ? AND author = 'assistant' AND status != 'streaming'
+             AND group_start IS NOT NULL`,
+        )
+        .get(threadId, messageId),
+    );
+    if (!chosen) return null;
+    const rows = databaseRows(
+      db
+        .prepare(
+          `SELECT message.message_json FROM projection_thread_messages AS message
+           JOIN projection_thread_messages AS chosen ON chosen.thread_id = message.thread_id AND chosen.message_id = ?
+           WHERE message.thread_id = ?
+             AND (message.group_start, message.group_first, message.group_id)
+               <= (chosen.group_start, chosen.group_first, chosen.group_id)
+           ORDER BY message.ordinal, message.message_id`,
+        )
+        .all(messageId, threadId),
+    );
+    return rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
+  /**
+   * Creates a branch: a side thread with a copy of a conversation, in one transaction. A retry with
+   * the same request id returns the branch that the first call made. The thread event holds the
+   * copied conversation, as each conversation write does, so a replay rebuilds it; the side-thread
+   * event holds ids only.
+   */
+  branch(input: AgentThreadBranchInput): AgentThreadRecord {
+    const result = this.#database.dispatch(
+      branchCommandId(input.agentId, input.requestId),
+      [
+        {
+          aggregateType: "agent-thread",
+          aggregateId: input.threadId,
+          eventType: "agent-thread.branched",
+          payload: {
+            agentId: input.agentId,
+            origin: "user",
+            sourceThreadId: input.sourceThreadId,
+            sourceMessageId: input.sourceMessageId,
+          },
+        },
+        {
+          aggregateType: "thread",
+          aggregateId: input.threadId,
+          eventType: "thread.branched",
+          payload: {
+            detail: { sourceThreadId: input.sourceThreadId, sourceMessageId: input.sourceMessageId },
+            snapshot: {
+              agentId: input.agentId,
+              threadId: input.threadId,
+              activeTurnId: null,
+              revision: 0,
+              messages: input.messages,
+            },
+            recovery: { turnProviderSessionIds: {} },
+          },
+        },
+      ],
+      (db, sequences) => {
+        const now = new Date().toISOString();
+        const threadSequence = sequences[0] ?? 0;
+        const conversationSequence = sequences[1] ?? threadSequence;
+        db.prepare("INSERT INTO projection_threads VALUES (?, ?, ?, NULL, ?, ?, ?)").run(
+          input.threadId,
+          input.agentId,
+          input.title,
+          now,
+          now,
+          conversationSequence,
+        );
+        // No usage row and no turn row: the copied turns ran, and were counted, in the source.
+        const insertMessage = db.prepare(`
+          INSERT INTO projection_thread_messages (
+            thread_id, message_id, turn_id, author, status, item_type, created_at,
+            ordinal, message_json, last_event_sequence
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const insertAttachment = db.prepare(`
+          INSERT INTO projection_attachments
+            (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
+          VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
+        `);
+        input.messages.forEach((message, ordinal) => {
+          insertMessage.run(
+            input.threadId,
+            message.id,
+            message.turnId ?? null,
+            message.author,
+            message.status,
+            message.itemType ?? null,
+            message.createdAt,
+            ordinal,
+            JSON.stringify(message),
+            conversationSequence,
+          );
+          for (const attachment of message.attachments ?? []) {
+            insertAttachment.run(
+              `${input.threadId}:${message.id}:${attachment.id}`,
+              `${input.threadId}:${message.id}`,
+              attachment.name,
+              JSON.stringify(attachment),
+              message.createdAt,
+              conversationSequence,
+            );
+          }
+        });
+        refreshThreadOrder(db, input.threadId);
+        const last = databaseRow(
+          db
+            .prepare(
+              `SELECT message_id FROM projection_thread_messages WHERE thread_id = ? ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
+            )
+            .get(input.threadId),
+        );
+        if (!last) throw new Error("A branch needs at least one message.");
+        db.prepare(
+          `INSERT INTO projection_agent_threads
+             (thread_id, agent_id, legacy_task_id, origin, title, title_source, outcome, error, created_at,
+              updated_at, archived_at, last_event_sequence, branch_source_thread_id, branch_source_message_id,
+              branch_through_message_id)
+           VALUES (?, ?, NULL, 'user', ?, 'auto', NULL, NULL, ?, ?, NULL, ?, ?, ?, ?)`,
+        ).run(
+          input.threadId,
+          input.agentId,
+          input.title,
+          now,
+          now,
+          threadSequence,
+          input.sourceThreadId,
+          input.sourceMessageId,
+          requiredStringColumn(last, "message_id"),
+        );
+        return { threadId: input.threadId };
+      },
+    );
+    const created = this.taskForThread(result.threadId);
+    if (!created) throw new Error("The branch was not stored.");
+    return created;
   }
 
   /** Creates the side thread and its conversation in one transaction. */
@@ -275,6 +479,36 @@ export class AgentThreadStore {
   }
 }
 
+/** One branch action of one agent: the receipt of this command makes a retry return the same branch. */
+function branchCommandId(agentId: string, requestId: string): string {
+  return `agent-thread-branch:${agentId}:${requestId}`;
+}
+
+/**
+ * The branch's copy of the source rows, in the same order. Each row gets a new id; its turn, author,
+ * item type, time and content stay. Reactions and queue state stay in the source. A reply link names
+ * the copy of its target, or goes when the target was not copied. `files` maps a source attachment id
+ * to the branch's copy of the file; an attachment with no copy keeps its card as it is.
+ */
+export function copyBranchMessages(
+  messages: readonly ConversationMessage[],
+  files: ReadonlyMap<string, AttachmentSummary>,
+): ConversationMessage[] {
+  const ids = new Map(messages.map((message) => [message.id, randomUUID()]));
+  const file = (attachment: AttachmentSummary) => files.get(attachment.id) ?? attachment;
+  return messages.map((message) => {
+    const { delivery: _delivery, reaction: _reaction, reactions: _reactions, replyToMessageId, ...copy } = message;
+    const replyTo = replyToMessageId ? ids.get(replyToMessageId) : undefined;
+    return {
+      ...structuredClone(copy),
+      id: ids.get(message.id) ?? message.id,
+      ...(replyTo ? { replyToMessageId: replyTo } : {}),
+      ...(message.attachments ? { attachments: message.attachments.map(file) } : {}),
+      ...(message.voiceRecording ? { voiceRecording: file(message.voiceRecording) } : {}),
+    };
+  });
+}
+
 const BY_TASK_ID = "(legacy_task_id = ? OR (legacy_task_id IS NULL AND thread_id = ?))";
 
 type Connection = OpenBotDatabase["connection"];
@@ -302,6 +536,11 @@ function decodeThread(row: DynamicRecord): AgentThreadRecord {
   const origin = requiredStringColumn(row, "origin");
   const titleSource = requiredStringColumn(row, "title_source");
   const outcome = optionalStringColumn(row, "outcome");
+  const sourceThreadId = optionalStringColumn(row, "branch_source_thread_id");
+  const sourceMessageId = optionalStringColumn(row, "branch_source_message_id");
+  const throughMessageId = optionalStringColumn(row, "branch_through_message_id");
+  const branchColumns = [sourceThreadId, sourceMessageId, throughMessageId].filter((value) => value !== null).length;
+  if (branchColumns !== 0 && branchColumns !== 3) throw new Error("Incomplete branch link.");
   if (!isOneOf(AGENT_THREAD_ORIGINS, origin)) throw new Error(`Unknown thread origin: ${origin}`);
   if (!isOneOf(AGENT_THREAD_TITLE_SOURCES, titleSource)) throw new Error(`Unknown title source: ${titleSource}`);
   if (outcome !== null && !isOneOf(AGENT_TASK_OUTCOMES, outcome)) throw new Error(`Unknown thread outcome: ${outcome}`);
@@ -317,5 +556,9 @@ function decodeThread(row: DynamicRecord): AgentThreadRecord {
     createdAt: requiredStringColumn(row, "created_at"),
     updatedAt: requiredStringColumn(row, "updated_at"),
     closedAt: optionalStringColumn(row, "archived_at"),
+    branch:
+      sourceThreadId !== null && sourceMessageId !== null && throughMessageId !== null
+        ? { sourceThreadId, sourceMessageId, throughMessageId }
+        : null,
   };
 }

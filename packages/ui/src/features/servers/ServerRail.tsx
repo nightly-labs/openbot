@@ -1,6 +1,15 @@
 import type { HostedServerSleep, ServerConnectionState, ServerSummary } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
-import { BellOff, buttonVariants, ContextMenu, ServerGradientLogo, Tooltip } from "@openbot/ui";
+import {
+  BellOff,
+  buttonVariants,
+  ContextMenu,
+  DropdownMenu,
+  Eye,
+  Plus,
+  ServerGradientLogo,
+  Tooltip,
+} from "@openbot/ui";
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
@@ -40,6 +49,17 @@ export function serverStatusLabels(
   ];
 }
 
+/**
+ * The add item. It names the hosted server plans only when it is the one way to add a server: beside
+ * a server on this computer, both the plans and an invite give a remote server.
+ */
+export function addServerLabel(props: {
+  addCreatesServer?: boolean | undefined;
+  onCreateLocal?: (() => void) | undefined;
+}): AppTextKey {
+  return props.addCreatesServer && !props.onCreateLocal ? "server.rail.add" : "server.rail.addRemote";
+}
+
 /** A small dot on a server's logo while its hosted server sleeps or wakes. */
 export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep" | "state">; class: string }) {
   return (
@@ -49,6 +69,12 @@ export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep
   );
 }
 
+/** The server on this computer while the user hides it from the server list, and the action that shows it again. */
+export interface HiddenLocalServer {
+  name: string;
+  show: () => void;
+}
+
 interface ServerRailProps extends ServerActionCallbacks {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
@@ -56,6 +82,10 @@ interface ServerRailProps extends ServerActionCallbacks {
   onAdd: () => void;
   /** True when the plus button opens the hosted server plans, where the user can also join with an invite. */
   addCreatesServer?: boolean | undefined;
+  /** Opens the dialog that creates a server on this computer. With it, the plus button opens a menu. */
+  onCreateLocal?: (() => void) | undefined;
+  /** The server on this computer while the user hides it. With it, the plus button opens a menu. */
+  hiddenLocal?: HiddenLocalServer | undefined;
 }
 
 interface DragSlot {
@@ -267,8 +297,10 @@ export function ServerRail(props: ServerRailProps) {
               canRestart={props.canRestart}
               onRemove={props.onRemove}
               canRemove={props.canRemove}
+              onHide={props.onHide}
+              canHide={props.canHide}
               onSetMuted={props.onSetMuted}
-              onSetNotificationLevel={props.onSetNotificationLevel}
+              onOpenNotificationSettings={props.onOpenNotificationSettings}
             />
           )}
         </For>
@@ -319,8 +351,10 @@ export function ServerRail(props: ServerRailProps) {
                     canRestart={props.canRestart}
                     onRemove={props.onRemove}
                     canRemove={props.canRemove}
+                    onHide={props.onHide}
+                    canHide={props.canHide}
                     onSetMuted={props.onSetMuted}
-                    onSetNotificationLevel={props.onSetNotificationLevel}
+                    onOpenNotificationSettings={props.onOpenNotificationSettings}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -328,34 +362,116 @@ export function ServerRail(props: ServerRailProps) {
             </For>
           </ul>
         </Show>
-        <Tooltip.Root
-          placement="right"
-          gutter={10}
-          openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
-          closeDelay={0}
-          skipDelayDuration={300}
+        <Show
+          when={props.onCreateLocal || props.hiddenLocal}
+          fallback={
+            <Tooltip.Root
+              placement="right"
+              gutter={10}
+              openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+              closeDelay={0}
+              skipDelayDuration={300}
+            >
+              <Tooltip.Trigger
+                type="button"
+                class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
+                aria-label={t(addServerLabel(props))}
+                data-cuelume-open=""
+                data-cuelume-emphasis="subtle"
+                onClick={props.onAdd}
+              >
+                <span class="server-rail-monogram">+</span>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content class="server-rail-tooltip">{t(addServerLabel(props))}</Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          }
         >
-          <Tooltip.Trigger
-            type="button"
-            class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-            aria-label={t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}
-            data-cuelume-open=""
-            data-cuelume-emphasis="subtle"
-            onClick={props.onAdd}
-          >
-            <span class="server-rail-monogram">+</span>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content class="server-rail-tooltip">
-              {t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
+          <ServerRailAddMenu
+            addLabel={addServerLabel(props)}
+            onAdd={props.onAdd}
+            onCreateLocal={props.onCreateLocal}
+            hiddenLocal={props.hiddenLocal}
+          />
+        </Show>
         <span class="sr-only" aria-live="polite">
           {announcement()}
         </span>
       </div>
     </aside>
+  );
+}
+
+/**
+ * The plus button when a server can also run on this computer, or when the user hides the server on this
+ * computer: a menu with the ways to add a server, and the item that shows the hidden server again.
+ */
+function ServerRailAddMenu(props: {
+  addLabel: AppTextKey;
+  onAdd: () => void;
+  onCreateLocal?: (() => void) | undefined;
+  hiddenLocal?: HiddenLocalServer | undefined;
+}) {
+  const { t } = useText();
+  const [tooltipOpen, setTooltipOpen] = createSignal(false);
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  return (
+    <Tooltip.Root
+      open={tooltipOpen() && !menuOpen()}
+      onOpenChange={setTooltipOpen}
+      placement="right"
+      gutter={10}
+      openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+      closeDelay={0}
+      skipDelayDuration={300}
+    >
+      <Tooltip.Trigger as="div" class="server-rail-tooltip-trigger">
+        <DropdownMenu.Root placement="right-start" gutter={10} onOpenChange={setMenuOpen}>
+          <DropdownMenu.Trigger
+            class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
+            aria-label={t("server.rail.add")}
+            data-cuelume-open=""
+            data-cuelume-emphasis="subtle"
+          >
+            <span class="server-rail-monogram">+</span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content aria-label={t("server.rail.add")}>
+              <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={props.onAdd}>
+                <span class="server-menu-add-circle" aria-hidden="true">
+                  <Plus />
+                </span>
+                <span>{t(props.addLabel)}</span>
+              </DropdownMenu.Item>
+              <Show when={props.onCreateLocal}>
+                {(onCreateLocal) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={onCreateLocal()}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Plus />
+                    </span>
+                    <span>{t("server.local.createTitle")}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
+              <Show when={props.hiddenLocal}>
+                {(hiddenLocal) => (
+                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={hiddenLocal().show}>
+                    <span class="server-menu-add-circle" aria-hidden="true">
+                      <Eye />
+                    </span>
+                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
+                  </DropdownMenu.Item>
+                )}
+              </Show>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="server-rail-tooltip">{t("server.rail.add")}</Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -454,7 +570,7 @@ function ServerRailButton(
                 server={props.server}
                 trigger={() => trigger}
                 onSetMuted={props.onSetMuted}
-                onSetNotificationLevel={props.onSetNotificationLevel}
+                onOpenNotificationSettings={props.onOpenNotificationSettings}
                 onOpenSettings={props.onOpenSettings}
                 onLeave={props.onLeave}
                 onDelete={props.onDelete}
@@ -463,6 +579,8 @@ function ServerRailButton(
                 canRestart={props.canRestart}
                 onRemove={props.onRemove}
                 canRemove={props.canRemove}
+                onHide={props.onHide}
+                canHide={props.canHide}
               />
             </ContextMenu.Content>
           </ContextMenu.Portal>
@@ -471,6 +589,7 @@ function ServerRailButton(
       <Tooltip.Portal>
         <Tooltip.Content class="server-rail-tooltip">
           {props.server.name}
+          {props.server.thisComputer ? ` · ${t("server.rail.thisComputer")}` : ""}
           {sleepLabel() ? ` · ${sleepLabel()}` : ""}
           {props.server.notificationsMuted ? ` · ${muteDescription()}` : ""}
         </Tooltip.Content>
@@ -479,7 +598,7 @@ function ServerRailButton(
   );
 }
 
-export function ServerMark(props: { server: ServerSummary }) {
+export function ServerMark(props: { server: Pick<ServerSummary, "id" | "logoUrl"> }) {
   const [failed, setFailed] = createSignal(false);
   createEffect(
     () => props.server.logoUrl,

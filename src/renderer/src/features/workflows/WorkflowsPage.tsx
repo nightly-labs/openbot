@@ -53,7 +53,7 @@ export function WorkflowsPage(props: { serverId: string }) {
 
 /** `admin`: an owner or admin of the server, who may make a webhook secret. The host checks it again. */
 function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
-  const { agentList, modelOptions } = useAgents();
+  const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
@@ -66,6 +66,9 @@ function WorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
     },
     get models() {
       return modelOptions();
+    },
+    get status() {
+      return agentStatus();
     },
     get places() {
       return workflows.places();

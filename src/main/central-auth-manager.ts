@@ -144,6 +144,11 @@ const remoteTicketJwksSchema = z.object({
 // paths below decode it with the one function in `@openbot/contracts/remote-control-plane`.
 export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
+/** Asks for the host's home Signal machine. Only the host peer asks; see `issueRemoteHostTicket`. */
+export interface RemoteHostTicketHome {
+  readonly failedSignalUrl?: string;
+}
+
 // The claims this host reads off a client's ticket, derived from the contract the account API mints
 // against. `clientPublicKey` is optional there because a host ticket carries none; a client that
 // reached this check without one is rejected below, so it is required here.
@@ -260,7 +265,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (
         resolved.name === state.user.name &&
         resolved.email === state.user.email &&
-        resolved.avatarUrl === state.user.avatarUrl
+        resolved.avatarUrl === state.user.avatarUrl &&
+        resolved.analyticsEnabled === state.user.analyticsEnabled
       )
         return this.getState();
       return this.#setState({ status: "signed_in", user: resolved });
@@ -637,15 +643,30 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return machineToken;
   });
 
+  /**
+   * A Signal ticket for this host. Without `home`, the ticket is for the entry Signal, which also
+   * carries the chat app and webhook traffic, and the account service keeps the host's home. With `home`, the account service picks the Signal
+   * machine where this host and its devices meet; `failedSignalUrl` names a home that did not answer,
+   * so the account service moves the host to another machine.
+   */
   readonly issueRemoteHostTicket = Effect.fn("CentralAuth.issueRemoteHostTicket")(
     function* (
       this: CentralAuthManager,
       hostId: string,
+      home?: RemoteHostTicketHome,
     ): Effect.fn.Return<RemoteConnectionBootstrap, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
+      const body = home
+        ? {
+            machineToken,
+            signalHome: true,
+            ...(home.failedSignalUrl === undefined ? {} : { failedSignalUrl: home.failedSignalUrl }),
+          }
+        : // `false` keeps the stored home: the host peer of this build still connects to it.
+          { machineToken, signalHome: false };
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
         decodeRemoteSessionTicket,
       );
     },
@@ -1701,6 +1722,39 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       return this.#setState({
         status: "signed_in",
         user: { ...this.#state.user, name: user.name },
+      });
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /**
+   * Saves the user's analytics answer on the account, so their other devices follow it. `ageMs` is
+   * the age of the choice; the account keeps a newer answer from another device.
+   */
+  readonly updateAnalytics = Effect.fn("CentralAuth.updateAnalytics")(
+    function* (
+      this: CentralAuthManager,
+      enabled: boolean,
+      ageMs: number,
+    ): Effect.fn.Return<CentralAuthState, CentralAuthOperationError, CentralAuthTransport> {
+      const sessionToken = this.#sessionToken;
+      if (!sessionToken)
+        return yield* new CentralAuthOperationError({
+          cause: new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired")),
+        });
+      const user = yield* this.#authorizedRequestEffect(
+        "/v1/me/analytics",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled, ageMs }),
+        },
+        decodeCentralAuthUser,
+      );
+      if (this.#sessionToken !== sessionToken || this.#state.status !== "signed_in") return this.getState();
+      return this.#setState({
+        status: "signed_in",
+        user: { ...this.#state.user, analyticsEnabled: user.analyticsEnabled ?? null },
       });
     },
     (operation) => this.#owned(operation),

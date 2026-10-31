@@ -19,7 +19,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Se requiere un mensaje o un archivo adjunto.",
   "error.agent.promptAnswersTooLong": "Las respuestas a las preguntas son demasiado largas.",
   "error.agent.gone": "Este agente ya no existe.",
+  "error.agent.instructionsTooLarge":
+    "El archivo de instrucciones es demasiado grande para abrirlo aquí. Acórtalo en un editor de texto.",
+  "error.agent.instructionsOutside":
+    "El archivo de instrucciones enlaza a un lugar fuera del espacio de trabajo del agente, así que OpenBot no lo abre.",
+  "error.agent.instructionsReadFailed": "No se pudo leer el archivo de instrucciones.",
+  "error.agent.instructionsSaveFailed": "No se pudo guardar el archivo de instrucciones.",
   "error.agent.profileGenerationBusy": "La generación de perfiles está ocupada. Inténtalo de nuevo en breve.",
+  "error.agent.instructionsChanged":
+    "El agente cambió el archivo de instrucciones. Tu último cambio no se guardó. Vuelve a hacerlo.",
   "error.agent.initialMessageRequired": "Se requiere un mensaje inicial.",
   "error.agent.initialMessageTooLong": "El mensaje inicial es demasiado largo.",
   "error.agent.setupCleanupFailed": "No se pudo configurar el agente ni eliminar el agente incompleto.",
@@ -119,6 +127,8 @@ export const messages = {
     "Este servidor tiene poca memoria disponible. Tu mensaje espera en la cola y se iniciará cuando se libere memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo espacio de trabajo requiere {tool}, que OpenBot no encontró. Instálalo o elige Acceso completo en los ajustes del agente.",
+  "error.agent.claudeSandboxUnavailable":
+    "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador: {reason}. Elige Acceso completo u otro proveedor en los ajustes del agente.",
   "error.agent.screenCaptureOff":
     "La captura de pantalla está desactivada para este agente. El usuario puede activar el uso del equipo en los ajustes del agente.",
   "error.agent.screenCaptureUnavailable": "La captura de pantalla no está disponible en este equipo.",

@@ -40,7 +40,7 @@ export const messages = {
   "mcp.status.noAnswer": "응답 없음",
   "mcp.status.didNotStart": "시작 안 됨",
   "mcp.status.unreachable": "연결할 수 없음",
-  "mcp.server.providerLimitNote": "Claude 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
+  "mcp.server.providerLimitNote": "Claude 및 Codex 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
   "mcp.server.runtimeDownloading":
     "STDIO 서버를 시작하는 데 쓰는 런타임을 다운로드하는 중이에요. 완료될 때까지 일부 서버는 시작되지 않을 수 있어요.",
   "mcp.server.runtimeDownloadingProgress":
@@ -82,7 +82,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "전달 변수 {position} 삭제",
   "mcp.panel.workingDirectory": "작업 디렉터리",
   "mcp.panel.workingDirectoryDescription":
-    "Claude 에이전트와 연결 테스트는 이 위치에서 서버를 시작해요. 비워 두면 모든 제공자에게 이 서버를 제공해요. 다른 제공자는 디렉터리를 지정할 수 없어서 디렉터리가 있는 서버는 건너뛰어요.",
+    "Claude 및 Codex 에이전트와 연결 테스트는 이 위치에서 서버를 시작해요. 비워 두면 모든 제공자에게 이 서버를 제공해요. 다른 제공자는 디렉터리를 지정할 수 없어서 디렉터리가 있는 서버는 건너뛰어요.",
   "mcp.panel.endpointTitle": "엔드포인트",
   "mcp.panel.endpointDescription": "모든 제공자가 HTTP MCP 서버를 사용할 수 있어요.",
   "mcp.panel.serverUrl": "서버 URL",

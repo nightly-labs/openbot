@@ -110,8 +110,20 @@ export const messages = {
   "server.add.custom.description":
     "Получите выделенную инфраструктуру, дополнительное хранилище или функции под ваш рабочий процесс.",
   "server.add.custom.action": "Связаться с нами",
-  "server.add.join.title": "Есть приглашение?",
   "server.add.join.action": "Присоединиться к серверу",
+  "server.add.otherOptions": "Другие варианты",
+  "server.local.createTitle": "Новый сервер на этом компьютере",
+  "server.local.createDescription": "У сервера свои агенты, чаты и файлы. Он работает на этом компьютере.",
+  "server.local.nameLabel": "Название сервера",
+  "server.local.create": "Создать сервер",
+  "server.local.creating": "Создание сервера…",
+  "server.local.createFailed": "Не удалось создать сервер.",
+  "server.local.limitReached":
+    "На этом компьютере может быть не больше {limit} серверов. Удалите один, чтобы создать новый.",
+  "server.local.deleteConfirmTitle": "Удалить {name}?",
+  "server.local.deleteConfirmDescription": "OpenBot остановит сервер и переместит его агентов, чаты и файлы в корзину.",
+  "server.local.deleting": "Удаление сервера…",
+  "server.local.deletedTitle": "{name} удалён",
   "server.add.limit.title": "В этом аккаунте максимальное число серверов",
   "server.add.limit.description": {
     one: "В аккаунте может быть {count} платный сервер. Чтобы добавить сервер, сначала удалите один из существующих.",
@@ -181,6 +193,7 @@ export const messages = {
   "server.rail.addRemote": "Добавить удалённый сервер",
   "server.rail.add": "Добавить сервер",
   "server.rail.buttonLabel": "Сервер {name}",
+  "server.rail.thisComputer": "на этом компьютере",
   "server.rail.notificationsMuted": "уведомления отключены",
   "server.rail.actions": "Действия с сервером",
   "server.rail.unmute": "Включить уведомления",
@@ -191,6 +204,8 @@ export const messages = {
   "server.rail.restart": "Перезапустить сервер",
   "server.rail.leave": "Покинуть сервер",
   "server.rail.delete": "Удалить сервер",
+  "server.rail.hide": "Скрыть сервер",
+  "server.rail.showLocal": "Показать {name}",
   "server.select.failedTitle": "Не удалось выбрать сервер",
   "server.select.failedDescription": "Не удалось переключить сервер. Повторите попытку.",
   "server.select.openAgentFailed": "Не удалось открыть {name}. Найдите его на боковой панели.",
@@ -292,13 +307,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Просматривайте этот Mac и управляйте им с другого компьютера.",
   "server.settings.later": "Позже",
   "server.settings.setUp": "Настроить",
-  "server.settings.notifications": "Уведомления",
-  "server.settings.muteNotifications": "Отключить уведомления",
-  "server.settings.muteDescription":
-    "Прекратить уведомления на рабочем столе, звуки и обновления в вырезе MacBook от этого сервера.",
-  "server.settings.mutedUntilDescription": "{until}. Выключите, чтобы включить уведомления сейчас.",
-  "server.settings.notifyAbout": "Уведомлять о",
-  "server.settings.notifyAboutDescription": "Какие события агентов показывают уведомление на рабочем столе.",
   "server.settings.agents": "Агенты",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
@@ -334,6 +342,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Текущий и новый ключи подписывают передачу. Приложения участников перейдут на новый ключ при следующем подключении. Сделайте это, если файл ключа был скопирован или раскрыт.",
   "server.settings.hostKeyRotated": "Ключ сервера изменён",
+  "server.settings.hostKeyChanged": "Последнее изменение",
+  "server.settings.hostKeyChangedDescription": "{date}. Предыдущий и новый ключи подписали это изменение.",
   "server.settings.hostKeyLocalOnly": "Здесь ключ может сменить только сервер на этом компьютере.",
   "server.settings.removeTitle": "Удалить сервер",
   "server.settings.removeDescription":

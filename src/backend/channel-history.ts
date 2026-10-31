@@ -51,19 +51,54 @@ function render(messages: ChannelMessage[]): string {
  * Claude rejects a request that carries a model's thinking (`reasoning_extraction`), and the packet
  * is rebuilt on every turn, so one such row stopped every assignment in the channel until the
  * summary covered it. The text between tool calls is commentary as well, but it stays: a turn that
- * answers and then calls a tool keeps its answer there.
+ * answers and then calls a tool keeps its answer there. A turn that posted a result is the
+ * exception: the result is its answer, and its commentary, such as "Result submitted to the shared
+ * chat." or the result again, only repeats it.
  */
 function conversation(messages: ChannelMessage[]): ChannelMessage[] {
+  const resultTurns = new Set(
+    messages.flatMap((message) =>
+      message.id.startsWith("channel-result-") && message.message.turnId ? [message.message.turnId] : [],
+    ),
+  );
   return messages.filter(
     (message) =>
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
-      !isMemberThinking(message),
+      !isMemberThinking(message) &&
+      !(
+        message.message.itemType === "commentary" &&
+        message.message.turnId !== undefined &&
+        resultTurns.has(message.message.turnId)
+      ),
   );
+}
+
+/**
+ * Whether two tasks answer one request. A request to several members gives each its own task. A
+ * "continue" moves only the tasks it continues to the new message, so siblings compare by the
+ * messages they share, not by their current request.
+ */
+export function sameRequest(task: ChannelTask, other: ChannelTask): boolean {
+  return task.sourceMessageIds.some((id) => other.sourceMessageIds.includes(id));
 }
 
 export function isMemberThinking({ message }: ChannelMessage): boolean {
   return message.author === "assistant" && message.itemType === "commentary" && REASONING_ID.test(message.id);
+}
+
+/**
+ * The work a task asks for. A follow-up such as "continue" resumes a task and becomes its request,
+ * but the task keeps its first instruction: the follow-up alone told the member nothing, and the
+ * member answered an older request from its own history instead. A new child task inherits its
+ * parent's request, so a child task has a follow-up only when the request is a message to that task.
+ */
+export function assignmentText(task: ChannelTask, request: ChannelMessage | null | undefined): string {
+  const followUp =
+    task.sourceMessageIds[0] !== task.requestMessageId && (task.parentTaskId === null || request?.taskId === task.id);
+  return followUp && request?.id === task.requestMessageId && request.message.text.trim()
+    ? `${task.instruction}\n\nFollow-up: ${request.message.text}`
+    : task.instruction;
 }
 
 /** Cuts one rendered message into inputs the summary model accepts. The source ID stays the same. */
@@ -172,6 +207,36 @@ export class ChannelHistory {
         recent = messages.filter((message) => message.sequence > summary.throughSequence);
       }
       const memories = yield* channelSync(() => dependencies.memories.list(channel.id));
+      const request = messages.find((message) => message.id === task.requestMessageId);
+      const tasks = yield* channelSync(() => dependencies.store.tasks(channel.id));
+      // A typed "continue" makes the follow-up the request, so the siblings count from the first one.
+      const origin = messages.find((message) => message.id === task.sourceMessageIds[0]) ?? request;
+      // Members that answer one request each give their own view. The reply of a member that
+      // finished first made the next one copy its first sentence, so the rows that the other tasks
+      // of this request wrote after the request stay out until this assignment ends. After the
+      // member gave its own view, a follow-up can ask about the others, so they show again. A note
+      // between tool calls or a reply that a stop cut off is not that view.
+      const answered = messages.some(
+        (message) =>
+          message.author.kind === "agent" &&
+          message.taskId === task.id &&
+          message.message.text.trim() &&
+          (message.id.startsWith("channel-result-") ||
+            (message.message.status === "completed" && message.message.itemType !== "commentary")),
+      );
+      const siblings = new Set(
+        task.parentTaskId === null && !answered
+          ? tasks
+              .filter((item) => item.id !== task.id && item.parentTaskId === null && sameRequest(item, task))
+              .map((item) => item.id)
+          : [],
+      );
+      const sibling = (message: ChannelMessage) =>
+        message.author.kind === "agent" &&
+        message.taskId !== null &&
+        siblings.has(message.taskId) &&
+        message.sequence > (origin?.sequence ?? 0);
+      const hidden = recent.find(sibling);
       const sources = new Set(task.sourceMessageIds);
       sources.add(task.requestMessageId);
       for (const message of [...messages].reverse())
@@ -186,11 +251,14 @@ export class ChannelHistory {
       // session that replaces it before the turn starts gets the complete packet.
       const open = recent.find((message) => message.message.status === "streaming");
       // A message that streams now is sent as it is, but the cursor stops before it, so the next
-      // packet gives its final text.
-      const throughSequence = open ? open.sequence - 1 : (messages.at(-1)?.sequence ?? 0);
-      const dependencyResults = yield* channelSync(() =>
-        dependencies.store.tasks(channel.id).filter((item) => task.dependencies.includes(item.id)),
+      // packet gives its final text. The cursor also stops before a hidden reply of another member,
+      // so a later turn of this session gets it.
+      const throughSequence = Math.min(
+        open ? open.sequence - 1 : (messages.at(-1)?.sequence ?? 0),
+        hidden ? hidden.sequence - 1 : Number.POSITIVE_INFINITY,
       );
+      recent = recent.filter((message) => !sibling(message));
+      const dependencyResults = tasks.filter((item) => task.dependencies.includes(item.id));
       const packet = (seen: number | null) =>
         [
           "You have one assignment in a shared OpenBot channel chat. Speak as yourself. Other members stay idle unless assigned work. Ordinary replies do not start work.",
@@ -229,10 +297,10 @@ export class ChannelHistory {
           seen === null
             ? `Recent shared messages:\n${render(recent)}`
             : `Shared messages after the ones you already have (after ${seen}):\n${render(recent.filter((message) => message.sequence > seen))}`,
-          `Current assignment:\n${task.instruction}\nExpected result: ${task.expectedResult}`,
+          `Current assignment:\n${assignmentText(task, request)}\nExpected result: ${task.expectedResult}`,
           ...(peers.length
             ? [
-                `Other members answer this same request separately: ${peers.join(", ")}. Give your own view from your own role. Do not answer for them, wait for them, or repeat what they already said.`,
+                `Other members answer this same request separately: ${peers.join(", ")}. Give your own view from your own role. Do not answer for them or wait for them.`,
               ]
             : []),
         ].join("\n\n");

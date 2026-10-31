@@ -1,4 +1,4 @@
-import { TEAM_PROTOCOL_V8 } from "@openbot/contracts/team-protocol/v8";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 // What a failure means to the user, and what this build claims to support. Pure functions only --
 // nothing here reads or writes connection state, so the whole table can be checked with a value in
 // and a value out.
@@ -18,7 +18,7 @@ import { referenceFrom } from "@openbot/user-errors";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
-export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V8 } as const;
+export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 } as const;
 
 // Everything the app tracks about one server's connection, and the whole of what `list()` reports
 // beyond the server's stored fields.

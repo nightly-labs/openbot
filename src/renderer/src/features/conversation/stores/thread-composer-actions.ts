@@ -54,6 +54,12 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return target && open !== undefined ? threadDraftKey(target, open?.id ?? DRAFT_THREAD_ID) : undefined;
   }
 
+  /** The draft of a side thread in the side panel. */
+  function sideDraftKey(id: string): string | undefined {
+    const target = currentConversationTarget(deps.props);
+    return target ? threadDraftKey(target, id) : undefined;
+  }
+
   function draft(key: string): ComposerDraft {
     return deps.threadDrafts()[key] ?? EMPTY_DRAFT;
   }
@@ -182,9 +188,12 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
    * message went, the sent text leaves the draft and each file whose reference the user deleted is
    * discarded. A file that came during the send stays.
    */
-  async function send(threads: ConversationThreads, typed: string): Promise<boolean> {
+  async function send(
+    threads: Pick<ConversationThreads, "onSend">,
+    typed: string,
     // The first message of a new thread starts the thread and opens it, so the key is read before the send.
-    const key = openDraftKey();
+    key = openDraftKey(),
+  ): Promise<boolean> {
     for (;;) {
       const pending = [...imports.values()].filter((entry) => entry.key === key).map((entry) => entry.ended);
       if (!pending.length) break;
@@ -217,5 +226,5 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     return sent;
   }
 
-  return { openDraftKey, draft, addFiles, pasteFiles, claimImport, releaseImport, setText, send };
+  return { openDraftKey, sideDraftKey, draft, addFiles, pasteFiles, claimImport, releaseImport, setText, send };
 }

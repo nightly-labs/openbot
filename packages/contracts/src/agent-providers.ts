@@ -1,4 +1,5 @@
 import type { AgentModelId } from "./ipc-agent-identity";
+import type { AgentInstructionFileName } from "./ipc-agent-instructions";
 import type { AccountUsageLimit, AgentAuthState } from "./ipc-agent-status";
 import type { ExternalDestination } from "./ipc-app-auth";
 import { isOneOf, isString } from "./runtime-values";
@@ -137,6 +138,12 @@ export interface AgentProviderDescriptor {
    */
   readonly homeSkills: "native" | "plugin" | "instructions";
   /**
+   * The agent instruction files that the CLI reads by itself from its working directory, the agent's
+   * workspace. OpenBot adds the agent's file to the developer instructions only when its name is not
+   * in this list, so that the CLI does not read it twice.
+   */
+  readonly workspaceInstructionFiles: readonly AgentInstructionFileName[];
+  /**
    * How a Workspace only agent is held to its folders. `tool-sandbox`: the client checks each tool
    * and asks before an edit. `command-sandbox`: the CLI runs each command in a sandbox.
    * `confined-process`: the CLI runs in a sandboxed process of its own (`process-confinement.ts`).
@@ -169,6 +176,13 @@ export interface AgentProviderDescriptor {
    * to ask.
    */
   readonly approvalsInFullAccess: boolean;
+  /**
+   * Whether the added folders apply in Full access too. `true`: the CLI's own file tools reach only
+   * the workspace, the shared folder and the added folders in every access level, so the user can add
+   * folders in Full access. Antigravity 1.4.5 limits them to `cwd` and `additionalDirectories` for
+   * every session that is not a Google admin session (#3843).
+   */
+  readonly foldersInFullAccess: boolean;
 }
 
 /**
@@ -191,11 +205,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "command-sandbox",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   claude: {
     id: "claude",
@@ -212,11 +228,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
+    workspaceInstructionFiles: ["CLAUDE.md"],
     workspaceEnforcement: "tool-sandbox",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: false,
+    foldersInFullAccess: false,
   },
   grok: {
     id: "grok",
@@ -233,11 +251,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   opencode: {
     id: "opencode",
@@ -256,11 +276,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
   // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
@@ -279,11 +301,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: true,
   },
   // The Cursor CLI (`cursor-agent acp`) with the user's Cursor plan. Sign-in is the ACP
   // `cursor_login` method, which opens a browser. `CURSOR_API_KEY` in the environment also signs in.
@@ -302,11 +326,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cursor/skills", ".claude/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // The Cline CLI (`cline --acp`). Sign-in is the ACP `cline` method, which opens a browser. A Cline
   // account runs the free models; `CLINE_API_KEY` in the environment also signs in.
@@ -325,11 +351,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".cline/skills", ".clinerules/skills", ".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   pi: {
     id: "pi",
@@ -346,11 +374,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   muse: {
     id: "muse",
@@ -367,11 +397,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "page",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // Inception's Mercury models run in the Pi CLI that OpenBot downloads for Pi, with a key the user
   // saves here. Pi's own sign-in and models stay on the Pi row.
@@ -390,11 +422,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // DeepSeek's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in DeepSeek
   // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
@@ -413,11 +447,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // OpenRouter's models run in the Pi CLI that OpenBot downloads for Pi, which has a built-in OpenRouter
   // provider. The user saves the key here. Pi's own sign-in and models stay on the Pi row.
@@ -436,11 +472,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
   // One provider for every Agent Client Protocol agent the user adds by command. The model id names
   // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
@@ -460,11 +498,13 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "instructions",
+    workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
     steer: "deferred",
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
+    foldersInFullAccess: false,
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 

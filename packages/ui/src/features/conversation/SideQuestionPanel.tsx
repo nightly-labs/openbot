@@ -1,5 +1,6 @@
+import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, MessageCircleQuestionMark, X } from "@openbot/ui";
-import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile, ComposerMcpServer } from "@openbot/ui/data";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -22,6 +23,12 @@ export interface SideQuestionPanelProps {
   agent: AgentProfile;
   agents: AgentProfile[];
   exchanges: readonly SideQuestionExchange[];
+  /** The agent's skills, for the `$` picker and the skill tags in messages. */
+  skills?: InstalledSkill[] | undefined;
+  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
+  skillsLoadFailed?: boolean | undefined;
+  /** The host's MCP servers, offered by the same `$` the skills answer. */
+  mcpServers?: ComposerMcpServer[] | undefined;
   /** Why the last question got no answer. The question is back in the draft. */
   error: string | null;
   draft: string;
@@ -120,6 +127,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
                     message={message()}
                     author={author(message())}
                     agents={props.agents}
+                    skills={props.skills}
                     onSelectAgent={() => undefined}
                     onOpenLink={props.onOpenLink}
                     onPreview={() => undefined}
@@ -167,6 +175,9 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}
+              skills={props.skills}
+              skillsLoadFailed={props.skillsLoadFailed}
+              mcpServers={props.mcpServers}
               value={props.draft}
               placeholder={t("conversation.sideQuestion.placeholder")}
               ariaLabel={t("conversation.sideQuestion.placeholder")}

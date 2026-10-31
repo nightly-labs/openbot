@@ -7,13 +7,37 @@ import type { AgentProviderId } from "@openbot/contracts/ipc";
 export type QueryScope = readonly [apiUrl: string | null | undefined, userId: string | undefined, sessionScope: number];
 
 /** The agent records that a single-part key ends in. */
-type AgentRecordPart = "memories" | "memory-selection" | "routines" | "storage" | "admin" | "host" | "publish";
+type AgentRecordPart =
+  | "memories"
+  | "memory-selection"
+  | "routines"
+  | "storage"
+  | "admin"
+  | "host"
+  | "backup-models"
+  | "task-limit"
+  | "new-chat"
+  | "plan-card"
+  | "publish"
+  | "browser-profile"
+  | "folders";
 
 /**
  * The last parts of the agent records that are not in the agent summary. The host sends
  * `agents-changed` when one of them changes, so an open settings page reads them again.
  */
-export const AGENT_SETTINGS_PARTS: readonly string[] = ["admin", "host", "session-settings", "provider-accounts"];
+export const AGENT_SETTINGS_PARTS: readonly string[] = [
+  "admin",
+  "host",
+  "backup-models",
+  "task-limit",
+  "new-chat",
+  "plan-card",
+  "session-settings",
+  "provider-accounts",
+  "browser-profile",
+  "folders",
+];
 
 /**
  * Every query key of the app. The host events invalidate them by prefix, so a key that a reader
@@ -76,6 +100,14 @@ export const queryKeys = {
     provider: AgentProviderId | undefined,
     model: string | undefined,
   ) => [...queryKeys.agentInfo(scope, serverId, agentId), provider, model, "session-settings"],
+  /** One folder of the host computer, to pick an agent folder from. Not an agent record: agent events leave it. */
+  agentFolderBrowse: (scope: QueryScope, serverId: string, agentId: string, path: string | null) => [
+    "agent-folder-browse",
+    ...scope,
+    serverId,
+    agentId,
+    path,
+  ],
   /** Under the server's agent records, so the host's agent events refresh it. */
   sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
   /** The settings of a channel. Its memory and routine events invalidate the part they change. */
@@ -108,6 +140,9 @@ export const queryKeys = {
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
+  instanceTransferSummary: (scope: QueryScope, serverId: string) => ["instance-transfer-summary", ...scope, serverId],
+  /** The named browser profiles of a host. `browser-profiles-changed` reads them again. */
+  serverBrowserProfiles: (scope: QueryScope, serverId: string) => ["server-browser-profiles", ...scope, serverId],
   providerStatus: (scope: QueryScope, serverId: string) => ["provider-status", ...scope, serverId],
   providerRuntimes: (scope: QueryScope, serverId: string) => ["provider-runtimes", ...scope, serverId],
   providerDefault: (scope: QueryScope, serverId: string) => ["provider-default", ...scope, serverId],
@@ -117,6 +152,12 @@ export const queryKeys = {
     serverId,
     provider,
   ],
+  /** The accounts of a host's providers (`provider-accounts-v1`). */
+  providerAccounts: (scope: QueryScope, serverId: string) => ["provider-accounts", ...scope, serverId],
+  /** The custom ACP agents of a host. A save or a removal answers with the whole list. */
+  customAgents: (scope: QueryScope, serverId: string) => ["custom-agents", ...scope, serverId],
+  /** The custom endpoints of a host. A save or a removal answers with the whole list. */
+  customProviders: (scope: QueryScope, serverId: string) => ["custom-providers", ...scope, serverId],
   mcpServers: (scope: QueryScope, serverId: string) => ["mcp-servers", ...scope, serverId],
   mcpSignIns: (scope: QueryScope, serverId: string) => ["mcp-sign-ins", ...scope, serverId],
   serverLogo: (scope: QueryScope, serverId: string, ...logo: [] | [logoKey: string | null]) => [
@@ -127,13 +168,7 @@ export const queryKeys = {
   ],
   /** The plan limits of a server's providers. The host's `usage-changed` event writes the providers' own sign-ins. */
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
-  serverUsage: (scope: QueryScope, serverId: string, range: unknown, agentId: string | undefined) => [
-    "server-usage",
-    ...scope,
-    serverId,
-    range,
-    agentId,
-  ],
+  serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   /** The routine calendar of a server. Its routine and turn events invalidate the prefix. */
   serverRoutines: (scope: QueryScope, serverId: string, ...range: [] | [from: string, to: string]) => [
     "server-routines",

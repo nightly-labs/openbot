@@ -2591,6 +2591,36 @@ export class MailboxStore {
     return persisted;
   }
 
+  /**
+   * Saves staged generated attachments in the same transaction as `write`, which stores the rows
+   * that name them. When `write` fails, nothing is saved and the files stay staged for the caller
+   * to discard.
+   */
+  persistGeneratedAttachmentsWith<T>(attachmentIds: readonly string[], eventType: string, write: () => T): T {
+    if (attachmentIds.length === 0) return write();
+    const staged = attachmentIds.map((id) => {
+      const attachment = this.#stagedGeneratedAttachments.get(id);
+      if (!attachment) throw new Error(`Staged generated attachment is missing: ${id}`);
+      return attachment;
+    });
+    const nextState: StoredState = {
+      ...this.#state,
+      generatedAttachments: [...this.#state.generatedAttachments, ...staged],
+    };
+    for (const attachment of staged) this.#changes.generatedAttachmentIds.add(attachment.id);
+    let result: T;
+    try {
+      result = this.#database.persistMailboxChangesWith(nextState, this.#changes, eventType, write);
+    } catch (error) {
+      for (const attachment of staged) this.#changes.generatedAttachmentIds.delete(attachment.id);
+      throw error;
+    }
+    this.#state = nextState;
+    this.#clearChanges();
+    for (const id of attachmentIds) this.#stagedGeneratedAttachments.delete(id);
+    return result;
+  }
+
   discardStagedGeneratedAttachments = Effect.fn("MailboxStore.discardStagedGeneratedAttachments")(function* (
     this: MailboxStore,
     attachmentIds: string[],
@@ -2658,6 +2688,27 @@ export class MailboxStore {
       mimeType: string;
       ownerAgentId?: string;
       ownerThreadId?: string | null;
+    },
+  ): Effect.fn.Return<AttachmentSummary, StoredStateFailure> {
+    const attachment = yield* this.#files
+      .storeGenerated(input)
+      .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    this.#stagedGeneratedAttachments.set(attachment.id, attachment);
+    return toAttachmentSummary(attachment);
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Copies a stored file as a staged generated attachment. `persistGeneratedAttachmentsWith` saves it
+   * with the rows that name it; `discardStagedGeneratedAttachments` removes it.
+   */
+  stageGeneratedCopy = Effect.fn("MailboxStore.stageGeneratedCopy")(function* (
+    this: MailboxStore,
+    input: {
+      sourcePath: string;
+      name: string;
+      mimeType: string;
+      ownerAgentId: string;
+      ownerThreadId: string;
     },
   ): Effect.fn.Return<AttachmentSummary, StoredStateFailure> {
     const attachment = yield* this.#files

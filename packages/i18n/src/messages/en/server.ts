@@ -115,8 +115,22 @@ export const messages = defineMessages("server", {
   "server.add.custom.description":
     "Get dedicated infrastructure, additional storage, or features tailored to your workflow.",
   "server.add.custom.action": "Contact us",
-  "server.add.join.title": "Have an invite?",
   "server.add.join.action": "Join a server",
+  // A small menu in the top corner of the hosted server plans, with the ways to add a server without a plan.
+  "server.add.otherOptions": "Other options",
+  // An item in the "Other options" menu of the hosted server plans. The server runs on this computer, with its own agents, chats and files.
+  "server.local.createTitle": "New server on this computer",
+  "server.local.createDescription": "The server has its own agents, chats and files. It runs on this computer.",
+  "server.local.nameLabel": "Server name",
+  "server.local.create": "Create server",
+  "server.local.creating": "Creating server…",
+  "server.local.createFailed": "Could not create the server.",
+  "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
+  "server.local.deleteConfirmTitle": "Delete {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stops the server and moves its agents, chats and files to the trash.",
+  "server.local.deleting": "Deleting server…",
+  "server.local.deletedTitle": "Deleted {name}",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -208,6 +222,8 @@ export const messages = defineMessages("server", {
   "server.rail.addRemote": "Add remote server",
   "server.rail.add": "Add a server",
   "server.rail.buttonLabel": "{name} server",
+  // Added to the tooltip of a server that runs on this computer, after its name.
+  "server.rail.thisComputer": "on this computer",
   "server.rail.notificationsMuted": "notifications muted",
   "server.rail.actions": "Server actions",
   "server.rail.unmute": "Unmute server",
@@ -219,6 +235,10 @@ export const messages = defineMessages("server", {
   "server.rail.restart": "Restart server",
   "server.rail.leave": "Leave server",
   "server.rail.delete": "Delete server",
+  // Hides the server on this computer from the server list while the user has other servers.
+  "server.rail.hide": "Hide server",
+  // Brings the hidden server on this computer back to the server list. {name} is its name, "Local".
+  "server.rail.showLocal": "Show {name}",
   "server.select.failedTitle": "Could not select the server",
   "server.select.failedDescription": "Could not switch servers. Try again.",
   "server.select.openAgentFailed": "Could not open {name}. Find it in the sidebar.",
@@ -319,12 +339,6 @@ export const messages = defineMessages("server", {
   "server.settings.setUpDesktopDescription": "View and control this Mac from another computer.",
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
-  "server.settings.notifications": "Notifications",
-  "server.settings.muteNotifications": "Mute notifications",
-  "server.settings.muteDescription": "Stop desktop notifications, sounds and MacBook notch updates from this server.",
-  "server.settings.mutedUntilDescription": "{until}. Turn off to unmute now.",
-  "server.settings.notifyAbout": "Notify me about",
-  "server.settings.notifyAboutDescription": "Which agent events show a desktop notification.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
@@ -359,6 +373,9 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyConfirmDescription":
     "The current key and the new key both sign a handover. Apps of members change to the new key when they connect again. Do this if the key file was copied or exposed.",
   "server.settings.hostKeyRotated": "Server key changed",
+  "server.settings.hostKeyChanged": "Last change",
+  // {date} is the date and time of the change.
+  "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
   "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":

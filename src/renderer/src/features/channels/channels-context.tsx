@@ -1,4 +1,4 @@
-import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
+import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
 import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
@@ -53,6 +53,7 @@ export function ChannelsProvider(props: ParentProps) {
     },
     supported: () => activeServerSupportsCapability(CHANNEL_CHATS_CAPABILITY),
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
+    taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
     beforeOpen: () => {
       setAgentSetupOpen(false);
       // The channel covers the workspace, and a direct conversation left selected under it is read

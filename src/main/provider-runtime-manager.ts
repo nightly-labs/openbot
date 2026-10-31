@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import {
   type AgentProviderId,
   type AgentProviderRef,
+  agentProviderDescriptor,
   isKeyOnlyProvider,
   isManagedToolRuntime,
   KEY_ONLY_PROVIDERS,
@@ -17,10 +18,10 @@ import {
   MANAGED_TOOL_RUNTIMES,
   type ManagedProviderId,
   type ManagedRuntimeId,
-  type OldRuntimeVersions,
   type ProviderRuntimeDownload,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
+  type RemovableRuntimes,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
@@ -28,7 +29,14 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { type BundledProviderExecutables, configuredCliPath, resolvePiCli } from "../backend/cli";
+import {
+  type BundledProviderExecutables,
+  compareReleases,
+  configuredCliPath,
+  isVersion,
+  olderVersion,
+  resolvePiCli,
+} from "../backend/cli";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { sha256File } from "../backend/file-hash";
 import { type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "../backend/mcp-provider-shapes";
@@ -335,22 +343,62 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * The bytes of the old versions that `removeOldVersions` would remove now. The update check
-   * removes the same versions on its own; this lets the Storage page free them at once.
+   * Collects the old versions now, with the window the update check would use. The update check
+   * collects the same versions on its own.
    */
-  oldVersions(): Effect.Effect<OldRuntimeVersions> {
+  removeOldVersions(): Effect.Effect<void> {
+    return this.#target ? this.#collectVersionsEffect(this.#target, this.#removalRetentionMs()) : Effect.void;
+  }
+
+  /**
+   * What the Storage page can free now: the old versions, and the download of each provider that is
+   * off or runs the CLI the user installed. A version that is both is counted once.
+   */
+  removableRuntimes(): Effect.Effect<RemovableRuntimes> {
     return Effect.gen({ self: this }, function* () {
-      if (!this.#target) return { bytes: 0 };
-      const paths = yield* this.#oldVersionPathsEffect(this.#target, Date.now() - this.#removalRetentionMs(), false);
-      return { bytes: yield* measurePaths(paths) };
+      const target = this.#target;
+      if (!target) return { bytes: 0, providers: [] };
+      const old = yield* this.#oldVersionPathsEffect(target, Date.now() - this.#removalRetentionMs(), false);
+      const downloads = yield* this.#removableDownloadsEffect(target);
+      const paths = new Set([...old, ...downloads.flatMap((download) => download.paths)]);
+      return { bytes: yield* measurePaths([...paths]), providers: downloads.map((download) => download.provider) };
     });
   }
 
-  /** Collects now, with the window the update check would use, and answers what is left. */
-  removeOldVersions(): Effect.Effect<OldRuntimeVersions> {
-    return Effect.gen({ self: this }, function* () {
-      if (this.#target) yield* this.#collectVersionsEffect(this.#target, this.#removalRetentionMs());
-      return yield* this.oldVersions();
+  /**
+   * Collects the old versions, then removes each download that `removableRuntimes` names now, with
+   * the rules of `removeDownload`. One that fails does not stop the others; the failure names them.
+   */
+  removeRemovableRuntimes(): Effect.Effect<RemovableRuntimes, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<RemovableRuntimes, ProviderRuntimeFailure> {
+      const target = this.#target;
+      if (!target) return yield* this.removableRuntimes();
+      yield* this.removeOldVersions();
+      const downloads = yield* this.#removableDownloadsEffect(target);
+      const failed = yield* Effect.forEach(
+        downloads,
+        ({ provider }) =>
+          this.removeDownload(provider).pipe(
+            Effect.as([]),
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                logger.warn("Provider runtime removal failed.", { runtime: provider, cause: logCause(error.cause) });
+                return [provider];
+              }),
+            ),
+          ),
+        { concurrency: "unbounded" },
+      );
+      const providers = failed.flat();
+      if (providers.length > 0)
+        return yield* new ProviderRuntimeFailure({
+          cause: new Error(
+            sourceText("error.provider.removeDownloadsFailed", {
+              providers: providers.map((provider) => agentProviderDescriptor(provider).displayName).join(", "),
+            }),
+          ),
+        });
+      return yield* this.removableRuntimes();
     });
   }
 
@@ -364,6 +412,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const paths = yield* this.#removableVersionPathsEffect(provider, this.#target);
       return { bytes: yield* measurePaths(paths), versions: paths.length };
     });
+  }
+
+  /**
+   * The providers whose download the Storage page removes now, with the version directories of each:
+   * those `removeDownload` takes, and none that downloads at this moment.
+   */
+  #removableDownloadsEffect(target: RuntimeTarget): Effect.Effect<{ provider: ManagedProviderId; paths: string[] }[]> {
+    return Effect.forEach(
+      MANAGED_RUNTIME_PROVIDERS,
+      (provider) =>
+        this.#tasks.has(provider) || this.#cliInUse(provider) || configuredCliPath(provider)
+          ? Effect.succeed([])
+          : this.#removableVersionPathsEffect(provider, target).pipe(
+              Effect.map((paths) => (paths.length > 0 ? [{ provider, paths }] : [])),
+            ),
+      { concurrency: "unbounded" },
+    ).pipe(Effect.map((downloads) => downloads.flat()));
   }
 
   /**
@@ -409,11 +474,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
-   * Whether this instance can run a runtime. A provider that is off runs no CLI here, except Pi,
-   * which the key-only providers run on.
+   * Whether this instance can run a runtime from the store. A provider that is off runs no CLI here,
+   * except Pi, which the key-only providers run on. Neither does one that runs the CLI the user
+   * installed: that CLI is as new as the copy, or the agent service would run the copy.
    */
   #cliInUse(runtime: ManagedRuntimeId): boolean {
-    if (isManagedToolRuntime(runtime) || this.#isProviderOn(runtime)) return true;
+    if (isManagedToolRuntime(runtime)) return true;
+    if (this.#isProviderOn(runtime) && !this.#systemVersions.has(runtime)) return true;
     return runtime === "pi" && KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
   }
 
@@ -533,14 +600,20 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * The manager does not own that install and never downloads for it. It decides which version is
    * current, though, so the comparison belongs here with the managed one rather than in the
    * renderer, which must not compare versions at all. Pass `null` when the provider went back to the
-   * managed copy or resolved nothing.
+   * managed copy or resolved nothing. While a version is set, the copy in the store runs nothing here,
+   * so `removeDownload` and the Storage page can remove it, and this instance does not stamp it.
+   *
+   * True when the provider runs its copy in the store again. The caller then runs
+   * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): void {
-    if ((this.#systemVersions.get(provider) ?? null) === version) return;
+  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+    const previous = this.#systemVersions.get(provider) ?? null;
+    if (previous === version) return false;
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;
     this.emit("status", this.getStatus());
+    return previous !== null && version === null;
   }
 
   /** Sends the update offers again after the user turns a provider on or off. */
@@ -1446,10 +1519,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       (runtime) =>
         Effect.gen({ self: this }, function* () {
           const spec = runtimeSpec(runtime, target, this.#lock);
-          const version = this.#statuses[runtime].version;
+          const { phase, version } = this.#statuses[runtime];
           const targetRoot = dirname(this.#installRoot(spec));
           if (stamp && version) yield* this.#stampInUseEffect(runtime, join(targetRoot, version));
-          const backup = version ? yield* this.#workingBackupEffect(targetRoot, spec, version) : null;
+          // A verified version needs nothing to fall back on. The one it replaced is not stamped again,
+          // so it stays only for the collection window and then goes, as any other old version does.
+          const backup =
+            version && phase !== "ready" ? yield* this.#workingBackupEffect(targetRoot, spec, version) : null;
           if (stamp && backup) yield* this.#stampInUseEffect(runtime, join(targetRoot, backup));
           return yield* this.#oldVersionsEffect(spec, backup, stale);
         }).pipe(Effect.catch(() => Effect.succeed([]))),
@@ -1460,8 +1536,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   /**
    * The versions no one has any use for.
    *
-   * This instance needs the version it runs, any newer one, and one older version that still works,
-   * to fall back on. An older pin is not kept for itself: the store never goes back to it.
+   * This instance needs the version it runs and any newer one. Until the version it runs is verified,
+   * it also needs one older version that still works, to fall back on; after that, the older one is
+   * kept only while a stamp within `stale` says an instance ran it. An older pin is not kept for
+   * itself: the store never goes back to it.
    *
    * Rank alone decided this when the store belonged to one profile. It is now the computer's, and
    * another instance -- the released app beside a development build, or a worktree whose lock pins
@@ -2134,23 +2212,6 @@ const digestMatches = Effect.fn("ProviderRuntime.digestMatches")(function* (path
   );
   return hash.digest("hex") === digest.hex;
 });
-
-function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
-}
-
-/**
- * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
- * no time, are neither older nor newer.
- */
-export function olderVersion(installed: string, target: string): boolean {
-  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
-}
-
-function compareReleases(a: string, b: string): number {
-  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
-  return release(a).localeCompare(release(b), "en", { numeric: true });
-}
 
 /** The total size of some directories. One that cannot be measured counts as empty. */
 const measurePaths = Effect.fn("ProviderRuntime.measurePaths")(function* (paths: readonly string[]) {

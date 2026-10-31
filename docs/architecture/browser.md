@@ -93,12 +93,20 @@ the `mp4-attachments` capability, because a host with only `media-attachments` r
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+Targeted typing checks that the target still holds focus before the End key, the text, and the
+Enter key. A page focus or input handler that moves focus stops it with an error that says if the
+text is already in the field. The check also reads each frame element that holds the target,
+because a frame in another process can keep its active element after the page takes focus.
+`bun run test:browser --scenario=typing-focus` covers it and writes
+`.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
 tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
-loopback HTTP, the host supplies the basic Chromium brand/version, desktop flag, and platform hints.
+loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
+be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
+chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
 It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
@@ -172,6 +180,53 @@ It includes actual runtime versions, completed cases, three warm-up pairs and tw
 serialized result bytes, and observed snapshot counts. Measurements include tool execution and loopback fixture
 confirmation. They do not measure provider tokens, model speed, or billable cost.
 
+### Run many steps in one call
+
+Each single action tool takes one model turn, and the model reads the page with a separate snapshot.
+`openbot_browser.run_script` does many actions in one call and returns one final snapshot, so a long
+task takes fewer turns.
+
+`run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
+`type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
+helper sends one step to the host. The script returns a JSON value of at most 64 KB.
+
+An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
+site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
+`run_steps` 130k. With both tools in the catalog, agents used both, at 198k. So the catalog has only
+`run_script` (`bun run bench:browser-tools`). With the shipped guidance and no hint in the prompt,
+agents used 216k until a browser search also returned `run_script` (see
+[Providers](providers.md)); then 149k. These runs were before input actions returned a short status
+in place of a snapshot, so the token counts can be different now.
+
+The script runs each step through the same code as the single tool, with its own tab queue slot.
+Before each step, the host checks the tab again: ownership, secret protection, takeover, and user
+control. The action steps read no result. `evaluate` keeps the scripted-origin
+record and the secret-document check. When a person takes control of the tab, the call stops and
+returns its partial results with status `user_control`. It does not wait for the release. The
+control event uses the released `click` action, so the Team API wire values do not change.
+
+An `evaluate` step returns `null` when the expression gives `undefined`, such as a click statement.
+The single `evaluate` tool still refuses that value. If the step failed after the click, the agent
+would click again. In a script, `waitFor` also takes a page function: the page polls it every
+100 ms until it returns a truthy value, in one `evaluate` step (at most 25 seconds). A script that
+fails without a final snapshot returns the tab's `url`, because the steps before the failure stay
+done and the agent must not start again from the wrong page. When the final snapshot fails after
+the last step, the result keeps the script's value and log. It has `snapshotError`, or the
+`user_control` status when a person took the tab.
+
+The script runs in a QuickJS WebAssembly sandbox (`src/backend/browser-script.ts`), not in
+`node:vm`, because the backend process holds the vault. The sandbox has no modules, network, files,
+timers, or process. Its limits are 64 MiB of memory, a 1 MiB stack, 200 steps, and a total deadline
+of `timeoutMs` (default 60 seconds, at most 120 seconds). An interrupt handler stops a script that
+loops without steps. Each script gets its own runtime, which the host disposes at the end. The
+backend bundle keeps the QuickJS packages external, so the WebAssembly file loads from
+`node_modules`.
+
+`bun run test:browser-steps` compiles its native fixture and drives a hidden Electron process with
+loopback pages, like the fill fields check. CI runs it in the `browser` job under `xvfb-run -a`.
+The report is `.openbot-build/browser-steps-e2e/report.json`.
+
 ### Browser sessions
 
 Each agent has one **browser profile**: the persistent partition that its new tabs open in. The agent
@@ -216,7 +271,10 @@ named profile has. "Only this agent" has no color, and the select offers it only
 already uses it, so the agent keeps its sign-ins. An owner or admin of a joined server uses the same
 operations through `browser-profiles-v1` (`route-browser-profiles.ts`); each member reads the labels of
 the tabs that they can see, and a private tab is hidden from a member. A host without the capability
-answers `agentSettingsUnsupported`, and the client shows no select, section or label for it.
+answers `agentSettingsUnsupported`, and the client shows no select, section or label for it. A host
+with `browser-profiles-events-v1` sends `browser-profiles-changed` after each change, so every open
+list and agent setting reads the profiles again. The phone shows the same operations in Server
+settings > Browser profiles and in Agent info > Advanced > Browser profile.
 
 ### Tab lifetime
 
@@ -250,6 +308,36 @@ agent passes the owner check for them, and the renderer lists tabs per agent, so
 view the user cannot see to close, across restarts. Closing is idempotent -- `close()` returns early
 on an id it does not hold -- and tab ids are UUIDs with no reorder feature at any layer, so a stale id
 can never name a tab that took its place.
+
+### Page dialogs
+
+A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
+Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
+input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
+runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
+queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
+an opaque id, the type, and the message, scrubbed and redacted like snapshot text. A `run_script` step
+stops with status `dialog`. The agent answers with `handle_dialog`, which sends
+`Page.handleJavaScriptDialog` and returns the next dialog or the page status. Until then, every other
+tool on that tab is refused; `close_tab` still works.
+
+Electron shows its own box for the same dialog, after the CDP event. After the CDP answer, the engine
+emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
+agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
+listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+`scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
+
+| Event | Dialog |
+| --- | --- |
+| Person's click, or a tool that is not an input action | Native box. The agent is not told. |
+| Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
+| Person answers first | `handle_dialog` fails with "This dialog is closed". |
+| Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
+| `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
+
+The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a
+cross-origin frame: those dialogs stay native.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

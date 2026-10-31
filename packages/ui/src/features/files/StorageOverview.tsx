@@ -1,3 +1,4 @@
+import { agentProviderDescriptor, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import { CLEARABLE_STORAGE_CATEGORIES, type ClearableStorageCategory } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -60,11 +61,13 @@ export interface StorageOverviewProps {
   canManage?: boolean;
   onClear: (category: ClearableStorageCategory) => void | Promise<void>;
   /**
-   * What older provider CLI versions take. Only this computer offers it: a server removes its old
+   * What the provider CLI downloads that can go take: the older versions, and the whole download of
+   * each provider in `runtimeProviders`. Only this computer offers it: a server removes its old
    * versions on its own.
    */
-  oldRuntimeBytes?: number;
-  onRemoveOldRuntimes?: () => void | Promise<void>;
+  runtimeBytes?: number;
+  runtimeProviders?: readonly ManagedProviderId[];
+  onRemoveRuntimes?: () => void | Promise<void>;
   onPreviewFile: (file: StoredFileRow) => void;
   onFileAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
   /** Shown above the OpenBot folder: the use of the whole machine, when the viewer can see it. */
@@ -90,8 +93,8 @@ export function StorageOverview(props: StorageOverviewProps) {
         ? [{ category: entry.category, bytes: entry.bytes }]
         : [],
     ),
-    ...(props.onRemoveOldRuntimes && props.oldRuntimeBytes
-      ? [{ category: "runtimes" as const, bytes: props.oldRuntimeBytes }]
+    ...(props.onRemoveRuntimes && props.runtimeBytes
+      ? [{ category: "runtimes" as const, bytes: props.runtimeBytes, providers: props.runtimeProviders ?? [] }]
       : []),
   ]);
   const removableBytes = () => removable().reduce((sum, entry) => sum + entry.bytes, 0);
@@ -333,7 +336,7 @@ export function StorageOverview(props: StorageOverviewProps) {
             entries={removable()}
             totalBytes={removableBytes()}
             disabled={props.state === "scanning"}
-            onClear={(category) => (category === "runtimes" ? props.onRemoveOldRuntimes?.() : props.onClear(category))}
+            onClear={(category) => (category === "runtimes" ? props.onRemoveRuntimes?.() : props.onClear(category))}
           />
         </Show>
       </div>
@@ -370,12 +373,14 @@ function relativeTime(iso: string, now: Date, t: AppTranslate, format: AppFormat
   return format.date(new Date(iso), { month: "short", day: "numeric" });
 }
 
-/** `runtimes` removes only the old provider CLI versions, not the row's whole size. */
+/** `runtimes` removes the old provider CLI versions and the named downloads, not the row's whole size. */
 type CleanupCategory = ClearableStorageCategory | "runtimes";
 
 interface CleanupEntry {
   category: CleanupCategory;
   bytes: number;
+  /** The providers whose whole download a `runtimes` entry also removes. */
+  providers?: readonly ManagedProviderId[];
 }
 
 const CLEANUP_DESCRIPTIONS = {
@@ -390,6 +395,20 @@ const CLEANUP_CONFIRM_TITLES = {
   runtimes: "files.cleanup.confirm.runtimes",
 } as const satisfies Record<CleanupCategory, AppTextKey>;
 
+function cleanupDescription(entry: CleanupEntry, t: AppTranslate, format: AppFormat): string {
+  const providers = entry.providers ?? [];
+  if (providers.length === 0) return t(CLEANUP_DESCRIPTIONS[entry.category]);
+  return t("files.cleanup.description.runtimeDownloads", {
+    providers: format.list(providers.map((provider) => agentProviderDescriptor(provider).displayName)),
+  });
+}
+
+function cleanupConfirmTitle(entry: CleanupEntry, t: AppTranslate): string {
+  return (entry.providers ?? []).length > 0
+    ? t("files.cleanup.confirm.runtimeDownloads")
+    : t(CLEANUP_CONFIRM_TITLES[entry.category]);
+}
+
 function StorageCleanup(props: {
   entries: readonly CleanupEntry[];
   totalBytes: number;
@@ -400,6 +419,13 @@ function StorageCleanup(props: {
   const headingId = `storage-cleanup-${createUniqueId()}`;
   const [pending, setPending] = createSignal<CleanupEntry | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const pendingEntry = (): CleanupEntry => pending() ?? { category: "caches", bytes: 0 };
+  const pendingTitle = () => cleanupConfirmTitle(pendingEntry(), t);
+  const pendingDescription = () =>
+    t("files.cleanup.confirmDescription", {
+      size: format.fileSize(pendingEntry().bytes),
+      description: cleanupDescription(pendingEntry(), t, format),
+    });
 
   async function confirm(): Promise<void> {
     const entry = pending();
@@ -429,7 +455,7 @@ function StorageCleanup(props: {
             <li class="storage-cleanup-row">
               <span class="storage-row-copy">
                 <span class="storage-row-title">{t(STORAGE_CATEGORY_LABELS[entry.category])}</span>
-                <span class="storage-row-meta">{t(CLEANUP_DESCRIPTIONS[entry.category])}</span>
+                <span class="storage-row-meta">{cleanupDescription(entry, t, format)}</span>
               </span>
               <span class="storage-row-size">{format.fileSize(entry.bytes)}</span>
               <Button
@@ -453,11 +479,8 @@ function StorageCleanup(props: {
         open={pending() !== null}
         onCancel={() => setPending(null)}
         onConfirm={confirm}
-        title={t(CLEANUP_CONFIRM_TITLES[pending()?.category ?? "caches"])}
-        description={t("files.cleanup.confirmDescription", {
-          size: format.fileSize(pending()?.bytes ?? 0),
-          description: t(CLEANUP_DESCRIPTIONS[pending()?.category ?? "caches"]),
-        })}
+        title={pendingTitle()}
+        description={pendingDescription()}
         confirmLabel={t("files.cleanup.clear")}
         pendingLabel={t("files.cleanup.clearing")}
         error={error() ?? undefined}

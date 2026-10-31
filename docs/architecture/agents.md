@@ -255,7 +255,9 @@ the Browser profiles section of the settings of the agent's server (`ServerBrows
 renames, changes the color of, clears and deletes the named profiles. It lists Shared first, with
 its agent count and no actions. A joined server without the capability has no section. The select, the browser toolbar and the tabs show the color of a named profile. A delete moves
 the profile's agents to Shared. The agent has no tool to change its profile, and tool results do not
-name it. See [Browser sessions](browser.md#browser-sessions) for the storage and the partitions.
+name it. The phone shows the choice in Agent info > Advanced > Browser profile, with "New profile",
+which adds a profile and gives it to the agent, and "Manage profiles". The desktop, the web client and
+the phone read the profiles again on `browser-profiles-changed` (`browser-profiles-events-v1`). See [Browser sessions](browser.md#browser-sessions) for the storage and the partitions.
 
 ## Agent threads
 
@@ -287,6 +289,22 @@ restores it. Rename sets a `user` title, which later messages do not change. Del
 at once and shows an Undo toast; when the toast ends, `AgentService.deleteTask` cancels the queued
 messages and deletes the thread with its conversation, attachments, event history and provider
 session. It refuses a thread with a running turn. The main thread has no archive, rename or delete.
+
+"Branch from here" (`AgentService.branchTask`, `AgentTasks.branch`, `AgentThreadStore.branch`) makes a
+new side thread of the same agent from the last agent message of a finished turn, in the main thread
+or in a side thread. The button and the message menu item are off while the source has a running
+turn. One dispatch copies the messages through the end of that turn, with new message ids, and writes
+one `thread.branched` snapshot event. It copies no usage rows, deliveries or reactions; a reply link
+and an attachment move to the copy, and each file is copied as a generated attachment of the branch.
+Migration 48 adds `branch_source_thread_id`, `branch_source_message_id` and
+`branch_through_message_id` to `projection_agent_threads`: all three are set, or none. The link stays
+when its source is deleted. The title is "{source} #N", or the last user message for a branch of the
+main thread. The `requestId` of the client makes a retry answer the same branch. The member has read
+the copy through its last message, and the new tab opens with focus. A divider "Branched from
+{source}" follows the copied messages and opens the source at that message. The thread menu shows
+each branch under its source. The branch has no provider session, so its first turn gets a handoff of
+its own transcript, with a note that workspace files were not rolled back. A branch counts toward the
+open-thread limit.
 
 The agent starts a side thread with the `start_task` OpenBot tool, up to 8 open tasks. On desktop and
 the web, it opens as a tab of the agent and does not take focus. An agent has at most 50
@@ -326,7 +344,18 @@ a start or a message with up to 10 attachment drafts that the member uploaded wi
 and text that can be empty. The answers are the frozen `agent-tasks-v1` task and receipt. The team client
 uses these routes only for a message with files, so a message without files still works on an older host.
 A joined desktop refuses files for a server without the capability with `error.backend.threadRemoteUnsupported`,
-and the phone shows the plus in the thread composer only on a server that has it. A server without either shows only
+and the phone shows the plus in the thread composer only on a server that has it. The optional
+`agent-thread-branches-v1` capability (`packages/contracts/src/team-protocol/agent-thread-branches-v1.ts`, host
+route `routeAgentThreadBranches` in `src/main/team-api/route-agent-threads.ts`) adds
+`POST /v1/agent-threads/{branch,branches}`. `branch` takes `{agentId, taskId|null, messageId, requestId}`, needs
+the `chat` agent level as a start does, and answers the frozen `agent-tasks-v1` task with its `branch` link. The
+member is the reader of the copy. A source or message that is not there is 404; a running source or the open-thread
+limit is 409. `branches` answers `{branches: [{taskId, sourceTaskId, sourceTitle, sourceMessageId, throughMessageId}]}`,
+the links among the listed tasks. `sourceTitle` is null for the agent's own chat and for a deleted source; the
+list can leave out an archived source, so the divider takes its title from the link. The `agent-tasks-v1` task and its events stay without the link: a joined desktop and
+the web read `branches` after the task list and add the links, and read the list again when an event names a task
+that they do not know. A server without the capability does not show "Branch from here", and a joined desktop
+refuses a branch with `error.backend.branchRemoteUnsupported`. The phone does not branch. A server without either shows only
 the main thread, and a task control there fails with `error.backend.taskRemoteUnsupported`. Prompts, approvals and warnings of a task turn show in the main chat. On desktop and the web, the
 approval of a side thread turn also shows in that thread. A provider
 error of a task turn goes to the task: `AgentTasks` stores the redacted text in the task's `error`
@@ -636,6 +665,47 @@ on failure. Updating an existing profile and its retry receipt shares a SQLite
 transaction. Creation follows the existing workspace/initial-message flow with
 cleanup on failure. Receipts make retries after a lost response return the saved
 agent. This does not introduce a schema migration or alter released protocol codecs.
+
+## Agent instruction file
+
+An agent keeps its standing rules (persona, style, steps) in one file at the root of its workspace:
+`AGENTS.md`, or `CLAUDE.md` when only that file exists. The profile description is a short summary
+for teammates and the Team API; it keeps its meaning and its 2,000-character limit.
+
+- `src/backend/agent/workspace-instructions.ts` finds, reads and saves the file. A link that goes
+  outside the workspace is refused. A save writes the first file that exists, else it creates
+  `AGENTS.md` with mode 0600. An existing file keeps its mode; a hard link to it is replaced by a
+  new file. A save never deletes the file.
+- The editor sends the text that the edit started from. When the agent changed the file after
+  that, main refuses the save. The editor keeps the user's text, says that the agent changed the
+  file, and a second Save replaces the agent's version.
+- The agent settings show the file as "Instructions" for a local agent only
+  (`agentInstructions` IPC group). The row in the Knows group opens a page
+  (`AgentInstructionsView`): a bar with the file name, its folder, Show in Finder and Edit, then
+  the file as Markdown. Edit puts the whole file in a field on the page that saves only on Save.
+  Show in Finder sends only the agent id; main finds the file, or the workspace when it has none.
+  The Team API does not carry the file.
+- `InstructionsChanges` (`src/backend/agent/instructions-changes.ts`) reads the file when the first
+  turn of an agent starts and again when a turn ends. When the text changed, the turn ends with an
+  `instructions-change` system line, "Updated its instructions". The baseline is one per agent, so
+  two turns at the same time show the change once. A save in the editor moves the baseline, so
+  the user's own edit does not show as the agent's. A turn that a restart settles shows no line.
+- The line carries `instructionsChange` (`before`, `after`) when both texts fit the editor limit.
+  The message stays in `projection_thread_messages.message_json`, so no migration is needed. The
+  Team API projections do not copy the field: a remote client sees the text only. View opens the
+  Instructions page, and does not show in a channel; Undo saves `before` with `after` as the expected text, so main refuses it after a later
+  change. A save on the page or an Undo updates the page and each line of the same agent. The
+  unread counts skip the line.
+- The developer instructions name the file and tell the agent to keep its rules there.
+  `workspaceInstructionFiles` in the provider descriptor lists the files that each CLI reads by
+  itself from its working directory. `ThreadLifecycle` adds the text of the file, at most 32,000
+  characters, only when the CLI does not read that file. Claude in workspace-only mode reads user
+  settings only, so it gets the text.
+- The text is redacted, and a `</agent_instructions>` tag in it is escaped.
+- Codex keeps the instructions of a loaded session: the developer instructions, and the
+  `AGENTS.md` that it read when the session started. The Codex tool fingerprint therefore includes
+  the file name when it is not `AGENTS.md`, and the file text. A change to the file starts a new
+  Codex session. Other providers read the file again when they start or resume a session.
 
 ## Agent import
 

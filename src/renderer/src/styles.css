@@ -24,6 +24,7 @@
 @import "./features/account/account-update-island.css";
 @import "@openbot/ui/features/servers/join-server-dialog.css";
 @import "@openbot/ui/features/servers/add-server-dialog.css";
+@import "@openbot/ui/features/servers/create-local-server-dialog.css";
 @import "@openbot/ui/features/servers/hosted-server-upsell.css";
 @import "@openbot/ui/features/servers/restart-server-dialog.css";
 @import "@openbot/ui/features/servers/server-roles.css";
@@ -64,7 +65,8 @@
 @import "./features/servers/server-mcp.css";
 @import "@openbot/ui/features/marketplace/marketplace.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
-@import "@openbot/ui/features/settings/sound-theme-picker.css";
+@import "@openbot/ui/features/settings/sound-choice-select.css";
+@import "@openbot/ui/features/settings/notification-matrix.css";
 @import "@openbot/ui/features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "@openbot/ui/features/custom-providers/custom-providers.css";

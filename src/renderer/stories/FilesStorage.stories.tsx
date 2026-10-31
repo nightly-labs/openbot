@@ -19,7 +19,7 @@ import {
   FILES_LAUNCH_ROWS,
   FILES_LONG_NAME_ROWS,
   FILES_NOW,
-  FILES_OLD_RUNTIME_BYTES,
+  FILES_REMOVABLE_RUNTIMES,
   FILES_ROWS,
   FILES_STATUS_ROWS,
 } from "./files-fixtures";
@@ -54,8 +54,9 @@ const overviewArgs = (): OverviewArgs => ({
   onOpenAgent: fn(),
   onOpenConversation: fn(),
   onClear: fn(async () => undefined),
-  oldRuntimeBytes: FILES_OLD_RUNTIME_BYTES,
-  onRemoveOldRuntimes: fn(async () => undefined),
+  runtimeBytes: FILES_REMOVABLE_RUNTIMES.bytes,
+  runtimeProviders: FILES_REMOVABLE_RUNTIMES.providers,
+  onRemoveRuntimes: fn(async () => undefined),
   onPreviewFile: fn(),
   onFileAction: fn(async () => undefined),
 });

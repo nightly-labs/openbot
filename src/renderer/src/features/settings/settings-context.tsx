@@ -8,12 +8,12 @@ import {
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createSignal, onSettled } from "solid-js";
+import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
 import { actionToast } from "../../action-toast";
 import { readShowAgentSteps, setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { desktopAnalytics } from "../../analytics";
-import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
+import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
@@ -98,6 +98,16 @@ const Settings = createSimpleContext({
     const [appSettingsOpenRequest, setAppSettingsOpenRequest] = createSignal(0);
     /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
+    /** The server that the Notifications tab shows first. Each nonce moves to it once. */
+    const [notificationFocusRequest, setNotificationFocusRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+    } | null>(null);
+    let notificationFocusNonce = 0;
+    // A request moves the tab once. A later opening of the settings shows the tab from the top.
+    createEffect(appSettingsOpen, (open) => {
+      if (!open) setNotificationFocusRequest(null);
+    });
     /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
@@ -106,7 +116,7 @@ const Settings = createSimpleContext({
     let hostedServerDeleteNonce = 0;
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
-      taskCompletionSound: isCompletionSoundEnabled(),
+      taskSound: readTaskSound(),
       sendShortcut: readSendShortcutMode(),
       showAgentSteps: readShowAgentSteps(),
       soundFeedback: isActionSoundEnabled(),
@@ -190,7 +200,11 @@ const Settings = createSimpleContext({
 
     let dynamicIslandSaveCount = 0;
 
-    function updateGeneralSettings(value: GeneralSettingsValue): void {
+    /**
+     * `analyticsChosen` is false for a default that the user did not change, such as the first-run
+     * box left as it was. Only a choice goes to the account.
+     */
+    function updateGeneralSettings(value: GeneralSettingsValue, options: { analyticsChosen?: boolean } = {}): void {
       const previous = generalSettings();
       function persistField<Key extends keyof GeneralSettingsValue, Response>(
         key: Key,
@@ -206,8 +220,9 @@ const Settings = createSimpleContext({
       }
 
       setGeneralSettings(value);
-      if (previous.taskCompletionSound !== value.taskCompletionSound) {
-        setCompletionSoundEnabled(value.taskCompletionSound);
+      if (previous.taskSound !== value.taskSound) {
+        setTaskSound(value.taskSound);
+        playSoundChoice(value.taskSound);
       }
       if (previous.sendShortcut !== value.sendShortcut) {
         setSendShortcutMode(value.sendShortcut);
@@ -218,11 +233,15 @@ const Settings = createSimpleContext({
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");
       }
-      if (previous.productAnalytics !== value.productAnalytics) {
+      // A choice equal to the shown default is still a choice, and the account gets it.
+      if (previous.productAnalytics !== value.productAnalytics || options.analyticsChosen === true) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics, { recordOptOut: true });
         setAnalyticsPreferenceLoaded(value.productAnalytics);
         void settingsPort()
-          .setAnalyticsPreference({ enabled: value.productAnalytics })
+          .setAnalyticsPreference({
+            enabled: value.productAnalytics,
+            ...(options.analyticsChosen === false ? {} : { chosen: true }),
+          })
           .then((preference) => {
             desktopAnalytics.setTrackingEnabled(preference.enabled);
             setAnalyticsPreferenceLoaded(preference.enabled);
@@ -409,6 +428,18 @@ const Settings = createSimpleContext({
       setAppSettingsOpenRequest((count) => count + 1);
     }
 
+    /**
+     * Opens the Notifications tab, the one place where the user changes the level of a server and its
+     * agents. With a server, the tab moves to the row of that server.
+     */
+    function openNotificationLevels(serverId?: string, trigger?: HTMLElement | null): void {
+      if (serverId) setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
+      // The modal applies a tab when the requested tab changes, so a repeated request clears it first.
+      setAppSettingsTab(undefined);
+      flush();
+      openAppSettings(trigger, "notifications");
+    }
+
     /** Opens the Hosted servers tab with the delete confirmation of one server. */
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
@@ -430,6 +461,11 @@ const Settings = createSimpleContext({
       );
       // A remote owner or admin can change an agent's grant from a phone or the web client.
       const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
+      // Main follows the account's analytics answer from another device.
+      const unsubscribeAnalytics = settingsPort().onAnalyticsPreference(({ enabled }) => {
+        setAnalyticsPreferenceLoaded(enabled);
+        setGeneralSettings((current) => ({ ...current, productAnalytics: enabled }));
+      });
       // An admin of a joined server can change how many memories each agent of this computer keeps.
       const unsubscribeMemoryLimit = settingsPort().onAgentMemoryLimitPreference(({ limit }) => {
         agentMemoryLimitChanged = true;
@@ -459,6 +495,7 @@ const Settings = createSimpleContext({
         unsubscribe();
         unsubscribeUpdateSettings();
         unsubscribeApprovals();
+        unsubscribeAnalytics();
         unsubscribeMemoryLimit();
         unsubscribeUpdates();
       };
@@ -612,6 +649,8 @@ const Settings = createSimpleContext({
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       appSettingsTab,
       openAppSettings,
+      notificationFocusRequest,
+      openNotificationLevels,
       hostedServerDeleteRequest,
       openHostedServerDelete,
       skillsMarketplaceOpen,

@@ -89,7 +89,7 @@ export const startDevelopmentRemoteRole = Effect.fn("DevelopmentRemote.startRole
   if (role === "host") {
     yield* remoteCall(() => rm(developmentRemoteConnectionPath(), { force: true }));
     const status = yield* host.start();
-    if (status.phase !== "online") yield* host.startDevelopmentLocal();
+    if (status.phase !== "online") yield* host.startLoopbackOnly();
     if (testClientEnabled) yield* writeDevelopmentRemoteConnection(yield* host.createDevelopmentConnection());
     return;
   }

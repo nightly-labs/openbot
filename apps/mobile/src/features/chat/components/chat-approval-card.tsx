@@ -113,7 +113,7 @@ export function ChatApprovalCard({
       accessibilityState={{ busy: pending !== null }}
     >
       <View
-        className="max-w-[88%] self-start gap-2.5 rounded-[30px] bg-control/60 px-4 py-3"
+        className="max-w-[92%] self-start gap-2.5 rounded-[30px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="gap-1">

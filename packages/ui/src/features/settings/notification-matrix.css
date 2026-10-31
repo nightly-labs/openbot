@@ -1,0 +1,83 @@
+/* The notification levels of every server and agent: one card for each server (NotificationMatrix.tsx). */
+
+.notification-scope-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.notification-matrix {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.notification-matrix-server-mark {
+  --server-gradient-logo-size: 32px;
+  --server-gradient-logo-radius: var(--openbot-radius-md);
+}
+
+.notification-matrix-server-mark > img {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--openbot-radius-md);
+}
+
+/* Every row of a card starts at the same edge: the agent avatar stands in the 32px column of the server logo. */
+.notification-matrix-agent > .ui-item-media {
+  width: 32px;
+  justify-content: center;
+}
+
+.notification-matrix-level {
+  min-width: 72px;
+}
+
+/* The last row of a card is one button as wide as the card. Its "+" stands in the column of the server logo. */
+.notification-matrix-add {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-matrix-add:hover,
+.notification-matrix-add[data-expanded] {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.notification-matrix-add:focus-visible {
+  outline: 1px solid var(--openbot-border-strong);
+  outline-offset: -1px;
+}
+
+.notification-matrix-add-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+}
+
+.notification-matrix-add-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The notes of a server tell what its card can do, so they wrap and are never cut. */
+.ui-item-description.notification-matrix-notes {
+  white-space: normal;
+}

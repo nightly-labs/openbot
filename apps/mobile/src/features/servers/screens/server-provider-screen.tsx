@@ -1,14 +1,27 @@
-import { type AgentProviderId, isAgentProvider, isKeyOnlyProvider, relayCallbackQuery } from "@openbot/contracts/ipc";
+import {
+  type AgentProviderId,
+  isAgentProvider,
+  isKeyOnlyProvider,
+  type ProviderAccountStatus,
+  relayCallbackQuery,
+} from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Spinner, Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Linking } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { type ProviderAdmin, providerRuntimeBusy, relayPage } from "@/features/servers/model/provider-admin";
-import { useServerProviders } from "@/features/servers/model/use-server-providers";
+import { TrailingValue } from "@/features/servers/components/trailing-value";
+import {
+  type ProviderAdmin,
+  providerAccountStateKey,
+  providerRuntimeBusy,
+  relayPage,
+} from "@/features/servers/model/provider-admin";
+import { useServerProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import { providerStatusLabel } from "@/features/servers/screens/server-providers-screen";
 import {
   SettingsContent,
@@ -45,12 +58,14 @@ type SignIn =
 export function ServerProviderScreen() {
   const text = useText();
   const { t, sourceText, errorMessage } = text;
-  const params = useLocalSearchParams<{ serverId: string; provider: string }>();
+  const params = useLocalSearchParams<{ serverId: string; provider: string; signInAccount?: string }>();
   const serverId = params.serverId;
   const provider = isAgentProvider(params.provider) ? params.provider : null;
   const [signIn, setSignIn] = useState<SignIn | null>(null);
   const providers = useServerProviders(serverId, { watchStatus: signIn !== null && signIn.kind !== "relay" });
   const { available, admin, status, rows, applyStatus, applyRuntimes, refreshStatus } = providers;
+  const accounts = useServerProviderAccounts(serverId, admin);
+  const refreshAccounts = accounts.refresh;
   const row = rows.find((candidate) => candidate.id === provider);
   const locked = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
@@ -128,6 +143,7 @@ export function ServerProviderScreen() {
               void haptics.notification("error");
             } else void haptics.notification("success");
             void refreshStatus();
+            void refreshAccounts();
             return;
           }
           if (!relay.authorizeUrl || relayReady) return;
@@ -156,7 +172,16 @@ export function ServerProviderScreen() {
       current = false;
       clearInterval(timer);
     };
-  }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus]);
+  }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, refreshAccounts]);
+
+  // The account page asks for a sign-in of one account, which runs here. The request runs once.
+  const requestedAccount = params.signInAccount;
+  const startAccountSignIn = useRef<(account: string) => boolean>(() => false);
+  useEffect(() => {
+    // A sign-in or another action that runs keeps the request until it ends.
+    if (!requestedAccount || !row || pending !== null) return;
+    if (startAccountSignIn.current(requestedAccount)) router.setParams({ signInAccount: undefined });
+  }, [requestedAccount, row, pending]);
 
   if (!available || !admin || !provider || !row)
     return (
@@ -171,7 +196,8 @@ export function ServerProviderScreen() {
       </SettingsContent>
     );
 
-  function startSignIn(method: "code" | "relay") {
+  /** `account` relays the sign-in of an account after the first: a string signs it in again, null adds one. */
+  function startSignIn(method: "code" | "relay", account?: string | null) {
     if (!admin || !provider || locked.current) return;
     setReconnecting(state === "available");
     setSawConnecting(false);
@@ -179,7 +205,10 @@ export function ServerProviderScreen() {
     void run("sign-in", async () => {
       try {
         if (method === "relay") {
-          const flowId = await admin.startRelay(provider);
+          const flowId =
+            account !== undefined && admin.accounts
+              ? await admin.accounts.startRelay(provider, account)
+              : await admin.startRelay(provider);
           if (!mounted.current) {
             void admin.cancelRelay(flowId).catch(() => undefined);
             return;
@@ -213,6 +242,12 @@ export function ServerProviderScreen() {
     });
   }
 
+  startAccountSignIn.current = (account) => {
+    if (signIn !== null || locked.current) return false;
+    startSignIn("relay", account);
+    return true;
+  };
+
   function openPage(url: string) {
     void Linking.openURL(url).catch(() => setError(t("mobile.server.providers.openFailed")));
   }
@@ -239,6 +274,8 @@ export function ServerProviderScreen() {
   const connectable = (!runtime || runtime.phase === "ready") && signIn === null;
   const connect = row.signIn;
   const version = runtime?.version ?? row.status?.version ?? null;
+  // The host lists only a provider that can hold more than one account.
+  const providerAccounts = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts;
   const message = row.status?.message ?? row.status?.checkError ?? null;
 
   return (
@@ -330,6 +367,7 @@ export function ServerProviderScreen() {
                 setSignIn(null);
                 setAddress("");
                 await refreshStatus();
+                void refreshAccounts();
               }
             })
           }
@@ -340,8 +378,19 @@ export function ServerProviderScreen() {
               setCode("");
               setAddress("");
               await applyStatus(await cancelSignIn(admin, provider, current));
+              void refreshAccounts();
             })
           }
+        />
+      ) : null}
+      {providerAccounts && providerAccounts.length > 0 ? (
+        <ProviderAccountsSection
+          serverId={serverId}
+          provider={provider}
+          accounts={providerAccounts}
+          canAdd={signIn === null && connectable && admin.accounts?.canSignIn(provider) === true}
+          busy={busy}
+          onAdd={() => startSignIn("relay", null)}
         />
       ) : null}
       {runtime && runtimeAction ? (
@@ -395,6 +444,56 @@ export function ServerProviderScreen() {
         <ProviderKeySection serverId={serverId} admin={admin} provider={provider} onStatus={applyStatus} />
       ) : null}
     </SettingsContent>
+  );
+}
+
+/** The accounts of the provider on the host. Each agent uses one; its settings choose which. */
+function ProviderAccountsSection({
+  serverId,
+  provider,
+  accounts,
+  canAdd,
+  busy,
+  onAdd,
+}: {
+  serverId: string;
+  provider: AgentProviderId;
+  accounts: readonly ProviderAccountStatus[];
+  canAdd: boolean;
+  busy: boolean;
+  onAdd: () => void;
+}) {
+  const { t } = useText();
+  const accountName = useProviderAccountName();
+  return (
+    <SettingsSection
+      title={t("mobile.server.providers.accounts")}
+      footer={t(canAdd ? "mobile.server.providers.accountsHint" : "mobile.server.providers.accountsOnComputer")}
+    >
+      {accounts.map((account, index) => {
+        const name = accountName(account, index);
+        return (
+          <SettingsRow
+            key={account.id}
+            supportingText={account.email && account.email !== name ? account.email : undefined}
+            trailing={<TrailingValue value={t(providerAccountStateKey(account.state))} />}
+            onPress={() =>
+              router.push({
+                pathname: "/server-settings/provider-account",
+                params: { serverId, provider, accountId: account.id },
+              })
+            }
+          >
+            <Typography.Paragraph numberOfLines={1}>{name}</Typography.Paragraph>
+          </SettingsRow>
+        );
+      })}
+      {canAdd ? (
+        <SettingsRow disclosure={false} disabled={busy} onPress={onAdd}>
+          <Typography.Paragraph className="text-accent">{t("mobile.server.providers.addAccount")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+    </SettingsSection>
   );
 }
 

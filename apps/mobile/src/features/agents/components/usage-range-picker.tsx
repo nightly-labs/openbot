@@ -34,7 +34,14 @@ function clamp(date: string, min: string, max: string): string {
  */
 export function UsageRangePicker({ range, onChange }: { range: UsageRange; onChange: (range: UsageRange) => void }) {
   const { t } = useText();
-  const [period, setPeriod] = useState<(typeof PRESETS)[number] | "custom">(30);
+  // A report can open on a range from another screen: a preset when the range is one, else a custom range.
+  const [period, setPeriod] = useState<(typeof PRESETS)[number] | "custom">(() => {
+    const preset = PRESETS.find((days) => {
+      const last = lastUsageDays(days);
+      return last.startDate === range.startDate && last.endDate === range.endDate;
+    });
+    return preset ?? "custom";
+  });
   const today = lastUsageDays(1).endDate;
   const options = [
     ...PRESETS.map((days) => ({

@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot kon Computerbesturing niet registreren in de configuratie van Codex. Controleer of je Codex-config.toml geldig en beschrijfbaar is en start OpenBot opnieuw. Je kunt Computerbesturing uitzetten in de instellingen van de teamgenoot om zonder door te gaan.",
   "error.provider.codexUnresponsive": "Codex reageerde niet meer, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
+  "error.provider.acpMcpNotLoaded":
+    "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
   "error.provider.endpointsReadOnly":
     "De opgeslagen endpoints zijn geschreven door een nieuwere versie van OpenBot, of het bestand kan niet worden gelezen. Werk OpenBot bij om ze te wijzigen.",
   "error.provider.endpointNoSecureStorage":
@@ -185,6 +187,8 @@ export const messages = {
   "error.provider.cliActivateFailed": "OpenBot kon de beheerde CLI niet activeren.",
   "error.provider.cliBusyReconnect":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en verbind dan opnieuw.",
+  "error.provider.cliBusySignOut":
+    "De {provider}-CLI verwerkt een beurt. Wacht tot die klaar is en verbreek dan de verbinding.",
   "error.provider.opencodeCredentialsRejected":
     "De modelaanbieder heeft de API-sleutel geweigerd. Corrigeer de OpenCode-sleutel in Instellingen, of de sleutel van de aanbieder met `opencode auth login`. Probeer het daarna opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeAuthRequired":
@@ -321,6 +325,7 @@ export const messages = {
   "error.provider.accountsUnsupported": "{provider} kan maar één account hebben.",
   "error.provider.accountNeedsConnection": "Verbind {provider} voordat je nog een account toevoegt.",
   "error.provider.usageResetUnsupported": "{provider} kan gebruikslimieten niet resetten.",
+  "error.provider.signOutUnsupported": "OpenBot kan de {provider}-aanmelding niet verbreken.",
   "error.provider.usageResetNotConnected": "Log opnieuw in bij dit {provider}-account voordat je het gebruik reset.",
   "error.provider.accountLimit": "{provider} kan maximaal {limit} accounts hebben.",
   "error.provider.accountNotFound":

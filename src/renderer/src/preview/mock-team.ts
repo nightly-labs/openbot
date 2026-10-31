@@ -464,8 +464,39 @@ export function createMockTeam(
     },
   };
 
+  const localServersApi: OpenBotDesktopApi["localServers"] = {
+    create: async (name) => {
+      const server: ServerSummary = {
+        id: `local-server-${servers.length + 1}`,
+        name: name.trim(),
+        logoUrl: null,
+        notificationsMuted: false,
+        notificationsMutedUntil: null,
+        notificationLevel: "all",
+        kind: "remote",
+        thisComputer: true,
+        state: "online",
+        apiUrl: "http://127.0.0.1:0",
+        remoteDesktopAvailable: false,
+        role: "owner",
+        active: true,
+      };
+      servers = [...servers.map((candidate) => ({ ...candidate, active: false })), server];
+      emit(serverListeners, servers);
+      return clone(server);
+    },
+    restart: async (serverId) => {
+      if (!servers.some((server) => server.id === serverId && server.thisComputer)) throw new Error("Server not found");
+    },
+    delete: async (serverId) => {
+      servers = servers.filter((server) => server.id !== serverId);
+      emit(serverListeners, servers);
+    },
+  };
+
   return {
     servers: serversApi,
+    localServers: localServersApi,
     /** The server the preview shows, which its agent events belong to. */
     activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,

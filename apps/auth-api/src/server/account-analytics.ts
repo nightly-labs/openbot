@@ -17,6 +17,7 @@ import {
   type HostedServerSize,
 } from "@openbot/contracts/hosted-servers";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
@@ -45,6 +46,18 @@ const BILLING_ACTIONS = [
   "portal_opened",
 ] as const;
 export type BillingAction = (typeof BILLING_ACTIONS)[number];
+/**
+ * The billing actions of an account that pays for a plan or a license. Each one also sets the
+ * account email on the OpenPanel profile, so that a paying account is never anonymous, also when
+ * its apps have product analytics off.
+ */
+const PAID_BILLING_ACTIONS = [
+  "plan_started",
+  "payment_succeeded",
+  "plan_changed",
+  "cancel_scheduled",
+  "cancel_withdrawn",
+] as const satisfies readonly BillingAction[];
 
 const HOSTED_SERVER_ACTIONS = [
   "provisioned",
@@ -151,19 +164,34 @@ export interface AccountAnalyticsOptions {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
   /** Keeps the Worker alive until the send ends (`waitUntil`). */
   schedule: (send: Effect.Effect<void>) => void;
+  /** Reads the account email for the profile of a paying account. */
+  database: D1Database;
 }
 
 class AnalyticsDeliveryError extends Schema.TaggedError<AnalyticsDeliveryError>()("AnalyticsDeliveryError", {}) {}
+
+/** The two OpenPanel requests of the account service. An event body never has an email. */
+type OpenPanelBody =
+  | { type: "track"; payload: { name: string; profileId?: string; properties: AnalyticsProperties } }
+  | { type: "identify"; payload: { profileId: string; email: string } };
+
+/**
+ * The normalized email of an account, for the OpenPanel profile of a paying account. `null` when the
+ * account is gone or its email is not valid.
+ */
+export async function readAccountEmail(database: D1Database, accountId: string): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT email FROM users WHERE id = ?")
+    .bind(accountId)
+    .first<{ email: unknown }>();
+  return typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
+}
 
 export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
   if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  const send = Effect.fn("AccountAnalytics.send")(function* (
-    accountId: string | null,
-    event: AccountAnalyticsEvent,
-    properties: AnalyticsProperties,
-  ) {
+  const post = Effect.fn("AccountAnalytics.post")(function* (body: OpenPanelBody) {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         options.fetch(`${OPENPANEL_API_URL}/track`, {
@@ -173,24 +201,46 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
             "openpanel-client-id": clientId,
             "openpanel-client-secret": clientSecret,
           },
-          body: JSON.stringify({
-            type: "track",
-            payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
-          }),
+          body: JSON.stringify(body),
           signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
         }),
       catch: () => new AnalyticsDeliveryError({}),
     });
-    if (!response.ok) console.warn("Account analytics send failed.", { status: response.status });
+    if (!response.ok) {
+      console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
+        status: response.status,
+      });
+    }
+  });
+  /** Sets the account email on the profile, as the apps do at sign-in. */
+  const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
+    const email = yield* Effect.tryPromise({
+      try: () => readAccountEmail(options.database, accountId),
+      catch: () => new AnalyticsDeliveryError({}),
+    });
+    if (email) yield* post({ type: "identify", payload: { profileId: accountId, email } });
   });
   return {
     track(accountId, event) {
       const properties = accountEventProperties(event);
       if (!properties || (accountId !== null && !ACCOUNT_ID_PATTERN.test(accountId))) return;
+      const send = post({
+        type: "track",
+        payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
+      }).pipe(Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))));
+      const paid = accountId !== null && event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action);
       options.schedule(
-        send(accountId, event, properties).pipe(
-          Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))),
-        ),
+        paid
+          ? Effect.all(
+              [
+                send,
+                identify(accountId).pipe(
+                  Effect.catch(() => Effect.sync(() => console.warn("Account analytics identify failed."))),
+                ),
+              ],
+              { concurrency: 2, discard: true },
+            )
+          : send,
       );
     },
   };

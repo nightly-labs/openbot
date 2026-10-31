@@ -46,10 +46,42 @@ const KEY_EXTENSIONS = {
   // Pi has a built-in DeepSeek provider. A registration with only the key keeps its models, endpoint
   // and thinking levels, which Pi updates (checked in Pi 1.4.0). Pi prefers a DeepSeek key that
   // `/login` stored in auth.json to this apiKey, but the Authorization header replaces either one.
+  // DeepSeek refuses the whole request when a tool `pattern` has an unescaped `[` in a character class,
+  // such as `^[^[\]]*$` from an MCP server (#4037). JSON Schema reads it as ECMA-262, where it is valid;
+  // DeepSeek reads a nested class. Pi sends patterns as they are, so this removes those patterns only.
+  // Values in `const`, `default`, `enum` and `examples` are data, and the keys of `properties` are names,
+  // so they stay as they are.
   deepseek: {
     variable: "OPENBOT_PI_DEEPSEEK_API_KEY",
-    source: `export default function (pi) {${readKey("deepseek", "OPENBOT_PI_DEEPSEEK_API_KEY")}
+    source: String.raw`export default function (pi) {${readKey("deepseek", "OPENBOT_PI_DEEPSEEK_API_KEY")}
   pi.registerProvider("deepseek", { apiKey, headers: { Authorization: "Bearer " + literal } });
+  const nestsClass = (pattern) => {
+    let inClass = false;
+    for (let index = 0; index < pattern.length; index++) {
+      if (pattern[index] === "\\") index++;
+      else if (pattern[index] === "[") {
+        if (inClass) return true;
+        inClass = true;
+      } else if (pattern[index] === "]") inClass = false;
+    }
+    return false;
+  };
+  const DATA = new Set(["const", "default", "enum", "examples"]);
+  const NAMES = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
+  const portable = (value, names = false) => {
+    if (Array.isArray(value)) return value.map((item) => portable(item));
+    if (value === null || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.entries(value).flatMap(([key, item]) => {
+        if (names) return [[key, portable(item)]];
+        if (key === "pattern" && typeof item === "string" && nestsClass(item)) return [];
+        return [[key, DATA.has(key) ? item : portable(item, NAMES.has(key))]];
+      }),
+    );
+  };
+  pi.on("before_provider_request", (event) =>
+    Array.isArray(event.payload?.tools) ? { ...event.payload, tools: portable(event.payload.tools) } : undefined,
+  );
 }
 `,
   },

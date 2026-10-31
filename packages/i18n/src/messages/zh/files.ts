@@ -107,13 +107,15 @@ export const messages = {
   "files.cleanup.canBeCleared": "可清理 {size}",
   "files.cleanup.description.caches": "服务器文件的副本。打开时 OpenBot 会重新下载。",
   "files.cleanup.description.logs": "诊断日志。新的日志会立即开始记录。",
-  "files.cleanup.description.runtimes":
-    "没有助手在用的旧版服务商 CLI。OpenBot 会保留正在使用的版本，以及一个仍然可用的旧版本。",
+  "files.cleanup.description.runtimes": "没有助手在用的旧版服务商 CLI。OpenBot 会保留正在使用的版本。",
+  "files.cleanup.description.runtimeDownloads":
+    "{providers} 的 CLI 下载，以及可能存在的旧版 CLI。没有助手在用它们：这些服务商已关闭，或在使用你安装的 CLI。服务商需要时，OpenBot 会重新下载 CLI。",
   "files.cleanup.clear": "清理",
   "files.cleanup.clearCategory": "清理{category}",
   "files.cleanup.confirm.caches": "清理缓存的服务器文件？",
   "files.cleanup.confirm.logs": "清理日志？",
   "files.cleanup.confirm.runtimes": "移除旧的服务商 CLI 版本？",
+  "files.cleanup.confirm.runtimeDownloads": "移除服务商 CLI 下载？",
   "files.cleanup.confirmDescription": "将释放 {size}。{description}",
   "files.cleanup.clearing": "正在清理…",
   "files.cleanup.failed": "无法清理这些数据。",

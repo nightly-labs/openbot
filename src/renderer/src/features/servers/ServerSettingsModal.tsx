@@ -3,7 +3,6 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
-  ServerNotificationLevel,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -93,9 +92,6 @@ export interface ServerSettingsModalProps {
    * section appears only when a caller supplies this.
    */
   onRotateHostKey?: (() => Promise<void>) | undefined;
-  /** The Notifications section appears only when a caller supplies both: they are desktop notifications. */
-  onSetMuted?: (muted: boolean) => Promise<void>;
-  onSetNotificationLevel?: (level: ServerNotificationLevel) => Promise<void>;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   /**
    * The license of the signed-in account. When the owner invites a person to a full license, the
@@ -237,6 +233,8 @@ export interface ServerHostedSitesOptions {
   onOpenSite: (url: string) => void;
   /** Called as a deletion starts. It returns the call that records the result. */
   trackDelete?: () => (result: HostedSiteDeleteResult) => void;
+  /** Opens the server plans when the server is at its site limit. Only for a user who can buy a plan. */
+  onSeePlans?: (() => void) | undefined;
 }
 
 export type ServerSettingsSection =
@@ -781,6 +779,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 available
                 canDelete={serverRoleCanAdminister(props.server)}
                 onOpenSite={sites().onOpenSite}
+                onSeePlans={sites().onSeePlans}
               />
             </Tabs.Content>
           )}

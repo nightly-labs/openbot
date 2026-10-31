@@ -18,6 +18,17 @@ import {
 import { checkServerUpdate, offerServerUpdate, type ServerUpdateTarget } from "./server-update-flow";
 import { serversPort } from "./servers-port";
 
+/** "true" while the user hides the server on this computer from the server list. */
+const LOCAL_SERVER_HIDDEN_STORAGE_KEY = "openbot:local-server-hidden";
+
+function readLocalServerHidden(): boolean {
+  try {
+    return window.localStorage.getItem(LOCAL_SERVER_HIDDEN_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The workspaces the user can switch between - the local one this computer
  * hosts and every remote team server joined - plus the status of the host this
@@ -56,6 +67,8 @@ const Servers = createSimpleContext({
     const [servers, setServers] = createSignal<ServerSummary[]>([]);
     const [hostStatus, setHostStatus] = createSignal<HostStatus>(FALLBACK_HOST_STATUS);
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
+    /** The dialog that creates a server on this computer. */
+    const [createLocalServerOpen, setCreateLocalServerOpen] = createSignal(false);
     /** Where the user opened the hosted server plans, or null while they are closed. */
     const [addServerEntryPoint, setAddServerEntryPoint] = createSignal<HostedServerEntryPoint | null>(null);
     const addServerOpen = () => addServerEntryPoint() !== null;
@@ -68,6 +81,11 @@ const Servers = createSimpleContext({
     /** True after the hosted servers were read once. Until then, an owned server can be a hosted one. */
     const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
     const [serverLoadRequest, setServerLoadRequest] = createSignal<{ serverId: string; nonce: number } | null>(null);
+    /**
+     * The user's choice to hide the server on this computer. The server menus show the server again
+     * while it is open or while no other server exists; `localServerHidden` keeps only the choice.
+     */
+    const [localServerHidden, setLocalServerHiddenSignal] = createSignal(readLocalServerHidden());
     let loadRequestNonce = 0;
     let pendingCompatibilityRetryServerId: string | null = null;
     let serverSelectionGeneration = 0;
@@ -216,6 +234,9 @@ const Servers = createSimpleContext({
         }
       }
       setServers(value);
+      // Without another server, the server on this computer is the only one. A server that the user
+      // joins later must not hide it.
+      if (!value.some((server) => server.kind === "remote") && untrack(localServerHidden)) setLocalServerHidden(false);
       const retryTarget = value.find(
         (server) => server.id === pendingCompatibilityRetryServerId && server.active && server.state === "online",
       );
@@ -244,6 +265,16 @@ const Servers = createSimpleContext({
         pendingCompatibilityRetryServerId = null;
         loadRequestNonce += 1;
         setServerLoadRequest({ serverId: loadTarget.id, nonce: loadRequestNonce });
+      }
+    }
+
+    function setLocalServerHidden(hidden: boolean): void {
+      setLocalServerHiddenSignal(hidden);
+      try {
+        if (hidden) window.localStorage.setItem(LOCAL_SERVER_HIDDEN_STORAGE_KEY, "true");
+        else window.localStorage.removeItem(LOCAL_SERVER_HIDDEN_STORAGE_KEY);
+      } catch {
+        // Blocked storage keeps the choice until the app restarts.
       }
     }
 
@@ -423,6 +454,8 @@ const Servers = createSimpleContext({
       setHostStatus,
       joinServerOpen,
       setJoinServerOpen,
+      createLocalServerOpen,
+      setCreateLocalServerOpen,
       addServerOpen,
       addServerEntryPoint,
       setAddServerOpen,
@@ -431,6 +464,8 @@ const Servers = createSimpleContext({
       hostedServersLoaded,
       refreshHostedServersAvailable,
       reorderServers,
+      localServerHidden,
+      setLocalServerHidden,
       setServerMuted,
       setServerNotificationLevel,
       retryServerConnection,

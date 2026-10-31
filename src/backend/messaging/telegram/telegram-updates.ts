@@ -55,8 +55,8 @@ export function telegramLink(update: DynamicRecord): TelegramLink | null {
  * - A private chat is one conversation. Every message in it addresses OpenBot.
  * - In a group, a message that mentions the bot, or a reply to the bot, starts or continues the
  *   conversation of its reply chain. Another message in a chain counts only in a conversation that
- *   an agent already answers (`requiresLink`). With privacy mode on, Telegram sends the bot only
- *   mentions, replies to it and commands.
+ *   an agent already answers (`requiresLink`). The bot has privacy mode off, so Telegram sends every
+ *   group message: privacy mode drops a plain mention to a bot that is not a group admin.
  * - The conversation key: a supergroup gives each reply chain a `message_thread_id`, the ID of its
  *   first message. A forum topic is one conversation. A basic group has no thread IDs, so the chain
  *   comes from the reply map in `TelegramChatState`.

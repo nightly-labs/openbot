@@ -41,6 +41,8 @@ export interface LocalMcpSession {
     headers: Array<{ name: string; value: string }>;
   }>;
   setThreadId(threadId: string): void;
+  /** Whether the client sent a request to each of `servers` since the session opened. */
+  reached(): boolean;
   close(): void;
 }
 
@@ -95,6 +97,8 @@ interface BridgeRoute {
    * carries `notifications/cancelled` cannot reach the call through the SDK and finds it here.
    */
   running: Map<RequestId, AbortController>;
+  /** Whether the client sent a request with this token. */
+  reached: boolean;
 }
 
 export class LocalMcpBridge {
@@ -144,7 +148,7 @@ export class LocalMcpBridge {
         shared.members.push(member);
       } else {
         token = randomBytes(32).toString("base64url");
-        this.#routes.set(token, { namespace, members: [member], shareKey, call, running: new Map() });
+        this.#routes.set(token, { namespace, members: [member], shareKey, call, running: new Map(), reached: false });
         if (shareKey !== null) this.#shared.set(shareKey, token);
       }
       tokens.push(token);
@@ -160,6 +164,7 @@ export class LocalMcpBridge {
       setThreadId: (nextThreadId) => {
         member.threadId = nextThreadId;
       },
+      reached: () => tokens.every((token) => this.#routes.get(token)?.reached === true),
       close: () => {
         for (const token of tokens) {
           const route = this.#routes.get(token);
@@ -261,6 +266,7 @@ export class LocalMcpBridge {
       response.end(JSON.stringify({ error: "unauthorized" }));
       return;
     }
+    route.reached = true;
     if (request.method !== "POST") {
       response.writeHead(405, { allow: "POST" });
       response.end();

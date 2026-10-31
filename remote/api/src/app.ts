@@ -37,10 +37,12 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
 import { type DiscordApi, type DiscordUpload, decodeDiscordApiRequest } from "./discord-api";
+import type { SignalEntry } from "./entry";
 import { SLACK_DELIVERY_BODY_BYTES_LIMIT, type SlackDeliveryKind } from "./protocol";
 import type { SignalService, SignalSocket, SignalTokens, SlackDeliveryResponse } from "./signal-service";
 import { telegramFailure } from "./telegram";
 import { verifySlackSignature, verifyWebhookSignature } from "./tokens";
+import type { TurnRelays } from "./turn-relays";
 
 const SLACK_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SLACK_RETRY_REASON_PATTERN = /^[a-z0-9_]{1,64}$/u;
@@ -72,11 +74,28 @@ const slackRequestSchema = z.object({
     .catch(undefined),
 });
 
-// The only parts of a Telegram update that Signal reads: the chat, the callback query, and the text
-// of a message, only to find a link code.
-const telegramChatSchema = z.object({ id: z.int() });
+// The only parts of a Telegram update that Signal reads: the chat, the callback query, the text of a
+// message, only to find a link code, and, to know whether a message can address OpenBot, the chat
+// type, the entity types, and whether it replies, is in a thread, or renames or leaves the chat.
+const telegramChatSchema = z.object({ id: z.int(), type: z.string().optional().catch(undefined) });
+const telegramEntitiesSchema = z
+  .array(z.object({ type: z.string() }))
+  .optional()
+  .catch(undefined);
 const telegramUpdateSchema = z.object({
-  message: z.object({ chat: telegramChatSchema, text: z.string().optional() }).optional(),
+  message: z
+    .object({
+      chat: telegramChatSchema,
+      text: z.string().optional(),
+      entities: telegramEntitiesSchema,
+      caption_entities: telegramEntitiesSchema,
+      reply_to_message: z.unknown().optional(),
+      message_thread_id: z.unknown().optional(),
+      new_chat_title: z.unknown().optional(),
+      left_chat_member: z.unknown().optional(),
+      migrate_to_chat_id: z.unknown().optional(),
+    })
+    .optional(),
   edited_message: z.object({ chat: telegramChatSchema }).optional(),
   callback_query: z.object({ id: z.string(), message: z.object({ chat: telegramChatSchema }).optional() }).optional(),
   my_chat_member: z.object({ chat: telegramChatSchema }).optional(),
@@ -127,12 +146,27 @@ export function createRemoteApiApp(
   config: RemoteApiConfig,
   signal: SignalService,
   runtime: ManagedRuntime.ManagedRuntime<SignalTokens, never>,
-  // Null when Signal has no Discord bot token: the Discord route answers 503.
-  discord: DiscordApi | null = null,
+  turnRelays: TurnRelays,
+  // The bots and `ingress` sockets go to the entry machine only. Another machine answers their webhooks 503.
+  entry: SignalEntry,
+  // Null when Signal has no Discord bot token, or while the Gateway is stopped because this machine is
+  // not the entry: the Discord route answers 503.
+  discordApi: () => DiscordApi | null = () => null,
 ) {
   const app = new Elysia()
     .get("/health/live", () => ({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }))
     .get("/health/ready", () => ({ service: "openbot-remote-api", status: "ready" }))
+    // For the status page: Signal can answer while the TURN relay refuses every allocation. This is the
+    // relay of `TURN_HOST`; the Signal on the machine of each other relay reports that relay. The route is
+    // public, so the probe result is kept for a minute (`TurnRelays`).
+    .get("/health/turn", async ({ set }) => {
+      const result = await runtime.runPromise(turnRelays.localProbe.pipe(Effect.result));
+      if (Result.isSuccess(result)) return { service: "openbot-turn", status: "ready" };
+      set.status = 503;
+      return result.failure.reason === "full"
+        ? { error: { code: "turn_full", message: "The TURN relay has no free allocation." } }
+        : { error: { code: "turn_unavailable", message: "The TURN relay did not allocate a relay address." } };
+    })
     .post("/internal/auth-events", async ({ request, set }) => {
       const timestamp = request.headers.get("OpenBot-Timestamp") ?? "";
       const signature = request.headers.get("OpenBot-Signature") ?? "";
@@ -169,7 +203,7 @@ export function createRemoteApiApp(
     .post(
       SLACK_EVENTS_PATH,
       async ({ request, server }) => {
-        if (config.slackSigningSecrets.length === 0) return slackResponse({ status: 503 });
+        if (config.slackSigningSecrets.length === 0 || !entry.isEntry) return slackResponse({ status: 503 });
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
         if (!Number.isFinite(declaredLength) || declaredLength > SLACK_DELIVERY_BODY_BYTES_LIMIT) {
           return slackResponse({ status: 413 });
@@ -222,6 +256,7 @@ export function createRemoteApiApp(
     .post(
       `${WEBHOOK_EVENTS_PATH}/:routeId`,
       async ({ request, params, server }) => {
+        if (!entry.isEntry) return webhookResponse(503);
         const routeId = params.routeId;
         if (!WEBHOOK_ROUTE_ID_PATTERN.test(routeId)) return webhookResponse(404);
         const declaredLength = Number(request.headers.get("content-length") ?? "0");
@@ -263,6 +298,7 @@ export function createRemoteApiApp(
     .post(
       DISCORD_API_PATH,
       async ({ request }) => {
+        const discord = discordApi();
         if (!discord) return discordError(503, "unavailable");
         const token = DISCORD_SESSION_PATTERN.exec(request.headers.get("authorization") ?? "")?.[1];
         const session = token ? signal.discordCaller(token, null) : null;
@@ -287,10 +323,12 @@ export function createRemoteApiApp(
     // The webhook of each OpenBot Telegram bot. Signal checks the bot's secret header, reads only the
     // chat, the callback query and a link code, and passes the exact body to the ingress socket of
     // the chat's host. Nothing here stores or logs the body. A signed update is always answered 200:
-    // Telegram holds back the bot's other updates while one fails.
+    // Telegram holds back the bot's other updates while one fails. A machine that is not the entry
+    // answers 503, and Telegram sends the update again through the entry name.
     .post(
       `${TELEGRAM_UPDATES_PATH}/:botId`,
       async ({ params, request, server }) => {
+        if (!entry.isEntry) return emptyResponse(503);
         const telegram = signal.telegram;
         const botId = params.botId;
         if (!telegram?.bot.hasBot(botId)) return emptyResponse(404);
@@ -588,9 +626,34 @@ function telegramUpdate(
     chatId,
     callbackQueryId: callbackQueryId.length > 0 && callbackQueryId.length <= 128 ? callbackQueryId : null,
     linkCode: update.message?.text?.match(TELEGRAM_START_PATTERN)?.[1] ?? null,
-    // A message or a button press can start a hosted server that sleeps; a member change cannot.
-    wakes: update.message !== undefined || update.callback_query !== undefined,
+    wakes:
+      update.callback_query !== undefined || (update.message !== undefined && telegramMessageWakes(update.message)),
   };
+}
+
+// Entity types that can name OpenBot: `@username`, a mention of a user without a username, and a
+// command such as `/stop@bot`. Signal reads only the type, not the text, so a mention of another
+// person also counts.
+const TELEGRAM_ADDRESSING_ENTITIES = new Set(["mention", "text_mention", "bot_command"]);
+
+/**
+ * True when a message can address OpenBot, so it can start a hosted server that sleeps: a direct
+ * message, a reply, a message in a thread, a message with a mention or a command, or a rename or a
+ * removal that the host must see. The bot gets every group message, and the host answers none of the
+ * others.
+ */
+function telegramMessageWakes(message: NonNullable<z.output<typeof telegramUpdateSchema>["message"]>): boolean {
+  return (
+    message.chat.type === "private" ||
+    message.reply_to_message !== undefined ||
+    message.message_thread_id !== undefined ||
+    message.new_chat_title !== undefined ||
+    message.left_chat_member !== undefined ||
+    message.migrate_to_chat_id !== undefined ||
+    [...(message.entities ?? []), ...(message.caption_entities ?? [])].some((entity) =>
+      TELEGRAM_ADDRESSING_ENTITIES.has(entity.type),
+    )
+  );
 }
 
 function decodeAuthEvent(body: string): RemoteAuthEvent | null {
@@ -602,9 +665,21 @@ function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   }
 }
 
-export function prometheusMetrics(signal: SignalService): string {
+export function prometheusMetrics(signal: SignalService, turnRelays: TurnRelays, entry: SignalEntry): string {
   const metrics = signal.metrics();
+  const relays = turnRelays.states().filter((relay) => relay.available !== null);
+  const entryLabel = entry.signalId ? `{signal="${entry.signalId}"}` : "";
   return [
+    // 1 while this machine is the entry, 0 while another machine is. Absent without the entry rule.
+    ...(entry.enabled
+      ? [
+          "# TYPE openbot_remote_signal_entry gauge",
+          `openbot_remote_signal_entry${entryLabel} ${entry.isEntry ? 1 : 0}`,
+        ]
+      : []),
+    // 1 when the last probe of the relay allocated, 0 when it failed. A relay that has no probe yet is absent.
+    "# TYPE openbot_remote_turn_relay_available gauge",
+    ...relays.map((relay) => `openbot_remote_turn_relay_available{host="${relay.host}"} ${relay.available ? 1 : 0}`),
     "# TYPE openbot_remote_signal_sockets gauge",
     `openbot_remote_signal_sockets ${metrics.activeSockets}`,
     "# TYPE openbot_remote_peer_connections gauge",

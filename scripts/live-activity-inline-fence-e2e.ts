@@ -29,8 +29,11 @@ const CASES = [
     input: "```npm install``` first.\nThen restart the app.",
     expected: "```npm install``` first. Then restart the app.",
   },
-  { name: "backtick-fence", input: "```js\nconst x = 1;\n```\nDone.", expected: "`const x = 1;` Done." },
-  { name: "tilde-fence-info-backtick", input: "~~~ uses `tick`\nx\n~~~\nDone.", expected: "`x` Done." },
+  // The detail shows the lead of a reply, so a code block gives way to the prose after it.
+  { name: "backtick-fence", input: "```js\nconst x = 1;\n```\nDone.", expected: "Done." },
+  { name: "tilde-fence-info-backtick", input: "~~~ uses `tick`\nx\n~~~\nDone.", expected: "Done." },
+  // A reply with no prose shows its code.
+  { name: "backtick-fence-only", input: "```js\nconst x = 1;\n```", expected: "`const x = 1;`" },
 ];
 const SOURCES = [
   "scripts/live-activity-inline-fence-e2e.ts",
@@ -40,6 +43,7 @@ const SOURCES = [
   "packages/team-client/src/agent-message-text.ts",
   "packages/team-client/src/live-activity-props.ts",
   "packages/team-client/src/live-activity-text.ts",
+  "packages/team-client/src/message-summary.ts",
   "packages/team-client/src/live-activity-seal.ts",
   "apps/mobile/src/features/live-activity/model/live-activity-open.ts",
 ];
@@ -206,7 +210,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
     assert.equal(result.relayPushes, 0);
     assert.equal(events.listenerCount("event"), 1);
     service.disconnected("fixture-session");
-    assert.equal(service.showsEvent("fixture-session", null, null), true);
+    assert.equal(service.showsEvent("fixture-session", { agentId: "fixture-agent", kind: "reply" }, null, null), true);
     result.stage = "relay";
     const push = await received;
     result.relay = { event: push.event, sealedLength: push.sealed?.length ?? 0, priority: push.priority };
@@ -242,7 +246,12 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
         // dispose closes the send scope and clears the registration's retry/keepalive timer.
         await Effect.runPromise(service.dispose());
         result.cleanup.disposeCompleted = true;
-        result.cleanup.registrationRemoved = !service.showsEvent("fixture-session", null, null);
+        result.cleanup.registrationRemoved = !service.showsEvent(
+          "fixture-session",
+          { agentId: "fixture-agent", kind: "reply" },
+          null,
+          null,
+        );
       }
     } catch {
       result.passed = false;

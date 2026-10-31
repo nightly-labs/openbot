@@ -66,11 +66,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
+  "error.backend.channelTaskNotStopped": "Yalnızca durdurulmuş veya başarısız bir görev iptal edilebilir.",
   "error.backend.channelSelectAgent": "Bir ajan seçin.",
   "error.backend.channelLeadRequired": "Kullanılabilir bir kanal lideri seçin veya bu görevi bir üyeye atayın.",
   "error.backend.channelRoutingTooLong":
     "Bu istek yönlendirme bağlamı sınırını aşıyor. Bir üye seçin veya daha kısa bir istek gönderin.",
   "error.backend.channelTaskMemberRequired": "Bu görev için bir üye seçin.",
+  "error.backend.channelTaskStopped": "Durduruldu. Bu göreve devam edin veya yeniden atayın.",
+  "error.backend.channelRoutingUnreadable": "Lider bu mesajı yönlendiremedi. Bir üyeye yeniden atayın.",
   "error.backend.channelRoutingFailed": "Yönlendirme başarısız oldu. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadTimedOut": "Kanal lideri zamanında yanıt vermedi. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadFailed": "Kanal lideri bu mesajı yönlendiremedi. Bir üye seçin veya tekrar deneyin.",
@@ -184,6 +187,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Bir beklemeyi yalnızca rutinlerinizden birinin çalıştırılması uyandırır ve hiç rutininiz yok. openbot.create_routine ile bir rutin oluşturun, ardından beklemeyi açın.",
   "error.backend.agentWaitRemoteUnsupported": "Açık beklemeler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Bir mesajı okunmadı olarak işaretleme yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
@@ -324,6 +329,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Bu ajanın {count} açık mesaj dizisi var. Bir mesaj dizisini arşivleyin, ardından başka birini başlatın veya geri yükleyin.",
   "error.backend.threadRemoteUnsupported": "Mesaj dizileri yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.branchSourceBusy": "Bu sohbeti dallandırmadan önce geçerli turu durdurun.",
+  "error.backend.branchMessageNotFound": "Yalnızca ajanın tamamlanmış bir yanıtından dallandırabilirsiniz.",
+  "error.backend.branchRemoteUnsupported": "Dallar yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
   "error.backend.threadMoveRefused":
     "Yeni bir mesaj dizisinde yalnızca, doğrudan ve tek başına bu ajana gönderdiğiniz bir mesaj çalışabilir.",
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",

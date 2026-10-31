@@ -107,8 +107,22 @@ export const messages = {
   "server.add.custom.description":
     "Obtén infraestructura dedicada, almacenamiento adicional o funciones adaptadas a tu forma de trabajar.",
   "server.add.custom.action": "Contáctanos",
-  "server.add.join.title": "¿Tienes una invitación?",
   "server.add.join.action": "Unirse a un servidor",
+  "server.add.otherOptions": "Otras opciones",
+  "server.local.createTitle": "Nuevo servidor en este equipo",
+  "server.local.createDescription":
+    "El servidor tiene sus propios agentes, chats y archivos. Se ejecuta en este equipo.",
+  "server.local.nameLabel": "Nombre del servidor",
+  "server.local.create": "Crear servidor",
+  "server.local.creating": "Creando servidor…",
+  "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.limitReached":
+    "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
+  "server.local.deleteConfirmTitle": "¿Eliminar {name}?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot detiene el servidor y mueve sus agentes, chats y archivos a la papelera.",
+  "server.local.deleting": "Eliminando servidor…",
+  "server.local.deletedTitle": "{name} eliminado",
   "server.add.limit.title": "Esta cuenta tiene el número máximo de servidores",
   "server.add.limit.description": {
     one: "Una cuenta puede tener {count} servidor de pago. Para añadir un servidor, elimina uno primero.",
@@ -175,6 +189,7 @@ export const messages = {
   "server.rail.addRemote": "Añadir servidor remoto",
   "server.rail.add": "Añadir un servidor",
   "server.rail.buttonLabel": "Servidor {name}",
+  "server.rail.thisComputer": "en este equipo",
   "server.rail.notificationsMuted": "notificaciones silenciadas",
   "server.rail.actions": "Acciones del servidor",
   "server.rail.unmute": "Dejar de silenciar",
@@ -185,6 +200,8 @@ export const messages = {
   "server.rail.restart": "Reiniciar servidor",
   "server.rail.leave": "Abandonar servidor",
   "server.rail.delete": "Eliminar servidor",
+  "server.rail.hide": "Ocultar servidor",
+  "server.rail.showLocal": "Mostrar {name}",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",
@@ -286,13 +303,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Ve y controla este Mac desde otro equipo.",
   "server.settings.later": "Más tarde",
   "server.settings.setUp": "Configurar",
-  "server.settings.notifications": "Notificaciones",
-  "server.settings.muteNotifications": "Silenciar notificaciones",
-  "server.settings.muteDescription":
-    "Detén las notificaciones de escritorio, los sonidos y las actualizaciones en la muesca del MacBook de este servidor.",
-  "server.settings.mutedUntilDescription": "{until}. Desactiva para volver a recibir notificaciones ahora.",
-  "server.settings.notifyAbout": "Notificarme sobre",
-  "server.settings.notifyAboutDescription": "Qué eventos de los agentes muestran una notificación de escritorio.",
   "server.settings.agents": "Agentes",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
@@ -323,6 +333,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "La clave actual y la nueva firman un traspaso. Las apps de los miembros cambian a la nueva clave cuando se vuelven a conectar. Hazlo si el archivo de la clave se copió o quedó expuesto.",
   "server.settings.hostKeyRotated": "Clave del servidor cambiada",
+  "server.settings.hostKeyChanged": "Último cambio",
+  "server.settings.hostKeyChangedDescription": "{date}. La clave anterior y la clave nueva firmaron este cambio.",
   "server.settings.hostKeyLocalOnly": "Aquí solo el servidor de este ordenador puede cambiar su clave.",
   "server.settings.removeTitle": "Eliminar servidor",
   "server.settings.removeDescription":

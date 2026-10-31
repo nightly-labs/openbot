@@ -1,6 +1,6 @@
 import type { FirstTouch } from "@openbot/contracts/first-touch";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
-import { isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   isUuidV4,
   normalizeEmailAddress,
@@ -84,6 +84,20 @@ class AuthDependencies extends Context.Service<
     attribution: AccountAttribution | null;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
+
+export interface AnalyticsAnswer {
+  enabled: boolean;
+  ageMs: number;
+}
+
+/** The body of an analytics answer, or null when it is not valid. A missing age is an answer of now. */
+export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null {
+  if (!isBoolean(body.enabled)) return null;
+  if (body.ageMs === undefined) return { enabled: body.enabled, ageMs: 0 };
+  return isNumber(body.ageMs) && Number.isSafeInteger(body.ageMs) && body.ageMs >= 0
+    ? { enabled: body.enabled, ageMs: body.ageMs }
+    : null;
+}
 
 export class AuthService {
   readonly #layer: Layer.Layer<AuthDependencies>;
@@ -382,6 +396,36 @@ export class AuthService {
       yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
       const updated = yield* dependencies.repository.updateUserName(user.id, validation.name, now);
       if (user.name !== updated.name) yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      return updated;
+    },
+    (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * Saves the latest product analytics answer of the account, so each device of the user follows it.
+   * `ageMs` is how long the answer waited on the device. The server clock dates it, so a wrong device
+   * clock cannot make an old answer replace a newer one.
+   */
+  readonly updateAnalytics = Effect.fn("AuthService.updateAnalytics")(
+    function* (
+      this: AuthService,
+      sessionToken: string,
+      answer: AnalyticsAnswer,
+    ): Effect.fn.Return<AuthUser, AuthWorkflowFailure, AuthDependencies> {
+      const dependencies = yield* AuthDependencies;
+      const user = yield* this.authenticate(sessionToken);
+      if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
+      const now = dependencies.now();
+      yield* this.#enforceRateLimit(`profile:user:${user.id}`, 20, now);
+      const updated = yield* dependencies.repository.updateUserAnalytics(
+        user.id,
+        answer.enabled,
+        now - answer.ageMs,
+        now,
+      );
+      if (user.analyticsEnabled !== updated.analyticsEnabled) {
+        yield* dependencies.profileChanged(user.id).pipe(Effect.catch(() => Effect.void));
+      }
       return updated;
     },
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),

@@ -17,8 +17,12 @@ one `query` string, because models often send one string. Up to three strong res
 queries that contain each word of the tool name without its namespace, include the original schema and guidance, so the agent can call them
 without a describe step. Each model step sends the full context again, so one step less saves more
 input than the added schema costs. A query word that is only in the namespace, or one shared verb
-such as "read", does not make a result strong. The other results have a short description only. `tool_describe`
-returns the original schemas for up to ten qualified names, plus guidance from
+such as "read", does not make a result strong. The other results have a short description only. When a
+strong result is an `openbot_browser` tool, the results also include `openbot_browser.run_script` with its
+schema. Agents search for the single actions that they know, such as click, and otherwise do not find the
+multi-step tool (see [Browser](browser.md)). The instructions
+tell the agent to describe a tool only when no search result gave its schema. `tool_describe` accepts `names`, or
+one `name` string, and returns the original schemas for up to ten qualified names, plus guidance from
 `agent/tool-guidance.ts`. Identical guidance appears once per response. The initial catalog lists
 names without schemas.
 
@@ -201,7 +205,11 @@ artifact and preserves the old runtime, so a release that does not start leaves 
 in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
-automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
+automatically discovered system CLI. When the managed copy wins, `resolveInstalledFirst` in
+`src/backend/cli.ts` also resolves with no managed copy, at the same time, and a system CLI of the same or a newer
+version runs instead: the user's CLI on `PATH` replaces a copy that is not newer. A version that
+cannot be compared, such as two Cursor builds of one date, keeps the managed copy. Antigravity has
+no `PATH` discovery, so it always runs the managed copy. Updates never run the system CLI's updater. An explicit path
 suppresses managed update offers. Startup uses the same selection and reads the executable's version.
 On macOS and Linux, discovery looks in the folders of the login-shell `PATH` (`loginSearchPath` in
 `src/backend/cli.ts`, shared with ACP and custom agents and cached for 60 s), then in fixed user
@@ -264,7 +272,10 @@ agent service has to be given the executable either way. Staging directories car
 random suffix and are swept by age, never by name, so a sibling's install is not collected while it
 runs. The manager stamps each version it takes into use -- the pinned one it verified, and the older
 one it falls back to until the pinned one arrives -- and collection keeps anything stamped within two
-days. When the computer has been awake for one check interval (one hour), the update check keeps
+days. Once the version it runs is `ready`, the manager keeps no older version to fall back on and stops
+stamping the one it replaced, so that version goes when its last stamp leaves the window. Before
+this, the store kept the last working older version of each CLI for good, and every update left two
+copies on disk. When the computer has been awake for one check interval (one hour), the update check keeps
 only what was stamped within three hours. So a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
@@ -284,6 +295,15 @@ stamps the version it activates, so an install it made in the same session is it
 provider that is off is not stamped, a sibling can collect its version; turning the provider on
 reads the store again when that version is gone. Turning the provider on later downloads the CLI as
 on first use.
+
+Server settings > Storage shows the same downloads in its "Provider runtimes" cleanup row, for this
+computer only. `removableRuntimes` answers the old versions and the download of each provider that is
+off, counts a directory that is both once, and names those providers; a provider whose download runs
+is left out. A provider that is on keeps its copy unless main reported a system version for it
+(`setSystemVersion`): it then runs the user's CLI, so its copy runs nothing and counts as removable.
+The row never moves a running provider to another CLI. `removeRemovableRuntimes` collects the old versions, then calls `removeDownload`
+for each named provider at once, so each follows the rules above. A failure does not stop the
+others; the error names the providers that failed, and the page measures again.
 
 ### Managed provider updates
 
@@ -319,8 +339,10 @@ Each provider status row reports `cliSource`, and main passes the version of a `
 it compares a managed installation. The row and the notification therefore use the one update offer,
 the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
 runs behind it, whoever owns the CLI: the download installs the managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+`updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
+Later resolutions keep that copy while it is newer than the system install, which is left where it
+is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+`providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
 the binary, not from the client that runs it, so a provider that is signed out still reports its own
@@ -400,6 +422,17 @@ drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driv
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
 buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
 split is a product rule rather than a check.
+
+The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
+sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
+applies config `options.apiKey` last. With no saved key, it reads the CLI's own keys in the order
+T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
+self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
+(or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
+Console key tries the Go key. The
+database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
+SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
 `PREFERRED_MODEL_ORDER` (in the same file) reorders that catalog, because a provider with no
 `defaultProviderModel` runs the first model of its list and OpenCode reports the third-party
@@ -500,7 +533,7 @@ callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session 
 VM. A browser on another computer cannot complete this loopback callback. A server with no
 desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
 
-The local Settings > Providers screen offers Connect for both a managed runtime and an
+The local Server settings > Providers screen offers Connect for both a managed runtime and an
 external runtime. Gemini has no device-code flow, so a remote host signs it in on a page in its
 own browser. A Linux host advertises `provider-host-sign-in-v1` (Team API v7 only). Connect sends
 `start` to the host. The host runs the same sign-in as its own Connect, and opens the Google link
@@ -565,8 +598,9 @@ The account sign-in is the same ACP `authenticate` call as the first account's; 
 `logout` first. So a Reconnect refuses while an agent on the account runs a turn, and it stops the
 account's idle agent processes, which keep the old token. A saved Gemini API key belongs to the
 first account: an account process never gets `GEMINI_API_KEY`. The server reports no email and the token file holds none, so OpenBot cannot see
-that two accounts are the same Google account. A joined server signs the account in through the
-live view, because `provider-account-relay-v1` names Codex and Claude only.
+that two accounts are the same Google account. A joined server relays the account's sign-in to the
+client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
+names Codex and Claude only, signs the account in through the live view.
 
 From 1.4.1 the server answers a prompt that starts with `/usage` itself, without a model turn: it
 reads the Google account's quota summary and sends one Markdown answer. The driver's
@@ -842,6 +876,34 @@ a refused `turn/start`, and a provider that fails to start do not fail over. A m
 most once for each model that failed it, so a move that cannot happen shows the error on the next
 failure; the check for a ready backup runs again when the turn ends.
 
+### Usage read pacing
+
+Each desktop window, web tab and phone polls the plan usage every five minutes, and each poll reaches
+the host. A usage endpoint allows few requests an hour for each login: Claude's is shared with Claude
+Code and answers HTTP 429 for an hour or more when a client asks too often. So `UsageReadGate`
+(`src/backend/agent/usage-read-gate.ts`) paces the reads of each provider's own sign-in in
+`ProviderRuntime.usage`, and of each account after the first in `ProviderAccounts.usage`. One read runs
+at a time; a request that comes during it waits and takes its reading. A reading answers for four
+minutes, a little less than the poll, so one view still gets a new reading at each poll. After a failed
+read, the next one waits 5 minutes, then 10, 20 and 40, up to an hour. Between reads and during the wait,
+the last reading stays on the rail, also when one of its windows has reset.
+A window that resets after the last read starts a read before the four minutes end, but not during the
+wait after a failure; a window that had already reset when the provider sent the reading does not.
+
+A read outside the poll of the provider's own sign-in, with the dock's model, also counts: when Codex
+starts, its reading replaces the kept one and the next poll does not read again. The read after a usage
+limit has no model, so for a provider whose limits depend on the model it resets the gate, and the next
+poll reads. These reads, and the reads of a usage reset, are not paced. A credential change, another
+login, a sign-out, turning the provider off or a new key resets the gate and forgets the kept reading and
+reset credits, so the next poll reads at once and no view shows the old login's reading; a read that
+started before the reset does not set the next read time. An account check or a usage reset of an
+account after the first also counts as a read.
+
+The values follow t3code (one refresh in five minutes for each host, one at a time) and openusage (5
+minutes, doubling up to an hour). CodexBar and openusage first wait for `Retry-After`; the Claude Agent
+SDK and the Codex app-server do not give OpenBot that header, so the gate uses only the doubling.
+`scripts/usage-read-pacing-e2e.ts` checks the gate with a fake Codex.
+
 ### Usage reset credits
 
 Codex can give an account usage reset credits: one restores the spent usage limits of the account at
@@ -849,8 +911,8 @@ once (issue #2859). `account/rateLimits/read` counts them in `rateLimitResetCred
 and `account/rateLimitResetCredit/consume` spends one; both are stable Codex app-server methods since
 0.156.0. `ProviderRuntime.#refreshUsage` keeps the count of each client with its usage reading.
 `usageResets` reads the provider's own sign-in again while its process runs, and keeps the last count
-while it is released; an account after the first uses the reading that the dock keeps for five
-minutes. An account whose reading has no count is left out. `resetUsage` sends the consume with a new
+while it is released; an account after the first uses the reading that the dock keeps (see
+[Usage read pacing](#usage-read-pacing)). An account whose reading has no count is left out. `resetUsage` sends the consume with a new
 `idempotencyKey` for each reset the user asks for, through the running client, an agent's process or a
 short one in the account's folder. Then it reads the account's usage again and sends `usage-changed`.
 After the answer `reset`, or `nothingToReset` (no limit of the account is spent), `AgentService` calls
@@ -859,6 +921,23 @@ After the answer `reset`, or `nothingToReset` (no limit of the account is spent)
 Settings > Providers shows **Reset usage** in the ⋯ menu of a connected account that has a credit.
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
+
+### Disconnect the own sign-in
+
+Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,
+Codex, Grok, Muse and Cursor (issue #3487). Claude and Codex have an `accounts.signOut` command
+(`claude auth logout`, `codex logout`), which also signs out an account folder before its removal.
+Grok, Muse and Cursor have a driver `signOut` (`grok logout`, `muse logout`, `cursor-agent logout`)
+for the own sign-in only. Muse offers it only on this computer with no OpenBot key saved
+(`apiKeyInUse`): the key keeps Muse connected, and the key dialog removes it. Cline, Gemini and Pi have no sign-out command.
+`ProviderRuntime.signOutProvider` refuses while the provider runs a turn, cancels a
+sign-in, and runs that command with no home variable, so it signs out the user's own home folder.
+On this computer a terminal CLI shares that folder and the macOS keychain item, so it signs out too;
+the confirmation says so. Then OpenBot stops the client and reports the provider signed out, as a
+Gemini Reconnect does. A failed sign-out keeps the client and shows its reason. Agents keep the own
+sign-in and wait for a Reconnect. The accounts after the first and their folders stay, but they
+need the connected CLI, so they wait too. A joined server uses the optional `provider-sign-out-v1`
+route.
 
 ## Provider settings and the ACP registry
 
@@ -974,8 +1053,10 @@ remain valid; the names are reserved only for new custom-agent creation.
 
 Optional `providers-v5` routes include the new runtimes and write-only provider keys.
 `agent-session-settings-v1` adds read, set, reset, and an agent-ID-only invalidation event.
-`acp-registry-v1` adds registry administration. Each administrative route checks the host role;
-clients hide unsupported controls. MCP-over-ACP transport is outside this change.
+`acp-registry-v1` adds registry administration. `custom-agents-v1` lists, adds, replaces and removes
+the host's custom agents with the parsers and change service of the local Settings; the trial start
+and the usage answers stay local. Each administrative route checks the host role; clients hide
+unsupported controls. MCP-over-ACP transport is outside this change.
 
 ## Local context indication
 

@@ -77,6 +77,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useAgentColorMessages } from "@/features/settings/model/message-color";
+import { canReadAloud, stopReadAloud } from "@/features/voice/model/message-reading";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -121,8 +122,8 @@ const OPENING_ROWS_TO_USER = 12;
 const ROW_STYLE = { paddingBottom: CHAT_ROW_GAP };
 /** The side padding of the list. */
 const LIST_PADDING = 16;
-/** A user's message is at most this part of the list width, as `max-w-[88%]` on its row. */
-const USER_BUBBLE_WIDTH = 0.88;
+/** A user's message is at most this part of the list width, as `max-w-[92%]` on its row. */
+const USER_BUBBLE_WIDTH = 0.92;
 
 /** The list keeps the sizes it measured by message, so rows that stay keep their place when the data changes. */
 function rowKey(message: VisibleMessage): string {
@@ -568,6 +569,7 @@ const MessageRow = memo(function MessageRow({
       <ChatQuestionPrompt
         key={message.id}
         prompt={message.prompt}
+        uiBlock={message.uiBlock}
         controller={questionForm}
         canSend={canSend}
         onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}
@@ -647,7 +649,7 @@ const MessageRow = memo(function MessageRow({
             animateSize={shared.textReveal}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle || memberColor ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[92%]" : "max-w-full"}`
                 : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
@@ -711,7 +713,7 @@ const MessageRow = memo(function MessageRow({
           ? "max-w-full self-start gap-1"
           : message.attachments?.length
             ? "max-w-full self-end gap-1"
-            : "max-w-[88%] self-end gap-1"
+            : "max-w-[92%] self-end gap-1"
       }
     >
       {message.replyToMessageId ? (
@@ -758,6 +760,7 @@ const MessageRow = memo(function MessageRow({
           onReply={shared.canReply ? () => actions.reply(message) : undefined}
           onSelectText={selectable ? () => actions.selectText(message) : undefined}
           selecting={selecting}
+          readAloudId={canReadAloud && message.author === "agent" ? message.id : undefined}
         />
       ) : null}
     </View>
@@ -965,6 +968,8 @@ export const ChatMessageList = memo(function ChatMessageList({
     [messages, messageAliases, referenceMessages],
   );
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  // A message that reads aloud stops when its chat closes.
+  useEffect(() => stopReadAloud, []);
   useEffect(() => {
     let active = true;
     void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => {

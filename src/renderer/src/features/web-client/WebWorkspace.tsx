@@ -8,11 +8,13 @@ import {
   type AgentStatus,
   type AppInfo,
   CHANNEL_CHATS_CAPABILITY,
+  CHANNEL_TASK_CANCEL_CAPABILITY,
   type ChannelSummary,
   type ClientAgentModelOption,
   canAdministerServer,
   decodeAgentBackupModelSettings,
   decodeAgentHostSettings,
+  decodeAgentPlanCardSettings,
   decodeAgentTaskLimitSettings,
   type ServerConnectionState,
   type ServerSummary,
@@ -22,6 +24,7 @@ import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-link
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
+import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
@@ -220,6 +223,7 @@ import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-ma
 import { webHostMessaging } from "./web-messaging-connector";
 import { createWebServerNotifications } from "./web-notification-preferences";
 import { createWebNotificationRouting } from "./web-notification-routing";
+import { createWebNotificationSettings } from "./web-notification-settings";
 import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
@@ -540,6 +544,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
   const [hostPage, setHostPage] = createSignal<{ view: HostPageView; trigger: HTMLElement | null } | null>(null);
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(): boolean {
+    return (
+      hostedServers.available() && hostedServers.loaded() && server()?.role === "owner" && server()?.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    serverSettings.setOpen(false);
+    hostedServers.openAddServer("upsell");
+  }
   /** Only the connected host answers, so another host is connected first, as for its settings. */
   async function openHostPage(serverId: string, view: HostPageView, trigger: HTMLElement | null) {
     if (server()?.id !== serverId) {
@@ -585,7 +599,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }
     if (workspace.state.host?.hostId === hostId) await channels.open(channelId);
   }
-  const { setMuted, setNotificationLevel, notifyChannelReplies } = createWebNotificationRouting({
+  const { setMuted, setNotificationLevel, notifyChannelReplies, refreshLevels } = createWebNotificationRouting({
     workspace,
     notifications,
     t,
@@ -599,7 +613,43 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             threadId,
           )
         : null,
+    readAgentLevels: workspace.runtime.listAgentNotificationLevels,
   });
+  // A host keeps the level of the user for all devices, so the rail reads it when the host comes online.
+  const onlineHostIds = createMemo(() =>
+    servers()
+      .filter((server) => server.state === "online")
+      .map((server) => server.id)
+      .join("\n"),
+  );
+  createEffect(onlineHostIds, (ids, previous) => {
+    const before = new Set(previous ? previous.split("\n") : []);
+    for (const hostId of ids ? ids.split("\n") : []) if (!before.has(hostId)) refreshLevels(hostId);
+  });
+  const notificationSettings = createWebNotificationSettings({
+    visible: accountSettingsOpen,
+    servers,
+    runtime: workspace.runtime,
+    notifications,
+    setLocalLevel: setNotificationLevel,
+    setMuted,
+    openHostId: () => server()?.id ?? null,
+  });
+  /** The host whose notification row the account settings show. Each nonce moves there once. */
+  const [notificationFocusRequest, setNotificationFocusRequest] = createSignal<{
+    serverId: string;
+    nonce: number;
+  } | null>(null);
+  let notificationFocusNonce = 0;
+  // A request moves the settings once. A later opening shows them from the top.
+  createEffect(accountSettingsOpen, (open) => {
+    if (!open) setNotificationFocusRequest(null);
+  });
+  /** Opens the notification levels, the one place where the user changes them, at one host. */
+  function openNotificationSettings(serverId: string): void {
+    setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
+    openAccountSettings();
+  }
   const [searchOpen, setSearchOpen] = createSignal(false);
   const communityCard = createCommunityCardVisibility();
   const [messageFocusRequest, setMessageFocusRequest] = createSignal<{
@@ -740,6 +790,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           taskLimit,
         }),
+      getAgentPlanCard: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.settings, decodeAgentPlanCardSettings, { agentId }),
+      updateAgentPlanCard: ({ agentId, quickAcknowledgement }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, {
+          agentId,
+          quickAcknowledgement,
+        }),
       getAgentAdminSettings: (agentId, serverId) =>
         runTeamEffect(
           getAgentAdminSettings(hostRequest(serverId), agentId).pipe(Effect.mapError((error) => error.cause)),
@@ -761,6 +818,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const taskLimit = remoteAgentAdmin.taskLimit();
+    const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     return agent
       ? {
           ...agent,
@@ -770,6 +828,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(backupModels ? { backupModels } : {}),
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(typeof taskLimit === "number" ? { taskLimit } : {}),
+          ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
         }
       : agent;
   });
@@ -1102,7 +1161,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const serverActionCallbacks = {
     onOpenSettings: (serverId, trigger) => void openServerSettings(serverId, trigger),
     onSetMuted: setMuted,
-    onSetNotificationLevel: setNotificationLevel,
+    onOpenNotificationSettings: (serverId) => openNotificationSettings(serverId),
     onLeave: (hostId, trigger) => setLeaveRequest({ hostId, trigger }),
     onRemove: (hostId, trigger) => setLeaveRequest({ hostId, trigger, removeOwned: true }),
     canRemove: (serverId) =>
@@ -1178,6 +1237,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     supported: channelsSupported,
     deletionSupported: () => canAdministerServer(workspace.state.host?.role),
+    taskCancelSupported: () => workspace.state.capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
     beforeOpen: () => {
       setCreating(false);
       // Not `showAgents`: the list restores the saved channel after a host connects, and that must
@@ -1196,6 +1256,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   onCleanup(
     workspace.onHostEvent((event) => {
       if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+    }),
+  );
+  // The user changed their levels on another device: the matrix and the notifications follow at once.
+  onCleanup(
+    workspace.onHostEvent((event) => {
+      if (event.type !== "agent-notification-levels-changed") return;
+      const hostId = server()?.id;
+      if (hostId) notificationSettings.applyLevels(hostId, { server: event.server, agents: event.agents });
     }),
   );
   // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
@@ -2076,6 +2144,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       onChangeAppearance={props.onChangeAppearance}
                       onOpenBilling={() => setBillingOpen(true)}
                       onSignOut={signOut}
+                      notifications={notificationSettings}
+                      notificationFocusRequest={notificationFocusRequest()}
                     />
                   </Loading>
                 </Show>
@@ -2104,8 +2174,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       loadError={serverSettings.state.error}
                       onRetry={serverSettings.refresh}
                       onSaveIdentity={serverSettings.saveIdentity}
-                      onSetMuted={async (muted) => setMuted(target().id, muted)}
-                      onSetNotificationLevel={async (level) => setNotificationLevel(target().id, level)}
                       // Publication and screen recording belong to the computer that runs the server.
                       onSetPublished={unavailable}
                       onCreateInvite={serverSettings.createInvite}
@@ -2181,7 +2249,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       // Every member lists; the host deletes only for an owner or admin.
                       hostedSites={
                         workspace.state.capabilities.includes(HOSTED_SITES_CAPABILITY)
-                          ? { api: hostedSiteCalls, onOpenSite: (url) => void openWebLink(url) }
+                          ? {
+                              api: hostedSiteCalls,
+                              onOpenSite: (url) => void openWebLink(url),
+                              onSeePlans: canOfferServerPlans() ? openServerPlans : undefined,
+                            }
                           : undefined
                       }
                       providers={providerSettings()}
@@ -2535,6 +2607,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onSignInProvider={composerSignIn() ? connectFromComposer : undefined}
                 onManageProviders={providerSettings() ? openProviderSettings : undefined}
                 onManageBrowserProfiles={browserProfiles() ? openBrowserProfileSettings : undefined}
+                onOpenNotificationSettings={(serverId) => openNotificationSettings(serverId)}
                 agent={conversationAgent()}
                 agents={workspace.profiles()}
                 modelOptions={models()}
@@ -2627,6 +2700,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 agentAutoApproves={remoteAgentAdmin.autoApproves()}
                 remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                 remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
+                remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
                 remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
                 defaultBusyMessageMode={remoteAgentAdmin.defaultBusyMessageMode()}
                 onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}

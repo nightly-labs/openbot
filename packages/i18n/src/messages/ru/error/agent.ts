@@ -19,7 +19,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Нужно сообщение или вложение.",
   "error.agent.promptAnswersTooLong": "Ответы на вопросы слишком длинные.",
   "error.agent.gone": "Этого агента больше нет.",
+  "error.agent.instructionsTooLarge":
+    "Файл инструкций слишком большой, чтобы открыть его здесь. Сократите его в текстовом редакторе.",
+  "error.agent.instructionsOutside":
+    "Файл инструкций ссылается на место вне рабочей папки агента, поэтому OpenBot его не открывает.",
+  "error.agent.instructionsReadFailed": "Не удалось прочитать файл инструкций.",
+  "error.agent.instructionsSaveFailed": "Не удалось сохранить файл инструкций.",
   "error.agent.profileGenerationBusy": "Создание профиля уже выполняется. Повторите попытку чуть позже.",
+  "error.agent.instructionsChanged":
+    "Агент изменил файл инструкций. Ваше последнее изменение не сохранено. Внесите его ещё раз.",
   "error.agent.initialMessageRequired": "Нужно первое сообщение.",
   "error.agent.initialMessageTooLong": "Первое сообщение слишком длинное.",
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",
@@ -114,6 +122,8 @@ export const messages = {
     "На этом сервере мало памяти. Ваше сообщение ждёт в очереди и начнётся, когда память освободится.",
   "error.agent.workspaceOnlyToolMissing":
     "Для режима «Только рабочее пространство» нужен {tool}, но OpenBot его не нашёл. Установите его или выберите «Полный доступ» в настройках агента.",
+  "error.agent.claudeSandboxUnavailable":
+    "Режиму «Только рабочее пространство» нужна песочница Claude, но Claude не может запустить её на этом компьютере: {reason}. Выберите «Полный доступ» или другого провайдера в настройках агента.",
   "error.agent.screenCaptureOff":
     "Снимки экрана для этого агента выключены. Пользователь может включить управление компьютером в настройках агента.",
   "error.agent.screenCaptureUnavailable": "Снимки экрана недоступны на этом компьютере.",

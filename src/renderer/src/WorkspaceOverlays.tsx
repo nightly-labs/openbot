@@ -1,4 +1,10 @@
-import { type CentralAuthUser, LOCAL_SERVER_ID, type RoutineFields, type ServerSummary } from "@openbot/contracts/ipc";
+import {
+  type CentralAuthUser,
+  LOCAL_SERVER_ID,
+  LOCAL_SERVER_LIMIT,
+  type RoutineFields,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -51,7 +57,7 @@ import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
 import { useGlobalSearchSources } from "./global-search-sources";
-import { RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
+import { CreateLocalServerDialog, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -99,6 +105,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SharedAgentInstall />
       <JoinServer account={props.account} />
       <AddServer />
+      <CreateLocalServer />
       <HostedUpsell account={props.account} />
       <LeaveServer />
       <RestartServer />
@@ -214,11 +221,36 @@ function JoinServer(props: AccountProps) {
   );
 }
 
+/** A new server on this computer, with its own agents, chats and files. */
+function CreateLocalServer() {
+  const { servers, createLocalServerOpen, setCreateLocalServerOpen } = useServers();
+  const { createLocalServer } = useServerSelection();
+  // Main refuses one more server too. This only tells the user before they type a name.
+  const limitReached = () => servers().filter((server) => server.thisComputer).length >= LOCAL_SERVER_LIMIT;
+  return (
+    <Show when={createLocalServerOpen()}>
+      <Loading>
+        <CreateLocalServerDialog
+          limitReached={limitReached()}
+          onClose={() => setCreateLocalServerOpen(false)}
+          onCreate={createLocalServer}
+        />
+      </Loading>
+    </Show>
+  );
+}
+
 /** A hosted server: the plans, the payment, then the setup. */
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
-  const { select } = useServerActions();
+  const { select, createLocal } = useServerActions();
   const { openAppSettings } = useSettings();
+  const onCreateLocal =
+    createLocal &&
+    (() => {
+      setAddServerOpen(false);
+      createLocal();
+    });
 
   return (
     <AddServerOverlay
@@ -237,6 +269,7 @@ function AddServer() {
         setAddServerOpen(false);
         setJoinServerOpen(true);
       }}
+      onCreateLocal={onCreateLocal}
       onManageServers={() => openAppSettings(null, "hosted-servers")}
     />
   );
@@ -314,6 +347,7 @@ function LeaveServer() {
     <LeaveServerDialog
       server={leaveConfirmServer()}
       removeOwned={leaveConfirmServer()?.role === "owner"}
+      deleteLocal={leaveConfirmServer()?.thisComputer === true}
       onClose={cancelLeaveServer}
       onLeave={leaveConfirmedServer}
       restoreFocusTarget={leaveRestoreTarget()}
@@ -321,7 +355,7 @@ function LeaveServer() {
   );
 }
 
-/** The hosted server restart that the server menu opens. */
+/** The restart of a hosted server, or of a server on this computer, that the server menu opens. */
 function RestartServer() {
   const { servers } = useServers();
   const { restartConfirmServer, restartRestoreTarget, cancelRestartServer, restartConfirmedServer } =
@@ -345,7 +379,7 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, setServerMuted, setServerNotificationLevel, hostedServerIds, hostedServersLoaded } = useServers();
+  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -643,6 +677,21 @@ function ServerSettings() {
     );
   };
 
+  /** A server at its site limit offers the server plans, which have more sites, to its owner. */
+  function canOfferServerPlans(server: ServerSummary): boolean {
+    return (
+      !platform.landingPreview &&
+      hostedServersAvailable() &&
+      hostedServersLoaded() &&
+      (server.kind === "local" || server.role === "owner") &&
+      server.hosted !== true
+    );
+  }
+  function openServerPlans(): void {
+    setServerSettingsOpen(false);
+    setAddServerOpen(true, "upsell");
+  }
+
   const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
     hostName:
       server.kind === "local"
@@ -674,8 +723,6 @@ function ServerSettings() {
           onSaveIdentity={saveServerIdentity}
           onSetPublished={setServerPublished}
           onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
-          onSetMuted={(muted) => setServerMuted(server().id, muted)}
-          onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -748,6 +795,7 @@ function ServerSettings() {
                   api: appPort().hostedSites,
                   onOpenSite: (url) => void appPort().openUrl(url),
                   trackDelete: trackHostedSiteDelete,
+                  onSeePlans: canOfferServerPlans(server()) ? openServerPlans : undefined,
                 }
               : undefined
           }
@@ -815,9 +863,10 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const whatsNew = useWhatsNew();
-  const { servers, setAddServerOpen } = useServers();
+  const { servers, setAddServerOpen, setServerMuted, setServerNotificationLevel } = useServers();
   const {
     appSettingsOpen,
+    notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
@@ -882,6 +931,9 @@ function AppSettings(props: AccountProps) {
         }}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}
+        onSetServerNotificationLevel={setServerNotificationLevel}
+        onSetServerMuted={setServerMuted}
+        notificationFocusRequest={notificationFocusRequest()}
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}

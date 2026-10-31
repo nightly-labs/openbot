@@ -27,7 +27,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
-import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import {
   WORKFLOW_STEP_TEXT_LIMIT,
@@ -325,7 +325,7 @@ async function call(
     Accept: "application/json",
     [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V7),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? TEAM_CURRENT_CAPABILITIES).join(","),
+    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7)).join(","),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -534,7 +534,9 @@ try {
     const response = await call("POST", WORKFLOWS_ROUTES.list, {
       token: member,
       body: {},
-      capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== WORKFLOWS_CAPABILITY),
+      capabilities: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V7).filter(
+        (capability) => capability !== WORKFLOWS_CAPABILITY,
+      ),
     });
     assert.equal(response.status, 400, JSON.stringify(response.body));
     assert.ok(JSON.stringify(response.body).includes(sourceText("error.workflow.serverTooOld")));

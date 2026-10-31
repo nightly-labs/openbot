@@ -33,12 +33,15 @@ message or a routine run (`error` with the code `delivery_start_failed`), or wai
 approval, or a step in the browser (`browser-takeover-requested`, also for a password or a code).
 The desktop and the web client notify about the same events (`agentEventCanNotify`), and all three
 decide as one: `notificationForAgentEvent` in `@openbot/team-client` applies the level of the server
-(`all`, or `needs-me` for the events that wait for the user), the switch of the agent, and the quiet
+(`all`, or `needs-me` for the events that wait for the user), or the member's own level of the agent
+(`agent-notification-levels-v1`, see [servers](servers.md)), the switch of the agent, and the quiet
 routine runs. The desktop and the web client close the notification of a request when an
 `agent-input-resolved` or `browser-takeover-resolved` event comes, also for an answer from another
 device. The title is the agent name. When the phone shows previews, the text is the
-preview of a desktop notification: the start of the answer of that turn, the question, or the action
-to approve, with secrets redacted. Otherwise it is the fixed desktop text, such as "Finished working.".
+preview of a desktop notification: the lead of the answer of that turn, the question, or the action
+to approve, with secrets redacted. The lead (`messageSummary` in `packages/team-client`) is the first
+sentences of the message, without code blocks, tables, headings or mail headers, with tool names as
+words and redaction marks as `•••`. The Live Activity shows the same lead. Otherwise it is the fixed desktop text, such as "Finished working.".
 
 Channels are an exception. The desktop and the web client notify an agent reply in a channel from
 the channel list (`channelReplyNotifications`), because the channel service consumes the
@@ -68,7 +71,13 @@ when nothing is left for that host or the user signs out. A level of
 "Nothing" and a mute with no end remove it too. `PushNotificationService` in `src/main` keeps the
 registrations in `openbot-push-notifications-v1.json` in the user data folder, readable only by the
 user, so a phone that does not connect after the host restarts still gets notifications. It sends
-only while the phone is away or its connection is closed. No event goes while the member uses a
+only while the phone is away or its connection is closed. iOS can suspend the app before it says
+that it goes away, and the host sees the lost path about 30 seconds later. So an event that comes
+while the phone looks on screen is kept in memory for 5 minutes (`HELD_EVENT_MS`). When the phone
+says that it is away, or its path fails, and does not come back within 3 seconds, the host sends
+each kept event that the member has not seen: a reply that is still unread in the agent's own chat,
+a failed turn that still shows as failed, or a request that nobody answered. A send that the
+account service, Apple or Google does not take goes again after 10 and 60 seconds. No event goes while the member uses a
 desktop app, which shows the event and asks for input, an approval, or a browser step itself: that
 computer had input in the last 30 seconds (`powerMonitor.getSystemIdleState`), and
 the window of the host's own desktop app has focus or shows the event as a desktop notification, for
@@ -77,8 +86,10 @@ computer's server let the event through); or the member sent, answered, or typed
 seconds (`TeamApiServer.lastMemberUseElsewhere`, kept in memory). The time is short because a task
 can end at any time after the member leaves the computer. While the phone shows a Live Activity of
 this host that iOS still updates (8 hours from its start, which the phone gives because a host that
-restarted does not know it), the host sends no notification
-(`LiveActivityPushService.showsEvent`). With a sound (Settings > Notifications > Sound), the next
+restarted does not know it), and the next view of the activity shows the event, the host sends no
+notification (`LiveActivityPushService.showsEvent`). The view shows one item, so a reply while
+another agent works, or a failure while another agent waits, still notifies. An activity whose last
+update did not go out does not replace notifications. With a sound (Settings > Notifications > Sound), the next
 update of the activity alerts at once, so iOS lights up the screen, shows the activity, and plays
 that sound; with Play sound off, the activity updates silently. iOS does not tell the host when
 the user removes the activity, so until the app runs again such an event shows nowhere.
@@ -157,20 +168,35 @@ Routing selects each member whose role or area the request touches, and only tho
 request in the area of one member, or in the area of no member, goes to the one member best able to
 answer it. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
-gets the request's attachments; its packet names the other members that answer. A member that the
+gets the request's attachments; its packet names the other members that answer, but does not carry
+their replies to that request, so each member gives its own view. This stays true after a typed
+"continue" makes the follow-up the request of a task: the replies count from the first request. After
+the member wrote its own complete reply or result (not commentary), a follow-up gets the other replies, so it can ask about them. The packet cursor stops before the
+first reply it leaves out, so a later turn of that session gets it. A member that the
 model names but that cannot take work is left out. Invalid or stale routing cannot broadcast a
 request. Routing can select an existing task, ask a question, or indicate that a message needs no answer.
+An existing task that routing selects keeps its instruction, and the new message is its follow-up.
 Each selected owner or existing task adds one channel message from the lead, so the selection is
-visible and the user can correct it. Deterministic selection adds no message.
+visible and the user can correct it. Deterministic selection adds no message, and a lead that selects
+only itself adds none: its reply shows who answers. A routing answer that does not decode pauses the
+task with `channelRoutingUnreadable` and offers Reassign. The log gets the answer length and its
+field names only, not its text.
 
 A message that opens with agent mentions ("@A @B what do you think?") goes to each mentioned member
 that can take work, with no routing turn. A message that opens with `@everyone` goes to each member
 that can take work. `@everyone` is plain text, not a tag; the channel composer's mention picker
 offers it. The host reads the address from the text (`leadingAddress`), so a client that sends only
 the first mention in `recipientAgentId` reaches all of them, and the Team API wire does not change.
-A routine run reads its text in the same way. A request to more than one member does not continue
-the task of the message it replies to. After a stop, "continue" continues each stopped task of the
-request and leaves a member that still works as it is. A request that needs routing in a channel with no lead stops with the reason
+A message that opens with a typed "@Name" and no tag goes to the member with that exact name
+(case-insensitive, the longest name wins), also with no routing turn. The host reads it; the contract
+parser does not change. A routine run reads its text in the same way. A request to more than one
+member does not continue the task of the message it replies to. "continue" (or "resume", "go on",
+"keep going") continues each stopped root task of the newest request that has one. A failed root
+task continues only when no root task is stopped. When the message has a recipient, that member's
+own stopped (or else failed) task continues first. Older open work does not block it, and a member
+that still works stays as it is. A resumed task keeps its instruction; the dispatch and the packet
+add the new message as a follow-up line. A child task gets the follow-up only when the message
+replies to that task, because a new child task has the request of its parent. A request that needs routing in a channel with no lead stops with the reason
 `channelLeadRequired`. A save that sets a new lead queues these requests again, and the lead routes
 them. A lead change does not move a task that already has an owner. The member packet names the lead
 (`leadAgentId`).
@@ -233,12 +259,28 @@ summary covers older messages, with a sequence and source IDs. Full messages rem
 The provider acceptance cursor records context delivery. Context packets remain self-contained so
 provider replacement or compaction does not remove shared decisions. Unrelated server conversations
 are available through paginated retrieval and are not inserted automatically. Agent memories keep
-their existing meaning.
+their existing meaning. A packet leaves out a member's thinking, and the commentary of a turn that
+posted a `channel_result`: the result is the answer of that turn.
+
+The channel copies the assistant rows of a member's execution thread. The first rows of a turn go
+to the running assignment before it knows the turn id; a row of another turn does not. A new row
+of an assignment that has ended is not copied: a turn sends its final rows before it completes, and
+after a restart the provider history import can write an old turn again with new row ids. An empty
+row is not copied until its first text arrives.
 
 Task revisions prevent an old assignment from completing a corrected request. The stored request
 keeps its own text and files: only its first dispatch converts the attachment drafts, and a later
-dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants
-and interrupts active work. Reassign waits for the old assignment to finish stopping. Restart
+dispatch of the same request sends the stored copies again. Stop pauses a task and its descendants,
+interrupts active work, and sets the reason `channelTaskStopped`. The clients show Continue and
+Reassign for a paused task that has a reason. A turn that ends interrupted gets the same reason. An
+archive pauses work with no reason; a restore gives those tasks the stop reason. Startup gives the
+stop reason to a paused task with no reason in a channel that is not archived: older versions stopped
+with no reason. Reassign waits for the old assignment to finish stopping. Cancel ends a stopped or
+failed task: it sets every open task of the same root to `cancelled`, interrupts active work, and
+keeps the messages. A parent waits for each task that it delegated, so a cancel always ends the whole
+run, and a cancelled routine run records `cancelled`. The host refuses Cancel for a task that is not
+stopped or failed. The clients show Cancel without a confirmation, once for each run, and only on a
+host that advertises `channel-task-cancel-v1`; a host rejects `cancel` from a peer without it. Restart
 recovery checks accepted provider work before retrying. Unknown outcomes require attention.
 Command, assignment, and result IDs prevent duplicate dispatch and visible results; external side
 effects do not have an exactly-once guarantee.
@@ -249,7 +291,7 @@ the capability only when its channel service is connected. When a host does not 
 `channel-chats-v1`, the renderer hides the channel controls in the sidebar, search and schedule. The account API and Signal service add no channel storage or routing.
 
 Mobile shows channels only on a host that advertises `channel-chats-v1`, and Delete and Restore only
-with `channel-delete-v1`. It uses the same host channel IDs and commands. The host database stores
+with `channel-delete-v1`, and Cancel task only with `channel-task-cancel-v1`. It uses the same host channel IDs and commands. The host database stores
 channel settings, members, messages, memories, routines, and read positions. Mobile keeps only an
 in-memory view. Reconnect loads the host list again. `channels-changed` events refresh the list and
 open channel history, with one request sequence per host and one pending refresh for an event burst.

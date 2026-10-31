@@ -70,7 +70,7 @@ export const messages = {
   "agentSettings.backupModels.ask": "切换前询问",
   "agentSettings.backupModels.order": "顺序",
   "agentSettings.backupModels.listLabel": "备用模型（按顺序）",
-  "agentSettings.backupModels.empty": "未设置顺序。{name} 会依次尝试每个可用模型。",
+  "agentSettings.backupModels.empty": "未设置顺序。{name} 会列出每个可用模型供你选择。",
   "agentSettings.backupModels.add": "添加备用模型",
   "agentSettings.backupModels.moveUp": "上移 {model}",
   "agentSettings.backupModels.moveDown": "下移 {model}",
@@ -91,9 +91,15 @@ export const messages = {
   "agentSettings.agentTitle": "称号",
   "agentSettings.agentTitleLabel": "助手称号",
   "agentSettings.agentTitlePlaceholder": "描述你的助手做什么",
+  "agentSettings.description": "描述",
+  "agentSettings.descriptionLabel": "助手描述",
+  "agentSettings.descriptionResize": "调整描述大小",
+  "agentSettings.descriptionPlaceholder": "这个助手用来做什么",
   "agentSettings.instructions": "指令",
   "agentSettings.instructionsLabel": "助手指令",
-  "agentSettings.instructionsPlaceholder": "这个助手用来做什么",
+  "agentSettings.instructionsEdit": "编辑指令",
+  "agentSettings.instructionsChangedWhileEditing": "你编辑时，代理更改了它的指令。再次保存即可替换它的版本。",
+  "agentSettings.instructionsPlaceholder": "这个助手始终遵守的规则",
 
   "agentSettings.avatar.edit": "编辑助手头像",
   "agentSettings.avatar.editor": "头像编辑器",
@@ -147,7 +153,10 @@ export const messages = {
   "agentSettings.taskLimit.default": "默认（{count}）",
   "agentSettings.taskLimit.oneTurn": "{provider} 一次只运行一轮。该助手的话题会互相等待。",
 
-  "agentSettings.notifications.title": "通知",
+  "agentSettings.notificationLevel.title": "通知我",
+  "agentSettings.notificationLevel.server": "服务器默认（{level}）",
+  "agentSettings.notificationLevel.note":
+    "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
 
   "agentSettings.newChat.title": "新对话",
   "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",

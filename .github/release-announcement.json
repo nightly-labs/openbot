@@ -1,10 +1,10 @@
 {
-  "version": "0.54.0",
+  "version": "0.56.0",
   "highlights": [
-    "Buy a commercial license for work from Billing or from Add server: Starter for 1 user, or Team for 2 to 10 users. A new license is free until 1 December 2026.",
-    "A Workspace only agent can now change files in folders that you add, from the agent's settings or by dropping a folder on the chat.",
-    "openbot.run has a Pricing page with the hosted servers and the licenses in EUR, USD or PLN.",
-    "Set the context window of each model of a custom provider, so OpenCode compacts at the correct size.",
-    "Remote desktop pairing on macOS 27 works again, and Gemini continues when one MCP server does not start."
+    "Agents do many browser actions in one step, so browser tasks finish sooner and use fewer tokens, and Cloudflare checks pass in the built-in browser.",
+    "Right-click an agent message and select Mark unread to come back to it later.",
+    "Hide the Local server when you have another server; its agents, chats and files stay on your computer.",
+    "Choose the sound that plays when a task finishes, in Settings › Notifications.",
+    "Each provider CLI now uses about half the disk space, and OpenBot uses the CLI you installed when it is as new as its own copy."
   ]
 }

@@ -19,7 +19,12 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "需要提供消息或附件。",
   "error.agent.promptAnswersTooLong": "提示词回答过长。",
   "error.agent.gone": "该助手已不存在。",
+  "error.agent.instructionsTooLarge": "指令文件太大，无法在这里打开。请在文本编辑器中缩短它。",
+  "error.agent.instructionsOutside": "指令文件指向助手工作区之外的位置，因此 OpenBot 不会打开它。",
+  "error.agent.instructionsReadFailed": "无法读取指令文件。",
+  "error.agent.instructionsSaveFailed": "无法保存指令文件。",
   "error.agent.profileGenerationBusy": "资料生成正忙，请稍后重试。",
+  "error.agent.instructionsChanged": "智能体已更改指令文件。你的最后一次更改未保存。请重新更改。",
   "error.agent.initialMessageRequired": "需要提供初始消息。",
   "error.agent.initialMessageTooLong": "初始消息过长。",
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
@@ -97,6 +102,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "该服务器内存不足。你的消息会在队列中等待，内存释放后自动开始。",
   "error.agent.workspaceOnlyToolMissing":
     "“仅工作区”需要 {tool}，但 OpenBot 没有找到它。请安装它，或在助手设置中选择完全访问。",
+  "error.agent.claudeSandboxUnavailable":
+    "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",

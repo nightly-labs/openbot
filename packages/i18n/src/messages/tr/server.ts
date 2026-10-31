@@ -111,8 +111,22 @@ export const messages = {
   "server.add.custom.description":
     "Özel altyapı, ek depolama alanı veya iş akışınıza göre uyarlanmış özellikler edinin.",
   "server.add.custom.action": "Bize ulaşın",
-  "server.add.join.title": "Davetiniz var mı?",
   "server.add.join.action": "Sunucuya katıl",
+  "server.add.otherOptions": "Diğer seçenekler",
+  "server.local.createTitle": "Bu bilgisayarda yeni sunucu",
+  "server.local.createDescription":
+    "Sunucunun kendi ajanları, sohbetleri ve dosyaları vardır. Bu bilgisayarda çalışır.",
+  "server.local.nameLabel": "Sunucu adı",
+  "server.local.create": "Sunucu oluştur",
+  "server.local.creating": "Sunucu oluşturuluyor…",
+  "server.local.createFailed": "Sunucu oluşturulamadı.",
+  "server.local.limitReached":
+    "Bu bilgisayarda en fazla {limit} sunucunuz olabilir. Yeni bir sunucu oluşturmak için birini silin.",
+  "server.local.deleteConfirmTitle": "{name} silinsin mi?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot sunucuyu durdurur ve ajanlarını, sohbetlerini ve dosyalarını çöp kutusuna taşır.",
+  "server.local.deleting": "Sunucu siliniyor…",
+  "server.local.deletedTitle": "{name} silindi",
   // Hesap maksimum sayıda barındırılan sunucuya sahip olduğunda gösterilir. Planlar devre dışıdır.
   "server.add.limit.title": "Bu hesap maksimum sunucu sayısına ulaştı",
   "server.add.limit.description": {
@@ -182,6 +196,7 @@ export const messages = {
   "server.rail.addRemote": "Uzak sunucu ekle",
   "server.rail.add": "Bir sunucu ekle",
   "server.rail.buttonLabel": "{name} sunucusu",
+  "server.rail.thisComputer": "bu bilgisayarda",
   "server.rail.notificationsMuted": "bildirimler sessize alındı",
   "server.rail.actions": "Sunucu eylemleri",
   "server.rail.unmute": "Sunucunun sesini aç",
@@ -192,6 +207,8 @@ export const messages = {
   "server.rail.restart": "Sunucuyu yeniden başlat",
   "server.rail.leave": "Sunucudan ayrıl",
   "server.rail.delete": "Sunucuyu sil",
+  "server.rail.hide": "Sunucuyu gizle",
+  "server.rail.showLocal": "{name} sunucusunu göster",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
@@ -291,13 +308,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Bu Mac'i başka bir bilgisayardan görüntüleyin ve kontrol edin.",
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
-  "server.settings.notifications": "Bildirimler",
-  "server.settings.muteNotifications": "Bildirimleri sessize al",
-  "server.settings.muteDescription":
-    "Bu sunucudan gelen masaüstü bildirimlerini, sesleri ve MacBook çentik güncellemelerini durdurun.",
-  "server.settings.mutedUntilDescription": "{until}. Şimdi sesi açmak için kapatın.",
-  "server.settings.notifyAbout": "Şunun hakkında bildir",
-  "server.settings.notifyAboutDescription": "Hangi ajan olaylarının bir masaüstü bildirimi göstereceği.",
   "server.settings.agents": "Ajanlar",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
@@ -328,6 +338,8 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "Mevcut anahtar ve yeni anahtar bir devri birlikte imzalar. Üyelerin uygulamaları yeniden bağlandığında yeni anahtara geçer. Anahtar dosyası kopyalandıysa veya açığa çıktıysa bunu yapın.",
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
+  "server.settings.hostKeyChanged": "Son değişiklik",
+  "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
   "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":

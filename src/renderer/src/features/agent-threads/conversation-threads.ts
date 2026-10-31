@@ -1,12 +1,18 @@
-import type { AgentApproval, AgentContextState, AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentApproval, AgentContextState, AgentEvent, AgentTask } from "@openbot/contracts/ipc";
 import { isAgentTaskActive, taskApproval } from "@openbot/team-client/agent-tasks";
-import { activeThreadId, threadLists } from "@openbot/ui/features/conversation/threads/thread-items";
+import {
+  activeThreadId,
+  type ThreadListsInput,
+  threadLists,
+} from "@openbot/ui/features/conversation/threads/thread-items";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type {
   BrowserTakeoverRequest,
+  ConversationBranchSource,
   ConversationThreads,
   PromptAnswerOptions,
+  SideThread,
 } from "../conversation/conversation-types";
 import type { AgentThreadTabsState } from "./agent-thread-tabs";
 
@@ -35,6 +41,11 @@ export interface ConversationThreadsInput {
   contextStates?: (() => Readonly<Record<string, AgentContextState>>) | undefined;
   /** Missing when the host cannot compact a side thread. */
   onCompactContext?: ((taskId: string) => Promise<void>) | undefined;
+  /**
+   * Opens the agent's own chat at a message, as a search result does. Without it, a click on
+   * "Branched from" opens the agent's own chat at its latest message.
+   */
+  onOpenMainMessage?: ((messageId: string) => void) | undefined;
 }
 
 /** The threads of one agent, for the conversation. Read it in a memo: it reads the thread state. */
@@ -43,11 +54,9 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
   const agentId = agent.id;
   const snapshot = tasks.snapshot(agentId);
   const list = snapshot?.tasks ?? [];
-  const lists = threadLists({
+  const listInput: Omit<ThreadListsInput, "open" | "draft"> = {
     mainUpdatedAt: agent.updatedAt,
     tasks: list,
-    open: tabs.openIds(agentId),
-    draft: tabs.hasDraft(agentId),
     draftTitle: input.newThreadTitle,
     hidden: tabs.hidden(),
     waitsFor: (task) =>
@@ -58,7 +67,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
-  });
+  };
+  const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
   const open =
     activeId === MAIN_THREAD_ID
@@ -68,6 +78,53 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         : list.find((task) => task.id === activeId);
   const approval = open ? taskApproval(open, approvals) : undefined;
   const editable = tasks.editable();
+  /** A thread in the side panel, with the actions of its own message box. */
+  const sideThread = (id: string): SideThread | undefined => {
+    const task = list.find((entry) => entry.id === id);
+    if (!task) return undefined;
+    const sideApproval = taskApproval(task, approvals);
+    return {
+      task,
+      conversation: tasks.conversation(task.id),
+      approval: sideApproval,
+      onSend: (text, attachmentDraftIds) => tabs.send(agentId, task.id, text, attachmentDraftIds),
+      onStop: () => tasks.stopTask(agentId, task.id),
+      onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
+      onRespondApproval: (decision, options) =>
+        sideApproval ? input.onRespondApproval(sideApproval, decision, options) : Promise.resolve(false),
+      get contextState() {
+        return input.contextStates?.()[task.threadId];
+      },
+      onCompactContext: onCompactContext ? () => onCompactContext(task.id) : undefined,
+    };
+  };
+  /**
+   * The source of a branch. The list has the current title of a listed source. The list can leave out an
+   * archived source, so the link's title is the fallback; a link with no title is a deleted source.
+   */
+  const branchSource = (task: AgentTask): ConversationBranchSource | undefined => {
+    const branch = task.branch;
+    if (!branch) return undefined;
+    const { sourceTaskId, sourceMessageId, throughMessageId } = branch;
+    if (sourceTaskId === null)
+      return {
+        throughMessageId,
+        title: null,
+        deleted: false,
+        onOpen: () => {
+          tabs.open(agentId, MAIN_THREAD_ID);
+          input.onOpenMainMessage?.(sourceMessageId);
+        },
+      };
+    const title = list.find((entry) => entry.id === sourceTaskId)?.title ?? branch.sourceTitle;
+    return {
+      throughMessageId,
+      title,
+      deleted: title === null,
+      onOpen: () => void tabs.openAt(agentId, sourceTaskId, sourceMessageId),
+    };
+  };
+  const focus = tabs.messageFocus();
   return {
     header: {
       ...lists,
@@ -83,6 +140,14 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onRestore: (id) => void tabs.restore(agentId, id),
       onRename: editable ? (id, title) => void tabs.rename(agentId, id, title) : undefined,
       onDelete: editable ? (id) => void tabs.remove(agentId, id) : undefined,
+    },
+    side: {
+      tabs: threadLists({ ...listInput, open: tabs.sideIds(agentId), draft: false }).tabs,
+      thread: sideThread,
+      onToSide: (id) => tabs.toSide(agentId, id),
+      onToChat: (id) => tabs.toChat(agentId, id),
+      onClose: (id) => tabs.closeSide(agentId, id),
+      onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
     limit: snapshot?.limit ?? 1,
@@ -106,6 +171,11 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
     // Only this computer moves a queued message to a new thread.
     onRunQueuedMessage: tasks.local() ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId) : undefined,
+    onBranch: tasks.canBranch()
+      ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
+      : undefined,
+    branchSource,
+    focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
   };
 }
 

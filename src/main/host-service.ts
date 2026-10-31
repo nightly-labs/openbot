@@ -7,6 +7,7 @@ import type {
   AgentEvent,
   AgentTaskReadState,
   AvatarImageInput,
+  BranchAgentTaskInput,
   CentralAuthUser,
   ChannelSummary,
   ConfigureHostInput,
@@ -24,6 +25,7 @@ import type {
   InviteSummary,
   MarkAgentTaskReadInput,
   MarkConversationReadInput,
+  MarkConversationUnreadInput,
   MarkDirectReadInput,
   RemoteDesktopDisplay,
   RemoteDesktopIceServer,
@@ -47,8 +49,9 @@ import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
+import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -60,6 +63,7 @@ import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifac
 import { appendRemoteDiagnosticLog } from "./remote-diagnostics";
 import { RemoteScreenGateway, type RemoteScreenGatewayCreateRuntime } from "./remote-screen-gateway";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
+import type { TeamApiAgentNotificationLevels } from "./team-api/dependencies";
 import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -96,6 +100,7 @@ interface HostServiceOptions {
   providerHostSignIns?: ForwardedApiOptions["providerHostSignIns"];
   providerAccounts?: ForwardedApiOptions["providerAccounts"];
   providerUsageResets?: ForwardedApiOptions["providerUsageResets"];
+  providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
   machine?: ForwardedApiOptions["machine"];
@@ -106,6 +111,8 @@ interface HostServiceOptions {
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
+  /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
+  agentNotificationLevels?: AgentNotificationLevelStore;
   agentAccess?: AgentAccessStore;
   agentTasks?: ForwardedApiOptions["agentTasks"];
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
@@ -113,7 +120,7 @@ interface HostServiceOptions {
   focusUse?: ForwardedApiOptions["focusUse"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "markTaskRead">;
+  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "branchTask" | "markTaskRead">;
   agentsReady: NonNullable<ForwardedApiOptions["agentsReady"]>;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
@@ -167,8 +174,12 @@ interface HostServiceOptions {
     hostId: string,
     handover: HostKeyHandover,
   ) => Effect.Effect<"accepted" | "refused", RemoteWorkflowError>;
+  /** The account service accepted a key handover. The server list carries it and its time now. */
+  onKeyRotated?: () => void;
+  /** With `home`, the ticket is for this host's home Signal machine; see `CentralAuthManager`. */
   issueRemoteHostTicket?: (
     hostId: string,
+    home?: RemoteHostTicketHome,
   ) => Effect.Effect<{ ticket: string; signalUrl: string; expiresAt: number }, RemoteWorkflowError>;
   /** Sends one sealed Live Activity update through the account service. `gone` means Apple refused the token. */
   sendLiveActivityPush?: (
@@ -249,6 +260,11 @@ export class HostService extends EventEmitter<HostEvents> {
   /** A registration and a key rotation each read the host key, so only one of them runs at a time. */
   readonly #hostKeyLock = Semaphore.makeUnsafe(1);
   #webRtcOnline = false;
+  /**
+   * The home Signal of the last start that got a ticket but did not reach Signal. The next start names
+   * it as failed, so a host that starts while its home machine is down gets another home.
+   */
+  #unreachedSignalUrl: string | null = null;
   /** `undefined` until the account service first reports, so the first report always binds. */
   #boundAccountId: string | null | undefined = undefined;
   #legacyCredentialRemoved = false;
@@ -370,8 +386,15 @@ export class HostService extends EventEmitter<HostEvents> {
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),
-            liveActivityShows: (sessionId, alert, startedAt) =>
-              this.#liveActivityPush?.showsEvent(sessionId, alert, startedAt) ?? false,
+            memberLevels: (memberId) => {
+              const key = this.#notificationKey(memberId);
+              return {
+                server: options.agentNotificationLevels?.serverLevel(key) ?? null,
+                agents: options.agentNotificationLevels?.levels(key) ?? new Map(),
+              };
+            },
+            liveActivityShows: (sessionId, subject, alert, startedAt) =>
+              this.#liveActivityPush?.showsEvent(sessionId, subject, alert, startedAt) ?? false,
             channelForThread: (threadId) => this.channelForThread(threadId),
             logger,
           })
@@ -392,6 +415,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.providerHostSignIns === undefined ? {} : { providerHostSignIns: options.providerHostSignIns }),
       ...(options.providerAccounts === undefined ? {} : { providerAccounts: options.providerAccounts }),
       ...(options.providerUsageResets === undefined ? {} : { providerUsageResets: options.providerUsageResets }),
+      ...(options.providerSignOut === undefined ? {} : { providerSignOut: options.providerSignOut }),
       ...(options.mcpToolRuntimePreparation === undefined
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
@@ -404,14 +428,22 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
+      ...(options.agentNotificationLevels === undefined
+        ? {}
+        : { agentNotificationLevels: this.#agentNotificationLevels(options.agentNotificationLevels) }),
       ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
       ...(options.agentTasks === undefined ? {} : { agentTasks: options.agentTasks }),
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       // The identity route changes this host's name and logo through `updateIdentity`, so a change
-      // from a joined admin runs every step a local one does.
+      // from a joined admin runs every step a local one does. The key route runs the steps of Server
+      // settings on this computer, and only where they can run: a host with no account service has
+      // nothing to accept the handover.
       admin: {
         ...options.admin,
         identity: { updateIdentity: (input) => this.updateIdentity(input).pipe(Effect.asVoid) },
+        ...(options.handOverRemoteHostKey && options.registerRemoteHost
+          ? { hostKey: { rotate: () => this.#rotateIdentityKeyForOwner() } }
+          : {}),
       },
       skills: options.skills,
       sidebarLayout: options.sidebarLayout,
@@ -447,14 +479,14 @@ export class HostService extends EventEmitter<HostEvents> {
           store: options.store,
           appVersion: options.appVersion,
           transferDirectory: join(options.logDirectory ?? ".openbot-remote", "transfers"),
-          renewSignal: (hostId) =>
+          renewSignal: (hostId, failedSignalUrl) =>
             Effect.gen(function* () {
               const issueTicket = options.issueRemoteHostTicket;
               if (!issueTicket)
                 return yield* new RemoteWorkflowError({
                   cause: new Error(sourceText("error.host.webRtcNotConfigured")),
                 });
-              return yield* issueTicket(hostId);
+              return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
@@ -771,25 +803,42 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   readonly rotateIdentityKey = Effect.fn("HostService.rotateIdentityKey")(
     function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
-      if (!this.#options.handOverRemoteHostKey || !this.#options.registerRemoteHost)
-        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationUnavailable")) });
-      yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
-      const { handover, result } = yield* this.#hostKeyLock.withPermit(
-        Effect.gen({ self: this }, function* () {
-          const handover = yield* this.#options.store.beginKeyRotation();
-          return { handover, result: yield* this.#resolvePendingKeyRotation() };
-        }),
-      );
-      if (result !== "accepted" || this.#options.store.getIdentity()?.publicKey !== handover.publicKey)
-        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) });
-      if (this.#isActiveHost(handover.hostId)) {
-        this.#setStatus({ message: sourceText("status.host.keyRotated") });
-        this.#api.refreshIdentity();
-      }
+      yield* this.#rotateKey();
       return this.getStatus();
     },
     (operation) => this.#provide(operation),
   ).bind(this);
+
+  /** `host-key-rotation-v1`: the owner asked from another device. The answer names the new public key. */
+  readonly #rotateIdentityKeyForOwner = Effect.fn("HostService.rotateIdentityKeyForOwner")(
+    function* (this: HostService): Effect.fn.Return<{ publicKey: string }, RemoteWorkflowError> {
+      return { publicKey: yield* this.#rotateKey() };
+    },
+    (operation) => this.#provide(operation),
+  );
+
+  /** One key change for both callers. Gives the public key of this change, not a later one. */
+  readonly #rotateKey = Effect.fn("HostService.rotateKey")(function* (
+    this: HostService,
+  ): Effect.fn.Return<string, RemoteWorkflowError> {
+    if (!this.#options.handOverRemoteHostKey || !this.#options.registerRemoteHost)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationUnavailable")) });
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const { handover, result } = yield* this.#hostKeyLock.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const handover = yield* this.#options.store.beginKeyRotation();
+        return { handover, result: yield* this.#resolvePendingKeyRotation() };
+      }),
+    );
+    if (result !== "accepted" || this.#options.store.getIdentity()?.publicKey !== handover.publicKey)
+      return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.host.keyRotationRefused")) });
+    if (this.#isActiveHost(handover.hostId)) {
+      this.#setStatus({ message: sourceText("status.host.keyRotated") });
+      this.#api.refreshIdentity();
+    }
+    this.#options.onKeyRotated?.();
+    return handover.publicKey;
+  });
 
   /**
    * Sends a handover that is still pending, for example after a restart or a lost answer. This
@@ -902,14 +951,29 @@ export class HostService extends EventEmitter<HostEvents> {
         yield* this.#syncRemoteDirectory(identity.serverId, members);
         if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       }
-      const bootstrap = yield* optionalIssueRemoteHostTicket(identity.serverId);
+      // The host peer meets its devices on its home Signal machine. Chat apps and webhooks stay on
+      // the entry Signal through their own tickets.
+      const failedSignalUrl = this.#unreachedSignalUrl;
+      const bootstrap = yield* optionalIssueRemoteHostTicket(
+        identity.serverId,
+        failedSignalUrl === null ? {} : { failedSignalUrl },
+      );
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
-      yield* gateway.start({
-        hostId: identity.serverId,
-        signalUrl: bootstrap.signalUrl,
-        ticket: bootstrap.ticket,
-        localApiPort: apiPort,
-      });
+      yield* gateway
+        .start({
+          hostId: identity.serverId,
+          signalUrl: bootstrap.signalUrl,
+          ticket: bootstrap.ticket,
+          localApiPort: apiPort,
+        })
+        .pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              this.#unreachedSignalUrl = bootstrap.signalUrl;
+            }),
+          ),
+        );
+      this.#unreachedSignalUrl = null;
       this.#webRtcOnline = true;
       if (yield* this.#cancelSupersededStartEffect(generation)) return this.getStatus();
       this.#setStatus({
@@ -939,7 +1003,8 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.getStatus();
   });
 
-  readonly startDevelopmentLocal = Effect.fn("HostService.startDevelopmentLocal")(
+  /** Starts the Team API on loopback only, with no Signal: the development host and a local server. */
+  readonly startLoopbackOnly = Effect.fn("HostService.startLoopbackOnly")(
     function* (this: HostService): Effect.fn.Return<HostStatus, RemoteWorkflowError, HostApiRuntime> {
       if (!this.#options.store.configured)
         return yield* new RemoteWorkflowError({
@@ -1137,6 +1202,21 @@ export class HostService extends EventEmitter<HostEvents> {
     );
   }
 
+  markAgentConversationUnread(input: MarkConversationUnreadInput) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) =>
+        this.#options.agents.markConversationUnread(input.agentId, readerId, input.fromMessageId),
+      ),
+    );
+  }
+
+  /** Makes a branch of a local conversation. This computer's reader has read the branch through its last copied message. */
+  branchAgentTask(input: BranchAgentTaskInput) {
+    return remoteDecode(() => this.#currentAgentReaderId()).pipe(
+      Effect.flatMap((readerId) => this.#options.agents.branchTask(input, readerId)),
+    );
+  }
+
   /** Moves this computer's reader's mark of a side thread, the mark that the member's other devices read. */
   markAgentTaskRead(input: MarkAgentTaskReadInput): AgentTaskReadState {
     return this.#options.agents.markTaskRead(input, this.#currentAgentReaderId());
@@ -1283,10 +1363,12 @@ export class HostService extends EventEmitter<HostEvents> {
         }
         yield* this.#revokeMemberSessions(memberId);
         yield* this.#forgetMemberRoles(hostId, memberId);
+        yield* this.#forgetNotificationLevels(memberId);
         return;
       }
       yield* this.#options.store.removeMember(memberId);
       if (hostId) yield* this.#forgetMemberRoles(hostId, memberId);
+      yield* this.#forgetNotificationLevels(memberId);
       yield* this.#remoteScreen.revokeMember(memberId);
       this.#options.browser.releaseUserControlHeldBy({ kind: "member", memberId });
       this.#api.refreshPresence();
@@ -1297,6 +1379,38 @@ export class HostService extends EventEmitter<HostEvents> {
   /** Gives a duplicated agent the levels of its source agent. */
   copyAgentAccess(sourceAgentId: string, agentId: string): Effect.Effect<void> {
     return this.#api.copyAgentAccess(sourceAgentId, agentId);
+  }
+
+  /** The key of a member's agent notification levels. The owner shares them with the desktop app of this computer. */
+  #notificationKey(memberId: string): string {
+    return memberId === this.#options.store.getOwnerMemberId() ? OWNER_NOTIFICATION_KEY : memberId;
+  }
+
+  #agentNotificationLevels(store: AgentNotificationLevelStore): TeamApiAgentNotificationLevels {
+    return {
+      snapshot: (memberId, hidden) => store.snapshot(this.#notificationKey(memberId), hidden),
+      set: (memberId, input) => store.set(this.#notificationKey(memberId), input),
+      setServer: (memberId, level) => store.setServer(this.#notificationKey(memberId), level),
+      subscribe: (listener) =>
+        store.subscribe((key) => {
+          // The owner's levels have one key for the desktop app of this computer and the owner's phones.
+          const memberId = key === OWNER_NOTIFICATION_KEY ? this.#options.store.getOwnerMemberId() : key;
+          if (memberId) listener(memberId);
+        }),
+    };
+  }
+
+  /** A removed member keeps no levels. The member is gone either way, so a failed write only logs. */
+  #forgetNotificationLevels(memberId: string): Effect.Effect<void> {
+    const store = this.#options.agentNotificationLevels;
+    if (!store || memberId === this.#options.store.getOwnerMemberId()) return Effect.void;
+    return store
+      .removeMember(memberId)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => logger.warn("The removed member's notification levels did not save.", toLogValue(error))),
+        ),
+      );
   }
 
   /** A removed member keeps no roles. The member is gone either way, so a failed write only logs. */

@@ -667,6 +667,54 @@ export function parseMuseVersion(output: string): string {
   return match[0];
 }
 
+export function isVersion(value: string): boolean {
+  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
+}
+
+/**
+ * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
+ * no time, are neither older nor newer.
+ */
+export function olderVersion(installed: string, target: string): boolean {
+  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
+}
+
+export function compareReleases(a: string, b: string): number {
+  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
+  return release(a).localeCompare(release(b), "en", { numeric: true });
+}
+
+/**
+ * Resolve a provider's CLI with OpenBot's copy as `bundledExecutable`. The CLI the user installed
+ * wins over the copy when it is as new: the copy then runs nothing, and the Storage page can remove
+ * it. A version that cannot be compared keeps the copy, as before. An update passes
+ * `preferInstalled: false`, because it must start the copy it just downloaded.
+ */
+export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+): Effect.Effect<Cli, E> {
+  const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
+  if (!preferInstalled) return copy;
+  const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
+  const choose = (resolved: Cli, installed: Cli | null): Cli =>
+    resolved.source === "managed" &&
+    installed?.source === "system" &&
+    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
+      ? installed
+      : resolved;
+  return Effect.gen(function* () {
+    // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    if (bundledExecutable) {
+      const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
+      return choose(resolved, installed);
+    }
+    const resolved = yield* copy;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+  });
+}
+
 /** The command name of a provider's CLI on `PATH`. */
 function cliCommandName(provider: AgentProviderId): string {
   return provider === "cursor" ? "cursor-agent" : provider;

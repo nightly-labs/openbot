@@ -24,6 +24,13 @@ import {
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "./ipc-app-auth";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import {
+  CUSTOM_AGENT_LIMITS,
+  type CustomAgentResult,
+  type CustomAgentSummary,
+  isCustomAgentResult,
+  isCustomAgentSummary,
+} from "./ipc-custom-agents";
+import {
   type CustomProviderResult,
   type CustomProviderSummary,
   isCustomProviderResult,
@@ -230,6 +237,18 @@ function runtimeRows(rows: readonly unknown[]): Map<string, unknown> {
 // The contract guard asserts that a summary carries no key, and fails closed on the whole list.
 export function decodeCustomProviderSummaries(value: unknown): CustomProviderSummary[] {
   if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) throw new Error("Invalid custom providers.");
+  return value;
+}
+
+/** `custom-agents-v1`: the list fails closed, as the local list does. */
+export function decodeCustomAgentSummaries(value: unknown): CustomAgentSummary[] {
+  if (!Array.isArray(value) || value.length > CUSTOM_AGENT_LIMITS.agents || !value.every(isCustomAgentSummary))
+    throw new Error("Invalid custom agents.");
+  return value;
+}
+
+export function decodeCustomAgentResult(value: unknown): CustomAgentResult {
+  if (!isCustomAgentResult(value)) throw new Error("Invalid custom agent result.");
   return value;
 }
 

@@ -20,7 +20,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Serve un messaggio o un allegato.",
   "error.agent.promptAnswersTooLong": "Le risposte al prompt sono troppo lunghe.",
   "error.agent.gone": "Questo agente non esiste più.",
+  "error.agent.instructionsTooLarge":
+    "Il file delle istruzioni è troppo grande per aprirlo qui. Accorcialo in un editor di testo.",
+  "error.agent.instructionsOutside":
+    "Il file delle istruzioni rimanda a una posizione fuori dallo spazio di lavoro dell'agente, quindi OpenBot non lo apre.",
+  "error.agent.instructionsReadFailed": "Impossibile leggere il file delle istruzioni.",
+  "error.agent.instructionsSaveFailed": "Impossibile salvare il file delle istruzioni.",
   "error.agent.profileGenerationBusy": "La generazione del profilo è occupata. Riprova tra poco.",
+  "error.agent.instructionsChanged":
+    "L'agente ha modificato il file delle istruzioni. L'ultima modifica non è stata salvata. Ripetila.",
   "error.agent.initialMessageRequired": "Serve il messaggio iniziale.",
   "error.agent.initialMessageTooLong": "Il messaggio iniziale è troppo lungo.",
   "error.agent.setupCleanupFailed":
@@ -120,6 +128,8 @@ export const messages = {
     "Questo server ha poca memoria. Il tuo messaggio resta in coda e parte quando si libera memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo workspace richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
+  "error.agent.claudeSandboxUnavailable":
+    "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":
     "L'acquisizione dello schermo è disattivata per questo agente. L'utente può attivare il Controllo del computer nelle impostazioni dell'agente.",
   "error.agent.screenCaptureUnavailable": "L'acquisizione dello schermo non è disponibile su questo computer.",

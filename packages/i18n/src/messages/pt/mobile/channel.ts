@@ -21,6 +21,7 @@ export const messages = {
   "mobile.channel.task.paused": "Pausada",
   "mobile.channel.task.resume": "Retomar",
   "mobile.channel.task.reassign": "Reatribuir",
+  "mobile.channel.task.cancel": "Cancelar tarefa",
   "mobile.channel.loadFailed": "Não foi possível carregar os canais. Tente novamente.",
   "mobile.channel.actions.historyStale": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
   "mobile.channel.actions.refreshFailed": "Não foi possível atualizar o histórico da tarefa. Tente novamente.",

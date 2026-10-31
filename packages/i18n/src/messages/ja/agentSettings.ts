@@ -94,9 +94,16 @@ export const messages = {
   "agentSettings.agentTitle": "肩書き",
   "agentSettings.agentTitleLabel": "エージェントの肩書き",
   "agentSettings.agentTitlePlaceholder": "エージェントの役割を説明してください",
+  "agentSettings.description": "説明",
+  "agentSettings.descriptionLabel": "エージェントの説明",
+  "agentSettings.descriptionResize": "説明欄のサイズを変更",
+  "agentSettings.descriptionPlaceholder": "このエージェントの用途",
   "agentSettings.instructions": "指示",
   "agentSettings.instructionsLabel": "エージェントへの指示",
-  "agentSettings.instructionsPlaceholder": "このエージェントの用途",
+  "agentSettings.instructionsEdit": "指示を編集",
+  "agentSettings.instructionsChangedWhileEditing":
+    "編集中にエージェントが指示を変更しました。もう一度保存すると、エージェントの版を置き換えます。",
+  "agentSettings.instructionsPlaceholder": "このエージェントが常に守るルール",
 
   "agentSettings.avatar.edit": "エージェントのアバターを編集",
   "agentSettings.avatar.editor": "アバターエディター",
@@ -154,7 +161,10 @@ export const messages = {
   "agentSettings.taskLimit.oneTurn":
     "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
-  "agentSettings.notifications.title": "通知",
+  "agentSettings.notificationLevel.title": "自分への通知",
+  "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
+  "agentSettings.notificationLevel.note":
+    "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",
 
   "agentSettings.newChat.title": "新しいチャット",
   "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",

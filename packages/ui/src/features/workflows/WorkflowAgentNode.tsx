@@ -23,7 +23,7 @@ import {
   useStepRun,
   useTextField,
   type WfProvider,
-  wfKnownProvider,
+  wfProviderLogo,
 } from "./workflow-node-parts";
 
 /* --------------------------------------------------------------- Agent */
@@ -37,7 +37,7 @@ function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
     chips: [
       { text: agent.title },
       {
-        icon: () => <ProviderLogo provider={wfKnownProvider(agent.provider)} class="wfn-model-logo" />,
+        icon: () => <ProviderLogo provider={wfProviderLogo(agent.provider)} class="wfn-model-logo" />,
         text: modelOption(catalogs.models, agent.model)?.name ?? agent.model,
       },
     ],

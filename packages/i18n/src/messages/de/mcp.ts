@@ -44,7 +44,7 @@ export const messages = {
   "mcp.status.didNotStart": "Nicht gestartet",
   "mcp.status.unreachable": "Nicht erreichbar",
   "mcp.server.providerLimitNote":
-    "Nur Claude: Ein Server mit Arbeitsverzeichnis wird den anderen Anbietern nicht bereitgestellt.",
+    "Nur Claude und Codex: Ein Server mit Arbeitsverzeichnis wird den anderen Anbietern nicht bereitgestellt.",
   "mcp.server.runtimeDownloading":
     "Die Laufzeitumgebung zum Starten von STDIO-Servern wird heruntergeladen. Ein Server kann möglicherweise erst danach starten.",
   "mcp.server.runtimeDownloadingProgress":
@@ -86,7 +86,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Weitergegebene Variable {position} entfernen",
   "mcp.panel.workingDirectory": "Arbeitsverzeichnis",
   "mcp.panel.workingDirectoryDescription":
-    "Claude-Agenten und der Verbindungstest starten den Server hier. Lass das Feld leer, um diesen Server allen Anbietern bereitzustellen. Kein anderer Anbieter kann ein Verzeichnis festlegen und überspringt deshalb Server, die eines angeben.",
+    "Claude- und Codex-Agenten und der Verbindungstest starten den Server hier. Lass das Feld leer, um diesen Server allen Anbietern bereitzustellen. Die anderen Anbieter können kein Verzeichnis festlegen und überspringen deshalb Server, die eines angeben.",
   "mcp.panel.endpointTitle": "Endpunkt",
   "mcp.panel.endpointDescription": "Jeder Anbieter kann einen HTTP-MCP-Server verwenden.",
   "mcp.panel.serverUrl": "Server-URL",

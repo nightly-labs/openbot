@@ -278,6 +278,15 @@ for a connection that advertises the capability; the frozen agent-tasks-v1 decod
 every other client. The HTTP and WebRTC clients accept it whenever it is present, and the WebRTC host
 peer encodes the local response and the events again with the same option.
 
+`ui-block-auto-answer-v1` (`team-protocol/ui-block-auto-answer-v1.ts`, protocol 9 only) adds
+`state.autoAnswer` to the blocks that the two capabilities above already send: the action that the
+host presses when nobody answers, its time, and `done` after the host pressed it. The plan card of
+`acknowledge_request` uses it. The frozen `ui-blocks-v1` codecs leave the key out in both
+directions, so the host adds it after it encodes a response or an event (`withUiBlockAutoAnswers`),
+and the WebRTC host peer adds it again after its own encoding. A client copies it back from the wire
+value after it decodes (`addUiBlockAutoAnswers`); the shared team client does this, and the mobile
+app shows the countdown with it. The desktop transports do not copy it yet.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -404,6 +413,16 @@ too. The event carries no skill data: a client reads the list again through `ins
 `skills-admin-v1`. `team-protocol/optional-events.ts` is the one place where each transport
 recognizes the optional events that the frozen base vocabularies reject.
 
+### Browser profile events
+
+`browser-profiles-events-v1` adds one optional event, `browser-profiles-changed`, with no data. The
+host sends it after each create, rename, color change, clear and delete of a named browser profile,
+and after each change of an agent's profile. `BrowserProfileService` calls its `onChanged` callback
+after each change that succeeds, and that callback emits the event through `AgentService`, so this
+computer's windows get it too. A client reads the list again through `browser-profiles-v1`: the
+desktop Browser profiles section and agent setting, the web client and the phone show a change made on
+another device while the page is open.
+
 ### Focus use
 
 `focus-use-v1` adds `POST /v1/client/focus` with an empty body. Only a hosted server advertises it
@@ -429,7 +448,11 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-host-settings-v1` | Agent Computer Use, local scripts, and messages while it works; reads the host default | `agentAdmin` |
 | `agent-backup-models-v1` | Agent backup models: the order and whether to switch without asking. Unknown providers are refused | `agentAdmin` |
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
+| `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | none: only the mobile app sends it |
+| `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
+| `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
@@ -438,13 +461,18 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `instance-transfer-v1` | Export and import the server's agents and server settings as a transfer file | `instanceTransfer` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
+| `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
+| `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
+| `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
@@ -499,6 +527,16 @@ call first, then from the sender's last message in that turn, then from this set
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
 
+`host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
+as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
+The host makes the new key, signs one handover with the current and the new key, and answers with the
+new public key only after the account service accepts the handover. No private key leaves the host.
+The client does not trust the answer: it reads the server list again and follows the signed handover
+from the key that it trusts. The desktop and mobile apps show the time of the last verified handover
+to every member, in Server settings → Server key (`hostKeyChangedAt`, `ServerSummary.keyChangedAt` on
+desktop). The mobile app reads the server list again when Server settings opens. The host advertises the capability only when it can send a
+handover to the account service.
+
 `agent-memory-limit-v1` reads and sets how many memories each agent of the host can keep. It is the
 same value as "Memories per agent" in the host's own Server settings. The snapshot gives the limit and
 the values that the host permits; the host refuses other values. A change reloads the threads of each
@@ -514,6 +552,31 @@ background memory reviews of the host's agents (`openbot-memory-review-v1.json`;
 other values. The agent service reads the value at each use, so a change applies from the next turn.
 Server settings → General → Agents → Memory review sets it for this computer
 (`hostAdmin.setMemoryReview`, local handler) and for a joined server.
+
+`agent-notification-levels-v1` reads and sets the notification levels that the signed-in member chose
+on this server, for all of their devices: the level of the whole server (`server`, `null` until they
+choose one) and the level of each agent (`all`, `needs-me` or `nothing`; `null` removes it). The host
+keeps the levels in `openbot-agent-notification-levels-v1.json`, by member ID; the owner's levels have
+the key `owner`, so the desktop app of the host computer and the owner's phones read the same levels. A
+member reads and sets only their own levels, and the read leaves out the agents that the member cannot
+see. After each change, the host sends `agent-notification-levels-changed` with all of the member's
+levels to each connection of that member, and to no other member, so a change on the phone shows at
+once on the desktop and the reverse. The owner's levels change in the host store of this computer, so
+the desktop app gets the same event from `RemoteServerManager`. Each client also reads the levels when
+a server connects; the desktop reads them for each notification too. The server level replaces the level that each device kept for the
+server before (the effective level is `server ?? the device level`); the agent level replaces the
+server level for that agent (`agentNotificationLevel` in `@openbot/team-client`), in both directions.
+A server set to Nothing, or muted on a device, stays quiet for all agents. A mute stays on each device.
+The shared switch of the agent (`notifications`) still turns notifications off for every member, because the released Team API carries it. Current clients do not show it in the agent settings any more: the matrix shows such an agent with a "Turn on" button, which sets the switch back on. The
+host applies the levels to phone notifications itself (`PushNotificationService`), so phones of every
+version follow them. On the desktop, `RemoteServerManager` reports the effective level in each
+`ServerSummary`, so the rail, the menus and the island follow it.
+
+Settings › Notifications is the one place that changes these levels: a matrix of the servers and their
+agents (`NotificationMatrix` in `@openbot/ui`, and its own screen on the phone). Server settings have no
+notification section on any device; the server menu (desktop and web) and the agent settings show the
+current level and open the matrix. A joined server
+without the capability keeps the level of each device and shows "This computer only".
 
 `prompt-cache-ttl-v1` reads and sets how long Claude keeps the prompt cache of the host's agents
 (`openbot-prompt-cache-ttl-v1.json`; `5m` or `1h`, default `5m`). With `1h` the host starts each
@@ -784,6 +847,51 @@ the tiers used the same lookup key. The license terms allow 3 devices for each u
   us" and creates no invite. Admins get no step; the join tells the person that the license is full.
 - Desktop calls the `license` IPC group; the web client calls the browser routes. Both render
   `@openbot/ui/features/billing/LicenseSection` in the license slot of `BillingPanel`.
+
+## Servers on this computer
+
+The desktop can run more servers on the same computer. Each one is a separate workspace: its own
+`openbot.db`, agents, chats, workspace folders, server settings, MCP servers and browser data. App
+preferences and the account sign-in stay with the desktop. The first server, "Local", does not
+change.
+
+Each extra server is a headless child process of the same binary (`src/main/local-server-child.ts`).
+`LocalServers` (`src/main/local-servers/local-servers.ts`) starts it with its own `--user-data-dir`
+(`<userData>/local-servers/<id>`) and its own agent root (`~/OpenBot/Servers/<id>`). The child
+sets up a password host whose one member is the owner, starts the Team API on loopback only, and
+writes one ready line to stdout with the API address and its identity. The line has no secret. The
+desktop pins the identity at the first start, signs in as the owner with the password, and attaches
+the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`.
+
+- **Registry.** `openbot-local-servers-v1.json` in the desktop userData. The owner password is 32
+  random bytes, sealed with the secret storage cipher. A file that this build cannot read is
+  read-only: no server starts and no write replaces it. Folder names come from a UUID, so a
+  changed file cannot name another path.
+- **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
+  directory sync keeps it. While the child is stopped, the entry has the address
+  `http://127.0.0.1:0` and no token, so a client never reaches an old port.
+- **Lifetime.** The child ends when its stdin closes. Teardown step 57 stops all children before
+  the joined-server connections close (step 60). The sibling scan before an update leaves out the
+  child PIDs. After an unexpected exit, the desktop starts the child again after 5 seconds, at most
+  3 times in 10 minutes. The owner password is registered for redaction and is never logged.
+- **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
+  with `shell.trashItem`. It never deletes them.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+
+Limits:
+
+- A user can create at most `LOCAL_SERVER_LIMIT` (5) servers on this computer, in addition to
+  "Local", because each one is a full OpenBot process that runs all the time. `LocalServers.create`
+  refuses one more with `error.remote.localServerLimit`. The create dialog tells the user before
+  they type a name.
+- A child server is reached as a joined server. Features behind `kind === "local"`, such as
+  Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
+- Only this computer can connect. The child does not publish to the account service and has no
+  WebRTC, so phones, the web client and other members cannot join it.
+- The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
+  shared with the other servers.
+- Not confirmed: the memory of each child, the agent browser in a child with no window, and which
+  process gets an `openbot://` link on macOS.
 
 ## macOS Host Manager
 

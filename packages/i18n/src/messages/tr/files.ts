@@ -109,12 +109,15 @@ export const messages = {
   "files.cleanup.description.caches": "Sunucu dosyalarının kopyaları. OpenBot açtığınızda bunları tekrar indirir.",
   "files.cleanup.description.logs": "Tanılama günlükleri. Yeni günlükler hemen başlar.",
   "files.cleanup.description.runtimes":
-    "Hiçbir ajanın kullanmadığı eski sağlayıcı CLI sürümleri. OpenBot kullanılan sürümü ve çalışan bir eski sürümü tutar.",
+    "Hiçbir ajanın kullanmadığı eski sağlayıcı CLI sürümleri. OpenBot kullanılan sürümü tutar.",
+  "files.cleanup.description.runtimeDownloads":
+    "Şu sağlayıcıların CLI indirmeleri: {providers}; varsa eski CLI sürümleri de. Hiçbir ajan bunları kullanmıyor: bu sağlayıcılar kapalı ya da yüklediğiniz CLI'yi kullanıyor. Bir sağlayıcı ihtiyaç duyduğunda OpenBot CLI'yi yeniden indirir.",
   "files.cleanup.clear": "Temizle",
   "files.cleanup.clearCategory": "Temizle: {category}",
   "files.cleanup.confirm.caches": "Önbelleğe alınan sunucu dosyaları temizlensin mi?",
   "files.cleanup.confirm.logs": "Günlükler temizlensin mi?",
   "files.cleanup.confirm.runtimes": "Eski sağlayıcı CLI sürümleri kaldırılsın mı?",
+  "files.cleanup.confirm.runtimeDownloads": "Sağlayıcı CLI indirmeleri kaldırılsın mı?",
   "files.cleanup.confirmDescription": "Bu işlem {size} alan boşaltır. {description}",
   "files.cleanup.clearing": "Temizleniyor…",
   "files.cleanup.failed": "Veriler temizlenemedi.",

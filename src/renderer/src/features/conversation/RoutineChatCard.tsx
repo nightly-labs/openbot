@@ -1,8 +1,5 @@
 import type { RoutineFields, RoutineSchedule } from "@openbot/contracts/ipc";
-import {
-  RoutineScheduleCard,
-  type RoutineScheduleCardState,
-} from "@openbot/ui/features/conversation/RoutineScheduleCard";
+import { RoutineScheduleCard } from "@openbot/ui/features/conversation/RoutineScheduleCard";
 import type { RoutineScheduleDraft } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import {
   ROUTINE_LOCAL_DRAFT_KINDS,
@@ -22,13 +19,7 @@ export interface RoutineChatCardProps {
   /** The chat shows the plain marker for a routine that no longer exists: its schedule is unknown. */
   routine: RoutineFields;
   agentId: string;
-  /** False when a later card in this chat is for the same routine. */
-  latest: boolean;
   onOpenRoutine: (routine: { routineId: string; name: string }) => void;
-  onShowLatest?: (() => void) | undefined;
-  /** "Show latest" on an older card moved here, so the card takes keyboard focus once it is in the page. */
-  focusRequested?: boolean;
-  onFocusHandled?: () => void;
 }
 
 type CardSave = { status: "idle" } | { status: "saving" } | { status: "saved" } | { status: "error"; message: string };
@@ -57,15 +48,6 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     (schedule) => {
       // A list refresh while a popover is open must not undo the edit shown in it.
       if (schedule && !pending) setDraft(routineScheduleToDraft(schedule));
-    },
-  );
-  const [element, setElement] = createSignal<HTMLElement>();
-  createEffect(
-    () => (props.focusRequested ? element() : undefined),
-    (card) => {
-      if (!card) return;
-      card.querySelector<HTMLButtonElement>('button:not(:disabled, [aria-disabled="true"])')?.focus();
-      props.onFocusHandled?.();
     },
   );
   let saveRequest = 0;
@@ -109,7 +91,6 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     }
   }
 
-  const state = (): RoutineScheduleCardState => (props.latest ? save().status : "superseded");
   const errorText = () => {
     const current = save();
     return current.status === "error" ? current.message : undefined;
@@ -122,7 +103,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
       schedule={draft()}
       // Only this computer's host keeps a one-time routine, so only its card offers the one-time kind.
       kinds={routine().trigger.schedule.kind === "once" ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS}
-      state={state()}
+      state={save().status}
       errorText={errorText()}
       nextRunLabel={nextRunLabel(routine(), text)}
       timeZoneLabel={timeZoneLabel(routine(), text)}
@@ -148,8 +129,6 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         saveSchedule(schedule);
       }}
       onOpenRoutine={() => props.onOpenRoutine({ routineId: routine().id, name: routine().name })}
-      onShowLatest={props.onShowLatest}
-      elementRef={setElement}
     />
   );
 }

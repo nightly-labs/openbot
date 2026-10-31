@@ -21,7 +21,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Un message ou une pièce jointe est requis.",
   "error.agent.promptAnswersTooLong": "Les réponses sont trop longues.",
   "error.agent.gone": "Cet agent n’existe plus.",
+  "error.agent.instructionsTooLarge":
+    "Le fichier d’instructions est trop volumineux pour être ouvert ici. Raccourcissez-le dans un éditeur de texte.",
+  "error.agent.instructionsOutside":
+    "Le fichier d’instructions renvoie vers un emplacement hors de l’espace de travail de l’agent : OpenBot ne l’ouvre pas.",
+  "error.agent.instructionsReadFailed": "Impossible de lire le fichier d’instructions.",
+  "error.agent.instructionsSaveFailed": "Impossible d’enregistrer le fichier d’instructions.",
   "error.agent.profileGenerationBusy": "La génération de profil est occupée. Réessayez dans un instant.",
+  "error.agent.instructionsChanged":
+    "L'agent a modifié le fichier d'instructions. Votre dernière modification n'a pas été enregistrée. Refaites-la.",
   "error.agent.initialMessageRequired": "Le message initial est requis.",
   "error.agent.initialMessageTooLong": "Le message initial est trop long.",
   "error.agent.setupCleanupFailed":
@@ -126,6 +134,8 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.claudeSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":
     "La capture d’écran est désactivée pour cet agent. L’utilisateur peut activer Computer Use dans les réglages de l’agent.",
   "error.agent.screenCaptureUnavailable": "La capture d’écran n’est pas disponible sur cet ordinateur.",

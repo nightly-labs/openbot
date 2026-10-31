@@ -48,6 +48,8 @@ const config: KnipConfig = {
     "osascript",
     // Makes the FIFO whose opens never finish in the exit watchdog E2E script.
     "mkfifo",
+    // Runs variant D of the manual browser tools bench, only when the developer installed it.
+    "browser-harness",
     // Reads the memory that programs can still use on macOS, for the machine part of Storage.
     "vm_stat",
   ],
@@ -117,8 +119,10 @@ const config: KnipConfig = {
         "expo-symbols",
       ],
     },
-    // src/index.ts is a default entry of knip.
+    // src/index.ts is a default entry of knip. The capacity-report Compose service runs
+    // src/capacity-report.ts.
     "remote/api": {
+      entry: ["src/capacity-report.ts"],
       project: ["src/**/*.ts"],
     },
     "packages/i18n": {

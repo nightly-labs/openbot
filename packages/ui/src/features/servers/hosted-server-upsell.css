@@ -8,7 +8,6 @@
   flex: none;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  margin-top: var(--openbot-space-3);
   padding: var(--openbot-space-3);
 }
 
@@ -26,7 +25,6 @@
 }
 
 .hosted-upsell-notice .ui-alert-actions {
-  justify-content: flex-start;
   margin-top: var(--openbot-space-2);
 }
 

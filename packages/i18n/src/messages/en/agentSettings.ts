@@ -93,9 +93,16 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.agentTitle": "Title",
   "agentSettings.agentTitleLabel": "Agent title",
   "agentSettings.agentTitlePlaceholder": "Describe what your agent does",
+  "agentSettings.description": "Description",
+  "agentSettings.descriptionLabel": "Agent description",
+  "agentSettings.descriptionResize": "Resize description",
+  "agentSettings.descriptionPlaceholder": "What this agent is for",
   "agentSettings.instructions": "Instructions",
   "agentSettings.instructionsLabel": "Agent instructions",
-  "agentSettings.instructionsPlaceholder": "What this agent is for",
+  "agentSettings.instructionsEdit": "Edit instructions",
+  "agentSettings.instructionsChangedWhileEditing":
+    "The agent changed its instructions while you edited them. Save again to replace its version.",
+  "agentSettings.instructionsPlaceholder": "Rules this agent always follows",
 
   "agentSettings.avatar.edit": "Edit agent avatar",
   "agentSettings.avatar.editor": "Avatar editor",
@@ -153,7 +160,10 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.taskLimit.oneTurn":
     "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
-  "agentSettings.notifications.title": "Notifications",
+  "agentSettings.notificationLevel.title": "Notify me",
+  "agentSettings.notificationLevel.server": "Server default ({level})",
+  "agentSettings.notificationLevel.note":
+    "This choice is only for you and applies on all your devices. When the server is muted or set to Nothing, this agent stays silent too.",
 
   "agentSettings.newChat.title": "New chat",
   "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",

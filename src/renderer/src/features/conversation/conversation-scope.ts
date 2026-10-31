@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/chat-tag-references";
 import {
   customProviderOfModel,
+  isCustomProviderHarness,
   type McpSignInRelayPage,
   relayableSignInLink,
   type UpdateAgentInput,
@@ -260,12 +261,16 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
     filesOpen,
     panelSubagentId,
     openSubagentPanel,
+    panelThreadId,
+    openPanelThread,
     sidePanel,
     sidePanelOpen,
     setSidePanelMaximized,
@@ -286,6 +291,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -397,12 +403,13 @@ export function createConversationViewScope(props: ConversationProps) {
     providerSilentMinutes,
     providerOffline,
   } = activity;
-  /** The name of what the agent's turns wait for. OpenCode serves a custom endpoint, so it names the endpoint (#3234). */
+  /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
   const agentProviderName = () => {
     const agent = props.agent;
     if (!agent) return undefined;
-    const endpoint =
-      agent.provider === "opencode" ? customProviderOfModel(agent.model, props.customProviders ?? []) : undefined;
+    const endpoint = isCustomProviderHarness(agent.provider)
+      ? customProviderOfModel(agent.model, props.customProviders ?? [])
+      : undefined;
     return endpoint?.name ?? providerDisplayName(agent.provider);
   };
   const browser = createBrowserStore({
@@ -451,17 +458,78 @@ export function createConversationViewScope(props: ConversationProps) {
     if (pane === "browser") showBrowserPanel();
     else setActiveRightPanel(SIDE_PANEL_MODES[pane]);
   }
-  /** The panel button opens the side panel at its last pane, or at the list of panes when none is open. */
+  const sideThreadIds = () => props.threads?.side.tabs.map((thread) => thread.id) ?? [];
+  /** The side thread that the side panel shows, or null when its tab is gone. */
+  const shownPanelThreadId = () => {
+    const id = panelThreadId();
+    return id !== null && sideThreadIds().includes(id) ? id : null;
+  };
+  /**
+   * The panel button opens the side panel at its last pane or side thread, or at the list of panes
+   * when no tab is open.
+   */
   function toggleSidePanel() {
     if (sidePanelOpen()) {
       hideBrowserPanel();
       return;
     }
     const { panes, selected } = sidePanel();
-    const pane = selected && panes.includes(selected) ? selected : (panes[0] ?? null);
+    const pane = selected && panes.includes(selected) ? selected : null;
+    const thread = shownPanelThreadId() ?? sideThreadIds()[0];
     if (pane) openSidePanelPane(pane);
+    else if (thread && selected === null) openPanelThread(thread);
+    else if (panes[0]) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
   }
+  /**
+   * A side thread tab left the side panel. When it showed, the side thread next to it shows, else the
+   * last pane. With no tab, the panel lists the panes.
+   */
+  function leavePanelThread(id: string, leave: () => void) {
+    const shown = activeRightPanel() === "thread" && shownPanelThreadId() === id;
+    const ids = sideThreadIds();
+    const index = ids.indexOf(id);
+    leave();
+    if (!shown) return;
+    const rest = ids.filter((other) => other !== id);
+    const thread = rest[Math.min(Math.max(index, 0), rest.length - 1)];
+    const pane = sidePanel().panes.at(-1);
+    if (thread) openPanelThread(thread);
+    else if (pane) openSidePanelPane(pane);
+    else setActiveRightPanel("side-panel");
+  }
+  /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
+  function closePanelThread(id: string) {
+    leavePanelThread(id, () => props.threads?.side.onClose(id));
+  }
+  /** Moves the tab of a side panel thread back to the chat, and opens it there. */
+  function movePanelThreadToChat(id: string) {
+    leavePanelThread(id, () => props.threads?.side.onToChat(id));
+  }
+  /** Moves a chat tab to the side panel, and shows its thread there. */
+  function moveThreadToPanel(id: string) {
+    props.threads?.side.onToSide(id);
+    openPanelThread(id);
+  }
+  // A side thread that shows can also leave the side panel from outside it: the thread list or a
+  // notification opens it in the chat, or it is archived. The side thread next to it then shows, else
+  // the last pane, as when its tab closes. A thread that is not in the list yet, as before the threads
+  // load after a start, did not show, so the panel keeps it.
+  createEffect(
+    () => ({
+      shown: activeRightPanel() === "thread" ? shownPanelThreadId() : null,
+      requested: activeRightPanel() === "thread" ? panelThreadId() : null,
+      ids: sideThreadIds(),
+      pane: sidePanel().panes.at(-1),
+    }),
+    (next, previous) => {
+      if (next.shown !== null || !previous?.shown || next.requested !== previous.shown) return;
+      const index = previous.ids.indexOf(previous.shown);
+      const thread = next.ids[Math.min(Math.max(index, 0), next.ids.length - 1)];
+      if (thread) openPanelThread(thread);
+      else if (next.pane) openSidePanelPane(next.pane);
+    },
+  );
   /** The subagent that the side panel shows now, or null. */
   const shownSubagentId = () => (activeRightPanel() === "subagent" ? panelSubagentId() : null);
   /** A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. */
@@ -475,7 +543,9 @@ export function createConversationViewScope(props: ConversationProps) {
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
     if (!shown) return;
+    const thread = sideThreadIds()[0];
     if (next) openSidePanelPane(next);
+    else if (thread) openPanelThread(thread);
     else setActiveRightPanel("side-panel");
   }
   const viewIsMounted = createScopeGuard();
@@ -684,6 +754,17 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   });
   const { startVoiceRecording, stopVoiceRecording, stopVoiceRecordingAndSend, cancelVoiceRecording } = voice;
+  /**
+   * Copies a conversation through an answer into a new thread. The branch opens in the chat, and its
+   * composer takes the focus, so the user can type the new direction at once.
+   */
+  const branchThread = async (sourceTaskId: string | null, messageId: string) => {
+    const onBranch = props.threads?.onBranch;
+    if (!onBranch || !(await onBranch(sourceTaskId, messageId))) return;
+    // The branch shows first, so that its editor takes the request.
+    flush();
+    setThreadFocusRequest((current) => current + 1);
+  };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
     const key = threadComposer.openDraftKey();
@@ -1785,6 +1866,18 @@ export function createConversationViewScope(props: ConversationProps) {
   const setUnreadMessagesDividerElement = (element: HTMLDivElement) => {
     unreadMessagesDivider = element;
   };
+  // The NEW line animates in when it shows a place that the last line did not mark: a chat that
+  // opens at its unread messages, or Mark unread. The virtualizer draws a row again when it scrolls
+  // back into view, and that draw shows the line at once.
+  let animatedUnreadBoundary: string | undefined;
+  const unreadDividerArrives = (): boolean => {
+    const boundary = untrack(
+      () => `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}:${unreadBoundaryMessageId() ?? ""}`,
+    );
+    if (boundary === animatedUnreadBoundary) return false;
+    animatedUnreadBoundary = boundary;
+    return true;
+  };
   const setAgentActivitySlotElement = (element: HTMLDivElement) => {
     agentActivitySlot = element;
     scrollResizeObserver?.observe(element);
@@ -1827,6 +1920,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setThreadScrollElement,
     threadComposer,
     threadFocusRequest,
+    branchThread,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
@@ -1847,6 +1941,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setStickToLatest,
     followReaderScroll,
     setUnreadMessagesDividerElement,
+    unreadDividerArrives,
     setVirtualRootElement,
     activeBrowserControl,
     actingBrowserControl,
@@ -1922,6 +2017,11 @@ export function createConversationViewScope(props: ConversationProps) {
     activeRightPanel,
     panelSubagentId,
     shownSubagentId,
+    shownPanelThreadId,
+    openPanelThread,
+    closePanelThread,
+    movePanelThreadToChat,
+    moveThreadToPanel,
     toggleSubagentPanel,
     sidePanel,
     sidePanelOpen,
@@ -1964,6 +2064,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,
+    previewFileKey,
     previewWorkspaceAgentId,
     sidebarFileBack,
     openSidebarFileBack,
@@ -1993,6 +2094,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setPageContext,
     skillSettingsRequest,
     openSkillSettings,
+    instructionsSettingsRequest,
+    openInstructionsSettings,
     routineSettingsRequest,
     updateRuntimeSettings,
     scheduleUnreadDividerVisibilityUpdate,

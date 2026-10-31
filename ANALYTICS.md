@@ -16,10 +16,11 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, or `account_api`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `12` on `desktop`,
-  `11` on `desktop_host`, `10` on `landing`, `12` on `account_api`, `4` on `mobile`, and `2` on `web`;
+  `11` on `desktop_host`, `10` on `landing`, `12` on `account_api`, `4` on `mobile`, `2` on `web`, and `1` on
+  `signal`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
@@ -65,12 +66,21 @@ be mixed into current conversion or reliability metrics.
 - Clients observing a remote host do not re-emit host lifecycle.
 - Landing, invitation, and pre-authentication events are anonymous.
 - The account service (`account_api`) sends account, billing and hosted server events from the
-  Worker, with the account ID as `profileId`. It never sends an email, a Stripe ID, a server ID, a name or an
+  Worker, with the account ID as `profileId`. Its events never contain an email, a Stripe ID, a server ID, a name or an
   amount in another currency. It uses an OpenPanel server client (`OPENPANEL_CLIENT_ID` and
   `OPENPANEL_CLIENT_SECRET`) of the same project, and only production has these secrets. The desktop
   analytics preference does not apply to these events: the account service records a payment or a
   server change, not a UI action on the computer. `email_sent` has no account, so it has no
   `profileId`, as `billing_snapshot`.
+- A paying account is not anonymous. With a `billing_action` of `plan_started`, `plan_changed`,
+  `cancel_scheduled` or `cancel_withdrawn`, and with each payment (`payment_succeeded` and `revenue`
+  from the sales ledger, once per account in a drain), for a server plan or a license, the account
+  service sends an OpenPanel `identify` with the account ID and the normalized account email from D1.
+  The app analytics preference does not stop it. The email stays a profile trait and is not in the
+  event. An account that paid before this change gets its email at its next payment or plan change;
+  the identity backfill below can set it earlier. `bun run test:paid-account-identity` checks this in `check:api`.
+- The Signal host (`signal`) sends `signal_capacity` from its capacity reporter, with the same server
+  client and no `profileId`. It has counts only: no account, address, session or room.
 - OpenPanel receives the central account ID as `profileId` and the normalized account email as the
   profile email. Email is not copied into individual event properties.
 - Existing profiles are repaired by the controlled identity backfill when their `profileId` matches
@@ -175,6 +185,7 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `billing_snapshot` | What is recurring revenue at the sample time? | Daily aggregate without a profile. `snapshot_date`, `as_of`, `reported_at`, `currency`, `mrr`, `arr`, `overdue_mrr`, `paying_accounts`, `paid_servers`, `cancellations_scheduled`, `checkout_mature_accounts`, `checkout_converted_accounts`, `checkout_pending_accounts`, `skipped_subscriptions` (subscriptions left out because Stripe has no valid data for them). From account service generation 11, `mrr`, `arr`, `overdue_mrr` and `paying_accounts` count servers only; `license_mrr`, `license_accounts` and `licensed_users` count licenses; `total_mrr` and `total_arr` count both. `skipped_subscriptions` counts both. Money is USD cents. Never sum snapshots across days. |
 | `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message`, `restart`, `schedule` or `retention`) and `error` (an allowlisted hosted server error code) |
 | `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP from `hello@openbot.run`, after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, or `welcome`. `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
+| `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`)? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, or `turn2.openbot.run` on the standby); `turn_allocations`, and `turn_allocations_udp`, `_tcp` and `_tls` for the client transports (0 when a transport has none); `signal_sockets` and `signal_peer_connections`. Generation 1 |
 
 ## Privacy and runtime validation
 
@@ -240,6 +251,10 @@ and only a loopback `http:` origin is accepted.
 10. Dev: `email_sent` with `result` `accepted` or `unknown` per hour by `kind`, against the
     500-message hourly limit of the mailbox, and all results per hour by `result`. OpenPanel counts clock hours, but the mail server counts
     the last 60 minutes, so two hours below the limit can still go above it together.
+11. Dev: `signal_capacity` (`surface = signal`) per hour: the largest `turn_allocations` by
+    `turn_host` against the `total-quota`, the largest per transport, and the largest
+    `signal_sockets` and `signal_peer_connections`. coturn adds relayed bytes to its metrics only
+    when an allocation closes, so the event has no live traffic value.
 
 Every dashboard must filter by the intended `surface` and that surface's current
 `event_schema_version`. Website bounce

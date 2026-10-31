@@ -39,7 +39,8 @@ serveFakeAcpAgent({
   },
   "session/new": (request, peer) => {
     sessions += 1;
-    const sessionId = `s-${sessions}`;
+    // Unique across processes, as Antigravity's own IDs are: each session has a process of its own.
+    const sessionId = `s-${process.pid}-${sessions}`;
     record(request, sessionId);
     peer.reply(request, { sessionId, models: MODELS });
   },

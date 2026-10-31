@@ -845,6 +845,102 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   margin-top: var(--openbot-space-3);
 }
 
+/* The product analytics choice is the last line of the answer list, lighter than the answers. */
+.first-run-choice-improve {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border-grouped);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  text-align: left;
+  cursor: pointer;
+}
+
+.first-run-choice-improve-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.first-run-choice-improve-text strong {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* Three of the team rise beside the title line, which is short, so they never cover the detail. */
+.first-run-choice-improve-pop {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-4);
+  display: flex;
+  align-items: flex-end;
+  gap: var(--openbot-space-1);
+  pointer-events: none;
+}
+
+.first-run-choice-improve-agent.agent-avatar {
+  width: 20px;
+  height: 20px;
+  animation: first-run-improve-pop 1600ms var(--openbot-ease-out) both;
+}
+
+.first-run-choice-improve-agent:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.first-run-choice-improve-agent:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+@keyframes first-run-improve-pop {
+  0% {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.4;
+  }
+  20% {
+    opacity: 1;
+    translate: 0 -6px;
+    scale: 1;
+  }
+  32% {
+    translate: 0 0;
+  }
+  80% {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.6;
+  }
+}
+
+.first-run-consent-notice {
+  width: min(100%, 440px);
+  margin: var(--openbot-space-4) 0 0;
+  color: var(--openbot-text-muted);
+  text-align: center;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.first-run-consent-notice .first-run-consent-link {
+  display: inline;
+  vertical-align: baseline;
+  font: inherit;
+  color: var(--openbot-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @keyframes first-run-rise {
   from {
     opacity: 0;
@@ -866,6 +962,11 @@ html:active-view-transition-type(open)::view-transition-new(*) {
 @media (prefers-reduced-motion: reduce) {
   .first-run-choice-avatar {
     animation: none;
+  }
+
+  /* The title still says thanks, and the toast still shows. */
+  .first-run-choice-improve-pop {
+    display: none;
   }
 }
 

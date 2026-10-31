@@ -20,7 +20,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "É necessário incluir uma mensagem ou um anexo.",
   "error.agent.promptAnswersTooLong": "As respostas às perguntas são muito longas.",
   "error.agent.gone": "Este agente não existe mais.",
+  "error.agent.instructionsTooLarge":
+    "O arquivo de instruções é grande demais para abrir aqui. Encurte-o em um editor de texto.",
+  "error.agent.instructionsOutside":
+    "O arquivo de instruções aponta para um local fora do espaço de trabalho do agente, então o OpenBot não o abre.",
+  "error.agent.instructionsReadFailed": "Não foi possível ler o arquivo de instruções.",
+  "error.agent.instructionsSaveFailed": "Não foi possível salvar o arquivo de instruções.",
   "error.agent.profileGenerationBusy": "A geração de perfil já está em andamento. Tente novamente em instantes.",
+  "error.agent.instructionsChanged":
+    "O agente alterou o arquivo de instruções. Sua última alteração não foi salva. Faça-a novamente.",
   "error.agent.initialMessageRequired": "É necessário informar uma mensagem inicial.",
   "error.agent.initialMessageTooLong": "A mensagem inicial é muito longa.",
   "error.agent.setupCleanupFailed": "A configuração do agente falhou e não foi possível remover o agente incompleto.",
@@ -116,6 +124,8 @@ export const messages = {
     "Este servidor está com pouca memória. Sua mensagem aguarda na fila e começa quando houver memória livre.",
   "error.agent.workspaceOnlyToolMissing":
     "O acesso Somente o espaço de trabalho exige {tool}, que o OpenBot não encontrou. Instale a ferramenta ou escolha Acesso completo nas configurações do agente.",
+  "error.agent.claudeSandboxUnavailable":
+    "O acesso Somente o espaço de trabalho precisa do sandbox do Claude, que o Claude não consegue iniciar neste computador: {reason}. Escolha Acesso completo ou outro provedor nas configurações do agente.",
   "error.agent.screenCaptureOff":
     "A captura de tela está desativada para este agente. O usuário pode ativar o Uso do computador nas configurações do agente.",
   "error.agent.screenCaptureUnavailable": "A captura de tela não está disponível neste computador.",

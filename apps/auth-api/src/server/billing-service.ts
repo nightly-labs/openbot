@@ -130,6 +130,8 @@ export interface BillingServiceOptions {
    * billing does not know about the provider. An error makes Stripe send the event again.
    */
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  /** Runs after the webhook stores a license change that can change the member limit of the owner's servers. */
+  onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
   sales?: BillingSales;
   /**
@@ -234,6 +236,7 @@ export class BillingService {
       ensureCustomer: (user) => this.ensureCustomer(user),
       analytics: this.#analytics,
       sales: this.#sales,
+      ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
     });
   }
 

@@ -1,5 +1,9 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  INSTANCE_TRANSFER_REMOTE_BYTES,
+  INSTANCE_TRANSFER_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -145,7 +149,18 @@ export const RemoteTeamTransport = memo(
           next.type === "connect"
             ? { id, type: "connect", hostId: next.hostId, hostPublicKey: next.hostPublicKey }
             : next.type === "request"
-              ? { id, type: "request", method: next.method, path: next.path, body: next.body, upload: next.upload }
+              ? {
+                  id,
+                  type: "request",
+                  method: next.method,
+                  path: next.path,
+                  body: next.body,
+                  upload: next.upload,
+                  // The transfer file is the one answer larger than an attachment.
+                  ...(next.path === INSTANCE_TRANSFER_ROUTES.export
+                    ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
+                    : {}),
+                }
               : { id, type: "disconnect" };
         if (!onUploadProgress) return mailbox.send(command);
         uploadListeners.current.set(id, onUploadProgress);

@@ -22,3 +22,5 @@ export * from "./v7-webrtc-adapter";
 export * from "./v8";
 export * from "./v8-adapter";
 export * from "./v8-webrtc-adapter";
+export * from "./v9";
+export * from "./v9-webrtc-adapter";

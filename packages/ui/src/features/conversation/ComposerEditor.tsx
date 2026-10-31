@@ -335,6 +335,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       quoteRequest,
       disabled,
     }) => {
+      // An owner can set its counter back to 0 after this editor read it, for example when the chat that it
+      // leaves closes after the next one opens. The next request after that must focus this editor.
+      if (focusRequest < lastFocusRequest) lastFocusRequest = focusRequest;
       if (!editor || (isComposing && agentId === lastAgentId)) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
       const skillKey = skills

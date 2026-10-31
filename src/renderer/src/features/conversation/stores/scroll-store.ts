@@ -23,6 +23,7 @@ import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
+import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -77,11 +78,13 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     () => new Set(deps.props.messages.flatMap((message) => (isTurnAnswer(message) ? [message.turnId] : []))),
   );
   const shownMessages = createMemo(() =>
-    deps.props.messages.filter(
-      (message) =>
-        message.kind !== "thinking" &&
-        !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
-        !silentAgentAnswer(message),
+    summarizeHostedSiteMessages(
+      deps.props.messages.filter(
+        (message) =>
+          message.kind !== "thinking" &&
+          !(message.kind === "memory-changes" && answeredTurns().has(message.turnId)) &&
+          !silentAgentAnswer(message),
+      ),
     ),
   );
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));

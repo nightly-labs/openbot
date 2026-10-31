@@ -68,6 +68,11 @@ import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
 import { VISIBLE_DYNAMIC_TOOLS } from "./tool-catalog";
 import {
+  AGENT_INSTRUCTIONS_FILE_BYTES,
+  type PromptInstructionsFile,
+  promptInstructionsFile,
+} from "./workspace-instructions";
+import {
   checkAgentFolders,
   codexSandboxConfig,
   codexSandboxMode,
@@ -89,9 +94,10 @@ const logger = createOpenBotLogger("thread-lifecycle");
  * server names in the form Codex accepts. Version 7 keeps approvals for custom MCP servers. Version 8
  * is the MCP namespaces in `features.code_mode.direct_only_tool_namespaces`: Codex 0.164 does not
  * add them on resume to a thread started without them, so a code-mode-only model saw no MCP tools.
- * Version 9 adds `image_gen` to those namespaces.
+ * Version 9 adds `image_gen` to those namespaces. Version 10 gives a stdio server its working
+ * directory as `cwd`; before, Codex did not get such a server.
  */
-const CODEX_MCP_ADAPTER_VERSION = 9;
+const CODEX_MCP_ADAPTER_VERSION = 10;
 
 /** What a provider other than Codex, or a Codex with no file to read, has in its own files. */
 const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {} };
@@ -106,6 +112,15 @@ const RUNTIME_RELOADED_ON_RESUME: ReadonlySet<AgentProvider> = new Set(["claude"
 
 /** Per server key, the `tools` table Codex saved for it: each tool's approval. */
 type CodexToolApprovals = Array<[string, DynamicRecord]>;
+
+/** The instruction file that the developer instructions name, and its text when they carry it. */
+interface InstructionsFileInPrompt {
+  fileName: PromptInstructionsFile["fileName"];
+  /** The file, when there is one. */
+  found: PromptInstructionsFile | null;
+  /** The file that the instructions carry: the CLI does not read it by itself. */
+  file: PromptInstructionsFile | null;
+}
 
 /**
  * Codex offers `update_plan` only when this is on, and without it a turn sends no
@@ -169,6 +184,8 @@ export interface ThreadLifecycleOptions {
   sectionTeammates?: (agentId: string) => SectionTeammates | null;
   /** Whether a public thread is a channel member's thread. */
   channelThread?: (threadId: string) => boolean;
+  /** Whether a side thread is a branch: a copy of another conversation, which its first session must receive. */
+  branchThread?: (threadId: string) => boolean;
 }
 
 /**
@@ -201,6 +218,7 @@ export class ThreadLifecycle {
   readonly #serverHost: boolean;
   readonly #sectionTeammates: (agentId: string) => SectionTeammates | null;
   readonly #channelThread: (threadId: string) => boolean;
+  readonly #branchThread: (threadId: string) => boolean;
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #pendingRuntimeRefreshes = new Set<string>();
   /**
@@ -232,6 +250,7 @@ export class ThreadLifecycle {
     this.#serverHost = options.serverHost ?? false;
     this.#sectionTeammates = options.sectionTeammates ?? (() => null);
     this.#channelThread = options.channelThread ?? (() => false);
+    this.#branchThread = options.branchThread ?? (() => false);
   }
 
   /**
@@ -578,6 +597,8 @@ export class ThreadLifecycle {
     const section = this.#sectionTeammates(agent.id);
     // Read before the configuration, which starts the same listener: both see one port.
     const proxy = client.provider === "codex" ? yield* this.#proxyFingerprint(mcpServers) : null;
+    // The same single reading, so the manifest records the file text these instructions carry.
+    const instructionsFile = yield* this.#instructionsFile(agent, client);
     const config = yield* this.codexConfigEffect(agent, client, mcpServers, own, toolRuntimes, environment);
     const params: DynamicRecord = {
       ...config,
@@ -589,6 +610,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
+      ...this.#mcpAgentParam(agent, client),
       ...this.#instructions(
         agent,
         client,
@@ -597,11 +619,12 @@ export class ThreadLifecycle {
         yield* this.#homeSkills(agent, client),
         this.#conversation.isTaskThread(publicThreadId),
         mcpServers,
+        instructionsFile,
       ),
       serviceName: "openbot",
       dynamicTools: VISIBLE_DYNAMIC_TOOLS,
     };
-    return { agent, mcpServers, toolRuntimes, own, environment, section, proxy, params };
+    return { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params };
   });
 
   readonly #startProviderThread = Effect.fn("ThreadLifecycle.prepareProviderThread")(function* (
@@ -611,11 +634,8 @@ export class ThreadLifecycle {
     publicThreadId: string,
     reason?: "configuration-change" | "missing-session",
   ) {
-    const { agent, mcpServers, toolRuntimes, own, environment, section, proxy, params } = yield* this.#startParams(
-      owner,
-      client,
-      publicThreadId,
-    );
+    const { agent, mcpServers, toolRuntimes, own, environment, section, proxy, instructionsFile, params } =
+      yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
@@ -642,7 +662,17 @@ export class ThreadLifecycle {
           const approvals = this.#toolApprovals(mcpServers, own);
           yield* this.#writeToolManifest(
             externalThreadId,
-            this.toolFingerprint(agent, mcpServers, own, approvals, toolRuntimes, environment, section, proxy),
+            this.toolFingerprint(
+              agent,
+              mcpServers,
+              own,
+              approvals,
+              toolRuntimes,
+              environment,
+              section,
+              proxy,
+              instructionsFile,
+            ),
             approvals,
           );
         }
@@ -773,6 +803,7 @@ export class ThreadLifecycle {
       config?: {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
+        project_doc_max_bytes: number;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & ReturnType<typeof codexSandboxConfig>;
@@ -780,7 +811,9 @@ export class ThreadLifecycle {
     ThreadOperationFailed
   > {
     if (client.provider !== "codex") return {};
-    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpEndpoint).pipe(toThreadOperationFailed);
+    const usable = yield* usableMcpServers(configs, toolRuntimes, this.#mcpEndpoint, agent.id).pipe(
+      toThreadOperationFailed,
+    );
     const { servers, dropped } = yield* threadStep(() => codexMcpServers(usable, own.transports));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = codexThreadMcpServers(own.disabled, servers);
@@ -788,6 +821,9 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
+        // script can be longer, and Codex would drop its end.
+        project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
         "features.code_mode.direct_only_tool_namespaces": [
           ...CODEX_DIRECT_ONLY_NAMESPACES,
           ...codexMcpNamespaces(servers),
@@ -894,6 +930,7 @@ export class ThreadLifecycle {
     environment: Readonly<Record<string, string>>,
     section: SectionTeammates | null,
     proxy: string | null,
+    instructionsFile: InstructionsFileInPrompt,
   ): string {
     const folders = existingAgentFolders(agent);
     const excluded = workspaceExcludedFolders(agent);
@@ -924,6 +961,10 @@ export class ThreadLifecycle {
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(section ? [section.members.map((member) => member.id).sort()] : []),
           ...(proxy ? [proxy] : []),
+          // A loaded session keeps the instruction file that it read or got at its start, so a change
+          // to the file adds a new value. Only another file name, or a file with text, adds a value.
+          ...(instructionsFile.fileName === "AGENTS.md" ? [] : [["instructions-file", instructionsFile.fileName]]),
+          ...(instructionsFile.found?.text ? [["instructions", instructionsFile.found.text]] : []),
         ]),
       )
       .digest("hex");
@@ -994,6 +1035,14 @@ export class ThreadLifecycle {
     return client.provider === "codex" || agentComputerUseEnabled(agent) ? {} : { computerUse: false };
   }
 
+  /**
+   * The agent, for Claude and the ACP clients, which read the servers themselves. Codex gets its
+   * servers from `codexConfigEffect` and takes the params as they are, so it is told nothing.
+   */
+  #mcpAgentParam(agent: AgentSummary, client: AgentClient): { openbotAgentId?: string } {
+    return client.provider === "codex" ? {} : { openbotAgentId: agent.id };
+  }
+
   private readonly hasCurrentToolsEffect = Effect.fn("ThreadLifecycle.hasCurrentTools")(function* (
     this: ThreadLifecycle,
     agent: AgentSummary,
@@ -1013,10 +1062,11 @@ export class ThreadLifecycle {
     const environment = this.#agentEnvironment();
     const section = this.#sectionTeammates(agent.id);
     const approvals = this.#toolApprovals(configs, own);
+    const instructionsFile = yield* this.#instructionsFile(agent, client);
     const newline = stored.success.indexOf("\n");
     const storedFingerprint = newline < 0 ? stored.success : stored.success.slice(0, newline);
     const fingerprint = yield* threadStep(() =>
-      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy),
+      this.toolFingerprint(agent, configs, own, approvals, toolRuntimes, environment, section, proxy, instructionsFile),
     );
     if (storedFingerprint === fingerprint) return true;
     if (newline < 0) return false;
@@ -1028,7 +1078,17 @@ export class ThreadLifecycle {
     ).pipe(Effect.orElseSucceed(() => null));
     if (!sessionApprovals || approvalRevoked(sessionApprovals, approvals)) return false;
     const sessionFingerprint = yield* threadStep(() =>
-      this.toolFingerprint(agent, configs, own, sessionApprovals, toolRuntimes, environment, section, proxy),
+      this.toolFingerprint(
+        agent,
+        configs,
+        own,
+        sessionApprovals,
+        toolRuntimes,
+        environment,
+        section,
+        proxy,
+        instructionsFile,
+      ),
     );
     if (storedFingerprint !== sessionFingerprint) return false;
     yield* this.#writeToolManifest(sessionId, fingerprint, approvals);
@@ -1048,6 +1108,7 @@ export class ThreadLifecycle {
     homeSkills: readonly HomeSkill[] = [],
     sideThread = false,
     mcpServers: readonly McpServerConfig[],
+    instructionsFile: InstructionsFileInPrompt,
   ): DynamicRecord {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
@@ -1063,6 +1124,8 @@ export class ThreadLifecycle {
       sectionTeammates: section,
       homeSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      instructionsFileName: instructionsFile.fileName,
+      instructionsFile: instructionsFile.file,
     };
     const instructions = developerInstructions(
       agent,
@@ -1095,6 +1158,26 @@ export class ThreadLifecycle {
   });
 
   /**
+   * The agent's instruction file, and its text when the CLI does not read that file by itself.
+   * Claude in workspace-only mode reads user settings only, so it gets the text too.
+   */
+  readonly #instructionsFile = Effect.fn("ThreadLifecycle.instructionsFile")(function* (
+    agent: AgentSummary,
+    client: AgentClient,
+  ) {
+    const read =
+      client.provider === "claude" && workspaceAccessEnforced(agent)
+        ? []
+        : agentProviderDescriptor(client.provider).workspaceInstructionFiles;
+    const file = yield* promptInstructionsFile(agent.workspacePath, read);
+    return {
+      fileName: file?.fileName ?? "AGENTS.md",
+      found: file,
+      file: file && !file.readByCli ? file : null,
+    } satisfies InstructionsFileInPrompt;
+  });
+
+  /**
    * What an existing provider session is addressed with. Read by `resumeThread` and by boot
    * recovery, which reads a session before any turn resumes it: a client that has to load the
    * session to answer needs the same workspace and settings as the resume would have given it.
@@ -1122,6 +1205,7 @@ export class ThreadLifecycle {
       sandbox: codexSandboxMode(agent),
       ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
+      ...this.#mcpAgentParam(agent, client),
       ...this.#instructions(
         agent,
         client,
@@ -1130,6 +1214,7 @@ export class ThreadLifecycle {
         yield* this.#homeSkills(agent, client),
         this.#conversation.isTaskThread(publicThreadId),
         configs,
+        yield* this.#instructionsFile(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: VISIBLE_DYNAMIC_TOOLS }),
       ...(yield* this.codexConfigEffect(
@@ -1488,7 +1573,9 @@ export class ThreadLifecycle {
     // A task keeps its own conversation across sessions, as the agent's own chat does.
     if (this.#conversation.isExecutionThread(threadId) && !this.#conversation.isTaskThread(threadId)) return null;
     const sessions = this.#store.database.listProviderSessions(threadId);
-    if (sessions.length < 1) return null;
+    // A branch starts with a copied conversation and no session, so its first session gets the copy.
+    const branch = this.#conversation.isTaskThread(threadId) && this.#branchThread(threadId);
+    if (sessions.length < 1 && !branch) return null;
     const agentNames = agentNamesById(this.#store.list());
     const history = readHandoffHistory(this.#store.database, agentId, threadId, agentNames);
     const captures = new Map<string, Map<string, string> | null>();
@@ -1504,7 +1591,7 @@ export class ThreadLifecycle {
       const text = captures.get(session.id)?.get(row.message.turnId);
       if (text) steps.set(row.message.id, text);
     }
-    return renderProviderHandoff(history, agentNames, steps);
+    return renderProviderHandoff(history, agentNames, steps, { branch });
   }).bind(this);
 }
 

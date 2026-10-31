@@ -14,6 +14,8 @@ export const messages = {
   "agent.setup.name": "Name",
   "agent.setup.purpose": "Wobei soll dieser Agent helfen?",
   "agent.setup.purposePlaceholder": "Reisen planen, Optionen vergleichen oder bei der täglichen Arbeit helfen.",
+  "agent.description.tooLong":
+    "Kürze die Beschreibung auf {limit} Zeichen. Eine längere Beschreibung wird nicht gespeichert.",
   "agent.instructions.length": "{length} / {limit}",
   "agent.instructions.tooLong":
     "Kürze die Anweisungen auf {limit} Zeichen. Längere Anweisungen werden nicht gespeichert.",

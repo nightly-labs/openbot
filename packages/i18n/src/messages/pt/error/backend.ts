@@ -71,11 +71,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
   "error.backend.channelTaskComplete": "Esta tarefa já está concluída.",
+  "error.backend.channelTaskNotStopped": "Só é possível cancelar uma tarefa parada ou com falha.",
   "error.backend.channelSelectAgent": "Selecione um agente.",
   "error.backend.channelLeadRequired": "Escolha um líder de canal disponível ou atribua esta tarefa a um membro.",
   "error.backend.channelRoutingTooLong":
     "Esta solicitação excede o limite de contexto de encaminhamento. Selecione um membro ou envie uma solicitação mais curta.",
   "error.backend.channelTaskMemberRequired": "Escolha um membro para esta tarefa.",
+  "error.backend.channelTaskStopped": "Parada. Continue ou reatribua esta tarefa.",
+  "error.backend.channelRoutingUnreadable": "O líder não conseguiu encaminhar esta mensagem. Reatribua-a a um membro.",
   "error.backend.channelRoutingFailed": "O encaminhamento falhou. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadTimedOut": "O líder do canal não respondeu a tempo. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadFailed":
@@ -197,6 +200,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Somente uma execução de uma das suas rotinas desperta uma espera, e você não tem nenhuma rotina. Crie uma com openbot.create_routine e depois abra a espera.",
   "error.backend.agentWaitRemoteUnsupported": "As esperas abertas só estão disponíveis para agentes neste computador.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marcar uma mensagem como não lida só está disponível para agentes neste computador.",
   "error.backend.routineFlowHandoffFailed": "A rotina não conseguiu passar o trabalho para este agente.",
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
@@ -339,6 +344,10 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Este agente tem {count} tópicos abertos. Arquive um tópico e depois inicie ou restaure outro.",
   "error.backend.threadRemoteUnsupported": "Os tópicos só estão disponíveis para agentes neste computador.",
+  "error.backend.branchSourceBusy": "Interrompa o turno atual antes de criar uma ramificação deste chat.",
+  "error.backend.branchMessageNotFound":
+    "Só é possível criar uma ramificação a partir de uma resposta concluída do agente.",
+  "error.backend.branchRemoteUnsupported": "As ramificações só estão disponíveis para agentes neste computador.",
   "error.backend.threadMoveRefused":
     "Só uma mensagem que você enviou apenas para este agente pode ser executada em um novo tópico.",
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",

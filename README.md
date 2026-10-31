@@ -178,7 +178,7 @@ OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot
 that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
 `bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
 `bin/`. Keep `localharness_external` beside the server. When that path is set, OpenBot uses
-only it. Connect remains available in the host's local Settings > Providers screen. Remote
+only it. Connect remains available in the host's local Server settings > Providers screen. Remote
 settings cannot perform Google sign-in; use a browser on the host. See
 [Gemini setup and download recovery](docs/architecture/providers.md#gemini) for the required
 layout, the reported IPv6 download failure, and checks that do not change host networking.

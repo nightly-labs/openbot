@@ -7,6 +7,7 @@ import {
   FIRST_TOUCH_PROPERTIES,
   isAnalyticsLicenseUsers,
   PLAN_CHANGE_DIRECTIONS,
+  readAccountEmail,
 } from "./account-analytics";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -228,10 +229,15 @@ export class SalesAnalyticsDelivery {
         };
         if (!this.#clientId || !this.#clientSecret) return summary;
 
+        const identified = new Set<string>();
         for (const row of rows) {
           const claimed = await this.#claim(row.source_key, now);
           if (!claimed) continue;
           summary.claimed += 1;
+          if (claimed.profile_id && !identified.has(claimed.profile_id) && isPaidEvent(claimed)) {
+            identified.add(claimed.profile_id);
+            await this.#identify(claimed.profile_id);
+          }
           const outcome = await this.#send(claimed);
           await this.#recordOutcome(claimed, outcome, now);
           summary[outcome.status] += 1;
@@ -241,6 +247,34 @@ export class SalesAnalyticsDelivery {
       catch: (error) =>
         error instanceof SalesAnalyticsDeliveryError ? error : new SalesAnalyticsDeliveryError({ code: "database" }),
     });
+  }
+
+  /**
+   * Sets the account email on the OpenPanel profile, as the apps do at sign-in. It is not part of the
+   * ledger: a failure logs one line with no address, and the event is still sent.
+   */
+  async #identify(profileId: string): Promise<void> {
+    const clientId = this.#clientId;
+    const clientSecret = this.#clientSecret;
+    if (!clientId || !clientSecret) return;
+    try {
+      const email = await readAccountEmail(this.#database, profileId);
+      if (!email) return;
+      const response = await this.#fetch(`${OPENPANEL_API_URL}/track`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "openpanel-client-id": clientId,
+          "openpanel-client-secret": clientSecret,
+          "openpanel-sdk-name": "openbot-account-api",
+        },
+        body: JSON.stringify({ type: "identify", payload: { profileId, email } }),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+      });
+      if (!response.ok) console.warn("Sales analytics identify failed.", { status: response.status });
+    } catch {
+      console.warn("Sales analytics identify failed.");
+    }
   }
 
   async #send(row: LedgerEvent): Promise<DeliveryOutcome> {
@@ -494,4 +528,20 @@ function isEventProperties(value: unknown): value is SalesAnalyticsProperties {
     }
   }
   return true;
+}
+
+/**
+ * A payment: `revenue`, or the `payment_succeeded` action that comes with it. It also sets the account
+ * email on the OpenPanel profile, so that a paying account is not anonymous when its apps have product
+ * analytics off.
+ */
+function isPaidEvent(row: LedgerEvent): boolean {
+  if (row.event_name === "revenue") return true;
+  if (row.event_name !== "billing_action") return false;
+  try {
+    const properties = JSON.parse(row.properties_json);
+    return isDynamicRecord(properties) && properties.action === "payment_succeeded";
+  } catch {
+    return false;
+  }
 }

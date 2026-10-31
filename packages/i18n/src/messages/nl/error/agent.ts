@@ -21,7 +21,15 @@ export const messages = {
   "error.agent.messageOrAttachmentRequired": "Een bericht of bijlage is verplicht.",
   "error.agent.promptAnswersTooLong": "De antwoorden op de prompt zijn te lang.",
   "error.agent.gone": "Deze agent bestaat niet meer.",
+  "error.agent.instructionsTooLarge":
+    "Het instructiebestand is te groot om hier te openen. Kort het in met een teksteditor.",
+  "error.agent.instructionsOutside":
+    "Het instructiebestand verwijst naar een plek buiten de werkruimte van de agent, dus OpenBot opent het niet.",
+  "error.agent.instructionsReadFailed": "Kan het instructiebestand niet lezen.",
+  "error.agent.instructionsSaveFailed": "Kan het instructiebestand niet opslaan.",
   "error.agent.profileGenerationBusy": "Er wordt al een profiel gemaakt. Probeer het zo opnieuw.",
+  "error.agent.instructionsChanged":
+    "De agent heeft het instructiebestand gewijzigd. Je laatste wijziging is niet opgeslagen. Breng deze opnieuw aan.",
   "error.agent.initialMessageRequired": "Een eerste bericht is verplicht.",
   "error.agent.initialMessageTooLong": "Het eerste bericht is te lang.",
   "error.agent.setupCleanupFailed":
@@ -123,6 +131,8 @@ export const messages = {
     "Deze server heeft weinig geheugen. Je bericht wacht in de wachtrij en start zodra er geheugen vrij is.",
   "error.agent.workspaceOnlyToolMissing":
     "Alleen werkruimte heeft {tool} nodig, maar OpenBot heeft dit niet gevonden. Installeer het, of kies Volledige toegang in de instellingen van de agent.",
+  "error.agent.claudeSandboxUnavailable":
+    "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":
     "Schermopname staat uit voor deze agent. De gebruiker kan Computerbesturing aanzetten in de instellingen van de agent.",
   "error.agent.screenCaptureUnavailable": "Schermopname is niet beschikbaar op deze computer.",

@@ -1,9 +1,9 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
-import type { AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { AgentRuntimeSnapshot, DynamicIslandPresentation } from "@openbot/contracts/ipc";
 import { LIVE_ACTIVITY_SEALED_LIMIT, type LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { LiveActivityPushRegistration } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { mobileTranslateFor, resolveLocale } from "@openbot/i18n/mobile";
-import { toLogValue } from "@openbot/logging";
+import { redactText, toLogValue } from "@openbot/logging";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import {
   type AgentLiveActivityProps,
@@ -21,6 +21,7 @@ import {
   sealLiveActivity,
 } from "@openbot/team-client/live-activity-seal";
 import { Effect, Exit, Schema, Scope } from "effect";
+import type { PushNotificationSubject } from "./push-notifications";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import type { markerExclusionsForCapabilities } from "./team-api/request-helpers";
 
@@ -76,6 +77,8 @@ interface Registration {
   connected: boolean;
   timer: { handle: ReturnType<typeof setTimeout>; at: number } | null;
   sent: { key: string; mode: string | null; at: number } | null;
+  /** The timestamp of the last update, in seconds. iOS drops an update that is not newer than the content it shows. */
+  timestamp: number;
   sending: boolean;
   /** Sends that failed in a row, for the time before the next attempt. */
   failures: number;
@@ -136,6 +139,7 @@ export class LiveActivityPushService {
       timer: null,
       // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
+      timestamp: same && previous ? previous.timestamp : 0,
       sending: false,
       failures: 0,
       retryAt: 0,
@@ -169,16 +173,25 @@ export class LiveActivityPushService {
   }
 
   /**
-   * Whether the phone of the session shows an activity of this host that iOS still updates, so the
-   * activity shows an event in place of a notification. With `alert`, its next update lights up the
-   * screen and plays the sound. `startedAt` is the start that the phone gives, in milliseconds, or
-   * `null`. iOS does not tell when the user removes the activity, so until the app runs again an
-   * event can go to an activity that is gone.
+   * Whether the phone of the session shows an activity of this host that iOS still updates, and its
+   * next view shows the event, so the activity shows it in place of a notification. With `alert`, its
+   * next update lights up the screen and plays the sound. `startedAt` is the start that the phone
+   * gives, in milliseconds, or `null`. iOS does not tell when the user removes the activity, so until
+   * the app runs again an event can go to an activity that is gone.
    */
-  showsEvent(sessionId: string, alert: LiveActivityRelayPush["alert"], startedAt: number | null): boolean {
+  showsEvent(
+    sessionId: string,
+    subject: PushNotificationSubject,
+    alert: LiveActivityRelayPush["alert"],
+    startedAt: number | null,
+  ): boolean {
     const registration = this.#registrations.get(sessionId);
     if (!registration || !away(registration)) return false;
+    // An activity that does not get its updates shows old content.
+    if (registration.failures > 0) return false;
     if (this.#now() >= (startedAt ?? registration.startedAt) + ACTIVITY_LIFETIME_MS) return false;
+    // The view shows one item: another agent that works or waits hides this event.
+    if (!presentationShows(this.#read(registration).presentation, subject)) return false;
     if (alert) {
       registration.alert = alert;
       this.#schedule(registration, EVENT_DELAY_MS);
@@ -249,12 +262,15 @@ export class LiveActivityPushService {
       this.#schedule(registration, sent.at + SAME_MODE_INTERVAL_MS - now);
       return;
     }
+    // The phone updated the activity itself just before it went away, with its own clock.
+    const timestamp = Math.max(registration.timestamp + 1, Math.ceil(now / 1000));
+    registration.timestamp = timestamp;
     const push: LiveActivityRelayPush = {
       token: registration.value.token,
       environment: registration.value.environment,
       event: props ? "update" : "end",
       sealed: props ? this.#sealToFit(props, registration.keys) : null,
-      timestamp: Math.floor(now / 1000),
+      timestamp,
       staleAt: props ? Math.floor((now + STALE_AFTER_MS) / 1000) : null,
       priority: !alert && sent?.mode === mode ? 5 : 10,
       alert,
@@ -300,7 +316,8 @@ export class LiveActivityPushService {
     return sealed;
   }
 
-  #view(registration: Registration) {
+  /** The island state of the host as this member sees it now. */
+  #read(registration: Registration) {
     const { value, viewer, coordinator } = registration;
     const hidden = viewer.hiddenAgentIds();
     const snapshot = visibleSnapshot(this.#options.agents.getRuntimeSnapshot(), hidden);
@@ -312,18 +329,25 @@ export class LiveActivityPushService {
       ),
     );
     coordinator.replaceUnreadReplies(value.serverId, Object.fromEntries(counts));
+    return { snapshot, counts, presentation: coordinator.presentation([value.serverId]) };
+  }
+
+  #view(registration: Registration) {
+    const { value } = registration;
+    const { snapshot, counts, presentation } = this.#read(registration);
     // An agent with its notifications off is not in the island, so it is not in the list.
     const unreadAgents: LiveActivityUnreadAgent[] = snapshot.agents.flatMap((agent) => {
       const count = counts.get(agent.id);
       return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
     });
-    return liveActivityView(coordinator.presentation([value.serverId]), {
+    return liveActivityView(presentation, {
       t: phoneText(value.locale),
       agentColor: avatarHeadColor,
       avatar: (_serverId, agent, mood) =>
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
       actionKey: registration.keys.action,
+      redact: redactText,
     });
   }
 
@@ -347,6 +371,27 @@ export class LiveActivityPushService {
     if (this.#listening) return;
     this.#options.agents.on("event", this.#listener);
     this.#listening = true;
+  }
+}
+
+/** Whether the island view shows the event that `subject` names, so a notification would repeat it. */
+function presentationShows(
+  presentation: DynamicIslandPresentation,
+  { agentId, kind }: PushNotificationSubject,
+): boolean {
+  switch (presentation.mode) {
+    case "message":
+      return kind === "reply" && presentation.message.agent.id === agentId;
+    case "question":
+      return kind === "input" && presentation.item.agent.id === agentId;
+    case "approval":
+      return kind === "approval" && presentation.item.agent.id === agentId;
+    case "takeover":
+      return kind === "browser" && presentation.item.agent.id === agentId;
+    case "failed":
+      return kind === "failed" && presentation.item.agent.id === agentId;
+    default:
+      return false;
   }
 }
 

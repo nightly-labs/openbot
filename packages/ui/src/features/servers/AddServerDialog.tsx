@@ -13,11 +13,16 @@ import {
   AlertIcon,
   AlertTitle,
   Button,
+  buttonVariants,
   Check,
+  ChevronDown,
   Dialog,
+  DropdownMenu,
   ErrorReference,
   Heading,
   IconButton,
+  Link2,
+  Monitor,
   OctagonX,
   Text,
   TriangleAlert,
@@ -94,8 +99,13 @@ interface AddServerDialogProps {
   serverLimit?: number | null | undefined;
   /** Opens the list of the account's hosted servers. Without it, the limit notice has no button. */
   onManageServers?: (() => void) | undefined;
-  /** Opens the invite dialog in place of this one. Without it, the dialog does not show the link. */
+  /** Opens the invite dialog in place of this one. Without it, the "Other options" menu does not show the item. */
   onJoinWithInvite?: (() => void) | undefined;
+  /**
+   * Opens the dialog that creates a server on this computer in place of this one. Without it, the "Other
+   * options" menu does not show the item.
+   */
+  onCreateLocal?: (() => void) | undefined;
   /** The consumer names the server, so the user does not have to. The logo uses the ID as its seed, as the rail does. */
   onCreate: (input: CreateHostedServerInput) => Promise<CreatedHostedServer>;
   onRetry: () => void;
@@ -355,6 +365,14 @@ export function AddServerDialog(props: AddServerDialogProps) {
               <X />
             </IconButton>
 
+            <Show when={step() === "pricing" && (props.onJoinWithInvite || props.onCreateLocal)}>
+              <AddServerOtherOptions
+                disabled={creating()}
+                onCreateLocal={props.onCreateLocal}
+                onJoinWithInvite={props.onJoinWithInvite}
+              />
+            </Show>
+
             <div class="join-server-content">
               <Switch>
                 <Match when={step() === "pricing"}>
@@ -442,17 +460,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         />
                       </Show>
                     </div>
-
-                    <Show when={props.onJoinWithInvite}>
-                      {(onJoinWithInvite) => (
-                        <Text as="p" tone="muted" class="add-server-join">
-                          {t("server.add.join.title")}{" "}
-                          <Button variant="link" size="sm" disabled={creating()} onClick={() => onJoinWithInvite()()}>
-                            {t("server.add.join.action")}
-                          </Button>
-                        </Text>
-                      )}
-                    </Show>
 
                     <Show when={props.onContactUs}>
                       {(onContactUs) => (
@@ -626,6 +633,45 @@ export function AddServerDialog(props: AddServerDialogProps) {
         </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** The ways to add a server without a plan, in the corner across from the close button. */
+function AddServerOtherOptions(props: {
+  disabled: boolean;
+  onCreateLocal: (() => void) | undefined;
+  onJoinWithInvite: (() => void) | undefined;
+}) {
+  const { t } = useText();
+  return (
+    <div class="add-server-other">
+      <DropdownMenu.Root placement="bottom-start">
+        <DropdownMenu.Trigger class={buttonVariants({ variant: "ghost", size: "sm" })} disabled={props.disabled}>
+          {t("server.add.otherOptions")}
+          <ChevronDown aria-hidden="true" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class="add-server-other-menu" aria-label={t("server.add.otherOptions")}>
+            <Show when={props.onCreateLocal}>
+              {(onCreateLocal) => (
+                <DropdownMenu.Item onSelectAfterClose={() => onCreateLocal()()}>
+                  <Monitor aria-hidden="true" />
+                  {t("server.local.createTitle")}
+                </DropdownMenu.Item>
+              )}
+            </Show>
+            <Show when={props.onJoinWithInvite}>
+              {(onJoinWithInvite) => (
+                <DropdownMenu.Item onSelectAfterClose={() => onJoinWithInvite()()}>
+                  <Link2 aria-hidden="true" />
+                  {t("server.add.join.action")}
+                </DropdownMenu.Item>
+              )}
+            </Show>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+    </div>
   );
 }
 

@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
-import { cleanAgentMessageText } from "./agent-message-text";
+import { hideRedactionMarks, messageSummary } from "./message-summary";
 
 export interface AgentNotificationContent {
   title: string;
@@ -73,6 +73,11 @@ export interface AgentNotificationPreview {
 
 /** About three lines of a macOS notification. The system cuts a longer body itself. */
 const PREVIEW_LIMIT = 200;
+/**
+ * The lead that a preview shows: the first sentences of a message, about two lines on a phone Lock
+ * Screen. A notification is a glance, and the chat has the full message.
+ */
+const SUMMARY_LIMIT = 140;
 /** The start of a reply that the preview reads, so that a long reply is not parsed in full. */
 const REPLY_READ_LIMIT = 2_000;
 
@@ -132,6 +137,37 @@ export function agentEventRequestThread(event: AgentEvent): string | null {
   return null;
 }
 
+/** The agent of an event that can notify, or null for another event. */
+export function agentEventAgentId(event: AgentEvent): string | null {
+  switch (event.type) {
+    case "prompt":
+    case "turn-completed":
+      return event.agentId;
+    case "approval":
+      return event.approval.agentId;
+    case "browser-takeover-requested":
+      return event.request.agentId;
+    case "error":
+      return event.agentId ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The level for the events of one agent. The level that the user chose for the agent replaces the
+ * server level, in both directions. A server set to "nothing" stays quiet for every agent: on a phone
+ * it then has no registration that the host could send to, so the desktop and the web do the same.
+ */
+export function agentNotificationLevel(
+  serverLevel: ServerNotificationLevel,
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  agentId: string | null,
+): ServerNotificationLevel {
+  if (serverLevel === "nothing" || agentId === null) return serverLevel;
+  return agentLevels?.get(agentId) ?? serverLevel;
+}
+
 /**
  * What a server's agent event says to the user, or null when the server level or the agent's own
  * switch keeps it quiet. "needs-me" keeps only the events that wait for the user. `channel` is the
@@ -177,7 +213,7 @@ function notificationSubject(
     const action = !preview
       ? null
       : kind === "command" && command
-        ? previewText(preview.redact(command))
+        ? previewText(hideRedactionMarks(preview.redact(command)))
         : reason && plainPreview(preview.redact(reason));
     const body = action
       ? translate("notification.needsApprovalFor", { action })
@@ -205,9 +241,9 @@ function notificationSubject(
   return null;
 }
 
-/** Agent Markdown as plain text, cut to the preview length. */
+/** The lead of agent Markdown as plain text, cut to the preview length. */
 export function plainPreview(text: string): string | null {
-  return previewText(markdownPreviewText(cleanAgentMessageText(text)));
+  return previewText(markdownPreviewText(messageSummary(text, SUMMARY_LIMIT)));
 }
 
 /** The text as one line, cut to the preview length, or null when nothing is left. */

@@ -9,6 +9,7 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { DynamicIslandText } from "./dynamic-island-presentation";
 import { signLiveActivityLink, verifyLiveActivityLink } from "./live-activity-seal";
 import { liveActivityMarkdown } from "./live-activity-text";
+import { hideRedactionMarks, messageSummary } from "./message-summary";
 
 /**
  * What the iOS Live Activity shows. The phone builds it while it runs, and its host builds the same
@@ -110,6 +111,11 @@ export interface LiveActivityViewInput {
   unreadAgents: readonly LiveActivityUnreadAgent[];
   /** Signs the button links. */
   actionKey: Uint8Array;
+  /**
+   * Hides the secrets in the agent text, because the Lock Screen and a paired watch show it. The
+   * caller supplies the shared log redaction: this package runs in React Native too.
+   */
+  redact: (text: string) => string;
 }
 
 /**
@@ -122,8 +128,12 @@ export const LIVE_ACTIVITY_LIST_URL = `${LIVE_ACTIVITY_URL}?list=1`;
 
 const TITLE_LIMIT = 80;
 const DETAIL_LIMIT = 180;
+/** The lead of a reply or a question that the detail shows: about its two lines. */
+const DETAIL_LEAD = 100;
 const ROW_NAME_LIMIT = 40;
 const ROW_TEXT_LIMIT = 100;
+/** The lead of a task in a one-line row. */
+const ROW_LEAD = 60;
 const WORKING_ROWS = 3;
 const BUTTON_LIMIT = 24;
 /** About four Lock Screen lines. A longer command is not approved from a view that cuts it. */
@@ -131,7 +141,7 @@ const APPROVAL_COMMAND_LIMIT = 140;
 
 type LiveActivityExtras = Pick<AgentLiveActivityProps, "avatar" | "tapUrl" | "buttons" | "agents" | "agentCount">;
 type LiveActivityTexts = "listUrl" | "moreLabel" | "appName" | "staleLabel" | "staleDetail";
-type LiveActivityText = Pick<LiveActivityViewInput, "t" | "agentColor">;
+type LiveActivityText = Pick<LiveActivityViewInput, "t" | "agentColor" | "redact">;
 /** A count for several agents. The island is always black, so white reads there. */
 const SEVERAL_AGENTS_TINT = "#FFFFFF";
 /** The list has 3 lines. When more agents have replies, 2 lines show agents and the last one opens the list. */
@@ -144,7 +154,7 @@ export function liveActivityView(
   presentation: DynamicIslandPresentation,
   input: LiveActivityViewInput,
 ): AgentLiveActivityProps | null {
-  const buttons = liveActivityButtons(presentation, input.t);
+  const buttons = liveActivityButtons(presentation, input.t, input.redact);
   const shown = liveActivityAgent(presentation);
   const allUnread =
     presentation.mode === "message" ? sortUnreadAgents(input.unreadAgents, presentation.message.agent.id) : [];
@@ -205,15 +215,19 @@ export function liveActivityProps(
 
 function liveActivityContent(
   presentation: DynamicIslandPresentation,
-  { t, agentColor }: LiveActivityText,
+  { t, agentColor, redact }: LiveActivityText,
 ): Omit<AgentLiveActivityProps, keyof LiveActivityExtras | LiveActivityTexts> | null {
+  // The agent's words show as their lead, as a notification shows them, with the secrets hidden.
+  const agentText = (source: string, lead: number, max: number) =>
+    liveActivityMarkdown(messageSummary(redact(source), lead), max);
+  const plain = (source: string, max: number) => limit(hideRedactionMarks(redact(source)), max);
   switch (presentation.mode) {
     case "idle":
       return null;
     case "working": {
       const rows = presentation.working.slice(0, WORKING_ROWS).map((item) => ({
         name: limit(item.agent.name, ROW_NAME_LIMIT),
-        text: liveActivityMarkdown(item.task, ROW_TEXT_LIMIT),
+        text: agentText(item.task, ROW_LEAD, ROW_TEXT_LIMIT),
       }));
       const first = presentation.working[0];
       return {
@@ -223,7 +237,7 @@ function liveActivityContent(
         // Work is the normal state, not an alert. It takes the agent color, as the avatar shows it.
         tint: first ? agentColor(first.agent.avatarSeed, first.agent.avatarHue) : "#8E8E93",
         title: first ? limit(first.agent.name, TITLE_LIMIT) : t("mobile.liveActivity.appName"),
-        detail: first ? liveActivityMarkdown(first.task, DETAIL_LIMIT) : "",
+        detail: first ? agentText(first.task, DETAIL_LEAD, DETAIL_LIMIT) : "",
         compact:
           presentation.working.length > 1
             ? String(presentation.working.length)
@@ -247,7 +261,7 @@ function liveActivityContent(
         symbol: "message.fill",
         tint: "#0A84FF",
         title: limit(presentation.message.agent.name, TITLE_LIMIT),
-        detail: liveActivityMarkdown(presentation.message.text, DETAIL_LIMIT),
+        detail: agentText(presentation.message.text, DETAIL_LEAD, DETAIL_LIMIT),
         compact: String(presentation.unreadCount),
         compactTint: agentColor(presentation.message.agent.avatarSeed, presentation.message.agent.avatarHue),
         footer: t("mobile.liveActivity.unread", { count: presentation.unreadCount }),
@@ -261,10 +275,11 @@ function liveActivityContent(
         label: t("mobile.liveActivity.badge.question"),
         symbol: "questionmark.bubble.fill",
         tint: "#0A84FF",
-        title: limit(presentation.item.title, TITLE_LIMIT),
-        detail: liveActivityMarkdown(
+        title: plain(presentation.item.title, TITLE_LIMIT),
+        detail: agentText(
           presentation.item.detail ??
             t("mobile.liveActivity.question.fallback", { name: presentation.item.agent.name }),
+          DETAIL_LEAD,
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
@@ -281,12 +296,13 @@ function liveActivityContent(
         label: t("mobile.liveActivity.badge.approval"),
         symbol: "checkmark.shield.fill",
         tint: "#FF9F0A",
-        title: limit(presentation.item.title, TITLE_LIMIT),
-        // The command shows as the host runs it. The reason is the agent's text.
+        title: plain(presentation.item.title, TITLE_LIMIT),
+        // The command shows as the host runs it, without its secrets. The reason is the agent's text.
         detail: command
-          ? limit(command, APPROVAL_COMMAND_LIMIT)
-          : liveActivityMarkdown(
+          ? plain(command, APPROVAL_COMMAND_LIMIT)
+          : agentText(
               reason ?? presentation.item.detail ?? t("mobile.liveActivity.approval.fallback"),
+              DETAIL_LEAD,
               DETAIL_LIMIT,
             ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
@@ -303,9 +319,10 @@ function liveActivityContent(
         label: t("mobile.liveActivity.badge.takeover"),
         symbol: "macwindow",
         tint: "#FF9F0A",
-        title: limit(presentation.item.title, TITLE_LIMIT),
-        detail: liveActivityMarkdown(
+        title: plain(presentation.item.title, TITLE_LIMIT),
+        detail: agentText(
           presentation.item.detail ?? t("mobile.liveActivity.takeover.fallback"),
+          DETAIL_LEAD,
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
@@ -321,11 +338,11 @@ function liveActivityContent(
         label: t("mobile.liveActivity.badge.failed"),
         symbol: "xmark.octagon.fill",
         tint: "#FF453A",
-        title: limit(
+        title: plain(
           t("mobile.liveActivity.failed.title", { name: presentation.item.agent.name, title: presentation.item.title }),
           TITLE_LIMIT,
         ),
-        detail: limit(presentation.item.detail ?? t("mobile.liveActivity.failed.fallback"), DETAIL_LIMIT),
+        detail: plain(presentation.item.detail ?? t("mobile.liveActivity.failed.fallback"), DETAIL_LIMIT),
         compact: t("mobile.liveActivity.badge.failed"),
         compactTint: "#FF453A",
         footer: "",
@@ -338,9 +355,14 @@ function liveActivityContent(
 
 /**
  * The desktop island answers questions and approvals in place. The activity offers the same
- * answers when it shows everything the answer depends on, and the Open button covers the rest.
+ * answers when it shows everything the answer depends on, and the Open button covers the rest. A
+ * command with a hidden secret does not show all of itself, so only the app approves it.
  */
-export function liveActivityButtons(presentation: DynamicIslandPresentation, t: MobileTranslate): LiveActivityButton[] {
+export function liveActivityButtons(
+  presentation: DynamicIslandPresentation,
+  t: MobileTranslate,
+  redact: (text: string) => string,
+): LiveActivityButton[] {
   const { serverId } = presentation;
   if (presentation.mode === "approval") {
     const { item } = presentation;
@@ -356,6 +378,7 @@ export function liveActivityButtons(presentation: DynamicIslandPresentation, t: 
       !item.truncated &&
       item.approval.kind === "command" &&
       command !== null &&
+      redact(command) === command &&
       Array.from(command.replace(/\s+/gu, " ").trim()).length <= APPROVAL_COMMAND_LIMIT;
     return [
       { label: t("mobile.liveActivity.button.decline"), prominent: false, action: respond("decline") },

@@ -11,10 +11,10 @@ import {
   Plus,
   Popover,
   Search,
-  Textarea,
   Tooltip,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ResizableTextarea } from "@openbot/ui/components/ResizableTextarea";
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
@@ -307,10 +307,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
       </SettingsField>
       <SettingsField label={t("channel.form.instructions")}>
-        <Textarea
+        <ResizableTextarea
           class="settings-instructions-input"
           rows="4"
           aria-label={t("channel.form.instructionsLabel")}
+          resizeLabel={t("channel.form.instructionsResize")}
           placeholder={t("channel.form.instructionsPlaceholder")}
           invalid={instructionsTooLong(fields.instructions)}
           value={fields.instructions}

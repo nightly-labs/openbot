@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "{path} に書き込みます。これはエージェントのワークスペース、共有フォルダー、一時フォルダーの外です。",
   "status.agent.contextCleared": "コンテキストを消去しました。ここから新しいチャットが始まります。",
+  "status.agent.instructionsChanged": "指示を更新しました",
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
@@ -41,4 +42,5 @@ export const messages = {
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
+  "status.agent.branchTitle": "分岐したチャット",
 } as const satisfies PartialTranslation<typeof source>;

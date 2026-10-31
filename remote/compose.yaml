@@ -9,6 +9,7 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
       SIGNAL_DOMAIN: ${SIGNAL_DOMAIN:?SIGNAL_DOMAIN is required}
       TURN_DOMAIN: ${TURN_DOMAIN:?TURN_DOMAIN is required}
+      ACME_EXTRA_DOMAINS: ${ACME_EXTRA_DOMAINS:-}
       CF_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN:?CLOUDFLARE_DNS_API_TOKEN is required}
       ACME_CERTIFICATE_GROUP_ID: ${ACME_CERTIFICATE_GROUP_ID:-2000}
     volumes:
@@ -33,6 +34,7 @@ services:
     environment:
       REMOTE_SIGNAL_HOST: 0.0.0.0
       REMOTE_SIGNAL_PORT: ${REMOTE_SIGNAL_PORT:-8443}
+      REMOTE_HEALTH_HOST: 0.0.0.0
       REMOTE_HEALTH_PORT: 8080
       REMOTE_TLS_DISABLED: ${REMOTE_TLS_DISABLED:-false}
       REMOTE_TLS_CERT_PATH: /acme/certificates/${SIGNAL_DOMAIN}.crt
@@ -55,10 +57,20 @@ services:
       REMOTE_TRUST_PROXY: ${REMOTE_TRUST_PROXY:-false}
       TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
       TURN_HOST: ${TURN_DOMAIN}
+      # Other coturn servers with the same TURN_SHARED_SECRET and ports, comma-separated: on production
+      # `turn2.openbot.run`, on the standby `turn.openbot.run`. Each host gets one relay (`turn-relays.ts`).
+      TURN_EXTRA_HOSTS: ${TURN_EXTRA_HOSTS:-}
+      # Two Signal machines (README "Two Signal machines"). SIGNAL_ID is the name in the `signal` ticket
+      # claim. SIGNAL_ENTRY_HOST and SIGNAL_PUBLIC_IPV4 go together: without them this Signal is always the entry.
+      SIGNAL_ID: ${SIGNAL_ID:-}
+      SIGNAL_ENTRY_HOST: ${SIGNAL_ENTRY_HOST:-}
+      SIGNAL_PUBLIC_IPV4: ${SIGNAL_PUBLIC_IPV4:-}
       TURN_PORT: 3478
       TURN_TLS_PORT: 5349
     ports:
       - "${REMOTE_SIGNAL_BIND_ADDRESS:-0.0.0.0}:${REMOTE_SIGNAL_PUBLIC_PORT:-443}:${REMOTE_SIGNAL_PORT:-8443}/tcp"
+      # Health and metrics for the capacity reporter, on the host loopback address only.
+      - "127.0.0.1:9642:8080/tcp"
     group_add:
       - "${ACME_CERTIFICATE_GROUP_ID:-2000}"
     volumes:
@@ -99,6 +111,34 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  # Sends the TURN and Signal counts to OpenPanel every 5 minutes (see ANALYTICS.md, `signal_capacity`).
+  # It uses the host network to read the coturn metrics on 127.0.0.1:9641. Without the OpenPanel server
+  # client it exits at start and stays stopped.
+  capacity-report:
+    build:
+      context: ..
+      dockerfile: remote/api/Dockerfile
+      args:
+        OPENBOT_SOURCE_COMMIT: ${OPENBOT_SOURCE_COMMIT:-unknown}
+    restart: on-failure
+    network_mode: host
+    entrypoint: ["bun", "src/capacity-report.ts"]
+    depends_on:
+      - remote-api
+      - coturn
+    environment:
+      OPENPANEL_CLIENT_ID: ${OPENPANEL_CLIENT_ID:-}
+      OPENPANEL_CLIENT_SECRET: ${OPENPANEL_CLIENT_SECRET:-}
+      REMOTE_METRICS_TOKEN: ${REMOTE_METRICS_TOKEN:?REMOTE_METRICS_TOKEN is required}
+      TURN_DOMAIN: ${TURN_DOMAIN}
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   acme-data:

@@ -15,11 +15,12 @@ import { Effect } from "effect";
 import lockValue from "../native-runtime.lock.json";
 import { isMissingProviderSessionError } from "../src/backend/agent/thread-items";
 import type { AgentClient } from "../src/backend/agent-client";
+import { olderVersion } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { decodeModelListResponse } from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { providerRuntimeDescriptor, type RuntimeTarget } from "../src/main/provider-runtime-descriptors";
-import { olderVersion, ProviderRuntimeManager, runtimeTarget } from "../src/main/provider-runtime-manager";
+import { ProviderRuntimeManager, runtimeTarget } from "../src/main/provider-runtime-manager";
 import {
   type BlockedVersions,
   fetchBlockedVersions,

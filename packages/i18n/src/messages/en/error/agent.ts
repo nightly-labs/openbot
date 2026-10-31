@@ -19,7 +19,14 @@ export const messages = defineMessages("error.agent", {
   "error.agent.messageOrAttachmentRequired": "A message or attachment is required.",
   "error.agent.promptAnswersTooLong": "Prompt answers are too long.",
   "error.agent.gone": "This agent no longer exists.",
+  "error.agent.instructionsTooLarge": "The instructions file is too large to open here. Shorten it in a text editor.",
+  "error.agent.instructionsOutside":
+    "The instructions file links to a place outside the agent's workspace, so OpenBot does not open it.",
+  "error.agent.instructionsReadFailed": "Could not read the instructions file.",
+  "error.agent.instructionsSaveFailed": "Could not save the instructions file.",
   "error.agent.profileGenerationBusy": "Profile generation is busy. Try again shortly.",
+  "error.agent.instructionsChanged":
+    "The agent changed the instructions file. Your last change was not saved. Make it again.",
   "error.agent.initialMessageRequired": "Initial message is required.",
   "error.agent.initialMessageTooLong": "Initial message is too long.",
   "error.agent.setupCleanupFailed": "Agent setup failed and the incomplete agent could not be removed.",
@@ -112,6 +119,8 @@ export const messages = defineMessages("error.agent", {
     "This server is low on memory. Your message waits in the queue and starts when memory is free.",
   "error.agent.workspaceOnlyToolMissing":
     "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
+  "error.agent.claudeSandboxUnavailable":
+    "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
     "Screen capture is off for this agent. The user can turn on Computer Use in the agent settings.",
   "error.agent.screenCaptureUnavailable": "Screen capture is not available on this computer.",

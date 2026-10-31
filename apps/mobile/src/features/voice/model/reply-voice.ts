@@ -49,6 +49,7 @@ export interface ReplyReading {
 
 type ReplyHandlers = {
   onPart: (text: string) => void;
+  /** The reading ended: it played to its end, or a newer reading stopped it. */
   onDone: () => void;
   onError: (failure: ReplyVoiceFailure) => void;
 };
@@ -92,6 +93,8 @@ function elevenLabsFailure(code: ElevenLabsError["code"]): ReplyVoiceFailure {
 }
 
 let nextReading = 0;
+/** Ends the reading that plays now, when a newer one starts. */
+let replaceActive: (() => void) | null = null;
 
 /** Reads a whole Markdown reply aloud, as `streamReply` does with a reply that is complete. */
 export function readReply(markdown: string, handlers: ReplyHandlers, choice?: ReplyVoiceChoice): ReplyReading {
@@ -124,9 +127,13 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     const [owner, index] = id.split(":");
     return owner === String(reading) ? Number(index) : -1;
   };
+  const release = () => {
+    if (replaceActive === replace) replaceActive = null;
+  };
   const end = (failure?: ReplyVoiceFailure) => {
     if (ended) return;
     ended = true;
+    release();
     listeners.delete(listener);
     abort.abort();
     wake?.();
@@ -153,10 +160,21 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
   const stop = () => {
     if (ended) return;
     ended = true;
+    release();
     listeners.delete(listener);
     abort.abort();
     wake?.();
     native?.stop();
+  };
+  /** A newer reading stopped the playback already; the owner continues as after the end. */
+  const replace = () => {
+    if (ended) return;
+    ended = true;
+    replaceActive = null;
+    listeners.delete(listener);
+    abort.abort();
+    wake?.();
+    handlers.onDone();
   };
   const settings = useVoiceSettings.getState();
   const engine = choice?.engine ?? settings.engine;
@@ -169,6 +187,8 @@ export function streamReply(handlers: ReplyHandlers, choice?: ReplyVoiceChoice):
     return { stop, update: () => undefined };
   }
   native.stop();
+  replaceActive?.();
+  replaceActive = replace;
   listeners.add(listener);
 
   /** The next part to play; null when the reply is complete and every part is out. */

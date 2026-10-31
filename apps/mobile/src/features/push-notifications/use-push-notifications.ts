@@ -15,21 +15,29 @@ import { useLiveActivityHost } from "@/features/live-activity/model/live-activit
 import { liveActivityHostKeys, loadLiveActivitySecret } from "@/features/live-activity/model/live-activity-keys";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import {
+  effectiveServerNotificationSetting,
+  useSyncedNotificationLevels,
+} from "@/features/settings/model/notification-levels";
+import {
   loadPushNotificationPreference,
   mutedUntil,
   registeredSound,
-  serverNotificationSetting,
   setNotificationPermission,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { isAndroid } from "@/shared/lib/platform";
-import { pushEnvironment } from "@/shared/lib/push-environment";
+import { usePushEnvironment } from "@/shared/lib/push-environment";
 import { currentLocale } from "@/shared/lib/text";
 import { pushNotificationsNative as native } from "./push-notifications-native";
 
 interface PushNotificationsInput {
   servers: readonly Pick<MobileServer, "id" | "name" | "state">[];
+  /**
+   * Whether `servers` came from the account service. Before that, and when it failed, the list is
+   * empty, and the key file keeps the keys of the last list.
+   */
+  serversReady: boolean;
   /** While the app is on screen, the hosts send nothing: the app shows the event itself. */
   foreground: boolean;
   post(serverId: string, path: string, body: TeamProtocolV2Json): Promise<unknown>;
@@ -43,16 +51,29 @@ const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATION
 
 /**
  * Gives each connected server that supports the notifications of this platform the push token of the
- * app, the events that the user chose, and whether the app is on screen. With notifications off, an
+ * app, the events that the user chose, and whether the app is on screen. The server level is the
+ * level that the user chose for all of their devices, or this phone's level when they chose none. With notifications off, an
  * iPhone still registers without a token when the Live Activity plays the sound, because the host
  * decides when it does. A host keeps the registration also when it restarts, so the phone tells each
  * host again after each connection, and removes it when the user turns both off for that host or
  * signs out.
  */
-export function usePushNotifications({ servers, foreground, post, supportsPush }: PushNotificationsInput): void {
+export function usePushNotifications({
+  servers,
+  serversReady,
+  foreground,
+  post,
+  supportsPush,
+}: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
+  // The level that the user chose for all of their devices replaces the level of this phone. The host
+  // applies it too, and the levels of the agents, so a change registers again only when it turns the
+  // server on or off here, or changes the level of the registration.
+  const synced = useSyncedNotificationLevels((state) => state.servers);
   const liveActivities = useLiveActivitiesPreference();
   const activityHost = useLiveActivityHost();
+  // An iPhone registers only when it knows which Apple environment its token is for.
+  const environment = usePushEnvironment();
   const [token, setToken] = useState<string | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
   /** What the phone last told each host, so an unchanged state is not sent again. */
@@ -93,29 +114,42 @@ export function usePushNotifications({ servers, foreground, post, supportsPush }
   }, [foreground]);
 
   // The phone asks once. The answer can change in the phone settings while the app is away, so it is read again.
+  // Apple or Google can fail to give the token, as without network at the first launch. Without it no
+  // host gets the phone, so the read runs again while the app is on screen.
   useEffect(() => {
-    if (!native || !enabled || !foreground) return;
+    // A local name, so that the check above also holds in the function below.
+    const push = native;
+    if (!push || !enabled || !foreground) return;
     let current = true;
+    let again: ReturnType<typeof setTimeout> | null = null;
+    const readToken = async () => {
+      try {
+        const device = await push.deviceToken();
+        if (current) setToken(device);
+      } catch {
+        if (current) again = setTimeout(() => void readToken(), RETRY_MS);
+      }
+    };
     void (async () => {
-      const permission = await native.permission((answer) =>
+      const permission = await push.permission((answer) =>
         mobileAnalytics.track("notification_settings_action", { action: "permission_prompted", permission: answer }),
       );
       if (!current) return;
       setNotificationPermission(permission);
-      if (permission !== "granted") return;
-      const device = await native.deviceToken();
-      if (current) setToken(device);
+      if (permission === "granted") await readToken();
     })().catch(() => undefined);
     return () => {
       current = false;
+      if (again) clearTimeout(again);
     };
   }, [enabled, foreground]);
 
   useEffect(() => native?.onDeviceToken(setToken), []);
 
-  // The file is written again only when a server or its name changes.
+  // The file is written again only when a server or its name changes. A list that did not load would
+  // remove the keys, and each notification would then show the app name only.
   useEffect(() => {
-    if (!native || !secret) return;
+    if (!native || !secret || !serversReady) return;
     try {
       native.writeKeys(
         servers.map(({ id, name }) => {
@@ -132,10 +166,10 @@ export function usePushNotifications({ servers, foreground, post, supportsPush }
     } catch {
       // Without the file the extension shows the app name only.
     }
-  }, [secret, servers]);
+  }, [secret, servers, serversReady]);
 
   useEffect(() => {
-    if (!native || !preference.ready || !liveActivities.ready || !secret) return;
+    if (!native || !preference.ready || !liveActivities.ready || !secret || !environment) return;
     // Wait for iOS and the token, so a phone that has notifications does not remove them at launch.
     if (preference.enabled && preference.permission === null) return;
     const deliverable = preference.enabled && preference.permission === "granted";
@@ -151,7 +185,7 @@ export function usePushNotifications({ servers, foreground, post, supportsPush }
         continue;
       }
       if (!supportsPush(server.id)) continue;
-      const setting = serverNotificationSetting(preference, server.id);
+      const setting = effectiveServerNotificationSetting(preference, synced[server.id], server.id);
       const muted = mutedUntil(setting, now);
       let registration: PushNotificationRegistration | AndroidPushNotificationRegistration | null = null;
       if ((deliverable || activitySound) && setting.level !== "nothing" && muted !== Number.POSITIVE_INFINITY) {
@@ -170,7 +204,7 @@ export function usePushNotifications({ servers, foreground, post, supportsPush }
           registration = {
             ...common,
             token: deliverable ? token : null,
-            environment: pushEnvironment(),
+            environment,
             liveActivityStartedAt:
               activityHost.serverId === server.id && activityHost.startedAt !== null
                 ? Math.floor(activityHost.startedAt / 1_000)
@@ -200,7 +234,20 @@ export function usePushNotifications({ servers, foreground, post, supportsPush }
         }
       });
     }
-  }, [servers, foreground, token, secret, preference, liveActivities, activityHost, supportsPush, enqueue, attempt]);
+  }, [
+    servers,
+    foreground,
+    token,
+    secret,
+    environment,
+    preference,
+    synced,
+    liveActivities,
+    activityHost,
+    supportsPush,
+    enqueue,
+    attempt,
+  ]);
 
   useEffect(() => {
     const sent = registered.current;

@@ -51,6 +51,7 @@ function createActivity(props: unknown) {
   activities.push(record);
   return {
     startedAt: Date.now(),
+    isActive: () => !record.ended,
     async update(next: unknown) {
       if (record.ended) throw new Error("The activity ended.");
       record.updates.push(JSON.stringify(next));

@@ -4,7 +4,10 @@
  */
 
 import type { ProviderLogoVariant } from "@openbot/brand";
+import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import {
+  type AgentProviderRef,
+  type AgentStatus,
   type ClientAgentModelOption,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
@@ -12,6 +15,7 @@ import {
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
 } from "@openbot/contracts/ipc";
+import { providerOffersModels } from "../../components/provider-model-options";
 import type { AgentProfile } from "../../data";
 
 export interface WorkflowFeatures {
@@ -61,10 +65,35 @@ export interface WorkflowImageModel {
 export interface WorkflowCatalogs {
   agents: readonly AgentProfile[];
   models: readonly ClientAgentModelOption[];
+  /** The providers of the host, so a model list leaves out the ones that are not connected. */
+  status: AgentStatus;
   places: readonly WorkflowPlace[];
   imageModels: readonly WorkflowImageModel[];
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
   /** The name of the user, which a new sticky note saves as its author. */
   self?: string | undefined;
+}
+
+/**
+ * The providers that a model list offers, in the order of the first model of each: the ones that the
+ * host can run now or soon, and `current`, so the model of a step stays in its list. A provider that
+ * this build does not know comes from a newer host with its models, so it stays. When no provider is
+ * left, the list offers all of them.
+ */
+export function workflowModelProviders(catalogs: WorkflowCatalogs, current?: AgentProviderRef): AgentProviderRef[] {
+  const all = [...new Set(catalogs.models.map((option) => option.provider))];
+  const offered = all.filter(
+    (provider) =>
+      provider === current ||
+      !isKnownAgentProvider(provider) ||
+      providerOffersModels(catalogs.status, catalogs.models, provider),
+  );
+  return offered.length ? offered : all;
+}
+
+/** The model that a new step takes: the first one of a provider that the host can run. */
+export function defaultWorkflowModel(catalogs: WorkflowCatalogs): ClientAgentModelOption | undefined {
+  const [provider] = workflowModelProviders(catalogs);
+  return catalogs.models.find((option) => option.provider === provider);
 }

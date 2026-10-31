@@ -236,10 +236,13 @@ export class ThreadReplay {
         messages.push(message);
         messagesByTurn.set(message.turnId, messages);
       }
+      // A branch keeps the turn ids of the rows it copied, and the turn row stays with the source
+      // thread: a turn id is unique across threads. The replay of a branch writes no row for them.
       const turnInsert = db.prepare(`
         INSERT INTO projection_turns (
           turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(turn_id) DO NOTHING
       `);
       for (const [turnId, messages] of messagesByTurn) {
         const running = latest.activeTurnId === turnId;

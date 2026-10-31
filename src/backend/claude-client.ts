@@ -97,6 +97,7 @@ import {
   type McpEndpointSource,
   type McpServerSource,
   type McpToolRuntimeSource,
+  mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { PendingServerRequests } from "./pending-server-requests";
@@ -171,6 +172,8 @@ interface ThreadConfig {
   workspaceOnly: boolean;
   /** Folders in the roots where Workspace only denies all writes. */
   excludedFolders: string[];
+  /** The agent, so the MCP sign-in proxy can name it to a server. See `mcpAgentParam`. */
+  agentId: string | null;
 }
 
 interface ActiveTurn {
@@ -837,6 +840,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             agentMcpServers(this.#mcpServers(), config.computerUse),
             this.#mcpToolRuntimes?.(),
             this.#mcpEndpoint,
+            config.agentId,
           ).pipe(toProviderClientOperationError),
         );
     const stateDirectory = this.#stateDirectory;
@@ -1692,7 +1696,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (status === "failed" && error) {
       this.emit("notification", {
         method: "error",
-        params: { threadId: runtime.id, turnId: turn.id, message: String(error) },
+        params: { threadId: runtime.id, turnId: turn.id, message: claudeTurnError(error) },
       });
     }
     this.#emitSubagents(runtime, endClaudeSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
@@ -1960,6 +1964,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess">;
 
 /**
+ * The error of a Workspace only query when the CLI cannot make its sandbox (`failIfUnavailable`).
+ * It tells the user to set `sandbox.failIfUnavailable=false`, which OpenBot does not show and which
+ * would let commands run with no sandbox. Windows gets it on every turn: the Windows sandbox of
+ * Claude Code 2.1.309 is behind a feature gate (#4094).
+ */
+const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
+
+function claudeTurnError(error: unknown): string {
+  const text = String(error);
+  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
+  return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
+}
+
+/**
  * The npm wrapper for Claude Code ends with the real program, `"%dp0%\node_modules\…\claude.exe" %*`,
  * or with `cli.js` after `"%_prog%"`.
  */
@@ -2162,6 +2180,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
       isRecord(params) && Array.isArray(params.excludedFolders)
         ? params.excludedFolders.filter((value): value is string => isString(value))
         : [],
+    agentId: mcpAgentParam(params),
   };
 }
 

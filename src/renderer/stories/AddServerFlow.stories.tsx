@@ -35,6 +35,7 @@ function AddServerFlow(props: FlowProps) {
   const [addOpen, setAddOpen] = createSignal(props.startOpen ?? false);
   const [contactNote, setContactNote] = createSignal(false);
   const [joinNote, setJoinNote] = createSignal(false);
+  const [localNote, setLocalNote] = createSignal(false);
   const [manageNote, setManageNote] = createSignal(false);
   const [setupStatus, setSetupStatus] = createSignal<HostedServerSetupStatus | null>(null);
   const [pending, setPending] = createSignal({ id: "", name: "" });
@@ -102,6 +103,11 @@ function AddServerFlow(props: FlowProps) {
         <Show when={joinNote()}>
           <Text tone="muted">"Join a server" was clicked. The app opens the invite dialog here.</Text>
         </Show>
+        <Show when={localNote()}>
+          <Text tone="muted">
+            "New server on this computer" was clicked. The app opens the dialog that names the server here.
+          </Text>
+        </Show>
       </main>
 
       <Show when={addOpen()}>
@@ -117,6 +123,10 @@ function AddServerFlow(props: FlowProps) {
           onJoinWithInvite={() => {
             setAddOpen(false);
             setJoinNote(true);
+          }}
+          onCreateLocal={() => {
+            setAddOpen(false);
+            setLocalNote(true);
           }}
           onCreate={async () => {
             await new Promise((resolve) => window.setTimeout(resolve, 700));

@@ -1,9 +1,10 @@
+import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useState } from "react";
 import { Linking } from "react-native";
 import { useUniwind } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
-import { ServerNotificationSettings } from "@/features/push-notifications/components/server-notification-settings";
+import { NotificationMatrix } from "@/features/push-notifications/components/notification-matrix";
 import { pushNotificationsNative } from "@/features/push-notifications/push-notifications-native";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
@@ -12,21 +13,22 @@ import {
   savePushNotificationPreference,
   usePushNotificationPreference,
 } from "@/features/settings/model/push-notifications";
-import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 /**
- * The screen goes from the ways the phone tells the user, to the one sound that they play, to the
- * choices for each server, which the desktop app has in its server settings. On iOS, notifications
- * and Live Activities tell the user, and the sound is there while either is on. Android has
- * notifications only, which reach the phone through Google.
+ * The one place for the notification settings. First what the user hears about from each server and
+ * agent, which the host keeps for all of their devices, and the mute of this phone. Then the ways this
+ * phone tells the user, and the one sound that they play. On iOS, notifications and Live Activities
+ * tell the user, and the sound is there while either is on. Android has notifications only, which
+ * reach the phone through Google. The server settings and the agent settings open this screen with
+ * `serverId`, and the agent settings also with `agentId`, to show that server and that agent.
  */
 export function NotificationsSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
-  const { servers } = useMobileWorkspace();
+  const { serverId, agentId } = useLocalSearchParams<{ serverId?: string; agentId?: string }>();
   const preference = usePushNotificationPreference();
   const liveActivities = useLiveActivitiesPreference();
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +62,9 @@ export function NotificationsSettingsScreen() {
 
   return (
     <SettingsContent>
+      <NotificationMatrix initialServerId={serverId} highlightAgentId={agentId} />
       <SettingsSection
-        title={t("mobile.settings.notifications.title")}
+        title={t("mobile.settings.notifications.thisPhone")}
         footer={
           error ??
           (denied
@@ -179,9 +182,6 @@ export function NotificationsSettingsScreen() {
           <Typography.Paragraph>{t("mobile.settings.notifications.sound")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      {servers.map((server) => (
-        <ServerNotificationSettings key={server.id} server={server} title={server.name} />
-      ))}
     </SettingsContent>
   );
 }

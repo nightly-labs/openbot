@@ -67,11 +67,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
   "error.backend.channelTaskNotFound": "No se encontró la tarea del canal.",
   "error.backend.channelTaskComplete": "Esta tarea ya está completada.",
+  "error.backend.channelTaskNotStopped": "Solo se puede cancelar una tarea detenida o fallida.",
   "error.backend.channelSelectAgent": "Selecciona un agente.",
   "error.backend.channelLeadRequired": "Elige un coordinador de canal disponible o asigna esta tarea a un miembro.",
   "error.backend.channelRoutingTooLong":
     "Esta solicitud supera el límite de contexto de asignación. Selecciona un miembro o envía una solicitud más corta.",
   "error.backend.channelTaskMemberRequired": "Elige un miembro para esta tarea.",
+  "error.backend.channelTaskStopped": "Detenida. Continúa o reasigna esta tarea.",
+  "error.backend.channelRoutingUnreadable": "El líder no pudo dirigir este mensaje. Reasígnalo a un miembro.",
   "error.backend.channelRoutingFailed": "La asignación falló. Elige un miembro o inténtalo de nuevo.",
   "error.backend.channelLeadTimedOut":
     "El coordinador del canal no respondió a tiempo. Elige un miembro o inténtalo de nuevo.",
@@ -196,6 +199,8 @@ export const messages = {
     "Solo una ejecución de una de tus rutinas despierta una espera, y no tienes ninguna rutina. Crea una con openbot.create_routine y luego abre la espera.",
   "error.backend.agentWaitRemoteUnsupported":
     "Las esperas abiertas solo están disponibles para agentes en este equipo.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Marcar un mensaje como no leído solo está disponible para agentes en este equipo.",
   "error.backend.routineFlowHandoffFailed": "La rutina no pudo pasar el trabajo a este agente.",
   "error.backend.mcpServerLimit": "OpenBot mantiene hasta {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Ya existe un servidor MCP llamado {name}.",
@@ -341,6 +346,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "Este agente tiene {count} hilos abiertos. Archiva un hilo y después inicia o restaura otro.",
   "error.backend.threadRemoteUnsupported": "Los hilos solo están disponibles para los agentes de este equipo.",
+  "error.backend.branchSourceBusy": "Detén el turno actual antes de crear una rama de este chat.",
+  "error.backend.branchMessageNotFound": "Solo puedes crear una rama desde una respuesta terminada del agente.",
+  "error.backend.branchRemoteUnsupported": "Las ramas solo están disponibles para los agentes de este equipo.",
   "error.backend.threadMoveRefused":
     "Solo un mensaje que enviaste únicamente a este agente puede ejecutarse en un hilo nuevo.",
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",

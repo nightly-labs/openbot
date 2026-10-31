@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/status/agent";
 export const messages = {
   "status.agent.claudeWriteOutside": "写入 {path}，位置在助手工作区、共享文件夹和临时文件夹之外。",
   "status.agent.contextCleared": "上下文已清空，将从这里开始新对话。",
+  "status.agent.instructionsChanged": "更新了它的指令",
   "status.agent.modelSwitchedForLimit": "额度已用完，已切换到 {model}。",
   "status.agent.modelReturnedAfterLimit": "额度已恢复，已切回 {model}。",
   "status.agent.modelSwitchedForError": "服务商出错，已切换到 {model}。",
@@ -51,4 +52,5 @@ export const messages = {
   "status.agent.vaultUpdated": "已在保险库中修改：{name}",
   "status.agent.vaultDeleted": "已从保险库删除：{name}",
   "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
+  "status.agent.branchTitle": "分支聊天",
 } as const satisfies PartialTranslation<typeof source>;

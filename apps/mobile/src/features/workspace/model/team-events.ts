@@ -1,5 +1,5 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
-import { type PlanLimits, withSignInUsage } from "@openbot/team-client/plan-limits";
+import { type PlanLimits, withUsageEvent } from "@openbot/team-client/plan-limits";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
@@ -59,7 +59,7 @@ export function syncEventQueries(
   applyTaskEvent(queryClient, scope, serverId, event);
   if (event.type === "usage-changed") {
     queryClient.setQueryData<PlanLimits>(queryKeys.planLimits(scope, serverId), (current) =>
-      current ? { ...current, usage: withSignInUsage(current.usage, event.usage) } : current,
+      current ? { ...current, usage: withUsageEvent(current.usage, event.usage) } : current,
     );
     return;
   }
@@ -108,6 +108,14 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "session-settings",
     });
   }
+  if (event.type === "browser-profiles-changed") {
+    // A change on the desktop or another phone: the profile list and each agent's choice read again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.agentInfo(scope, serverId),
+      predicate: (query) => query.queryKey.at(-1) === "browser-profile",
+    });
+  }
   if (event.type === "workflows-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflowList(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });
@@ -117,7 +125,7 @@ export function syncEventQueries(
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(scope, serverId) });
     // The host also sends this event when the roles change, and this client does not get `agent-access-changed`.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoles(scope, serverId) });
-    // The admin and host settings and the provider account of an agent are not in the agent summary.
+    // The admin, host and new-chat settings and the provider account of an agent are not in the agent summary.
     // The host sends this event when one of them changes, so an open settings page reads them again.
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId),

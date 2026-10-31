@@ -1,5 +1,77 @@
 [
   {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents do many browser actions in one step, such as typing a search, pressing Enter and waiting for results. Browser tasks finish sooner and use fewer tokens.",
+          "Right-click an agent message and select Mark unread to read it again later.",
+          "When you have another server, you can hide the Local server from its menu. Its agents, chats and files stay on your computer.",
+          "Choose the sound that plays when a task finishes in Settings › Notifications."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A provider uses the CLI that you installed when it is the same version as OpenBot's copy or newer.",
+          "Your analytics answer follows your account to your other devices. If you turned analytics off before this version, it stays off on this computer until you change it here.",
+          "Drag the grip of the Instructions field to make it taller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Cloudflare checks pass in the built-in browser.",
+          "Each provider CLI uses about half the disk space: OpenBot keeps one version.",
+          "A message that you send to an agent at a usage limit tries the provider again at once.",
+          "In the sidebar, a chat that you drag lands in the section below the pointer."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.55.0",
+    "date": "2026-10-30",
+    "notices": [
+      "In a Telegram group that you connected before this version, remove OpenBot from the group and connect the group again, or make OpenBot a group admin."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Settings › Notifications is the one place for notifications. Choose All activity, Only when it needs me, or Nothing for each server and agent. The choice applies on your computer, in the web client and on your phones.",
+          "Create more servers on this computer. Each one is a separate workspace. Click the plus button on the server rail, then Other options › New server on this computer.",
+          "Exclude folders on an agent's Folders page, so the agent cannot change files in them.",
+          "Connect your own OpenAI-compatible voice server in Settings › Voice for dictation and spoken replies.",
+          "Settings › Agents lists the background processes that agents left running, and Stop ends them.",
+          "Press Tab in the message box to send a message into the agent's running turn.",
+          "Log in to ChatGPT with an OpenAI API key, and disconnect the Claude and Codex sign-in from the ⋯ menu."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "In a channel, more than one agent can answer the same request.",
+          "The Tasks page is back on desktop and the web. It lists the side threads of all agents.",
+          "The Marketplace Skills tab shows your skills first, with the agents that have them and an Update button.",
+          "An agent that ends a turn with open plan steps continues by itself, up to 3 times."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini no longer fills the memory of a computer or server over hours of use.",
+          "A self-hosted server takes as many members as your license has users.",
+          "The web app connects to your server again at once when you go back to it.",
+          "Picture in Picture shows the page of a joined server's browser."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.54.0",
     "date": "2026-10-29",
     "notices": [],

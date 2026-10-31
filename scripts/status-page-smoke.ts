@@ -59,6 +59,7 @@ const probeServer = createServer((request, response) => {
   };
   if (path === "/api/health/ready") return reply("accounts", '{"status":"ready"}');
   if (path === "/signal/health/ready") return reply("connections", '{"status":"ready"}');
+  if (path === "/signal/health/turn") return reply("connections", '{"status":"ready"}');
   if (path === "/api/health/hosting") return reply("hosted", '{"status":"ok"}');
   if (path === "/api/v1/skills?limit=1") return reply("marketplace", '{"skills":[]}');
   if (/^\/github\/nightly-labs\/openbot\/releases\/latest\/download\/latest(-mac|-linux)?\.yml$/.test(path)) {

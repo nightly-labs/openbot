@@ -37,7 +37,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
-import type { ThreadHeaderProps } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
@@ -188,6 +188,8 @@ export interface ConversationProps {
    * a member, and for a host without `browser-profiles-v1`.
    */
   onManageBrowserProfiles?: ((trigger: HTMLElement) => void) | undefined;
+  /** Opens the notification settings at a server, where the user changes the level of its agents. */
+  onOpenNotificationSettings?: ((serverId: string, trigger: HTMLElement) => void) | undefined;
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
   /**
@@ -293,6 +295,8 @@ export interface ConversationProps {
     voiceRecordingDraftId?: string,
   ) => Promise<SendMessageResult>;
   onMarkRead: () => Promise<void>;
+  /** Marks an agent message and the messages after it unread. Without it, the message menu has no such item. */
+  onMarkUnread?: ((messageId: string) => Promise<void>) | undefined;
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
@@ -315,6 +319,8 @@ export interface ConversationProps {
   remoteBackupModelsLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
   remoteTaskLimitLoaded?: boolean | undefined;
+  /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
+  remotePlanCardLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's busy-message mode: owners and admins only. */
   remoteBusyMessageModeLoaded?: boolean | undefined;
   /**
@@ -396,7 +402,9 @@ export type RightPanelMode =
   | "files"
   | "question"
   | "voice"
-  | "subagent";
+  | "subagent"
+  /** A side thread in the side panel, beside the agent's own chat. */
+  | "thread";
 
 export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 
@@ -406,6 +414,8 @@ export type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel"
  */
 export interface ConversationThreads {
   header: ThreadHeaderProps;
+  /** The side threads with a tab in the side panel. */
+  side: SideThreads;
   /** The open side thread, or null for a new thread. Undefined while the agent's own chat is open. */
   open: AgentTask | null | undefined;
   /** How many side threads of the agent can run at the same time. */
@@ -430,4 +440,51 @@ export interface ConversationThreads {
   onCompactContext?: (() => Promise<void>) | undefined;
   /** Missing when the host cannot move a queued message to a new thread. */
   onRunQueuedMessage?: ((deliveryId: string) => void) | undefined;
+  /**
+   * Copies a conversation through an agent answer into a new thread, and opens it: the agent's own
+   * chat when `sourceTaskId` is null, or a side thread. Resolves true when the branch opened. Missing
+   * when the host cannot branch.
+   */
+  onBranch?: ((sourceTaskId: string | null, messageId: string) => Promise<boolean>) | undefined;
+  /** Where a side thread came from, when it is a branch. Undefined for a thread that is no branch. */
+  branchSource: (task: AgentTask) => ConversationBranchSource | undefined;
+  /** The message that a side thread scrolls to once, after a click on "Branched from". */
+  focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+}
+
+/** The source of a branch: the agent's own chat, a side thread, or a side thread that was deleted. */
+export interface ConversationBranchSource {
+  throughMessageId: string;
+  /** The title of the source thread. Null for the agent's own chat, which shows the agent's name. */
+  title: string | null;
+  deleted: boolean;
+  /** Opens the source at the message that the branch came from. */
+  onOpen: () => void;
+}
+
+/** The side threads in the side panel. Each shows beside the agent's own chat. */
+interface SideThreads {
+  /** In tab order. */
+  tabs: readonly ThreadItem[];
+  /** A thread of a tab, with the actions of its own message box. Undefined when the thread is gone. */
+  thread: (id: string) => SideThread | undefined;
+  /** Moves a chat tab to the side panel. */
+  onToSide: (id: string) => void;
+  /** Moves a side panel tab back to the chat tabs, and opens it there. */
+  onToChat: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+}
+
+/** A side thread in the side panel. Each action applies to this thread. */
+export interface SideThread {
+  task: AgentTask;
+  conversation: ConversationSnapshot | undefined;
+  approval: AgentApproval | undefined;
+  onSend: (text: string, attachmentDraftIds: string[]) => Promise<boolean>;
+  onStop: () => void;
+  onRead: (messageId: string) => void;
+  onRespondApproval: (decision: "accept" | "decline", options?: PromptAnswerOptions) => Promise<boolean>;
+  contextState: AgentContextState | undefined;
+  onCompactContext?: (() => Promise<void>) | undefined;
 }

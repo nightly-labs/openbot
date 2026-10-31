@@ -247,7 +247,7 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
   );
 }
 
-/** The offer at the top of a routine list, while active routines depend on this host. */
+/** The offer at the bottom of the routines panel, while active routines depend on this host. */
 export function HostedUpsellRoutinesNotice(props: { count: number }) {
   return (
     <Show when={props.count > 0 && controller()?.noticeVisible() ? controller() : null}>

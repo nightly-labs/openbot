@@ -65,11 +65,14 @@ export const messages = {
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",
   "error.backend.channelTaskComplete": "Эта задача уже выполнена.",
+  "error.backend.channelTaskNotStopped": "Отменить можно только остановленную или неудавшуюся задачу.",
   "error.backend.channelSelectAgent": "Выберите агента.",
   "error.backend.channelLeadRequired": "Выберите доступного ведущего канала или назначьте эту задачу участнику.",
   "error.backend.channelRoutingTooLong":
     "Этот запрос превышает лимит контекста маршрутизации. Выберите участника или отправьте запрос короче.",
   "error.backend.channelTaskMemberRequired": "Выберите участника для этой задачи.",
+  "error.backend.channelTaskStopped": "Остановлено. Продолжите или переназначьте эту задачу.",
+  "error.backend.channelRoutingUnreadable": "Ведущий не смог распределить это сообщение. Назначьте его участнику.",
   "error.backend.channelRoutingFailed": "Не удалось выполнить маршрутизацию. Выберите участника или повторите попытку.",
   "error.backend.channelLeadTimedOut": "Ведущий канала не ответил вовремя. Выберите участника или повторите попытку.",
   "error.backend.channelLeadFailed":
@@ -189,6 +192,8 @@ export const messages = {
   "error.backend.agentWaitNoRoutine":
     "Ожидание пробуждает только запуск одной из ваших регулярных задач, а у вас их нет. Создайте регулярную задачу с помощью openbot.create_routine, затем откройте ожидание.",
   "error.backend.agentWaitRemoteUnsupported": "Открытые ожидания доступны только для агентов на этом компьютере.",
+  "error.backend.markUnreadRemoteUnsupported":
+    "Отметить сообщение непрочитанным можно только для агентов на этом компьютере.",
   "error.backend.routineFlowHandoffFailed": "Регулярной задаче не удалось передать работу этому агенту.",
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
@@ -330,6 +335,9 @@ export const messages = {
   "error.backend.threadOpenLimitReached":
     "У этого агента открыто веток: {count}. Архивируйте ветку, затем начните или восстановите другую.",
   "error.backend.threadRemoteUnsupported": "Ветки доступны только для агентов на этом компьютере.",
+  "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
+  "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
+  "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",

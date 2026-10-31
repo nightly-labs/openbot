@@ -5,6 +5,7 @@ export const messages = {
   "status.agent.claudeWriteOutside":
     "Запись в {path} — за пределами рабочего пространства агента, общей папки и временных папок.",
   "status.agent.contextCleared": "Контекст очищен. Здесь начинается новый чат.",
+  "status.agent.instructionsChanged": "Обновил свои инструкции",
   "status.agent.modelSwitchedForLimit": "Лимит использования исчерпан. Переключено на {model}.",
   "status.agent.modelReturnedAfterLimit": "Лимит использования обновился. Снова используется {model}.",
   "status.agent.modelSwitchedForError": "Ошибка провайдера. Переключено на {model}.",
@@ -45,4 +46,5 @@ export const messages = {
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
+  "status.agent.branchTitle": "Ответвлённый чат",
 } as const satisfies PartialTranslation<typeof source>;

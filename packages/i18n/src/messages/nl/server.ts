@@ -98,8 +98,21 @@ export const messages = {
   "server.add.custom.description":
     "Krijg een eigen infrastructuur, extra opslag of functies die passen bij je manier van werken.",
   "server.add.custom.action": "Neem contact op",
-  "server.add.join.title": "Heb je een uitnodiging?",
   "server.add.join.action": "Word lid van een server",
+  "server.add.otherOptions": "Andere opties",
+  "server.local.createTitle": "Nieuwe server op deze computer",
+  "server.local.createDescription": "De server heeft eigen agents, chats en bestanden. Hij draait op deze computer.",
+  "server.local.nameLabel": "Servernaam",
+  "server.local.create": "Server maken",
+  "server.local.creating": "Server maken…",
+  "server.local.createFailed": "Kan de server niet maken.",
+  "server.local.limitReached":
+    "Je kunt maximaal {limit} servers op deze computer hebben. Wis er een om een nieuwe te maken.",
+  "server.local.deleteConfirmTitle": "{name} wissen?",
+  "server.local.deleteConfirmDescription":
+    "OpenBot stopt de server en verplaatst de agents, chats en bestanden ervan naar de prullenbak.",
+  "server.local.deleting": "Server wissen…",
+  "server.local.deletedTitle": "{name} gewist",
   "server.add.limit.title": "Dit account heeft het maximale aantal servers",
   "server.add.limit.description": {
     one: "Een account kan {count} betaalde server hebben. Verwijder eerst een server om er een toe te voegen.",
@@ -184,6 +197,7 @@ export const messages = {
   "server.rail.addRemote": "Externe server toevoegen",
   "server.rail.add": "Server toevoegen",
   "server.rail.buttonLabel": "Server {name}",
+  "server.rail.thisComputer": "op deze computer",
   "server.rail.notificationsMuted": "meldingen gedempt",
   "server.rail.actions": "Serveracties",
   "server.rail.unmute": "Server niet meer dempen",
@@ -194,6 +208,8 @@ export const messages = {
   "server.rail.restart": "Server herstarten",
   "server.rail.leave": "Server verlaten",
   "server.rail.delete": "Server wissen",
+  "server.rail.hide": "Server verbergen",
+  "server.rail.showLocal": "{name} tonen",
   "server.select.failedTitle": "Kan de server niet kiezen",
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",
@@ -297,13 +313,6 @@ export const messages = {
   "server.settings.setUpDesktopDescription": "Bekijk en bedien deze Mac vanaf een andere computer.",
   "server.settings.later": "Later",
   "server.settings.setUp": "Instellen",
-  "server.settings.notifications": "Meldingen",
-  "server.settings.muteNotifications": "Meldingen dempen",
-  "server.settings.muteDescription":
-    "Stop bureaubladmeldingen, geluiden en updates in de MacBook-notch van deze server.",
-  "server.settings.mutedUntilDescription": "{until}. Zet uit om het dempen nu op te heffen.",
-  "server.settings.notifyAbout": "Meld me over",
-  "server.settings.notifyAboutDescription": "Welke gebeurtenissen van agents een bureaubladmelding tonen.",
   "server.settings.agents": "Agents",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":
@@ -337,6 +346,9 @@ export const messages = {
   "server.settings.hostKeyConfirmDescription":
     "De huidige en de nieuwe sleutel ondertekenen allebei een overdracht. Apps van leden gaan over op de nieuwe sleutel wanneer ze opnieuw verbinden. Doe dit als het sleutelbestand is gekopieerd of uitgelekt.",
   "server.settings.hostKeyRotated": "Serversleutel gewijzigd",
+  "server.settings.hostKeyChanged": "Laatste wijziging",
+  "server.settings.hostKeyChangedDescription":
+    "{date}. De vorige en de nieuwe sleutel hebben deze wijziging ondertekend.",
   "server.settings.hostKeyLocalOnly": "Alleen de server op deze computer kan hier zijn sleutel wijzigen.",
   "server.settings.removeTitle": "Server verwijderen",
   "server.settings.removeDescription":

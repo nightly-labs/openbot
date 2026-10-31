@@ -121,12 +121,15 @@ export const messages = {
     "Copias de archivos del servidor. OpenBot los descarga de nuevo cuando los abres.",
   "files.cleanup.description.logs": "Registros de diagnóstico. Los nuevos registros se inician de inmediato.",
   "files.cleanup.description.runtimes":
-    "Versiones anteriores de la CLI de proveedores que ningún agente usa. OpenBot conserva la versión en uso y una versión anterior que funciona.",
+    "Versiones anteriores de la CLI de proveedores que ningún agente usa. OpenBot conserva la versión en uso.",
+  "files.cleanup.description.runtimeDownloads":
+    "Las descargas de la CLI de {providers} y las versiones anteriores de la CLI, si las hay. Ningún agente las usa: estos proveedores están desactivados o usan la CLI que instalaste. OpenBot descarga una CLI de nuevo cuando un proveedor la necesita.",
   "files.cleanup.clear": "Borrar",
   "files.cleanup.clearCategory": "Borrar {category}",
   "files.cleanup.confirm.caches": "¿Borrar los archivos del servidor en caché?",
   "files.cleanup.confirm.logs": "¿Borrar los registros?",
   "files.cleanup.confirm.runtimes": "¿Quitar las versiones anteriores de la CLI de proveedores?",
+  "files.cleanup.confirm.runtimeDownloads": "¿Quitar las descargas de la CLI de proveedores?",
   "files.cleanup.confirmDescription": "Esto libera {size}. {description}",
   "files.cleanup.clearing": "Borrando…",
   "files.cleanup.failed": "No se pudieron borrar los datos.",

@@ -46,10 +46,14 @@ import {
   type WebhookRoute,
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Effect, Layer, Result, Schema } from "effect";
+import { Context, Effect, Layer, Option, Result, Schema } from "effect";
 import { importJWK, type JWK, type JWTPayload, SignJWT } from "jose";
-import { getServerEntitlement, SERVER_MEMBER_LIMIT_SQL } from "./billing-entitlement";
-import { OPEN_STATUSES_SQL } from "./billing-errors";
+import {
+  getServerEntitlement,
+  type OwnerLicense,
+  ownerLicenseForHost,
+  SERVER_MEMBER_LIMIT_SQL,
+} from "./billing-entitlement";
 import { decodeBase64Url, hmacSha256, importHmacSha256Key, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -57,6 +61,7 @@ import type { AuthUser, WorkerBindings } from "./types";
 const TICKET_TTL_SECONDS = 180;
 const LEGACY_SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const AUTH_EVENT_RETRY_MS = 60_000;
+/** Events that one drain sends at a time. It sends each event to all its targets at the same time. */
 const AUTH_EVENT_SEND_CONCURRENCY = 6;
 /** Longer than one drain: 50 events, 6 at a time, each with a 5 s timeout. */
 const AUTH_EVENT_CLAIM_MS = 2 * 60_000;
@@ -79,13 +84,20 @@ const LICENSE_SEAT_AVAILABLE_SQL = `(
        WHERE h.owner_user_id = ? AND m.user_id <> ? AND m.status = 'active') + 1 < ?
 )`;
 
-/** The seat checks for one user on one host: the server plan's member limit and the owner's license. */
+/** The seat checks for one user on one host: the host's member limit and the owner's license. */
 interface MemberSeat {
   readonly sql: string;
   readonly binds: readonly (string | number)[];
   readonly limit: number;
-  readonly memberBinds: readonly (string | number)[];
+  /** Null when the license gives the limit: the license count is then the stricter check. */
+  readonly memberBinds: readonly (string | number)[] | null;
   readonly licenseBinds: readonly (string | number)[] | null;
+}
+
+interface MemberLimit {
+  readonly limit: number;
+  /** True when the users of the owner's license give the limit. */
+  readonly fromLicense: boolean;
 }
 
 /** The membership row that this accept wrote: its id and its update time. */
@@ -166,6 +178,8 @@ interface RemoteHostRow {
   auth_epoch: number;
   machine_token_hash: string | null;
   device_public_key: string | null;
+  /** The configured home ID that the Worker last gave the host, or NULL. A removed ID can stay here. */
+  signal_home: string | null;
 }
 
 interface RemoteHostKeyHandoverRow {
@@ -190,6 +204,7 @@ interface RemoteSessionRow extends RemoteMembershipRow {
   expires_at: number;
   ended_at: number | null;
   auth_epoch: number;
+  signal_home: string | null;
 }
 
 // What a resume token has to prove it still stands for. The Signal service holds the token; this
@@ -244,7 +259,31 @@ interface RemoteAuthEventRow {
   event_id: string;
   payload: string;
   attempts: number;
+  /** The webhook URLs that still need the event, as a JSON array. NULL = every configured URL. */
+  pending_targets: string | null;
 }
+
+/** The bindings that the auth event outbox reads. */
+export type RemoteAuthEventBindings = Pick<
+  WorkerBindings,
+  "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS" | "REMOTE_AUTH_WEBHOOK_SECRET"
+>;
+
+/** The Signal URLs that the tickets of this Worker name. */
+export interface RemoteSignalPlan {
+  /** The entry Signal: released hosts, ingress, the webhook relay, bots, and hosts with no home. */
+  entryUrl: string;
+  /** The Signal machines that a host can have as its home, by ID. Empty = no host has a home. */
+  homes: ReadonlyMap<string, string>;
+}
+
+/** One configured Signal machine: the `signal` ticket claim and the URL that the ticket answer names. */
+interface RemoteSignalHome {
+  id: string;
+  url: string;
+}
+
+const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
 
 interface RemotePublicJwk extends DynamicRecord {
   kid: string;
@@ -292,6 +331,8 @@ export class RemoteTicketSigner {
       authEpoch: number;
       sessionExpiresAt: number;
       clientPublicKey?: string;
+      /** The home Signal machine ID. Only that machine accepts the ticket. */
+      signal?: string;
       now: number;
     },
   ) {
@@ -312,6 +353,7 @@ export class RemoteTicketSigner {
         protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION,
         sessionExpiresAt: Math.floor(input.sessionExpiresAt / 1_000),
         ...(input.clientPublicKey ? { clientPublicKey: input.clientPublicKey } : {}),
+        ...(input.signal ? { signal: input.signal } : {}),
       } satisfies Omit<RemoteTicketClaims, "aud" | "jti" | "iat" | "exp">)
         .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
         .setJti(crypto.randomUUID())
@@ -437,7 +479,9 @@ class RemoteDependencies extends Context.Service<
     now: () => number;
     schedule: ((delivery: Effect.Effect<void, RemoteFailure>) => void) | null;
     fetch: RemoteFetch;
-    webhookUrl: string | null;
+    /** Null when `REMOTE_SIGNAL_URL` is not set or `REMOTE_SIGNAL_HOMES` is invalid. */
+    signal: RemoteSignalPlan | null;
+    webhookUrls: readonly string[];
     webhookSecret: string | null;
   }
 >()("auth-api/RemoteControlPlane/Dependencies") {}
@@ -455,7 +499,10 @@ export class RemoteControlPlane {
       | "REMOTE_TICKET_PRIVATE_JWK"
       | "REMOTE_TICKET_PUBLIC_JWKS"
       | "REMOTE_TICKET_KEY_ID"
+      | "REMOTE_SIGNAL_URL"
+      | "REMOTE_SIGNAL_HOMES"
       | "REMOTE_AUTH_WEBHOOK_URL"
+      | "REMOTE_AUTH_WEBHOOK_URLS"
       | "REMOTE_AUTH_WEBHOOK_SECRET"
       | "SLACK_ROUTE_PRIVATE_JWK"
       | "SLACK_ROUTE_KEY_ID"
@@ -501,7 +548,7 @@ export class RemoteControlPlane {
       telegramBotId && telegramBotUsername && TELEGRAM_BOT_ID_PATTERN.test(telegramBotId)
         ? { botId: telegramBotId, botUsername: telegramBotUsername }
         : null;
-    const webhookUrl = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null;
+    const webhookUrls = remoteAuthWebhookUrls(bindings);
     const webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     const fetcher: RemoteFetch = options.fetch ?? ((input, init) => fetch(input, init));
     const now = options.now ?? Date.now;
@@ -515,7 +562,8 @@ export class RemoteControlPlane {
       now,
       schedule,
       fetch: fetcher,
-      webhookUrl,
+      signal: remoteSignalPlan(bindings),
+      webhookUrls,
       webhookSecret,
     });
   }
@@ -821,6 +869,8 @@ export class RemoteControlPlane {
         result.results ?? [],
         (row) =>
           Effect.gen({ self: this }, function* () {
+            const license = yield* this.#ownerLicense(row.host_id);
+            const { limit } = yield* this.#memberLimit(row.host_id, license);
             return {
               hostId: row.host_id,
               name: row.name,
@@ -830,7 +880,9 @@ export class RemoteControlPlane {
               authEpoch: row.auth_epoch,
               membershipId: row.membership_id,
               role: row.role,
-              memberLimit: yield* this.#memberLimit(row.host_id),
+              // The license counts the people of all the owner's servers, and any open license refuses a
+              // join after its users. So no server takes more people than the license has users.
+              memberLimit: license ? Math.min(limit, license.users) : limit,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
               hosted: row.hosted === 1,
             };
@@ -1783,7 +1835,7 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT s.session_id, s.expires_at, s.ended_at, m.membership_id, m.host_id, m.user_id, m.role, m.status,
-                h.auth_epoch
+                h.auth_epoch, h.signal_home
          FROM remote_sessions s
          JOIN remote_memberships m ON m.membership_id = s.membership_id
          JOIN remote_hosts h ON h.host_id = s.host_id
@@ -1798,7 +1850,11 @@ export class RemoteControlPlane {
       if (!session || session.ended_at || session.expires_at <= now || session.status !== "active") {
         return yield* new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");
       }
-      return yield* dependencies.signer.issue({
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      // A member connects to the home of the host. Only the host peer gateway moves that home.
+      const home = configuredSignalHome(signal, session.signal_home);
+      const issued = yield* dependencies.signer.issue({
         sessionId,
         hostId: session.host_id,
         userId,
@@ -1807,8 +1863,10 @@ export class RemoteControlPlane {
         authEpoch: session.auth_epoch,
         sessionExpiresAt: session.expires_at,
         clientPublicKey: boundClientPublicKey,
+        ...(home ? { signal: home.id } : {}),
         now,
       });
+      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1817,22 +1875,29 @@ export class RemoteControlPlane {
 
   readonly planChanged = Effect.fn("RemoteControlPlane.planChanged")(
     function* (this: RemoteControlPlane, hostId: string): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
-      const dependencies = yield* RemoteDependencies;
-      const now = dependencies.now();
-      yield* remoteCall(() =>
-        dependencies.database
-          .prepare(
-            `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
-         SELECT lower(hex(randomblob(16))),
-                json_object('type', 'account-servers-changed', 'userId', user_id),
-                ?, 0, ?
-           FROM remote_memberships
-          WHERE host_id = ? AND status = 'active'`,
-          )
-          .bind(now, now, hostId)
-          .run(),
+      yield* this.#serversChanged(
+        "SELECT user_id FROM remote_memberships WHERE host_id = ? AND status = 'active'",
+        hostId,
       );
-      yield* this.#flushAuthEvents();
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * The license of an account changed, so the member limit of its servers can be different. Each active
+   * member of those servers reads the server list again, once.
+   */
+
+  readonly licenseChanged = Effect.fn("RemoteControlPlane.licenseChanged")(
+    function* (
+      this: RemoteControlPlane,
+      ownerUserId: string,
+    ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+      yield* this.#serversChanged(
+        `SELECT DISTINCT m.user_id FROM remote_memberships m JOIN remote_hosts h ON h.host_id = m.host_id
+          WHERE h.owner_user_id = ? AND m.status = 'active'`,
+        ownerUserId,
+      );
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1940,11 +2005,37 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  /**
+   * A host socket ticket and the Signal URL for it. Only the host peer gateway sends `signalHome: true`:
+   * with homes configured, its ticket names the home of the host. Ingress and the webhook relay send
+   * `signalHome: false` and get the entry Signal and no `signal` claim. Their requests keep the stored
+   * home, because the members of the host still connect to it. A released host build sends no
+   * `signalHome` (`null`) and connects only to the entry Signal, so its request removes the stored
+   * home: else the members of a host that went back to a released build wait on the old home.
+   */
   readonly issueHostTicket = Effect.fn("RemoteControlPlane.issueHostTicket")(
-    function* (this: RemoteControlPlane, hostId: string, machineToken: string) {
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+      placement: { signalHome: boolean | null; failedSignalUrl: string | null } = {
+        signalHome: null,
+        failedSignalUrl: null,
+      },
+    ) {
       const dependencies = yield* RemoteDependencies;
       const host = yield* this.authenticateHost(hostId, machineToken);
-      return yield* dependencies.signer.issue({
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      if (placement.signalHome === null && host.signal_home !== null)
+        yield* remoteCall(() =>
+          dependencies.database
+            .prepare("UPDATE remote_hosts SET signal_home = NULL WHERE host_id = ?")
+            .bind(hostId)
+            .run(),
+        );
+      const home = placement.signalHome ? yield* this.#placeHost(host, signal, placement.failedSignalUrl) : null;
+      const issued = yield* dependencies.signer.issue({
         sessionId: `host-${hostId}`,
         hostId,
         userId: host.owner_user_id,
@@ -1952,8 +2043,10 @@ export class RemoteControlPlane {
         role: "host",
         authEpoch: host.auth_epoch,
         sessionExpiresAt: PERSISTENT_SESSION_EXPIRES_AT,
+        ...(home ? { signal: home.id } : {}),
         now: dependencies.now(),
       });
+      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -2795,21 +2888,16 @@ export class RemoteControlPlane {
     hostId: string,
     userId: string,
   ): Effect.fn.Return<MemberSeat, RemoteFailure, RemoteDependencies> {
-    const dependencies = yield* RemoteDependencies;
-    const limit = yield* this.#memberLimit(hostId);
-    const license = yield* remoteCall(() =>
-      dependencies.database
-        .prepare(
-          `SELECT l.user_id AS owner_id, l.users FROM remote_hosts h
-             JOIN licenses l ON l.user_id = h.owner_user_id AND l.status IN ${OPEN_STATUSES_SQL}
-            WHERE h.host_id = ? ORDER BY l.updated_at DESC LIMIT 1`,
-        )
-        .bind(hostId)
-        .first<{ owner_id: string; users: number }>(),
-    );
+    const license = yield* this.#ownerLicense(hostId);
+    const { limit, fromLicense } = yield* this.#memberLimit(hostId, license);
+    const licenseBinds = license ? [license.ownerId, userId, license.ownerId, license.ownerId, license.users] : null;
+    // The license count covers each of the owner's servers, so it is never below this host's count. With
+    // a limit from the license, a full server then answers that the license is full.
+    if (fromLicense && licenseBinds) {
+      return { sql: LICENSE_SEAT_AVAILABLE_SQL, binds: licenseBinds, limit, memberBinds: null, licenseBinds };
+    }
     const memberBinds = [hostId, userId, hostId, limit];
-    if (!license) return { sql: MEMBER_SEAT_AVAILABLE_SQL, binds: memberBinds, limit, memberBinds, licenseBinds: null };
-    const licenseBinds = [license.owner_id, userId, license.owner_id, license.owner_id, license.users];
+    if (!licenseBinds) return { sql: MEMBER_SEAT_AVAILABLE_SQL, binds: memberBinds, limit, memberBinds, licenseBinds };
     return {
       sql: `(${MEMBER_SEAT_AVAILABLE_SQL} AND ${LICENSE_SEAT_AVAILABLE_SQL})`,
       binds: [...memberBinds, ...licenseBinds],
@@ -2827,33 +2915,70 @@ export class RemoteControlPlane {
     const available = yield* remoteCall(() =>
       dependencies.database
         .prepare(
-          `SELECT ${MEMBER_SEAT_AVAILABLE_SQL} AS member, ${seat.licenseBinds ? LICENSE_SEAT_AVAILABLE_SQL : "1"} AS license`,
+          `SELECT ${seat.memberBinds ? MEMBER_SEAT_AVAILABLE_SQL : "1"} AS member, ${seat.licenseBinds ? LICENSE_SEAT_AVAILABLE_SQL : "1"} AS license`,
         )
-        .bind(...seat.memberBinds, ...(seat.licenseBinds ?? []))
+        .bind(...(seat.memberBinds ?? []), ...(seat.licenseBinds ?? []))
         .first<{ member: number; license: number }>(),
     );
     if (!available?.member) return yield* memberLimitReached(seat.limit);
     if (!available.license) return yield* licenseUsersFull();
   });
 
+  /** Each user that `usersSql` selects (one `user_id` column, one bind) reads the server list again, once. */
+  readonly #serversChanged = Effect.fn("RemoteControlPlane.serversChanged")(function* (
+    this: RemoteControlPlane,
+    usersSql: string,
+    bind: string,
+  ): Effect.fn.Return<void, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const now = dependencies.now();
+    yield* remoteCall(() =>
+      dependencies.database
+        .prepare(
+          `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+           SELECT lower(hex(randomblob(16))), json_object('type', 'account-servers-changed', 'userId', user_id), ?, 0, ?
+             FROM (${usersSql})`,
+        )
+        .bind(now, now, bind)
+        .run(),
+    );
+    yield* this.#flushAuthEvents();
+  });
+
+  readonly #ownerLicense = Effect.fn("RemoteControlPlane.ownerLicense")(function* (
+    this: RemoteControlPlane,
+    hostId: string,
+  ): Effect.fn.Return<OwnerLicense | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    return yield* ownerLicenseForHost(dependencies.database, hostId, dependencies.now()).pipe(
+      Effect.mapError(() => new RemoteOperationError({})),
+    );
+  });
+
   /**
-   * The active members that the host's custom limit allows, else its plan, else the default for a
-   * host with no plan. A lower limit removes no one: members who are active keep their seats.
+   * The active members that the host's custom limit allows, else its hosted plan. A hosted plan already
+   * holds the license users, so it keeps its own limit. Else the users of the owner's entitled license
+   * when they are more than a plan that a self-hosted host keeps from before the license, else that plan,
+   * else the default. A lower limit removes no one: members who are active keep their seats. `license`
+   * is the owner's open license (`ownerLicenseForHost`).
    */
   readonly #memberLimit = Effect.fn("RemoteControlPlane.memberLimit")(function* (
     this: RemoteControlPlane,
     hostId: string,
-  ): Effect.fn.Return<number, RemoteFailure, RemoteDependencies> {
+    license: OwnerLicense | null,
+  ): Effect.fn.Return<MemberLimit, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
     const custom = yield* remoteCall(() =>
       dependencies.database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(hostId).first<{ member_limit: number }>(),
     );
-    if (custom) return custom.member_limit;
-    return (
-      (yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
-        Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
-      ))?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT
+    if (custom) return { limit: custom.member_limit, fromLicense: false };
+    const plan = yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
+      Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
     );
+    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false };
+    if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
+      return { limit: license.users, fromLicense: true };
+    return { limit: plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT, fromLicense: false };
   });
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
@@ -2875,12 +3000,44 @@ export class RemoteControlPlane {
     return yield* remoteCall(() =>
       dependencies.database
         .prepare(
-          `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key
+          `SELECT host_id, owner_user_id, name, logo_key, auth_epoch, machine_token_hash, device_public_key, signal_home
          FROM remote_hosts WHERE host_id = ? LIMIT 1`,
         )
         .bind(hostId)
         .first<RemoteHostRow>(),
     );
+  });
+
+  /**
+   * The home of a host that asks for one. The stored home stays while its URL is not the one that
+   * failed for the host. Else the rendezvous choice replaces it, so a removed or failed machine moves
+   * only its own hosts. When two requests race, both use the home that the first one stored.
+   */
+  readonly #placeHost = Effect.fn("RemoteControlPlane.placeHost")(function* (
+    this: RemoteControlPlane,
+    host: RemoteHostRow,
+    signal: RemoteSignalPlan,
+    failedSignalUrl: string | null,
+  ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
+    const current = configuredSignalHome(signal, host.signal_home);
+    if (current && current.url !== failedSignalUrl) return current;
+    const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, signal, failedSignalUrl));
+    if (!chosen || chosen.id === host.signal_home) return chosen;
+    const stored = yield* remoteCall(() =>
+      dependencies.database
+        .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
+        .bind(chosen.id, host.host_id, host.signal_home)
+        .run(),
+    );
+    if ((stored.meta.changes ?? 0) === 1) return chosen;
+    const raced = yield* remoteCall(() =>
+      dependencies.database
+        .prepare("SELECT signal_home FROM remote_hosts WHERE host_id = ? LIMIT 1")
+        .bind(host.host_id)
+        .first<{ signal_home: string | null }>(),
+    );
+    return configuredSignalHome(signal, raced?.signal_home ?? null) ?? chosen;
   });
 
   /** The account server creates hosted server IDs, so only the account it created one for can publish it. */
@@ -2999,7 +3156,7 @@ export class RemoteControlPlane {
     const delivery = Effect.suspend(() =>
       deliverRemoteAuthEvents({
         database: dependencies.database,
-        webhookUrl: dependencies.webhookUrl,
+        webhookUrls: dependencies.webhookUrls,
         webhookSecret: dependencies.webhookSecret,
         fetch: dependencies.fetch,
         now: dependencies.now(),
@@ -3011,12 +3168,12 @@ export class RemoteControlPlane {
 }
 
 export const notifyAccountProfileChanged = Effect.fn("RemoteControlPlane.notifyProfileChanged")(function* (
-  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
+  bindings: RemoteAuthEventBindings,
   userId: string,
   waitUntil: (delivery: Effect.Effect<void, RemoteFailure>) => void,
   fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ) {
-  if (!bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
+  if (remoteAuthWebhookUrls(bindings).length === 0 || !bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim()) return;
   const now = Date.now();
   yield* remoteCall(() => authEventStatement(bindings.DB, { type: "account-profile-changed", userId }, now).run());
   waitUntil(deliverPendingRemoteAuthEvents(bindings, now, fetcher));
@@ -3035,6 +3192,100 @@ export function authEventStatement(
        SELECT ?, ?, ?, 0, ?${condition ? ` WHERE ${condition.sql}` : ""}`,
     )
     .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
+}
+
+function remoteSignalNotConfigured(): RemoteControlPlaneError {
+  return new RemoteControlPlaneError(503, "remote_not_configured", "The Remote Signal URL is not configured.");
+}
+
+/**
+ * The Signal URLs of the tickets, or null when `REMOTE_SIGNAL_URL` is not a ws or wss URL or
+ * `REMOTE_SIGNAL_HOMES` is invalid. A ticket request then fails with 503 and does not send a host to a wrong machine.
+ */
+export function remoteSignalPlan(
+  bindings: Pick<WorkerBindings, "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES">,
+): RemoteSignalPlan | null {
+  const entryUrl = bindings.REMOTE_SIGNAL_URL?.trim();
+  if (!entryUrl) return null;
+  const entryProtocol = urlProtocol(entryUrl);
+  if (entryProtocol !== "wss:" && entryProtocol !== "ws:") return null;
+  // Only a local development entry Signal without TLS permits homes without TLS.
+  const permitsWs = entryProtocol === "ws:";
+  const homes = new Map<string, string>();
+  for (const entry of (bindings.REMOTE_SIGNAL_HOMES ?? "").split(",")) {
+    if (!entry.trim()) continue;
+    const separator = entry.indexOf("=");
+    if (separator < 0) return null;
+    const id = entry.slice(0, separator).trim();
+    const url = entry.slice(separator + 1).trim();
+    const protocol = urlProtocol(url);
+    if (!SIGNAL_HOME_ID_PATTERN.test(id) || homes.has(id)) return null;
+    if (protocol !== "wss:" && !(permitsWs && protocol === "ws:")) return null;
+    homes.set(id, url);
+  }
+  return { entryUrl, homes };
+}
+
+function urlProtocol(value: string): string | null {
+  try {
+    return new URL(value).protocol;
+  } catch {
+    return null;
+  }
+}
+
+/** The configured home with this ID, or null for no ID or an ID that is no longer configured. */
+function configuredSignalHome(signal: RemoteSignalPlan, id: string | null): RemoteSignalHome | null {
+  const url = id === null ? undefined : signal.homes.get(id);
+  return id !== null && url !== undefined ? { id, url } : null;
+}
+
+/**
+ * The rendezvous choice of a home for the host: the highest first 8 bytes (big-endian) of
+ * sha256(`${id}\n${hostId}`), over the machines whose URL is not `failedSignalUrl`, or over all
+ * machines when that excludes each one. Null only when no home is configured.
+ */
+const rendezvousSignalHome = Effect.fn("RemoteControlPlane.rendezvousSignalHome")(function* (
+  hostId: string,
+  signal: RemoteSignalPlan,
+  failedSignalUrl: string | null,
+) {
+  const homes = [...signal.homes];
+  const available = homes.filter(([, url]) => url !== failedSignalUrl);
+  let chosen: { id: string; score: bigint } | null = null;
+  for (const [id] of available.length > 0 ? available : homes) {
+    const digest = yield* remoteCall(() =>
+      crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${id}\n${hostId}`)),
+    );
+    const score = new DataView(digest).getBigUint64(0);
+    if (!chosen || score > chosen.score) chosen = { id, score };
+  }
+  return chosen?.id ?? null;
+});
+
+/** Each Signal that gets the auth events: `REMOTE_AUTH_WEBHOOK_URLS`, else `REMOTE_AUTH_WEBHOOK_URL`. */
+function remoteAuthWebhookUrls(
+  bindings: Pick<WorkerBindings, "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_URLS">,
+): string[] {
+  const urls = (bindings.REMOTE_AUTH_WEBHOOK_URLS ?? "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+  if (urls.length > 0) return [...new Set(urls)];
+  const url = bindings.REMOTE_AUTH_WEBHOOK_URL?.trim();
+  return url ? [url] : [];
+}
+
+const decodeAuthEventTargets = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)));
+
+/**
+ * The configured webhook URLs that still need the event. NULL is each one. A stored URL that is no
+ * longer configured is ignored. An unreadable list sends to each URL again, as a lost answer does.
+ */
+function pendingAuthEventTargets(stored: string | null, webhookUrls: readonly string[]): readonly string[] {
+  if (stored === null) return webhookUrls;
+  const pending = Option.getOrUndefined(decodeAuthEventTargets(stored));
+  return pending ? webhookUrls.filter((url) => pending.includes(url)) : webhookUrls;
 }
 
 function telegramNotConfigured(): RemoteControlPlaneError {
@@ -3066,13 +3317,13 @@ function licenseUsersFull(): RemoteControlPlaneError {
 }
 
 export function deliverPendingRemoteAuthEvents(
-  bindings: Pick<WorkerBindings, "DB" | "REMOTE_AUTH_WEBHOOK_URL" | "REMOTE_AUTH_WEBHOOK_SECRET">,
+  bindings: RemoteAuthEventBindings,
   now: number,
   fetcher: RemoteFetch = (input, init) => fetch(input, init),
 ) {
   return deliverRemoteAuthEvents({
     database: bindings.DB,
-    webhookUrl: bindings.REMOTE_AUTH_WEBHOOK_URL?.trim() || null,
+    webhookUrls: remoteAuthWebhookUrls(bindings),
     webhookSecret: bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null,
     fetch: fetcher,
     now,
@@ -3081,66 +3332,76 @@ export function deliverPendingRemoteAuthEvents(
 
 const deliverRemoteAuthEvents = Effect.fn("RemoteControlPlane.deliverAuthEvents")(function* (input: {
   database: D1Database;
-  webhookUrl: string | null;
+  webhookUrls: readonly string[];
   webhookSecret: string | null;
   fetch: RemoteFetch;
   now: number;
 }) {
-  const { webhookUrl, webhookSecret } = input;
-  if (!webhookUrl || !webhookSecret) return;
+  const { webhookUrls, webhookSecret } = input;
+  if (webhookUrls.length === 0 || !webhookSecret) return;
   // The claim moves the events out of reach of other drains until it lapses, so each drain sends its own.
   const result = yield* remoteCall(() =>
     input.database
       .prepare(
         `UPDATE remote_auth_events SET next_attempt_at = ?
          WHERE event_id IN (SELECT event_id FROM remote_auth_events WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50)
-         RETURNING event_id, payload, attempts`,
+         RETURNING event_id, payload, attempts, pending_targets`,
       )
       .bind(input.now + AUTH_EVENT_CLAIM_MS, input.now)
       .all<RemoteAuthEventRow>(),
   );
-  // Each event saves its result after its send, so a drain that the Worker stops keeps what it did.
+  const send = Effect.fn("RemoteControlPlane.sendAuthEvent")(function* (url: string, payload: string) {
+    const timestamp = Math.floor(input.now / 1_000).toString();
+    const signature = yield* hmacSha256(webhookSecret, `${timestamp}.${payload}`).pipe(
+      Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
+    );
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        input.fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "OpenBot-Timestamp": timestamp,
+            "OpenBot-Signature": signature,
+          },
+          body: payload,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+        }),
+      catch: () => new RemoteOperationError({}),
+    });
+    if (!response.ok) return yield* new RemoteOperationError({});
+  });
+  // Each event saves its result after its sends, so a drain that the Worker stops keeps what it did.
+  // The sends of one event go to different Signals, so each Signal gets at most 6 at a time.
   yield* Effect.forEach(
     result.results ?? [],
     (event) =>
       Effect.gen(function* () {
-        const delivery = yield* Effect.result(
-          Effect.gen(function* () {
-            const timestamp = Math.floor(input.now / 1_000).toString();
-            const signature = yield* hmacSha256(webhookSecret, `${timestamp}.${event.payload}`).pipe(
-              Effect.mapError((error) =>
-                error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}),
-              ),
-            );
-            const response = yield* Effect.tryPromise({
-              try: (signal) =>
-                input.fetch(webhookUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "OpenBot-Timestamp": timestamp,
-                    "OpenBot-Signature": signature,
-                  },
-                  body: event.payload,
-                  signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
-                }),
-              catch: () => new RemoteOperationError({}),
-            });
-            if (!response.ok) return yield* new RemoteOperationError({});
-            yield* remoteCall(() =>
-              input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run(),
-            );
-          }),
+        const targets = pendingAuthEventTargets(event.pending_targets, webhookUrls);
+        const sent = yield* Effect.forEach(
+          targets,
+          (url) => Effect.result(send(url, event.payload)).pipe(Effect.map((delivery) => ({ url, delivery }))),
+          { concurrency: "unbounded" },
         );
-        if (Result.isFailure(delivery)) {
-          const delay = Math.min(AUTH_EVENT_RETRY_MS * 2 ** Math.min(event.attempts, 6), 60 * 60_000);
-          yield* remoteCall(() =>
-            input.database
-              .prepare("UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ? WHERE event_id = ?")
-              .bind(input.now + delay, event.event_id)
-              .run(),
+        const failed = sent.filter((target) => Result.isFailure(target.delivery)).map((target) => target.url);
+        if (failed.length === 0) {
+          const deleted = yield* Effect.result(
+            remoteCall(() =>
+              input.database.prepare("DELETE FROM remote_auth_events WHERE event_id = ?").bind(event.event_id).run(),
+            ),
           );
+          if (Result.isSuccess(deleted)) return;
         }
+        // Only the failed targets get the event again. An empty list lets the next drain delete the event.
+        const delay = Math.min(AUTH_EVENT_RETRY_MS * 2 ** Math.min(event.attempts, 6), 60 * 60_000);
+        yield* remoteCall(() =>
+          input.database
+            .prepare(
+              "UPDATE remote_auth_events SET attempts = attempts + 1, next_attempt_at = ?, pending_targets = ? WHERE event_id = ?",
+            )
+            .bind(input.now + delay, JSON.stringify(failed), event.event_id)
+            .run(),
+        );
       }),
     { concurrency: AUTH_EVENT_SEND_CONCURRENCY, discard: true },
   );

@@ -52,6 +52,58 @@ export const DialogContextWindows: Story = {
   },
 };
 
+/** This computer: the endpoint can run on each provider that can run it now. */
+export const DialogRunsOn: Story = {
+  args: {
+    contextWindows: true,
+    draft: localEndpoint,
+    harnesses: [
+      { id: "opencode", ready: true },
+      { id: "pi", ready: true },
+    ],
+  },
+};
+
+/** Pi is not downloaded: a choice of it chooses it and downloads it. */
+export const DialogRunsOnDownload: Story = {
+  args: {
+    contextWindows: true,
+    draft: localEndpoint,
+    onDownloadHarness: fn(),
+    harnesses: [
+      { id: "opencode", ready: true },
+      { id: "pi", ready: false, runtime: { phase: "not-downloaded", progress: null, message: null, version: null } },
+    ],
+  },
+};
+
+/** Pi is chosen and downloads: the field shows the progress. */
+export const DialogRunsOnDownloading: Story = {
+  args: {
+    contextWindows: true,
+    draft: { ...localEndpoint, harness: "pi" },
+    onDownloadHarness: fn(),
+    harnesses: [
+      { id: "opencode", ready: true },
+      { id: "pi", ready: false, runtime: { phase: "downloading", progress: 42, message: null, version: null } },
+    ],
+  },
+};
+
+/** The download of the chosen Pi failed: its item retries, and the field says why. */
+export const DialogRunsOnDownloadError: Story = {
+  args: {
+    contextWindows: true,
+    draft: { ...localEndpoint, harness: "pi" },
+    onDownloadHarness: fn(),
+    harnessError: "Could not download Pi. Check your connection and try again.",
+    harnesses: [
+      { id: "opencode", ready: true },
+      { id: "pi", ready: false, runtime: { phase: "download-error", progress: null, message: null, version: null } },
+    ],
+  },
+};
+
 export const DialogContextWindowError: Story = {
   args: {
     contextWindows: true,

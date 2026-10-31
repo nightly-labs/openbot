@@ -381,3 +381,55 @@ input.custom-acp-code {
   flex-wrap: wrap;
   margin-inline-start: auto;
 }
+
+/* "Runs on": the logo and the name of the provider that runs the endpoint. */
+.custom-provider-harness {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+/* A provider to download keeps its action at the end of the row. */
+.custom-provider-harness-item .ui-select-item-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* With no check mark to make room for, the action reaches the end of the row. */
+.custom-provider-harness-item[data-action]:not([data-selected]) {
+  padding-inline-end: var(--openbot-space-1-5);
+}
+
+.custom-provider-harness-action {
+  margin-inline-start: auto;
+}
+
+.custom-provider-harness-button {
+  gap: var(--openbot-space-1);
+  font-size: inherit;
+  pointer-events: none;
+}
+
+.custom-provider-harness-item .custom-provider-harness-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The closed field: the chosen provider, and its download at the end. */
+.custom-provider-harness-value {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+.custom-provider-harness-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin-inline-start: auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
