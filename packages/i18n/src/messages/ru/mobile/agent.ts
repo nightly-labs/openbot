@@ -353,6 +353,10 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Направлять (по умолчанию на хосте)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} не умеет направлять выполняемый ход. Сообщения, отправленные во время работы, ждут в очереди.",
+  "mobile.agent.taskLimit.label": "Параллельные ветки",
+  "mobile.agent.taskLimit.footer": "Ветки, которые работают одновременно",
+  "mobile.agent.taskLimit.default": "По умолчанию ({count})",
+  "mobile.agent.taskLimit.oneTurn": "{provider} выполняет один ход за раз. Ветки этого агента ждут друг друга.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.notifications.failed": "Не удалось изменить уведомления",

@@ -321,6 +321,11 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.busyMessage.hostDefaultSteer": "Host default (Steer)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
+  "mobile.agent.taskLimit.label": "Parallel threads",
+  "mobile.agent.taskLimit.footer": "Threads that run at the same time",
+  "mobile.agent.taskLimit.default": "Default ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} runs one turn at a time. The threads of this agent wait for each other.",
   "mobile.agent.workspace.title": "Workspace folder",
   "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
   "mobile.agent.notifications.failed": "Could not change notifications",

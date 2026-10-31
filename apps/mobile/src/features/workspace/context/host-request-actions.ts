@@ -6,6 +6,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentHostSettings,
   decodeAgentNewChatSettings,
+  decodeAgentTaskLimitSettings,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
@@ -40,6 +41,10 @@ import { AGENT_NEW_CHAT_CAPABILITY, AGENT_NEW_CHAT_ROUTES } from "@openbot/contr
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import {
+  AGENT_TASK_LIMIT_CAPABILITY,
+  AGENT_TASK_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
@@ -265,6 +270,8 @@ type HostRequestActions = Pick<
   | "updateAgentAdminSettings"
   | "loadAgentHostSettings"
   | "updateAgentHostSettings"
+  | "loadAgentTaskLimit"
+  | "updateAgentTaskLimit"
   | "loadAgentNewChat"
   | "updateAgentNewChat"
   | "loadProviderAccounts"
@@ -810,6 +817,14 @@ export function createHostRequestActions({
     updateAgentHostSettings: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_HOST_SETTINGS_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_HOST_SETTINGS_ROUTES.update, decodeAgentHostSettings, { ...input }, serverId);
+    },
+    loadAgentTaskLimit: async (agentId, serverId) =>
+      has(serverId, AGENT_TASK_LIMIT_CAPABILITY)
+        ? request("POST", AGENT_TASK_LIMIT_ROUTES.settings, decodeAgentTaskLimitSettings, { agentId }, serverId)
+        : null,
+    updateAgentTaskLimit: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_TASK_LIMIT_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_TASK_LIMIT_ROUTES.update, decodeAgentTaskLimitSettings, { ...input }, serverId);
     },
     loadAgentNewChat: async (agentId, serverId) =>
       has(serverId, AGENT_NEW_CHAT_CAPABILITY)

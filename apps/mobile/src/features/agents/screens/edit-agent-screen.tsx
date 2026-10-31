@@ -26,6 +26,7 @@ import {
   AgentBusyMessageField,
   AgentHostPermissionFields,
   AgentNewChatAllowedField,
+  AgentTaskLimitField,
 } from "@/features/agents/components/agent-host-fields";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
@@ -113,6 +114,7 @@ function AgentForm({
     canStartNewChat,
     canManageAgentAccess,
     canManageAgentHostSettings,
+    canManageAgentTaskLimit,
     canManageAgentNewChat,
     canSetAgentNotificationLevel,
     setAgentProviderAccount,
@@ -128,6 +130,7 @@ function AgentForm({
     Boolean(agent.workspacePath) ||
     canStartNewChat(agent.serverId) ||
     canManageAgentHostSettings(agent.serverId) ||
+    canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId);
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
@@ -388,6 +391,7 @@ function AgentForm({
       {page === "advanced" ? (
         <>
           <AgentBusyMessageField agent={agent} server={host} available={available} />
+          <AgentTaskLimitField agent={agent} server={host} available={available} />
           {agent.workspacePath ? (
             <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
               <SettingsRow>

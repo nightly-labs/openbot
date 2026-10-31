@@ -19,6 +19,7 @@ import type {
   AgentSessionSettings,
   AgentTask,
   AgentTaskInput,
+  AgentTaskLimitSettings,
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTemplatePreview,
@@ -95,6 +96,7 @@ import type {
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
+  UpdateAgentTaskLimitInput,
   UpdateRestartMode,
   UpdateRoutineInput,
   VaultHostImportResult,
@@ -560,6 +562,15 @@ export interface MobileWorkspaceContextValue {
   loadAgentHostSettings: (agentId: string, serverId: string) => Promise<AgentHostSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentHostSettings: (input: UpdateAgentHostSettingsInput, serverId: string) => Promise<AgentHostSettings>;
+  /** An owner or admin of an online host that serves `agent-task-limit-v1`. The host checks the role again. */
+  canManageAgentTaskLimit: (serverId: string) => boolean;
+  /**
+   * How many threads of the agent run at the same time. Null when the host does not advertise
+   * `agent-task-limit-v1`. Owners and admins only; the host refuses a member.
+   */
+  loadAgentTaskLimit: (agentId: string, serverId: string) => Promise<AgentTaskLimitSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the limit the host saved. */
+  updateAgentTaskLimit: (input: UpdateAgentTaskLimitInput, serverId: string) => Promise<AgentTaskLimitSettings>;
   /** An owner or admin of an online host that serves `agent-new-chat-v1`. The host checks the role again. */
   canManageAgentNewChat: (serverId: string) => boolean;
   /**
@@ -802,6 +813,7 @@ type MobileWorkspaceStateKey =
   | "canManageAgentSkills"
   | "canManageAgentAccess"
   | "canManageAgentHostSettings"
+  | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageProviderAccounts"
   | "canManageSharedTables"

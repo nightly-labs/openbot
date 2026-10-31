@@ -328,6 +328,11 @@ export const messages = {
   "mobile.agent.busyMessage.hostDefaultSteer": "Predefinita dell'host (Indirizza)",
   "mobile.agent.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
+  "mobile.agent.taskLimit.label": "Thread in parallelo",
+  "mobile.agent.taskLimit.footer": "Thread eseguiti contemporaneamente",
+  "mobile.agent.taskLimit.default": "Predefinito ({count})",
+  "mobile.agent.taskLimit.oneTurn":
+    "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.notifications.failed": "Impossibile modificare le notifiche",

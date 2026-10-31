@@ -1,6 +1,9 @@
 import {
+  AGENT_TASK_LIMIT_DEFAULT,
+  AGENT_TASK_LIMIT_MAX,
   type AgentHostSettings,
   type AgentNewChatSettings,
+  type AgentTaskLimitSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
@@ -25,6 +28,13 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 /** `default` follows the host default. */
+type TaskLimitChoice = "default" | number;
+const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
+  "default",
+  ...Array.from({ length: AGENT_TASK_LIMIT_MAX }, (_, index) => index + 1),
+];
+
+/** `default` follows the host default. */
 type BusyMessageChoice = "default" | BusyMessageMode;
 
 const BUSY_MESSAGE_LABEL = {
@@ -44,17 +54,16 @@ interface AgentHostFieldsProps {
 }
 
 /**
- * One group of agent settings that the host keeps, read from and saved on the host. Only an owner or
- * admin sees them, and only when the host serves their capability: a host without it answers null.
- * The host checks the role again on every call. A change saves at once, as on desktop, and does not
- * wait for the sheet's Save action. The control shows the new value during the save and goes back on
- * a failure.
+ * One agent setting that is read from and saved on the agent's host. Only an owner or admin sees
+ * it, and only when the host serves its capability. The host checks the role again on every call.
+ * A change saves at once, as on desktop, and does not wait for the sheet's Save action. The control
+ * shows the new value during the save and goes back on a failure.
  */
-function useAgentSetting<Settings extends object, Input extends Partial<Settings>>(
+function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
-  part: "host" | "new-chat",
-  load: () => Promise<Settings | null>,
-  update: (input: Input) => Promise<Settings>,
+  part: "host" | "task-limit" | "new-chat",
+  load: (agentId: string, serverId: string) => Promise<Settings | null>,
+  update: (input: Input & { agentId: string }, serverId: string) => Promise<Settings>,
 ) {
   const { t, errorMessage } = useText();
   const queryScope = useQueryScope();
@@ -62,12 +71,12 @@ function useAgentSetting<Settings extends object, Input extends Partial<Settings
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canAdminister = canAdministerServer(server?.role);
-  // Under "agent-info" and ending in a part of `AGENT_SETTINGS_PARTS`: the host's `agents-changed`
+  // Under "agent-info" and ending in an `AGENT_SETTINGS_PARTS` part: the host's `agents-changed`
   // event reads it again, so a change made on another device shows here while the page is open.
   const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, part);
   const settings = useQuery({
     queryKey,
-    queryFn: load,
+    queryFn: () => load(agent.id, agent.serverId),
     enabled: available && canAdminister,
     retry: false,
     // Another device can change these at any time, so a reopened page reads the host again.
@@ -77,10 +86,9 @@ function useAgentSetting<Settings extends object, Input extends Partial<Settings
   async function save(current: Settings, input: Input) {
     setSaving(true);
     setError(null);
-    const next: Settings = { ...current, ...input };
-    queryClient.setQueryData<Settings | null>(queryKey, next);
+    queryClient.setQueryData<Settings | null>(queryKey, { ...current, ...input });
     try {
-      const saved = await update(input);
+      const saved = await update({ ...input, agentId: agent.id }, agent.serverId);
       queryClient.setQueryData<Settings | null>(queryKey, saved);
       void haptics.notification("success");
     } catch (cause) {
@@ -92,20 +100,19 @@ function useAgentSetting<Settings extends object, Input extends Partial<Settings
     }
   }
 
-  // A failed read keeps the controls hidden, as for a member.
+  // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
   const current = canAdminister ? (settings.data ?? null) : null;
   return { current, enabled: available && !saving, error, save };
 }
 
-/** Computer Use, local scripts and the busy-message mode of an agent, on `agent-host-settings-v1`. */
+/** Computer Use, local scripts and the busy-message mode of an agent, from `agent-host-settings-v1`. */
 function useAgentHostSettings(props: AgentHostFieldsProps) {
   const workspace = useMobileWorkspaceActions();
-  const { agent } = props;
-  return useAgentSetting<AgentHostSettings, Omit<UpdateAgentHostSettingsInput, "agentId">>(
+  return useAgentHostRecord<AgentHostSettings, Omit<UpdateAgentHostSettingsInput, "agentId">>(
     props,
     "host",
-    () => workspace.loadAgentHostSettings(agent.id, agent.serverId),
-    (input) => workspace.updateAgentHostSettings({ agentId: agent.id, ...input }, agent.serverId),
+    workspace.loadAgentHostSettings,
+    workspace.updateAgentHostSettings,
   );
 }
 
@@ -199,20 +206,76 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
 }
 
 /**
+ * Agent info > Advanced: how many threads of the agent run at the same time. Only an owner or admin
+ * sees it, and only when the host serves `agent-task-limit-v1`. It saves at once, as the fields above.
+ */
+export function AgentTaskLimitField(props: AgentHostFieldsProps) {
+  const { t, format } = useText();
+  const { theme } = useUniwind();
+  const workspace = useMobileWorkspaceActions();
+  const { current, enabled, error, save } = useAgentHostRecord<AgentTaskLimitSettings, AgentTaskLimitSettings>(
+    props,
+    "task-limit",
+    workspace.loadAgentTaskLimit,
+    workspace.updateAgentTaskLimit,
+  );
+  if (!current) return null;
+  const { agent } = props;
+
+  // A provider that runs one turn at a time runs one thread, whatever the limit.
+  const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
+  const choice: TaskLimitChoice = oneTurnAtATime ? 1 : (current.taskLimit ?? "default");
+  return (
+    <>
+      <SettingsSection
+        footer={
+          oneTurnAtATime && agent.provider
+            ? t("mobile.agent.taskLimit.oneTurn", { provider: agentProviderName(agent.provider) })
+            : t("mobile.agent.taskLimit.footer")
+        }
+      >
+        <SettingsRow
+          trailing={
+            <SettingsPicker<TaskLimitChoice>
+              value={choice}
+              options={TASK_LIMIT_CHOICES.map((value) => ({
+                value,
+                label:
+                  value === "default"
+                    ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
+                    : format.number(value),
+              }))}
+              enabled={enabled && !oneTurnAtATime}
+              dark={theme === "dark"}
+              label={t("mobile.agent.taskLimit.footer")}
+              onChange={(next) => {
+                if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
+              }}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SaveError error={error} />
+    </>
+  );
+}
+
+/**
  * Agent info > Advanced: whether the agent starts a new chat itself when its chat gets long, as on
- * desktop, on `agent-new-chat-v1`. A change on desktop shows here while the page is open, and a
- * change here shows on desktop at once.
+ * desktop. Only an owner or admin sees it, and only when the host serves `agent-new-chat-v1`. A
+ * change on desktop shows here while the page is open, and a change here shows on desktop at once.
  */
 export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
   const workspace = useMobileWorkspaceActions();
-  const { agent } = props;
-  const { current, enabled, error, save } = useAgentSetting<AgentNewChatSettings, AgentNewChatSettings>(
+  const { current, enabled, error, save } = useAgentHostRecord<AgentNewChatSettings, AgentNewChatSettings>(
     props,
     "new-chat",
-    () => workspace.loadAgentNewChat(agent.id, agent.serverId),
-    (input) => workspace.updateAgentNewChat({ agentId: agent.id, ...input }, agent.serverId),
+    workspace.loadAgentNewChat,
+    workspace.updateAgentNewChat,
   );
   if (!current) return null;
   return (
