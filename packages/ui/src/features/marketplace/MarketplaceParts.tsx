@@ -5,7 +5,6 @@ import {
   Button,
   Check,
   ErrorReference,
-  Heading,
   IconButton,
   Link2,
   Plug,
@@ -23,24 +22,6 @@ import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
 import { LogoTile } from "../settings/IntegrationLayout";
 import type { MarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
-
-/** The top of an agent or skill page. The window moves the focus to the title when the page opens. */
-export function PageHead(props: { media: JSX.Element; title: string; description: string; actions?: JSX.Element }) {
-  return (
-    <div class="marketplace-head">
-      {props.media}
-      <div class="marketplace-head-copy">
-        <Heading as="h3" size="lg" class="marketplace-page-title">
-          {props.title}
-        </Heading>
-        <Text as="p" variant="body-sm" tone="muted">
-          {props.description}
-        </Text>
-      </div>
-      {props.actions}
-    </div>
-  );
-}
 
 /** The part of a page that waits for the full listing: a status line, or the failure with Retry. */
 export function DetailState(props: {
@@ -72,64 +53,6 @@ export function DetailState(props: {
       </Match>
       <Match when={props.status === "loaded"}>{props.children}</Match>
     </Switch>
-  );
-}
-
-/** A titled part of a page. */
-export function Block(props: {
-  id: string;
-  level: "h3" | "h4";
-  title: string;
-  description?: string;
-  aside?: JSX.Element;
-  children: JSX.Element;
-}) {
-  return (
-    <section class="marketplace-block" aria-labelledby={props.id}>
-      <div class="marketplace-block-head">
-        <div class="marketplace-block-copy">
-          <Heading as={props.level} size="sm" id={props.id}>
-            {props.title}
-          </Heading>
-          <Show when={props.description}>
-            <Text variant="caption" tone="muted">
-              {props.description}
-            </Text>
-          </Show>
-        </div>
-        {props.aside}
-      </div>
-      {props.children}
-    </section>
-  );
-}
-
-/**
- * The facts column of a page. `dt` and `dd` stay direct children of the list: axe rejects a wrapper
- * per row.
- */
-export function Properties(props: { label: string; items: readonly { label: string; value: JSX.Element }[] }) {
-  return (
-    <aside class="marketplace-side" aria-label={props.label}>
-      <dl class="marketplace-props">
-        <For each={props.items}>
-          {(entry) => (
-            <>
-              <dt>
-                <Text as="span" variant="caption" tone="muted">
-                  {entry.label}
-                </Text>
-              </dt>
-              <dd>
-                <Text as="span" variant="body-sm">
-                  {entry.value}
-                </Text>
-              </dd>
-            </>
-          )}
-        </For>
-      </dl>
-    </aside>
   );
 }
 

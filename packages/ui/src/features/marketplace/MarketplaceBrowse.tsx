@@ -88,7 +88,7 @@ export function createBrowseLists(scope: MarketplaceScope) {
   const { format } = useText();
   const model = () => scope.model;
   const state = () => scope.nav.state;
-  // The catalog server does not filter agents by source, so the list does.
+  // A Worker before the `verified` filter sends every agent, so the list filters by source too.
   const agents = () => scope.agents.items().filter((listing) => agentFromSource(listing, state().agentSource));
   const skills = () => scope.skills.items();
   const apps = () =>

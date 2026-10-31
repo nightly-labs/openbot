@@ -121,8 +121,7 @@ export function marketplaceListingFromWebAppSearch(search: string): MarketplaceL
 }
 
 /**
- * The listing a Marketplace link names, in either form. Throws for anything else, so a caller that
- * wants a decision rather than a value uses `isMarketplaceUrl`.
+ * The listing a Marketplace link names, in either form. Throws for anything else.
  */
 export function parseMarketplaceUrl(value: string): MarketplaceListingLink {
   let url: URL;
@@ -159,13 +158,4 @@ export function parseMarketplaceUrl(value: string): MarketplaceListingLink {
   const link = { kind, id };
   assertListing(link);
   return link;
-}
-
-export function isMarketplaceUrl(value: string): boolean {
-  try {
-    parseMarketplaceUrl(value);
-    return true;
-  } catch {
-    return false;
-  }
 }

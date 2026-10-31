@@ -128,7 +128,8 @@ export class AgentMarketplaceService {
 
   /**
    * The agent a shared link names: the approved version, else the version that waits for its first
-   * review, marked `pending`. Only a link reads this; it never adds the agent.
+   * review, marked `pending`. The listing page shows it, and Add installs it, so that Add works on a
+   * pending agent that its creator shared.
    */
   getListing(agentId: string): Effect.Effect<MarketplaceAgentDetail, AgentMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceAgentDetail, AgentMarketplaceFailure> {
@@ -206,7 +207,7 @@ export class AgentMarketplaceService {
         return yield* new AgentMarketplaceFailure({
           cause: new Error(sourceText("error.marketplace.timezoneInvalid")),
         });
-      const detail = yield* this.get(input.listingId);
+      const detail = yield* this.getListing(input.listingId);
       const existing = input.agentId
         ? this.agents.listAgents().find((candidate) => candidate.id === input.agentId)
         : undefined;

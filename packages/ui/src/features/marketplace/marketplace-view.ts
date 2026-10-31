@@ -47,16 +47,11 @@ export const MARKETPLACE_TAB_LABEL = {
   skills: "marketplace.tab.skills",
 } as const satisfies Record<MarketplaceTab, string>;
 
-/** "yes": only what the user has. "no": only what the user does not have. */
-export type OwnedFilter = "yes" | "no";
-
 export interface MarketplaceNavigationState {
   /** The views the user went through. The first is always the browse view. */
   stack: MarketplaceView[];
   tab: MarketplaceTab;
   query: string;
-  agentCategory: SkillCategory | null;
-  agentsOwned: OwnedFilter | null;
   /** Verified or Public on the Agents tab. No source shows all agents. */
   agentSource: SkillSource | null;
   /** The order of a skill group page. */
@@ -92,8 +87,6 @@ function initialState(): MarketplaceNavigationState {
     stack: [{ kind: "browse" }],
     tab: "apps",
     query: "",
-    agentCategory: null,
-    agentsOwned: null,
     agentSource: null,
     skillSort: "installs",
     skillSource: null,

@@ -269,18 +269,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-4);
 }
 
-.marketplace-head-copy {
-  display: grid;
-  flex: 1;
-  gap: var(--openbot-space-1);
-  min-width: 0;
-}
-
-.marketplace-page-title {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
 .marketplace-command {
   overflow-wrap: anywhere;
   color: var(--openbot-text-primary);
@@ -321,24 +309,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 .marketplace-search {
   position: relative;
   flex: 1;
-  min-width: 0;
-}
-
-.marketplace-block {
-  display: grid;
-  gap: var(--openbot-space-2);
-}
-
-.marketplace-block-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--openbot-space-2);
-}
-
-.marketplace-block-copy {
-  display: grid;
-  gap: var(--openbot-space-0-5);
   min-width: 0;
 }
 
@@ -558,32 +528,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
   color: var(--marketplace-done-mark, currentColor);
 }
 
-/* ---------------------------------------------------------------- rows */
-
-.marketplace-rows {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.marketplace-row {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-3);
-  min-height: 52px;
-  padding: var(--openbot-space-1-5) var(--openbot-space-2);
-  border-radius: var(--openbot-radius-md);
-}
-
-.marketplace-row-copy {
-  display: grid;
-  flex: 1;
-  gap: var(--openbot-space-0-5);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 /* ---------------------------------------------------------------- app list */
 
 .marketplace-app-group {
@@ -706,13 +650,6 @@ body:has(.skills-marketplace) :is(.integration-dialog-backdrop, .integration-wiz
 }
 
 /* ---------------------------------------------------------------- pages */
-
-.marketplace-side {
-  position: sticky;
-  top: var(--openbot-space-6);
-  padding-left: var(--openbot-space-6);
-  border-left: 1px solid var(--openbot-border);
-}
 
 /* `dt` and `dd` are direct children of the list, so each fact is one pair of grid rows. */
 .marketplace-props {
@@ -1379,13 +1316,6 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
 @media (max-width: 860px) {
   .skills-marketplace {
     --marketplace-inset: var(--openbot-space-4);
-  }
-
-  .marketplace-side {
-    position: static;
-    padding: var(--openbot-space-4) 0 0;
-    border-top: 1px solid var(--openbot-border);
-    border-left: 0;
   }
 
   .marketplace-head {

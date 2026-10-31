@@ -21,9 +21,9 @@ const AgentAvatar = lazy(() =>
  * serves; how it is drawn is a later step.
  */
 
-export const SHARE_HOST = "openbot.run";
+const SHARE_HOST = "openbot.run";
 
-export function shareTitle(agent: MarketplaceAgentSummary): string {
+function shareTitle(agent: MarketplaceAgentSummary): string {
   return `${agent.name} — OpenBot agent`;
 }
 
