@@ -481,7 +481,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   /** The opened host has its own connection. Another host shows its status connection, as on mobile. */
   function hostState(hostId: string): ServerConnectionState {
-    if (hostId === workspace.state.host?.hostId) return workspace.state.status;
+    // The tab that has the host open reports its state.
+    if (hostId === workspace.state.host?.hostId && !workspace.state.otherTab) return workspace.state.status;
     const state = workspace.state.hostStates[hostId];
     // Without status connections (no BroadcastChannel), nothing will report this host.
     if (!workspace.runtime.hosts) return "offline";
@@ -1740,11 +1741,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         <Show
           when={!workspace.state.otherTab}
           fallback={
-            <WebServerOtherTab
-              name={workspace.state.host?.name ?? ""}
-              busy={workspace.state.status === "connecting"}
-              onUseHere={() => void workspace.run(workspace.useHere)}
-            />
+            <div class="web-other-tab-window">
+              {/* With more than one server, the user can open another one here. The add dialogs live in the workspace. */}
+              <Show when={servers().length > 1}>
+                <ServerRail servers={servers()} onSelect={selectServer} onReorder={workspace.reorderHosts} />
+              </Show>
+              <WebServerOtherTab
+                name={workspace.state.host?.name ?? ""}
+                busy={workspace.state.status === "connecting"}
+                onUseHere={() => void workspace.run(workspace.useHere)}
+              />
+            </div>
           }
         >
           {/* As on desktop: the page rail sits at the left of the frame. */}

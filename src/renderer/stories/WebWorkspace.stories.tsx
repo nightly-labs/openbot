@@ -335,3 +335,23 @@ const sleepingFetch: typeof fetch = async (input, init) => {
 export const HostedServerAsleep: Story = {
   args: { createRuntime: sleepingRuntime, accountFetch: sleepingFetch },
 };
+
+/** Another tab has the cloud server open. The server rail opens the other server. */
+const otherTabServersRuntime: WebRuntimeFactory = (...args) => {
+  const runtime = createMockWebRuntime(...args);
+  return {
+    ...runtime,
+    listHosts: async () => {
+      const [computer] = await runtime.listHosts();
+      return computer ? [{ ...computer, hostId: NEW_SERVER_ID, name: "Cloud server" }, computer] : [];
+    },
+    connect: async (host, options) => {
+      if (host.hostId === NEW_SERVER_ID && !options?.takeOver) throw new WebHostOtherTabError();
+      return runtime.connect(host, options);
+    },
+  };
+};
+
+export const OpenInAnotherTabWithServers: Story = {
+  args: { accountEmail: "you@example.com", createRuntime: otherTabServersRuntime },
+};
