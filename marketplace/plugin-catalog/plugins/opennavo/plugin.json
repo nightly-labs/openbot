@@ -1,0 +1,32 @@
+{
+  "slug": "opennavo",
+  "name": "OpenNavo",
+  "tagline": "Mac app catalog with release notes",
+  "description": "OpenNavo is a catalog of Mac applications built from Homebrew casks. Agents can search apps by name or purpose, read an app's latest version and release notes, list its dependencies and alternatives, browse categories, rankings and collections, and read articles. The server is anonymous and read-only, so a listing needs no key and no sign-in.",
+  "category": "productivity",
+  "creatorName": "OpenNavo",
+  "iconUrl": "https://opennavo.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-app", "text": "Find a free Mac app for taking notes without a subscription." },
+    { "id": "prompt-release-notes", "text": "What changed in the latest version of OrbStack?" },
+    { "id": "prompt-alternatives", "text": "What are the alternatives to CleanMyMac on OpenNavo?" }
+  ],
+  "apps": [
+    {
+      "id": "app-opennavo-mcp",
+      "name": "OpenNavo",
+      "description": "Search the OpenNavo catalog of Mac apps, read release notes and version facts, and list categories, over OpenNavo's public read-only MCP server.",
+      "iconUrl": "https://opennavo.com/favicon.ico",
+      "server": {
+        "name": "opennavo",
+        "transport": "http",
+        "url": "https://opennavo.com/mcp"
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://opennavo.com",
+  "privacyPolicyUrl": null,
+  "termsUrl": null
+}
