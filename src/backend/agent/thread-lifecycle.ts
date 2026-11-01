@@ -331,6 +331,15 @@ export class ThreadLifecycle {
       this.#conversation.openAgentThreads(agentId),
       ([externalThreadId, client]) =>
         Effect.gen({ self: this }, function* () {
+          const archiveThread = client.archiveThread?.bind(client);
+          if (archiveThread)
+            yield* archiveThread(externalThreadId)
+              .pipe(toThreadOperationFailed)
+              .pipe(
+                Effect.catch((failure) =>
+                  Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause)),
+                ),
+              );
           const releaseThread = client.releaseThread?.bind(client);
           if (releaseThread)
             yield* releaseThread(externalThreadId)
@@ -356,6 +365,13 @@ export class ThreadLifecycle {
   ) {
     const client = this.#conversation.openClientFor(externalThreadId);
     if (!client) return;
+    if (client.archiveThread) {
+      yield* client
+        .archiveThread(externalThreadId)
+        .pipe(
+          Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
+        );
+    }
     yield* this.#releaseProviderSession(externalThreadId, client);
     this.#conversation.unloadThread(externalThreadId);
   }, Effect.uninterruptible).bind(this);
