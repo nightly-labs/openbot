@@ -51,6 +51,7 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
     case "inception":
     case "deepseek":
     case "openrouter":
+    case "opper":
       return facts.hasApiKey(agent.provider) ? "api_key" : "unknown";
     case "cursor":
       if (facts.envKey("CURSOR_API_KEY")) return "api_key";

@@ -84,9 +84,9 @@ export interface PiProviderOptions {
   confine?: (target: SpawnTarget) => SpawnTarget;
   extraEnv?: () => Record<string, string>;
   /**
-   * A provider that signs in only with a key, such as Inception, DeepSeek or OpenRouter, and its saved key. With
-   * it the client is that provider: Pi lists only that provider's models, and the model ids have no
-   * `<provider>/` prefix.
+   * A provider that signs in only with a key, such as Inception, DeepSeek, OpenRouter or Opper, and its
+   * saved key. With it the client is that provider: Pi lists only that provider's models, and the model
+   * ids have no `<provider>/` prefix.
    */
   keyProvider?: { id: KeyOnlyProviderId; apiKey: () => string | null };
   /** The custom endpoints that run on Pi, read at each spawn. Only for the main `pi` client. */
