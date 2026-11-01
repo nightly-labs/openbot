@@ -70,6 +70,6 @@ export function readLocalRuntimeVars(environment: NodeJS.ProcessEnv): Record<str
   return result;
 }
 
-function normalizeBooleanFlag(value: string): boolean {
+export function normalizeBooleanFlag(value: string): boolean {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }

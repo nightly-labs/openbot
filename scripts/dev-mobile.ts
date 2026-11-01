@@ -250,8 +250,13 @@ async function main(): Promise<void> {
   }
   let desktop = findWorktreeDesktop();
   if (!desktop && options.pairOnly) throw new Error("No dev app runs in this worktree. Run without --pair-only.");
-  if (desktop) logger.info("Reusing this worktree's dev app.");
-  else startChild("bun run dev", "bun", ["scripts/dev-services.ts", "app"], "ignore");
+  if (desktop) {
+    logger.info("Reusing this worktree's dev app.");
+    logger.info("For a physical phone, this stack must have been started with `bun run dev --lan`.");
+  } else {
+    logger.info("This stack uses loopback. Stop it and start `bun run dev --lan` for a physical phone.");
+    startChild("bun run dev", "bun", ["scripts/dev-services.ts", "app"], "ignore");
+  }
   if (!options.pairOnly) {
     // Metro reads keyboard shortcuts, so it owns the terminal input.
     startChild("bun mobile:ios", "bun", ["scripts/mobile-ios.ts", ...options.mobileArgs], "inherit");

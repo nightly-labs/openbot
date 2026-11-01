@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { devNull } from "node:os";
 import { join } from "node:path";
 import { config } from "@dotenvx/dotenvx";
-import { readDevelopmentState } from "./development-secrets";
+import { readDevelopmentState, readDevelopmentStateForDryRun } from "./development-secrets";
 
 const LOCAL_IDENTITY_KEYS = [
   "REMOTE_TICKET_PRIVATE_JWK",
@@ -58,8 +58,9 @@ async function decryptEnvironment(
 export async function loadDevelopmentEnvironment(
   projectRoot: string,
   environment: NodeJS.ProcessEnv = process.env,
+  options: { readOnly?: boolean } = {},
 ): Promise<NodeJS.ProcessEnv> {
-  const state = readDevelopmentState(projectRoot);
+  const state = options.readOnly ? readDevelopmentStateForDryRun(projectRoot) : readDevelopmentState(projectRoot);
   const shared = await loadSharedDevelopmentEnvironment(projectRoot, environment);
   // Shared service credentials must not change the identity of an existing local instance.
   for (const key of LOCAL_IDENTITY_KEYS) delete shared[key];
