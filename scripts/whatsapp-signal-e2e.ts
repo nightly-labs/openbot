@@ -5,7 +5,8 @@
 //
 // `bun scripts/whatsapp-signal-e2e.ts`. Writes .openbot-build/whatsapp-signal-e2e/report.json.
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import {
   type KeyPair,
@@ -248,8 +249,20 @@ function symmetricMatches() {
   return { ok: true };
 }
 
+/** Baileys must load this package as `libsignal`, never the GPL package from npm. */
+async function baileysLoadsReplacement() {
+  const fromBaileys = createRequire(
+    resolve(import.meta.dirname, "../node_modules/@whiskeysockets/baileys/package.json"),
+  );
+  const loaded = await realpath(fromBaileys.resolve("libsignal"));
+  const expected = await realpath(resolve(import.meta.dirname, "../vendor/whatsapp-signal/index.js"));
+  assert.equal(loaded, expected);
+  return { ok: true };
+}
+
 await mkdir(OUT, { recursive: true });
 const cases = {
+  baileysLoadsReplacement: await baileysLoadsReplacement(),
   sessionsBothWays: await sessionsBothWays(),
   changedMessageRefused: await changedMessageRefused(),
   libsignalNodeMessages: await libsignalNodeMessages(),

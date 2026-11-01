@@ -376,6 +376,14 @@
         "typescript": "catalog:",
       },
     },
+    "vendor/whatsapp-signal": {
+      "name": "libsignal",
+      "version": "6.0.0",
+      "dependencies": {
+        "protobufjs": "7.5.6",
+        "whatsapp-rust-bridge": "0.5.4",
+      },
+    },
   },
   "trustedDependencies": [
     "esbuild",
@@ -396,9 +404,6 @@
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
-  },
-  "overrides": {
-    "libsignal": "file:./vendor/whatsapp-signal",
   },
   "catalog": {
     "@cloudflare/workers-types": "5.20261023.1",
@@ -2573,6 +2578,8 @@
 
     "leven": ["leven@3.1.0", "", {}, "sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A=="],
 
+    "libsignal": ["libsignal@workspace:vendor/whatsapp-signal"],
+
     "lightningcss": ["lightningcss@1.33.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA=="],
 
     "lightningcss-android-arm64": ["lightningcss-android-arm64@1.33.0", "", { "os": "android", "cpu": "arm64" }, "sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg=="],
@@ -3632,8 +3639,6 @@
     "@vitest/mocker/magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
     "@vitest/snapshot/magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
-
-    "@whiskeysockets/baileys/libsignal": ["libsignal@file:vendor/whatsapp-signal", { "dependencies": { "protobufjs": "7.5.6", "whatsapp-rust-bridge": "0.5.4" } }],
 
     "ansi-escapes/type-fest": ["type-fest@0.21.3", "", {}, "sha512-t0rzBq87m3fVcduHDUFhKmyyX+9eo6WQjZvf51Ea/M0Q7+T374Jp1aUiyUl0GKxp8M/OETVHSDvmkyPgvX+X2w=="],
 

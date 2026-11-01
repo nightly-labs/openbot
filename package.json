@@ -32,7 +32,8 @@
     "packages": [
       "apps/*",
       "packages/*",
-      "remote/api"
+      "remote/api",
+      "vendor/whatsapp-signal"
     ],
     "catalog": {
       "@noble/hashes": "2.4.0",
@@ -484,8 +485,5 @@
     "electron-winstaller",
     "esbuild",
     "workerd"
-  ],
-  "overrides": {
-    "libsignal": "file:./vendor/whatsapp-signal"
-  }
+  ]
 }
