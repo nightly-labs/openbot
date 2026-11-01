@@ -294,7 +294,7 @@ function bridgedTool(item: ThreadItem) {
   return name ? BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name) : undefined;
 }
 
-const TOOL_RESULT_PROGRESS = "Reviewing the latest tool result…";
+const TOOL_RESULT_PROGRESS = sourceText("status.agent.toolResultReviewing");
 
 /**
  * The OpenBot tool that an item calls, or null for any other tool: a Codex, Pi or Muse item names
@@ -388,7 +388,7 @@ export function isToolItem(item: ThreadItem): boolean {
 export function toolProgressText(item: ThreadItem, completed: boolean): string | null {
   if (!isToolItem(item)) return null;
   if (completed && getString(item, "status") === "failed") {
-    return "A tool step failed; reviewing the result and deciding what to try next…";
+    return sourceText("status.agent.toolStepFailed");
   }
 
   const descriptor = [
@@ -428,21 +428,23 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     return completed ? sourceText("status.agent.browserReviewing") : browserProgressText(browser);
   }
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
-    return completed ? "Reviewing the sources and information I found…" : "Searching for current information…";
+    return completed ? sourceText("status.agent.sourcesReviewing") : sourceText("status.agent.sourcesSearching");
   }
   if (/(read|find|list|get|inspect|snapshot)/u.test(descriptor)) {
-    return completed ? "Reviewing the information I gathered…" : "Gathering the relevant information…";
+    return completed
+      ? sourceText("status.agent.informationReviewing")
+      : sourceText("status.agent.informationGathering");
   }
   if (/(test|check|lint|build|verify)/u.test(descriptor)) {
-    return completed ? "Reviewing the verification results…" : "Checking the work…";
+    return completed ? sourceText("status.agent.workReviewing") : sourceText("status.agent.workChecking");
   }
   if (/(write|edit|patch|create|update|delete|move|filechange)/u.test(descriptor)) {
-    return completed ? "Reviewing the changes I made…" : "Making the requested changes…";
+    return completed ? sourceText("status.agent.changesReviewing") : sourceText("status.agent.changesMaking");
   }
   if (/(agent|delegate|message|send)/u.test(descriptor)) {
-    return completed ? "Reviewing the other agent’s response…" : "Coordinating with another agent…";
+    return completed ? sourceText("status.agent.agentResponseReviewing") : sourceText("status.agent.agentCoordinating");
   }
-  return completed ? TOOL_RESULT_PROGRESS : "Working through the next tool-assisted step…";
+  return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.toolStepWorking");
 }
 
 /** The provider account after the first that an agent runs on, or null for the provider's own sign-in. */
