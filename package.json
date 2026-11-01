@@ -192,6 +192,7 @@
     "test:related": "vitest related --run --maxWorkers=1",
     "test:durations": "bun scripts/test-durations.ts",
     "test:api": "bun run --cwd apps/auth-api test",
+    "test:api-migration-numbers": "bun scripts/auth-migration-numbers-smoke.ts",
     "test:backend": "vitest run src/backend",
     "test:browser": "bun scripts/browser-smoke.ts",
     "test:browser-agent-session": "bun scripts/browser-agent-session-e2e.ts",
