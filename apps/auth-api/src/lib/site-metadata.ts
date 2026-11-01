@@ -35,6 +35,49 @@ export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
 ] as const;
 
+/** The site's card in the shape of `pageSocialImageMeta`, for a page that can have either. */
+export const OPENBOT_SOCIAL_IMAGE_TAGS = {
+  openGraph: OPENBOT_SOCIAL_IMAGE_META,
+  twitter: [
+    { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+    { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+  ],
+} as const;
+
+/** A page's own social card: a 1600x900 JPEG in `public/social/`, the size of the site's card. */
+export interface PageSocialImage {
+  /** The path from the site root, for example `/social/teams.jpg`. */
+  path: string;
+  alt: string;
+}
+
+/** The card of the terms, the privacy policy and the DPA. */
+export const OPENBOT_LEGAL_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/legal.jpg",
+  alt: "Plain terms. No surprises. OpenBot agents beside a paper map",
+};
+
+/**
+ * The Open Graph and X tags of a page's own social card. The image URL uses the site that
+ * serves the page, so a pull-request preview names an image that it has.
+ */
+export function pageSocialImageMeta(image: PageSocialImage, siteUrl: string) {
+  const url = new URL(image.path, siteUrl).toString();
+  return {
+    openGraph: [
+      { property: "og:image", content: url },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1600" },
+      { property: "og:image:height", content: "900" },
+      { property: "og:image:alt", content: image.alt },
+    ],
+    twitter: [
+      { name: "twitter:image", content: url },
+      { name: "twitter:image:alt", content: image.alt },
+    ],
+  } as const;
+}
+
 // The hosts production answers on. Both serve the same pages, and those pages go by
 // openbot.run.
 const OPENBOT_PRODUCTION_HOSTS = new Set(["openbot.run", "api.openbot.run"]);
@@ -171,7 +214,14 @@ export function openBotRootHead(interLatinFont: string) {
   };
 }
 
-export function openBotHomeHead(application: OpenBotSoftwareApplication) {
+/** The home page's own social card. Other pages without a card of their own keep the site's card. */
+const OPENBOT_HOME_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/home.jpg",
+  alt: "Models come and go. Your team stays. OpenBot agents on a paper planet",
+};
+
+export function openBotHomeHead(application: OpenBotSoftwareApplication, siteUrl: string) {
+  const image = pageSocialImageMeta(OPENBOT_HOME_SOCIAL_IMAGE, siteUrl);
   return {
     meta: [
       { "script:ld+json": application },
@@ -183,13 +233,12 @@ export function openBotHomeHead(application: OpenBotSoftwareApplication) {
       { property: "og:url", content: OPENBOT_SITE_URL },
       { property: "og:title", content: OPENBOT_SITE_TITLE },
       { property: "og:description", content: OPENBOT_SITE_DESCRIPTION },
-      ...OPENBOT_SOCIAL_IMAGE_META,
+      ...image.openGraph,
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: OPENBOT_SITE_TITLE },
       { name: "twitter:description", content: OPENBOT_SITE_DESCRIPTION },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { name: "twitter:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      ...image.twitter,
       { "script:ld+json": LANDING_FAQ_STRUCTURED_DATA },
     ],
     links: [{ rel: "canonical", href: OPENBOT_SITE_URL }],
