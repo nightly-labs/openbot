@@ -2404,6 +2404,12 @@ export class ProviderRuntime implements ProviderPort {
     yield* this.#awaitConfinedStart(agentId);
     const confined = this.#confined.get(agentId);
     if (confined) yield* this.#stopConfined(agentId, confined);
+    if (process.platform === "win32") {
+      const antigravity = this.#clients.get("antigravity");
+      if (antigravity && !this.#hooks.isProviderBusy("antigravity")) {
+        yield* this.#stopProviderClient("antigravity");
+      }
+    }
   }, Effect.uninterruptible).bind(this);
 
   readonly #awaitConfinedStart = Effect.fn("ProviderRuntime.awaitConfinedStart")(function* (

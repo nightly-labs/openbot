@@ -152,7 +152,12 @@ const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
-const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 150 } as const;
+// Windows answers `EBUSY` or `EPERM` while a file in the tree is still open: a provider process that
+// is exiting after its session closed, an antivirus scan or the search indexer. Node retries these
+// codes with a delay, about 8 seconds in total, before the deletion reports a failure. The
+// Claude SDK's close does not wait for the `claude` process. On Windows it kills a process that has
+// not exited after 7 seconds, so a shorter wait fails a delete that a retry then completes.
+const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 32, retryDelay: 250 } as const;
 
 export class AgentStore {
   readonly #statePath: string;
