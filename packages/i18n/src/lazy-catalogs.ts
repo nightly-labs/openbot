@@ -75,6 +75,12 @@ const loaders: Record<LoadableLocale, () => Promise<LocaleCatalogs>> = {
     Promise.all([import("./messages/zh/index"), import("./messages/zh/source"), import("./messages/zh/format")]).then(
       ([app, source, format]) => ({ app: app.zh, source: source.source, format: format.messages }),
     ),
+  "zh-TW": () =>
+    Promise.all([
+      import("./messages/zh-TW/index"),
+      import("./messages/zh-TW/source"),
+      import("./messages/zh-TW/format"),
+    ]).then(([app, source, format]) => ({ app: app.zhTW, source: source.source, format: format.messages })),
 };
 
 const loaded = new Map<TranslatedLocale, LocaleCatalogs>([["en", { app: en, source: enSource, format: enFormat }]]);
