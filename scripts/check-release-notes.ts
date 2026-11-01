@@ -36,12 +36,15 @@ const show = (object: string): string | undefined => {
   }
 };
 
+const stagedObject = (path: string): string => `:./${path}`;
+const headObject = (path: string): string => `HEAD:./${path}`;
+
 const fragmentsFlag = process.argv.indexOf("--fragments");
 if (fragmentsFlag !== -1) {
   const problems = process.argv
     .slice(fragmentsFlag + 1)
     .flatMap((path) =>
-      fragmentProblems((staged ? show(`:${path}`) : readFileSync(path, "utf8")) ?? "").map(
+      fragmentProblems((staged ? show(stagedObject(path)) : readFileSync(path, "utf8")) ?? "").map(
         (problem) => `- ${path}: ${problem}`,
       ),
     );
@@ -62,15 +65,15 @@ function version(json: string | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-const nextVersion = version(staged ? show(`:${versionFile}`) : readFileSync(versionFile, "utf8"));
+const nextVersion = version(staged ? show(stagedObject(versionFile)) : readFileSync(versionFile, "utf8"));
 if (nextVersion === undefined) {
   process.stderr.write(`${versionFile} has no version.\n`);
   process.exit(1);
 }
-if (staged && version(show(`HEAD:${versionFile}`)) === nextVersion) process.exit(0);
+if (staged && version(show(headObject(versionFile))) === nextVersion) process.exit(0);
 
 const problems = releaseNotesProblems(
-  (staged ? show(`:${changelogFile}`) : readFileSync(changelogFile, "utf8")) ?? "",
+  (staged ? show(stagedObject(changelogFile)) : readFileSync(changelogFile, "utf8")) ?? "",
   nextVersion,
   // A new mobile version waits for store review before `/changelog` shows it.
   { storeReview: mobile },
