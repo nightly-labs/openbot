@@ -6,6 +6,7 @@ import {
   type LogValue,
   redactText,
   redactValue,
+  isStandardProcessVariable,
   registerSecretValue,
   resolveLogLevel,
   toLogValue,
@@ -457,5 +458,14 @@ describe("createOpenBotLogger", () => {
     const error = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     createOpenBotLogger("automation").warn("careful");
     expect(error).toHaveBeenCalledOnce();
+  });
+});
+
+describe("isStandardProcessVariable", () => {
+  it("matches whatever the case, and only the names on the list", () => {
+    expect(isStandardProcessVariable("USER")).toBe(true);
+    expect(isStandardProcessVariable("Path")).toBe(true);
+    expect(isStandardProcessVariable("DATABASE_URL")).toBe(false);
+    expect(isStandardProcessVariable("XDG_SESSION_COOKIE")).toBe(false);
   });
 });

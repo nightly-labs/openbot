@@ -165,6 +165,40 @@ export function isSecretName(name: string): boolean {
   return SECRET_KEY.test(name);
 }
 
+// The variables every process carries. A server may be configured with `USER` or `HOME`, and these
+// values are not credentials: masking `USER` hides an account name in every line an agent writes.
+// The list is exact rather than a prefix match, so it cannot grow to cover a name such as
+// `XDG_SESSION_COOKIE` that does carry one. Windows spells some of them `Path`, and its names are
+// case-insensitive, so the match is too.
+const STANDARD_PROCESS_VARIABLES = new Set([
+  "USER",
+  "LOGNAME",
+  "HOME",
+  "PATH",
+  "SHELL",
+  "PWD",
+  "OLDPWD",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "TMPDIR",
+  "TZ",
+  "HOSTNAME",
+  "NODE_ENV",
+  "DISPLAY",
+  "XAUTHORITY",
+  "XDG_RUNTIME_DIR",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+]);
+
+/** Whether a variable name is one of the standard process variables, which never carry a secret. */
+export function isStandardProcessVariable(name: string): boolean {
+  return STANDARD_PROCESS_VARIABLES.has(name.toUpperCase());
+}
+
 export function redactText(value: string): string {
   const marked = markRegisteredSecrets(value);
   const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
