@@ -2,8 +2,8 @@
 // loads this module only when it needs WhatsApp, so Baileys is not loaded at startup on a computer
 // that never links. Baileys runs on events and Promises; the service wraps each call in an Effect.
 //
-// Baileys depends on `libsignal`, which is GPL-3.0. The root package.json replaces it with
-// `vendor/whatsapp-signal`, so no GPL code is installed (see that package's README).
+// Baileys depends on `libsignal`, which is GPL-3.0. The workspace `vendor/whatsapp-signal`, named
+// `libsignal`, takes its place, so no GPL code is installed (see that package's README).
 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText } from "@openbot/logging";

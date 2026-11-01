@@ -84,6 +84,12 @@ const config: KnipConfig = {
       // root. Every file in scripts/ is already an entry.
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
+    // Baileys loads this package as `libsignal` (vendor/whatsapp-signal/README.md), by the paths that
+    // it imports, so each file is an entry.
+    "vendor/whatsapp-signal": {
+      entry: ["index.js", "src/*.js"],
+      project: ["**/*.js"],
+    },
     "apps/auth-api": {
       // The wrangler plugin of knip reads `main` (src/worker-entry.ts) from wrangler.jsonc.
       entry: ["*.ts"],

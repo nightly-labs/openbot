@@ -481,8 +481,8 @@ While the host is linked, its agents get the WhatsApp MCP server; sending and ma
 refused until the admin turns sending on. A host older than this capability hides the WhatsApp
 account.
 
-Baileys depends on `libsignal` (`libsignal-node`, GPL-3.0). The root `package.json` replaces it,
-through `overrides`, with [`vendor/whatsapp-signal`](../../vendor/whatsapp-signal/README.md): the part
+Baileys depends on `libsignal` (`libsignal-node`, GPL-3.0). The workspace
+[`vendor/whatsapp-signal`](../../vendor/whatsapp-signal/README.md), named `libsignal`, takes its place: the part
 of its API that Baileys uses, on the Signal protocol of `whatsapp-rust-bridge` (MIT), which Baileys
 already ships. No GPL code is installed. `bun run test:whatsapp-signal` checks it against messages
 that `libsignal-node` encrypted.
