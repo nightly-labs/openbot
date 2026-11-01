@@ -67,4 +67,23 @@ export const messages = {
     "Telegram がこのセッションを終了しました（例: 設定 > デバイス）。Telegram アカウントをもう一度接続してください。",
   "error.connector.telegramAccountFileUnreadable": "Telegram アカウントの接続ファイルを読み取れません。",
   "error.connector.telegramAccountFileTooLarge": "Telegram アカウントの接続ファイルが大きすぎます。",
+  "error.connector.whatsappAccountPhoneFormat": "電話番号を国番号付きで入力してください（例: +48 600 100 200）。",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp からコードを取得できませんでした: {detail}",
+  "error.connector.whatsappAccountQrExpired": "使用する前にコードの有効期限が切れました。もう一度始めてください。",
+  "error.connector.whatsappAccountTimedOut":
+    "10 分間操作がなかったため、リンクを停止しました。もう一度始めてください。",
+  "error.connector.whatsappAccountMovedOn": "リンクは別のステップに進んでいます。もう一度始めてください。",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp はこのデバイスをリンクしませんでした: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot は WhatsApp の接続を保存できませんでした: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp がこのデバイスを削除しました（例: 設定 > リンク済みデバイス）。WhatsApp アカウントをもう一度リンクしてください。",
+  "error.connector.whatsappAccountReplaced":
+    "別のプログラムがこのリンク済みデバイスを開いたため、WhatsApp はここでの接続を閉じました。リンクを解除してから、もう一度リンクしてください。",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp がこのデバイスを拒否しました。番号が制限されている可能性があります。スマートフォンの WhatsApp を確認してください。",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp はこのバージョンの接続を受け付けなくなりました。OpenBot をアップデートしてから、もう一度リンクしてください。",
+  "error.connector.whatsappAccountOffline":
+    "現在 WhatsApp に接続できません。OpenBot が再試行します。エージェントは引き続きこのコンピューター上のチャットを読めます。",
+  "error.connector.whatsappAccountFileUnreadable": "WhatsApp アカウントの接続ファイルを読み取れません。",
 } as const satisfies PartialTranslation<typeof source>;

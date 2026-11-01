@@ -62,4 +62,23 @@ export const messages = {
     "Telegram завершил этот сеанс, например в Настройки > Устройства. Подключите аккаунт Telegram заново.",
   "error.connector.telegramAccountFileUnreadable": "Файл подключения аккаунта Telegram не читается.",
   "error.connector.telegramAccountFileTooLarge": "Файл подключения аккаунта Telegram слишком большой.",
+  "error.connector.whatsappAccountPhoneFormat": "Введите номер телефона с кодом страны, например +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp не выдал код: {detail}",
+  "error.connector.whatsappAccountQrExpired":
+    "Срок действия кода истёк до того, как вы его использовали. Начните заново.",
+  "error.connector.whatsappAccountTimedOut": "Привязка остановлена после 10 минут без действий. Начните заново.",
+  "error.connector.whatsappAccountMovedOn": "Привязка перешла к другому шагу. Начните заново.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp не привязал это устройство: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot не удалось сохранить подключение WhatsApp: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp удалил это устройство, например в Настройки > Связанные устройства. Привяжите аккаунт WhatsApp заново.",
+  "error.connector.whatsappAccountReplaced":
+    "Другая программа открыла это связанное устройство, поэтому WhatsApp закрыл подключение здесь. Отвяжите его, затем привяжите снова.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp отклонил это устройство. Ваш номер может быть ограничен. Проверьте WhatsApp на телефоне.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp больше не принимает эту версию подключения. Обновите OpenBot, затем привяжите устройство снова.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp сейчас недоступен. OpenBot пробует снова. Агенты по-прежнему могут читать чаты на этом компьютере.",
+  "error.connector.whatsappAccountFileUnreadable": "Файл подключения аккаунта WhatsApp не читается.",
 } as const satisfies PartialTranslation<typeof source>;

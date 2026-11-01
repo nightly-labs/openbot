@@ -68,7 +68,7 @@ export const messages = defineMessages("error.connector", {
   "error.connector.telegramAccountFileTooLarge": "The Telegram account connection file is too large.",
   // The WhatsApp account connection: each step of the link, the linked device and its files.
   "error.connector.whatsappAccountPhoneFormat":
-    "Enter the phone number with its country code, for example +48 600 100 200.",
+    "Type the number of your WhatsApp account with its country code, for example +48 600 100 200.",
   "error.connector.whatsappAccountPairingFailed": "WhatsApp did not give a code: {detail}",
   "error.connector.whatsappAccountQrExpired": "The code expired before you used it. Start again.",
   "error.connector.whatsappAccountTimedOut": "The link stopped after 10 minutes with no activity. Start again.",

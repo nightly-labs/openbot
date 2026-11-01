@@ -57,4 +57,19 @@ export const messages = {
     "Telegram 已结束此会话，例如在“设置 > 设备”中。请重新连接你的 Telegram 账号。",
   "error.connector.telegramAccountFileUnreadable": "无法读取 Telegram 账号连接文件。",
   "error.connector.telegramAccountFileTooLarge": "Telegram 账号连接文件过大。",
+  "error.connector.whatsappAccountPhoneFormat": "输入带国家/地区代码的电话号码，例如 +48 600 100 200。",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp 未提供代码：{detail}",
+  "error.connector.whatsappAccountQrExpired": "代码在你使用前已过期。请重新开始。",
+  "error.connector.whatsappAccountTimedOut": "关联在 10 分钟无操作后已停止。请重新开始。",
+  "error.connector.whatsappAccountMovedOn": "关联已进入其他步骤。请重新开始。",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp 未关联此设备：{detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot 无法保存 WhatsApp 连接：{detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp 已移除此设备，例如在“设置 > 已关联的设备”中。请重新关联你的 WhatsApp 账号。",
+  "error.connector.whatsappAccountReplaced":
+    "另一个程序打开了此关联设备，因此 WhatsApp 关闭了这里的连接。请取消关联，然后重新关联。",
+  "error.connector.whatsappAccountForbidden": "WhatsApp 拒绝了此设备。你的号码可能受到限制。请在手机上检查 WhatsApp。",
+  "error.connector.whatsappAccountOutdated": "WhatsApp 不再接受此版本的连接。请更新 OpenBot，然后重新关联。",
+  "error.connector.whatsappAccountOffline": "目前无法连接 WhatsApp。OpenBot 会重试。智能体仍可读取这台电脑上的聊天。",
+  "error.connector.whatsappAccountFileUnreadable": "无法读取 WhatsApp 账号连接文件。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -451,4 +451,68 @@ export const messages = {
   "connector.telegramAccount.accountDescriptionHost": "{host}의 에이전트가 이 Telegram 계정을 사용합니다.",
   "connector.telegramAccount.sendingLabel": "에이전트가 메시지를 보내고 채팅을 읽음으로 표시하도록 허용",
   "connector.telegramAccount.sendingDescription": "꺼져 있으면 에이전트는 채팅을 읽기만 할 수 있습니다.",
+  "connector.whatsappAccount.title": "WhatsApp 계정",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "에이전트가 내 WhatsApp 채팅을 읽고, 허용하면 내 이름으로 메시지를 보낼 수 있습니다.",
+  "connector.whatsappAccount.descriptionHost":
+    "{host}의 에이전트가 내 WhatsApp 채팅을 읽고, 허용하면 내 이름으로 메시지를 보낼 수 있습니다.",
+  "connector.whatsappAccount.statusConnecting": "연결 중",
+  "connector.whatsappAccount.statusConnected": "연결됨",
+  "connector.whatsappAccount.actionFailed": "OpenBot이 WhatsApp 계정 연결을 변경하지 못했습니다.",
+  "connector.whatsappAccount.disconnectTitle": "WhatsApp 계정 연결 해제",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot이 이 연결된 기기에서 로그아웃하고 이 컴퓨터에서 키와 채팅을 삭제합니다. 보내기가 꺼집니다.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host}이(가) 이 연결된 기기에서 로그아웃하고 키와 채팅을 삭제합니다. 보내기가 꺼집니다.",
+  "connector.whatsappAccount.disconnect": "연결 해제",
+  "connector.whatsappAccount.linkTitle": "기기 연결",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot은 WhatsApp Web처럼 내 WhatsApp 계정의 연결된 기기가 됩니다. 휴대폰은 계속 기본 기기로 유지됩니다. 키와 채팅은 이 컴퓨터에 암호화되어 저장됩니다.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host}은(는) WhatsApp Web처럼 내 WhatsApp 계정의 연결된 기기가 됩니다. 휴대폰은 계속 기본 기기로 유지됩니다. 키와 채팅은 {host}에 암호화되어 저장됩니다.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp은 개인 계정에 공식 접근 방법을 제공하지 않습니다. OpenBot은 비공식 WhatsApp Web 클라이언트를 사용하며, WhatsApp은 자동화되었다고 판단한 번호를 제한하거나 차단할 수 있습니다. 직접 보낼 만한 내용만 보내세요.",
+  "connector.whatsappAccount.linkProgress": "기기를 연결하려면 아래 단계를 진행하세요. 취소하면 연결이 중단됩니다.",
+  "connector.whatsappAccount.methodTitle": "연결 방법",
+  "connector.whatsappAccount.methodQrDescription": "휴대폰의 WhatsApp으로 코드를 스캔합니다.",
+  "connector.whatsappAccount.methodPhoneDescription": "스캔하는 대신 휴대폰에 코드를 입력합니다.",
+  "connector.whatsappAccount.methodQr": "QR 코드",
+  "connector.whatsappAccount.methodPhone": "전화번호",
+  "connector.whatsappAccount.connect": "연결",
+  "connector.whatsappAccount.sendingOffNote": "보내기를 켜기 전까지 에이전트는 채팅을 읽기만 할 수 있습니다.",
+  "connector.whatsappAccount.connecting": "WhatsApp에 연결 중",
+  "connector.whatsappAccount.connectingDescription":
+    "이 컴퓨터가 WhatsApp과 통신하고 있습니다. 몇 초 걸릴 수 있습니다.",
+  "connector.whatsappAccount.connectingHost": "{host}이(가) WhatsApp과 통신하고 있습니다. 몇 초 걸릴 수 있습니다.",
+  "connector.whatsappAccount.qrLabel": "WhatsApp 연결용 QR 코드",
+  "connector.whatsappAccount.qrTitle": "휴대폰의 WhatsApp으로 이 코드를 스캔하세요",
+  "connector.whatsappAccount.stepOpen": "휴대폰에서 WhatsApp을 엽니다.",
+  "connector.whatsappAccount.stepDevices": "설정 › 연결된 기기 › 기기 연결로 이동합니다.",
+  "connector.whatsappAccount.qrStepScan": "휴대폰을 이 코드에 비춥니다.",
+  "connector.whatsappAccount.qrRefresh": "코드는 약 20초마다 바뀝니다. 최신 코드를 스캔하세요.",
+  "connector.whatsappAccount.usePhone": "전화번호 사용",
+  "connector.whatsappAccount.useQr": "QR 코드 사용",
+  "connector.whatsappAccount.phoneDescription":
+    "국가 코드를 포함해 WhatsApp 계정의 전화번호를 입력하세요. 그러면 WhatsApp이 휴대폰에 입력할 코드를 알려 줍니다.",
+  "connector.whatsappAccount.phoneLabel": "전화번호",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "코드 받기",
+  "connector.whatsappAccount.codeTitle": "휴대폰에 이 코드를 입력하세요",
+  "connector.whatsappAccount.codeStepPhone": "대신 전화번호로 연결하기를 탭합니다.",
+  "connector.whatsappAccount.codeStepType": "이 코드를 입력합니다.",
+  "connector.whatsappAccount.codeLabel": "휴대폰에 입력할 코드",
+  "connector.whatsappAccount.accountTitle": "계정",
+  "connector.whatsappAccount.accountDescription": "이 컴퓨터의 에이전트가 이 WhatsApp 계정을 사용합니다.",
+  "connector.whatsappAccount.accountDescriptionHost": "{host}의 에이전트가 이 WhatsApp 계정을 사용합니다.",
+  "connector.whatsappAccount.historyChats": { other: "채팅 {count}개" },
+  "connector.whatsappAccount.historyMessages": { other: "메시지 {count}개" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp은 기기가 연결될 때 최근 기록을 보내고, 그 후에는 새 메시지를 모두 보냅니다. 오래된 메시지는 빠질 수 있습니다.",
+  "connector.whatsappAccount.sendingLabel": "에이전트가 메시지를 보내고 채팅을 읽음으로 표시하도록 허용",
+  "connector.whatsappAccount.sendingDescription": "꺼져 있으면 에이전트는 채팅을 읽기만 할 수 있습니다.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp의 설정 › 연결된 기기에 OpenBot이 표시됩니다. 거기서 로그아웃하면 OpenBot 연결이 해제됩니다.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp의 설정 › 연결된 기기에 OpenBot이 표시됩니다. 거기서 로그아웃하면 {host} 연결이 해제됩니다.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -64,4 +64,24 @@ export const messages = {
     "Telegram ha chiuso questa sessione, per esempio in Impostazioni > Dispositivi. Connetti di nuovo il tuo account Telegram.",
   "error.connector.telegramAccountFileUnreadable": "Il file di connessione dell'account Telegram non è leggibile.",
   "error.connector.telegramAccountFileTooLarge": "Il file di connessione dell'account Telegram è troppo grande.",
+  "error.connector.whatsappAccountPhoneFormat":
+    "Inserisci il numero di telefono con il prefisso internazionale, per esempio +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp non ha fornito un codice: {detail}",
+  "error.connector.whatsappAccountQrExpired": "Il codice è scaduto prima che lo usassi. Ricomincia.",
+  "error.connector.whatsappAccountTimedOut":
+    "Il collegamento si è interrotto dopo 10 minuti senza attività. Ricomincia.",
+  "error.connector.whatsappAccountMovedOn": "Il collegamento è passato a un altro passaggio. Ricomincia.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp non ha collegato questo dispositivo: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot non è riuscito a salvare la connessione a WhatsApp: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp ha rimosso questo dispositivo, per esempio in Impostazioni > Dispositivi collegati. Collega di nuovo il tuo account WhatsApp.",
+  "error.connector.whatsappAccountReplaced":
+    "Un altro programma ha aperto questo dispositivo collegato, quindi WhatsApp ha chiuso la connessione qui. Scollega, poi collega di nuovo.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp ha rifiutato questo dispositivo. Il tuo numero potrebbe essere limitato. Controlla WhatsApp sul telefono.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp non accetta più questa versione della connessione. Aggiorna OpenBot, poi collega di nuovo.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp non è raggiungibile ora. OpenBot riprova. Gli agenti possono ancora leggere le chat su questo computer.",
+  "error.connector.whatsappAccountFileUnreadable": "Il file di connessione dell'account WhatsApp non è leggibile.",
 } as const satisfies PartialTranslation<typeof source>;

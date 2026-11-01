@@ -64,4 +64,22 @@ export const messages = {
     "Telegram이 이 세션을 종료했어요(예: 설정 > 기기). Telegram 계정을 다시 연결해 주세요.",
   "error.connector.telegramAccountFileUnreadable": "Telegram 계정 연결 파일을 읽을 수 없어요.",
   "error.connector.telegramAccountFileTooLarge": "Telegram 계정 연결 파일이 너무 커요.",
+  "error.connector.whatsappAccountPhoneFormat": "국가 번호를 포함해 전화번호를 입력해 주세요. 예: +48 600 100 200",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp이 코드를 주지 않았어요: {detail}",
+  "error.connector.whatsappAccountQrExpired": "사용하기 전에 코드가 만료됐어요. 다시 시작해 주세요.",
+  "error.connector.whatsappAccountTimedOut": "10분 동안 아무 활동이 없어 기기 연결을 중단했어요. 다시 시작해 주세요.",
+  "error.connector.whatsappAccountMovedOn": "기기 연결이 다른 단계로 넘어갔어요. 다시 시작해 주세요.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp이 이 기기를 연결하지 않았어요: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot이 WhatsApp 연결을 저장하지 못했어요: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp이 이 기기를 삭제했어요(예: 설정 > 연결된 기기). WhatsApp 계정을 다시 연결해 주세요.",
+  "error.connector.whatsappAccountReplaced":
+    "다른 프로그램이 이 연결된 기기를 열어서 WhatsApp이 여기의 연결을 닫았어요. 연결을 해제한 후 다시 연결해 주세요.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp이 이 기기를 거부했어요. 번호가 제한되었을 수 있어요. 휴대폰의 WhatsApp을 확인해 주세요.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp이 더 이상 이 버전의 연결을 받아들이지 않아요. OpenBot을 업데이트한 후 다시 연결해 주세요.",
+  "error.connector.whatsappAccountOffline":
+    "지금은 WhatsApp에 연결할 수 없어요. OpenBot이 다시 시도해요. 에이전트는 이 컴퓨터에 있는 채팅을 계속 읽을 수 있어요.",
+  "error.connector.whatsappAccountFileUnreadable": "WhatsApp 계정 연결 파일을 읽을 수 없어요.",
 } as const satisfies PartialTranslation<typeof source>;

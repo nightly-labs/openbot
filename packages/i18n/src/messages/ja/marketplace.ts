@@ -99,6 +99,7 @@ export const messages = {
   "marketplace.app.telegramTagline": "Telegram のグループとダイレクトチャット",
   "marketplace.app.bitwardenTagline": "共有フォルダーのログイン情報でサイトにサインイン",
   "marketplace.app.telegramAccountTagline": "Telegram であなたとしてメッセージを読み書き",
+  "marketplace.app.whatsappAccountTagline": "WhatsApp であなたとしてメッセージを読み書き",
   "marketplace.app.onePasswordCategory": "ログインと認証情報の管理",
   "marketplace.app.yourApps": "あなたのアプリ",
   "marketplace.app.addCustom": "カスタムを追加",
