@@ -254,7 +254,8 @@ export const messages = {
   "connector.discord.accessRoleDeleted": "{role} (gelöscht)",
   "connector.discord.accessSave": "Speichern",
   "connector.discord.accessHostUpdate": "Aktualisiere OpenBot auf {host}, um Rollen zu wählen.",
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Füge den OpenBot-Bot zu einer Telegram-Gruppe hinzu oder öffne einen direkten Chat mit ihm. Der Telegram-Orchestrator fragt den passenden Agenten und antwortet.",
   "connector.telegram.statusConnected": "Verbunden",
@@ -430,4 +431,81 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API-Schlüssel client_secret",
   "connector.bitwarden.masterPassword": "Master-Passwort",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.telegramAccount.title": "Telegram-Konto",
+  "connector.telegramAccount.description":
+    "Agenten können Ihre Telegram-Chats lesen und, wenn Sie es erlauben, in Ihrem Namen Nachrichten senden.",
+  "connector.telegramAccount.descriptionHost":
+    "Agenten auf {host} können Ihre Telegram-Chats lesen und, wenn Sie es erlauben, in Ihrem Namen Nachrichten senden.",
+  "connector.telegramAccount.statusConnecting": "Anmeldung",
+  "connector.telegramAccount.statusConnected": "Verbunden",
+  "connector.telegramAccount.actionFailed": "OpenBot konnte die Verbindung zum Telegram-Konto nicht ändern.",
+  "connector.telegramAccount.disconnectTitle": "Telegram-Konto trennen",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot meldet diese Sitzung ab. Agenten können keine Nachrichten mehr lesen oder senden, und das Senden wird ausgeschaltet.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} meldet diese Sitzung ab. Agenten auf {host} können keine Nachrichten mehr lesen oder senden, und das Senden wird ausgeschaltet.",
+  "connector.telegramAccount.disconnect": "Trennen",
+  "connector.telegramAccount.signInTitle": "Anmelden",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot meldet sich bei Ihrem eigenen Telegram-Konto an, wie Telegram Desktop. Die Sitzung bleibt verschlüsselt auf diesem Computer. Telegram zeigt sie unter Einstellungen › Geräte als OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} meldet sich bei Ihrem eigenen Telegram-Konto an, wie Telegram Desktop. Die Sitzung bleibt verschlüsselt auf {host}. Telegram zeigt sie unter Einstellungen › Geräte als OpenBot.",
+  "connector.telegramAccount.signInProgress":
+    "Führen Sie den Schritt unten aus, um sich anzumelden. Abbrechen beendet die Anmeldung.",
+  "connector.telegramAccount.methodTitle": "Anmelden mit",
+  "connector.telegramAccount.methodQrDescription": "Scannen Sie einen Code mit Telegram auf Ihrem Telefon.",
+  "connector.telegramAccount.methodPhoneDescription":
+    "Geben Sie Ihre Telefonnummer und den Code ein, den Telegram Ihnen sendet.",
+  "connector.telegramAccount.methodQr": "QR-Code",
+  "connector.telegramAccount.methodPhone": "Telefonnummer",
+  "connector.telegramAccount.credentialsTitle": "api_id und api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot verwendet Ihre eigene Telegram-App von my.telegram.org. Nach der ersten Anmeldung behält dieser Computer ihre api_id und ihren api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot verwendet Ihre eigene Telegram-App von my.telegram.org. Nach der ersten Anmeldung behält {host} ihre api_id und ihren api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Eingeben",
+  "connector.telegramAccount.credentialsHelp":
+    "Melden Sie sich bei my.telegram.org an, öffnen Sie API development tools und erstellen Sie eine App. Kopieren Sie ihre api_id und ihren api_hash hierher.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "my.telegram.org öffnen",
+  "connector.telegramAccount.openAppsFailed": "OpenBot konnte my.telegram.org nicht öffnen.",
+  "connector.telegramAccount.connect": "Verbinden",
+  "connector.telegramAccount.sendingOffNote": "Agenten können Ihre Chats nur lesen, bis Sie das Senden einschalten.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram zeigt diese Sitzung unter Einstellungen › Geräte als OpenBot. Wenn Sie sie dort beenden, trennt sich OpenBot.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram zeigt diese Sitzung unter Einstellungen › Geräte als OpenBot. Wenn Sie sie dort beenden, trennt sich {host}.",
+  "connector.telegramAccount.connecting": "Verbindung zu Telegram",
+  "connector.telegramAccount.connectingDescription":
+    "Dieser Computer spricht mit Telegram. Das kann einige Sekunden dauern.",
+  "connector.telegramAccount.connectingHost": "{host} spricht mit Telegram. Das kann einige Sekunden dauern.",
+  "connector.telegramAccount.qrLabel": "QR-Code zur Anmeldung bei Telegram",
+  "connector.telegramAccount.qrTitle": "Scannen Sie diesen Code mit Telegram auf Ihrem Telefon",
+  "connector.telegramAccount.qrStepOpen": "Öffnen Sie Telegram auf Ihrem Telefon.",
+  "connector.telegramAccount.qrStepDevices": "Gehen Sie zu Einstellungen › Geräte › Desktop-Gerät verknüpfen.",
+  "connector.telegramAccount.qrStepScan": "Richten Sie Ihr Telefon auf diesen Code.",
+  "connector.telegramAccount.qrRefresh": "Der Code ändert sich etwa alle 30 Sekunden. Scannen Sie den neuesten.",
+  "connector.telegramAccount.usePhone": "Telefonnummer verwenden",
+  "connector.telegramAccount.phoneDescription":
+    "Geben Sie die Telefonnummer Ihres Telegram-Kontos mit Ländervorwahl ein.",
+  "connector.telegramAccount.phoneLabel": "Telefonnummer",
+  "connector.telegramAccount.sendCode": "Code senden",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "QR-Code verwenden",
+  "connector.telegramAccount.codeViaApp":
+    "Telegram hat einen Code an die Telegram-App auf Ihren anderen Geräten gesendet.",
+  "connector.telegramAccount.codeViaSms": "Telegram hat einen Code per SMS gesendet.",
+  "connector.telegramAccount.codeDescription": "Geben Sie den Code ein, den Telegram Ihnen gesendet hat.",
+  "connector.telegramAccount.codeLabel": "Code",
+  "connector.telegramAccount.signIn": "Anmelden",
+  "connector.telegramAccount.passwordDescription":
+    "Ihr Konto hat die zweistufige Bestätigung. Geben Sie das Passwort dafür ein.",
+  "connector.telegramAccount.passwordHint": "Hinweis: {hint}",
+  "connector.telegramAccount.passwordLabel": "Passwort der zweistufigen Bestätigung",
+  "connector.telegramAccount.accountTitle": "Konto",
+  "connector.telegramAccount.accountDescription": "Agenten auf diesem Computer verwenden dieses Telegram-Konto.",
+  "connector.telegramAccount.accountDescriptionHost": "Agenten auf {host} verwenden dieses Telegram-Konto.",
+  "connector.telegramAccount.sendingLabel": "Agenten Nachrichten senden und Chats als gelesen markieren lassen",
+  "connector.telegramAccount.sendingDescription": "Wenn dies aus ist, können Agenten Ihre Chats nur lesen.",
 } as const satisfies PartialTranslation<typeof source>;

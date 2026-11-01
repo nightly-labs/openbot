@@ -311,6 +311,8 @@ import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
+import { TelegramAccountConnectorService } from "./telegram-account-connector-service";
+import { TelegramAccountConnectorStore } from "./telegram-account-connector-store";
 import { TraceFile } from "./trace-file";
 import { readUpdatePreference, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
@@ -393,6 +395,8 @@ const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 /** The Bitwarden API key and master password of a host connection (`bitwarden-connector-v1`), with the same cipher. */
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
+/** The Telegram account session and API credentials of this computer, with the same cipher. */
+const TELEGRAM_ACCOUNT_CONNECTOR_FILE = "openbot-telegram-account-connector-v1.json";
 /** The logins, payment cards and contact info of the Vault in Server settings, with the same cipher. */
 const VAULT_FILE = "openbot-vault-v1.json";
 /** Which agent each imported Hermes profile made, so a second import updates that agent. */
@@ -466,6 +470,8 @@ const TEARDOWN_ORDER = {
   // Before the agent service. It holds no file an agent reads; only a CLI run that waits is stopped.
   onePasswordConnector: 106,
   bitwardenConnector: 106.5,
+  // Before the agent service, so no agent tool call reaches a Telegram client that is being closed.
+  telegramAccountConnector: 106.7,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no script starts a run while the service stops.
@@ -546,6 +552,7 @@ export interface ApplicationServices {
   githubConnector: GitHubConnectorService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
+  telegramAccountConnector: TelegramAccountConnectorService;
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
@@ -1489,6 +1496,24 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.bitwardenConnector, "the Bitwarden connection", async () => {
     await runCauseEffect(bitwardenConnector.dispose());
   });
+  /*
+   * The Telegram account connection. Loaded before the agent service, because the first spawn reads
+   * its MCP server. GramJS loads only when the connection is used; a stored session is checked in
+   * the background.
+   */
+  const telegramAccountConnector = new TelegramAccountConnectorService({
+    store: new TelegramAccountConnectorStore(
+      join(app.getPath("userData"), TELEGRAM_ACCOUNT_CONNECTOR_FILE),
+      secretCipher,
+    ),
+    appVersion: app.getVersion(),
+    mediaDirectory: join(app.getPath("downloads"), "OpenBot Telegram"),
+    protectedDirectory: app.getPath("userData"),
+  });
+  await Effect.runPromise(telegramAccountConnector.load());
+  teardown.push(TEARDOWN_ORDER.telegramAccountConnector, "the Telegram account connection", () =>
+    Effect.runPromise(telegramAccountConnector.dispose()),
+  );
 
   /*
    * The Vault in Server settings. Every agent fills its logins, cards and contact info; the file
@@ -1782,6 +1807,10 @@ export async function createApplicationServices({
       mcpServer: () => githubConnector.mcpServer(),
       mcpAuthorization: () => githubConnector.mcpAuthorization().pipe(toMcpGatewayFailed),
     },
+    telegramAccountConnector: {
+      mcpServer: () => telegramAccountConnector.mcpServer(),
+      mcpAuthorization: () => telegramAccountConnector.mcpAuthorization(),
+    },
     passwordVault: passwordVaultRouter([
       { prefix: "", vault: onePasswordConnector },
       { prefix: "bitwarden:", vault: bitwardenConnector },
@@ -1988,6 +2017,12 @@ export async function createApplicationServices({
   // A connect, a disconnect or an expiry changes the tools and the `gh` sign-in of every agent.
   githubConnector.onAgentAccessChanged(() => {
     void runCauseEffect(service.notifyGitHubConnectorChanged()).catch((error) =>
+      logger.warn("Provider tools did not refresh.", toLogValue(error)),
+    );
+  });
+  // A sign-in, a sign-out or a session that Telegram ended adds or removes the Telegram tools of every agent.
+  telegramAccountConnector.onAgentAccessChanged(() => {
+    void runCauseEffect(service.notifyTelegramAccountConnectorChanged()).catch((error) =>
       logger.warn("Provider tools did not refresh.", toLogValue(error)),
     );
   });
@@ -2418,6 +2453,9 @@ export async function createApplicationServices({
     // Present, so the host advertises `bitwarden-connector-v1`. An owner or admin connects it with an
     // API key and the master password: a session key from their computer cannot open this vault.
     bitwardenConnector,
+    // Present, so the host advertises `telegram-account-connector-v1`. An owner or admin signs the
+    // host in to their own Telegram account from their computer; the session stays on the host.
+    telegramAccountConnector,
     // Present, so the host advertises `vault-v1`. The routes are admin-only.
     vault,
     // Present on Linux, so the host advertises `provider-host-sign-in-v1`. The routes are admin-only.
@@ -3282,6 +3320,7 @@ export async function createApplicationServices({
     githubConnector,
     onePasswordConnector,
     bitwardenConnector,
+    telegramAccountConnector,
     vault,
     mailbox,
     storageUsage,

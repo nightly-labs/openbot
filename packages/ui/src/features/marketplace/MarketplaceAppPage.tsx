@@ -439,16 +439,21 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
     { label: "plugin.link.terms", url: "https://1password.com/legal/terms-of-service" },
   ],
   bitwarden: [{ label: "plugin.link.website", url: "https://bitwarden.com" }],
+  "telegram-account": [
+    { label: "plugin.link.website", url: "https://telegram.org" },
+    { label: "plugin.link.privacyPolicy", url: "https://telegram.org/privacy" },
+  ],
 };
 
 /** Who makes each connector's service: the name the user knows it by. */
 const CONNECTOR_DEVELOPER = {
   slack: "connector.slack.title",
   discord: "connector.discord.title",
-  telegram: "connector.telegram.title",
+  telegram: "connector.telegram.developer",
   github: "connector.github.title",
   onepassword: "connector.onePassword.title",
   bitwarden: "connector.bitwarden.title",
+  "telegram-account": "connector.telegram.developer",
 } as const satisfies Record<ConnectorId, AppTextKey>;
 
 /** The information card of a connector page: what it gives, its developer, category and website. */

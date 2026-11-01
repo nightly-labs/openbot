@@ -105,6 +105,7 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostTelegramAccountConnectorStatus,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeHostVaultImport,
@@ -189,6 +190,9 @@ import {
   type SignInRelayStatus,
   type SignOutMcpServerInput,
   type SubmitProviderCodeLoginInput,
+  type TelegramAccountConnectInput,
+  type TelegramAccountConnectorStatus,
+  type TelegramAccountSubmitInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
@@ -262,6 +266,7 @@ import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-ta
 import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { TELEGRAM_ACCOUNT_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/telegram-account-connector-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
@@ -1410,6 +1415,31 @@ export function bitwardenConnectorRequest(
 ): Effect.Effect<BitwardenConnectorStatus, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", BITWARDEN_CONNECTOR_ROUTES[route], decodeHostBitwardenConnectorStatus, { ...body }),
+  );
+}
+
+/** The body of each route of the host's Telegram account connection. */
+interface TelegramAccountConnectorBodies {
+  status: Record<string, never>;
+  connect: TelegramAccountConnectInput;
+  submit: TelegramAccountSubmitInput;
+  cancel: Record<string, never>;
+  disconnect: Record<string, never>;
+  setSending: { enabled: boolean };
+}
+
+/**
+ * The host's Telegram account connection (`telegram-account-connector-v1`): read it, start a sign-in,
+ * send the phone number, the code or the two-step password, cancel, disconnect, or let agents send.
+ * No answer carries a value that `submit` sent.
+ */
+export function telegramAccountConnectorRequest<Route extends keyof typeof TELEGRAM_ACCOUNT_CONNECTOR_ROUTES>(
+  request: TeamApiRequest,
+  route: Route,
+  body: TelegramAccountConnectorBodies[Route],
+): Effect.Effect<TelegramAccountConnectorStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", TELEGRAM_ACCOUNT_CONNECTOR_ROUTES[route], decodeHostTelegramAccountConnectorStatus, { ...body }),
   );
 }
 

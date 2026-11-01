@@ -894,7 +894,8 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
 - a Discord server is connected. See [Discord connections](#discord-connections);
-- a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+- a Telegram chat is connected. See [Telegram connections](#telegram-connections);
+- a Telegram account is connected. See [Telegram account connection](#telegram-account-connection).
 
 ## Webhook routines
 
@@ -1109,6 +1110,50 @@ plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
+
+## Telegram account connection
+
+The Telegram account connection (Marketplace › Apps › Telegram account) is a different thing from
+the OpenBot Telegram bot. OpenBot signs in to your own Telegram account over Telegram's MTProto
+protocol, as Telegram Desktop does, and it shows in Telegram › Settings › Devices as "OpenBot". It
+uses the api_id and api_hash of a Telegram app that you create at my.telegram.org.
+
+- **Sent to Telegram.** The api_id and api_hash, the device name "OpenBot" with the operating system
+  name and version, and, for a sign-in with the phone number, the number, the code that Telegram
+  sends and the two-step verification password. A QR sign-in sends none of these: you scan the code
+  in Telegram on your phone. Then the requests of the agents: the chat list, the messages of a chat,
+  searches, the files that they download, and, only when you turn on sending, the messages and files
+  that agents send as you and the chats that they mark as read. OpenBot never creates a Telegram
+  account.
+- **Kept on the computer.** The session, the api_id and api_hash, the account name, username and
+  phone number, the sending switch, and the port and secret of the local Telegram MCP server are
+  kept in `~/Library/Application Support/OpenBot/openbot-telegram-account-connector-v1.json`,
+  encrypted by the operating system's secret storage. The session gives full access to the account.
+  Disconnect signs the session out at Telegram, when Telegram answers, and removes it from the file;
+  the api_id and api_hash stay, so the next sign-in does not ask for them. The session, the api_hash,
+  the number, the code, the password and the MCP secret are redacted from logs, exports and
+  diagnostics.
+- **Downloaded files.** When an agent downloads the photo, voice message, video or file of a message,
+  OpenBot saves it unencrypted in `~/Downloads/OpenBot Telegram/<chat id>/`, so that the agent and
+  you can open it. Disconnect does not remove these files; delete the folder when you no longer need
+  it. A photo or image of up to 5 MB also goes into the agent's conversation, and so to the agent's
+  model provider.
+- **Sent files.** With sending on, an agent can send a file from the computer by its path. OpenBot
+  refuses files in its own data folder and in the hidden folders of your home folder, such as
+  `~/.ssh`, because they keep keys and sessions. Any other file that the agent can name can be sent,
+  so turn on sending only for agents that you trust with your files.
+- **Given to agents and their model provider.** While the account is connected, every agent on the
+  computer gets the Telegram tools. What a tool reads, such as chat titles, names, usernames and
+  message text, goes into the agent's conversation and so to the agent's model provider. The tools
+  never give an agent the session, the api_hash or the whole phone number: the status shows the
+  number with its middle hidden.
+- **On a joined server.** An owner or admin can sign the server in to their own Telegram account
+  from their computer. The server sends the QR code address to that owner or admin only. The api_id
+  and api_hash, the number, the code and the password go once over the encrypted connection to the
+  server, which keeps the session in the same file on its own disk. The computer that sent them does
+  not keep them, and no answer from the server carries them. Every agent on that server then gets
+  the Telegram tools, including agents that members who are not admins talk to, so those members can
+  ask an agent to read the account. Connect an account that every member may use.
 
 ## Agent access
 

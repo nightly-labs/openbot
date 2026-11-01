@@ -241,7 +241,8 @@ export const messages = {
   "connector.discord.accessSave": "Opslaan",
   "connector.discord.accessHostUpdate": "Werk OpenBot bij op {host} om rollen te kiezen.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Voeg de OpenBot-bot toe aan een Telegram-groep of open een directe chat ermee. De Telegram Orchestrator vraagt de juiste agent en antwoordt.",
   "connector.telegram.statusConnected": "Verbonden",
@@ -412,4 +413,78 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret van API-sleutel",
   "connector.bitwarden.masterPassword": "Hoofdwachtwoord",
   "connector.bitwarden.connecting": "Verbinden",
+  "connector.telegramAccount.title": "Telegram-account",
+  "connector.telegramAccount.description":
+    "Agents kunnen je Telegram-chats lezen en, als je dat toestaat, berichten namens jou sturen.",
+  "connector.telegramAccount.descriptionHost":
+    "Agents op {host} kunnen je Telegram-chats lezen en, als je dat toestaat, berichten namens jou sturen.",
+  "connector.telegramAccount.statusConnecting": "Inloggen",
+  "connector.telegramAccount.statusConnected": "Verbonden",
+  "connector.telegramAccount.actionFailed": "OpenBot kon de verbinding met het Telegram-account niet wijzigen.",
+  "connector.telegramAccount.disconnectTitle": "Telegram-account loskoppelen",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot meldt deze sessie af. Agents kunnen geen berichten meer lezen of sturen, en verzenden gaat uit.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} meldt deze sessie af. Agents op {host} kunnen geen berichten meer lezen of sturen, en verzenden gaat uit.",
+  "connector.telegramAccount.disconnect": "Loskoppelen",
+  "connector.telegramAccount.signInTitle": "Inloggen",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot logt in op je eigen Telegram-account, zoals Telegram Desktop. De sessie blijft versleuteld op deze computer. Telegram toont haar onder Instellingen › Apparaten als OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} logt in op je eigen Telegram-account, zoals Telegram Desktop. De sessie blijft versleuteld op {host}. Telegram toont haar onder Instellingen › Apparaten als OpenBot.",
+  "connector.telegramAccount.signInProgress":
+    "Voer de stap hieronder uit om in te loggen. Annuleren stopt het inloggen.",
+  "connector.telegramAccount.methodTitle": "Inloggen met",
+  "connector.telegramAccount.methodQrDescription": "Scan een code met Telegram op je telefoon.",
+  "connector.telegramAccount.methodPhoneDescription": "Typ je telefoonnummer en de code die Telegram je stuurt.",
+  "connector.telegramAccount.methodQr": "QR-code",
+  "connector.telegramAccount.methodPhone": "Telefoonnummer",
+  "connector.telegramAccount.credentialsTitle": "api_id en api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot gebruikt je eigen Telegram-app van my.telegram.org. Na de eerste keer inloggen bewaart deze computer de api_id en api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot gebruikt je eigen Telegram-app van my.telegram.org. Na de eerste keer inloggen bewaart {host} de api_id en api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Invoeren",
+  "connector.telegramAccount.credentialsHelp":
+    "Log in op my.telegram.org, open API development tools en maak een app. Kopieer de api_id en api_hash hierheen.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "my.telegram.org openen",
+  "connector.telegramAccount.openAppsFailed": "OpenBot kon my.telegram.org niet openen.",
+  "connector.telegramAccount.connect": "Verbinden",
+  "connector.telegramAccount.sendingOffNote": "Agents kunnen je chats alleen lezen tot je verzenden aanzet.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram toont deze sessie onder Instellingen › Apparaten als OpenBot. Als je haar daar beëindigt, wordt OpenBot losgekoppeld.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram toont deze sessie onder Instellingen › Apparaten als OpenBot. Als je haar daar beëindigt, wordt {host} losgekoppeld.",
+  "connector.telegramAccount.connecting": "Verbinden met Telegram",
+  "connector.telegramAccount.connectingDescription":
+    "Deze computer praat met Telegram. Dit kan een paar seconden duren.",
+  "connector.telegramAccount.connectingHost": "{host} praat met Telegram. Dit kan een paar seconden duren.",
+  "connector.telegramAccount.qrLabel": "QR-code om in te loggen bij Telegram",
+  "connector.telegramAccount.qrTitle": "Scan deze code met Telegram op je telefoon",
+  "connector.telegramAccount.qrStepOpen": "Open Telegram op je telefoon.",
+  "connector.telegramAccount.qrStepDevices": "Ga naar Instellingen › Apparaten › Desktopapparaat koppelen.",
+  "connector.telegramAccount.qrStepScan": "Richt je telefoon op deze code.",
+  "connector.telegramAccount.qrRefresh": "De code verandert ongeveer elke 30 seconden. Scan de nieuwste.",
+  "connector.telegramAccount.usePhone": "Telefoonnummer gebruiken",
+  "connector.telegramAccount.phoneDescription": "Typ het telefoonnummer van je Telegram-account, met de landcode.",
+  "connector.telegramAccount.phoneLabel": "Telefoonnummer",
+  "connector.telegramAccount.sendCode": "Code sturen",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "QR-code gebruiken",
+  "connector.telegramAccount.codeViaApp":
+    "Telegram heeft een code gestuurd naar de Telegram-app op je andere apparaten.",
+  "connector.telegramAccount.codeViaSms": "Telegram heeft een code per sms gestuurd.",
+  "connector.telegramAccount.codeDescription": "Typ de code die Telegram je heeft gestuurd.",
+  "connector.telegramAccount.codeLabel": "Code",
+  "connector.telegramAccount.signIn": "Inloggen",
+  "connector.telegramAccount.passwordDescription": "Je account heeft verificatie in twee stappen. Typ het wachtwoord.",
+  "connector.telegramAccount.passwordHint": "Hint: {hint}",
+  "connector.telegramAccount.passwordLabel": "Wachtwoord voor verificatie in twee stappen",
+  "connector.telegramAccount.accountTitle": "Account",
+  "connector.telegramAccount.accountDescription": "Agents op deze computer gebruiken dit Telegram-account.",
+  "connector.telegramAccount.accountDescriptionHost": "Agents op {host} gebruiken dit Telegram-account.",
+  "connector.telegramAccount.sendingLabel": "Agents berichten laten sturen en chats als gelezen laten markeren",
+  "connector.telegramAccount.sendingDescription": "Als dit uit staat, kunnen agents je chats alleen lezen.",
 } as const satisfies PartialTranslation<typeof source>;

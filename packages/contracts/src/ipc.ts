@@ -80,6 +80,7 @@ export * from "./ipc-sidebar-layout";
 export * from "./ipc-skills";
 export * from "./ipc-storage";
 export * from "./ipc-team-host";
+export * from "./ipc-telegram-account-connector";
 export * from "./ipc-vault";
 export * from "./ipc-voice";
 export * from "./ipc-workflow-github";

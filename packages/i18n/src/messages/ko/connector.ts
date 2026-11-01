@@ -219,7 +219,8 @@ export const messages = {
   "connector.discord.accessSave": "저장",
   "connector.discord.accessHostUpdate": "역할을 선택하려면 {host}의 OpenBot을 업데이트하세요.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "OpenBot 봇을 Telegram 그룹에 추가하거나 봇과 1:1 채팅을 시작하세요. Telegram 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
   "connector.telegram.statusConnected": "연결됨",
@@ -378,4 +379,76 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API 키 client_secret",
   "connector.bitwarden.masterPassword": "마스터 비밀번호",
   "connector.bitwarden.connecting": "연결 중",
+  "connector.telegramAccount.title": "Telegram 계정",
+  "connector.telegramAccount.description":
+    "에이전트가 내 Telegram 채팅을 읽고, 허용하면 내 이름으로 메시지를 보낼 수 있습니다.",
+  "connector.telegramAccount.descriptionHost":
+    "{host}의 에이전트가 내 Telegram 채팅을 읽고, 허용하면 내 이름으로 메시지를 보낼 수 있습니다.",
+  "connector.telegramAccount.statusConnecting": "로그인 중",
+  "connector.telegramAccount.statusConnected": "연결됨",
+  "connector.telegramAccount.actionFailed": "OpenBot이 Telegram 계정 연결을 변경하지 못했습니다.",
+  "connector.telegramAccount.disconnectTitle": "Telegram 계정 연결 해제",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot이 이 세션에서 로그아웃합니다. 에이전트는 더 이상 메시지를 읽거나 보낼 수 없고, 보내기가 꺼집니다.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host}이(가) 이 세션에서 로그아웃합니다. {host}의 에이전트는 더 이상 메시지를 읽거나 보낼 수 없고, 보내기가 꺼집니다.",
+  "connector.telegramAccount.disconnect": "연결 해제",
+  "connector.telegramAccount.signInTitle": "로그인",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot은 Telegram Desktop처럼 내 Telegram 계정에 로그인합니다. 세션은 이 컴퓨터에 암호화되어 저장됩니다. Telegram의 설정 › 기기에 OpenBot으로 표시됩니다.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host}은(는) Telegram Desktop처럼 내 Telegram 계정에 로그인합니다. 세션은 {host}에 암호화되어 저장됩니다. Telegram의 설정 › 기기에 OpenBot으로 표시됩니다.",
+  "connector.telegramAccount.signInProgress": "로그인하려면 아래 단계를 진행하세요. 취소하면 로그인이 중단됩니다.",
+  "connector.telegramAccount.methodTitle": "로그인 방법",
+  "connector.telegramAccount.methodQrDescription": "휴대폰의 Telegram으로 코드를 스캔합니다.",
+  "connector.telegramAccount.methodPhoneDescription": "전화번호와 Telegram이 보내는 코드를 입력합니다.",
+  "connector.telegramAccount.methodQr": "QR 코드",
+  "connector.telegramAccount.methodPhone": "전화번호",
+  "connector.telegramAccount.credentialsTitle": "api_id 및 api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot은 my.telegram.org에서 만든 내 Telegram 앱을 사용합니다. 처음 로그인한 뒤에는 이 컴퓨터가 api_id와 api_hash를 보관합니다.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot은 my.telegram.org에서 만든 내 Telegram 앱을 사용합니다. 처음 로그인한 뒤에는 {host}이(가) api_id와 api_hash를 보관합니다.",
+  "connector.telegramAccount.credentialsOpen": "입력",
+  "connector.telegramAccount.credentialsHelp":
+    "my.telegram.org에 로그인하고 API development tools를 열어 앱을 만드세요. 그 앱의 api_id와 api_hash를 여기에 복사하세요.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "my.telegram.org 열기",
+  "connector.telegramAccount.openAppsFailed": "OpenBot이 my.telegram.org를 열지 못했습니다.",
+  "connector.telegramAccount.connect": "연결",
+  "connector.telegramAccount.sendingOffNote": "보내기를 켜기 전까지 에이전트는 채팅을 읽기만 할 수 있습니다.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram의 설정 › 기기에 이 세션이 OpenBot으로 표시됩니다. 거기서 세션을 종료하면 OpenBot 연결이 해제됩니다.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram의 설정 › 기기에 이 세션이 OpenBot으로 표시됩니다. 거기서 세션을 종료하면 {host} 연결이 해제됩니다.",
+  "connector.telegramAccount.connecting": "Telegram에 연결 중",
+  "connector.telegramAccount.connectingDescription":
+    "이 컴퓨터가 Telegram과 통신하고 있습니다. 몇 초 걸릴 수 있습니다.",
+  "connector.telegramAccount.connectingHost": "{host}이(가) Telegram과 통신하고 있습니다. 몇 초 걸릴 수 있습니다.",
+  "connector.telegramAccount.qrLabel": "Telegram 로그인용 QR 코드",
+  "connector.telegramAccount.qrTitle": "휴대폰의 Telegram으로 이 코드를 스캔하세요",
+  "connector.telegramAccount.qrStepOpen": "휴대폰에서 Telegram을 엽니다.",
+  "connector.telegramAccount.qrStepDevices": "설정 › 기기 › 데스크톱 기기 연결로 이동합니다.",
+  "connector.telegramAccount.qrStepScan": "휴대폰을 이 코드에 비춥니다.",
+  "connector.telegramAccount.qrRefresh": "코드는 약 30초마다 바뀝니다. 최신 코드를 스캔하세요.",
+  "connector.telegramAccount.usePhone": "전화번호 사용",
+  "connector.telegramAccount.phoneDescription": "국가 코드를 포함해 Telegram 계정의 전화번호를 입력하세요.",
+  "connector.telegramAccount.phoneLabel": "전화번호",
+  "connector.telegramAccount.sendCode": "코드 보내기",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "QR 코드 사용",
+  "connector.telegramAccount.codeViaApp": "Telegram이 다른 기기의 Telegram 앱으로 코드를 보냈습니다.",
+  "connector.telegramAccount.codeViaSms": "Telegram이 SMS로 코드를 보냈습니다.",
+  "connector.telegramAccount.codeDescription": "Telegram이 보낸 코드를 입력하세요.",
+  "connector.telegramAccount.codeLabel": "코드",
+  "connector.telegramAccount.signIn": "로그인",
+  "connector.telegramAccount.passwordDescription": "계정에 2단계 인증이 설정되어 있습니다. 비밀번호를 입력하세요.",
+  "connector.telegramAccount.passwordHint": "힌트: {hint}",
+  "connector.telegramAccount.passwordLabel": "2단계 인증 비밀번호",
+  "connector.telegramAccount.accountTitle": "계정",
+  "connector.telegramAccount.accountDescription": "이 컴퓨터의 에이전트가 이 Telegram 계정을 사용합니다.",
+  "connector.telegramAccount.accountDescriptionHost": "{host}의 에이전트가 이 Telegram 계정을 사용합니다.",
+  "connector.telegramAccount.sendingLabel": "에이전트가 메시지를 보내고 채팅을 읽음으로 표시하도록 허용",
+  "connector.telegramAccount.sendingDescription": "꺼져 있으면 에이전트는 채팅을 읽기만 할 수 있습니다.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -252,7 +252,8 @@ export const messages = {
   "connector.discord.accessRoleDeleted": "{role} (eliminado)",
   "connector.discord.accessSave": "Guardar",
   "connector.discord.accessHostUpdate": "Actualiza OpenBot en {host} para elegir roles.",
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Añade el bot de OpenBot a un grupo de Telegram o abre un chat directo con él. El Orquestador de Telegram consulta al agente adecuado y responde.",
   "connector.telegram.statusConnected": "Conectado",
@@ -428,4 +429,79 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret de la clave de API",
   "connector.bitwarden.masterPassword": "Contraseña maestra",
   "connector.bitwarden.connecting": "Conectando",
+  "connector.telegramAccount.title": "Cuenta de Telegram",
+  "connector.telegramAccount.description":
+    "Los agentes pueden leer tus chats de Telegram y, si lo permites, enviar mensajes en tu nombre.",
+  "connector.telegramAccount.descriptionHost":
+    "Los agentes de {host} pueden leer tus chats de Telegram y, si lo permites, enviar mensajes en tu nombre.",
+  "connector.telegramAccount.statusConnecting": "Iniciando sesión",
+  "connector.telegramAccount.statusConnected": "Conectado",
+  "connector.telegramAccount.actionFailed": "OpenBot no pudo cambiar la conexión de la cuenta de Telegram.",
+  "connector.telegramAccount.disconnectTitle": "Desconectar la cuenta de Telegram",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot cierra esta sesión. Los agentes ya no pueden leer ni enviar mensajes, y el envío se desactiva.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} cierra esta sesión. Los agentes de {host} ya no pueden leer ni enviar mensajes, y el envío se desactiva.",
+  "connector.telegramAccount.disconnect": "Desconectar",
+  "connector.telegramAccount.signInTitle": "Iniciar sesión",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot inicia sesión en tu propia cuenta de Telegram, como Telegram Desktop. La sesión queda cifrada en este ordenador. Telegram la muestra en Ajustes › Dispositivos como OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} inicia sesión en tu propia cuenta de Telegram, como Telegram Desktop. La sesión queda cifrada en {host}. Telegram la muestra en Ajustes › Dispositivos como OpenBot.",
+  "connector.telegramAccount.signInProgress":
+    "Completa el paso de abajo para iniciar sesión. Cancelar detiene el inicio de sesión.",
+  "connector.telegramAccount.methodTitle": "Iniciar sesión con",
+  "connector.telegramAccount.methodQrDescription": "Escanea un código con Telegram en tu teléfono.",
+  "connector.telegramAccount.methodPhoneDescription":
+    "Escribe tu número de teléfono y el código que te envía Telegram.",
+  "connector.telegramAccount.methodQr": "Código QR",
+  "connector.telegramAccount.methodPhone": "Teléfono",
+  "connector.telegramAccount.credentialsTitle": "api_id y api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot usa tu propia app de Telegram de my.telegram.org. Tras el primer inicio de sesión, este ordenador guarda su api_id y su api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot usa tu propia app de Telegram de my.telegram.org. Tras el primer inicio de sesión, {host} guarda su api_id y su api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Introducir",
+  "connector.telegramAccount.credentialsHelp":
+    "Inicia sesión en my.telegram.org, abre API development tools y crea una app. Copia aquí su api_id y su api_hash.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "Abrir my.telegram.org",
+  "connector.telegramAccount.openAppsFailed": "OpenBot no pudo abrir my.telegram.org.",
+  "connector.telegramAccount.connect": "Conectar",
+  "connector.telegramAccount.sendingOffNote": "Los agentes solo pueden leer tus chats hasta que actives el envío.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram muestra esta sesión en Ajustes › Dispositivos como OpenBot. Si la cierras allí, OpenBot se desconecta.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram muestra esta sesión en Ajustes › Dispositivos como OpenBot. Si la cierras allí, {host} se desconecta.",
+  "connector.telegramAccount.connecting": "Conectando con Telegram",
+  "connector.telegramAccount.connectingDescription":
+    "Este ordenador se comunica con Telegram. Puede tardar unos segundos.",
+  "connector.telegramAccount.connectingHost": "{host} se comunica con Telegram. Puede tardar unos segundos.",
+  "connector.telegramAccount.qrLabel": "Código QR para iniciar sesión en Telegram",
+  "connector.telegramAccount.qrTitle": "Escanea este código con Telegram en tu teléfono",
+  "connector.telegramAccount.qrStepOpen": "Abre Telegram en tu teléfono.",
+  "connector.telegramAccount.qrStepDevices": "Ve a Ajustes › Dispositivos › Vincular dispositivo de escritorio.",
+  "connector.telegramAccount.qrStepScan": "Apunta el teléfono a este código.",
+  "connector.telegramAccount.qrRefresh": "El código cambia cada 30 segundos aproximadamente. Escanea el más reciente.",
+  "connector.telegramAccount.usePhone": "Usar teléfono",
+  "connector.telegramAccount.phoneDescription":
+    "Escribe el número de teléfono de tu cuenta de Telegram, con el prefijo del país.",
+  "connector.telegramAccount.phoneLabel": "Número de teléfono",
+  "connector.telegramAccount.sendCode": "Enviar código",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "Usar código QR",
+  "connector.telegramAccount.codeViaApp": "Telegram envió un código a la app de Telegram de tus otros dispositivos.",
+  "connector.telegramAccount.codeViaSms": "Telegram envió un código por SMS.",
+  "connector.telegramAccount.codeDescription": "Escribe el código que te envió Telegram.",
+  "connector.telegramAccount.codeLabel": "Código",
+  "connector.telegramAccount.signIn": "Iniciar sesión",
+  "connector.telegramAccount.passwordDescription": "Tu cuenta tiene verificación en dos pasos. Escribe su contraseña.",
+  "connector.telegramAccount.passwordHint": "Pista: {hint}",
+  "connector.telegramAccount.passwordLabel": "Contraseña de verificación en dos pasos",
+  "connector.telegramAccount.accountTitle": "Cuenta",
+  "connector.telegramAccount.accountDescription": "Los agentes de este ordenador usan esta cuenta de Telegram.",
+  "connector.telegramAccount.accountDescriptionHost": "Los agentes de {host} usan esta cuenta de Telegram.",
+  "connector.telegramAccount.sendingLabel": "Permitir que los agentes envíen mensajes y marquen chats como leídos",
+  "connector.telegramAccount.sendingDescription": "Si está desactivado, los agentes solo pueden leer tus chats.",
 } as const satisfies PartialTranslation<typeof source>;
