@@ -358,9 +358,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
   const planLimits = usePlanLimits(activeServer.id);
   const showsPlanLimits = hasSelectedServer && planLimits.rows.length > 0;
+  // A server that the phone shows from its cache has its list at once, while it connects.
   const showLoader =
     (serverDirectoryState === "loading" && servers.length === 0) ||
-    (hasSelectedServer && activeServer.initialConnectionPending);
+    (hasSelectedServer && activeServer.initialConnectionPending && channelAgents.size === 0);
   // The list comes in as the loader starts to roll up, so the two overlap instead of waiting in turn.
   const listReady = !showLoader && !isLoaderPresent;
   // A new account gets the first-run flow in place of the empty home. The flow shows its own
