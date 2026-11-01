@@ -539,7 +539,7 @@ jobs:
         run: cp "$BUNDLE_PATH" "dist/OpenBot-$RELEASE_VERSION-${{ matrix.suffix }}.sigstore.json"
 
       - name: Upload macOS release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.suffix }}
           path: |
@@ -710,7 +710,7 @@ jobs:
           subject-checksums: dist/SHA256SUMS-windows.txt
 
       - name: Upload Windows release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-windows
           path: |
@@ -879,7 +879,7 @@ jobs:
           subject-checksums: dist/SHA256SUMS-${{ matrix.suffix }}.txt
 
       - name: Upload Linux release assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.suffix }}
           # An AppImage embeds its block map, so there is no sidecar file to upload beside it.
@@ -975,7 +975,7 @@ jobs:
           SUFFIX: ${{ matrix.suffix }}
 
       - name: Upload the image
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: docker-${{ matrix.suffix }}
           path: openbot-image-${{ matrix.suffix }}.tar.gz
