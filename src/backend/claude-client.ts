@@ -1204,9 +1204,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             : message.compact_result === "failed"
               ? "failed"
               : null;
-      if (status) runtime.compacting = status === "running";
-      if (status)
+      if (status) {
+        runtime.compacting = status === "running";
+        queryLogger.info("Claude context compaction changed state.", {
+          status,
+          threadId: runtime.id,
+          turnId: runtime.activeTurn?.id ?? null,
+          ...(status === "failed" ? { reason: "provider_reported_failed" } : {}),
+        });
         this.emit("notification", { method: "openbot/context-compaction", params: { threadId: runtime.id, status } });
+      }
       return;
     }
     if (message.type === "system" && message.subtype === "background_tasks_changed") {
@@ -1695,8 +1702,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ) {
     const turn = runtime.activeTurn;
     if (!turn) return;
-    if (runtime.compacting && status !== "completed") {
+    // A finished turn cannot keep waiting for a compaction result. Without an explicit success
+    // or boundary, close the pending compaction as failed, not as an inferred success.
+    if (runtime.compacting) {
       runtime.compacting = false;
+      queryLogger.warn("A Claude turn ended without a compaction result.", {
+        reason: "missing_terminal",
+        threadId: runtime.id,
+        turnId: turn.id,
+        status,
+      });
       this.emit("notification", {
         method: "openbot/context-compaction",
         params: { threadId: runtime.id, status: "failed" },
