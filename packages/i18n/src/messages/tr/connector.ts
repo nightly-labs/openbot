@@ -530,4 +530,69 @@ export const messages = {
   "connector.telegramAccount.sendingLabel":
     "Ajanların mesaj göndermesine ve sohbetleri okundu olarak işaretlemesine izin ver",
   "connector.telegramAccount.sendingDescription": "Bu kapalıyken ajanlar sohbetlerinizi yalnızca okuyabilir.",
+  "connector.whatsappAccount.title": "WhatsApp hesabı",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Ajanlar WhatsApp sohbetlerinizi okuyabilir ve izin verirseniz sizin adınıza mesaj gönderebilir.",
+  "connector.whatsappAccount.descriptionHost":
+    "{host} üzerindeki ajanlar WhatsApp sohbetlerinizi okuyabilir ve izin verirseniz sizin adınıza mesaj gönderebilir.",
+  "connector.whatsappAccount.statusConnecting": "Bağlanıyor",
+  "connector.whatsappAccount.statusConnected": "Bağlı",
+  "connector.whatsappAccount.actionFailed": "OpenBot, WhatsApp hesabı bağlantısını değiştiremedi.",
+  "connector.whatsappAccount.disconnectTitle": "WhatsApp hesabının bağlantısını kes",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot bu bağlı cihazdan çıkış yapar ve anahtarlarını ve sohbetlerini bu bilgisayardan siler. Gönderme kapanır.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} bu bağlı cihazdan çıkış yapar ve anahtarlarını ve sohbetlerini siler. Gönderme kapanır.",
+  "connector.whatsappAccount.disconnect": "Bağlantıyı kes",
+  "connector.whatsappAccount.linkTitle": "Cihaz bağla",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot, WhatsApp Web gibi WhatsApp hesabınızın bağlı bir cihazı olur. Telefonunuz ana cihaz olarak kalır. Anahtarlar ve sohbetler bu bilgisayarda şifreli kalır.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host}, WhatsApp Web gibi WhatsApp hesabınızın bağlı bir cihazı olur. Telefonunuz ana cihaz olarak kalır. Anahtarlar ve sohbetler {host} üzerinde şifreli kalır.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp kişisel hesaplar için resmî bir erişim sunmaz. OpenBot resmî olmayan bir WhatsApp Web istemcisi kullanır ve WhatsApp otomatik olduğunu düşündüğü numaraları kısıtlayabilir veya yasaklayabilir. Yalnızca kendiniz de göndereceğiniz şeyleri gönderin.",
+  "connector.whatsappAccount.linkProgress": "Bağlamak için aşağıdaki adımı uygulayın. İptal, bağlamayı durdurur.",
+  "connector.whatsappAccount.methodTitle": "Bağlama yolu",
+  "connector.whatsappAccount.methodQrDescription": "Telefonunuzdaki WhatsApp ile bir kodu tarayın.",
+  "connector.whatsappAccount.methodPhoneDescription": "Taramak yerine telefonunuza bir kod yazın.",
+  "connector.whatsappAccount.methodQr": "QR kod",
+  "connector.whatsappAccount.methodPhone": "Telefon",
+  "connector.whatsappAccount.connect": "Bağla",
+  "connector.whatsappAccount.sendingOffNote": "Göndermeyi açana kadar ajanlar sohbetlerinizi yalnızca okuyabilir.",
+  "connector.whatsappAccount.connecting": "WhatsApp’a bağlanılıyor",
+  "connector.whatsappAccount.connectingDescription":
+    "Bu bilgisayar WhatsApp ile iletişim kuruyor. Bu birkaç saniye sürebilir.",
+  "connector.whatsappAccount.connectingHost": "{host} WhatsApp ile iletişim kuruyor. Bu birkaç saniye sürebilir.",
+  "connector.whatsappAccount.qrLabel": "WhatsApp’ı bağlamak için QR kod",
+  "connector.whatsappAccount.qrTitle": "Bu kodu telefonunuzdaki WhatsApp ile tarayın",
+  "connector.whatsappAccount.stepOpen": "Telefonunuzda WhatsApp’ı açın.",
+  "connector.whatsappAccount.stepDevices": "Ayarlar › Bağlı cihazlar › Cihaz bağla bölümüne gidin.",
+  "connector.whatsappAccount.qrStepScan": "Telefonunuzu bu koda doğrultun.",
+  "connector.whatsappAccount.qrRefresh": "Kod yaklaşık 20 saniyede bir değişir. En yenisini tarayın.",
+  "connector.whatsappAccount.usePhone": "Telefonla",
+  "connector.whatsappAccount.useQr": "QR kodla",
+  "connector.whatsappAccount.phoneDescription":
+    "WhatsApp hesabınızın telefon numarasını ülke koduyla birlikte yazın. WhatsApp daha sonra telefona yazılacak bir kod verir.",
+  "connector.whatsappAccount.phoneLabel": "Telefon numarası",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Kod al",
+  "connector.whatsappAccount.codeTitle": "Bu kodu telefonunuza yazın",
+  "connector.whatsappAccount.codeStepPhone": "Bunun yerine telefon numarasıyla bağla seçeneğine dokunun.",
+  "connector.whatsappAccount.codeStepType": "Bu kodu yazın.",
+  "connector.whatsappAccount.codeLabel": "Telefonunuza yazılacak kod",
+  "connector.whatsappAccount.accountTitle": "Hesap",
+  "connector.whatsappAccount.accountDescription": "Bu bilgisayardaki ajanlar bu WhatsApp hesabını kullanır.",
+  "connector.whatsappAccount.accountDescriptionHost": "{host} üzerindeki ajanlar bu WhatsApp hesabını kullanır.",
+  "connector.whatsappAccount.historyChats": { one: "{count} sohbet", other: "{count} sohbet" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} mesaj", other: "{count} mesaj" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp, cihaz bağlandığında yakın geçmişi, ardından her yeni mesajı gönderir. Daha eski mesajlar eksik olabilir.",
+  "connector.whatsappAccount.sendingLabel":
+    "Ajanların mesaj göndermesine ve sohbetleri okundu olarak işaretlemesine izin ver",
+  "connector.whatsappAccount.sendingDescription": "Bu kapalıyken ajanlar sohbetlerinizi yalnızca okuyabilir.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp, OpenBot’u Ayarlar › Bağlı cihazlar bölümünde gösterir. Orada çıkış yaparsanız OpenBot’un bağlantısı kesilir.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp, OpenBot’u Ayarlar › Bağlı cihazlar bölümünde gösterir. Orada çıkış yaparsanız {host} bağlantısı kesilir.",
 } as const satisfies PartialTranslation<typeof source>;

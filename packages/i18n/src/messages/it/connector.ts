@@ -496,4 +496,69 @@ export const messages = {
   "connector.telegramAccount.accountDescriptionHost": "Gli agenti su {host} usano questo account Telegram.",
   "connector.telegramAccount.sendingLabel": "Consenti agli agenti di inviare messaggi e segnare le chat come lette",
   "connector.telegramAccount.sendingDescription": "Se è disattivato, gli agenti possono solo leggere le tue chat.",
+  "connector.whatsappAccount.title": "Account WhatsApp",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Gli agenti possono leggere le tue chat di WhatsApp e, se lo consenti, inviare messaggi a tuo nome.",
+  "connector.whatsappAccount.descriptionHost":
+    "Gli agenti su {host} possono leggere le tue chat di WhatsApp e, se lo consenti, inviare messaggi a tuo nome.",
+  "connector.whatsappAccount.statusConnecting": "Collegamento",
+  "connector.whatsappAccount.statusConnected": "Connesso",
+  "connector.whatsappAccount.actionFailed": "OpenBot non è riuscito a modificare la connessione dell’account WhatsApp.",
+  "connector.whatsappAccount.disconnectTitle": "Scollega l’account WhatsApp",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot disconnette questo dispositivo collegato ed elimina le sue chiavi e le sue chat da questo computer. L’invio viene disattivato.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} disconnette questo dispositivo collegato ed elimina le sue chiavi e le sue chat. L’invio viene disattivato.",
+  "connector.whatsappAccount.disconnect": "Scollega",
+  "connector.whatsappAccount.linkTitle": "Collega",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot diventa un dispositivo collegato del tuo account WhatsApp, come fa WhatsApp Web. Il telefono resta il dispositivo principale. Le chiavi e le chat restano cifrate su questo computer.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} diventa un dispositivo collegato del tuo account WhatsApp, come fa WhatsApp Web. Il telefono resta il dispositivo principale. Le chiavi e le chat restano cifrate su {host}.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp non offre un accesso ufficiale per gli account personali. OpenBot usa un client WhatsApp Web non ufficiale e WhatsApp può limitare o bloccare i numeri che ritiene automatizzati. Invia solo ciò che invieresti tu.",
+  "connector.whatsappAccount.linkProgress":
+    "Completa il passaggio qui sotto per collegare. Annulla interrompe il collegamento.",
+  "connector.whatsappAccount.methodTitle": "Collega con",
+  "connector.whatsappAccount.methodQrDescription": "Scansiona un codice con WhatsApp sul telefono.",
+  "connector.whatsappAccount.methodPhoneDescription": "Inserisci un codice sul telefono invece di scansionare.",
+  "connector.whatsappAccount.methodQr": "Codice QR",
+  "connector.whatsappAccount.methodPhone": "Telefono",
+  "connector.whatsappAccount.connect": "Collega",
+  "connector.whatsappAccount.sendingOffNote": "Gli agenti possono solo leggere le tue chat finché non attivi l’invio.",
+  "connector.whatsappAccount.connecting": "Connessione a WhatsApp",
+  "connector.whatsappAccount.connectingDescription":
+    "Questo computer comunica con WhatsApp. Può richiedere qualche secondo.",
+  "connector.whatsappAccount.connectingHost": "{host} comunica con WhatsApp. Può richiedere qualche secondo.",
+  "connector.whatsappAccount.qrLabel": "Codice QR per collegare WhatsApp",
+  "connector.whatsappAccount.qrTitle": "Scansiona questo codice con WhatsApp sul telefono",
+  "connector.whatsappAccount.stepOpen": "Apri WhatsApp sul telefono.",
+  "connector.whatsappAccount.stepDevices": "Vai in Impostazioni › Dispositivi collegati › Collega un dispositivo.",
+  "connector.whatsappAccount.qrStepScan": "Inquadra questo codice con il telefono.",
+  "connector.whatsappAccount.qrRefresh": "Il codice cambia circa ogni 20 secondi. Scansiona quello più recente.",
+  "connector.whatsappAccount.usePhone": "Usa il telefono",
+  "connector.whatsappAccount.useQr": "Usa il codice QR",
+  "connector.whatsappAccount.phoneDescription":
+    "Inserisci il numero di telefono del tuo account WhatsApp, con il prefisso internazionale. WhatsApp ti darà poi un codice da inserire sul telefono.",
+  "connector.whatsappAccount.phoneLabel": "Numero di telefono",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Ottieni codice",
+  "connector.whatsappAccount.codeTitle": "Inserisci questo codice sul telefono",
+  "connector.whatsappAccount.codeStepPhone": "Tocca Collega con il numero di telefono.",
+  "connector.whatsappAccount.codeStepType": "Inserisci questo codice.",
+  "connector.whatsappAccount.codeLabel": "Codice da inserire sul telefono",
+  "connector.whatsappAccount.accountTitle": "Account",
+  "connector.whatsappAccount.accountDescription": "Gli agenti su questo computer usano questo account WhatsApp.",
+  "connector.whatsappAccount.accountDescriptionHost": "Gli agenti su {host} usano questo account WhatsApp.",
+  "connector.whatsappAccount.historyChats": { one: "{count} chat", other: "{count} chat" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} messaggio", other: "{count} messaggi" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp invia la cronologia recente quando il dispositivo si collega, poi ogni nuovo messaggio. I messaggi più vecchi possono mancare.",
+  "connector.whatsappAccount.sendingLabel": "Consenti agli agenti di inviare messaggi e segnare le chat come lette",
+  "connector.whatsappAccount.sendingDescription": "Se è disattivato, gli agenti possono solo leggere le tue chat.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp mostra OpenBot in Impostazioni › Dispositivi collegati. Se lo disconnetti lì, OpenBot si disconnette.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp mostra OpenBot in Impostazioni › Dispositivi collegati. Se lo disconnetti lì, {host} si disconnette.",
 } as const satisfies PartialTranslation<typeof source>;

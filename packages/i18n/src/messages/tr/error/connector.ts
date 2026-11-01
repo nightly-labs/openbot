@@ -63,4 +63,23 @@ export const messages = {
     "Telegram bu oturumu sonlandırdı, örneğin Ayarlar > Cihazlar bölümünde. Telegram hesabınızı yeniden bağlayın.",
   "error.connector.telegramAccountFileUnreadable": "Telegram hesabı bağlantı dosyası okunamıyor.",
   "error.connector.telegramAccountFileTooLarge": "Telegram hesabı bağlantı dosyası çok büyük.",
+  "error.connector.whatsappAccountPhoneFormat": "Telefon numarasını ülke koduyla girin, örneğin +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp bir kod vermedi: {detail}",
+  "error.connector.whatsappAccountQrExpired": "Kodun süresi siz kullanmadan önce doldu. Yeniden başlayın.",
+  "error.connector.whatsappAccountTimedOut":
+    "Bağlama, 10 dakika boyunca etkinlik olmadığı için durdu. Yeniden başlayın.",
+  "error.connector.whatsappAccountMovedOn": "Bağlama başka bir adıma geçti. Yeniden başlayın.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp bu cihazı bağlamadı: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot WhatsApp bağlantısını kaydedemedi: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp bu cihazı kaldırdı, örneğin Ayarlar > Bağlı cihazlar bölümünde. WhatsApp hesabınızı yeniden bağlayın.",
+  "error.connector.whatsappAccountReplaced":
+    "Başka bir program bu bağlı cihazı açtı, bu yüzden WhatsApp buradaki bağlantıyı kapattı. Bağlantıyı kesin, sonra yeniden bağlayın.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp bu cihazı reddetti. Numaranız kısıtlanmış olabilir. Telefonunuzdaki WhatsApp'ı kontrol edin.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp bağlantının bu sürümünü artık kabul etmiyor. OpenBot'u güncelleyin, sonra yeniden bağlayın.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp'a şu anda ulaşılamıyor. OpenBot yeniden deniyor. Ajanlar bu bilgisayardaki sohbetleri okumaya devam edebilir.",
+  "error.connector.whatsappAccountFileUnreadable": "WhatsApp hesabı bağlantı dosyası okunamıyor.",
 } as const satisfies PartialTranslation<typeof source>;

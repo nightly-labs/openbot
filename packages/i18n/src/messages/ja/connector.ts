@@ -496,4 +496,70 @@ export const messages = {
   "connector.telegramAccount.accountDescriptionHost": "{host} のエージェントは、この Telegram アカウントを使います。",
   "connector.telegramAccount.sendingLabel": "エージェントにメッセージの送信とチャットの既読化を許可",
   "connector.telegramAccount.sendingDescription": "オフの場合、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.title": "WhatsApp アカウント",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "エージェントがあなたの WhatsApp のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.whatsappAccount.descriptionHost":
+    "{host} のエージェントがあなたの WhatsApp のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.whatsappAccount.statusConnecting": "リンク中",
+  "connector.whatsappAccount.statusConnected": "接続済み",
+  "connector.whatsappAccount.actionFailed": "OpenBot は WhatsApp アカウントの接続を変更できませんでした。",
+  "connector.whatsappAccount.disconnectTitle": "WhatsApp アカウントのリンクを解除",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot はこのリンク済みデバイスからログアウトし、その鍵とチャットをこのコンピューターから削除します。送信はオフになります。",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} はこのリンク済みデバイスからログアウトし、その鍵とチャットを削除します。送信はオフになります。",
+  "connector.whatsappAccount.disconnect": "リンク解除",
+  "connector.whatsappAccount.linkTitle": "リンク",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot は WhatsApp Web と同じように、あなたの WhatsApp アカウントのリンク済みデバイスになります。スマートフォンは引き続きメインのデバイスです。鍵とチャットはこのコンピューターに暗号化して保存されます。",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} は WhatsApp Web と同じように、あなたの WhatsApp アカウントのリンク済みデバイスになります。スマートフォンは引き続きメインのデバイスです。鍵とチャットは {host} に暗号化して保存されます。",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp には個人アカウント向けの公式なアクセス手段がありません。OpenBot は非公式の WhatsApp Web クライアントを使います。WhatsApp は、自動化されていると判断した番号を制限したり利用停止にしたりすることがあります。自分でも送る内容だけを送信してください。",
+  "connector.whatsappAccount.linkProgress":
+    "リンクするには、下の手順を行ってください。キャンセルするとリンクを中止します。",
+  "connector.whatsappAccount.methodTitle": "リンク方法",
+  "connector.whatsappAccount.methodQrDescription": "スマートフォンの WhatsApp でコードをスキャンします。",
+  "connector.whatsappAccount.methodPhoneDescription": "スキャンする代わりに、スマートフォンでコードを入力します。",
+  "connector.whatsappAccount.methodQr": "QR コード",
+  "connector.whatsappAccount.methodPhone": "電話番号",
+  "connector.whatsappAccount.connect": "リンク",
+  "connector.whatsappAccount.sendingOffNote": "送信をオンにするまで、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.connecting": "WhatsApp に接続中",
+  "connector.whatsappAccount.connectingDescription":
+    "このコンピューターが WhatsApp と通信しています。数秒かかることがあります。",
+  "connector.whatsappAccount.connectingHost": "{host} が WhatsApp と通信しています。数秒かかることがあります。",
+  "connector.whatsappAccount.qrLabel": "WhatsApp をリンクする QR コード",
+  "connector.whatsappAccount.qrTitle": "スマートフォンの WhatsApp でこのコードをスキャン",
+  "connector.whatsappAccount.stepOpen": "スマートフォンで WhatsApp を開きます。",
+  "connector.whatsappAccount.stepDevices": "「設定 › リンク済みデバイス › デバイスをリンク」を開きます。",
+  "connector.whatsappAccount.qrStepScan": "スマートフォンをこのコードに向けます。",
+  "connector.whatsappAccount.qrRefresh": "コードは約 20 秒ごとに変わります。最新のコードをスキャンしてください。",
+  "connector.whatsappAccount.usePhone": "電話番号を使う",
+  "connector.whatsappAccount.useQr": "QR コードを使う",
+  "connector.whatsappAccount.phoneDescription":
+    "WhatsApp アカウントの電話番号を国番号付きで入力してください。その後、スマートフォンで入力するコードを WhatsApp が表示します。",
+  "connector.whatsappAccount.phoneLabel": "電話番号",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "コードを取得",
+  "connector.whatsappAccount.codeTitle": "このコードをスマートフォンで入力",
+  "connector.whatsappAccount.codeStepPhone": "「代わりに電話番号でリンク」をタップします。",
+  "connector.whatsappAccount.codeStepType": "このコードを入力します。",
+  "connector.whatsappAccount.codeLabel": "スマートフォンで入力するコード",
+  "connector.whatsappAccount.accountTitle": "アカウント",
+  "connector.whatsappAccount.accountDescription":
+    "このコンピューターのエージェントは、この WhatsApp アカウントを使います。",
+  "connector.whatsappAccount.accountDescriptionHost": "{host} のエージェントは、この WhatsApp アカウントを使います。",
+  "connector.whatsappAccount.historyChats": { other: "{count} 件のチャット" },
+  "connector.whatsappAccount.historyMessages": { other: "{count} 件のメッセージ" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp はデバイスのリンク時に最近の履歴を送り、その後は新しいメッセージをすべて送ります。古いメッセージは含まれないことがあります。",
+  "connector.whatsappAccount.sendingLabel": "エージェントにメッセージの送信とチャットの既読化を許可",
+  "connector.whatsappAccount.sendingDescription": "オフの場合、エージェントはチャットを読むことしかできません。",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp の「設定 › リンク済みデバイス」に OpenBot が表示されます。そこでログアウトすると、OpenBot の接続は解除されます。",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp の「設定 › リンク済みデバイス」に OpenBot が表示されます。そこでログアウトすると、{host} の接続は解除されます。",
 } as const satisfies PartialTranslation<typeof source>;

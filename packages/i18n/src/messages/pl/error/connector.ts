@@ -64,4 +64,23 @@ export const messages = {
     "Telegram zakończył tę sesję, na przykład w Ustawienia > Urządzenia. Połącz ponownie swoje konto Telegram.",
   "error.connector.telegramAccountFileUnreadable": "Nie można odczytać pliku połączenia z kontem Telegram.",
   "error.connector.telegramAccountFileTooLarge": "Plik połączenia z kontem Telegram jest za duży.",
+  "error.connector.whatsappAccountPhoneFormat":
+    "Wpisz numer telefonu z kierunkowym kraju, na przykład +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp nie podał kodu: {detail}",
+  "error.connector.whatsappAccountQrExpired": "Kod wygasł przed użyciem. Zacznij od nowa.",
+  "error.connector.whatsappAccountTimedOut": "Łączenie zatrzymało się po 10 minutach bez aktywności. Zacznij od nowa.",
+  "error.connector.whatsappAccountMovedOn": "Łączenie przeszło do innego kroku. Zacznij od nowa.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp nie połączył tego urządzenia: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot nie mógł zapisać połączenia z WhatsApp: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp usunął to urządzenie, na przykład w Ustawienia > Połączone urządzenia. Połącz ponownie swoje konto WhatsApp.",
+  "error.connector.whatsappAccountReplaced":
+    "Inny program otworzył to połączone urządzenie, więc WhatsApp zamknął tutaj połączenie. Odłącz je, a potem połącz ponownie.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp odrzucił to urządzenie. Twój numer może być ograniczony. Sprawdź WhatsApp na telefonie.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp nie akceptuje już tej wersji połączenia. Zaktualizuj OpenBot, a potem połącz ponownie.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp jest teraz niedostępny. OpenBot ponawia próby. Agenci nadal mogą czytać czaty na tym komputerze.",
+  "error.connector.whatsappAccountFileUnreadable": "Nie można odczytać pliku połączenia z kontem WhatsApp.",
 } as const satisfies PartialTranslation<typeof source>;

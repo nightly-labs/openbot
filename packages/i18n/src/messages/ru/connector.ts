@@ -519,4 +519,79 @@ export const messages = {
   "connector.telegramAccount.accountDescriptionHost": "Агенты на {host} используют этот аккаунт Telegram.",
   "connector.telegramAccount.sendingLabel": "Разрешить агентам отправлять сообщения и отмечать чаты прочитанными",
   "connector.telegramAccount.sendingDescription": "Если выключено, агенты могут только читать ваши чаты.",
+  "connector.whatsappAccount.title": "Аккаунт WhatsApp",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Агенты могут читать ваши чаты в WhatsApp и, если вы разрешите, отправлять сообщения от вашего имени.",
+  "connector.whatsappAccount.descriptionHost":
+    "Агенты на {host} могут читать ваши чаты в WhatsApp и, если вы разрешите, отправлять сообщения от вашего имени.",
+  "connector.whatsappAccount.statusConnecting": "Привязка",
+  "connector.whatsappAccount.statusConnected": "Подключено",
+  "connector.whatsappAccount.actionFailed": "OpenBot не удалось изменить подключение аккаунта WhatsApp.",
+  "connector.whatsappAccount.disconnectTitle": "Отвязать аккаунт WhatsApp",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot выйдет из этого связанного устройства и удалит его ключи и чаты с этого компьютера. Отправка выключится.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} выйдет из этого связанного устройства и удалит его ключи и чаты. Отправка выключится.",
+  "connector.whatsappAccount.disconnect": "Отвязать",
+  "connector.whatsappAccount.linkTitle": "Привязка",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot становится связанным устройством вашего аккаунта WhatsApp, как WhatsApp Web. Ваш телефон остаётся основным устройством. Ключи и чаты хранятся в зашифрованном виде на этом компьютере.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} становится связанным устройством вашего аккаунта WhatsApp, как WhatsApp Web. Ваш телефон остаётся основным устройством. Ключи и чаты хранятся в зашифрованном виде на {host}.",
+  "connector.whatsappAccount.riskNote":
+    "У WhatsApp нет официального доступа для личных аккаунтов. OpenBot использует неофициальный клиент WhatsApp Web, и WhatsApp может ограничить или заблокировать номера, которые сочтёт автоматизированными. Отправляйте только то, что отправили бы сами.",
+  "connector.whatsappAccount.linkProgress":
+    "Выполните шаг ниже, чтобы привязать устройство. «Отмена» прерывает привязку.",
+  "connector.whatsappAccount.methodTitle": "Способ привязки",
+  "connector.whatsappAccount.methodQrDescription": "Отсканируйте код в WhatsApp на телефоне.",
+  "connector.whatsappAccount.methodPhoneDescription": "Введите код на телефоне вместо сканирования.",
+  "connector.whatsappAccount.methodQr": "QR-код",
+  "connector.whatsappAccount.methodPhone": "Телефон",
+  "connector.whatsappAccount.connect": "Привязать",
+  "connector.whatsappAccount.sendingOffNote": "Пока вы не включите отправку, агенты могут только читать ваши чаты.",
+  "connector.whatsappAccount.connecting": "Подключение к WhatsApp",
+  "connector.whatsappAccount.connectingDescription":
+    "Этот компьютер связывается с WhatsApp. Это может занять несколько секунд.",
+  "connector.whatsappAccount.connectingHost": "{host} связывается с WhatsApp. Это может занять несколько секунд.",
+  "connector.whatsappAccount.qrLabel": "QR-код для привязки WhatsApp",
+  "connector.whatsappAccount.qrTitle": "Отсканируйте этот код в WhatsApp на телефоне",
+  "connector.whatsappAccount.stepOpen": "Откройте WhatsApp на телефоне.",
+  "connector.whatsappAccount.stepDevices": "Перейдите в Настройки › Связанные устройства › Привязка устройства.",
+  "connector.whatsappAccount.qrStepScan": "Наведите телефон на этот код.",
+  "connector.whatsappAccount.qrRefresh": "Код меняется примерно каждые 20 секунд. Сканируйте самый новый.",
+  "connector.whatsappAccount.usePhone": "По номеру",
+  "connector.whatsappAccount.useQr": "По QR-коду",
+  "connector.whatsappAccount.phoneDescription":
+    "Введите номер телефона вашего аккаунта WhatsApp с кодом страны. Затем WhatsApp выдаст код, который нужно ввести на телефоне.",
+  "connector.whatsappAccount.phoneLabel": "Номер телефона",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Получить код",
+  "connector.whatsappAccount.codeTitle": "Введите этот код на телефоне",
+  "connector.whatsappAccount.codeStepPhone": "Нажмите «Привязать по номеру телефона».",
+  "connector.whatsappAccount.codeStepType": "Введите этот код.",
+  "connector.whatsappAccount.codeLabel": "Код для ввода на телефоне",
+  "connector.whatsappAccount.accountTitle": "Аккаунт",
+  "connector.whatsappAccount.accountDescription": "Агенты на этом компьютере используют этот аккаунт WhatsApp.",
+  "connector.whatsappAccount.accountDescriptionHost": "Агенты на {host} используют этот аккаунт WhatsApp.",
+  "connector.whatsappAccount.historyChats": {
+    one: "{count} чат",
+    few: "{count} чата",
+    many: "{count} чатов",
+    other: "{count} чата",
+  },
+  "connector.whatsappAccount.historyMessages": {
+    one: "{count} сообщение",
+    few: "{count} сообщения",
+    many: "{count} сообщений",
+    other: "{count} сообщения",
+  },
+  "connector.whatsappAccount.historyNote":
+    "При привязке устройства WhatsApp присылает недавнюю историю, а затем каждое новое сообщение. Более старых сообщений может не быть.",
+  "connector.whatsappAccount.sendingLabel": "Разрешить агентам отправлять сообщения и отмечать чаты прочитанными",
+  "connector.whatsappAccount.sendingDescription": "Если выключено, агенты могут только читать ваши чаты.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp показывает OpenBot в Настройки › Связанные устройства. Если выйти из него там, OpenBot отключится.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp показывает OpenBot в Настройки › Связанные устройства. Если выйти из него там, {host} отключится.",
 } as const satisfies PartialTranslation<typeof source>;

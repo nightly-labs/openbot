@@ -65,4 +65,23 @@ export const messages = {
     "Telegram heeft deze sessie beëindigd, bijvoorbeeld in Instellingen > Apparaten. Verbind je Telegram-account opnieuw.",
   "error.connector.telegramAccountFileUnreadable": "Het verbindingsbestand van het Telegram-account is onleesbaar.",
   "error.connector.telegramAccountFileTooLarge": "Het verbindingsbestand van het Telegram-account is te groot.",
+  "error.connector.whatsappAccountPhoneFormat":
+    "Voer het telefoonnummer in met de landcode, bijvoorbeeld +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp gaf geen code: {detail}",
+  "error.connector.whatsappAccountQrExpired": "De code is verlopen voordat je hem gebruikte. Begin opnieuw.",
+  "error.connector.whatsappAccountTimedOut": "Het koppelen is gestopt na 10 minuten zonder activiteit. Begin opnieuw.",
+  "error.connector.whatsappAccountMovedOn": "Het koppelen is naar een andere stap gegaan. Begin opnieuw.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp heeft dit apparaat niet gekoppeld: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot kan de WhatsApp-verbinding niet opslaan: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp heeft dit apparaat verwijderd, bijvoorbeeld in Instellingen > Gekoppelde apparaten. Koppel je WhatsApp-account opnieuw.",
+  "error.connector.whatsappAccountReplaced":
+    "Een ander programma heeft dit gekoppelde apparaat geopend, dus WhatsApp heeft de verbinding hier gesloten. Ontkoppel en koppel daarna opnieuw.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp heeft dit apparaat geweigerd. Je nummer kan beperkt zijn. Controleer WhatsApp op je telefoon.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp accepteert deze versie van de verbinding niet meer. Werk OpenBot bij en koppel daarna opnieuw.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp is nu niet bereikbaar. OpenBot probeert het opnieuw. Agents kunnen de chats op deze computer nog steeds lezen.",
+  "error.connector.whatsappAccountFileUnreadable": "Het verbindingsbestand van het WhatsApp-account is onleesbaar.",
 } as const satisfies PartialTranslation<typeof source>;

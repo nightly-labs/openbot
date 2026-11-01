@@ -64,4 +64,23 @@ export const messages = {
     "O Telegram encerrou esta sessão, por exemplo em Configurações > Dispositivos. Conecte sua conta do Telegram de novo.",
   "error.connector.telegramAccountFileUnreadable": "O arquivo de conexão da conta do Telegram não pode ser lido.",
   "error.connector.telegramAccountFileTooLarge": "O arquivo de conexão da conta do Telegram é muito grande.",
+  "error.connector.whatsappAccountPhoneFormat":
+    "Digite o número de telefone com o código do país, por exemplo +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "O WhatsApp não forneceu um código: {detail}",
+  "error.connector.whatsappAccountQrExpired": "O código expirou antes de você usá-lo. Comece de novo.",
+  "error.connector.whatsappAccountTimedOut": "A conexão parou após 10 minutos sem atividade. Comece de novo.",
+  "error.connector.whatsappAccountMovedOn": "A conexão passou para outra etapa. Comece de novo.",
+  "error.connector.whatsappAccountLinkFailed": "O WhatsApp não conectou este aparelho: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "O OpenBot não conseguiu salvar a conexão com o WhatsApp: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "O WhatsApp removeu este aparelho, por exemplo em Configurações > Aparelhos conectados. Conecte sua conta do WhatsApp de novo.",
+  "error.connector.whatsappAccountReplaced":
+    "Outro programa abriu este aparelho conectado, então o WhatsApp fechou a conexão aqui. Desconecte e depois conecte de novo.",
+  "error.connector.whatsappAccountForbidden":
+    "O WhatsApp recusou este aparelho. Seu número pode estar limitado. Confira o WhatsApp no seu celular.",
+  "error.connector.whatsappAccountOutdated":
+    "O WhatsApp não aceita mais esta versão da conexão. Atualize o OpenBot e depois conecte de novo.",
+  "error.connector.whatsappAccountOffline":
+    "O WhatsApp não está acessível agora. O OpenBot tenta de novo. Os agentes ainda podem ler as conversas neste computador.",
+  "error.connector.whatsappAccountFileUnreadable": "O arquivo de conexão da conta do WhatsApp não pode ser lido.",
 } as const satisfies PartialTranslation<typeof source>;

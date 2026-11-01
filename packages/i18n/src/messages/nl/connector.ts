@@ -487,4 +487,68 @@ export const messages = {
   "connector.telegramAccount.accountDescriptionHost": "Agents op {host} gebruiken dit Telegram-account.",
   "connector.telegramAccount.sendingLabel": "Agents berichten laten sturen en chats als gelezen laten markeren",
   "connector.telegramAccount.sendingDescription": "Als dit uit staat, kunnen agents je chats alleen lezen.",
+  "connector.whatsappAccount.title": "WhatsApp-account",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Agents kunnen je WhatsApp-chats lezen en, als je dat toestaat, berichten namens jou sturen.",
+  "connector.whatsappAccount.descriptionHost":
+    "Agents op {host} kunnen je WhatsApp-chats lezen en, als je dat toestaat, berichten namens jou sturen.",
+  "connector.whatsappAccount.statusConnecting": "Koppelen",
+  "connector.whatsappAccount.statusConnected": "Verbonden",
+  "connector.whatsappAccount.actionFailed": "OpenBot kon de verbinding met het WhatsApp-account niet wijzigen.",
+  "connector.whatsappAccount.disconnectTitle": "WhatsApp-account ontkoppelen",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot logt dit gekoppelde apparaat uit en verwijdert de sleutels en chats ervan van deze computer. Verzenden gaat uit.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} logt dit gekoppelde apparaat uit en verwijdert de sleutels en chats ervan. Verzenden gaat uit.",
+  "connector.whatsappAccount.disconnect": "Ontkoppelen",
+  "connector.whatsappAccount.linkTitle": "Koppelen",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot wordt een gekoppeld apparaat van je WhatsApp-account, zoals WhatsApp Web. Je telefoon blijft het hoofdapparaat. De sleutels en de chats blijven versleuteld op deze computer.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} wordt een gekoppeld apparaat van je WhatsApp-account, zoals WhatsApp Web. Je telefoon blijft het hoofdapparaat. De sleutels en de chats blijven versleuteld op {host}.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp biedt geen officiële toegang voor persoonlijke accounts. OpenBot gebruikt een onofficiële WhatsApp Web-client, en WhatsApp kan nummers beperken of blokkeren die het voor geautomatiseerd houdt. Stuur alleen wat je zelf ook zou sturen.",
+  "connector.whatsappAccount.linkProgress": "Voer de stap hieronder uit om te koppelen. Annuleren stopt het koppelen.",
+  "connector.whatsappAccount.methodTitle": "Koppelen met",
+  "connector.whatsappAccount.methodQrDescription": "Scan een code met WhatsApp op je telefoon.",
+  "connector.whatsappAccount.methodPhoneDescription": "Typ een code op je telefoon in plaats van te scannen.",
+  "connector.whatsappAccount.methodQr": "QR-code",
+  "connector.whatsappAccount.methodPhone": "Telefoonnummer",
+  "connector.whatsappAccount.connect": "Koppelen",
+  "connector.whatsappAccount.sendingOffNote": "Agents kunnen je chats alleen lezen tot je verzenden aanzet.",
+  "connector.whatsappAccount.connecting": "Verbinden met WhatsApp",
+  "connector.whatsappAccount.connectingDescription":
+    "Deze computer praat met WhatsApp. Dit kan een paar seconden duren.",
+  "connector.whatsappAccount.connectingHost": "{host} praat met WhatsApp. Dit kan een paar seconden duren.",
+  "connector.whatsappAccount.qrLabel": "QR-code om WhatsApp te koppelen",
+  "connector.whatsappAccount.qrTitle": "Scan deze code met WhatsApp op je telefoon",
+  "connector.whatsappAccount.stepOpen": "Open WhatsApp op je telefoon.",
+  "connector.whatsappAccount.stepDevices": "Ga naar Instellingen › Gekoppelde apparaten › Apparaat koppelen.",
+  "connector.whatsappAccount.qrStepScan": "Richt je telefoon op deze code.",
+  "connector.whatsappAccount.qrRefresh": "De code verandert ongeveer elke 20 seconden. Scan de nieuwste.",
+  "connector.whatsappAccount.usePhone": "Telefoonnummer gebruiken",
+  "connector.whatsappAccount.useQr": "QR-code gebruiken",
+  "connector.whatsappAccount.phoneDescription":
+    "Typ het telefoonnummer van je WhatsApp-account, met de landcode. WhatsApp geeft dan een code om op de telefoon te typen.",
+  "connector.whatsappAccount.phoneLabel": "Telefoonnummer",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Code ophalen",
+  "connector.whatsappAccount.codeTitle": "Typ deze code op je telefoon",
+  "connector.whatsappAccount.codeStepPhone": "Tik op In plaats daarvan koppelen met telefoonnummer.",
+  "connector.whatsappAccount.codeStepType": "Typ deze code.",
+  "connector.whatsappAccount.codeLabel": "Code om op je telefoon te typen",
+  "connector.whatsappAccount.accountTitle": "Account",
+  "connector.whatsappAccount.accountDescription": "Agents op deze computer gebruiken dit WhatsApp-account.",
+  "connector.whatsappAccount.accountDescriptionHost": "Agents op {host} gebruiken dit WhatsApp-account.",
+  "connector.whatsappAccount.historyChats": { one: "{count} chat", other: "{count} chats" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} bericht", other: "{count} berichten" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp stuurt recente geschiedenis wanneer het apparaat koppelt, daarna elk nieuw bericht. Oudere berichten kunnen ontbreken.",
+  "connector.whatsappAccount.sendingLabel": "Agents berichten laten sturen en chats als gelezen laten markeren",
+  "connector.whatsappAccount.sendingDescription": "Als dit uit staat, kunnen agents je chats alleen lezen.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp toont OpenBot onder Instellingen › Gekoppelde apparaten. Als je het daar uitlogt, wordt OpenBot losgekoppeld.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp toont OpenBot onder Instellingen › Gekoppelde apparaten. Als je het daar uitlogt, wordt {host} losgekoppeld.",
 } as const satisfies PartialTranslation<typeof source>;
