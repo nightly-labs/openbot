@@ -28,7 +28,7 @@ export const messages = {
   "error.team.loginIncorrect": "使用者名稱或密碼不正確。",
   "error.team.currentPasswordIncorrect": "當前密碼不正確。",
   "error.team.memberNotFound": "未找到該團隊成員。",
-  "error.team.directMessageSelf": "你不能與自己開始私信。",
+  "error.team.directMessageSelf": "你不能與自己開始私訊。",
   "error.team.directRecipientUnavailable": "該團隊成員不可用。",
   "error.team.ownerCannotChange": "所有者帳號無法更改。",
   "error.team.ownerCannotRemove": "所有者帳號無法移除。",

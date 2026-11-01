@@ -49,7 +49,7 @@ export const messages = {
   "server.compatibility.updateClientDescription": "該應用支援的協議版本比主機更舊，請先更新該應用再重試。",
   "server.compatibility.updateHostDescription": "主機支援的協議版本比該應用更舊，請先更新主機再重試。",
   "server.compatibility.unsafeDataDescription":
-    "由於某個已知載荷無效，OpenBot 中止了這次連線。當前工作區資料未被更改。",
+    "由於某個已知負載無效，OpenBot 中止了這次連線。當前工作區資料未被更改。",
   "server.compatibility.clientVersion": "客戶端版本",
   "server.compatibility.hostVersion": "主機版本",
   "server.compatibility.negotiatedProtocol": "協商協議",
@@ -494,7 +494,7 @@ export const messages = {
   "server.settings.updatesDescription": "更新執行該伺服器那臺電腦上的 OpenBot。",
   "server.update.hostTitle": "{name} 上的 OpenBot",
   "server.update.version": "OpenBot {version}",
-  "server.update.status.idle": "檢查更新以獲取最新版本。",
+  "server.update.status.idle": "檢查更新以取得最新版本。",
   "server.update.status.checking": "正在檢查更新…",
   "server.update.status.available": "{version} 可安裝。",
   // {progress} is a percent, such as 42%.

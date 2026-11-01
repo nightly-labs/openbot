@@ -35,6 +35,6 @@ export const messages = {
   "mobile.workspace.alert.serverOrderTitle": "無法儲存伺服器順序",
   "mobile.workspace.alert.serverOrderBody": "已保留之前的順序，請重試。",
   "mobile.workspace.error.connectFailed": "伺服器連線失敗。",
-  "mobile.workspace.error.disconnectFailed": "伺服器未能幹淨地斷開連線。",
+  "mobile.workspace.error.disconnectFailed": "伺服器未能乾淨地斷開連線。",
   "mobile.workspace.error.queueEditRejected": "主機未接受這次編輯。",
 } as const satisfies PartialTranslation<typeof source>;

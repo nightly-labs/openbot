@@ -16,7 +16,7 @@ export const messages = {
   "status.messaging.approvalTitle": "OpenBot 請求批准以繼續。",
   "status.messaging.approvalCommand": "執行命令",
   "status.messaging.approvalFileChange": "修改檔案",
-  "status.messaging.approvalPermissions": "獲取更多權限",
+  "status.messaging.approvalPermissions": "取得更多權限",
   "status.messaging.approve": "批准",
   "status.messaging.deny": "拒絕",
   "status.messaging.approvedBy": "已由 {user} 批准。",

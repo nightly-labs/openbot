@@ -75,7 +75,7 @@ export const messages = {
   "sidebar.channel.unread": { one: "{count} 條未讀訊息", other: "{count} 條未讀訊息" },
   "sidebar.people.online": "線上",
   "sidebar.people.offline": "離線",
-  "sidebar.people.unread": { one: "{count} 條未讀私信", other: "{count} 條未讀私信" },
+  "sidebar.people.unread": { one: "{count} 條未讀私訊", other: "{count} 條未讀私訊" },
   "sidebar.state.working": "思考中",
   "sidebar.state.responded": "已回覆",
   "sidebar.state.unread": { one: "{count} 條新回覆", other: "{count} 條新回覆" },

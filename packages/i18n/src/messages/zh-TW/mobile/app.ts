@@ -38,7 +38,7 @@ export const messages = {
   "mobile.app.quickAction.search": "搜尋",
   "mobile.app.update.title": "OpenBot {version} 來了",
   "mobile.app.update.readyTitle": "新版 OpenBot 已就緒",
-  "mobile.app.update.storeBody": "獲取最新功能和修復。",
+  "mobile.app.update.storeBody": "取得最新功能和修復。",
   "mobile.app.update.readyBody": "OpenBot 將重啟以完成安裝。",
   "mobile.app.update.install": "更新",
   "mobile.app.update.later": "稍後",

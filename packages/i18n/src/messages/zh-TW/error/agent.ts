@@ -95,7 +95,7 @@ export const messages = {
   "error.agent.localScriptsRateLimited":
     "過去一小時內本地指令碼向該助理傳送了 {limit} 條訊息或自動化任務請求，請稍後再試。",
   "error.agent.automationOff": "該助理不允許本地指令碼執行它的自動化任務。",
-  "error.agent.automationPayloadTooLong": "載荷超過 {limit} 個字元。",
+  "error.agent.automationPayloadTooLong": "負載超過 {limit} 個字元。",
   "error.agent.automationRateLimited": "過去一小時內本地指令碼執行了該助理的自動化任務 {limit} 次，請稍後再試。",
   "error.agent.workspaceOnlyMacOnly": "該供應商的「僅工作區」僅在 macOS 上可用，請在助理設定中選擇完全訪問。",
   "error.agent.lowMemory":
@@ -114,8 +114,8 @@ export const messages = {
   "error.agent.mcpServerKeysMove":
     "MCP 伺服器 {name} 儲存著當前伺服器的金鑰。請讓使用者在「伺服器設定 → MCP」中更改它的地址、命令、引數或傳輸方式。",
   "error.agent.mcpServerUnknown": "沒有名為 {name} 的 MCP 伺服器。請呼叫 list_mcp_servers 檢視名稱。",
-  "error.agent.screenCaptureWindowMissing": "該視窗當前未開啟，請呼叫 list_capture_sources 獲取當前視窗 ID。",
-  "error.agent.screenCaptureDisplayMissing": "該顯示器當前未連線，請呼叫 list_capture_sources 獲取當前顯示器 ID。",
+  "error.agent.screenCaptureWindowMissing": "該視窗當前未開啟，請呼叫 list_capture_sources 取得當前視窗 ID。",
+  "error.agent.screenCaptureDisplayMissing": "該顯示器當前未連線，請呼叫 list_capture_sources 取得當前顯示器 ID。",
   "error.agent.screenCaptureRegionOutside":
     "該區域不在任何單個顯示器內，請使用某個顯示器範圍內的桌面座標（來自 list_capture_sources）。",
   "error.agent.screenCapturePermissionMissing":

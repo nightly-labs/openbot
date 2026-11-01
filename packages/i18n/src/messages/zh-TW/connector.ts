@@ -81,7 +81,7 @@ export const messages = {
   // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
   // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
-  "connector.slack.description": "人們在 Slack 中提及 @OpenBot 或給它發私信，Slack 排程助理會找到合適的助理來回答。",
+  "connector.slack.description": "人們在 Slack 中提及 @OpenBot 或給它發私訊，Slack 排程助理會找到合適的助理來回答。",
   "connector.slack.statusConnected": "已連線",
   "connector.slack.statusAttention": "需要關注",
   // {workspace} is the Slack workspace name.
@@ -96,7 +96,7 @@ export const messages = {
   "connector.slack.addAgent": "新增助理",
   "connector.slack.actionFailed": "Slack 沒有接受該更改",
   "connector.slack.workspaceTitle": "工作區",
-  "connector.slack.workspaceDescription": "人們提及 @OpenBot 或給它發私信。",
+  "connector.slack.workspaceDescription": "人們提及 @OpenBot 或給它發私訊。",
   "connector.slack.disconnectWorkspace": "斷開連線",
   "connector.slack.disconnectAllTitle": "斷開 Slack",
   "connector.slack.disconnectAllSummary": "所有工作區都將斷開，其他人無法再透過 @OpenBot 聯絡你的助理。",
@@ -135,7 +135,7 @@ export const messages = {
   "connector.slack.orchestratorDoesAnswer": "把答案發到 Slack 話題中",
   "connector.slack.orchestratorModel": "模型",
   "connector.slack.doneTitle": "OpenBot 已加入 {workspace}",
-  "connector.slack.doneDescription": "在任意公開頻道中提及 @OpenBot，或給它發私信。",
+  "connector.slack.doneDescription": "在任意公開頻道中提及 @OpenBot，或給它發私訊。",
   "connector.slack.done": "完成",
   "connector.slack.disconnectTitle": "斷開 {workspace}？",
   "connector.slack.disconnectDescription": "OpenBot 將停止在 {workspace} 中回答，並從這臺電腦刪除其 Slack 權杖。",

@@ -6,7 +6,7 @@ export const messages = {
   "mcp.connect.title": "連線 {name}",
   "mcp.connect.notConnected": "未連線",
   "mcp.connect.close": "關閉連線 {name}",
-  "mcp.connect.getKey": "獲取金鑰",
+  "mcp.connect.getKey": "取得金鑰",
   "mcp.connect.keyDescription": "貼上你 {name} 帳號的憑據。OpenBot 會用它連線，並儲存在 {host} 上。",
   "mcp.connect.thisComputer": "這臺電腦",
   "mcp.connect.noCredentialDescription": "{name} 不需要憑據。OpenBot 會連線一次，看看它提供哪些工具。",
@@ -137,10 +137,10 @@ export const messages = {
     "確認登入頁面是 {page}，然後在瀏覽器中開啟它。完成後，OpenBot 會把登入結果傳送到 {host}。",
   "mcp.signIn.relayOpenDescription":
     "在瀏覽器中開啟 {page} 的登入頁面。完成後，把瀏覽器顯示的地址貼上到這裡，OpenBot 會把登入結果傳送到 {host}。",
-  "mcp.signIn.relayDeviceDescription": "確認登入頁面是 {page}，然後在瀏覽器中開啟並完成。{host} 會自動獲取登入結果。",
+  "mcp.signIn.relayDeviceDescription": "確認登入頁面是 {page}，然後在瀏覽器中開啟並完成。{host} 會自動取得登入結果。",
   "mcp.signIn.relayOpen": "開啟登入頁面",
   "mcp.signIn.relayPasteHint": "如果瀏覽器沒有跳回 OpenBot，請複製它顯示的地址並貼上到這裡。",
-  "mcp.signIn.relayPasteRequired": "OpenBot 無法自行從瀏覽器獲取登入結果。完成後，請複製瀏覽器顯示的地址並貼上到這裡。",
+  "mcp.signIn.relayPasteRequired": "OpenBot 無法自行從瀏覽器取得登入結果。完成後，請複製瀏覽器顯示的地址並貼上到這裡。",
   "mcp.signIn.relayAddress": "瀏覽器地址",
   "mcp.signIn.relaySend": "傳送",
   "mcp.panel.callbackUrlRelayed":

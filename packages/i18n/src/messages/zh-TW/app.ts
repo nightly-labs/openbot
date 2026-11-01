@@ -26,7 +26,7 @@ export const messages = {
   "app.provider.connected": "{name} 已連線",
   "app.provider.signedInAs": "已登入為 {account}。",
   "app.provider.signedInElsewhere": "登入已在另一臺裝置上完成。",
-  "app.provider.newCode": "獲取新驗證碼",
+  "app.provider.newCode": "取得新驗證碼",
   "app.provider.codeExpired": "{name} 驗證碼已過期",
   "app.provider.codeExpiredDescription": "沒在有效期內輸入，驗證碼已失效。",
   "app.provider.connectFailed": "無法連線 {name}",

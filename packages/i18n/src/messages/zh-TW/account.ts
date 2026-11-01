@@ -5,7 +5,7 @@ export const messages = {
   "account.menu.billing": "帳單",
   "account.menu.sendFeedback": "傳送回饋",
   "account.menu.signOut": "登出",
-  "account.menu.signingOut": "正在退出…",
+  "account.menu.signingOut": "正在登出…",
   "account.menu.updateFailed": "無法更新 OpenBot。",
   "account.menu.signOutFailed": "無法登出。",
   "account.usage.title": "用量",

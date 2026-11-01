@@ -24,7 +24,7 @@ export const messages = {
   "common.create": "建立",
   "common.open": "開啟",
   "common.search": "搜尋",
-  "common.noMatches": "無匹配項",
+  "common.noMatches": "沒有相符結果",
   "common.loading": "載入中…",
   "common.saving": "儲存中…",
   "common.tryAgain": "再試一次",

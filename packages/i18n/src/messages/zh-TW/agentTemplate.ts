@@ -40,7 +40,7 @@ export const messages = {
   "agentTemplate.publish.updating": "正在更新…",
   "agentTemplate.publish.updateFailed": "無法更新該助理。",
   "agentTemplate.publish.skillsError": "技能無法釋出：{reason}",
-  "agentTemplate.publish.filesNotPublished": "檔案和記憶不會被髮布。",
+  "agentTemplate.publish.filesNotPublished": "檔案和記憶不會被發布。",
   "agentTemplate.publish.skillsAttention": "技能需要處理",
   "agentTemplate.publish.instructionsAndSkills": "指令與技能",
   "agentTemplate.publish.noRoutines": "沒有自動化任務",

@@ -97,7 +97,7 @@ export const messages = {
   "mobile.marketplace.app.connectedHint": "你的助理現在可以使用該應用。可在伺服器的 MCP 設定中管理它。",
   "mobile.marketplace.app.connectFailed": "無法連線該應用。",
   "mobile.marketplace.app.linkInvalid": "請使用 {hostname} 上的 https 連結。",
-  "mobile.marketplace.app.docs": "獲取金鑰",
+  "mobile.marketplace.app.docs": "取得金鑰",
   "mobile.marketplace.app.local": "該應用執行在裝有 OpenBot 的電腦上。請在那臺電腦上設定。",
   "mobile.marketplace.app.relayUnsupported":
     "該應用需要在瀏覽器中登入。請更新伺服器上的 OpenBot，或在電腦上連線該應用。",

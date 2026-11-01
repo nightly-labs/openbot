@@ -6,7 +6,7 @@ export const messages = {
   "mobile.onboarding.progress": "第 {current} 步，共 {total} 步",
   "mobile.onboarding.back": "返回",
   "mobile.onboarding.hello.title": "認識你的助理",
-  "mobile.onboarding.hello.body": "助理在伺服器上幹活。你給它們分配任務，在手機上隨時跟進。",
+  "mobile.onboarding.hello.body": "助理在伺服器上工作。你給它們分配任務，在手機上隨時跟進。",
   "mobile.onboarding.hello.start": "開始使用",
   "mobile.onboarding.server.title": "你的助理在哪裡工作？",
   "mobile.onboarding.server.body": "助理執行在伺服器上。請選擇連線方式。",

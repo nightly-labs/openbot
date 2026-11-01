@@ -406,7 +406,7 @@ export const messages = {
   "mobile.agent.publish.noSkills": "沒有技能",
   "mobile.agent.publish.noRoutines": "沒有自動化任務",
   "mobile.agent.publish.andOthers": { one: "{name} 等 {count} 個", other: "{name} 等 {count} 個" },
-  "mobile.agent.publish.notIncluded": "檔案和記憶不會被髮布。",
+  "mobile.agent.publish.notIncluded": "檔案和記憶不會被發布。",
   "mobile.agent.publish.shareLink": "分享連結",
   "mobile.agent.publish.publish": "釋出",
   "mobile.agent.publish.skillsError": "技能無法釋出：{reason}",

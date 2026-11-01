@@ -83,7 +83,7 @@ export const messages = {
   // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "用驗證碼登入 {name}",
   "provider.codeLogin.description": "在你的手機或另一個瀏覽器上完成，OpenBot 會在這裡等待。",
-  "provider.codeLogin.starting": "正在從 {name} 獲取驗證碼…",
+  "provider.codeLogin.starting": "正在從 {name} 取得驗證碼…",
   "provider.codeLogin.qrLabel": "{name} 登入頁面的 QR Code",
   "provider.codeLogin.open": "開啟",
   "provider.codeLogin.enterCode": "輸入該驗證碼",
@@ -109,7 +109,7 @@ export const messages = {
   "provider.useApp.title": "在 OpenBot 應用中連線 {name}",
   "provider.useApp.description":
     "{name} 的登入結果會返回發起登入的電腦，瀏覽器標籤頁無法接收。請在 OpenBot 應用中連線 {name}，應用會自動完成登入。",
-  "provider.useApp.download": "獲取應用",
+  "provider.useApp.download": "取得應用",
 
   // The agent model picker.
   "provider.picker.noEndpoints": "還沒有端點",

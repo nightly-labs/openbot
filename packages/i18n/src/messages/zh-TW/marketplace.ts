@@ -98,8 +98,8 @@ export const messages = {
   "marketplace.app.custom": "MCP 伺服器",
   "marketplace.app.githubTagline": "倉庫、Issue 與拉取請求",
   "marketplace.app.onePasswordTagline": "用你共享的登入資訊登入網站",
-  "marketplace.app.slackTagline": "Slack 中的提及和私信",
-  "marketplace.app.discordTagline": "Discord 中的提及和私信",
+  "marketplace.app.slackTagline": "Slack 中的提及和私訊",
+  "marketplace.app.discordTagline": "Discord 中的提及和私訊",
   "marketplace.app.telegramTagline": "Telegram 中的群組和私聊",
   "marketplace.app.bitwardenTagline": "用共享資料夾中的登入資訊登入網站",
   // The category row in the 1Password page's information.
@@ -208,7 +208,7 @@ export const messages = {
   "marketplace.plugin.appleApps.prompt.schedule": "找到關於專案會議的最新郵件，並把這個會議新增到我的日曆中。",
   "marketplace.plugin.sentry.tagline": "錯誤與崩潰排查",
   "marketplace.plugin.sentry.description":
-    "Sentry 讓助理搜尋最近的錯誤、檢視堆疊與受影響的版本，並總結髮布後出了什麼問題。每位使用者透過瀏覽器登入自己的 Sentry 帳號。",
+    "Sentry 讓助理搜尋最近的錯誤、檢視堆疊與受影響的版本，並總結發布後出了什麼問題。每位使用者透過瀏覽器登入自己的 Sentry 帳號。",
   "marketplace.plugin.sentry.app": "透過 Sentry 的 MCP 伺服器和瀏覽器登入，提供錯誤搜尋、Issue 檢查與版本健康狀況。",
   "marketplace.plugin.sentry.prompt.newErrors": "昨天釋出之後出現了哪些新錯誤？",
   "marketplace.plugin.sentry.prompt.topCrash": "解釋移動端專案中最嚴重的崩潰及其可能原因。",
@@ -236,7 +236,7 @@ export const messages = {
   "marketplace.plugin.supabase.prompt.errors": "我的 Supabase 專案在過去一小時記錄了哪些錯誤？",
   "marketplace.plugin.context7.tagline": "最新的庫文件",
   "marketplace.plugin.context7.description":
-    "Context7 獲取庫與框架的最新文件和 API 參考，讓回答基於專案實際執行的版本。無需帳號，也無需金鑰。",
+    "Context7 取得庫與框架的最新文件和 API 參考，讓回答基於專案實際執行的版本。無需帳號，也無需金鑰。",
   "marketplace.plugin.context7.app": "透過 Context7 的 MCP 伺服器查詢最新庫文件，無需登入。",
   "marketplace.plugin.context7.prompt.apiCheck": "這個框架中虛擬列表當前的 API 是什麼？",
   "marketplace.plugin.context7.prompt.migrate": "這個路由的 v2 到 v3 之間有什麼變化？",
@@ -250,7 +250,7 @@ export const messages = {
   "marketplace.plugin.stripe.prompt.link": "為每月 49 的專業版方案起草一個支付連結。",
   "marketplace.plugin.posthog.tagline": "產品分析與功能開關",
   "marketplace.plugin.posthog.description":
-    "PostHog 讓助理查詢事件和漏斗、檢查功能開關，並總結髮布後的變化。把專案設定中的個人 API 金鑰填入一個 Authorization 請求頭即可。",
+    "PostHog 讓助理查詢事件和漏斗、檢查功能開關，並總結發布後的變化。把專案設定中的個人 API 金鑰填入一個 Authorization 請求頭即可。",
   "marketplace.plugin.posthog.app": "透過 PostHog 的 MCP 伺服器和個人 API 金鑰，提供事件、漏斗與功能開關訪問。",
   "marketplace.plugin.posthog.prompt.funnel": "最近 14 天的註冊漏斗情況如何？",
   "marketplace.plugin.posthog.prompt.flag": "該使用者啟用了哪些功能開關？",
