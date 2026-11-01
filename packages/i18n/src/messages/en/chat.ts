@@ -21,6 +21,8 @@ export const messages = defineMessages("chat", {
   "chat.activity.current": "Current activity",
   "chat.steps.show": "Show steps",
   "chat.steps.hide": "Hide steps",
+  "chat.steps.showError": "Show error",
+  "chat.steps.hideError": "Hide error",
   "chat.steps.list": "Agent steps",
   "chat.steps.count": { one: "{count} step", other: "{count} steps" },
   "chat.steps.failed": { one: "{count} failed", other: "{count} failed" },

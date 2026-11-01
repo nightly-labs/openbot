@@ -72,6 +72,7 @@ import {
   isToolItem,
   refusedSessionFailure,
   type ToolUsageSignal,
+  toolErrorText,
   toolFailed,
   toolProgressText,
   toolTraceDetail,
@@ -1535,7 +1536,15 @@ export class TurnLifecycle {
     const toolProgress = toolProgressText(item, completed);
     this.#observeTraceStep(turnId, item, completed, toolProgress);
     if (toolProgress) {
-      this.#emitTurnProgress(agentId, this.#conversation.publicThreadId(agentId, threadId), turnId, toolProgress);
+      const errorText = completed ? toolErrorText(item) : null;
+      const redactedError = errorText ? this.#hooks.redactMcp(errorText) : undefined;
+      this.#emitTurnProgress(
+        agentId,
+        this.#conversation.publicThreadId(agentId, threadId),
+        turnId,
+        toolProgress,
+        redactedError,
+      );
       return;
     }
     if (item.type !== "agentMessage" || !isString(item.id)) return;
@@ -1627,10 +1636,13 @@ export class TurnLifecycle {
     if (!isString(item.id)) return;
     if (isToolItem(item)) {
       const failed = completed && toolFailed(item);
+      const errorText = failed ? toolErrorText(item) : null;
+      const redactedError = errorText ? this.#hooks.redactMcp(errorText) : undefined;
       this.#traces.observe(turnId, item.id, "tool", {
         completed,
         failed,
         text: toolProgress,
+        error: redactedError,
         ...toolTraceDetail(item),
       });
     } else if (item.type === "agentMessage")
@@ -1661,13 +1673,14 @@ export class TurnLifecycle {
     return message;
   }
 
-  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string): void {
+  #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string, error?: string): void {
     this.#hooks.emit({
       type: "turn-progress",
       agentId,
       threadId,
       turnId,
       detail: text,
+      ...(error ? { error } : {}),
     });
   }
 }

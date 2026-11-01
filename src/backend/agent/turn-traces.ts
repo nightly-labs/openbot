@@ -46,6 +46,7 @@ export class TurnTraces {
       text?: string | null;
       command?: string | null;
       recipientAgentIds?: string[] | null;
+      error?: string | null;
     },
   ): void {
     const trace = this.#turns.get(turnId);
@@ -67,6 +68,8 @@ export class TurnTraces {
       step.command = redactText(command).slice(0, CONVERSATION_TRACE_TEXT_LIMIT);
     if (kind === "tool" && step.recipientAgentIds === undefined && event.recipientAgentIds?.length)
       step.recipientAgentIds = [...event.recipientAgentIds];
+    if (kind === "tool" && step.error === undefined && event.error)
+      step.error = redactText(event.error).slice(0, CONVERSATION_TRACE_TEXT_LIMIT);
     if (event.completed && step.endedAt === null) step.endedAt = now;
     if (event.completed && event.failed) step.failed = true;
   }
