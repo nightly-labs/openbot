@@ -28,7 +28,7 @@ import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
 const BROWSER_PANEL_MIN = 220;
 const BROWSER_PANEL_MAX = 1600;
-const CONVERSATION_PANEL_MIN = 96;
+const CONVERSATION_PANEL_MIN = 320;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
