@@ -1091,13 +1091,6 @@ export const ChatMessageList = memo(function ChatMessageList({
     void focusHandlers.current.openAt(focusIndex).then(() => focusHandlers.current.onFocusPlaced?.());
   }, [focusId, focusIndex, motion.listPlaced]);
   const header = topInset + 84;
-  // The latest user message can always move to the top of the chat: the list adds blank space
-  // under it while the rows after it are shorter than the screen.
-  const anchoredEndSpace = useMemo<AnchoredEndSpaceConfig | undefined>(
-    () =>
-      tailIndex >= 0 ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady } : undefined,
-    [tailIndex, header, motion.onAnchorReady],
-  );
   const sharedValues = useMemo(() => ({ scrollOffset: motion.scrollOffset }), [motion.scrollOffset]);
   const screen = useWindowDimensions();
   const columnWidth = useColumnWidth();
@@ -1228,6 +1221,32 @@ export const ChatMessageList = memo(function ChatMessageList({
   );
   const pendingReveal = visibleMessages.some((message) =>
     awaitingFirstWord(message, shared, arrivals.has(message.id), revealedIds.has(message.id)),
+  );
+  // A turn ran while this chat was open: its reply grows under the latest user message.
+  const [turnSeen, setTurnSeen] = useState(false);
+  if (
+    !turnSeen &&
+    (activity ||
+      activities?.length ||
+      sending ||
+      awaitingTurn ||
+      activeTurnId ||
+      pendingReveal ||
+      messages.some(isStreamingReply))
+  ) {
+    setTurnSeen(true);
+  }
+  // After a send or during a turn, the latest user message can move to the top of the chat: the list
+  // adds blank space under it while the rows after it are shorter than the screen. A chat that opens
+  // with no turn ends at its last row, above the composer. The space stays while the chat is open, so
+  // the rows do not move when the reply ends.
+  const anchorsLatest = motion.anchorsSend || turnSeen;
+  const anchoredEndSpace = useMemo<AnchoredEndSpaceConfig | undefined>(
+    () =>
+      anchorsLatest && tailIndex >= 0
+        ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady }
+        : undefined,
+    [anchorsLatest, tailIndex, header, motion.onAnchorReady],
   );
   const { responseStyle, responseVisible } = motion;
   // The prompt controller is a new object on each render. Without a prompt it is left out, so the

@@ -131,6 +131,9 @@ export function useChatMotion(
   const [userScrolled, setUserScrolled] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
+  // A message was sent from this chat. The list then adds blank space under the latest user message,
+  // so the sent message can move to the top while its reply comes.
+  const [anchorsSend, setAnchorsSend] = useState(false);
   const pending = useRef<{ baseline: string | null; first: boolean; fromLatest: boolean } | null>(null);
   const followLatest = useRef(true);
   const [keyboardLiftBehavior, setKeyboardLiftBehavior] = useState<"whenAtEnd" | "never">("whenAtEnd");
@@ -342,6 +345,7 @@ export function useChatMotion(
     const baseline = current.current.lastUserId;
     const first = baseline === null;
     pending.current = { baseline, first, fromLatest: atLatestNow.current };
+    setAnchorsSend(true);
     if (first) {
       firstOpacity.set(0);
       responseOpacity.set(0);
@@ -417,6 +421,8 @@ export function useChatMotion(
       userScrolled,
       historyVisible,
       responseVisible,
+      /** The list adds blank space under the latest user message: a message was sent from this chat. */
+      anchorsSend,
       composerHeight,
       composerStyle,
       keyboardHeight,
@@ -452,6 +458,7 @@ export function useChatMotion(
       userScrolled,
       historyVisible,
       responseVisible,
+      anchorsSend,
       composerHeight,
       composerStyle,
       keyboardHeight,
