@@ -18,6 +18,17 @@ describe("file preview page decoding", () => {
     expect(decodeFilePreview(preview)).toEqual(preview);
   });
 
+  it("keeps a missing preview and drops the flag when main does not send it", () => {
+    expect(decodeFilePreview({ ...preview, previewKind: "none", bytes: null, missing: true })).toEqual({
+      ...preview,
+      previewKind: "none",
+      bytes: null,
+      missing: true,
+    });
+    expect(decodeFilePreview({ ...preview, missing: false })).toEqual(preview);
+    expect(() => decodeFilePreview({ ...preview, missing: "yes" })).toThrow("Invalid file preview response.");
+  });
+
   it("rejects page addresses outside the isolated preview scheme", () => {
     for (const address of [
       "file:///private.html",

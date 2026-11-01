@@ -180,6 +180,11 @@ export interface FilePreview {
   mimeType: string;
   previewKind: FilePreviewKind;
   bytes: Uint8Array | null;
+  /**
+   * The path is not in the workspace or on the host. A message can name a file that only its author
+   * has, so the read answers this instead of failing; the chat then says the file is missing.
+   */
+  missing?: boolean;
   /** Temporary HTML page on this client. Never a workspace path or a Team API field. */
   pageUrl?: string;
 }

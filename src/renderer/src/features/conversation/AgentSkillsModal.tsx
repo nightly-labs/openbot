@@ -208,7 +208,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     const readHostFile = localLibrary() ? undefined : props.previewWorkspaceFile;
     if (readHostFile && (!isFolderSkill(skill) || skill.location)) {
       const listing = catalogPort && !local && !isFolderSkill(skill) ? () => catalogPort.get(skill.skillId) : null;
-      return () => hostSkillDetail(skill, readHostFile, listing);
+      return () => hostSkillDetail(skill, readHostFile, listing, t("skill.loadDetailsFailed"));
     }
     if (isFolderSkill(skill) || !catalogPort || (!localLibrary() && local)) return null;
     return local
@@ -739,13 +739,17 @@ async function hostSkillDetail(
   skill: InstalledSkill,
   readHostFile: (path: string) => Promise<FilePreview>,
   listing: (() => Promise<SkillDetail>) | null,
+  notFoundMessage: string,
 ): Promise<SkillDetail> {
   const pendingEntry = listing?.().catch(() => null) ?? Promise.resolve(null);
   let file: FilePreview | null = null;
   let failure: unknown;
   for (const path of hostSkillPaths(skill)) {
     try {
-      file = await readHostFile(path);
+      const preview = await readHostFile(path);
+      // A path that is not on the host is no reason to stop: the next one may be the copy it wrote.
+      if (preview.missing) continue;
+      file = preview;
       break;
     } catch (error) {
       failure ??= error;
@@ -754,7 +758,7 @@ async function hostSkillDetail(
   const entry = await pendingEntry;
   if (!file) {
     if (entry) return entry;
-    throw failure;
+    throw failure ?? new Error(notFoundMessage);
   }
   const text = file.bytes ? new TextDecoder().decode(file.bytes) : "";
   return {

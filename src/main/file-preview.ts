@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { attachmentFileExtension, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
@@ -9,6 +10,18 @@ import { filePreviewPages } from "./file-preview-pages";
 
 export function mimeTypeForName(name: string) {
   return attachmentMimeTypeForName(name);
+}
+
+/** A path that is not there: no bytes and no preview, so the chat can say the file is missing. */
+export function missingFilePreview(path: string): FilePreview {
+  return {
+    name: basename(path),
+    size: 0,
+    mimeType: "application/octet-stream",
+    previewKind: "none",
+    bytes: null,
+    missing: true,
+  };
 }
 
 export function filePreviewFromBytes(name: string, bytes: Uint8Array): FilePreview {
@@ -31,7 +44,7 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
   const kind = size > Math.min(maxBytes, ATTACHMENT_LIMITS.fileBytes) ? "none" : filePreviewKindForFile(name, mimeType);
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
   const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation) : undefined;
-  return {
+  const preview: FilePreview = {
     name,
     size,
     mimeType,
@@ -39,4 +52,5 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
     bytes,
     ...(pageUrl ? { pageUrl } : {}),
   };
+  return preview;
 });

@@ -53,6 +53,7 @@ export function decodeFilePreview(value: unknown): FilePreview {
     !isString(preview.mimeType) ||
     !isFilePreviewKind(preview.previewKind) ||
     (preview.bytes !== null && !(preview.bytes instanceof Uint8Array)) ||
+    (preview.missing !== undefined && typeof preview.missing !== "boolean") ||
     (preview.pageUrl !== undefined && !isFilePreviewPageUrl(preview.pageUrl))
   ) {
     throw new Error("Invalid file preview response.");
@@ -63,6 +64,7 @@ export function decodeFilePreview(value: unknown): FilePreview {
     mimeType: preview.mimeType,
     previewKind: preview.previewKind,
     bytes: preview.bytes,
+    ...(preview.missing === true ? { missing: true } : {}),
     ...(preview.pageUrl === undefined ? {} : { pageUrl: preview.pageUrl }),
   };
 }
