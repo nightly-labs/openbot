@@ -1,0 +1,32 @@
+{
+  "name": "libsignal",
+  "version": "6.0.0",
+  "private": true,
+  "description": "The libsignal API that Baileys uses, on whatsapp-rust-bridge. OpenBot installs it in place of libsignal.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./src/curve.js": {
+      "types": "./src/curve.d.ts",
+      "default": "./src/curve.js"
+    },
+    "./src/crypto.js": {
+      "types": "./src/crypto.d.ts",
+      "default": "./src/crypto.js"
+    },
+    "./src/protobufs.js": {
+      "types": "./src/protobufs.d.ts",
+      "default": "./src/protobufs.js"
+    }
+  },
+  "dependencies": {
+    "protobufjs": "7.5.6",
+    "whatsapp-rust-bridge": "0.5.4"
+  }
+}

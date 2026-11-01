@@ -15,6 +15,7 @@ import {
   mcpConfigErrors,
   normalizeMcpConfig,
   TELEGRAM_ACCOUNT_MCP_SERVER_ID,
+  WHATSAPP_ACCOUNT_MCP_SERVER_ID,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { type Logger, toLogValue } from "@openbot/logging";
@@ -64,8 +65,8 @@ export interface McpGatewayHooks {
 }
 
 /**
- * A built-in connection that gives agents one MCP server, as the gateway reads it: GitHub, or the
- * Telegram account. The main process owns the sign-in; the gateway sees the entry while the
+ * A built-in connection that gives agents one MCP server, as the gateway reads it: GitHub, the
+ * Telegram account or the WhatsApp account. The main process owns the sign-in; the gateway sees the entry while the
  * connection is active, and a fresh bearer at each hand-off.
  */
 export interface ConnectorMcpSource {
@@ -79,6 +80,7 @@ export interface ConnectorMcpSource {
 
 export type GitHubConnectorSource = ConnectorMcpSource;
 export type TelegramAccountConnectorSource = ConnectorMcpSource;
+export type WhatsAppAccountConnectorSource = ConnectorMcpSource;
 
 export interface McpGatewayOptions {
   servers: McpServerStore;
@@ -87,6 +89,7 @@ export interface McpGatewayOptions {
   computerUseMcpServer: () => McpServerConfig | null;
   githubConnector?: GitHubConnectorSource | null;
   telegramAccountConnector?: TelegramAccountConnectorSource | null;
+  whatsappAccountConnector?: WhatsAppAccountConnectorSource | null;
   /** The agents, read when a server signed in through the proxy opens a session, for their names. */
   agents?: () => ReadonlyArray<{ id: string; name: string }>;
   /** The agent service logger, so a drop report keeps the `agent-service` prefix it always had. */
@@ -106,6 +109,7 @@ export class McpGateway {
   readonly #computerUseMcpServer: () => McpServerConfig | null;
   readonly #githubConnector: GitHubConnectorSource | null;
   readonly #telegramAccountConnector: TelegramAccountConnectorSource | null;
+  readonly #whatsappAccountConnector: WhatsAppAccountConnectorSource | null;
   /**
    * What OpenBot downloaded for the MCP servers, read at each use. It travels with the credentials
    * because both are the main process's knowledge of this machine, and because the clients already
@@ -140,6 +144,7 @@ export class McpGateway {
     this.#computerUseMcpServer = options.computerUseMcpServer;
     this.#githubConnector = options.githubConnector ?? null;
     this.#telegramAccountConnector = options.telegramAccountConnector ?? null;
+    this.#whatsappAccountConnector = options.whatsappAccountConnector ?? null;
     this.#toolRuntimes = () => credentials.mcpToolRuntimes?.() ?? NO_MCP_TOOL_RUNTIMES;
     this.#oauth = credentials.mcpOAuth ?? null;
     this.#logger = options.logger;
@@ -177,8 +182,8 @@ export class McpGateway {
    * Where one http configuration is reached and with which bearer, asked at every hand-off.
    *
    * A row this machine signed in to goes through the OAuth proxy: the provider gets a loopback
-   * route and that route's bearer, and the OAuth token stays in this process. The GitHub and the
-   * Telegram account rows keep their own loopback servers. Every other row is handed as the user wrote it, with no bearer added. A proxy that
+   * route and that route's bearer, and the OAuth token stays in this process. The GitHub, Telegram
+   * account and WhatsApp account rows keep their own loopback servers. Every other row is handed as the user wrote it, with no bearer added. A proxy that
    * cannot start leaves the row out of the hand-off: the raw token is never the fallback.
    *
    * A session of an agent gets a route of its own, so the proxy can name the agent to the server.
@@ -257,6 +262,7 @@ export class McpGateway {
   #connectorSource(id: string): ConnectorMcpSource | null | undefined {
     if (id === GITHUB_CONNECTOR_MCP_SERVER_ID) return this.#githubConnector;
     if (id === TELEGRAM_ACCOUNT_MCP_SERVER_ID) return this.#telegramAccountConnector;
+    if (id === WHATSAPP_ACCOUNT_MCP_SERVER_ID) return this.#whatsappAccountConnector;
     return undefined;
   }
 
@@ -538,7 +544,7 @@ export class McpGateway {
    * driver daemon runs and the user never configured it. This one line is what gives Codex, Claude
    * and the ACP providers the same tools: all three read this function.
    *
-   * The GitHub and Telegram account connections' entries are appended the same way, unless an
+   * The GitHub, Telegram account and WhatsApp account connections' entries are appended the same way, unless an
    * enabled row already has the name: a server the user added keeps working as they set it up, and
    * two entries with one name would collide in every provider's configuration.
    */
@@ -547,7 +553,7 @@ export class McpGateway {
     const builtIn: McpServerConfig[] = [];
     const computerUse = this.#computerUseMcpServer();
     if (computerUse) builtIn.push(computerUse);
-    for (const connector of [this.#githubConnector, this.#telegramAccountConnector]) {
+    for (const connector of [this.#githubConnector, this.#telegramAccountConnector, this.#whatsappAccountConnector]) {
       const entry = connector?.mcpServer() ?? null;
       if (entry && !configured.some((config) => config.name === entry.name)) builtIn.push(entry);
     }

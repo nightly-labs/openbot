@@ -83,6 +83,7 @@ export * from "./ipc-team-host";
 export * from "./ipc-telegram-account-connector";
 export * from "./ipc-vault";
 export * from "./ipc-voice";
+export * from "./ipc-whatsapp-account-connector";
 export * from "./ipc-workflow-github";
 export * from "./ipc-workflows";
 export * from "./marketplace-suggestion-events";

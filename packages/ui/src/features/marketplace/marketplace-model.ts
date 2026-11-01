@@ -90,6 +90,7 @@ const CONNECTOR_SETUP = {
   bitwarden: "vault",
   github: "account",
   "telegram-account": "account",
+  "whatsapp-account": "account",
 } as const satisfies Record<ConnectorId, AppSetup>;
 
 const FLOW_SETUP = {

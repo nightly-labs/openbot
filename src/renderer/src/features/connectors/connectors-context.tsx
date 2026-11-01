@@ -2,6 +2,7 @@ import type { ServerSummary } from "@openbot/contracts/ipc";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/telegram-account-connector-v1";
+import { WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-account-connector-v1";
 import { createMemo } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { resolveCreationModel } from "../agents/agent-creation-model";
@@ -25,6 +26,7 @@ import { hostMessagingApi } from "./host-messaging-port";
 import { localMessagingApi, type MessagingApi, type MessagingConnectorOptions } from "./messaging-connector";
 import { hostOnePasswordConnectorPort } from "./onepassword-connector-port";
 import { hostTelegramAccountConnectorPort } from "./telegram-account-connector-port";
+import { hostWhatsAppAccountConnectorPort } from "./whatsapp-account-connector-port";
 
 const context = createSimpleContext({
   name: "ConnectorsProvider",
@@ -102,21 +104,28 @@ const context = createSimpleContext({
       const telegramAccountTarget = createMemo(() =>
         remoteAdminServer(server(), TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY),
       );
+      const whatsappAccountTarget = createMemo(() =>
+        remoteAdminServer(server(), WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY),
+      );
       const options: MessagingConnectorOptions = {
         agents: agentList,
-        hostName: () => (target() ?? onePasswordTarget() ?? bitwardenTarget() ?? telegramAccountTarget())?.name,
+        hostName: () =>
+          (target() ?? onePasswordTarget() ?? bitwardenTarget() ?? telegramAccountTarget() ?? whatsappAccountTarget())
+            ?.name,
         serverId: () => target()?.id,
       };
       const github = hostGitHubConnectorPort(() => target()?.id);
       const onePassword = hostOnePasswordConnectorPort(() => onePasswordTarget()?.id);
       const bitwarden = hostBitwardenConnectorPort(() => bitwardenTarget()?.id);
       const telegramAccount = hostTelegramAccountConnectorPort(() => telegramAccountTarget()?.id);
+      const whatsappAccount = hostWhatsAppAccountConnectorPort(() => whatsappAccountTarget()?.id);
       const host = createConnectorSet(
         {
           github: () => github,
           onePassword: () => onePassword,
           bitwarden: () => bitwarden,
           telegramAccount: () => telegramAccount,
+          whatsappAccount: () => whatsappAccount,
           messaging: hostMessagingApi(() => target()?.id),
         },
         options,

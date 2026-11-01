@@ -443,6 +443,10 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
     { label: "plugin.link.website", url: "https://telegram.org" },
     { label: "plugin.link.privacyPolicy", url: "https://telegram.org/privacy" },
   ],
+  "whatsapp-account": [
+    { label: "plugin.link.website", url: "https://www.whatsapp.com" },
+    { label: "plugin.link.privacyPolicy", url: "https://www.whatsapp.com/legal/privacy-policy" },
+  ],
 };
 
 /** Who makes each connector's service: the name the user knows it by. */
@@ -454,6 +458,7 @@ const CONNECTOR_DEVELOPER = {
   onepassword: "connector.onePassword.title",
   bitwarden: "connector.bitwarden.title",
   "telegram-account": "connector.telegram.developer",
+  "whatsapp-account": "connector.whatsappAccount.developer",
 } as const satisfies Record<ConnectorId, AppTextKey>;
 
 /** The information card of a connector page: what it gives, its developer, category and website. */

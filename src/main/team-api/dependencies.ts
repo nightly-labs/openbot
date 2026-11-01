@@ -81,6 +81,7 @@ import type { SignInRelayHost } from "../sign-in-relay-host";
 import type { TeamStore } from "../team-store";
 import type { TelegramAccountConnectorService } from "../telegram-account-connector-service";
 import type { VaultService } from "../vault-service";
+import type { WhatsAppAccountConnectorService } from "../whatsapp-account-connector-service";
 
 type TeamApiAgentMethods = Pick<
   AgentService,
@@ -522,6 +523,12 @@ export type TeamApiTelegramAccountConnector = Pick<
   "status" | "connect" | "submit" | "cancel" | "disconnect" | "setSending"
 >;
 
+/** `whatsapp-account-connector-v1`: the WhatsApp account connection of this host, linked by an admin. */
+export type TeamApiWhatsAppAccountConnector = Pick<
+  WhatsAppAccountConnectorService,
+  "status" | "connect" | "submit" | "cancel" | "disconnect" | "setSending"
+>;
+
 /** `vault-v1`: the Vault of this host, for an owner or admin. The route uses no CSV import. */
 export type TeamApiVault = VaultService;
 
@@ -538,6 +545,7 @@ export interface TeamApiOptions {
   onePasswordConnector?: TeamApiOnePasswordConnector | undefined;
   bitwardenConnector?: TeamApiBitwardenConnector | undefined;
   telegramAccountConnector?: TeamApiTelegramAccountConnector | undefined;
+  whatsappAccountConnector?: TeamApiWhatsAppAccountConnector | undefined;
   vault?: TeamApiVault | undefined;
   providerHostSignIns?: TeamApiProviderHostSignIns | undefined;
   providerAccounts?: TeamApiProviderAccounts | undefined;

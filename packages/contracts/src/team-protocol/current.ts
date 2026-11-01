@@ -107,6 +107,7 @@ import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
+import { WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY } from "./whatsapp-account-connector-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
@@ -248,6 +249,7 @@ export {
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
+  WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -380,6 +382,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+  WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -524,7 +527,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CUSTOM_AGENTS_CAPABILITY &&
     capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
     capability !== WORKFLOWS_GITHUB_CAPABILITY &&
-    capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+    capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
+    capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -545,6 +549,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_TASK_CANCEL_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+  WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -648,6 +653,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CUSTOM_AGENTS_CAPABILITY &&
       capability !== CHANNEL_TASK_CANCEL_CAPABILITY &&
       capability !== WORKFLOWS_GITHUB_CAPABILITY &&
-      capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
+      capability !== TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY &&
+      capability !== WHATSAPP_ACCOUNT_CONNECTOR_CAPABILITY,
   );
 }

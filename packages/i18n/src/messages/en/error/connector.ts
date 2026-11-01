@@ -66,4 +66,24 @@ export const messages = defineMessages("error.connector", {
     "Telegram ended this session, for example in Settings > Devices. Connect your Telegram account again.",
   "error.connector.telegramAccountFileUnreadable": "The Telegram account connection file is unreadable.",
   "error.connector.telegramAccountFileTooLarge": "The Telegram account connection file is too large.",
+  // The WhatsApp account connection: each step of the link, the linked device and its files.
+  "error.connector.whatsappAccountPhoneFormat":
+    "Enter the phone number with its country code, for example +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp did not give a code: {detail}",
+  "error.connector.whatsappAccountQrExpired": "The code expired before you used it. Start again.",
+  "error.connector.whatsappAccountTimedOut": "The link stopped after 10 minutes with no activity. Start again.",
+  "error.connector.whatsappAccountMovedOn": "The link has moved to a different step. Start again.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp did not link this device: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot could not save the WhatsApp connection: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp removed this device, for example in Settings > Linked devices. Link your WhatsApp account again.",
+  "error.connector.whatsappAccountReplaced":
+    "Another program opened this linked device, so WhatsApp closed the connection here. Unlink, then link again.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp refused this device. Your number can be limited. Check WhatsApp on your phone.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp no longer accepts this version of the connection. Update OpenBot, then link again.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp is not reachable now. OpenBot tries again. Agents can still read the chats on this computer.",
+  "error.connector.whatsappAccountFileUnreadable": "The WhatsApp account connection file is unreadable.",
 });
