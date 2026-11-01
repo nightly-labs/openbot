@@ -246,7 +246,8 @@ export const messages = {
   "connector.discord.accessHostUpdate": "请更新 {host} 上的 OpenBot，以选择角色。",
   // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
   // Orchestrator agent receives the messages of all chats, asks the team and answers.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "把 OpenBot 机器人加入 Telegram 群组，或与它开启私聊。Telegram 调度助手会找到合适的助手来回答。",
   "connector.telegram.statusConnected": "已连接",

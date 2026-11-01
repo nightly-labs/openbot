@@ -219,7 +219,8 @@ export const messages = {
   "connector.discord.accessSave": "저장",
   "connector.discord.accessHostUpdate": "역할을 선택하려면 {host}의 OpenBot을 업데이트하세요.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "OpenBot 봇을 Telegram 그룹에 추가하거나 봇과 1:1 채팅을 시작하세요. Telegram 오케스트레이터가 알맞은 에이전트에게 물어보고 답해요.",
   "connector.telegram.statusConnected": "연결됨",

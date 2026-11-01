@@ -270,7 +270,8 @@ export const messages = {
   "connector.discord.accessSave": "Zapisz",
   "connector.discord.accessHostUpdate": "Zaktualizuj OpenBot na {host}, aby wybrać role.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Dodaj bota OpenBot do grupy Telegram lub otwórz z nim czat prywatny. Telegram Orchestrator pyta odpowiedniego agenta i odpowiada.",
   "connector.telegram.statusConnected": "Połączono",

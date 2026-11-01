@@ -274,7 +274,8 @@ export const messages = {
   "connector.discord.accessHostUpdate": "Rol seçmek için {host} üzerindeki OpenBot'u güncelleyin.",
   // Sunucu ayarları > Bağlayıcılar > Telegram: her sohbet tek OpenBot botunu ekler ve Telegram
   // Düzenleyicisi ajanı tüm sohbetlerin mesajlarını alır, ekibe sorar ve yanıtlar.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "OpenBot botunu bir Telegram grubuna ekleyin veya botla doğrudan bir sohbet açın. Telegram Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.telegram.statusConnected": "Bağlandı",

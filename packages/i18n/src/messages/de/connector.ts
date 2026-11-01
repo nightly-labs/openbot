@@ -254,7 +254,8 @@ export const messages = {
   "connector.discord.accessRoleDeleted": "{role} (gelöscht)",
   "connector.discord.accessSave": "Speichern",
   "connector.discord.accessHostUpdate": "Aktualisiere OpenBot auf {host}, um Rollen zu wählen.",
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Füge den OpenBot-Bot zu einer Telegram-Gruppe hinzu oder öffne einen direkten Chat mit ihm. Der Telegram-Orchestrator fragt den passenden Agenten und antwortet.",
   "connector.telegram.statusConnected": "Verbunden",

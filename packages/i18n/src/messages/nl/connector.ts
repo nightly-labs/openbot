@@ -241,7 +241,8 @@ export const messages = {
   "connector.discord.accessSave": "Opslaan",
   "connector.discord.accessHostUpdate": "Werk OpenBot bij op {host} om rollen te kiezen.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Voeg de OpenBot-bot toe aan een Telegram-groep of open een directe chat ermee. De Telegram Orchestrator vraagt de juiste agent en antwoordt.",
   "connector.telegram.statusConnected": "Verbonden",

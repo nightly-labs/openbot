@@ -249,7 +249,8 @@ export const messages = {
   "connector.discord.accessHostUpdate": "ロールを選択するには、{host} の OpenBot を更新してください。",
 
   // Marketplace > Apps > Telegram.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
   "connector.telegram.statusConnected": "接続済み",

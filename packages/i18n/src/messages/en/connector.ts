@@ -272,7 +272,8 @@ export const messages = defineMessages("connector", {
 
   // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
   // Orchestrator agent receives the messages of all chats, asks the team and answers.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Add the OpenBot bot to a Telegram group or open a direct chat with it. The Telegram Orchestrator asks the right agent and answers.",
   "connector.telegram.statusConnected": "Connected",
