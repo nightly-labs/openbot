@@ -49,6 +49,13 @@ export const GITHUB_CONNECTOR_MCP_SERVER_ID = "openbot-github";
 export const GITHUB_CONNECTOR_MCP_SERVER_NAME = "github";
 export const GITHUB_CONNECTOR_MCP_SERVER_URL = "https://api.githubcopilot.com/mcp/";
 
+/**
+ * The id and name of the loopback MCP server that the Telegram account connection hands to agents.
+ * When an enabled row already has this name, the built-in entry is not added.
+ */
+export const TELEGRAM_ACCOUNT_MCP_SERVER_ID = "openbot-telegram-account";
+export const TELEGRAM_ACCOUNT_MCP_SERVER_NAME = "telegram";
+
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];

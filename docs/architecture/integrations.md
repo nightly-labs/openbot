@@ -383,6 +383,7 @@ state on each of them.
 | Telegram | `src/backend/messaging/telegram/` | A one-use link code in a `t.me` link. No OAuth | `telegram-app.ts`, `ipc-messaging.ts` |
 | 1Password | [`onepassword-connector-service.ts`](../../src/main/onepassword-connector-service.ts) | The user's `op` session creates a read-only service account, or the user pastes a token | `ipc-onepassword-connector.ts`; joined server: `onepassword-connector-v1` (token only) |
 | Bitwarden | [`bitwarden-connector-service.ts`](../../src/main/bitwarden-connector-service.ts) | A `bw` session key, kept in memory only; a joined server signs in with an API key and the master password | `ipc-bitwarden-connector.ts`; joined server: `bitwarden-connector-v1` |
+| Telegram account | [`telegram-account-connector-service.ts`](../../src/main/telegram-account-connector-service.ts), `telegram-account-sign-in.ts`, `telegram-account-client.ts` (GramJS) | The user's own account over MTProto, with the user's api_id and api_hash: a QR code scanned in Telegram on the phone, or the number, the code and the two-step password. Agents get the loopback MCP server `telegram-account-mcp-server.ts` | `ipc-telegram-account-connector.ts`; joined server: `telegram-account-connector-v1` |
 
 To add a connector:
 
@@ -453,6 +454,19 @@ carries 1Password. A server often has no screen for the 1Password app, so an own
 service account token in Marketplace › Apps › 1Password. The token goes to the host once, in `connect`. The
 host checks it with 1Password and keeps it in its own encrypted store. No answer carries it. Status
 and disconnect act on that host only. A host older than this capability hides 1Password.
+
+The optional capability `telegram-account-connector-v1`
+([`telegram-account-connector-v1.ts`](../../packages/contracts/src/team-protocol/telegram-account-connector-v1.ts),
+host route [`route-telegram-account-connector.ts`](../../src/main/team-api/route-telegram-account-connector.ts))
+carries the Telegram account connection, which is not the OpenBot Telegram bot of `connectors-v1`.
+The host runs the sign-in and keeps the session; an owner or admin follows its steps in Marketplace ›
+Apps › Telegram account. `connect` can carry the api_id and api_hash, and `submit` carries the phone
+number, the code or the two-step password, one value per call; the host registers each one for
+redaction, and no answer carries them. A QR sign-in needs nothing from the client but the picture of
+`qrUrl`, which only an admin gets. The client reads `status` until the state changes, as for
+Bitwarden. While the host is signed in, its agents get the Telegram MCP server; sending and marking
+as read stay refused until the admin turns sending on. A host older than this capability hides the
+Telegram account.
 
 ### Bitwarden on a joined server
 

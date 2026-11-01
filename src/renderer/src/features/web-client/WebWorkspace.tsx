@@ -233,6 +233,7 @@ import { webRoutineFlowsHost } from "./web-routine-flows";
 import { webScheduleSource } from "./web-schedule";
 import { createWebServerSettings } from "./web-server-settings";
 import { webTasksSource } from "./web-tasks";
+import { webTelegramAccountConnectorPort } from "./web-telegram-account-connector";
 import { createWebUsagePort } from "./web-usage-port";
 import { webVaultCalls } from "./web-vault";
 
@@ -927,6 +928,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const githubPort = webGitHubConnectorPort(() => hostRequest());
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
+  const telegramAccountPort = webTelegramAccountConnectorPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -938,6 +940,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         github: () => githubPort,
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
+        telegramAccount: () => telegramAccountPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,

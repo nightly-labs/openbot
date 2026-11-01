@@ -114,6 +114,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY,
   type TeamCurrentCapability,
   teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
@@ -272,6 +273,7 @@ import { routeSignInRelay } from "./team-api/route-sign-in-relay";
 import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
+import { routeTelegramAccountConnector } from "./team-api/route-telegram-account-connector";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeWorkflows } from "./team-api/route-workflows";
@@ -955,6 +957,7 @@ export class TeamApiServer {
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
+      if ((await routeTelegramAccountConnector(context, this.#options.telegramAccountConnector)) === "handled") return;
       if ((await routeVault(context, this.#options.vault)) === "handled") return;
       if ((await routeVaultImport(context, this.#options.vault)) === "handled") return;
       if ((await routeProviderHostSignIn(context, this.#options.providerHostSignIns)) === "handled") return;
@@ -2055,6 +2058,8 @@ export class TeamApiServer {
           if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
+          if (capability === TELEGRAM_ACCOUNT_CONNECTOR_CAPABILITY)
+            return this.#options.telegramAccountConnector !== undefined;
           if (capability === VAULT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === BROWSER_SECRET_VAULT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;

@@ -77,6 +77,7 @@ import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
+import { TELEGRAM_ACCOUNT_CONNECTOR_CODECS } from "./telegram-account-connector-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
@@ -150,6 +151,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_SIGN_OUT_CODECS,
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
+  ...TELEGRAM_ACCOUNT_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,
   ...AGENT_HIDDEN_CODECS,
   ...AGENT_NOTIFICATION_LEVELS_CODECS,

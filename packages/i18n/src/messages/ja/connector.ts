@@ -420,4 +420,79 @@ export const messages = {
   "connector.bitwarden.clientSecret": "API キーの client_secret",
   "connector.bitwarden.masterPassword": "マスターパスワード",
   "connector.bitwarden.connecting": "接続中",
+  "connector.telegramAccount.title": "Telegram アカウント",
+  "connector.telegramAccount.description":
+    "エージェントがあなたの Telegram のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.telegramAccount.descriptionHost":
+    "{host} のエージェントがあなたの Telegram のチャットを読み、許可すればあなたとしてメッセージを送信できます。",
+  "connector.telegramAccount.statusConnecting": "サインイン中",
+  "connector.telegramAccount.statusConnected": "接続済み",
+  "connector.telegramAccount.actionFailed": "OpenBot は Telegram アカウントの接続を変更できませんでした。",
+  "connector.telegramAccount.disconnectTitle": "Telegram アカウントの接続を解除",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot はこのセッションからサインアウトします。エージェントはメッセージを読むことも送ることもできなくなり、送信はオフになります。",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} はこのセッションからサインアウトします。{host} のエージェントはメッセージを読むことも送ることもできなくなり、送信はオフになります。",
+  "connector.telegramAccount.disconnect": "接続解除",
+  "connector.telegramAccount.signInTitle": "サインイン",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot は Telegram Desktop と同じように、あなた自身の Telegram アカウントにサインインします。セッションはこのコンピューターに暗号化して保存されます。Telegram の「設定 › デバイス」に OpenBot として表示されます。",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} は Telegram Desktop と同じように、あなた自身の Telegram アカウントにサインインします。セッションは {host} に暗号化して保存されます。Telegram の「設定 › デバイス」に OpenBot として表示されます。",
+  "connector.telegramAccount.signInProgress":
+    "サインインするには、下の手順を行ってください。キャンセルするとサインインを中止します。",
+  "connector.telegramAccount.methodTitle": "サインイン方法",
+  "connector.telegramAccount.methodQrDescription": "スマートフォンの Telegram でコードをスキャンします。",
+  "connector.telegramAccount.methodPhoneDescription": "電話番号と、Telegram から届くコードを入力します。",
+  "connector.telegramAccount.methodQr": "QR コード",
+  "connector.telegramAccount.methodPhone": "電話番号",
+  "connector.telegramAccount.credentialsTitle": "api_id と api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot は my.telegram.org で作成したあなた自身の Telegram アプリを使います。最初のサインイン後は、このコンピューターがその api_id と api_hash を保持します。",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot は my.telegram.org で作成したあなた自身の Telegram アプリを使います。最初のサインイン後は、{host} がその api_id と api_hash を保持します。",
+  "connector.telegramAccount.credentialsOpen": "入力",
+  "connector.telegramAccount.credentialsHelp":
+    "my.telegram.org にサインインし、API development tools を開いてアプリを作成します。その api_id と api_hash をここにコピーしてください。",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "my.telegram.org を開く",
+  "connector.telegramAccount.openAppsFailed": "OpenBot は my.telegram.org を開けませんでした。",
+  "connector.telegramAccount.connect": "接続",
+  "connector.telegramAccount.sendingOffNote": "送信をオンにするまで、エージェントはチャットを読むことしかできません。",
+  "connector.telegramAccount.devicesNote":
+    "Telegram の「設定 › デバイス」に、このセッションが OpenBot として表示されます。そこで終了すると、OpenBot の接続は解除されます。",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram の「設定 › デバイス」に、このセッションが OpenBot として表示されます。そこで終了すると、{host} の接続は解除されます。",
+  "connector.telegramAccount.connecting": "Telegram に接続中",
+  "connector.telegramAccount.connectingDescription":
+    "このコンピューターが Telegram と通信しています。数秒かかることがあります。",
+  "connector.telegramAccount.connectingHost": "{host} が Telegram と通信しています。数秒かかることがあります。",
+  "connector.telegramAccount.qrLabel": "Telegram にサインインする QR コード",
+  "connector.telegramAccount.qrTitle": "スマートフォンの Telegram でこのコードをスキャン",
+  "connector.telegramAccount.qrStepOpen": "スマートフォンで Telegram を開きます。",
+  "connector.telegramAccount.qrStepDevices": "「設定 › デバイス › デスクトップ端末をリンク」を開きます。",
+  "connector.telegramAccount.qrStepScan": "スマートフォンをこのコードに向けます。",
+  "connector.telegramAccount.qrRefresh": "コードは約 30 秒ごとに変わります。最新のコードをスキャンしてください。",
+  "connector.telegramAccount.usePhone": "電話番号を使う",
+  "connector.telegramAccount.phoneDescription": "Telegram アカウントの電話番号を国番号付きで入力してください。",
+  "connector.telegramAccount.phoneLabel": "電話番号",
+  "connector.telegramAccount.sendCode": "コードを送信",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "QR コードを使う",
+  "connector.telegramAccount.codeViaApp": "Telegram が、ほかのデバイスの Telegram アプリにコードを送信しました。",
+  "connector.telegramAccount.codeViaSms": "Telegram が SMS でコードを送信しました。",
+  "connector.telegramAccount.codeDescription": "Telegram から届いたコードを入力してください。",
+  "connector.telegramAccount.codeLabel": "コード",
+  "connector.telegramAccount.signIn": "サインイン",
+  "connector.telegramAccount.passwordDescription":
+    "このアカウントには 2 段階認証が設定されています。そのパスワードを入力してください。",
+  "connector.telegramAccount.passwordHint": "ヒント: {hint}",
+  "connector.telegramAccount.passwordLabel": "2 段階認証のパスワード",
+  "connector.telegramAccount.accountTitle": "アカウント",
+  "connector.telegramAccount.accountDescription":
+    "このコンピューターのエージェントは、この Telegram アカウントを使います。",
+  "connector.telegramAccount.accountDescriptionHost": "{host} のエージェントは、この Telegram アカウントを使います。",
+  "connector.telegramAccount.sendingLabel": "エージェントにメッセージの送信とチャットの既読化を許可",
+  "connector.telegramAccount.sendingDescription": "オフの場合、エージェントはチャットを読むことしかできません。",
 } as const satisfies PartialTranslation<typeof source>;

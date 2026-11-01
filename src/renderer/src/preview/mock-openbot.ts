@@ -210,6 +210,7 @@ import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
 import { createMockStorage } from "./mock-storage";
 import { clone, type Listener, type MockRuntime, matchesQuery } from "./mock-support";
 import { createMockTeam, type MockTeamOptions } from "./mock-team";
+import { createMockTelegramAccountConnector } from "./mock-telegram-account-connector";
 import { createMockVault } from "./mock-vault";
 import { createMockVoice, type MockVoiceOptions } from "./mock-voice";
 import { type MockWorkflowSeed, mockWorkflows } from "./mock-workflows";
@@ -1449,6 +1450,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     githubConnector: createMockGitHubConnector(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
+    telegramAccountConnector: createMockTelegramAccountConnector(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
     license: createMockLicense(),

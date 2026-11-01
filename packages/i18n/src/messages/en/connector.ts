@@ -453,4 +453,77 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.clientSecret": "API key client_secret",
   "connector.bitwarden.masterPassword": "Master password",
   "connector.bitwarden.connecting": "Connecting",
+  // Marketplace > Apps > Telegram account: OpenBot signs in to the user's own Telegram account.
+  "connector.telegramAccount.title": "Telegram account",
+  "connector.telegramAccount.description":
+    "Agents can read your Telegram chats and, when you let them, send messages as you.",
+  "connector.telegramAccount.descriptionHost":
+    "Agents on {host} can read your Telegram chats and, when you let them, send messages as you.",
+  "connector.telegramAccount.statusConnecting": "Signing in",
+  "connector.telegramAccount.statusConnected": "Connected",
+  "connector.telegramAccount.actionFailed": "OpenBot could not change the Telegram account connection.",
+  "connector.telegramAccount.disconnectTitle": "Disconnect Telegram account",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot signs out of this session. Agents can no longer read or send messages, and sending turns off.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} signs out of this session. Agents on {host} can no longer read or send messages, and sending turns off.",
+  "connector.telegramAccount.disconnect": "Disconnect",
+  "connector.telegramAccount.signInTitle": "Sign in",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot signs in to your own Telegram account, as Telegram Desktop does. The session stays encrypted on this computer. Telegram shows it in Settings › Devices as OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} signs in to your own Telegram account, as Telegram Desktop does. The session stays encrypted on {host}. Telegram shows it in Settings › Devices as OpenBot.",
+  "connector.telegramAccount.signInProgress": "Do the step below to sign in. Cancel stops the sign-in.",
+  "connector.telegramAccount.methodTitle": "Sign in with",
+  "connector.telegramAccount.methodQrDescription": "Scan a code with Telegram on your phone.",
+  "connector.telegramAccount.methodPhoneDescription": "Type your phone number and the code that Telegram sends you.",
+  "connector.telegramAccount.methodQr": "QR code",
+  "connector.telegramAccount.methodPhone": "Phone number",
+  "connector.telegramAccount.credentialsTitle": "api_id and api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot uses your own Telegram app from my.telegram.org. After the first sign-in, this computer keeps its api_id and api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot uses your own Telegram app from my.telegram.org. After the first sign-in, {host} keeps its api_id and api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Enter",
+  "connector.telegramAccount.credentialsHelp":
+    "Sign in at my.telegram.org, open API development tools and create an app. Copy its api_id and api_hash here.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "Open my.telegram.org",
+  "connector.telegramAccount.openAppsFailed": "OpenBot could not open my.telegram.org.",
+  "connector.telegramAccount.connect": "Connect",
+  "connector.telegramAccount.sendingOffNote": "Agents can only read your chats until you turn on sending.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram shows this session in Settings › Devices as OpenBot. When you end it there, OpenBot disconnects.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram shows this session in Settings › Devices as OpenBot. When you end it there, {host} disconnects.",
+  "connector.telegramAccount.connecting": "Connecting to Telegram",
+  "connector.telegramAccount.connectingDescription": "This computer talks to Telegram. This can take a few seconds.",
+  "connector.telegramAccount.connectingHost": "{host} talks to Telegram. This can take a few seconds.",
+  "connector.telegramAccount.qrLabel": "QR code to sign in to Telegram",
+  "connector.telegramAccount.qrTitle": "Scan this code with Telegram on your phone",
+  "connector.telegramAccount.qrStepOpen": "Open Telegram on your phone.",
+  "connector.telegramAccount.qrStepDevices": "Go to Settings › Devices › Link Desktop Device.",
+  "connector.telegramAccount.qrStepScan": "Point your phone at this code.",
+  "connector.telegramAccount.qrRefresh": "The code changes about every 30 seconds. Scan the newest one.",
+  "connector.telegramAccount.usePhone": "Use phone number",
+  "connector.telegramAccount.phoneDescription":
+    "Type the phone number of your Telegram account, with its country code.",
+  "connector.telegramAccount.phoneLabel": "Phone number",
+  "connector.telegramAccount.sendCode": "Send code",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "Use QR code",
+  "connector.telegramAccount.codeViaApp": "Telegram sent a code to the Telegram app on your other devices.",
+  "connector.telegramAccount.codeViaSms": "Telegram sent a code by SMS.",
+  "connector.telegramAccount.codeDescription": "Type the code that Telegram sent you.",
+  "connector.telegramAccount.codeLabel": "Code",
+  "connector.telegramAccount.signIn": "Sign in",
+  "connector.telegramAccount.passwordDescription": "Your account has two-step verification. Type its password.",
+  "connector.telegramAccount.passwordHint": "Hint: {hint}",
+  "connector.telegramAccount.passwordLabel": "Two-step verification password",
+  "connector.telegramAccount.accountTitle": "Account",
+  "connector.telegramAccount.accountDescription": "Agents on this computer use this Telegram account.",
+  "connector.telegramAccount.accountDescriptionHost": "Agents on {host} use this Telegram account.",
+  "connector.telegramAccount.sendingLabel": "Let agents send messages and mark chats as read",
+  "connector.telegramAccount.sendingDescription": "When this is off, agents can only read your chats.",
 });

@@ -498,6 +498,11 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
+import type {
+  TelegramAccountConnectInput,
+  TelegramAccountConnectorStatus,
+  TelegramAccountSubmitInput,
+} from "./ipc-telegram-account-connector";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
 import type {
   SpeechAudio,
@@ -1235,6 +1240,35 @@ export const IPC_ENDPOINTS = {
     ),
     hostDisconnect: scopedQuery<OnePasswordConnectorStatus, "required">()("onepassword-connector:host-disconnect"),
   },
+  // The Telegram account connection of this computer: OpenBot signs in to the user's own Telegram
+  // account. `connect` can carry the API credentials and `submit` carries a phone number, a code or a
+  // two-step password, once each; every answer is the status only. The `host*` endpoints do the same
+  // for a joined server (`telegram-account-connector-v1`): the host runs the sign-in and keeps the session.
+  telegramAccountConnector: {
+    status: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:status"),
+    connect: request<TelegramAccountConnectInput, TelegramAccountConnectorStatus>()(
+      "telegram-account-connector:connect",
+    ),
+    submit: request<TelegramAccountSubmitInput, TelegramAccountConnectorStatus>()("telegram-account-connector:submit"),
+    cancel: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:cancel"),
+    disconnect: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:disconnect"),
+    setSending: request<boolean, TelegramAccountConnectorStatus>()("telegram-account-connector:set-sending"),
+    changed: event<TelegramAccountConnectorStatus>()("telegram-account-connector:changed"),
+    hostStatus: scopedQuery<TelegramAccountConnectorStatus, "required">()("telegram-account-connector:host-status"),
+    hostConnect: scopedRequest<TelegramAccountConnectInput, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-connect",
+    ),
+    hostSubmit: scopedRequest<TelegramAccountSubmitInput, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-submit",
+    ),
+    hostCancel: scopedQuery<TelegramAccountConnectorStatus, "required">()("telegram-account-connector:host-cancel"),
+    hostDisconnect: scopedQuery<TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-disconnect",
+    ),
+    hostSetSending: scopedRequest<boolean, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-set-sending",
+    ),
+  },
   hostedSites: {
     // The sites of one server. A joined server answers through `hosted-sites-v1`.
     list: scopedQuery<HostedSiteList, "required">()("hosted-sites:list"),
@@ -1922,6 +1956,7 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  telegramAccountConnector: "telegramAccountConnector",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",

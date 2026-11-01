@@ -164,7 +164,12 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import { MailboxSync } from "./agent/mailbox-sync";
-import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
+import {
+  type GitHubConnectorSource,
+  McpGateway,
+  type TelegramAccountConnectorSource,
+  type TestMcpServerOptions,
+} from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
@@ -387,6 +392,11 @@ export interface AgentServiceOptions {
    * for the same reason as `computerUseMcpServer`: the user connects and disconnects while OpenBot runs.
    */
   githubConnector?: GitHubConnectorSource | null;
+  /**
+   * The Telegram account connection of this computer, or `null`. Read at each spawn and each
+   * hand-off, as `githubConnector` is.
+   */
+  telegramAccountConnector?: TelegramAccountConnectorSource | null;
   /** The 1Password vault the user shared with OpenBot, or `null`. The browser fills logins from it. */
   passwordVault?: PasswordVault | null;
   /** The cards and contact info of the Vault, or `null`. The browser fills cards from it. */
@@ -505,6 +515,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       developmentDefaults = false,
       computerUseMcpServer = () => null,
       githubConnector = null,
+      telegramAccountConnector = null,
       hostMemory = null,
       busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
     } = options;
@@ -520,6 +531,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       credentials,
       computerUseMcpServer,
       githubConnector,
+      telegramAccountConnector,
       agents: () => store.list(),
       logger,
       hooks: {
@@ -2105,6 +2117,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   earliestRunningTurnStartedAt(): number | null {
     return this.#turn.earliestRunningTurnStartedAt();
+  }
+
+  /**
+   * The Telegram account was connected or disconnected, or its session ended. The same treatment as
+   * the Computer Use entry: the agents are marked for a fresh provider session with the new tool list.
+   */
+  notifyTelegramAccountConnectorChanged(): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#mcp.changed().pipe(
+      Effect.asVoid,
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "refresh Telegram tools", cause: failure.cause }),
+      ),
+    );
   }
 
   /**

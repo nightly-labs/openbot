@@ -92,6 +92,7 @@ export const messages = {
   "marketplace.app.discordTagline": "Vermeldingen en privéberichten in Discord",
   "marketplace.app.telegramTagline": "Groepen en privéchats in Telegram",
   "marketplace.app.bitwardenTagline": "Log in op sites met logins uit een gedeelde map",
+  "marketplace.app.telegramAccountTagline": "Berichten lezen en sturen als jou in Telegram",
   "marketplace.app.onePasswordCategory": "Beheer van logins en inloggegevens",
   "marketplace.app.yourApps": "Jouw apps",
   "marketplace.app.addCustom": "Eigen toevoegen",

@@ -53,4 +53,10 @@ export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>>
     category: "productivity",
     Mark: () => <Lock aria-hidden="true" />,
   },
+  "telegram-account": {
+    title: "connector.telegramAccount.title",
+    tagline: "marketplace.app.telegramAccountTagline",
+    category: "productivity",
+    Mark: () => <TelegramMark />,
+  },
 };

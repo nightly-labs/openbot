@@ -143,3 +143,6 @@ export const TelegramConnected = connector("telegram");
 export const OnePasswordConnected = connector("onepassword");
 
 export const BitwardenConnected = connector("bitwarden");
+
+/** The user's own Telegram account, connected, with sending off. */
+export const TelegramAccountConnected = connector("telegram-account");
