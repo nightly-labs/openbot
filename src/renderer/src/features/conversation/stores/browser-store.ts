@@ -96,7 +96,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsTab(agent, tab));
   const browserTabs = createMemo(() => {
     const agent = deps.props.agent;
-    return agent ? tabsOwnedBy(agent) : [];
+    return agent
+      ? tabsOwnedBy(agent)
+      : deps.props.channel
+        ? allBrowserTabs().filter((tab) => !tab.ownerAgentId && !tab.ownerThreadId)
+        : [];
   });
   const closingBrowserTabIds = new Set<string>();
   createEffect(
