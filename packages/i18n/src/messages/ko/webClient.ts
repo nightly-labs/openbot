@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "호스팅 서버 만들기",
   "webClient.notice.join": "초대로 참여",
   "webClient.notice.refreshHosts": "서버 새로 고침",
+  "webClient.otherTab.title": "{name}이(가) 다른 탭에서 열려 있습니다",
+  "webClient.otherTab.description": "OpenBot은 한 번에 하나의 탭에서만 서버를 사용할 수 있습니다.",
+  "webClient.otherTab.useHere": "여기서 사용",
   "webClient.agent.modelsFailed": "서버 모델을 불러올 수 없었어요.",
   "webClient.agent.refreshFailed":
     "에이전트를 만들었지만 워크스페이스를 새로 고치지 못했어요. 다시 시도하기 전에 페이지를 새로 고쳐 주세요.",

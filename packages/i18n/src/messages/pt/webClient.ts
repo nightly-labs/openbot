@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Criar servidor hospedado",
   "webClient.notice.join": "Entrar com convite",
   "webClient.notice.refreshHosts": "Atualizar servidores",
+  "webClient.otherTab.title": "{name} está aberto em outra aba",
+  "webClient.otherTab.description": "O OpenBot pode usar um servidor em uma aba de cada vez.",
+  "webClient.otherTab.useHere": "Usar aqui",
   "webClient.agent.modelsFailed": "Não foi possível carregar os modelos do servidor.",
   "webClient.agent.refreshFailed":
     "O agente foi criado, mas não foi possível atualizar o espaço de trabalho. Recarregue antes de tentar novamente.",

@@ -418,3 +418,12 @@
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
 }
+
+/* Takes the whole window in place of the workspace. */
+.web-other-tab.web-connect.conversation-panel {
+  height: 100%;
+}
+
+.web-other-tab-use.ui-button {
+  min-width: 200px;
+}

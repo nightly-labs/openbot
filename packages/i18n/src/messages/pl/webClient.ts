@@ -34,6 +34,9 @@ export const messages = {
   "webClient.notice.createServer": "Utwórz hostowany serwer",
   "webClient.notice.join": "Dołącz przez zaproszenie",
   "webClient.notice.refreshHosts": "Odśwież serwery",
+  "webClient.otherTab.title": "{name} jest otwarty w innej karcie",
+  "webClient.otherTab.description": "OpenBot może używać serwera tylko w jednej karcie naraz.",
+  "webClient.otherTab.useHere": "Użyj tutaj",
   "webClient.agent.modelsFailed": "Nie udało się wczytać modeli serwera.",
   "webClient.agent.refreshFailed":
     "Agent został utworzony, ale nie udało się odświeżyć obszaru roboczego. Przeładuj stronę, zanim spróbujesz ponownie.",

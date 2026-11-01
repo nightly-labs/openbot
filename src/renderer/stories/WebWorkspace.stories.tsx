@@ -10,6 +10,7 @@ import { Toaster } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import type { WebRuntimeFactory } from "../src/features/web-client/web-client-context";
+import { WebHostOtherTabError } from "../src/features/web-client/web-host-lock";
 import { WebHostIncompatibleError } from "../src/features/web-client/web-runtime";
 import { createBenchWebRuntime } from "../src/preview/bench-web-runtime";
 import { mockAccountCatalogFetch } from "../src/preview/mock-account-catalog";
@@ -71,12 +72,17 @@ const failedHostsRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
-const otherTabRuntime: WebRuntimeFactory = (...args) => ({
-  ...createMockWebRuntime(...args),
-  connect: async () => {
-    throw new Error("This host is open in another tab. Close that connection before trying again.");
-  },
-});
+/** Another tab has the host open until "Use here" takes it. */
+const otherTabRuntime: WebRuntimeFactory = (...args) => {
+  const runtime = createMockWebRuntime(...args);
+  return {
+    ...runtime,
+    connect: async (host, options) => {
+      if (!options?.takeOver) throw new WebHostOtherTabError();
+      return runtime.connect(host, options);
+    },
+  };
+};
 
 const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
   ...createMockWebRuntime(...args),
@@ -96,7 +102,7 @@ export const HostsFailed: Story = {
   args: { accountEmail: "you@example.com", createRuntime: failedHostsRuntime },
 };
 
-export const Disconnected: Story = {
+export const OpenInAnotherTab: Story = {
   args: { accountEmail: "you@example.com", createRuntime: otherTabRuntime },
 };
 

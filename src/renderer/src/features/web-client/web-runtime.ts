@@ -208,7 +208,8 @@ export interface WebWorkspaceRuntime {
   removeOwnedHost?: (hostId: string) => Promise<void>;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
-  connect(host: RemoteTeamHost): Promise<string[]>;
+  /** With `takeOver`, a tab that has the host open closes it, and `hostTaken` tells that tab. */
+  connect(host: RemoteTeamHost, options?: { takeOver?: boolean }): Promise<string[]>;
   disconnect(): Promise<void>;
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
@@ -310,6 +311,8 @@ export interface WebRuntimeEvents {
   hostState?(hostId: string, state: WebHostState): void;
   /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
+  /** Another tab took the host that this tab has open. The runtime closes it after this call. */
+  hostTaken?(hostId: string): void;
   /** An event of a host this tab has not opened that a notification can show. */
   hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
@@ -450,15 +453,22 @@ export function createWebWorkspaceRuntime(
           : {}),
       })
     : undefined;
-  // Another tab asks for the host that this tab has open: it stays here.
+  // Another tab asks for the host that this tab has open: it stays here, unless the user takes it there.
   hostChannel?.addEventListener("message", (event) => {
     const message = decodeWebHostTabMessage(event.data);
-    if (message?.type === "release" && message.hostId === lockedHostId)
+    if (!message || disposed || !("requestId" in message) || message.hostId !== lockedHostId) return;
+    if (message.type === "release")
       hostChannel.postMessage({
         type: "busy",
         hostId: message.hostId,
         requestId: message.requestId,
       } satisfies WebHostTabMessage);
+    else if (message.type === "take") {
+      events.hostTaken?.(message.hostId);
+      // The selection stays, so no status connection of this tab asks for the host again.
+      hosts?.holdSelected(message.hostId, false);
+      void closeOpenedHost().catch(() => undefined);
+    }
   });
   let connecting: Promise<unknown> | null = null;
   let disposed = false;
@@ -655,7 +665,24 @@ export function createWebWorkspaceRuntime(
   const emitView = (event: BrowserLiveViewEvent) => {
     for (const listener of viewListeners) listener(event);
   };
-  async function connectHost(host: RemoteTeamHost): Promise<string[]> {
+  /** Ends the connection of the opened host and gives up its lock. */
+  async function closeOpenedHost(): Promise<void> {
+    const hostForCleanup = lockedHostId;
+    try {
+      await peer.cancelUpload().catch(() => undefined);
+      await discardCompletedDrafts(hostForCleanup);
+      generation += 1;
+      await releaseLiveView();
+      browserView.disconnect();
+      await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
+    } finally {
+      releaseHostLock?.();
+      releaseHostLock = null;
+      lockedHostId = null;
+      connectedHost = null;
+    }
+  }
+  async function connectHost(host: RemoteTeamHost, takeOver: boolean): Promise<string[]> {
     try {
       await peer.cancelUpload().catch(() => undefined);
       const switchingHost = lockedHostId !== host.hostId;
@@ -675,6 +702,8 @@ export function createWebWorkspaceRuntime(
           host.hostId,
           hostChannel,
           dependencies.acquireHostLock,
+          undefined,
+          takeOver,
         );
         if (disposed) {
           release();
@@ -883,7 +912,7 @@ export function createWebWorkspaceRuntime(
       };
     },
     acceptInvite: (url) => runTeamEffect(directory.acceptInvite(url)),
-    async connect(host) {
+    async connect(host, options) {
       // An attempt that waits for an offline host has no deadline, so another host replaces it.
       if (connecting && waitingHostId !== null && waitingHostId !== host.hostId) {
         const previous = connecting;
@@ -891,7 +920,7 @@ export function createWebWorkspaceRuntime(
         await previous.catch(() => undefined);
       }
       if (connecting || disposed) throw new Error(currentText().t("webClient.error.connectionChanging"));
-      const attempt = connectHost(host);
+      const attempt = connectHost(host, options?.takeOver === true);
       connecting = attempt;
       try {
         return await attempt;
@@ -903,19 +932,9 @@ export function createWebWorkspaceRuntime(
       }
     },
     async disconnect() {
-      const hostForCleanup = lockedHostId;
       try {
-        await peer.cancelUpload().catch(() => undefined);
-        await discardCompletedDrafts(hostForCleanup);
-        generation += 1;
-        await releaseLiveView();
-        browserView.disconnect();
-        await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
+        await closeOpenedHost();
       } finally {
-        releaseHostLock?.();
-        releaseHostLock = null;
-        lockedHostId = null;
-        connectedHost = null;
         void hosts?.select(null);
       }
     },

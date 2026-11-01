@@ -33,6 +33,9 @@ export const messages = defineMessages("webClient", {
   "webClient.notice.createServer": "Create a hosted server",
   "webClient.notice.join": "Join with invitation",
   "webClient.notice.refreshHosts": "Refresh servers",
+  "webClient.otherTab.title": "{name} is open in another tab",
+  "webClient.otherTab.description": "OpenBot can use a server in one tab at a time.",
+  "webClient.otherTab.useHere": "Use here",
   "webClient.agent.modelsFailed": "Could not load the server models.",
   "webClient.agent.refreshFailed":
     "The agent was created, but the workspace could not refresh. Reload before trying again.",
