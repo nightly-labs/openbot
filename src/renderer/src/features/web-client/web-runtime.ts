@@ -467,10 +467,11 @@ export function createWebWorkspaceRuntime(
       events.hostTaken?.(message.hostId);
       // The selection stays, so no status connection of this tab asks for the host again.
       hosts?.holdSelected(message.hostId, false);
-      void closeOpenedHost().catch(() => undefined);
+      void giveUpHost(message.hostId).catch(() => undefined);
     }
   });
   let connecting: Promise<unknown> | null = null;
+  let connectingHostId: string | null = null;
   let disposed = false;
   let generation = 0;
   let uploadGeneration = 0;
@@ -681,6 +682,19 @@ export function createWebWorkspaceRuntime(
       lockedHostId = null;
       connectedHost = null;
     }
+  }
+  /**
+   * Closes a host that another tab takes. An attempt in progress ends first: a reconnect keeps the lock and
+   * does not acquire it again, so a close before its `connect` leaves a peer without the lock.
+   */
+  async function giveUpHost(hostId: string): Promise<void> {
+    const attempt = connecting;
+    if (attempt) {
+      if (connectingHostId === hostId) await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
+      await attempt.catch(() => undefined);
+    }
+    // An attempt for another host already let this host go.
+    if (lockedHostId === hostId) await closeOpenedHost();
   }
   async function connectHost(host: RemoteTeamHost, takeOver: boolean): Promise<string[]> {
     try {
@@ -922,11 +936,13 @@ export function createWebWorkspaceRuntime(
       if (connecting || disposed) throw new Error(currentText().t("webClient.error.connectionChanging"));
       const attempt = connectHost(host, options?.takeOver === true);
       connecting = attempt;
+      connectingHostId = host.hostId;
       try {
         return await attempt;
       } finally {
         if (connecting === attempt) {
           connecting = null;
+          connectingHostId = null;
           waitingHostId = null;
         }
       }
