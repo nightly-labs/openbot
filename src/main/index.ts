@@ -1440,7 +1440,11 @@ if (!hasSingleInstanceLock) {
       // remote servers on their retry backoff while the computer is already back online, and the
       // main process has no online event to hear about it, only this poll of the link.
       const networkReturned = new NetworkReturned({
-        onReturned: () => void Effect.runPromise(remoteServers.wake()),
+        isOnline: () => net.isOnline(),
+        onReturned: () =>
+          void Effect.runPromise(remoteServers.wake()).catch((error) =>
+            logger.error("Unable to retry the remote servers after the network returned:", toLogValue(error)),
+          ),
       });
       teardown.push(0, "network returned", () => networkReturned.dispose());
       // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
