@@ -7,6 +7,8 @@ import {
   SLACK_MARK_PATH,
   TELEGRAM_ICON_GRADIENT,
   TELEGRAM_MARK_PATH,
+  WHATSAPP_ICON_COLOR,
+  WHATSAPP_MARK_PATH,
 } from "@openbot/brand/connector-mark-shape";
 import { createUniqueId } from "solid-js";
 
@@ -63,6 +65,16 @@ export function TelegramAccountMark(props: { class?: string | undefined }) {
       </defs>
       <rect width="24" height="24" fill={`url(#${gradient})`} />
       <path d={TELEGRAM_MARK_PATH} fill="#fff" transform="translate(4.7 4.9) scale(0.6)" />
+    </svg>
+  );
+}
+
+/** WhatsApp's mark on WhatsApp's green, filling its tile like the Telegram account mark. */
+export function WhatsAppAccountMark(props: { class?: string | undefined }) {
+  return (
+    <svg class={["brand-mark-tile", props.class].filter(Boolean).join(" ")} viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" fill={WHATSAPP_ICON_COLOR} />
+      <path d={WHATSAPP_MARK_PATH} fill="#fff" transform="translate(5.03 5) scale(0.5833)" />
     </svg>
   );
 }
