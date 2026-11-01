@@ -51,6 +51,12 @@ export interface PageSocialImage {
   alt: string;
 }
 
+/** The card of the terms, the privacy policy and the DPA. */
+export const OPENBOT_LEGAL_SOCIAL_IMAGE: PageSocialImage = {
+  path: "/social/legal.jpg",
+  alt: "Plain terms. No surprises. OpenBot agents beside a paper map",
+};
+
 /**
  * The Open Graph and X tags of a page's own social card. The image URL uses the site that
  * serves the page, so a pull-request preview names an image that it has.
