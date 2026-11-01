@@ -8,6 +8,7 @@ import Camera from "lucide-react-native/icons/camera";
 import ScanLine from "lucide-react-native/icons/scan-line";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import Animated, {
   Easing,
@@ -139,6 +140,12 @@ function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanSt
   );
 }
 
+/**
+ * How far one pinch moves the zoom. `zoom` is a fraction of the largest zoom of the lens, and
+ * that range is wide, so a pinch to twice the finger distance moves it a quarter of the way.
+ */
+const PINCH_ZOOM_RATE = 0.25;
+
 // Mount with the session so readiness resets on close, focus loss and background.
 function ScannerCamera({
   onBarcodeScanned,
@@ -147,21 +154,37 @@ function ScannerCamera({
 }: Pick<CameraViewProps, "onBarcodeScanned" | "onCameraReady" | "onMountError">) {
   const opacity = useSharedValue(0);
   const previewStyle = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+  // A QR code on a screen across the room is too small to read, and a phone held close cannot
+  // focus. Two fingers zoom the preview, as in the system camera. The zoom starts at 0 each time
+  // the scanner opens.
+  const [zoom, setZoom] = useState(0);
+  const pinchStart = useRef(0);
+  const pinch = Gesture.Pinch()
+    .runOnJS(true)
+    .onStart(() => {
+      pinchStart.current = zoom;
+    })
+    .onUpdate(({ scale }) => {
+      setZoom(Math.min(1, Math.max(0, pinchStart.current + (scale - 1) * PINCH_ZOOM_RATE)));
+    });
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, previewStyle]}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={QR_SCANNER_SETTINGS}
-        onBarcodeScanned={onBarcodeScanned}
-        onMountError={onMountError}
-        onCameraReady={() => {
-          opacity.set(onCameraReady ? 1 : withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
-          onCameraReady?.();
-        }}
-      />
-    </Animated.View>
+    <GestureDetector gesture={pinch}>
+      <Animated.View style={[StyleSheet.absoluteFill, previewStyle]}>
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          zoom={zoom}
+          barcodeScannerSettings={QR_SCANNER_SETTINGS}
+          onBarcodeScanned={onBarcodeScanned}
+          onMountError={onMountError}
+          onCameraReady={() => {
+            opacity.set(onCameraReady ? 1 : withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }));
+            onCameraReady?.();
+          }}
+        />
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
