@@ -616,6 +616,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:custom-agents:login-path
 
+      - name: Run the custom agent usage metering E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:custom-agent-usage-metering
+
       - name: Run the Codex login shell PATH E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex:login-path
@@ -712,6 +716,7 @@ jobs:
           path: |
             .openbot-build/custom-acp-agent-e2e/
             .openbot-build/custom-acp-agent-login-path-e2e/
+            .openbot-build/custom-agent-usage-metering-e2e/
             .openbot-build/codex-login-path-e2e/
             .openbot-build/antigravity-login-path-e2e/
             .openbot-build/antigravity-mcp-load-failure-e2e/
