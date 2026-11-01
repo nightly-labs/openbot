@@ -291,6 +291,8 @@ export class TurnLifecycle {
   readonly #failoverRetries = new Map<string, Set<string>>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
+  /** The deliveries run again after a failed turn that did no provider work. One replay each. */
+  readonly #unworkedReplays = new Set<string>();
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
@@ -381,6 +383,7 @@ export class TurnLifecycle {
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
+    this.#unworkedReplays.clear();
     this.#lastEventAt.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
@@ -972,6 +975,30 @@ export class TurnLifecycle {
         return;
       }
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
+      // A failed turn that no provider work reached never read the messages it ended with. A stalled
+      // model request held such a turn open (#4304) while the messages sent meanwhile steered into
+      // it, and settling them with the turn dropped them unread — no run, no failure of their own
+      // (#4326). Each one goes back to the queue, once, as its own turn; a second such failure ends
+      // it.
+      const unworkedReplay =
+        running !== undefined &&
+        replaysUnworkedTurn({
+          status,
+          acted: running.acted,
+          produced: running.produced,
+          refused,
+          limited,
+          failover: failover !== undefined,
+          executionThread: channelTurn,
+        }) &&
+        deliveries.length > 0 &&
+        deliveries.every(({ delivery }) => !this.#unworkedReplays.has(delivery.id));
+      if (unworkedReplay) {
+        for (const { delivery } of deliveries) this.#unworkedReplays.add(delivery.id);
+        yield* this.#requeueTurn(agentId, threadId, turnId, snapshot, deliveries);
+        this.#hooks.scheduleDrain(agentId);
+        return;
+      }
       // After work started, only a ready automatic backup continues it. A turn refused before
       // work still waits for the reset when no backup is ready. A continuation that a backup refused
       // before work keeps the earlier provider's work.
@@ -1146,6 +1173,7 @@ export class TurnLifecycle {
         for (const delivery of deliveries) {
           this.#refusedRetries.delete(delivery.delivery.id);
           this.#failoverRetries.delete(delivery.delivery.id);
+          this.#unworkedReplays.delete(delivery.delivery.id);
           // A plan that continues keeps the deliveries for its next turn, which the drain starts.
           if (continuation) {
             yield* this.#mailbox.requeueForPlan(delivery.delivery.id, turnId).pipe(toTurnOperationFailed);
@@ -1706,6 +1734,41 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
 export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>()("TurnOperationFailed", {
   cause: Schema.Defect(),
 }) {}
+
+export interface UnworkedTurnReplay {
+  status: string;
+  /** A tool step or answer text ran. Running the turn again would repeat work. */
+  acted: boolean;
+  /** Any item or delta arrived, an echo included. The provider read the messages. */
+  produced: boolean;
+  /** The turn ended refused; the refused retry owns it. */
+  refused: boolean;
+  /** A spent plan stopped the turn; the usage-limit requeue owns it. */
+  limited: boolean;
+  /** A provider error can move the turn to a backup model; that requeue owns it. */
+  failover: boolean;
+  /** A turn of an execution thread — a channel task or a channel — runs by its own rules. */
+  executionThread: boolean;
+}
+
+/**
+ * Whether a failed turn that reached no provider work takes its messages back into the queue for
+ * one more turn. Such a turn read nothing, so running its messages again repeats nothing: a stalled
+ * model request held the turn open (#4304) while the messages sent meanwhile steered into it, and
+ * settling them with the turn dropped them unread (#4326). The paths that already run a turn again
+ * keep their own messages.
+ */
+export function replaysUnworkedTurn(input: UnworkedTurnReplay): boolean {
+  return (
+    input.status === "failed" &&
+    !input.acted &&
+    !input.produced &&
+    !input.refused &&
+    !input.limited &&
+    !input.failover &&
+    !input.executionThread
+  );
+}
 
 const { sync: turnStep, rewrap: toTurnOperationFailed } = causeHelpers(TurnOperationFailed);
 
