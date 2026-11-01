@@ -316,6 +316,7 @@ import { TelegramAccountConnectorStore } from "./telegram-account-connector-stor
 import { TraceFile } from "./trace-file";
 import { readUpdatePreference, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
+
 import {
   createDisabledUpdateAdapter,
   isNixStoreInstall,
@@ -343,6 +344,9 @@ import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
+import { WhatsAppAccountConnectorService } from "./whatsapp-account-connector-service";
+import { WhatsAppAccountConnectorStore } from "./whatsapp-account-connector-store";
+import { WhatsAppDataFile } from "./whatsapp-account-data-file";
 
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
@@ -397,6 +401,12 @@ const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
 /** The Telegram account session and API credentials of this computer, with the same cipher. */
 const TELEGRAM_ACCOUNT_CONNECTOR_FILE = "openbot-telegram-account-connector-v1.json";
+/** The WhatsApp account link of this computer, with the same cipher. */
+const WHATSAPP_ACCOUNT_CONNECTOR_FILE = "openbot-whatsapp-account-connector-v1.json";
+/** The keys of the linked WhatsApp device, with the same cipher. */
+const WHATSAPP_ACCOUNT_AUTH_FILE = "openbot-whatsapp-account-keys-v1.json";
+/** The WhatsApp chats and messages that this computer received, with the same cipher. */
+const WHATSAPP_ACCOUNT_HISTORY_FILE = "openbot-whatsapp-account-chats-v1.json";
 /** The logins, payment cards and contact info of the Vault in Server settings, with the same cipher. */
 const VAULT_FILE = "openbot-vault-v1.json";
 /** Which agent each imported Hermes profile made, so a second import updates that agent. */
@@ -472,6 +482,8 @@ const TEARDOWN_ORDER = {
   bitwardenConnector: 106.5,
   // Before the agent service, so no agent tool call reaches a Telegram client that is being closed.
   telegramAccountConnector: 106.7,
+  // Before the agent service, so no agent tool call reaches a WhatsApp client that is being closed.
+  whatsappAccountConnector: 106.8,
   // Before the agent service, so no agent is handed a token file that is being removed.
   githubConnector: 107,
   // Before the agent service, so no script starts a run while the service stops.
@@ -553,6 +565,7 @@ export interface ApplicationServices {
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   telegramAccountConnector: TelegramAccountConnectorService;
+  whatsappAccountConnector: WhatsAppAccountConnectorService;
   vault: VaultService;
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
@@ -1512,6 +1525,34 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.telegramAccountConnector, "the Telegram account connection", () =>
     Effect.runPromise(telegramAccountConnector.dispose()),
   );
+  /*
+   * The WhatsApp account connection. Loaded before the agent service, because the first spawn reads
+   * its MCP server. Baileys loads only when the connection is used; a linked device connects in the
+   * background.
+   */
+  const whatsappAccountConnector = new WhatsAppAccountConnectorService({
+    store: new WhatsAppAccountConnectorStore(
+      join(app.getPath("userData"), WHATSAPP_ACCOUNT_CONNECTOR_FILE),
+      secretCipher,
+    ),
+    authFile: new WhatsAppDataFile({
+      path: join(app.getPath("userData"), WHATSAPP_ACCOUNT_AUTH_FILE),
+      cipher: secretCipher,
+      maxBytes: 64 * 1024 * 1024,
+      delayMs: 250,
+    }),
+    historyFile: new WhatsAppDataFile({
+      path: join(app.getPath("userData"), WHATSAPP_ACCOUNT_HISTORY_FILE),
+      cipher: secretCipher,
+      maxBytes: 256 * 1024 * 1024,
+      delayMs: 3_000,
+    }),
+    appVersion: app.getVersion(),
+  });
+  await Effect.runPromise(whatsappAccountConnector.load());
+  teardown.push(TEARDOWN_ORDER.whatsappAccountConnector, "the WhatsApp account connection", () =>
+    Effect.runPromise(whatsappAccountConnector.dispose()),
+  );
 
   /*
    * The Vault in Server settings. Every agent fills its logins, cards and contact info; the file
@@ -1809,6 +1850,10 @@ export async function createApplicationServices({
       mcpServer: () => telegramAccountConnector.mcpServer(),
       mcpAuthorization: () => telegramAccountConnector.mcpAuthorization(),
     },
+    whatsappAccountConnector: {
+      mcpServer: () => whatsappAccountConnector.mcpServer(),
+      mcpAuthorization: () => whatsappAccountConnector.mcpAuthorization(),
+    },
     passwordVault: passwordVaultRouter([
       { prefix: "", vault: onePasswordConnector },
       { prefix: "bitwarden:", vault: bitwardenConnector },
@@ -2021,6 +2066,12 @@ export async function createApplicationServices({
   // A sign-in, a sign-out or a session that Telegram ended adds or removes the Telegram tools of every agent.
   telegramAccountConnector.onAgentAccessChanged(() => {
     void runCauseEffect(service.notifyTelegramAccountConnectorChanged()).catch((error) =>
+      logger.warn("Provider tools did not refresh.", toLogValue(error)),
+    );
+  });
+  // A link, an unlink or a device that WhatsApp removed adds or removes the WhatsApp tools of every agent.
+  whatsappAccountConnector.onAgentAccessChanged(() => {
+    void runCauseEffect(service.notifyWhatsAppAccountConnectorChanged()).catch((error) =>
       logger.warn("Provider tools did not refresh.", toLogValue(error)),
     );
   });
@@ -2454,6 +2505,9 @@ export async function createApplicationServices({
     // Present, so the host advertises `telegram-account-connector-v1`. An owner or admin signs the
     // host in to their own Telegram account from their computer; the session stays on the host.
     telegramAccountConnector,
+    // Present, so the host advertises `whatsapp-account-connector-v1`. An owner or admin links the
+    // host to their own WhatsApp account from their computer; the device keys stay on the host.
+    whatsappAccountConnector,
     // Present, so the host advertises `vault-v1`. The routes are admin-only.
     vault,
     // Present on Linux, so the host advertises `provider-host-sign-in-v1`. The routes are admin-only.
@@ -3319,6 +3373,7 @@ export async function createApplicationServices({
     onePasswordConnector,
     bitwardenConnector,
     telegramAccountConnector,
+    whatsappAccountConnector,
     vault,
     mailbox,
     storageUsage,

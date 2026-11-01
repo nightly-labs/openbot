@@ -146,3 +146,6 @@ export const BitwardenConnected = connector("bitwarden");
 
 /** The user's own Telegram account, connected, with sending off. */
 export const TelegramAccountConnected = connector("telegram-account");
+
+/** The user's own WhatsApp account, linked, with sending off. */
+export const WhatsAppAccountConnected = connector("whatsapp-account");

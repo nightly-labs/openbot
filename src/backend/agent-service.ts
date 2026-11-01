@@ -169,6 +169,7 @@ import {
   McpGateway,
   type TelegramAccountConnectorSource,
   type TestMcpServerOptions,
+  type WhatsAppAccountConnectorSource,
 } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
@@ -397,6 +398,8 @@ export interface AgentServiceOptions {
    * hand-off, as `githubConnector` is.
    */
   telegramAccountConnector?: TelegramAccountConnectorSource | null;
+  /** The WhatsApp account connection of this computer, or `null`. Read as `telegramAccountConnector` is. */
+  whatsappAccountConnector?: WhatsAppAccountConnectorSource | null;
   /** The 1Password vault the user shared with OpenBot, or `null`. The browser fills logins from it. */
   passwordVault?: PasswordVault | null;
   /** The cards and contact info of the Vault, or `null`. The browser fills cards from it. */
@@ -516,6 +519,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer = () => null,
       githubConnector = null,
       telegramAccountConnector = null,
+      whatsappAccountConnector = null,
       hostMemory = null,
       busyMessageMode = () => DEFAULT_BUSY_MESSAGE_MODE,
     } = options;
@@ -532,6 +536,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       computerUseMcpServer,
       githubConnector,
       telegramAccountConnector,
+      whatsappAccountConnector,
       agents: () => store.list(),
       logger,
       hooks: {
@@ -2128,6 +2133,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       Effect.asVoid,
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "refresh Telegram tools", cause: failure.cause }),
+      ),
+    );
+  }
+
+  /**
+   * The WhatsApp account was linked or unlinked, or WhatsApp removed the device. The same treatment as
+   * the Telegram account: the agents are marked for a fresh provider session with the new tool list.
+   */
+  notifyWhatsAppAccountConnectorChanged(): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#mcp.changed().pipe(
+      Effect.asVoid,
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "refresh WhatsApp tools", cause: failure.cause }),
       ),
     );
   }

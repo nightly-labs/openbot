@@ -236,6 +236,7 @@ import { webTasksSource } from "./web-tasks";
 import { webTelegramAccountConnectorPort } from "./web-telegram-account-connector";
 import { createWebUsagePort } from "./web-usage-port";
 import { webVaultCalls } from "./web-vault";
+import { webWhatsAppAccountConnectorPort } from "./web-whatsapp-account-connector";
 
 const CONNECTING_STATUS: AgentStatus = {
   phase: "starting",
@@ -929,6 +930,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const onePasswordPort = webOnePasswordConnectorPort(() => hostRequest());
   const bitwardenPort = webBitwardenConnectorPort(() => hostRequest());
   const telegramAccountPort = webTelegramAccountConnectorPort(() => hostRequest());
+  const whatsappAccountPort = webWhatsAppAccountConnectorPort(() => hostRequest());
   const webMessaging = webHostMessaging(hostRequest, () =>
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
@@ -941,6 +943,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         onePassword: () => onePasswordPort,
         bitwarden: () => bitwardenPort,
         telegramAccount: () => telegramAccountPort,
+        whatsappAccount: () => whatsappAccountPort,
         messaging: hostMessagingApi(
           () => connectorTarget()?.id,
           () => webMessaging.api,

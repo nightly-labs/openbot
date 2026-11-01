@@ -97,6 +97,7 @@ import {
   parseGitHubConnectorStatus,
   parseOnePasswordConnectorStatus,
   parseTelegramAccountConnectorStatus,
+  parseWhatsAppAccountConnectorStatus,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   type RemoteNetworkRouteState,
@@ -116,6 +117,7 @@ import {
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
+  type WhatsAppAccountConnectorStatus,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
@@ -584,6 +586,12 @@ export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordCon
 export function decodeTelegramAccountConnectorStatus(value: unknown): TelegramAccountConnectorStatus {
   const status = parseTelegramAccountConnectorStatus(value);
   if (!status) throw new Error("Invalid Telegram account connector response.");
+  return status;
+}
+
+export function decodeWhatsAppAccountConnectorStatus(value: unknown): WhatsAppAccountConnectorStatus {
+  const status = parseWhatsAppAccountConnectorStatus(value);
+  if (!status) throw new Error("Invalid WhatsApp account connector response.");
   return status;
 }
 

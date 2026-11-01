@@ -527,4 +527,69 @@ export const messages = defineMessages("connector", {
   "connector.telegramAccount.accountDescriptionHost": "Agents on {host} use this Telegram account.",
   "connector.telegramAccount.sendingLabel": "Let agents send messages and mark chats as read",
   "connector.telegramAccount.sendingDescription": "When this is off, agents can only read your chats.",
+  // Marketplace > Apps > WhatsApp account: OpenBot links itself to the user's own WhatsApp account as
+  // a linked device, as WhatsApp Web does.
+  "connector.whatsappAccount.title": "WhatsApp account",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Agents can read your WhatsApp chats and, when you let them, send messages as you.",
+  "connector.whatsappAccount.descriptionHost":
+    "Agents on {host} can read your WhatsApp chats and, when you let them, send messages as you.",
+  "connector.whatsappAccount.statusConnecting": "Linking",
+  "connector.whatsappAccount.statusConnected": "Connected",
+  "connector.whatsappAccount.actionFailed": "OpenBot could not change the WhatsApp account connection.",
+  "connector.whatsappAccount.disconnectTitle": "Unlink WhatsApp account",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot logs out this linked device and deletes its keys and chats from this computer. Sending turns off.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} logs out this linked device and deletes its keys and chats. Sending turns off.",
+  "connector.whatsappAccount.disconnect": "Unlink",
+  "connector.whatsappAccount.linkTitle": "Link",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot becomes a linked device of your WhatsApp account, as WhatsApp Web does. Your phone stays the main device. The keys and the chats stay encrypted on this computer.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} becomes a linked device of your WhatsApp account, as WhatsApp Web does. Your phone stays the main device. The keys and the chats stay encrypted on {host}.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp has no official access for personal accounts. OpenBot uses an unofficial WhatsApp Web client, and WhatsApp can limit or ban numbers that it thinks are automated. Send only what you would send yourself.",
+  "connector.whatsappAccount.linkProgress": "Do the step below to link. Cancel stops the link.",
+  "connector.whatsappAccount.methodTitle": "Link with",
+  "connector.whatsappAccount.methodQrDescription": "Scan a code with WhatsApp on your phone.",
+  "connector.whatsappAccount.methodPhoneDescription": "Type a code on your phone instead of scanning.",
+  "connector.whatsappAccount.methodQr": "QR code",
+  "connector.whatsappAccount.methodPhone": "Phone number",
+  "connector.whatsappAccount.connect": "Link",
+  "connector.whatsappAccount.sendingOffNote": "Agents can only read your chats until you turn on sending.",
+  "connector.whatsappAccount.connecting": "Connecting to WhatsApp",
+  "connector.whatsappAccount.connectingDescription": "This computer talks to WhatsApp. This can take a few seconds.",
+  "connector.whatsappAccount.connectingHost": "{host} talks to WhatsApp. This can take a few seconds.",
+  "connector.whatsappAccount.qrLabel": "QR code to link WhatsApp",
+  "connector.whatsappAccount.qrTitle": "Scan this code with WhatsApp on your phone",
+  "connector.whatsappAccount.stepOpen": "Open WhatsApp on your phone.",
+  "connector.whatsappAccount.stepDevices": "Go to Settings › Linked devices › Link a device.",
+  "connector.whatsappAccount.qrStepScan": "Point your phone at this code.",
+  "connector.whatsappAccount.qrRefresh": "The code changes about every 20 seconds. Scan the newest one.",
+  "connector.whatsappAccount.usePhone": "Use phone number",
+  "connector.whatsappAccount.useQr": "Use QR code",
+  "connector.whatsappAccount.phoneDescription":
+    "Type the phone number of your WhatsApp account, with its country code. WhatsApp then gives a code to type on the phone.",
+  "connector.whatsappAccount.phoneLabel": "Phone number",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Get code",
+  "connector.whatsappAccount.codeTitle": "Type this code on your phone",
+  "connector.whatsappAccount.codeStepPhone": "Tap Link with phone number instead.",
+  "connector.whatsappAccount.codeStepType": "Type this code.",
+  "connector.whatsappAccount.codeLabel": "Code to type on your phone",
+  "connector.whatsappAccount.accountTitle": "Account",
+  "connector.whatsappAccount.accountDescription": "Agents on this computer use this WhatsApp account.",
+  "connector.whatsappAccount.accountDescriptionHost": "Agents on {host} use this WhatsApp account.",
+  "connector.whatsappAccount.historyChats": { one: "{count} chat", other: "{count} chats" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} message", other: "{count} messages" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp sends recent history when the device links, then every new message. Older messages can be missing.",
+  "connector.whatsappAccount.sendingLabel": "Let agents send messages and mark chats as read",
+  "connector.whatsappAccount.sendingDescription": "When this is off, agents can only read your chats.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp shows OpenBot in Settings › Linked devices. When you log it out there, OpenBot disconnects.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp shows OpenBot in Settings › Linked devices. When you log it out there, {host} disconnects.",
 });

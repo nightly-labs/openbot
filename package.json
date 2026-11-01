@@ -236,6 +236,8 @@
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
     "test:mcp-oauth-store": "bun scripts/mcp-oauth-store-e2e.ts",
+    "test:whatsapp-signal": "bun scripts/whatsapp-signal-e2e.ts",
+    "test:whatsapp-account-connector": "bun scripts/whatsapp-account-connector-e2e.ts",
     "test:mcp-sign-in-client-refused": "bun scripts/mcp-sign-in-client-refused-e2e.ts",
     "test:mcp-server-unreadable-row": "bun scripts/mcp-server-unreadable-row-e2e.ts",
     "test:mcp-tool-consent": "bun scripts/mcp-tool-consent-e2e.ts",
@@ -414,6 +416,7 @@
     "@solidjs/web": "catalog:",
     "@speed-highlight/core": "catalog:",
     "@tanstack/virtual-core": "catalog:",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "class-variance-authority": "catalog:",
     "cuelume": "0.2.8",
     "effect": "catalog:",
@@ -481,5 +484,8 @@
     "electron-winstaller",
     "esbuild",
     "workerd"
-  ]
+  ],
+  "overrides": {
+    "libsignal": "file:./vendor/whatsapp-signal"
+  }
 }

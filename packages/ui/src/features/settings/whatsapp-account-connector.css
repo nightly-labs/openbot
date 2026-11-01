@@ -1,0 +1,68 @@
+/* The WhatsApp account page: the link steps and the account. */
+
+/* A row's text is its instruction, so it wraps instead of ending in an ellipsis. */
+.whatsapp-account-row .ui-item-description {
+  white-space: normal;
+}
+
+.whatsapp-account-row .ui-item-media {
+  color: var(--openbot-text-muted);
+}
+
+.whatsapp-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+/* The phone number field, and its button in line with the field, not with the label. */
+.whatsapp-account-step-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--openbot-space-3);
+}
+
+.whatsapp-account-step-form > .ui-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The QR code or the pairing code, and the steps on the phone next to it. */
+.whatsapp-account-link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-4);
+  align-items: center;
+}
+
+.whatsapp-account-link .ui-qr-code {
+  flex: none;
+}
+
+.whatsapp-account-link-copy {
+  display: grid;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  min-width: min(100%, 14rem);
+}
+
+.whatsapp-account-steps {
+  display: grid;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding-inline-start: var(--openbot-space-4);
+  list-style: decimal;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The eight characters that the user types on the phone: large, spaced and selectable. */
+.whatsapp-account-pairing-code {
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-3xl);
+  line-height: var(--openbot-leading-3xl);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: var(--openbot-tracking-wide);
+  user-select: all;
+}

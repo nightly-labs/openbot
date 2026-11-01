@@ -213,6 +213,7 @@ import { createMockTeam, type MockTeamOptions } from "./mock-team";
 import { createMockTelegramAccountConnector } from "./mock-telegram-account-connector";
 import { createMockVault } from "./mock-vault";
 import { createMockVoice, type MockVoiceOptions } from "./mock-voice";
+import { createMockWhatsAppAccountConnector } from "./mock-whatsapp-account-connector";
 import { type MockWorkflowSeed, mockWorkflows } from "./mock-workflows";
 
 export interface MockOpenBotOptions
@@ -1451,6 +1452,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     telegramAccountConnector: createMockTelegramAccountConnector(),
+    whatsappAccountConnector: createMockWhatsAppAccountConnector(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
     license: createMockLicense(),

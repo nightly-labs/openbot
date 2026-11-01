@@ -187,6 +187,7 @@ import {
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
   decodeVoid,
+  decodeWhatsAppAccountConnectorStatus,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
 import {
@@ -898,6 +899,21 @@ const openbotApi: OpenBotDesktopApi = {
     hostCancel: decodeTelegramAccountConnectorStatus,
     hostDisconnect: decodeTelegramAccountConnectorStatus,
     hostSetSending: decodeTelegramAccountConnectorStatus,
+  }),
+  whatsappAccountConnector: bridgeGroup(IPC_ENDPOINTS.whatsappAccountConnector, {
+    status: decodeWhatsAppAccountConnectorStatus,
+    connect: decodeWhatsAppAccountConnectorStatus,
+    submit: decodeWhatsAppAccountConnectorStatus,
+    cancel: decodeWhatsAppAccountConnectorStatus,
+    disconnect: decodeWhatsAppAccountConnectorStatus,
+    setSending: decodeWhatsAppAccountConnectorStatus,
+    changed: decodeWhatsAppAccountConnectorStatus,
+    hostStatus: decodeWhatsAppAccountConnectorStatus,
+    hostConnect: decodeWhatsAppAccountConnectorStatus,
+    hostSubmit: decodeWhatsAppAccountConnectorStatus,
+    hostCancel: decodeWhatsAppAccountConnectorStatus,
+    hostDisconnect: decodeWhatsAppAccountConnectorStatus,
+    hostSetSending: decodeWhatsAppAccountConnectorStatus,
   }),
   vault: bridgeGroup(IPC_ENDPOINTS.vault, {
     list: decodeVaultState,
