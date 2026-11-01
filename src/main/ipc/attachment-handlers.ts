@@ -47,6 +47,7 @@ import { filePreviewPages } from "../file-preview-pages";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { remoteCall, remoteDecode } from "../remote-service-effects";
+import { previewWorkspacePath } from "../workspace-preview";
 import {
   agentRequest,
   parseAttachmentData,
@@ -282,13 +283,12 @@ export function attachmentIpcHandlers({
         },
       }),
       previewWorkspaceFile: scopedHandler(parsePreviewWorkspaceFile, {
-        local: async (parsed) => {
-          const generation = filePreviewPages.generation;
-          const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
-          return runCauseEffect(
-            localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size, generation, parsed.maxBytes),
-          );
-        },
+        local: (parsed) =>
+          previewWorkspacePath(
+            () => runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path)),
+            parsed.path,
+            parsed.maxBytes,
+          ),
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(
             remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId, parsed.maxBytes),

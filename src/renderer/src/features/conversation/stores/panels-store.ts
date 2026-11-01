@@ -356,6 +356,13 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
+        // The host answers a path that is not there with a missing preview, so a chip for a file that
+        // only the message's author has says so instead of opening an empty panel.
+        if (preview.missing) {
+          releaseFilePreviewPage(preview.pageUrl);
+          deps.setComposerError(missingFileError(path), target);
+          return;
+        }
         deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "workspace", agentId, path, folder }, preview });
         setActiveRightPanel("file-preview", ownerAgentId);
       },
@@ -483,7 +490,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       (preview) => {
         // No bytes from a file that showed bytes: the file is over the limit, so keep what shows.
         const overLimit = preview.bytes === null && file.preview?.bytes;
-        if (!current() || overLimit || (file.preview && samePreview(preview, file.preview))) {
+        // A file moved or deleted since it opened keeps what shows, as a failed read does.
+        if (!current() || preview.missing || overLimit || (file.preview && samePreview(preview, file.preview))) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
@@ -624,17 +632,23 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 }
 
 function filePreviewError(error: unknown, path: string): string {
+  if (error instanceof Error && /\bENOENT\b/u.test(error.message)) return missingFileError(path);
+  return errorMessage(error, t("attachment.error.previewFile", { name: fileName(path) }));
+}
+
+/** The sentence a chip shows for a path that is not in the workspace. */
+function missingFileError(path: string): string {
+  return t("attachment.error.fileNotFound", { name: fileName(path) });
+}
+
+function fileName(path: string): string {
   let decodedPath = path;
   try {
     decodedPath = decodeURIComponent(path);
   } catch {
     // A literal percent sign can be part of a file name.
   }
-  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
-  if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
-    return t("attachment.error.fileNotFound", { name });
-  }
-  return errorMessage(error, t("attachment.error.previewFile", { name }));
+  return decodedPath.replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
 }
 
 /** The same file content, so a read again need not replace the shown one. */

@@ -147,6 +147,11 @@ function refuse(reason: WorkspacePathRefused["reason"], message: string, memberM
   return Effect.fail(attachmentFailure(new WorkspacePathRefused(reason, message, memberMessage)));
 }
 
+/** Whether a workspace path was refused because nothing is there, rather than for another reason. */
+export function isMissingWorkspacePath(error: unknown): boolean {
+  return error instanceof WorkspacePathRefused && error.reason === "missing";
+}
+
 /** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
 const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
