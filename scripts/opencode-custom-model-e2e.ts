@@ -2,6 +2,9 @@
 // OpenAI-compatible server with two models, as a llama-swap user has them: the user's own OpenCode
 // config names one as `model` and `small_model`, and the agent runs on the other. A local server like llama-swap loads
 // the model that each request names, so every request must name the agent's model.
+// Two more models carry #4234's shapes: one whose saved output cap must reach the request verbatim
+// where the window-derived guess stays 32,000 (the corrected repro: a 128K window with a 16K cap),
+// and one whose small window must turn into the half-window guess (the repro as first filed).
 // `OPENCODE_CLI=<opencode> bun run test:opencode-custom-model`.
 // Writes .openbot-build/opencode-custom-model/report.json.
 import assert from "node:assert/strict";
@@ -24,11 +27,17 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-custom-mode
 const ENDPOINT = "spark";
 const DEFAULT_MODEL = "default-model";
 const AGENT_MODEL = "agent-model";
+/** #4234's corrected repro: a 128K window whose real output cap is 16K, so the guess stays 32,000. */
+const CAPPED_MODEL = "capped-model";
+/** #4234 as first filed: a 16K window, where half the window is the only budget that fits. */
+const GUESSED_MODEL = "guessed-model";
 
 interface Request {
   path: string;
   model: string | null;
   stream: boolean;
+  /** The output budget OpenCode asked for; absent when the endpoint protocol has no such field. */
+  maxCompletionTokens: number | null;
 }
 
 interface Report {
@@ -51,7 +60,12 @@ async function readRequest(request: IncomingMessage): Promise<Omit<Request, "pat
   for await (const part of request) chunks.push(Buffer.from(part));
   const text = Buffer.concat(chunks).toString("utf8");
   const value = text ? JSON.parse(text) : null;
-  return { model: getString(value, "model"), stream: isRecord(value) && value.stream === true };
+  const budget = isRecord(value) ? value.max_completion_tokens : null;
+  return {
+    model: getString(value, "model"),
+    stream: isRecord(value) && value.stream === true,
+    maxCompletionTokens: typeof budget === "number" ? budget : null,
+  };
 }
 
 function chunk(model: string, content: string | null): string {
@@ -64,8 +78,8 @@ function chunk(model: string, content: string | null): string {
 
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
-    const { model, stream } = await readRequest(request);
-    report.requests.push({ path: request.url ?? "", model, stream });
+    const { model, stream, maxCompletionTokens } = await readRequest(request);
+    report.requests.push({ path: request.url ?? "", model, stream, maxCompletionTokens });
     const reply = `reply from ${model}`;
     if (!stream) {
       response.writeHead(200, { "content-type": "application/json" });
@@ -145,6 +159,8 @@ try {
     models: [
       { id: DEFAULT_MODEL, name: "Default model" },
       { id: AGENT_MODEL, name: "Agent model" },
+      { id: CAPPED_MODEL, name: "Capped model", contextWindow: 131_072, maxOutput: 16_384 },
+      { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
     ],
   };
 
@@ -173,9 +189,35 @@ try {
     assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
   }
 
+  // #4234's shapes: the saved cap verbatim, and the half-window guess for a small window. An
+  // explicit limit is served as written on both the pinned 2.1.1 runtime and 2.2.5; only an
+  // unset one falls back to OpenCode's own pick (#4234's `max_completion_tokens: 32000`).
+  const budgets: ReadonlyArray<readonly [string, number]> = [
+    [CAPPED_MODEL, 16_384],
+    [GUESSED_MODEL, 8_192],
+  ];
+  for (const [model] of budgets) {
+    const modelThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${model}` });
+    const turn = await runTurn(client, modelThread, { text: "Say one word.", timeoutMs: 120_000 });
+    report.turns.push(turn);
+    assert.equal(turn.error, null, `The turn on ${model} failed: ${turn.error}`);
+  }
+
   assert.ok(report.requests.length > 0, "The endpoint got no request.");
-  const others = report.requests.filter((request) => request.model !== null && request.model !== AGENT_MODEL);
-  assert.deepEqual(others, [], "Each request must name the agent's model.");
+  const known = new Set([AGENT_MODEL, ...budgets.map(([model]) => model)]);
+  const others = report.requests.filter((request) => request.model !== null && !known.has(request.model));
+  assert.deepEqual(others, [], "Each request must name a model OpenBot configured.");
+  for (const [model, budget] of budgets) {
+    const seen = report.requests.filter((request) => request.model === model);
+    assert.ok(seen.length > 0, `The endpoint got no request for ${model}.`);
+    for (const request of seen) {
+      assert.equal(
+        request.maxCompletionTokens,
+        budget,
+        `${model} must ask for the ${budget}-token budget OpenBot wrote, not ${request.maxCompletionTokens}.`,
+      );
+    }
+  }
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

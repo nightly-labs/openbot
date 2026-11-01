@@ -11,3 +11,7 @@
   guess: a 128K-window model with a 16K output cap — the shape that produced this report — still
   got a 32,000-token budget from the guess, so the endpoint settings now take the model's real
   output limit and write that into the OpenCode entry. Leave the field blank to keep the guess.
+  A model whose window was already saved also changes what it sends with a blank cap: the fixed
+  half-window budget replaces the runtime's own pick (OpenCode 2.1.1 gave a 32,768-window model
+  about 21,071 tokens; it now sends 16,384) — smaller and predictable, and the new field covers a
+  model that needs more.

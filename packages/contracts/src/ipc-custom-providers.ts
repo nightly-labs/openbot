@@ -232,7 +232,8 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isDynamicRecord(value) &&
     isBoundedString(value.id, INPUT_LIMITS.identifier) &&
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
-    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow))
+    (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
+    (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput))
   );
 }
 
