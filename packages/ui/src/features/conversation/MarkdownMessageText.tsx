@@ -673,6 +673,7 @@ function MarkdownInline(props: {
             return url ? (
               <MessageLink
                 url={url}
+                label={markdownInlinePlainText(token.tokens) || token.text}
                 title={token.title || linkTitle(token.text, url)}
                 favicon={props.content.linkFavicons !== false}
                 onOpenLink={props.content.onOpenLink}
@@ -712,6 +713,7 @@ function MarkdownInline(props: {
               return (
                 <MessageLink
                   url={url}
+                  label={token.text || t("chat.image.view")}
                   title={url}
                   favicon={props.content.linkFavicons !== false}
                   onOpenLink={props.content.onOpenLink}
