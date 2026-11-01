@@ -18,7 +18,7 @@ export const CUSTOM_AGENTS_PROVIDER: ProviderPage = {
     {
       icon: "puzzle",
       title: "Presets for known agents",
-      text: "Presets fill in the start command for Goose, Qwen Code, GitHub Copilot CLI and Oh My Pi.",
+      text: "Presets fill in the start command for Goose, Qwen Code, GitHub Copilot CLI, Oh My Pi and Hermes Agent.",
     },
     {
       icon: "download",
@@ -53,6 +53,11 @@ export const CUSTOM_AGENTS_PROVIDER: ProviderPage = {
       platforms: "Terminal",
       note: "A fork of Pi. MIT license.",
     },
+    {
+      name: "Hermes Agent",
+      platforms: "macOS, Linux, Windows",
+      note: "Nous Research's agent. It starts its ACP server with `hermes acp`. MIT license.",
+    },
   ],
   comparisons: [],
   faq: [
@@ -64,7 +69,7 @@ export const CUSTOM_AGENTS_PROVIDER: ProviderPage = {
     {
       question: "Which agents work in OpenBot?",
       answer:
-        "Any agent that speaks ACP over standard input and output. OpenBot has presets for Goose, Qwen Code, GitHub Copilot CLI and Oh My Pi, and finds more in the ACP registry.",
+        "Any agent that speaks ACP over standard input and output. OpenBot has presets for Goose, Qwen Code, GitHub Copilot CLI, Oh My Pi and Hermes Agent, and finds more in the ACP registry.",
     },
     {
       question: "Can I send a message while a custom agent works?",
@@ -89,6 +94,8 @@ export const CUSTOM_AGENTS_PROVIDER: ProviderPage = {
     },
     { label: "GitHub Copilot plans", url: "https://github.com/features/copilot/plans" },
     { label: "Oh My Pi on GitHub", url: "https://github.com/can1357/oh-my-pi" },
+    { label: "Hermes Agent ACP", url: "https://hermes-agent.nousresearch.com/docs/user-guide/features/acp" },
+    { label: "Hermes Agent on GitHub", url: "https://github.com/NousResearch/hermes-agent" },
   ],
-  checkedAt: "2026-10-24",
+  checkedAt: "2026-11-01",
 };
