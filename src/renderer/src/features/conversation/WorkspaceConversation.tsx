@@ -172,6 +172,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     closeBrowserTab,
   } = useBrowserTabs();
   const { activeRemoteDesktopSession, remoteDesktopWorkspaceVisible, openRemoteDesktopWorkspace } = useRemoteDesktop();
+  /** A joined host's workspace or open conversation is still loading, so the composer says "Connecting…". */
+  const remoteLoading = () =>
+    activeServer()?.kind === "remote" && (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded);
   const usage = useUsage();
   const windowPage = useWindowPage();
   // The composer never asks for usage itself. It reads the dock's reading, which is scoped to the
@@ -499,13 +502,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
         onOpenUsage={(trigger) => usage.openUsage(activeServer()?.id ?? "local", trigger, activeAgent()?.id)}
-        agentStatus={
-          activeServer()?.kind === "remote" &&
-          (!serverScope.loaded() || !conversations[activeAgent()?.id ?? ""]?.loaded)
-            ? { ...agentStatus(), phase: "starting" }
-            : agentStatus()
-        }
-        agentsConnecting={agentListConnecting()}
+        agentStatus={remoteLoading() ? { ...agentStatus(), phase: "starting" } : agentStatus()}
+        agentsConnecting={agentListConnecting() || (remoteLoading() && activeServer()?.state === "online")}
         accountUsage={withHostAccountUsage(auth.accountUsage(), hostAccountLimits())}
         providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
         customProviders={activeCustomProviders()}

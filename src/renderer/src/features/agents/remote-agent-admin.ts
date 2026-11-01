@@ -18,7 +18,7 @@ import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { serverCanAdminister } from "../servers/server-capabilities";
 import { type AgentsPort, agentsPort } from "./agents-port";
 
@@ -76,12 +76,12 @@ export function createRemoteAgentAdmin(
     planCardKey: null,
     planCard: null,
   });
-  const hostKey = () => {
+  const hostKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_HOST_SETTINGS_CAPABILITY))
       return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
   /** Null until the host answers for the current agent. */
   const currentHostSettings = () => (state.hostKey !== null && state.hostKey === hostKey() ? state.hostSettings : null);
   function acceptHost(requestKey: string, settings: AgentHostSettings): void {
@@ -92,9 +92,11 @@ export function createRemoteAgentAdmin(
     });
   }
   let hostReadGeneration = 0;
-  // A settings change on another client updates the agent's timestamp in the released summary.
+  // A settings change on another client updates the agent's timestamp in the released summary. An effect
+  // runs again each time its key is computed, and the server summary changes while a workspace loads, so
+  // each key is a memo: only a changed key reads again.
   createEffect(
-    () => JSON.stringify([hostKey(), target()?.updatedAt]),
+    createMemo(() => JSON.stringify([hostKey(), target()?.updatedAt])),
     () => {
       const requestKey = untrack(hostKey);
       const generation = ++hostReadGeneration;
@@ -113,12 +115,12 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
-  const backupKey = () => {
+  const backupKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_BACKUP_MODELS_CAPABILITY))
       return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
   function acceptBackup(requestKey: string, settings: AgentBackupModelSettings): void {
     if (backupKey() !== requestKey) return;
     setState((draft) => {
@@ -128,7 +130,7 @@ export function createRemoteAgentAdmin(
   }
   let backupReadGeneration = 0;
   createEffect(
-    () => JSON.stringify([backupKey(), target()?.updatedAt]),
+    createMemo(() => JSON.stringify([backupKey(), target()?.updatedAt])),
     () => {
       const requestKey = untrack(backupKey);
       const generation = ++backupReadGeneration;
@@ -148,12 +150,12 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
-  const taskLimitKey = () => {
+  const taskLimitKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_TASK_LIMIT_CAPABILITY))
       return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
   function acceptTaskLimit(requestKey: string, settings: AgentTaskLimitSettings): void {
     if (taskLimitKey() !== requestKey) return;
     setState((draft) => {
@@ -163,7 +165,7 @@ export function createRemoteAgentAdmin(
   }
   let taskLimitReadGeneration = 0;
   createEffect(
-    () => JSON.stringify([taskLimitKey(), target()?.updatedAt]),
+    createMemo(() => JSON.stringify([taskLimitKey(), target()?.updatedAt])),
     () => {
       const requestKey = untrack(taskLimitKey);
       const generation = ++taskLimitReadGeneration;
@@ -183,12 +185,12 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
-  const planCardKey = () => {
+  const planCardKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_PLAN_CARD_CAPABILITY))
       return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
   function acceptPlanCard(requestKey: string, settings: AgentPlanCardSettings): void {
     if (planCardKey() !== requestKey) return;
     setState((draft) => {
@@ -198,7 +200,7 @@ export function createRemoteAgentAdmin(
   }
   let planCardReadGeneration = 0;
   createEffect(
-    () => JSON.stringify([planCardKey(), target()?.updatedAt]),
+    createMemo(() => JSON.stringify([planCardKey(), target()?.updatedAt])),
     () => {
       const requestKey = untrack(planCardKey);
       const generation = ++planCardReadGeneration;
@@ -218,11 +220,11 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
-  const key = () => {
+  const key = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverCanAdministerAgents(current.server)) return null;
     return JSON.stringify([current.server.id, current.agentId]);
-  };
+  });
 
   function accept(requestKey: string, settings: AgentAdminSettings): void {
     if (key() !== requestKey) return;

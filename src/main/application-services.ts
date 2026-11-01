@@ -92,6 +92,7 @@ import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
+import { installRemoteSyncProfileSink } from "@openbot/team-client/sync-profile";
 import {
   app,
   BrowserWindow,
@@ -183,6 +184,7 @@ import { shouldAutoStartHost } from "./development-profile";
 import {
   applyDevelopmentRemoteAccount,
   type DevelopmentRemoteRole,
+  readDevelopmentClientTransport,
   startDevelopmentRemoteRole,
 } from "./development-remote-bootstrap";
 import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
@@ -279,6 +281,7 @@ import {
   createRemoteSessionReusePreferenceStore,
   type RemoteSessionReusePreferenceStore,
 } from "./remote-session-reuse-preference-store";
+import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { ResourceMonitor } from "./resource-monitor";
@@ -2157,6 +2160,7 @@ export async function createApplicationServices({
       applyDevelopmentRemoteAccount({
         role: developmentRemoteRole,
         testClientEnabled: developmentTestClientEnabled,
+        clientTransport: readDevelopmentClientTransport(process.env.OPENBOT_DEV_CLIENT_TRANSPORT),
         centralAuth,
         teamStore,
         setupFile,
@@ -2341,7 +2345,7 @@ export async function createApplicationServices({
     store: teamStore,
     agents: service,
     // Defined below with the startup it waits for; a request runs only after this returns.
-    agentsReady: () => agentInitialization.awaitSettled(),
+    agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
     sidebarLayout,
@@ -2703,6 +2707,16 @@ export async function createApplicationServices({
   service.on("failure", (failure) => analytics.handleFailure(failure));
   resourceMonitor.start(() => analytics.checkResources());
   const connectTrace = new RemoteConnectTrace((span) => trace.record(span));
+  // Development only: a network round trip added to the WebRTC client, for `bun run perf:remote`.
+  const developmentRoundTripMs = app.isPackaged ? 0 : Math.max(0, Number(process.env.OPENBOT_DEV_RTT_MS) || 0);
+  installRemoteSyncProfileSink(
+    remoteSyncProfileFile({
+      isPackaged: app.isPackaged,
+      setting: process.env.OPENBOT_DEV_SYNC_PROFILE,
+      userData: app.getPath("userData"),
+      roundTripMs: developmentRoundTripMs,
+    }),
+  );
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     safeStorageCipher("error.app.macSecureStorageUnavailable"),
@@ -2755,6 +2769,7 @@ export async function createApplicationServices({
         transferDirectory: join(app.getPath("userData"), "remote-transfers"),
         connectTrace,
         sessionCache: remoteSessionCache,
+        developmentRoundTripMs,
       }),
     },
   );
@@ -2804,6 +2819,7 @@ export async function createApplicationServices({
       startDevelopmentRemoteRole({
         role: developmentRemoteRole,
         testClientEnabled: developmentTestClientEnabled,
+        clientTransport: readDevelopmentClientTransport(process.env.OPENBOT_DEV_CLIENT_TRANSPORT),
         host,
         remoteServers,
       }),
@@ -2997,10 +3013,12 @@ export async function createApplicationServices({
     updaterCacheDirectory,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
-  const agentInitialization = new AgentInitializationGate(() =>
+  const agentInitialization = new AgentInitializationGate((rosterLoaded) =>
     Effect.gen(function* () {
       yield* Fiber.join(computerUseWarmUp);
       yield* service.initialize({ heldRoutines: takeRoutineHold(routineHoldFile, (message) => logger.warn(message)) });
+      // A client's agent list waits only until here. The steps below do not change the roster.
+      yield* rosterLoaded;
       yield* eventsRuntime.start();
       yield* automation.sync();
       // Picks up the flows a restart stopped between one agent's answer and the next agent's message.

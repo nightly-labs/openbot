@@ -368,36 +368,20 @@ export class RemoteServerClient {
   }).bind(this);
 
   /**
-   * Re-reads what a WebRTC host supports and records it. Unlike the pinned V2 framing the WebRTC arm
-   * always uses, this reports the host's real protocol range, so the user is told to update the end
-   * that is actually behind.
+   * The one compatibility read after a WebRTC connect. It is the shared negotiation of
+   * `ensureCompatibility`, so a request that the connect starts at the same time waits for this read
+   * and does not send its own. The caller is a `connected` handler with nowhere to put an error, so
+   * this records it: the transport raises `protocol_error` for a frame the released adapter refuses,
+   * and a host talking nonsense must not look healthy.
    */
 
   readonly refreshWebRtcCompatibility = Effect.fn("RemoteClient.refreshWebRtcCompatibility")(function* (
     this: RemoteServerClient,
-    serverId: string,
+    server: StoredRemoteServerView,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     if (!this.#transport) return;
-    const attempt3 = yield* Effect.gen({ self: this }, function* () {
-      // The request is inside the reporting `try`, not before it: the transport itself raises
-      // `protocol_error` for a frame the released adapter refuses, and that is the same failure as a
-      // compatibility body that will not decode. The caller of this one is a `connected` handler
-      // with nowhere to put an error, so recording it here is the only thing that stops the app
-      // treating a host talking nonsense as healthy.
-      const value = yield* this.#hostRequestEffect(serverId, TEAM_API_ROUTES.compatibility);
-      return yield* remoteDecode(() =>
-        decodeOrProtocolError(decodeTeamProtocolSupportV9, value, sourceText("error.remote.invalidCompatibility")),
-      );
-    }).pipe(Effect.result);
-    if (Result.isFailure(attempt3)) {
-      const error = attempt3.failure.cause;
-      this.#connections.reportError(serverId, error);
-      return yield* new RemoteWorkflowError({ cause: error });
-    }
-    const host = attempt3.success;
-    this.#connections.setCompatibility(
-      serverId,
-      negotiatedCompatibility(this.#appVersion, host, highestCommonTeamProtocol(LOCAL_TEAM_PROTOCOL, host.protocol)),
+    yield* this.ensureCompatibility(server, true).pipe(
+      Effect.tapError(({ cause }) => Effect.sync(() => this.#connections.reportError(server.id, cause))),
     );
   }).bind(this);
 

@@ -73,6 +73,7 @@ const peerDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch
 
 import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
+import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from "./sync-profile";
 
 export type { RemoteFileUpload } from "./file-upload";
 export { MOBILE_ATTACHMENT_BYTES } from "./file-upload";
@@ -312,6 +313,7 @@ interface PendingRequest {
   resolve: (value: { status: number; body: TeamProtocolV2Json }) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  profile: RemoteRequestProfile | null;
 }
 
 interface PeerState {
@@ -451,11 +453,21 @@ class RemotePeerIO extends Context.Service<
   }
 }
 
+/** The highest protocol of each host, from its last compatibility read. */
+export interface RemoteHostProtocols {
+  get(hostId: string): number | undefined;
+  set(hostId: string, protocol: number): void;
+}
+
 /**
  * `waitForHost` asks Signal to hold an attempt while the host is offline, rather than fail it. The
- * consumer must handle the `hostOffline` update.
+ * consumer must handle the `hostOffline` update. `hostProtocols` can keep the protocols after the
+ * peer ends; the default keeps them for the life of the peer.
  */
-export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost?: boolean } = {}) {
+export function createRemoteTeamPeer(
+  actions: ActionsRef,
+  options: { waitForHost?: boolean; hostProtocols?: RemoteHostProtocols } = {},
+) {
   const runtime = ManagedRuntime.make(RemotePeerIO.layer(actions));
   const workScope = Scope.makeUnsafe();
   const running = new Set<Promise<unknown>>();
@@ -470,6 +482,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
   }
 
   let active = true;
+  let waitForHost = options.waitForHost ?? false;
   /** When the consumer last made this peer inactive, such as when the app went to the background. */
   let inactiveSince: number | null = null;
   let peer: PeerState | null = null;
@@ -501,7 +514,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
   let retainedSession: { hostId: string; sessionId: string } | null = null;
   // A new peer of a known host sends the capabilities of its last protocol. With the bootstrap
   // capabilities, the host would hide the agents of the providers that protocol 7 does not know.
-  const hostProtocols = new Map<string, number>();
+  const hostProtocols: RemoteHostProtocols = options.hostProtocols ?? new Map<string, number>();
 
   return {
     async sendHostStreamData(data: string | ArrayBuffer) {
@@ -517,6 +530,10 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
       void runPeerEffect(sendEventControl(state, { type: "team-typing", agentId, typing })).catch(() => undefined);
     },
     execute: (command: RemoteTeamCommand) => runPeerEffect(executeCommand(command, actions)),
+    /** Changes `waitForHost` for the next Signal hello, such as when a status connection becomes the opened host. */
+    setWaitForHost(value: boolean) {
+      waitForHost = value;
+    },
     dispose: async () => {
       active = false;
       await runPeerEffect(closePeer(actions.current.endSession));
@@ -591,6 +608,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
     },
   };
   function diagnosticCall(state: PeerState, step: RemoteTeamDiagnostic["step"], detail?: string) {
+    markRemoteSync(`peer:${step}`);
     const diagnostic: RemoteTeamDiagnostic = { hostId: state.hostId, step, ...(detail ? { detail } : {}) };
     return peerCall(() => actions.current.onDiagnostic?.(diagnostic));
   }
@@ -996,7 +1014,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         version: SIGNAL_PROTOCOL_VERSION,
         peer: "client",
         token: state.resumeToken ?? state.ticket,
-        ...(options.waitForHost ? { waitForHost: true } : {}),
+        ...(waitForHost ? { waitForHost: true } : {}),
       };
       socket.send(JSON.stringify(hello));
     };
@@ -1409,6 +1427,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
         state.answeredRequest = true;
         const pending = pendingRequests.get(frame.requestId);
         if (!pending) return;
+        pending.profile?.responded(data);
         // The host's code names its operation. Its text stays the message, as before.
         if ("error" in frame)
           pending.reject(referenced(frame.error.message, referenceFrom("host", frame.error.status, frame.error.code)));
@@ -1666,6 +1685,7 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               path,
               resolve,
               reject,
+              profile: startRemoteRequest(method, path, payload),
               timer: setTimeout(
                 checksConnection ? checkPath : expire,
                 checksConnection
@@ -1690,10 +1710,11 @@ export function createRemoteTeamPeer(actions: ActionsRef, options: { waitForHost
               workScope,
               { startImmediately: true },
             ).pipe(Effect.andThen(Deferred.await(answer))),
-          (pending) =>
+          (pending, exit) =>
             Effect.sync(() => {
               clearTimeout(pending.timer);
               pendingRequests.delete(requestId);
+              pending.profile?.end(exit);
             }),
         );
         // A response confirms that the host has every uploaded byte.

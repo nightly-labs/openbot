@@ -1418,6 +1418,12 @@ if (!hasSingleInstanceLock) {
       await runCauseEffect(dynamicIsland.initialize()).catch((error) =>
         logger.error("Unable to initialize Dynamic Island:", toLogValue(error)),
       );
+      const reconcileDynamicIsland = () =>
+        void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
+          logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
+        );
+      // The island pages load beside the main window, not before it.
+      reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
       // `sendToRenderer` dropped the server changes made while the window loaded: the host list and
@@ -1425,10 +1431,6 @@ if (!hasSingleInstanceLock) {
       forwardServers(remoteServers.list());
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
-      const reconcileDynamicIsland = () =>
-        void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
-          logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
-        );
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);

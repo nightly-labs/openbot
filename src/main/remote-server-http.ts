@@ -20,6 +20,7 @@ import {
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
+import { startRemoteRequest } from "@openbot/team-client/sync-profile";
 import { Effect, Result, Schema } from "effect";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
@@ -51,6 +52,21 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
   const method = options.method ?? (options.body === undefined ? "GET" : "POST");
   const sideRoute = teamSideRouteCodec(path);
   const codec = teamHttpCodec(options.protocol);
+  const body =
+    options.body === undefined
+      ? undefined
+      : sideRoute
+        ? JSON.stringify(sideRoute.request(path, options.body))
+        : codec.encodeRequest(method, path, options.body, {
+            ...(options.preserveSemanticTags === undefined
+              ? {}
+              : { preserveSemanticTags: options.preserveSemanticTags }),
+            ...(options.agentCreateModel === undefined ? {} : { agentCreateModel: options.agentCreateModel }),
+          });
+  const profile = yield* Effect.acquireRelease(
+    Effect.sync(() => startRemoteRequest(method, path, body ?? "", "http")),
+    (profile, exit) => Effect.sync(() => profile?.end(exit)),
+  );
   const response = yield* remoteFetch(
     new URL(path, apiUrl),
     {
@@ -64,21 +80,17 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
         ...(options.appVersion ? { [TEAM_APP_VERSION_HEADER]: options.appVersion } : {}),
         ...(options.capabilities ? { [TEAM_CAPABILITIES_HEADER]: options.capabilities.join(",") } : {}),
       },
-      ...(options.body === undefined
-        ? {}
-        : {
-            body: sideRoute
-              ? JSON.stringify(sideRoute.request(path, options.body))
-              : codec.encodeRequest(method, path, options.body, {
-                  ...(options.preserveSemanticTags === undefined
-                    ? {}
-                    : { preserveSemanticTags: options.preserveSemanticTags }),
-                  ...(options.agentCreateModel === undefined ? {} : { agentCreateModel: options.agentCreateModel }),
-                }),
-          }),
+      ...(body === undefined ? {} : { body }),
     },
     options.timeoutMs,
   );
+  // Only a development profile reads the body twice: the host sends no length for a JSON body.
+  if (profile)
+    profile.responded(
+      yield* Effect.tryPromise(() => response.clone().arrayBuffer()).pipe(
+        Effect.match({ onFailure: () => 0, onSuccess: (buffer) => buffer.byteLength }),
+      ),
+    );
   let value: unknown;
   if (response.status !== 204) {
     const decoded = yield* Effect.result(

@@ -1,8 +1,20 @@
+import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { createEffect, createSignal, createStore, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  flush,
+  getOwner,
+  isDisposed,
+  onSettled,
+  untrack,
+} from "solid-js";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
@@ -16,6 +28,12 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
+import {
+  deleteRemoteWorkspaceFrame,
+  deleteRemoteWorkspaceFrames,
+  readRemoteWorkspaceFrame,
+  saveRemoteWorkspaceFrame,
+} from "./remote-workspace-frame";
 import { serverSupportsCapability } from "./server-capabilities";
 import { useServerSwitch } from "./server-switch";
 import { useServers } from "./servers-context";
@@ -67,7 +85,15 @@ const ServerScope = createSimpleContext({
       markDirectMessagesRead,
       conversationVisible,
     } = useDirectMessages();
-    const { setModelOptions, activeAgent, setAgentStatus, applyStoredAgents, applyUserHiddenAgents } = useAgents();
+    const {
+      setModelOptions,
+      activeAgent,
+      setAgentStatus,
+      applyStoredAgents,
+      applyFrameAgents,
+      applyUserHiddenAgents,
+      userHiddenAgents,
+    } = useAgents();
     const {
       setBrowserControlState,
       supportsBrowser,
@@ -75,12 +101,14 @@ const ServerScope = createSimpleContext({
       loadControlState: loadBrowserControlState,
       beginBrowserLoad,
     } = useBrowserTabs();
-    const { setSidebarLayout, loadLayout: loadSidebarLayout, reconcileActiveServerPins } = useSidebar();
+    const { sidebarLayout, setSidebarLayout, loadLayout: loadSidebarLayout, reconcileActiveServerPins } = useSidebar();
     const { globalSearchOpen, setGlobalSearchVisibility, selectAgent } = useNavigation();
     const { conversations, clearRecentReplies, requestConversationRead, applyConversationReads, isAgentChatOpen } =
       useConversation();
 
     const [bootstrapReady, setBootstrapReady] = createSignal(false);
+    /** The channel rows of the saved frame, with no text. The sidebar shows them until the host lists channels. */
+    const [frameChannels, setFrameChannels] = createSignal<ChannelSummary[]>([]);
     const [connection, setConnection] = createStore<{
       hasContent: boolean;
       loading: boolean;
@@ -148,6 +176,7 @@ const ServerScope = createSimpleContext({
       const isCurrent = () =>
         scopeIsCurrent() && generation === loadGeneration && sequence === selectedServer()?.connectionSequence;
       if (!isCurrent() || !transportReady()) return;
+      if (server?.kind === "remote") markRemoteSync("workspace-load");
       loadedAccount = untrack(signedInAccount);
       setConnection((draft) => {
         draft.failed = false;
@@ -176,6 +205,8 @@ const ServerScope = createSimpleContext({
         draft.loading = false;
         draft.sequence = sequence;
       });
+      if (server?.kind === "remote" && loadedAccount)
+        saveRemoteWorkspaceFrame(loadedAccount, serverId, { agents, models });
       // By id: a chat window can show a server that the main window does not.
       void serversPort()
         .servers.getPresenceFor(serverId)
@@ -203,12 +234,15 @@ const ServerScope = createSimpleContext({
             draft.panelsFailed = true;
           });
       };
+      const account = server?.kind === "remote" ? untrack(signedInAccount) : null;
       const reads = [
         loadSidebarLayout(server)
           .then((value) => {
             // A layout event can land while this read is in flight. The newer revision stays.
-            if (value && isCurrent())
+            if (value && isCurrent()) {
               setSidebarLayout((current) => (value.revision >= current.revision ? value : current));
+              if (account && server) saveRemoteWorkspaceFrame(account, server.id, { sidebarLayout: value });
+            }
           })
           .catch(failed),
       ];
@@ -218,7 +252,9 @@ const ServerScope = createSimpleContext({
           serversPort()
             .agent.listHiddenAgents(server.id)
             .then((value) => {
-              if (isCurrent()) applyUserHiddenAgents(value.agents);
+              if (!isCurrent()) return;
+              applyUserHiddenAgents(value.agents);
+              if (account) saveRemoteWorkspaceFrame(account, server.id, { hiddenAgents: value.agents });
             })
             .catch(failed),
         );
@@ -293,6 +329,88 @@ const ServerScope = createSimpleContext({
       };
     });
 
+    // A joined server shows the frame of its last load while it connects: the sidebar and the agents,
+    // read-only under the connection notice. The first read replaces it. A setup that is not done
+    // shows its own flow, and an empty roster waits for the host, which opens the setup sheet.
+    createEffect(
+      createMemo(() => {
+        const server = selectedServer();
+        const account = signedInAccount();
+        return server?.kind === "remote" && account && serversLoaded() && setupState()?.completed === true
+          ? `${account}\0${server.id}`
+          : null;
+      }),
+      (key) =>
+        untrack(() => {
+          if (!key || connection.hasContent) return;
+          const [account = "", serverId = ""] = key.split("\0");
+          const frame = readRemoteWorkspaceFrame(account, serverId);
+          if (!frame?.agents.length) return;
+          setModelOptions(frame.models);
+          applyFrameAgents(frame.agents);
+          applyUserHiddenAgents(frame.hiddenAgents);
+          setFrameChannels(frame.channels);
+          const layout = frame.sidebarLayout;
+          if (layout) setSidebarLayout((current) => (layout.revision >= current.revision ? layout : current));
+          setConnection((draft) => {
+            draft.hasContent = true;
+          });
+          markRemoteSync("workspace-frame");
+        }),
+    );
+
+    // A hide, a restore or a move updates the frame at once, so the next start does not show the old sidebar.
+    createEffect(
+      () => {
+        const server = selectedServer();
+        const account = signedInAccount();
+        return server?.kind === "remote" && account && loaded() && !connection.panelsLoading && !connection.panelsFailed
+          ? { account, serverId: server.id, sidebarLayout: sidebarLayout(), hiddenAgents: userHiddenAgents() }
+          : null;
+      },
+      (frame) => {
+        if (frame)
+          saveRemoteWorkspaceFrame(frame.account, frame.serverId, {
+            sidebarLayout: frame.sidebarLayout,
+            hiddenAgents: frame.hiddenAgents,
+          });
+      },
+    );
+
+    // The frames go with the account, with a server that leaves the list, and with ended access.
+    createEffect(
+      () => centralAuth().status === "signed_out",
+      (signedOut) => {
+        if (signedOut) deleteRemoteWorkspaceFrames(null);
+      },
+    );
+    createEffect(
+      createMemo(() => {
+        const account = signedInAccount();
+        if (!account || !serversLoaded()) return null;
+        return [account, ...servers().flatMap((server) => (server.kind === "remote" ? [server.id] : []))].join("\0");
+      }),
+      (key) => {
+        if (!key) return;
+        const [account = "", ...serverIds] = key.split("\0");
+        deleteRemoteWorkspaceFrames(account, serverIds);
+      },
+    );
+    createEffect(
+      createMemo(() => {
+        const server = selectedServer();
+        const account = signedInAccount();
+        return account && server?.kind === "remote" && server.issue?.code === "authentication_required"
+          ? `${account}\0${server.id}`
+          : null;
+      }),
+      (key) => {
+        if (!key) return;
+        const [account = "", serverId = ""] = key.split("\0");
+        deleteRemoteWorkspaceFrame(account, serverId);
+      },
+    );
+
     createEffect(
       () => serverLoadRequest(),
       (request) =>
@@ -347,7 +465,7 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    return { loaded, connection, retryPanels: loadPanels, retry: () => recovery.refresh() };
+    return { loaded, connection, frameChannels, retryPanels: loadPanels, retry: () => recovery.refresh() };
   },
 });
 

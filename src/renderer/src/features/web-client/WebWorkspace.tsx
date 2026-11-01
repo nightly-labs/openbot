@@ -173,6 +173,7 @@ import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt
 import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
+import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -400,6 +401,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   const hostOffline = () => !noHost() && !workspace.state.workspaceLoaded;
+  /** The composer says "Connecting…" while the frame shows and while the open conversation loads. */
+  const conversationConnecting = () =>
+    !workspace.state.hostedSleep &&
+    (workspace.state.status === "connecting" ||
+      (workspace.state.status === "online" &&
+        Boolean(workspace.conversation()) &&
+        !workspace.conversation()?.page &&
+        !workspace.conversation()?.error));
   // A host that restarts into an update drops the connection on purpose. That error is not news.
   const hostUpdating = () => workspace.state.hostRestart?.state === "restarting";
   createServerConnectionToast(() => {
@@ -1215,6 +1224,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const routinesView = () => routinesSupported() && layout.sidebarView() === "routines";
   /** The Routines view lists only agents: a channel has no routine canvas. */
   const channelsListed = () => channelsSupported() && !routinesView();
+  /** Until the host lists channels, the sidebar shows the frame's rows, so the agents below them stay. */
+  const sidebarChannels = () =>
+    !channels.state.listed && !routinesView() && (workspace.state.status !== "online" || channelsSupported())
+      ? workspace.state.frameChannels
+      : channelsListed()
+        ? channels.state.channels
+        : [];
   const savedChannelId = () => {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
@@ -1250,7 +1266,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const hostId = workspace.state.host?.hostId;
       const previous = channelBaseline?.scope === scope ? channelBaseline.channels : null;
       channelBaseline = { scope, channels: list };
-      if (hostId) notifyChannelReplies(hostId, previous, list);
+      if (hostId) {
+        notifyChannelReplies(hostId, previous, list);
+        saveRemoteFrameChannels(props.accountId, hostId, list);
+      }
     },
   });
   onCleanup(
@@ -1956,10 +1975,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 </Show>
                 <Sidebar
                   agentsConnecting={!noHost() && !workspace.state.agentsLoaded}
-                  channels={channelsListed() ? channels.state.channels.filter((channel) => !channel.archived) : []}
-                  deletedChannels={
-                    channelsListed() ? channels.state.channels.filter((channel) => channel.archived) : []
-                  }
+                  channels={sidebarChannels().filter((channel) => !channel.archived)}
+                  deletedChannels={sidebarChannels().filter((channel) => channel.archived)}
                   activeChannelId={tasksOpen() ? null : channels.state.selectedId}
                   onSelectChannel={openChannel}
                   onEditChannel={(id) => openChannel(id, true)}
@@ -2005,6 +2022,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   activeDirectMemberId={null}
                   agentStates={sidebarAgentStates()}
                   channelWaits={sidebarChannelWaitStates()}
+                  channelPreviewsPending={!channels.state.listed}
                   agentMoods={sidebarAgentMoods()}
                   layout={workspace.state.sidebarLayout}
                   layoutMutable={
@@ -2593,6 +2611,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     ? providerAdmin.status()
                     : CONNECTING_STATUS
                 }
+                agentsConnecting={conversationConnecting()}
                 accountUsage={accountUsage()}
                 // As in the desktop app on a joined host: an owner or admin downloads the host's
                 // providers, and Connect runs the provider's route for this tab.

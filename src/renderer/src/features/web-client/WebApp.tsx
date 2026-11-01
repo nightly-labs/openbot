@@ -12,6 +12,7 @@ import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contr
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { classifyFailure } from "@openbot/telemetry";
 import { NotificationObserver, Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
@@ -33,6 +34,7 @@ import {
 import { StaticI18nProvider } from "../../i18n-context";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
+import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { createWebAppearancePreference } from "./web-appearance-preference";
@@ -45,8 +47,8 @@ import { createWebLanguagePreference } from "./web-language-preference";
 export { loadSavedLanguage } from "./web-language-preference";
 
 /**
- * The workspace is its own chunk, so the sign-in screen does not wait for it. A signed-in account
- * loads it after the session check; the sign-in screen loads it after it shows. A failed import is
+ * The workspace is its own chunk, so the sign-in screen does not wait for it. Each session check
+ * starts it beside the session request; a signed-in account waits for both. A failed import is
  * tried again on the next check.
  */
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
@@ -214,6 +216,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   let sessionEnded = false;
   function clearSession(ended = true) {
     sessionEnded = ended;
+    // The saved workspace frames name the agents of the account's servers.
+    if (ended) deleteRemoteWorkspaceFrames(null);
     sessionGeneration += 1;
     setState((draft) => {
       draft.account = null;
@@ -319,8 +323,13 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   }
   async function checkSession() {
     const generation = sessionGeneration;
+    // The workspace code loads beside the session check, not after it.
+    void loadWorkspace().catch(() => undefined);
     try {
-      const account = await showAccount(accountFrom(await request("session")));
+      const session = await request("session");
+      markRemoteSync("session");
+      const account = await showAccount(accountFrom(session));
+      markRemoteSync("workspace-code");
       if (!disposed && generation === sessionGeneration) {
         sessionEnded = false;
         setState((draft) => {

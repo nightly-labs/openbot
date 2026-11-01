@@ -40,11 +40,17 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const draggable = () => !rowProps.channel.archived && layoutMutable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
+  // A row from a saved frame has no last message yet: it shows no preview and no time until the list loads.
+  const previewPending = () => props.channelPreviewsPending === true && !rowProps.channel.lastMessage;
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
+  const time = () =>
+    previewPending() ? "" : sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format);
   const preview = () => {
     // A waiting row previews the question, as on the agent row.
-    const text = wait()?.detail || (rowProps.channel.lastMessage?.text ?? t("sidebar.channel.noMessages"));
+    const text =
+      wait()?.detail ||
+      (rowProps.channel.lastMessage?.text ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
   // The wait label already reads the question, so the label does not say it twice, unless the
@@ -97,14 +103,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
                 )}
               </Show>
             </span>
-            <Show
-              when={wait()}
-              fallback={
-                <span class="agent-row-time">
-                  {sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format)}
-                </span>
-              }
-            >
+            <Show when={wait()} fallback={<span class="agent-row-time">{time()}</span>}>
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>

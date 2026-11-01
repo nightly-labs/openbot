@@ -544,50 +544,87 @@ async function runDevelopmentServices(specs: DevelopmentServiceSpec[], stack: De
   process.once("SIGTERM", () => void stopAll("SIGTERM").then(() => process.exit(143)));
   process.once("SIGHUP", () => void stopAll("SIGTERM").then(() => process.exit(129)));
 
-  try {
-    for (const spec of specs) {
-      const target = cliSpawnTarget(spec.executable, spec.args);
-      const child = spawn(target.command, target.args, {
-        cwd: spec.cwd,
-        env: spec.env,
-        stdio: "inherit",
-        shell: false,
-        detached: process.platform !== "win32",
-        windowsVerbatimArguments: target.windowsVerbatimArguments,
-      });
-      processes.set(spec.name, child);
-      if (stack && child.pid) {
-        // Republished after every spawn rather than once at the end: a stack
-        // that dies while starting still leaves behind the pids of whatever it
-        // did get running, which is what `dev:stop` needs to clear the ports.
-        stack.processes.push({ name: spec.name, pid: child.pid, startedAt: Date.now() });
-        writeDevStackRecord(stack);
-      }
-      const instance = child.pid ? createDevInstanceRecord(spec, child.pid, Date.now()) : null;
-      if (instance) {
-        writeDevInstanceRecord(instance);
-        publishedInstances.push(instance);
-        logger.info(
-          `[${spec.name}] dev:automation can reach this instance with --instance=${instance.instanceId} (:${instance.remoteDebuggingPort}).`,
-        );
-      }
-      child.once("error", (error) => {
-        logger.error(`[${spec.name}] Could not start:`, error.message);
-        void stopAll("SIGTERM").then(() => {
-          process.exitCode = 1;
-        });
-      });
-      child.once("exit", (code, signal) => {
-        if (stopping) return;
-        const result = signal ? `signal ${signal}` : `code ${code ?? 1}`;
-        logger.info(`[${spec.name}] stopped with ${result}. Stopping the other services.`);
-        void stopAll("SIGTERM").then(() => {
-          process.exitCode = code ?? 1;
-        });
-      });
-      if (spec.name === "api") await waitForDevelopmentApi(spec.env.OPENBOT_API_PORT, child);
-      if (spec.name === "remote") await waitForDevelopmentRemote(spec.env.REMOTE_HEALTH_PORT, child);
+  // A service that this runner stops on purpose to start it again.
+  const restarting = new Set<DevelopmentService>();
+
+  const startService = async (spec: DevelopmentServiceSpec): Promise<void> => {
+    const target = cliSpawnTarget(spec.executable, spec.args);
+    const child = spawn(target.command, target.args, {
+      cwd: spec.cwd,
+      env: spec.env,
+      stdio: "inherit",
+      shell: false,
+      detached: process.platform !== "win32",
+      windowsVerbatimArguments: target.windowsVerbatimArguments,
+    });
+    processes.set(spec.name, child);
+    if (stack && child.pid) {
+      // Republished after every spawn rather than once at the end: a stack
+      // that dies while starting still leaves behind the pids of whatever it
+      // did get running, which is what `dev:stop` needs to clear the ports.
+      stack.processes.push({ name: spec.name, pid: child.pid, startedAt: Date.now() });
+      writeDevStackRecord(stack);
     }
+    const instance = child.pid ? createDevInstanceRecord(spec, child.pid, Date.now()) : null;
+    if (instance) {
+      writeDevInstanceRecord(instance);
+      publishedInstances.push(instance);
+      logger.info(
+        `[${spec.name}] dev:automation can reach this instance with --instance=${instance.instanceId} (:${instance.remoteDebuggingPort}).`,
+      );
+    }
+    child.once("error", (error) => {
+      logger.error(`[${spec.name}] Could not start:`, error.message);
+      void stopAll("SIGTERM").then(() => {
+        process.exitCode = 1;
+      });
+    });
+    child.once("exit", (code, signal) => {
+      // A child that a restart replaced can report its exit after the new one starts.
+      if (stopping || processes.get(spec.name) !== child) return;
+      const result = signal ? `signal ${signal}` : `code ${code ?? 1}`;
+      logger.info(`[${spec.name}] stopped with ${result}. Stopping the other services.`);
+      void stopAll("SIGTERM").then(() => {
+        process.exitCode = code ?? 1;
+      });
+    });
+    if (spec.name === "api") await waitForDevelopmentApi(spec.env.OPENBOT_API_PORT, child);
+    if (spec.name === "remote") await waitForDevelopmentRemote(spec.env.REMOTE_HEALTH_PORT, child);
+  };
+
+  // `bun run dev:restart-client` sends SIGUSR2: only the test client stops and starts again, so a
+  // client start can be measured against a host that stays live. Windows has no SIGUSR2.
+  const testClient = specs.find((spec) => spec.name === "test-client");
+  if (testClient && process.platform !== "win32") {
+    process.on("SIGUSR2", () => {
+      const child = processes.get("test-client");
+      if (stopping || restarting.has("test-client") || !child) return;
+      restarting.add("test-client");
+      processes.delete("test-client");
+      logger.info("[test-client] Restarting the test client. The other services keep running.");
+      void (async () => {
+        await stopOwnedProcesses([child], "SIGTERM");
+        if (stack) {
+          stack.processes = stack.processes.filter((entry) => entry.pid !== child.pid);
+          writeDevStackRecord(stack);
+        }
+        const index = publishedInstances.findIndex((record) => record.pid === child.pid);
+        const [instance] = index >= 0 ? publishedInstances.splice(index, 1) : [];
+        if (instance) removeDevInstanceRecord(instance);
+        if (!stopping) await startService(testClient);
+      })()
+        .catch((error: unknown) => {
+          logger.error("[test-client] Could not restart:", error instanceof Error ? error.message : String(error));
+          void stopAll("SIGTERM").then(() => {
+            process.exitCode = 1;
+          });
+        })
+        .finally(() => restarting.delete("test-client"));
+    });
+  }
+
+  try {
+    for (const spec of specs) await startService(spec);
   } catch (error) {
     await stopAll("SIGTERM");
     throw error;

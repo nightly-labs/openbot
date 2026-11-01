@@ -11,6 +11,7 @@
     "./remote-peer": "./src/remote-peer.ts",
     "./remote-recovery": "./src/remote-recovery.ts",
     "./request-id": "./src/request-id.ts",
+    "./sync-profile": "./src/sync-profile.ts",
     "./routine-calendar": "./src/routine-calendar.ts",
     "./routine-calendar-dates": "./src/routine-calendar-dates.ts",
     "./routine-schedule": "./src/routine-schedule.ts",

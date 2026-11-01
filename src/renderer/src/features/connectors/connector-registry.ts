@@ -106,11 +106,13 @@ export function createConnectorRegistry(
   );
   // GitHub tells its availability only after a read, so a new server is read before it can show. A
   // joined server's capabilities come after its id, so the connectors it can reach are part of the key.
+  // The key is a memo because the server summary changes while a workspace loads, and an effect runs
+  // again each time its key is computed.
   createEffect(
-    () => {
+    createMemo(() => {
       const id = server()?.id;
       return id ? `${id}:${reachable().map((controller) => controller.id)}` : undefined;
-    },
+    }),
     (key) => {
       if (key) reload();
     },

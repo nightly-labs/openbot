@@ -410,10 +410,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
-            // Read the host report before negotiating the fixed WebRTC transport. This keeps the
-            // transport view stable when both operations finish in the same event-loop turn.
-            yield* this.#client.refreshWebRtcCompatibility(serverId).pipe(Effect.catch(() => Effect.void));
-            if (server) yield* this.#client.ensureCompatibility(server, true).pipe(Effect.catch(() => Effect.void));
+            if (server) yield* this.#client.refreshWebRtcCompatibility(server).pipe(Effect.catch(() => Effect.void));
             this.#connectTrace?.mark(serverId, "compatibility");
             this.#emitChanged();
             yield* Effect.all(

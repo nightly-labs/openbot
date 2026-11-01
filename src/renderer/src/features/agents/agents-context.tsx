@@ -182,7 +182,9 @@ const Agents = createSimpleContext({
 
     const activeAgent = createMemo(() => {
       if (activeDirectMember()) return undefined;
-      return agentList().find((agent) => agent.id === activeAgentId()) ?? agentList()[0];
+      // Before the first read, a saved frame can show the agents: the saved choice is open in it.
+      const agentId = activeAgentId() || savedAgentId;
+      return agentList().find((agent) => agent.id === agentId) ?? agentList()[0];
     });
 
     function setActiveAgentId(value: string | ((current: string) => string)): void {
@@ -242,6 +244,21 @@ const Agents = createSimpleContext({
       }
       // An agent event can be a provider or an account change made elsewhere.
       hostAccounts.schedule();
+    }
+
+    /**
+     * Shows the agents of a saved frame (`remote-workspace-frame`) until the first read. The roster does
+     * not settle and no agent opens, so nothing reads the host for them, and the setup sheet stays shut.
+     */
+    function applyFrameAgents(storedAgents: ClientAgentSummary[]): void {
+      if (agentListSettled()) return;
+      const host = untrack(hostAccounts.host);
+      // The frame holds no message text: a row shows no preview, not "No messages yet".
+      setAgentList(
+        storedAgents.map((stored) =>
+          createStoredProfile({ ...toAgentProfile(withHostAgentAccount(stored, host)), preview: "" }),
+        ),
+      );
     }
 
     /**
@@ -403,6 +420,7 @@ const Agents = createSimpleContext({
       setExplicitlyOpenedAgentChatId,
       analyticsAgentProperties,
       applyStoredAgents,
+      applyFrameAgents,
       hideAgent,
       forgetHiddenAgent,
       userHiddenAgents,

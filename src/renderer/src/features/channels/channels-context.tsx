@@ -3,6 +3,7 @@ import { createContext, type ParentProps, untrack, useContext } from "solid-js";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
@@ -67,6 +68,13 @@ export function ChannelsProvider(props: ParentProps) {
     // arrives behind it was never seen, however focused the window is. The channel stays
     // selected under the report, which is the state this read has to refuse.
     canMarkRead: () => document.hasFocus() && !windowPage.conversationCovered(),
+    // The rows of a joined server's channels go to its frame for the next start.
+    onList: (channels) => {
+      const server = activeServer();
+      const auth = centralAuth();
+      if (server?.kind === "remote" && auth.status === "signed_in")
+        saveRemoteFrameChannels(auth.user.id, server.id, channels);
+    },
   });
   return <ChannelsControllerProvider controller={controller}>{props.children}</ChannelsControllerProvider>;
 }

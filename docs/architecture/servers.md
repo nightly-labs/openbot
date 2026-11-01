@@ -961,3 +961,118 @@ requests always wait for idle time and preserve any existing schedule. Host rest
 apply. Cancellation, preferences, and forced restarts stay on the administrator-only
 `host-update-v1` routes. Desktop and web clients show member controls only after this capability
 is negotiated; older hosts keep the administrator-only panel.
+
+## Remote connect measurement
+
+`bun run perf:remote` (`scripts/remote-sync-perf-e2e.ts`) is the baseline for lazy sync. It reports
+the time until the workspace can be used, and the host requests that block that point.
+
+- `packages/team-client/src/sync-profile.ts` records each request of `RemotePeer` (web, mobile), of
+  `TeamWebRtcClientTransport` and of the HTTPS arm `requestJson` (desktop main): route template,
+  method, transport, times, bytes and the requests in flight. The dev test client uses the HTTPS arm
+  when its account has no WebRTC membership of the host, so the report names the transport. It records only when a sink is installed. The web harness installs
+  `globalThis.__openbotSyncProfile` before the page loads. Desktop main installs a file sink only in an
+  unpackaged build with `OPENBOT_DEV_SYNC_PROFILE=1`; it writes `dev-sync-profile.ndjson` in the profile
+  root, which no export reads. A route keeps its words and `v<n>` segments; every other segment becomes
+  `:id`, and query values are dropped. Records never go to the trace file, the logs or analytics.
+- Marks use fixed names only, `openbot:remote-<step>`. Web: `session`, `workspace-code`,
+  `hosts-start`, `hosts`, `connect-start`, `peer:<step>`, `connected`, `workspace-ready`,
+  `panels-ready` and `conversation-ready`. Desktop renderer:
+  `workspace-load`, `workspace-shell`, `workspace-ready` and `conversation-ready`. Desktop main keeps
+  its `remote-connect:*` spans in `logs/trace.ndjson`; the harness aligns them by their `at` time.
+- A request that ends before `workspace-ready` is a gate request. The report gives their count, bytes,
+  critical-path depth (the longest chain of requests that do not overlap) and repeated routes, and the
+  count and bytes of the background requests until the client is idle for 500 ms. A repeat is the same
+  method and route template, so one read for each agent also counts; the route table separates them.
+- The `desktop` client has one cold sample, the process that is running, and with
+  `--allow-mutations` it reloads the renderer for the next runs. Main keeps its connection during a
+  reload, so those runs measure the renderer gate only. The cold sample starts with the host when
+  `dev:test-client` starts both, so it includes the host start.
+- The `desktop-start` client (`--allow-mutations`) restarts only the test client with
+  `bun run dev:restart-client`, while the host stays live. The supervisor stops its own test-client
+  child by PID on `SIGUSR2` and starts it again. The run measures from the main process start, which
+  is the first line of `dev-sync-profile.ndjson`. It writes `steps.md`, the time of each step from
+  that origin.
+- `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` makes the test client sign in as the dev host user. The
+  account directory then lists the host, and the client connects over `webrtc-v2` as real users do.
+  Without it, the client joins over the HTTPS arm. A new `dev:seed` gives the host a new id while the account keeps the old one; pass
+  `--host-id=<id>` so the web client opens the new host.
+- `web` runs start with no saved workspace frame and `web-warm` runs start with the frame of the
+  first load; `frameMs` is the time to the `workspace-frame` mark. The first warm web run and the
+  first desktop reload write `web-warm-frame.png` and `desktop-frame.png`. A desktop reload keeps
+  the connection of main, so the host often answers before the screenshot ends; the log says which. `--latency=<ms>` delays
+  each document and fetch request of the web page by that time, and each WebSocket message by half
+  of it. Module files keep their time, because the dev server sends hundreds of them. The page wrapper
+  also delays each `RTCDataChannel` send and message by half of it. For the desktop client, start
+  the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
+  by the full time and each data-channel send and message by half of it. The desktop Signal socket is
+  in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
+  `--latency`.
+- A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
+  an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
+  or a host.
+
+## Remote connect order
+
+A client connects to a live host with as few serial round trips as it can.
+
+- Desktop main does not wait for the Dynamic Island before it loads the main window. Startup reads
+  only the Island preference, and the Island pages load at the same time as the main window.
+- After the WebRTC peer is `connected`, desktop main reads `/v1/compatibility` once
+  (`refreshWebRtcCompatibility` forces the read). It does not read it twice in sequence.
+- The web app loads the workspace code at the same time as the session request.
+- The web client stores the negotiated host protocol in `localStorage`
+  (`openbot.web.host-protocol:<account>:<host>`). It holds the protocol number only. When it has one,
+  the gate reads start with that protocol at the same time as the compatibility read. When the new
+  compatibility gives a different protocol, the client drops the early results and reads again. A
+  first connection, with no stored protocol, reads compatibility first: without it the request frames
+  name the bootstrap capabilities only, and the host answers less or fails.
+- A web server switch does not wait for the old host's session end (`POST .../sessions/<id>/end`).
+  Each switch gives the opened host a new peer, and the old peer ends its sessions in the
+  background. The old host's tab lock stays held until the end returns: the account service gives
+  a new connection to that host the same session while it is active, and a late end would close it.
+- When this tab has an online status connection to the target host, that connection becomes the
+  opened host (`WebHostConnections.handOver`). It keeps its session, Signal socket, WebRTC path and
+  tab lock, and takes the opened host's actions and `waitForHost`. The switch then sends no session,
+  ticket, Signal or ICE step. Status connections use the same stored host protocols as the opened
+  host, so a handed-over peer sends the right capabilities.
+
+## Remote workspace frame
+
+A client that comes back to a joined server shows the workspace of its last load at once, read-only,
+and replaces it when the host answers (`src/renderer/src/features/servers/remote-workspace-frame.ts`).
+
+- The frame holds the agent summaries, the model options, the sidebar layout, the hidden agents, the
+  channel rows and, on the web, the agent that was open. It holds no message text: the `preview` of
+  each agent is removed before the write, and a channel keeps its name, title, members and lead
+  agent, with no last message, instructions or counts. It does not hold capabilities, status,
+  queues or conversations. The channel rows stop the agents below them from moving down when the
+  channel list comes.
+- It is in the renderer's `localStorage`, one key for each account and server
+  (`openbot:remote-frame:v1:<account>:<server>`), not in `openbot.db`. The host stays the source of
+  truth. A frame older than 30 days is not shown, and a frame with no agents is not shown.
+- Desktop applies the frame only when setup is complete and the remote server has no content yet:
+  `hasContent` turns on while `loaded` stays off, so the shell shows the cached-content notice. The
+  frame agents do not become the active agent, and the reads of all queues wait for the first roster
+  from the host, so no host request starts before the connection.
+- Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
+  host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
+  agent avatars load only when the host is online. The web connect starts before the frame renders.
+- A frame agent's row shows no preview: the last message is not known, so it does not say that
+  there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
+  and a channel row with no last message shows no preview and no time.
+- The frame costs one render of the sidebar before the host answers. On a local host with 50 agents
+  in a dev build, the web workspace is ready about 230 ms later than with no frame, and the frame
+  shows about 140 ms before a cold start is ready. With 300 ms added latency the frame shows about
+  1.4 s before a cold start is ready.
+- Both clients write the frame after the workspace read and after the panels read, and again when
+  the user hides, restores or moves an agent, and when the channel rows change. The web also writes
+  the open agent when it changes. An agent that the user opens during the frame stays open after
+  the load.
+- While the frame shows, the composer says that the client connects, and the setup prompts wait
+  for the host's status, so a frame does not show "Complete provider setup".
+- The host answers `GET /v1/agents` when its agents are loaded (`AgentInitializationGate.awaitRoster`).
+  It does not wait for the later start steps (automation sync and the routine sweeps), which do not
+  change the roster. The frame of a server is deleted when the host ends access
+  (revoke), and when the server leaves the account's server list. All frames are deleted on
+  sign-out.

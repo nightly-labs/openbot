@@ -546,8 +546,9 @@ export interface TeamApiOptions {
   store: TeamStore;
   agents: TeamApiAgents;
   /**
-   * Waits for the agent initialization in progress. A host that wakes publishes before its agents
-   * load, and an empty roster then would tell a peer that the server has no agents.
+   * Waits until the agent initialization in progress has loaded the agents. A host that wakes
+   * publishes before its agents load, and an empty roster then would tell a peer that the server has
+   * no agents. The later startup steps, such as the routine sweeps, do not hold the list.
    */
   agentsReady?: (() => Effect.Effect<void>) | undefined;
   skills?: Pick<SkillMarketplaceService, "listInstalledForChatTags"> | undefined;

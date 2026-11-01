@@ -23,6 +23,8 @@ import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
   channels: ChannelSummary[];
+  /** A list read for this reader has answered. Until then, a client can show the channels of its frame. */
+  listed: boolean;
   selectedId: string | null;
   page: ChannelPage | null;
   loading: boolean;
@@ -84,6 +86,7 @@ function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPa
 export function createChannelsController(env: ChannelsEnvironment) {
   const [state, setState] = createStore<ChannelsState>({
     channels: [],
+    listed: false,
     selectedId: null,
     page: null,
     loading: false,
@@ -166,6 +169,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         // Keep each summary object, so the sidebar, which keys its rows by object, does not remount
         // every channel row (and close an open menu) on each refresh.
         reconcile(channels, "id")(state.channels);
+        state.listed = true;
         if (selected && !selectedExists) {
           state.selectedId = null;
           state.editing = null;
@@ -367,6 +371,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
           setState((state) => {
             Object.assign(state, {
               channels: [],
+              listed: false,
               selectedId: selected,
               page: null,
               pending: false,

@@ -24,6 +24,7 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
+import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
@@ -153,6 +154,11 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   const remote = () => activeServer()?.kind === "remote";
+  createRemoteSyncMarks({
+    "workspace-shell": () => remote() && serversLoaded(),
+    "workspace-ready": () => remote() && scope.loaded(),
+    "conversation-ready": () => remote() && activeConversation()?.loaded === true,
+  });
   // Only Signal knows that the computer is off. A remote server is also "offline" before its first connection.
   const offlineUpsell = createHostedUpsellOffline(
     () => remote() && activeServer()?.issue?.reference === "signal/host_unavailable",

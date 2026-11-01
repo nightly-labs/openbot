@@ -38,6 +38,15 @@ import {
 const RELEASED_HOST_REST_MS = 30_000;
 
 type Peer = ReturnType<typeof createRemoteTeamPeer>;
+type PeerActions = Parameters<typeof createRemoteTeamPeer>[0];
+
+/** A live status connection that the opened host takes over, with the host's tab lock. */
+export interface WebHostHandover {
+  peer: Peer;
+  /** Set `current` to the opened host's actions: the status connection no longer hears the peer. */
+  actions: PeerActions;
+  releaseLock: () => void;
+}
 
 /** A host request that failed. `reference` names the status or the transport failure. */
 export class WebHostRequestError extends Error {
@@ -54,6 +63,7 @@ interface HostEntry {
   stop: AbortController;
   releaseLock: (() => void) | null;
   peer: Peer | null;
+  actions: PeerActions | null;
   recovery: ReturnType<typeof createRemoteConnectionRecovery> | null;
   /** The connect command in progress. Its bootstrap can still end the session after `dispose`. */
   connecting: Promise<unknown> | null;
@@ -95,6 +105,11 @@ export interface WebHostConnections {
   setHosts(hosts: readonly RemoteTeamHost[]): void;
   /** The host this tab opens, or null. Resolves when its status connection has ended. */
   select(hostId: string | null): Promise<void>;
+  /**
+   * Takes the online status connection of a host that this tab opens, with its lock, so the open needs
+   * no new session or path. Returns null when the host has no online status connection. Call before `select`.
+   */
+  handOver(hostId: string): WebHostHandover | null;
   /** Whether this tab holds the lock of the opened host. Only then does it speak for that host. */
   holdSelected(hostId: string, held: boolean): void;
   /** The state of the opened host, for the other tabs. */
@@ -139,6 +154,8 @@ export function createWebHostConnections(options: {
   channel: BroadcastChannel;
   actions: Pick<RemoteTeamPeerActions, "getBootstrap" | "endSession">;
   createPeer: typeof createRemoteTeamPeer;
+  /** The opened host's peer options apart from `waitForHost`, so a status connection can become it. */
+  peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols">;
   acquireHostLock: typeof acquireWebHostLock;
   /** Throws when the host identity differs from the pinned one. */
   pinHostKey(host: RemoteTeamHost): void;
@@ -180,6 +197,7 @@ export function createWebHostConnections(options: {
       stop: new AbortController(),
       releaseLock: null,
       peer: null,
+      actions: null,
       recovery: null,
       connecting: null,
       endingSessions: new Set(),
@@ -207,7 +225,7 @@ export function createWebHostConnections(options: {
     // The peer's code goes with its text, so the recovery keeps both.
     const failed = (message: string | null | undefined, reference: string | undefined) =>
       new WebHostRequestError(message ?? currentText().t("webClient.error.connectionUnavailable"), reference ?? null);
-    const peer = options.createPeer({
+    const actions: PeerActions = {
       current: {
         getBootstrap: options.actions.getBootstrap,
         endSession(sessionId) {
@@ -238,7 +256,9 @@ export function createWebHostConnections(options: {
           } else if (isWebHostNotice(event)) options.onNotice?.(host.hostId, event, entry.agents);
         },
       },
-    });
+    };
+    const peer = options.createPeer(actions, options.peerOptions);
+    entry.actions = actions;
     entry.peer = peer;
     const recovery = createRemoteConnectionRecovery(
       async () => {
@@ -420,6 +440,17 @@ export function createWebHostConnections(options: {
         }
         sync();
       }
+    },
+    handOver(hostId) {
+      const entry = entries.get(hostId);
+      const { peer, actions, releaseLock } = entry ?? {};
+      if (!entry || !peer || !actions || !releaseLock || !entry.capabilities || states.get(hostId) !== "online")
+        return null;
+      // The peer keeps its session and path. Its own session ends still finish before it reconnects.
+      entries.delete(hostId);
+      entry.stop.abort();
+      entry.recovery?.dispose();
+      return { peer, actions, releaseLock };
     },
     holdSelected(hostId, held) {
       if (selected?.hostId !== hostId || selected.held === held) return;

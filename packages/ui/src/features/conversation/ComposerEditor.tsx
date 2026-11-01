@@ -358,11 +358,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
           (id) => attachments.some((attachment) => attachment.id === id) && !renderedAttachments.has(id),
         );
       const contentChanged = draftChanged || value !== lastEmittedValue || attachmentResolved;
-      const selection =
-        !draftChanged && editor.ownerDocument.activeElement === editor ? readEditorSelection(editor) : null;
-      const scrollTop = draftChanged ? 0 : editor.scrollTop;
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
+      const editorChanges = contentChanged || attachmentsChanged || skillsChanged || mcpChanged;
+      // Only a change of the editor's content can move its caret or scroll position. A read of either
+      // lays out the page, and this effect runs for each list that loads while a conversation opens.
+      const selection =
+        editorChanges && !draftChanged && editor.ownerDocument.activeElement === editor
+          ? readEditorSelection(editor)
+          : null;
+      const scrollTop = draftChanged ? 0 : editorChanges ? editor.scrollTop : null;
       const focusRequested = focusRequest > lastFocusRequest;
       if (draftChanged) savedCaret = null;
       if (contentChanged) {
@@ -376,11 +381,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
         if (skillsChanged) syncSkillTokens(editor, skills);
         if (mcpChanged) syncMcpTokens(editor, mcpServers);
       }
-      if (selection && (contentChanged || attachmentsChanged || skillsChanged || mcpChanged)) {
+      if (selection) {
         restoreEditorSelection(editor, selection);
         scheduleCaretScroll();
       }
-      editor.scrollTop = scrollTop;
+      if (scrollTop !== null) editor.scrollTop = scrollTop;
       lastAttachmentKey = attachmentKey;
       lastSkillKey = skillKey;
       lastMcpKey = mcpKey;
