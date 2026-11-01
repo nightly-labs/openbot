@@ -173,6 +173,8 @@ export interface OpenBotToolRouterHooks {
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   /** Records a no-update tool call for the turn; null when no routine run started the turn. */
   requestNoUpdate(agentId: string, threadId: string, turnId: string): "quiet" | "shown" | null;
+  /** Ends an accepted quiet-only routine turn after its tool result has been sent. */
+  completeQuietRoutineTurn(client: AgentClient, threadId: string, turnId: string): Effect.Effect<void>;
   /** Records the reason a routine run failed for the turn; false when no routine run started the turn. */
   reportRoutineFailure(agentId: string, turnId: string, reason: string): boolean;
   /** Starts a new chat with the agent when its turn ends and its queue is empty. */
@@ -513,6 +515,12 @@ export class OpenBotToolRouter {
             yield* tool === "attach_files_to_response" || tool === "html_render"
               ? Effect.uninterruptible(response)
               : response;
+            if (tool === ROUTINE_NO_UPDATE_TOOL && !toolRequest.signal?.aborted)
+              yield* this.#hooks.completeQuietRoutineTurn(
+                client,
+                toolRequest.params.threadId,
+                toolRequest.params.turnId,
+              );
             return;
           }
           throw new Error(`Unsupported dynamic tool namespace: ${toolRequest.params.namespace}`);

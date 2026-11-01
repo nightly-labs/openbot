@@ -4,7 +4,7 @@
 // names in `<<CALLS[...]CALLS>>`, logs each result, and then answers. The check asserts that a called
 // run ends `failed` with the redacted reason while its delivery stays `completed` and its answer shows,
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
-// still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
+// still wins, that a reported failure stays visible, that the tool fails outside a routine run, that
 // a flow skips the agents after a failed owner or linked step, and that a result destination gets the
 // answer of a reported failure but not of a provider failure.
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
@@ -140,10 +140,11 @@ const answer = (message) => {
       const next = /<<NEXT([\\s\\S]*?)NEXT>>/.exec(task);
       const turnCalls = named ? JSON.parse(named[1]) : [];
       const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
-      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL") });
+      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), quietHang: task.includes("QUIET-HANG") });
     }
     case "turn/interrupt": {
       write({ id: message.id, result: {} });
+      write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
       return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
     }
     default:
@@ -164,7 +165,7 @@ process.stdin.on("data", (chunk) => {
         const { turn, tool } = waiting.get(message.id);
         waiting.delete(message.id);
         log({ method: "tool-result", turnId: turn.turnId, tool, result: message.result ?? null, error: message.error ?? null });
-        callNext(turn);
+        if (!turn.quietHang || tool !== "routine_no_update" || !message.result?.contentItems?.some((item) => item.text.includes('"quiet"'))) callNext(turn);
       }
     }
     newline = buffer.indexOf("\\n");
@@ -367,7 +368,7 @@ try {
     "Quiet failed",
     `Check quietly. ${calls(noUpdate, reportFailure(REASON))}`,
   );
-  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. ${calls(noUpdate)}`);
+  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. QUIET-HANG ${calls(noUpdate)}`);
   const failedThenQuiet = createRoutine(
     checker.id,
     "Failed then quiet",
@@ -483,8 +484,16 @@ try {
     healthAfter?.status === "failed" && healthAfter.error === healthRun.run.error,
   );
 
-  // Script runs: a reported failure is never quiet, also after `routine_no_update`.
+  // Script runs: an accepted no-update call ends the run without another model response.
   await runCauseEffect(agents.updateAgent({ agentId: checker.id, allowAutomation: true }));
+  const quietTestRun = await settledRun(
+    "Quiet Test",
+    await runCauseEffect(agents.testRoutine({ agentId: checker.id, routineId: quietOk.id })),
+  );
+  pass(
+    "A Test no-update call keeps the visible answer",
+    quietTestRun.run.status === "succeeded" && turnCompleted(quietTestRun.delivery.turnId)?.quiet !== true,
+  );
   const quietOkRun = await settledRun(
     "Quiet ok",
     await runCauseEffect(agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietOk.id, payload: "" })),
@@ -493,6 +502,11 @@ try {
     "A script run with only routine_no_update is quiet",
     quietOkRun.run.status === "succeeded" && turnCompleted(quietOkRun.delivery.turnId)?.quiet === true,
   );
+  pass(
+    "A duplicate stop completion settles the quiet turn once",
+    events.filter((event) => event.type === "turn-completed" && event.turnId === quietOkRun.delivery.turnId).length ===
+      1,
+  );
   const quietFailedRun = await settledRun(
     "Quiet failed",
     await runCauseEffect(
@@ -500,10 +514,10 @@ try {
     ),
   );
   pass(
-    "A failed script run is not quiet, also after routine_no_update",
-    quietFailedRun.run.status === "failed" &&
-      turnCompleted(quietFailedRun.delivery.turnId) !== undefined &&
-      turnCompleted(quietFailedRun.delivery.turnId)?.quiet !== true,
+    "An accepted quiet completion does not execute later tool calls",
+    quietFailedRun.run.status === "succeeded" &&
+      turnCompleted(quietFailedRun.delivery.turnId)?.quiet === true &&
+      toolResults(quietFailedRun.delivery.turnId, "routine_report_failure").length === 0,
     turnCompleted(quietFailedRun.delivery.turnId),
   );
   const failedThenQuietRun = await settledRun(
