@@ -1001,6 +1001,48 @@
   outline-offset: 2px;
 }
 
+.message-link-preview {
+  z-index: var(--openbot-layer-tooltip);
+  display: flex;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-canvas);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  pointer-events: auto;
+}
+
+.message-link-preview-title,
+.message-link-preview-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-link-preview-title {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.message-link-preview-address {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--openbot-text-muted);
+}
+
+.message-link-preview-arrow {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  margin-left: var(--openbot-space-2);
+}
+
 .message-citation {
   position: relative;
   display: inline;
