@@ -35,4 +35,51 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",
+  "error.connector.telegramAccountCredentialsMissing":
+    "Telegram uygulamanızın api_id ve api_hash değerlerini girin. Bunları my.telegram.org adresinden alabilirsiniz.",
+  "error.connector.telegramAccountCredentialsInvalid":
+    "api_id bir sayıdır ve api_hash 0-9 ile a-f arasındaki 32 karakterden oluşur. Bunları my.telegram.org adresinden yeniden kopyalayın.",
+  "error.connector.telegramAccountApiRejected":
+    "Telegram bu api_id ve api_hash değerlerini kabul etmiyor. Bunları my.telegram.org adresinden yeniden kopyalayın.",
+  "error.connector.telegramAccountPhoneFormat": "Telefon numarasını ülke koduyla girin, örneğin +48 600 100 200.",
+  "error.connector.telegramAccountPhoneInvalid": "Telegram bu numarayı tanımıyor. Ülke kodunu ekleyin, örneğin +48.",
+  "error.connector.telegramAccountCodeInvalid": "Bu kod doğru değil. Kontrol edip yeniden deneyin.",
+  "error.connector.telegramAccountCodeEmpty": "Telegram'ın size gönderdiği kodu girin.",
+  "error.connector.telegramAccountCodeExpired": "Kodun süresi doldu. Yeni bir kod almak için yeniden başlayın.",
+  "error.connector.telegramAccountPasswordInvalid": "Bu parola doğru değil. Yeniden deneyin.",
+  "error.connector.telegramAccountPasswordEmpty": "İki adımlı doğrulama parolanızı girin.",
+  "error.connector.telegramAccountPasswordNeeded": "Telegram iki adımlı doğrulama parolanıza ihtiyaç duyuyor.",
+  "error.connector.telegramAccountNoAccount":
+    "Bu numaranın Telegram hesabı yok. Zaten Telegram kullanan bir numarayla giriş yapın.",
+  "error.connector.telegramAccountPhoneBanned": "Telegram bu numarayı yasakladı.",
+  "error.connector.telegramAccountQrExpired": "QR kodun süresi siz taramadan önce doldu. Yeniden başlayın.",
+  "error.connector.telegramAccountFloodWait": "Telegram beklemenizi istiyor. {count} dk sonra yeniden deneyin.",
+  "error.connector.telegramAccountCancelled": "Telegram girişi iptal edildi.",
+  "error.connector.telegramAccountTimedOut": "Giriş, 10 dakika boyunca etkinlik olmadığı için durdu. Yeniden başlayın.",
+  "error.connector.telegramAccountMovedOn": "Giriş başka bir adıma geçti. Yeniden başlayın.",
+  "error.connector.telegramAccountRefused": "Telegram girişi reddetti: {detail}",
+  "error.connector.telegramAccountSaveFailed": "OpenBot Telegram bağlantısını kaydedemedi: {detail}",
+  "error.connector.telegramAccountSessionEnded":
+    "Telegram bu oturumu sonlandırdı, örneğin Ayarlar > Cihazlar bölümünde. Telegram hesabınızı yeniden bağlayın.",
+  "error.connector.telegramAccountFileUnreadable": "Telegram hesabı bağlantı dosyası okunamıyor.",
+  "error.connector.telegramAccountFileTooLarge": "Telegram hesabı bağlantı dosyası çok büyük.",
+  "error.connector.whatsappAccountPhoneFormat": "Telefon numarasını ülke koduyla girin, örneğin +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp bir kod vermedi: {detail}",
+  "error.connector.whatsappAccountQrExpired": "Kodun süresi siz kullanmadan önce doldu. Yeniden başlayın.",
+  "error.connector.whatsappAccountTimedOut":
+    "Bağlama, 10 dakika boyunca etkinlik olmadığı için durdu. Yeniden başlayın.",
+  "error.connector.whatsappAccountMovedOn": "Bağlama başka bir adıma geçti. Yeniden başlayın.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp bu cihazı bağlamadı: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot WhatsApp bağlantısını kaydedemedi: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp bu cihazı kaldırdı, örneğin Ayarlar > Bağlı cihazlar bölümünde. WhatsApp hesabınızı yeniden bağlayın.",
+  "error.connector.whatsappAccountReplaced":
+    "Başka bir program bu bağlı cihazı açtı, bu yüzden WhatsApp buradaki bağlantıyı kapattı. Bağlantıyı kesin, sonra yeniden bağlayın.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp bu cihazı reddetti. Numaranız kısıtlanmış olabilir. Telefonunuzdaki WhatsApp'ı kontrol edin.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp bağlantının bu sürümünü artık kabul etmiyor. OpenBot'u güncelleyin, sonra yeniden bağlayın.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp'a şu anda ulaşılamıyor. OpenBot yeniden deniyor. Ajanlar bu bilgisayardaki sohbetleri okumaya devam edebilir.",
+  "error.connector.whatsappAccountFileUnreadable": "WhatsApp hesabı bağlantı dosyası okunamıyor.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -498,6 +498,11 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
+import type {
+  TelegramAccountConnectInput,
+  TelegramAccountConnectorStatus,
+  TelegramAccountSubmitInput,
+} from "./ipc-telegram-account-connector";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState } from "./ipc-vault";
 import type {
   SpeechAudio,
@@ -518,6 +523,11 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type {
+  WhatsAppAccountConnectInput,
+  WhatsAppAccountConnectorStatus,
+  WhatsAppAccountSubmitInput,
+} from "./ipc-whatsapp-account-connector";
 import type {
   WorkflowGitHubCatalog,
   WorkflowGitHubHistory,
@@ -1235,6 +1245,64 @@ export const IPC_ENDPOINTS = {
     ),
     hostDisconnect: scopedQuery<OnePasswordConnectorStatus, "required">()("onepassword-connector:host-disconnect"),
   },
+  // The Telegram account connection of this computer: OpenBot signs in to the user's own Telegram
+  // account. `connect` can carry the API credentials and `submit` carries a phone number, a code or a
+  // two-step password, once each; every answer is the status only. The `host*` endpoints do the same
+  // for a joined server (`telegram-account-connector-v1`): the host runs the sign-in and keeps the session.
+  telegramAccountConnector: {
+    status: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:status"),
+    connect: request<TelegramAccountConnectInput, TelegramAccountConnectorStatus>()(
+      "telegram-account-connector:connect",
+    ),
+    submit: request<TelegramAccountSubmitInput, TelegramAccountConnectorStatus>()("telegram-account-connector:submit"),
+    cancel: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:cancel"),
+    disconnect: request<undefined, TelegramAccountConnectorStatus>()("telegram-account-connector:disconnect"),
+    setSending: request<boolean, TelegramAccountConnectorStatus>()("telegram-account-connector:set-sending"),
+    changed: event<TelegramAccountConnectorStatus>()("telegram-account-connector:changed"),
+    hostStatus: scopedQuery<TelegramAccountConnectorStatus, "required">()("telegram-account-connector:host-status"),
+    hostConnect: scopedRequest<TelegramAccountConnectInput, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-connect",
+    ),
+    hostSubmit: scopedRequest<TelegramAccountSubmitInput, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-submit",
+    ),
+    hostCancel: scopedQuery<TelegramAccountConnectorStatus, "required">()("telegram-account-connector:host-cancel"),
+    hostDisconnect: scopedQuery<TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-disconnect",
+    ),
+    hostSetSending: scopedRequest<boolean, TelegramAccountConnectorStatus, "required">()(
+      "telegram-account-connector:host-set-sending",
+    ),
+  },
+  // The WhatsApp account connection of this computer: OpenBot links itself to the user's own WhatsApp
+  // account as a linked device. `submit` carries the phone number for a link with a code; every
+  // answer is the status only. The `host*` endpoints do the same for a joined server
+  // (`whatsapp-account-connector-v1`): the host runs the link and keeps the keys of the device.
+  whatsappAccountConnector: {
+    status: request<undefined, WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:status"),
+    connect: request<WhatsAppAccountConnectInput, WhatsAppAccountConnectorStatus>()(
+      "whatsapp-account-connector:connect",
+    ),
+    submit: request<WhatsAppAccountSubmitInput, WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:submit"),
+    cancel: request<undefined, WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:cancel"),
+    disconnect: request<undefined, WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:disconnect"),
+    setSending: request<boolean, WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:set-sending"),
+    changed: event<WhatsAppAccountConnectorStatus>()("whatsapp-account-connector:changed"),
+    hostStatus: scopedQuery<WhatsAppAccountConnectorStatus, "required">()("whatsapp-account-connector:host-status"),
+    hostConnect: scopedRequest<WhatsAppAccountConnectInput, WhatsAppAccountConnectorStatus, "required">()(
+      "whatsapp-account-connector:host-connect",
+    ),
+    hostSubmit: scopedRequest<WhatsAppAccountSubmitInput, WhatsAppAccountConnectorStatus, "required">()(
+      "whatsapp-account-connector:host-submit",
+    ),
+    hostCancel: scopedQuery<WhatsAppAccountConnectorStatus, "required">()("whatsapp-account-connector:host-cancel"),
+    hostDisconnect: scopedQuery<WhatsAppAccountConnectorStatus, "required">()(
+      "whatsapp-account-connector:host-disconnect",
+    ),
+    hostSetSending: scopedRequest<boolean, WhatsAppAccountConnectorStatus, "required">()(
+      "whatsapp-account-connector:host-set-sending",
+    ),
+  },
   hostedSites: {
     // The sites of one server. A joined server answers through `hosted-sites-v1`.
     list: scopedQuery<HostedSiteList, "required">()("hosted-sites:list"),
@@ -1922,6 +1990,8 @@ export const IPC_GROUP_PATHS = {
   githubConnector: "githubConnector",
   onePasswordConnector: "onePasswordConnector",
   bitwardenConnector: "bitwardenConnector",
+  telegramAccountConnector: "telegramAccountConnector",
+  whatsappAccountConnector: "whatsappAccountConnector",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",

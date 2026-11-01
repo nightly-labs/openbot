@@ -248,7 +248,8 @@ export const messages = {
   "connector.discord.accessSave": "Enregistrer",
   "connector.discord.accessHostUpdate": "Mettez à jour OpenBot sur {host} pour choisir des rôles.",
 
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Ajoutez le bot OpenBot à un groupe Telegram ou ouvrez une discussion directe avec lui. Le Telegram Orchestrator sollicite le bon agent et répond.",
   "connector.telegram.statusConnected": "Connecté",
@@ -421,4 +422,152 @@ export const messages = {
   "connector.bitwarden.clientSecret": "client_secret de la clé d’API",
   "connector.bitwarden.masterPassword": "Mot de passe principal",
   "connector.bitwarden.connecting": "Connexion",
+  "connector.telegramAccount.title": "Compte Telegram",
+  "connector.telegramAccount.description":
+    "Les agents peuvent lire vos discussions Telegram et, si vous l’autorisez, envoyer des messages en votre nom.",
+  "connector.telegramAccount.descriptionHost":
+    "Les agents de {host} peuvent lire vos discussions Telegram et, si vous l’autorisez, envoyer des messages en votre nom.",
+  "connector.telegramAccount.statusConnecting": "Connexion",
+  "connector.telegramAccount.statusConnected": "Connecté",
+  "connector.telegramAccount.actionFailed": "OpenBot n’a pas pu modifier la connexion du compte Telegram.",
+  "connector.telegramAccount.disconnectTitle": "Déconnecter le compte Telegram",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot ferme cette session. Les agents ne peuvent plus lire ni envoyer de messages, et l’envoi est désactivé.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} ferme cette session. Les agents de {host} ne peuvent plus lire ni envoyer de messages, et l’envoi est désactivé.",
+  "connector.telegramAccount.disconnect": "Déconnecter",
+  "connector.telegramAccount.signInTitle": "Connexion",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot se connecte à votre propre compte Telegram, comme Telegram Desktop. La session reste chiffrée sur cet ordinateur. Telegram l’affiche dans Paramètres › Appareils sous le nom OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} se connecte à votre propre compte Telegram, comme Telegram Desktop. La session reste chiffrée sur {host}. Telegram l’affiche dans Paramètres › Appareils sous le nom OpenBot.",
+  "connector.telegramAccount.signInProgress":
+    "Suivez l’étape ci-dessous pour vous connecter. Annuler arrête la connexion.",
+  "connector.telegramAccount.methodTitle": "Se connecter avec",
+  "connector.telegramAccount.methodQrDescription": "Scannez un code avec Telegram sur votre téléphone.",
+  "connector.telegramAccount.methodPhoneDescription":
+    "Saisissez votre numéro de téléphone et le code que Telegram vous envoie.",
+  "connector.telegramAccount.methodQr": "Code QR",
+  "connector.telegramAccount.methodPhone": "Téléphone",
+  "connector.telegramAccount.credentialsTitle": "api_id et api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot utilise votre propre application Telegram de my.telegram.org. Après la première connexion, cet ordinateur garde son api_id et son api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot utilise votre propre application Telegram de my.telegram.org. Après la première connexion, {host} garde son api_id et son api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Saisir",
+  "connector.telegramAccount.credentialsHelp":
+    "Connectez-vous à my.telegram.org, ouvrez API development tools et créez une application. Copiez ici son api_id et son api_hash.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "Ouvrir my.telegram.org",
+  "connector.telegramAccount.openAppsFailed": "OpenBot n’a pas pu ouvrir my.telegram.org.",
+  "connector.telegramAccount.connect": "Connecter",
+  "connector.telegramAccount.sendingOffNote":
+    "Les agents peuvent seulement lire vos discussions tant que vous n’activez pas l’envoi.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram affiche cette session dans Paramètres › Appareils sous le nom OpenBot. Si vous la fermez là, OpenBot se déconnecte.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram affiche cette session dans Paramètres › Appareils sous le nom OpenBot. Si vous la fermez là, {host} se déconnecte.",
+  "connector.telegramAccount.connecting": "Connexion à Telegram",
+  "connector.telegramAccount.connectingDescription":
+    "Cet ordinateur communique avec Telegram. Cela peut prendre quelques secondes.",
+  "connector.telegramAccount.connectingHost": "{host} communique avec Telegram. Cela peut prendre quelques secondes.",
+  "connector.telegramAccount.qrLabel": "Code QR pour se connecter à Telegram",
+  "connector.telegramAccount.qrTitle": "Scannez ce code avec Telegram sur votre téléphone",
+  "connector.telegramAccount.qrStepOpen": "Ouvrez Telegram sur votre téléphone.",
+  "connector.telegramAccount.qrStepDevices": "Allez dans Paramètres › Appareils › Associer un appareil de bureau.",
+  "connector.telegramAccount.qrStepScan": "Pointez votre téléphone vers ce code.",
+  "connector.telegramAccount.qrRefresh": "Le code change environ toutes les 30 secondes. Scannez le plus récent.",
+  "connector.telegramAccount.usePhone": "Utiliser le téléphone",
+  "connector.telegramAccount.phoneDescription":
+    "Saisissez le numéro de téléphone de votre compte Telegram, avec l’indicatif du pays.",
+  "connector.telegramAccount.phoneLabel": "Numéro de téléphone",
+  "connector.telegramAccount.sendCode": "Envoyer le code",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "Utiliser un code QR",
+  "connector.telegramAccount.codeViaApp":
+    "Telegram a envoyé un code dans l’application Telegram de vos autres appareils.",
+  "connector.telegramAccount.codeViaSms": "Telegram a envoyé un code par SMS.",
+  "connector.telegramAccount.codeDescription": "Saisissez le code que Telegram vous a envoyé.",
+  "connector.telegramAccount.codeLabel": "Code",
+  "connector.telegramAccount.signIn": "Se connecter",
+  "connector.telegramAccount.passwordDescription":
+    "Votre compte utilise la validation en deux étapes. Saisissez son mot de passe.",
+  "connector.telegramAccount.passwordHint": "Indice : {hint}",
+  "connector.telegramAccount.passwordLabel": "Mot de passe de la validation en deux étapes",
+  "connector.telegramAccount.accountTitle": "Compte",
+  "connector.telegramAccount.accountDescription": "Les agents de cet ordinateur utilisent ce compte Telegram.",
+  "connector.telegramAccount.accountDescriptionHost": "Les agents de {host} utilisent ce compte Telegram.",
+  "connector.telegramAccount.sendingLabel":
+    "Autoriser les agents à envoyer des messages et à marquer les discussions comme lues",
+  "connector.telegramAccount.sendingDescription":
+    "Si cette option est désactivée, les agents peuvent seulement lire vos discussions.",
+  "connector.whatsappAccount.title": "Compte WhatsApp",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Les agents peuvent lire vos discussions WhatsApp et, si vous l’autorisez, envoyer des messages en votre nom.",
+  "connector.whatsappAccount.descriptionHost":
+    "Les agents de {host} peuvent lire vos discussions WhatsApp et, si vous l’autorisez, envoyer des messages en votre nom.",
+  "connector.whatsappAccount.statusConnecting": "Connexion",
+  "connector.whatsappAccount.statusConnected": "Connecté",
+  "connector.whatsappAccount.actionFailed": "OpenBot n’a pas pu modifier la connexion du compte WhatsApp.",
+  "connector.whatsappAccount.disconnectTitle": "Déconnecter le compte WhatsApp",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot déconnecte cet appareil connecté et supprime ses clés et ses discussions de cet ordinateur. L’envoi est désactivé.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} déconnecte cet appareil connecté et supprime ses clés et ses discussions. L’envoi est désactivé.",
+  "connector.whatsappAccount.disconnect": "Déconnecter",
+  "connector.whatsappAccount.linkTitle": "Connexion",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot devient un appareil connecté de votre compte WhatsApp, comme WhatsApp Web. Votre téléphone reste l’appareil principal. Les clés et les discussions restent chiffrées sur cet ordinateur.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} devient un appareil connecté de votre compte WhatsApp, comme WhatsApp Web. Votre téléphone reste l’appareil principal. Les clés et les discussions restent chiffrées sur {host}.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp ne propose pas d’accès officiel pour les comptes personnels. OpenBot utilise un client WhatsApp Web non officiel, et WhatsApp peut limiter ou bannir les numéros qu’il juge automatisés. N’envoyez que ce que vous enverriez vous-même.",
+  "connector.whatsappAccount.linkProgress":
+    "Suivez l’étape ci-dessous pour connecter l’appareil. Annuler arrête la connexion.",
+  "connector.whatsappAccount.methodTitle": "Connecter avec",
+  "connector.whatsappAccount.methodQrDescription": "Scannez un code avec WhatsApp sur votre téléphone.",
+  "connector.whatsappAccount.methodPhoneDescription": "Saisissez un code sur votre téléphone au lieu de scanner.",
+  "connector.whatsappAccount.methodQr": "Code QR",
+  "connector.whatsappAccount.methodPhone": "Téléphone",
+  "connector.whatsappAccount.connect": "Connecter",
+  "connector.whatsappAccount.sendingOffNote":
+    "Les agents peuvent seulement lire vos discussions tant que vous n’activez pas l’envoi.",
+  "connector.whatsappAccount.connecting": "Connexion à WhatsApp",
+  "connector.whatsappAccount.connectingDescription":
+    "Cet ordinateur communique avec WhatsApp. Cela peut prendre quelques secondes.",
+  "connector.whatsappAccount.connectingHost": "{host} communique avec WhatsApp. Cela peut prendre quelques secondes.",
+  "connector.whatsappAccount.qrLabel": "Code QR pour connecter WhatsApp",
+  "connector.whatsappAccount.qrTitle": "Scannez ce code avec WhatsApp sur votre téléphone",
+  "connector.whatsappAccount.stepOpen": "Ouvrez WhatsApp sur votre téléphone.",
+  "connector.whatsappAccount.stepDevices": "Allez dans Réglages › Appareils connectés › Connecter un appareil.",
+  "connector.whatsappAccount.qrStepScan": "Pointez votre téléphone vers ce code.",
+  "connector.whatsappAccount.qrRefresh": "Le code change environ toutes les 20 secondes. Scannez le plus récent.",
+  "connector.whatsappAccount.usePhone": "Utiliser le téléphone",
+  "connector.whatsappAccount.useQr": "Utiliser un code QR",
+  "connector.whatsappAccount.phoneDescription":
+    "Saisissez le numéro de téléphone de votre compte WhatsApp, avec l’indicatif du pays. WhatsApp donne ensuite un code à saisir sur le téléphone.",
+  "connector.whatsappAccount.phoneLabel": "Numéro de téléphone",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Obtenir le code",
+  "connector.whatsappAccount.codeTitle": "Saisissez ce code sur votre téléphone",
+  "connector.whatsappAccount.codeStepPhone": "Appuyez sur Connecter avec le numéro de téléphone à la place.",
+  "connector.whatsappAccount.codeStepType": "Saisissez ce code.",
+  "connector.whatsappAccount.codeLabel": "Code à saisir sur votre téléphone",
+  "connector.whatsappAccount.accountTitle": "Compte",
+  "connector.whatsappAccount.accountDescription": "Les agents de cet ordinateur utilisent ce compte WhatsApp.",
+  "connector.whatsappAccount.accountDescriptionHost": "Les agents de {host} utilisent ce compte WhatsApp.",
+  "connector.whatsappAccount.historyChats": { one: "{count} discussion", other: "{count} discussions" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} message", other: "{count} messages" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp envoie l’historique récent quand l’appareil se connecte, puis chaque nouveau message. Des messages plus anciens peuvent manquer.",
+  "connector.whatsappAccount.sendingLabel":
+    "Autoriser les agents à envoyer des messages et à marquer les discussions comme lues",
+  "connector.whatsappAccount.sendingDescription":
+    "Si cette option est désactivée, les agents peuvent seulement lire vos discussions.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp affiche OpenBot dans Réglages › Appareils connectés. Si vous le déconnectez là-bas, OpenBot est déconnecté.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp affiche OpenBot dans Réglages › Appareils connectés. Si vous le déconnectez là-bas, {host} est déconnecté.",
 } as const satisfies PartialTranslation<typeof source>;

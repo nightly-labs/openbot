@@ -10,6 +10,10 @@ import type { GitHubConnectorPort } from "./github-connector-port";
 import { createMessagingConnector, type MessagingApi, type MessagingConnectorOptions } from "./messaging-connector";
 import { createOnePasswordConnector } from "./onepassword-connector";
 import { type OnePasswordConnectorPort, onePasswordConnectorPort } from "./onepassword-connector-port";
+import { createTelegramAccountConnector } from "./telegram-account-connector";
+import { type TelegramAccountConnectorPort, telegramAccountConnectorPort } from "./telegram-account-connector-port";
+import { createWhatsAppAccountConnector } from "./whatsapp-account-connector";
+import { type WhatsAppAccountConnectorPort, whatsappAccountConnectorPort } from "./whatsapp-account-connector-port";
 
 /** The connectors of one place. A connector that the place cannot reach has no controller. */
 export type ConnectorSet = Partial<Record<ConnectorId, ConnectorController>>;
@@ -19,6 +23,8 @@ export interface ConnectorTransports {
   github?: () => GitHubConnectorPort;
   onePassword?: () => OnePasswordConnectorPort;
   bitwarden?: () => BitwardenConnectorPort;
+  telegramAccount?: () => TelegramAccountConnectorPort;
+  whatsappAccount?: () => WhatsAppAccountConnectorPort;
   messaging?: MessagingApi;
 }
 
@@ -26,6 +32,8 @@ export interface ConnectorTransports {
 export const LOCAL_CONNECTOR_TRANSPORTS = {
   onePassword: onePasswordConnectorPort,
   bitwarden: bitwardenConnectorPort,
+  telegramAccount: telegramAccountConnectorPort,
+  whatsappAccount: whatsappAccountConnectorPort,
 } as const satisfies ConnectorTransports;
 
 /**
@@ -43,6 +51,10 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
   if (transports.github) set.github = createGitHubConnector(transports.github, options.hostName);
   if (transports.onePassword) set.onepassword = createOnePasswordConnector(transports.onePassword, options.hostName);
   if (transports.bitwarden) set.bitwarden = createBitwardenConnector(transports.bitwarden, options.hostName);
+  if (transports.telegramAccount)
+    set["telegram-account"] = createTelegramAccountConnector(transports.telegramAccount, options.hostName);
+  if (transports.whatsappAccount)
+    set["whatsapp-account"] = createWhatsAppAccountConnector(transports.whatsappAccount, options.hostName);
   return set;
 }
 

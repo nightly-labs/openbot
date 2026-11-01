@@ -105,10 +105,12 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostTelegramAccountConnectorStatus,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeHostVaultImport,
   decodeHostVaultState,
+  decodeHostWhatsAppAccountConnectorStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
@@ -189,6 +191,9 @@ import {
   type SignInRelayStatus,
   type SignOutMcpServerInput,
   type SubmitProviderCodeLoginInput,
+  type TelegramAccountConnectInput,
+  type TelegramAccountConnectorStatus,
+  type TelegramAccountSubmitInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
@@ -199,6 +204,9 @@ import {
   type VaultHostImportResult,
   type VaultSaveInput,
   type VaultState,
+  type WhatsAppAccountConnectInput,
+  type WhatsAppAccountConnectorStatus,
+  type WhatsAppAccountSubmitInput,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -262,11 +270,13 @@ import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-ta
 import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { TELEGRAM_ACCOUNT_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/telegram-account-connector-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
+import { WHATSAPP_ACCOUNT_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-account-connector-v1";
 import { Effect, Schema } from "effect";
 import { bytesToBase64 } from "./base64";
 import type { TeamApiRequest } from "./team-api-requests";
@@ -1410,6 +1420,56 @@ export function bitwardenConnectorRequest(
 ): Effect.Effect<BitwardenConnectorStatus, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", BITWARDEN_CONNECTOR_ROUTES[route], decodeHostBitwardenConnectorStatus, { ...body }),
+  );
+}
+
+/** The body of each route of the host's Telegram account connection. */
+interface TelegramAccountConnectorBodies {
+  status: Record<string, never>;
+  connect: TelegramAccountConnectInput;
+  submit: TelegramAccountSubmitInput;
+  cancel: Record<string, never>;
+  disconnect: Record<string, never>;
+  setSending: { enabled: boolean };
+}
+
+/**
+ * The host's Telegram account connection (`telegram-account-connector-v1`): read it, start a sign-in,
+ * send the phone number, the code or the two-step password, cancel, disconnect, or let agents send.
+ * No answer carries a value that `submit` sent.
+ */
+export function telegramAccountConnectorRequest<Route extends keyof typeof TELEGRAM_ACCOUNT_CONNECTOR_ROUTES>(
+  request: TeamApiRequest,
+  route: Route,
+  body: TelegramAccountConnectorBodies[Route],
+): Effect.Effect<TelegramAccountConnectorStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", TELEGRAM_ACCOUNT_CONNECTOR_ROUTES[route], decodeHostTelegramAccountConnectorStatus, { ...body }),
+  );
+}
+
+/** The body of each route of the host's WhatsApp account connection. */
+interface WhatsAppAccountConnectorBodies {
+  status: Record<string, never>;
+  connect: WhatsAppAccountConnectInput;
+  submit: WhatsAppAccountSubmitInput;
+  cancel: Record<string, never>;
+  disconnect: Record<string, never>;
+  setSending: { enabled: boolean };
+}
+
+/**
+ * The host's WhatsApp account connection (`whatsapp-account-connector-v1`): read it, start a link,
+ * send the phone number for a link with a code, cancel, unlink, or let agents send. No answer carries
+ * the phone number that `submit` sent.
+ */
+export function whatsappAccountConnectorRequest<Route extends keyof typeof WHATSAPP_ACCOUNT_CONNECTOR_ROUTES>(
+  request: TeamApiRequest,
+  route: Route,
+  body: WhatsAppAccountConnectorBodies[Route],
+): Effect.Effect<WhatsAppAccountConnectorStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", WHATSAPP_ACCOUNT_CONNECTOR_ROUTES[route], decodeHostWhatsAppAccountConnectorStatus, { ...body }),
   );
 }
 

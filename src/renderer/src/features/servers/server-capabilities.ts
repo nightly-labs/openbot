@@ -41,6 +41,8 @@ export function serverSupportsCapability(
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
+      capability === "telegram-account-connector-v1" ||
+      capability === "whatsapp-account-connector-v1" ||
       capability === "vault-v1" ||
       capability === "vault-v2" ||
       capability === "browser-secret-vault-v1" ||

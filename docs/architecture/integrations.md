@@ -383,6 +383,8 @@ state on each of them.
 | Telegram | `src/backend/messaging/telegram/` | A one-use link code in a `t.me` link. No OAuth | `telegram-app.ts`, `ipc-messaging.ts` |
 | 1Password | [`onepassword-connector-service.ts`](../../src/main/onepassword-connector-service.ts) | The user's `op` session creates a read-only service account, or the user pastes a token | `ipc-onepassword-connector.ts`; joined server: `onepassword-connector-v1` (token only) |
 | Bitwarden | [`bitwarden-connector-service.ts`](../../src/main/bitwarden-connector-service.ts) | A `bw` session key, kept in memory only; a joined server signs in with an API key and the master password | `ipc-bitwarden-connector.ts`; joined server: `bitwarden-connector-v1` |
+| WhatsApp account | [`whatsapp-account-connector-service.ts`](../../src/main/whatsapp-account-connector-service.ts), `whatsapp-account-client.ts` (Baileys), `whatsapp-account-history.ts` | A linked device of the user's own account, as WhatsApp Web: a QR code scanned on the phone, or a pairing code typed on the phone. The chats that WhatsApp sends are kept encrypted on the computer. Agents get the loopback MCP server `whatsapp-account-mcp-server.ts`. Baileys loads `vendor/whatsapp-signal` in place of the GPL `libsignal` | `ipc-whatsapp-account-connector.ts`; joined server: `whatsapp-account-connector-v1` |
+| Telegram account | [`telegram-account-connector-service.ts`](../../src/main/telegram-account-connector-service.ts), `telegram-account-sign-in.ts`, `telegram-account-client.ts` (GramJS) | The user's own account over MTProto, with the user's api_id and api_hash: a QR code scanned in Telegram on the phone, or the number, the code and the two-step password. Agents get the loopback MCP server `telegram-account-mcp-server.ts` | `ipc-telegram-account-connector.ts`; joined server: `telegram-account-connector-v1` |
 
 To add a connector:
 
@@ -453,6 +455,37 @@ carries 1Password. A server often has no screen for the 1Password app, so an own
 service account token in Marketplace › Apps › 1Password. The token goes to the host once, in `connect`. The
 host checks it with 1Password and keeps it in its own encrypted store. No answer carries it. Status
 and disconnect act on that host only. A host older than this capability hides 1Password.
+
+The optional capability `telegram-account-connector-v1`
+([`telegram-account-connector-v1.ts`](../../packages/contracts/src/team-protocol/telegram-account-connector-v1.ts),
+host route [`route-telegram-account-connector.ts`](../../src/main/team-api/route-telegram-account-connector.ts))
+carries the Telegram account connection, which is not the OpenBot Telegram bot of `connectors-v1`.
+The host runs the sign-in and keeps the session; an owner or admin follows its steps in Marketplace ›
+Apps › Telegram account. `connect` can carry the api_id and api_hash, and `submit` carries the phone
+number, the code or the two-step password, one value per call; the host registers each one for
+redaction, and no answer carries them. A QR sign-in needs nothing from the client but the picture of
+`qrUrl`, which only an admin gets. The client reads `status` until the state changes, as for
+Bitwarden. While the host is signed in, its agents get the Telegram MCP server; sending and marking
+as read stay refused until the admin turns sending on. A host older than this capability hides the
+Telegram account.
+
+The optional capability `whatsapp-account-connector-v1`
+([`whatsapp-account-connector-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-account-connector-v1.ts),
+host route [`route-whatsapp-account-connector.ts`](../../src/main/team-api/route-whatsapp-account-connector.ts))
+carries the WhatsApp account connection. The host runs the link, keeps the keys of the linked device
+and receives the chats; an owner or admin follows its steps in Marketplace › Apps › WhatsApp account.
+`submit` carries the phone number of a link with a code; the host registers it for redaction, and no
+answer carries it. The answers carry `qrCode` or `pairingCode`, which link the host's device, so only
+an admin gets them. The client reads `status` until the state changes, as for the Telegram account.
+While the host is linked, its agents get the WhatsApp MCP server; sending and marking as read stay
+refused until the admin turns sending on. A host older than this capability hides the WhatsApp
+account.
+
+Baileys depends on `libsignal` (`libsignal-node`, GPL-3.0). The workspace
+[`vendor/whatsapp-signal`](../../vendor/whatsapp-signal/README.md), named `libsignal`, takes its place: the part
+of its API that Baileys uses, on the Signal protocol of `whatsapp-rust-bridge` (MIT), which Baileys
+already ships. No GPL code is installed. `bun run test:whatsapp-signal` checks it against messages
+that `libsignal-node` encrypted.
 
 ### Bitwarden on a joined server
 

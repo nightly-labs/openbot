@@ -86,6 +86,8 @@
     "./team-protocol/connectors-v1": "./src/team-protocol/connectors-v1.ts",
     "./team-protocol/onepassword-connector-v1": "./src/team-protocol/onepassword-connector-v1.ts",
     "./team-protocol/bitwarden-connector-v1": "./src/team-protocol/bitwarden-connector-v1.ts",
+    "./team-protocol/telegram-account-connector-v1": "./src/team-protocol/telegram-account-connector-v1.ts",
+    "./team-protocol/whatsapp-account-connector-v1": "./src/team-protocol/whatsapp-account-connector-v1.ts",
     "./team-protocol/current": "./src/team-protocol/current.ts",
     "./team-protocol/current-agent-keys": "./src/team-protocol/current-agent-keys.ts",
     "./team-protocol/http-codecs": "./src/team-protocol/http-codecs.ts",

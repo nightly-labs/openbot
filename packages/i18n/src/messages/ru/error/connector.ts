@@ -34,4 +34,51 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "Не удалось установить Bitwarden CLI на этом сервере. Проверьте его сетевое подключение и подключитесь снова.",
   "error.connector.bitwardenFileUnreadable": "Файл подключения Bitwarden не читается.",
+  "error.connector.telegramAccountCredentialsMissing":
+    "Введите api_id и api_hash вашего приложения Telegram. Их можно получить на my.telegram.org.",
+  "error.connector.telegramAccountCredentialsInvalid":
+    "api_id — это число, а api_hash состоит из 32 символов 0-9 и a-f. Скопируйте их снова с my.telegram.org.",
+  "error.connector.telegramAccountApiRejected":
+    "Telegram не принимает эти api_id и api_hash. Скопируйте их снова с my.telegram.org.",
+  "error.connector.telegramAccountPhoneFormat": "Введите номер телефона с кодом страны, например +48 600 100 200.",
+  "error.connector.telegramAccountPhoneInvalid": "Telegram не знает этот номер. Укажите код страны, например +48.",
+  "error.connector.telegramAccountCodeInvalid": "Этот код неверный. Проверьте его и попробуйте снова.",
+  "error.connector.telegramAccountCodeEmpty": "Введите код, который прислал Telegram.",
+  "error.connector.telegramAccountCodeExpired": "Срок действия кода истёк. Начните заново, чтобы получить новый код.",
+  "error.connector.telegramAccountPasswordInvalid": "Этот пароль неверный. Попробуйте снова.",
+  "error.connector.telegramAccountPasswordEmpty": "Введите пароль двухэтапной аутентификации.",
+  "error.connector.telegramAccountPasswordNeeded": "Telegram нужен пароль двухэтапной аутентификации.",
+  "error.connector.telegramAccountNoAccount":
+    "У этого номера нет аккаунта Telegram. Войдите с номером, который уже использует Telegram.",
+  "error.connector.telegramAccountPhoneBanned": "Telegram заблокировал этот номер.",
+  "error.connector.telegramAccountQrExpired": "Срок действия QR-кода истёк до сканирования. Начните заново.",
+  "error.connector.telegramAccountFloodWait": "Telegram просит подождать. Попробуйте снова через {count} мин.",
+  "error.connector.telegramAccountCancelled": "Вход в Telegram отменён.",
+  "error.connector.telegramAccountTimedOut": "Вход остановлен после 10 минут без действий. Начните заново.",
+  "error.connector.telegramAccountMovedOn": "Вход перешёл к другому шагу. Начните заново.",
+  "error.connector.telegramAccountRefused": "Telegram отклонил вход: {detail}",
+  "error.connector.telegramAccountSaveFailed": "OpenBot не удалось сохранить подключение Telegram: {detail}",
+  "error.connector.telegramAccountSessionEnded":
+    "Telegram завершил этот сеанс, например в Настройки > Устройства. Подключите аккаунт Telegram заново.",
+  "error.connector.telegramAccountFileUnreadable": "Файл подключения аккаунта Telegram не читается.",
+  "error.connector.telegramAccountFileTooLarge": "Файл подключения аккаунта Telegram слишком большой.",
+  "error.connector.whatsappAccountPhoneFormat": "Введите номер телефона с кодом страны, например +48 600 100 200.",
+  "error.connector.whatsappAccountPairingFailed": "WhatsApp не выдал код: {detail}",
+  "error.connector.whatsappAccountQrExpired":
+    "Срок действия кода истёк до того, как вы его использовали. Начните заново.",
+  "error.connector.whatsappAccountTimedOut": "Привязка остановлена после 10 минут без действий. Начните заново.",
+  "error.connector.whatsappAccountMovedOn": "Привязка перешла к другому шагу. Начните заново.",
+  "error.connector.whatsappAccountLinkFailed": "WhatsApp не привязал это устройство: {detail}",
+  "error.connector.whatsappAccountSaveFailed": "OpenBot не удалось сохранить подключение WhatsApp: {detail}",
+  "error.connector.whatsappAccountLoggedOut":
+    "WhatsApp удалил это устройство, например в Настройки > Связанные устройства. Привяжите аккаунт WhatsApp заново.",
+  "error.connector.whatsappAccountReplaced":
+    "Другая программа открыла это связанное устройство, поэтому WhatsApp закрыл подключение здесь. Отвяжите его, затем привяжите снова.",
+  "error.connector.whatsappAccountForbidden":
+    "WhatsApp отклонил это устройство. Ваш номер может быть ограничен. Проверьте WhatsApp на телефоне.",
+  "error.connector.whatsappAccountOutdated":
+    "WhatsApp больше не принимает эту версию подключения. Обновите OpenBot, затем привяжите устройство снова.",
+  "error.connector.whatsappAccountOffline":
+    "WhatsApp сейчас недоступен. OpenBot пробует снова. Агенты по-прежнему могут читать чаты на этом компьютере.",
+  "error.connector.whatsappAccountFileUnreadable": "Файл подключения аккаунта WhatsApp не читается.",
 } as const satisfies PartialTranslation<typeof source>;

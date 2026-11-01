@@ -272,7 +272,8 @@ export const messages = defineMessages("connector", {
 
   // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
   // Orchestrator agent receives the messages of all chats, asks the team and answers.
-  "connector.telegram.title": "Telegram",
+  "connector.telegram.title": "Telegram Bot",
+  "connector.telegram.developer": "Telegram",
   "connector.telegram.description":
     "Add the OpenBot bot to a Telegram group or open a direct chat with it. The Telegram Orchestrator asks the right agent and answers.",
   "connector.telegram.statusConnected": "Connected",
@@ -453,4 +454,142 @@ export const messages = defineMessages("connector", {
   "connector.bitwarden.clientSecret": "API key client_secret",
   "connector.bitwarden.masterPassword": "Master password",
   "connector.bitwarden.connecting": "Connecting",
+  // Marketplace > Apps > Telegram account: OpenBot signs in to the user's own Telegram account.
+  "connector.telegramAccount.title": "Telegram account",
+  "connector.telegramAccount.description":
+    "Agents can read your Telegram chats and, when you let them, send messages as you.",
+  "connector.telegramAccount.descriptionHost":
+    "Agents on {host} can read your Telegram chats and, when you let them, send messages as you.",
+  "connector.telegramAccount.statusConnecting": "Signing in",
+  "connector.telegramAccount.statusConnected": "Connected",
+  "connector.telegramAccount.actionFailed": "OpenBot could not change the Telegram account connection.",
+  "connector.telegramAccount.disconnectTitle": "Disconnect Telegram account",
+  "connector.telegramAccount.disconnectSummary":
+    "OpenBot signs out of this session. Agents can no longer read or send messages, and sending turns off.",
+  "connector.telegramAccount.disconnectSummaryHost":
+    "{host} signs out of this session. Agents on {host} can no longer read or send messages, and sending turns off.",
+  "connector.telegramAccount.disconnect": "Disconnect",
+  "connector.telegramAccount.signInTitle": "Sign in",
+  "connector.telegramAccount.howItWorks":
+    "OpenBot signs in to your own Telegram account, as Telegram Desktop does. The session stays encrypted on this computer. Telegram shows it in Settings › Devices as OpenBot.",
+  "connector.telegramAccount.howItWorksHost":
+    "{host} signs in to your own Telegram account, as Telegram Desktop does. The session stays encrypted on {host}. Telegram shows it in Settings › Devices as OpenBot.",
+  "connector.telegramAccount.signInProgress": "Do the step below to sign in. Cancel stops the sign-in.",
+  "connector.telegramAccount.methodTitle": "Sign in with",
+  "connector.telegramAccount.methodQrDescription": "Scan a code with Telegram on your phone.",
+  "connector.telegramAccount.methodPhoneDescription": "Type your phone number and the code that Telegram sends you.",
+  "connector.telegramAccount.methodQr": "QR code",
+  "connector.telegramAccount.methodPhone": "Phone number",
+  "connector.telegramAccount.credentialsTitle": "api_id and api_hash",
+  "connector.telegramAccount.credentialsStored":
+    "OpenBot uses your own Telegram app from my.telegram.org. After the first sign-in, this computer keeps its api_id and api_hash.",
+  "connector.telegramAccount.credentialsStoredHost":
+    "OpenBot uses your own Telegram app from my.telegram.org. After the first sign-in, {host} keeps its api_id and api_hash.",
+  "connector.telegramAccount.credentialsOpen": "Enter",
+  "connector.telegramAccount.credentialsHelp":
+    "Sign in at my.telegram.org, open API development tools and create an app. Copy its api_id and api_hash here.",
+  "connector.telegramAccount.apiId": "api_id",
+  "connector.telegramAccount.apiHash": "api_hash",
+  "connector.telegramAccount.openApps": "Open my.telegram.org",
+  "connector.telegramAccount.openAppsFailed": "OpenBot could not open my.telegram.org.",
+  "connector.telegramAccount.connect": "Connect",
+  "connector.telegramAccount.sendingOffNote": "Agents can only read your chats until you turn on sending.",
+  "connector.telegramAccount.devicesNote":
+    "Telegram shows this session in Settings › Devices as OpenBot. When you end it there, OpenBot disconnects.",
+  "connector.telegramAccount.devicesNoteHost":
+    "Telegram shows this session in Settings › Devices as OpenBot. When you end it there, {host} disconnects.",
+  "connector.telegramAccount.connecting": "Connecting to Telegram",
+  "connector.telegramAccount.connectingDescription": "This computer talks to Telegram. This can take a few seconds.",
+  "connector.telegramAccount.connectingHost": "{host} talks to Telegram. This can take a few seconds.",
+  "connector.telegramAccount.qrLabel": "QR code to sign in to Telegram",
+  "connector.telegramAccount.qrTitle": "Scan this code with Telegram on your phone",
+  "connector.telegramAccount.qrStepOpen": "Open Telegram on your phone.",
+  "connector.telegramAccount.qrStepDevices": "Go to Settings › Devices › Link Desktop Device.",
+  "connector.telegramAccount.qrStepScan": "Point your phone at this code.",
+  "connector.telegramAccount.qrRefresh": "The code changes about every 30 seconds. Scan the newest one.",
+  "connector.telegramAccount.usePhone": "Use phone number",
+  "connector.telegramAccount.phoneDescription":
+    "Type the phone number of your Telegram account, with its country code.",
+  "connector.telegramAccount.phoneLabel": "Phone number",
+  "connector.telegramAccount.sendCode": "Send code",
+  "connector.telegramAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.telegramAccount.useQr": "Use QR code",
+  "connector.telegramAccount.codeViaApp": "Telegram sent a code to the Telegram app on your other devices.",
+  "connector.telegramAccount.codeViaSms": "Telegram sent a code by SMS.",
+  "connector.telegramAccount.codeDescription": "Type the code that Telegram sent you.",
+  "connector.telegramAccount.codeLabel": "Code",
+  "connector.telegramAccount.signIn": "Sign in",
+  "connector.telegramAccount.passwordDescription": "Your account has two-step verification. Type its password.",
+  "connector.telegramAccount.passwordHint": "Hint: {hint}",
+  "connector.telegramAccount.passwordLabel": "Two-step verification password",
+  "connector.telegramAccount.accountTitle": "Account",
+  "connector.telegramAccount.accountDescription": "Agents on this computer use this Telegram account.",
+  "connector.telegramAccount.accountDescriptionHost": "Agents on {host} use this Telegram account.",
+  "connector.telegramAccount.sendingLabel": "Let agents send messages and mark chats as read",
+  "connector.telegramAccount.sendingDescription": "When this is off, agents can only read your chats.",
+  // Marketplace > Apps > WhatsApp account: OpenBot links itself to the user's own WhatsApp account as
+  // a linked device, as WhatsApp Web does.
+  "connector.whatsappAccount.title": "WhatsApp account",
+  "connector.whatsappAccount.developer": "WhatsApp",
+  "connector.whatsappAccount.description":
+    "Agents can read your WhatsApp chats and, when you let them, send messages as you.",
+  "connector.whatsappAccount.descriptionHost":
+    "Agents on {host} can read your WhatsApp chats and, when you let them, send messages as you.",
+  "connector.whatsappAccount.statusConnecting": "Linking",
+  "connector.whatsappAccount.statusConnected": "Connected",
+  "connector.whatsappAccount.actionFailed": "OpenBot could not change the WhatsApp account connection.",
+  "connector.whatsappAccount.disconnectTitle": "Unlink WhatsApp account",
+  "connector.whatsappAccount.disconnectSummary":
+    "OpenBot logs out this linked device and deletes its keys and chats from this computer. Sending turns off.",
+  "connector.whatsappAccount.disconnectSummaryHost":
+    "{host} logs out this linked device and deletes its keys and chats. Sending turns off.",
+  "connector.whatsappAccount.disconnect": "Unlink",
+  "connector.whatsappAccount.linkTitle": "Link",
+  "connector.whatsappAccount.howItWorks":
+    "OpenBot becomes a linked device of your WhatsApp account, as WhatsApp Web does. Your phone stays the main device. The keys and the chats stay encrypted on this computer.",
+  "connector.whatsappAccount.howItWorksHost":
+    "{host} becomes a linked device of your WhatsApp account, as WhatsApp Web does. Your phone stays the main device. The keys and the chats stay encrypted on {host}.",
+  "connector.whatsappAccount.riskNote":
+    "WhatsApp has no official access for personal accounts. OpenBot uses an unofficial WhatsApp Web client, and WhatsApp can limit or ban numbers that it thinks are automated. Send only what you would send yourself.",
+  "connector.whatsappAccount.linkProgress": "Do the step below to link. Cancel stops the link.",
+  "connector.whatsappAccount.methodTitle": "Link with",
+  "connector.whatsappAccount.methodQrDescription": "Scan a code with WhatsApp on your phone.",
+  "connector.whatsappAccount.methodPhoneDescription": "Type a code on your phone instead of scanning.",
+  "connector.whatsappAccount.methodQr": "QR code",
+  "connector.whatsappAccount.methodPhone": "Phone number",
+  "connector.whatsappAccount.connect": "Link",
+  "connector.whatsappAccount.sendingOffNote": "Agents can only read your chats until you turn on sending.",
+  "connector.whatsappAccount.connecting": "Connecting to WhatsApp",
+  "connector.whatsappAccount.connectingDescription": "This computer talks to WhatsApp. This can take a few seconds.",
+  "connector.whatsappAccount.connectingHost": "{host} talks to WhatsApp. This can take a few seconds.",
+  "connector.whatsappAccount.qrLabel": "QR code to link WhatsApp",
+  "connector.whatsappAccount.qrTitle": "Scan this code with WhatsApp on your phone",
+  "connector.whatsappAccount.stepOpen": "Open WhatsApp on your phone.",
+  "connector.whatsappAccount.stepDevices": "Go to Settings › Linked devices › Link a device.",
+  "connector.whatsappAccount.qrStepScan": "Point your phone at this code.",
+  "connector.whatsappAccount.qrRefresh": "The code changes about every 20 seconds. Scan the newest one.",
+  "connector.whatsappAccount.usePhone": "Use phone number",
+  "connector.whatsappAccount.useQr": "Use QR code",
+  "connector.whatsappAccount.phoneDescription":
+    "Type the phone number of your WhatsApp account, with its country code. WhatsApp then gives a code to type on the phone.",
+  "connector.whatsappAccount.phoneLabel": "Phone number",
+  "connector.whatsappAccount.phonePlaceholder": "+48 600 100 200",
+  "connector.whatsappAccount.getCode": "Get code",
+  "connector.whatsappAccount.codeTitle": "Type this code on your phone",
+  "connector.whatsappAccount.codeStepPhone": "Tap Link with phone number instead.",
+  "connector.whatsappAccount.codeStepType": "Type this code.",
+  "connector.whatsappAccount.codeLabel": "Code to type on your phone",
+  "connector.whatsappAccount.accountTitle": "Account",
+  "connector.whatsappAccount.accountDescription": "Agents on this computer use this WhatsApp account.",
+  "connector.whatsappAccount.accountDescriptionHost": "Agents on {host} use this WhatsApp account.",
+  "connector.whatsappAccount.historyChats": { one: "{count} chat", other: "{count} chats" },
+  "connector.whatsappAccount.historyMessages": { one: "{count} message", other: "{count} messages" },
+  "connector.whatsappAccount.historyNote":
+    "WhatsApp sends recent history when the device links, then every new message. Older messages can be missing.",
+  "connector.whatsappAccount.sendingLabel": "Let agents send messages and mark chats as read",
+  "connector.whatsappAccount.sendingDescription": "When this is off, agents can only read your chats.",
+  "connector.whatsappAccount.devicesNote":
+    "WhatsApp shows OpenBot in Settings › Linked devices. When you log it out there, OpenBot disconnects.",
+  "connector.whatsappAccount.devicesNoteHost":
+    "WhatsApp shows OpenBot in Settings › Linked devices. When you log it out there, {host} disconnects.",
 });

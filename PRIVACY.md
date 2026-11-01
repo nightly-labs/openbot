@@ -894,7 +894,9 @@ Network traffic can also occur when:
 - a user opens an explicitly labeled external support or setup link;
 - a Slack workspace is connected. See [Slack connections](#slack-connections);
 - a Discord server is connected. See [Discord connections](#discord-connections);
-- a Telegram chat is connected. See [Telegram connections](#telegram-connections).
+- a Telegram chat is connected. See [Telegram connections](#telegram-connections);
+- a Telegram account is connected. See [Telegram account connection](#telegram-account-connection);
+- a WhatsApp account is linked. See [WhatsApp account connection](#whatsapp-account-connection).
 
 ## Webhook routines
 
@@ -1109,6 +1111,79 @@ plugin page does not connect your browser to the plugin developer's servers.
 
 Account usage shown in OpenBot is requested through the local Codex App Server. OpenBot does not send
 that usage to its maintainer.
+
+## Telegram account connection
+
+The Telegram account connection (Marketplace › Apps › Telegram account) is a different thing from
+the OpenBot Telegram bot. OpenBot signs in to your own Telegram account over Telegram's MTProto
+protocol, as Telegram Desktop does, and it shows in Telegram › Settings › Devices as "OpenBot". It
+uses the api_id and api_hash of a Telegram app that you create at my.telegram.org.
+
+- **Sent to Telegram.** The api_id and api_hash, the device name "OpenBot" with the operating system
+  name and version, and, for a sign-in with the phone number, the number, the code that Telegram
+  sends and the two-step verification password. A QR sign-in sends none of these: you scan the code
+  in Telegram on your phone. Then the requests of the agents: the chat list, the messages of a chat,
+  searches, and, only when you turn on sending, the messages that agents send as you and the chats
+  that they mark as read. OpenBot never creates a Telegram account.
+- **Kept on the computer.** The session, the api_id and api_hash, the account name, username and
+  phone number, the sending switch, and the port and secret of the local Telegram MCP server are
+  kept in `~/Library/Application Support/OpenBot/openbot-telegram-account-connector-v1.json`,
+  encrypted by the operating system's secret storage. The session gives full access to the account.
+  Disconnect signs the session out at Telegram, when Telegram answers, and removes it from the file;
+  the api_id and api_hash stay, so the next sign-in does not ask for them. The session, the api_hash,
+  the number, the code, the password and the MCP secret are redacted from logs, exports and
+  diagnostics.
+- **Given to agents and their model provider.** While the account is connected, every agent on the
+  computer gets the Telegram tools. What a tool reads, such as chat titles, names, usernames and
+  message text, goes into the agent's conversation and so to the agent's model provider. The tools
+  never give an agent the session, the api_hash or the whole phone number: the status shows the
+  number with its middle hidden.
+- **On a joined server.** An owner or admin can sign the server in to their own Telegram account
+  from their computer. The server sends the QR code address to that owner or admin only. The api_id
+  and api_hash, the number, the code and the password go once over the encrypted connection to the
+  server, which keeps the session in the same file on its own disk. The computer that sent them does
+  not keep them, and no answer from the server carries them. Every agent on that server then gets
+  the Telegram tools, including agents that members who are not admins talk to, so those members can
+  ask an agent to read the account. Connect an account that every member may use.
+
+## WhatsApp account connection
+
+The WhatsApp account connection (Marketplace › Apps › WhatsApp account) makes OpenBot a linked device
+of your own WhatsApp account, as WhatsApp Web does. Your phone stays the main device, and WhatsApp
+shows OpenBot in Settings › Linked devices. WhatsApp has no official access for personal accounts:
+OpenBot uses Baileys, an unofficial WhatsApp Web client, and WhatsApp can limit or ban a number that
+it thinks is automated.
+
+- **Sent to WhatsApp.** The keys of the new linked device, as WhatsApp Web sends them, and the name
+  "OpenBot". A link with a QR code sends nothing else: you scan the code on your phone. A link with
+  a code sends your phone number, and WhatsApp answers the code that you type on the phone. Then, only
+  when you turn on sending, the messages that agents send as you and the read receipts of the chats
+  that they mark as read. Reading sends nothing: OpenBot does not show as online and does not send
+  read receipts. When an agent asks for messages older than the ones on the computer, OpenBot asks
+  the phone for them.
+- **Received from WhatsApp.** As WhatsApp Web does, the phone sends the device recent history when it
+  links, then every new message. History can have gaps.
+- **Kept on the computer.** In `~/Library/Application Support/OpenBot/`, encrypted by the operating
+  system's secret storage: the account name and phone number, the sending switch and the port and
+  secret of the local WhatsApp MCP server (`openbot-whatsapp-account-connector-v1.json`); the keys of
+  the linked device (`openbot-whatsapp-account-keys-v1.json`); and the chats, contact names and up to
+  200 messages per chat, as text with a word for each media item
+  (`openbot-whatsapp-account-chats-v1.json`). Media files are not downloaded. The keys give access to
+  new messages of the account. Unlink logs the device out at WhatsApp, when WhatsApp answers,
+  deletes the keys and the chats, and removes the account from the first file. When you log the device out on the phone, OpenBot deletes the
+  keys and the chats too. The phone number, the pairing code and the MCP secret are redacted from
+  logs, exports and diagnostics, and the WhatsApp library's log lines are kept only without long
+  numbers.
+- **Given to agents and their model provider.** While the account is linked, every agent on the
+  computer gets the WhatsApp tools. What a tool reads, such as chat names, contact names, phone
+  numbers and message text, goes into the agent's conversation and so to the agent's model provider.
+  The tools never give an agent the keys of the device.
+- **On a joined server.** An owner or admin can link the server to their own WhatsApp account from
+  their computer. The server sends the QR code or the pairing code to that owner or admin only. The
+  phone number of a link with a code goes once over the encrypted connection to the server, which
+  keeps the keys and the chats in the same files on its own disk. Every agent on that server then
+  gets the WhatsApp tools, including agents that members who are not admins talk to, so those members
+  can ask an agent to read the account. Link an account that every member may use.
 
 ## Agent access
 
