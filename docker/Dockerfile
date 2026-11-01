@@ -23,11 +23,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 COPY --from=release /tmp/squashfs-root/resources/hosting/packages.txt /tmp/packages.txt
 # The packages of a self-hosted server, without AppArmor, which only the host can load. tini is PID 1:
 # it reaps the processes that agents leave, and gives the stop signal to OpenBot, which stops them.
-# Agents run their commands in this image, so it also has the tools that they use most.
+# Agents run their commands in this image, so it also has the tools that they use most. The CJK fonts
+# let the embedded browser render Chinese, Japanese and Korean text, which DejaVu alone cannot.
 RUN apt-get update \
   && sed -e '/^#/d' -e '/^$/d' -e '/^apparmor$/d' /tmp/packages.txt \
     | xargs apt-get install --yes --no-install-recommends \
-      git less openssh-client procps ripgrep tini unzip xz-utils \
+      fonts-noto-cjk git less openssh-client procps ripgrep tini unzip xz-utils \
   && rm -rf /var/lib/apt/lists/* /tmp/packages.txt
 # Not root. The image of Ubuntu has the user ubuntu with the UID 1000, which OpenBot takes. The home
 # folder is the data volume.
