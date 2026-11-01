@@ -198,6 +198,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "fae1384d23b374e5b0e08c0c220b3bd72cf0b4f880231eeb2565747f3549655f",
     },
+    {
+      slug: "clickup",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "b2aeef38331559856b56996d4c523d2ddca3517c3faf549eccd91ce61d589744",
+    },
   ],
 };
 
@@ -1402,6 +1408,44 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://composio.dev",
     privacyPolicyUrl: "https://composio.dev/privacy-policy",
     termsUrl: "https://composio.dev/terms-of-service",
+    skills: [],
+  },
+  clickup: {
+    slug: "clickup",
+    name: "ClickUp",
+    tagline: "Tasks, docs and team updates",
+    description:
+      "ClickUp lets agents search tasks, docs and comments, and manage tasks and team updates in the signed-in workspace. Sign in to a ClickUp account through the browser. The connection can read and write within that account's workspace permissions.",
+    category: "productivity",
+    creatorName: "ClickUp",
+    iconUrl: "https://clickup.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-find-tasks", text: "Find my open ClickUp tasks due this week." },
+      { id: "prompt-create-task", text: "Create a ClickUp task for these action items and assign it to me." },
+      {
+        id: "prompt-summarize-doc",
+        text: "Find the latest project update in ClickUp and summarize the open questions.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-clickup-mcp",
+        name: "ClickUp",
+        description:
+          "Task and document search, task updates, and team comments, over ClickUp's MCP server with browser sign-in.",
+        iconUrl: "https://clickup.com/favicon.ico",
+        server: {
+          name: "clickup",
+          transport: "http",
+          url: "https://mcp.clickup.com/mcp",
+          auth: [{ id: "clickup-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://clickup.com",
+    privacyPolicyUrl: "https://clickup.com/terms/privacy",
+    termsUrl: "https://clickup.com/terms",
     skills: [],
   },
 };

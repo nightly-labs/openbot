@@ -1,0 +1,36 @@
+{
+  "slug": "clickup",
+  "name": "ClickUp",
+  "tagline": "Tasks, docs and team updates",
+  "description": "ClickUp lets agents search tasks, docs and comments, and manage tasks and team updates in the signed-in workspace. Sign in to a ClickUp account through the browser. The connection can read and write within that account's workspace permissions.",
+  "category": "productivity",
+  "creatorName": "ClickUp",
+  "iconUrl": "https://clickup.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-tasks", "text": "Find my open ClickUp tasks due this week." },
+    { "id": "prompt-create-task", "text": "Create a ClickUp task for these action items and assign it to me." },
+    {
+      "id": "prompt-summarize-doc",
+      "text": "Find the latest project update in ClickUp and summarize the open questions."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-clickup-mcp",
+      "name": "ClickUp",
+      "description": "Task and document search, task updates, and team comments, over ClickUp's MCP server with browser sign-in.",
+      "iconUrl": "https://clickup.com/favicon.ico",
+      "server": {
+        "name": "clickup",
+        "transport": "http",
+        "url": "https://mcp.clickup.com/mcp",
+        "auth": [{ "id": "clickup-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://clickup.com",
+  "privacyPolicyUrl": "https://clickup.com/terms/privacy",
+  "termsUrl": "https://clickup.com/terms",
+  "skills": []
+}
