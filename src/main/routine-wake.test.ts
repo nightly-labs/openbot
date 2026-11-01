@@ -109,4 +109,48 @@ describe("routine wake", () => {
     vi.advanceTimersByTime(600_000);
     expect(routines.resumeRoutines).not.toHaveBeenCalled();
   });
+
+  it("ignores a resume event that arrives after dispose, while the process ends", () => {
+    vi.useFakeTimers();
+    const { routines, wake } = makeWake({ lostResumeMs: 600_000 });
+    wake.suspend();
+    wake.dispose();
+    wake.resume();
+    vi.advanceTimersByTime(600_000);
+    expect(routines.resumeRoutines).not.toHaveBeenCalled();
+  });
+
+  it("cancels a network wait that a second suspend interrupts", () => {
+    vi.useFakeTimers();
+    let online = false;
+    const { routines, wake } = makeWake({
+      online: () => online,
+      pollMs: 100,
+      maxWaitMs: 60_000,
+      lostResumeMs: 600_000,
+    });
+    wake.suspend();
+    wake.resume();
+    // The second suspend takes the pending network poll away, and starts one new window.
+    wake.suspend();
+    expect(routines.suspendRoutines).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(60_000);
+    expect(routines.resumeRoutines).not.toHaveBeenCalled();
+    online = true;
+    vi.advanceTimersByTime(600_000);
+    expect(routines.resumeRoutines).toHaveBeenCalledTimes(1);
+    wake.dispose();
+  });
+
+  it("keeps one lost-resume window across a repeated suspend", () => {
+    vi.useFakeTimers();
+    const { routines, wake } = makeWake({ lostResumeMs: 600_000 });
+    wake.suspend();
+    wake.suspend();
+    vi.advanceTimersByTime(600_000);
+    expect(routines.resumeRoutines).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(600_000);
+    expect(routines.resumeRoutines).toHaveBeenCalledTimes(1);
+    wake.dispose();
+  });
 });

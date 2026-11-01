@@ -17,7 +17,12 @@ export interface RoutineWakeOptions {
   lostResumeMs?: number;
 }
 
-/** Long enough that a maintenance wake of a few minutes does not run it out; a dark wake is shorter. */
+/**
+ * Long enough that a maintenance wake of a few minutes does not end it. Awake time adds up across
+ * the dark wakes of a long night, though, so the window can end inside one; the resume then waits
+ * out the network deadline and runs one collapsed occurrence, which is still less loss than a
+ * schedule that stays frozen.
+ */
 const DEFAULT_LOST_RESUME_MS = 10 * 60_000;
 
 export class RoutineWake {
@@ -45,8 +50,8 @@ export class RoutineWake {
     this.dispose();
     this.#suspended = true;
     this.#routines.suspendRoutines();
-    // The timeout freezes with the process while the computer sleeps, so it runs out only while the
-    // computer is awake. A real resume or a dispose clears it, so it acts only when neither came.
+    // The timeout freezes with the process while the computer sleeps, so it ends only while the
+    // computer is awake. A real resume or a dispose clears it, so it acts only when neither arrives.
     this.#lostResume = setTimeout(() => this.resume(), this.#lostResumeMs);
     this.#lostResume.unref?.();
   }
@@ -72,6 +77,9 @@ export class RoutineWake {
   }
 
   dispose(): void {
+    // A stopped wake reports no suspend either: a resume event that arrives while the process ends
+    // must not resume the routines on the way out.
+    this.#suspended = false;
     if (this.#poll) clearTimeout(this.#poll);
     this.#poll = null;
     if (this.#lostResume) clearTimeout(this.#lostResume);
