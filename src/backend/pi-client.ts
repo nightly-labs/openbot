@@ -61,6 +61,12 @@ import type {
   ReadProviderHistory,
 } from "./provider-history";
 
+/**
+ * How long a turn may send nothing, with no tool call open and no question to the user, before
+ * OpenBot ends it. A model request that never answers held the turn open with no limit (#4304).
+ */
+const PI_TURN_STALL_MS = 5 * 60_000;
+
 const PiSessionUsage = Schema.Struct({
   tokens: Schema.Struct({
     input: Schema.Number,
@@ -72,6 +78,8 @@ const PiSessionUsage = Schema.Struct({
 
 export interface PiProviderOptions {
   requestTimeoutMs?: number;
+  /** How long a turn may send nothing before it fails (`PI_TURN_STALL_MS` when absent). */
+  turnStallMs?: number;
   discoveryCwd?: () => string;
   confine?: (target: SpawnTarget) => SpawnTarget;
   extraEnv?: () => Record<string, string>;
@@ -104,6 +112,13 @@ interface PiTurn {
   stopped: boolean;
   failure: string | null;
   finishing: boolean;
+  lastActivityAt: number;
+  /** Tool calls that started and did not end. The turn is not stalled while one is open. */
+  openTools: Set<string>;
+  /** Questions that wait for the user. The turn is not stalled while one is open. */
+  waitingOnUser: number;
+  /** The stall message. Pi's events after the stop do not change the failure. */
+  stalled: string | null;
 }
 interface PiThread {
   id: string;
@@ -622,6 +637,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       stopped: false,
       failure: null,
       finishing: false,
+      lastActivityAt: Date.now(),
+      openTools: new Set(),
+      waitingOnUser: 0,
+      stalled: null,
     };
     this.#addUserMessage(turn, prompt.message);
     thread.turn = turn;
@@ -639,7 +658,32 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       this.#scope,
       { startImmediately: true },
     );
+    yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
     return { turn: { id: turn.id, status: "inProgress" }, turnId: turn.id };
+  });
+
+  /** Fails a turn that sends nothing while no tool call runs and no question waits for the user. */
+  readonly #watchStall = Effect.fn("PiAgentClient.watchStall")(function* (
+    this: PiAgentClient,
+    thread: PiThread,
+    turn: PiTurn,
+  ) {
+    const limit = this.options.turnStallMs ?? PI_TURN_STALL_MS;
+    // A stopped turn ends by its stop, as interrupted, and not as a stall.
+    while (thread.turn === turn && !turn.finishing && !turn.stopped) {
+      const silentFor = Date.now() - turn.lastActivityAt;
+      if (silentFor < limit || turn.openTools.size > 0 || turn.waitingOnUser > 0) {
+        yield* Effect.sleep(silentFor < limit ? limit - silentFor : limit);
+        continue;
+      }
+      this.emit("diagnostic", `Pi sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
+      const failure = sourceText("error.agent.turnStalled", { provider: agentProviderName(this.provider) });
+      turn.stalled = failure;
+      // Stop Pi before the turn ends, so that the stop cannot reach the next turn.
+      yield* thread.rpc.request({ type: "clear_queue" }, 2_000).pipe(Effect.ignore);
+      yield* thread.rpc.request({ type: "abort" }, 2_000).pipe(Effect.ignore);
+      yield* this.#finish(thread, "failed", failure);
+    }
   });
 
   readonly #steer = Effect.fn("PiAgentClient.steer")(function* (
@@ -727,12 +771,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     }
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
+    turn.lastActivityAt = Date.now();
     if (record.type === "agent_settled") {
+      const failure = turn.stalled ?? turn.failure;
       this.#background(
         this.#finish(
           thread,
-          turn.stopped ? "interrupted" : turn.failure ? "failed" : "completed",
-          turn.failure ?? undefined,
+          turn.stalled ? "failed" : turn.stopped ? "interrupted" : failure ? "failed" : "completed",
+          failure ?? undefined,
         ),
       );
     } else if (record.type === "message_update") {
@@ -767,6 +813,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       const id = getString(record, "toolCallId");
       if (!id) return;
       const done = record.type === "tool_execution_end";
+      if (done) turn.openTools.delete(id);
+      else turn.openTools.add(id);
       const item: ThreadItem = {
         ...turn.items.get(id),
         id,
@@ -843,6 +891,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         ? [confirm, sourceText("status.provider.confirmCancel")]
         : getArray(record, "options").filter(isString);
     const question = getString(record, "message") ?? getString(record, "title") ?? "Pi";
+    const turn = thread.turn;
+    if (turn) turn.waitingOnUser += 1;
     const result = yield* this.#requests
       .call("item/tool/requestUserInput", {
         threadId: thread.id,
@@ -857,7 +907,16 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           },
         ],
       })
-      .pipe(Effect.catch(() => Effect.succeed(null)));
+      .pipe(
+        Effect.catch(() => Effect.succeed(null)),
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (!turn) return;
+            turn.waitingOnUser -= 1;
+            turn.lastActivityAt = Date.now();
+          }),
+        ),
+      );
     const answer = getArray(getRecord(getRecord(result, "answers"), id), "answers").find(isString);
     yield* providerSync(() =>
       thread.rpc.send({
