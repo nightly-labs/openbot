@@ -1374,6 +1374,51 @@ const COMPOSIO: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/composio",
 };
 
+const KEENABLE: MarketplacePluginDetail = {
+  id: "plugin-keenable",
+  slug: "keenable",
+  name: "Keenable",
+  tagline: "Web search and page reading",
+  description:
+    "Search the web and read pages as markdown through Keenable. It works without an account or key. Add an X-API-Key header in server settings for higher limits.",
+  category: "research",
+  creatorName: "Keenable",
+  iconUrl: "https://keenable.ai/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    {
+      id: "prompt-release",
+      text: "Find the latest release of this library and summarize its changes with links to the release notes.",
+    },
+    {
+      id: "prompt-docs",
+      text: "Read this documentation page and list the steps to configure the feature it describes.",
+    },
+    {
+      id: "prompt-compare",
+      text: "Compare the current free plans of these two hosting services and cite the source pages.",
+    },
+  ],
+  apps: [
+    {
+      id: "app-keenable-mcp",
+      name: "Keenable",
+      description:
+        "Search the web and fetch page content using Keenable's hosted MCP server. To raise the limits, add your API key as an X-API-Key header in server settings.",
+      iconUrl: "https://keenable.ai/favicon.ico",
+      server: { name: "keenable", transport: "http", url: "https://api.keenable.ai/mcp-public" },
+    },
+  ],
+  websiteUrl: "https://keenable.ai",
+  privacyPolicyUrl: "https://keenable.ai/privacy",
+  termsUrl: "https://keenable.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-30T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/keenable",
+};
+
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
@@ -1405,4 +1450,5 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   BRAVE_SEARCH,
   RESEND,
   COMPOSIO,
+  KEENABLE,
 ];
