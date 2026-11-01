@@ -593,6 +593,8 @@
 
 .provider-model-list {
   display: grid;
+  /* A long model name must not widen its row past the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
 
@@ -808,10 +810,10 @@
   gap: 7px;
 }
 
+/* A long name, such as a Fusion model of Devin, goes to a second line so that it shows in full. */
 .provider-model-option-name > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
   font-size: var(--openbot-text-md);
   line-height: 18px;
 }
