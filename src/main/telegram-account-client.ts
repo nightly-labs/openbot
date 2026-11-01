@@ -3,7 +3,10 @@
 // connects. Every call is an Effect; GramJS asks for sign-in values through callbacks, which stay
 // native Promises.
 
+import { randomBytes } from "node:crypto";
+import { mkdir, rename, rm, stat } from "node:fs/promises";
 import { release, type } from "node:os";
+import { join } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { Api, Logger, TelegramClient, utils } from "telegram";
@@ -20,13 +23,16 @@ import {
 } from "./telegram-account-effects";
 import {
   accountFromUser,
+  attachmentFileName,
   chatTitle,
   chatType,
   chatUsername,
   clip,
   entityName,
   isoDate,
+  messageAttachment,
   messageRecord,
+  type TelegramAttachment,
   type TelegramChatSummary,
   type TelegramChatType,
   type TelegramMessageRecord,
@@ -424,6 +430,89 @@ export class TelegramAccountClient {
       this.#client.sendMessage(chat.input, {
         message: options.text,
         parseMode: false,
+        ...(options.replyToId ? { replyTo: options.replyToId } : {}),
+      }),
+    );
+    return { chat: summary(chat), message: messageRecord(sent) };
+  });
+
+  /**
+   * Saves the file of one message in `directory`/<chat id>/, as `<message id>-<file name>`, and answers
+   * its path. A file that is already there with the same size is not downloaded again. The download
+   * goes to a temporary name first, so a stopped download leaves no partial file under the final name.
+   */
+  readonly downloadMedia = Effect.fn("TelegramAccountClient.downloadMedia")(function* (
+    this: TelegramAccountClient,
+    options: { chat: string; messageId: number; directory: string; maxBytes: number },
+  ): Effect.fn.Return<
+    { chat: TelegramChatSummary; message: TelegramMessageRecord; attachment: TelegramAttachment; path: string },
+    TelegramAccountOperationError
+  > {
+    const chat = yield* this.resolveChat(options.chat, { exact: false });
+    const found = yield* telegramAccountCall(() => this.#client.getMessages(chat.input, { ids: [options.messageId] }));
+    const message = found.find((item) => item instanceof Api.Message && item.id === options.messageId);
+    if (!message) return yield* telegramToolFailure(`No message with id ${options.messageId} in ${chat.title}.`);
+    const attachment = messageAttachment(message);
+    if (!attachment) {
+      const label = messageRecord(message).media;
+      return yield* telegramToolFailure(
+        label
+          ? `Message ${options.messageId} has no file to download: it is a ${label}.`
+          : `Message ${options.messageId} has no file.`,
+      );
+    }
+    const megabytes = (bytes: number) => Math.ceil(bytes / (1024 * 1024));
+    if (attachment.size_bytes !== null && attachment.size_bytes > options.maxBytes)
+      return yield* telegramToolFailure(
+        `The file is ${megabytes(attachment.size_bytes)} MB, more than max_mb (${megabytes(options.maxBytes)}). Pass a larger max_mb to download it.`,
+      );
+    const folder = join(options.directory, chat.id);
+    const path = join(folder, attachmentFileName(message, attachment));
+    const existing = yield* telegramAccountCall(() => stat(path)).pipe(Effect.orElseSucceed(() => null));
+    if (existing?.isFile() && (attachment.size_bytes === null || existing.size === attachment.size_bytes))
+      return { chat: summary(chat), message: messageRecord(message), attachment, path };
+    yield* telegramAccountCall(() => mkdir(folder, { recursive: true }));
+    const partial = `${path}.${randomBytes(4).toString("hex")}.part`;
+    yield* telegramAccountCall(async () => {
+      try {
+        const written = await this.#client.downloadMedia(message, { outputFile: partial });
+        if (written === undefined) throw new Error("Telegram sent no file for this message.");
+        await rename(partial, path);
+      } catch (error) {
+        await rm(partial, { force: true });
+        throw error;
+      }
+    });
+    return { chat: summary(chat), message: messageRecord(message), attachment, path };
+  });
+
+  /**
+   * Sends a file from this computer. `kind` chooses how Telegram shows it: `auto` lets Telegram
+   * choose (a photo for an image, else a file), `photo` compresses an image, `document` keeps the file
+   * as it is, `voice` sends audio as a voice message (OGG/Opus plays best), and `video_note` sends a
+   * square video as a round video message. The caller checks the path.
+   */
+  readonly sendFile = Effect.fn("TelegramAccountClient.sendFile")(function* (
+    this: TelegramAccountClient,
+    options: {
+      chat: string;
+      path: string;
+      caption: string | null;
+      kind: "auto" | "photo" | "document" | "voice" | "audio" | "video" | "video_note";
+      replyToId: number | null;
+    },
+  ): Effect.fn.Return<{ chat: TelegramChatSummary; message: TelegramMessageRecord }, TelegramAccountOperationError> {
+    const chat = yield* this.resolveChat(options.chat, { exact: true });
+    const sent = yield* telegramAccountCall(() =>
+      this.#client.sendFile(chat.input, {
+        file: options.path,
+        ...(options.caption ? { caption: options.caption } : {}),
+        parseMode: false,
+        forceDocument: options.kind === "document",
+        voiceNote: options.kind === "voice",
+        videoNote: options.kind === "video_note",
+        supportsStreaming: options.kind === "video",
+        workers: 4,
         ...(options.replyToId ? { replyTo: options.replyToId } : {}),
       }),
     );

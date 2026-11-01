@@ -1122,8 +1122,9 @@ uses the api_id and api_hash of a Telegram app that you create at my.telegram.or
   name and version, and, for a sign-in with the phone number, the number, the code that Telegram
   sends and the two-step verification password. A QR sign-in sends none of these: you scan the code
   in Telegram on your phone. Then the requests of the agents: the chat list, the messages of a chat,
-  searches, and, only when you turn on sending, the messages that agents send as you and the chats
-  that they mark as read. OpenBot never creates a Telegram account.
+  searches, the files that they download, and, only when you turn on sending, the messages and files
+  that agents send as you and the chats that they mark as read. OpenBot never creates a Telegram
+  account.
 - **Kept on the computer.** The session, the api_id and api_hash, the account name, username and
   phone number, the sending switch, and the port and secret of the local Telegram MCP server are
   kept in `~/Library/Application Support/OpenBot/openbot-telegram-account-connector-v1.json`,
@@ -1132,6 +1133,15 @@ uses the api_id and api_hash of a Telegram app that you create at my.telegram.or
   the api_id and api_hash stay, so the next sign-in does not ask for them. The session, the api_hash,
   the number, the code, the password and the MCP secret are redacted from logs, exports and
   diagnostics.
+- **Downloaded files.** When an agent downloads the photo, voice message, video or file of a message,
+  OpenBot saves it unencrypted in `~/Downloads/OpenBot Telegram/<chat id>/`, so that the agent and
+  you can open it. Disconnect does not remove these files; delete the folder when you no longer need
+  it. A photo or image of up to 5 MB also goes into the agent's conversation, and so to the agent's
+  model provider.
+- **Sent files.** With sending on, an agent can send a file from the computer by its path. OpenBot
+  refuses files in its own data folder and in the hidden folders of your home folder, such as
+  `~/.ssh`, because they keep keys and sessions. Any other file that the agent can name can be sent,
+  so turn on sending only for agents that you trust with your files.
 - **Given to agents and their model provider.** While the account is connected, every agent on the
   computer gets the Telegram tools. What a tool reads, such as chat titles, names, usernames and
   message text, goes into the agent's conversation and so to the agent's model provider. The tools

@@ -1507,6 +1507,8 @@ export async function createApplicationServices({
       secretCipher,
     ),
     appVersion: app.getVersion(),
+    mediaDirectory: join(app.getPath("downloads"), "OpenBot Telegram"),
+    protectedDirectory: app.getPath("userData"),
   });
   await Effect.runPromise(telegramAccountConnector.load());
   teardown.push(TEARDOWN_ORDER.telegramAccountConnector, "the Telegram account connection", () =>

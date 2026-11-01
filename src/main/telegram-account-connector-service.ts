@@ -3,6 +3,9 @@
 // user turns sending on, send messages as the user.
 
 import { randomBytes } from "node:crypto";
+import { realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { isAbsolute, relative, sep } from "node:path";
 import {
   DISCONNECTED_TELEGRAM_ACCOUNT_CONNECTOR,
   type McpServerConfig,
@@ -39,6 +42,45 @@ import { TelegramSignIn, type TelegramSignInState, telegramCredentialsRejected }
 
 const logger = createOpenBotLogger("telegram-account-connector");
 
+/** Telegram takes files up to 2 GB from an account without Premium. */
+const MAX_SEND_BYTES = 2000 * 1024 * 1024;
+
+/** Whether `path` is `directory` or a path in it. */
+function inside(directory: string, path: string): boolean {
+  const rest = relative(directory, path);
+  return rest === "" || (!rest.startsWith(`..${sep}`) && rest !== ".." && !isAbsolute(rest));
+}
+
+/**
+ * The real path of a file that an agent asks to send. It must be an absolute path to a regular file
+ * of at most 2 GB, outside OpenBot's data (`folders.protected`) and outside the hidden folders of the
+ * home folder (`~/.ssh`, `~/.config` and the like), which keep keys and sessions.
+ */
+export const telegramFileToSend = Effect.fn("telegramFileToSend")(function* (
+  path: string,
+  folders: { protected: string; home: string },
+): Effect.fn.Return<string, TelegramAccountOperationError> {
+  if (!isAbsolute(path))
+    return yield* telegramToolFailure(`"${path}" is not an absolute path. Give the full path of the file.`);
+  const real = yield* telegramAccountCall(() => realpath(path)).pipe(
+    Effect.mapError(() => telegramToolFailure(`No file at ${path}.`)),
+  );
+  const info = yield* telegramAccountCall(() => stat(real));
+  if (!info.isFile()) return yield* telegramToolFailure(`${path} is not a file.`);
+  if (info.size === 0) return yield* telegramToolFailure(`${path} is empty.`);
+  if (info.size > MAX_SEND_BYTES) return yield* telegramToolFailure(`${path} is larger than 2 GB.`);
+  const own = yield* telegramAccountCall(() => realpath(folders.protected)).pipe(
+    Effect.orElseSucceed(() => folders.protected),
+  );
+  const home = yield* telegramAccountCall(() => realpath(folders.home)).pipe(Effect.orElseSucceed(() => folders.home));
+  const inHome = inside(home, real) ? relative(home, real) : null;
+  if (inside(own, real) || inHome?.startsWith("."))
+    return yield* telegramToolFailure(
+      `${path} is in a folder that keeps keys or sessions. Telegram does not send files from it.`,
+    );
+  return real;
+});
+
 /** Telegram may not answer a sign-out at all; the local session goes either way. */
 const LOG_OUT_TIMEOUT = Duration.seconds(15);
 
@@ -52,6 +94,10 @@ const SENDING_OFF_FOR_AGENT =
 export interface TelegramAccountConnectorServiceOptions {
   store: TelegramAccountConnectorStore;
   appVersion: string;
+  /** Where downloaded media goes, one folder per chat. */
+  mediaDirectory: string;
+  /** OpenBot's own data. A file in it is never sent, so an agent cannot send a session or a key. */
+  protectedDirectory: string;
   /** Creates a GramJS client. A test passes a fake; the default loads GramJS at its first use. */
   createClient?: (
     options: TelegramAccountClientOptions,
@@ -109,6 +155,8 @@ function signedOut(record: TelegramAccountConnectorRecord): TelegramAccountConne
 export class TelegramAccountConnectorService {
   readonly #store: TelegramAccountConnectorStore;
   readonly #appVersion: string;
+  readonly #mediaDirectory: string;
+  readonly #protectedDirectory: string;
   readonly #createClient: NonNullable<TelegramAccountConnectorServiceOptions["createClient"]>;
   /** Owns the sign-in runs and the session check that runs in the background. */
   readonly #scope = Scope.makeUnsafe();
@@ -131,6 +179,8 @@ export class TelegramAccountConnectorService {
   constructor(options: TelegramAccountConnectorServiceOptions) {
     this.#store = options.store;
     this.#appVersion = options.appVersion;
+    this.#mediaDirectory = options.mediaDirectory;
+    this.#protectedDirectory = options.protectedDirectory;
     this.#createClient = options.createClient ?? createGramClient;
     registerSecretValue(this.#mcpSecret);
   }
@@ -583,6 +633,22 @@ export class TelegramAccountConnectorService {
           Effect.tap((sent) =>
             Effect.sync(() => {
               logger.info("An agent sent a Telegram message.", { chat: sent.chat.id, message: sent.message.id });
+            }),
+          ),
+        ),
+      downloadMedia: (options) =>
+        this.#withClient((client) => client.downloadMedia({ ...options, directory: this.#mediaDirectory })),
+      sendFile: (options) =>
+        this.#requireSending().pipe(
+          Effect.andThen(telegramFileToSend(options.path, { protected: this.#protectedDirectory, home: homedir() })),
+          Effect.flatMap((path) =>
+            this.#withClient((client) =>
+              this.#requireSending().pipe(Effect.andThen(client.sendFile({ ...options, path }))),
+            ),
+          ),
+          Effect.tap((sent) =>
+            Effect.sync(() => {
+              logger.info("An agent sent a Telegram file.", { chat: sent.chat.id, message: sent.message.id });
             }),
           ),
         ),
