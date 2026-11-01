@@ -6,6 +6,7 @@ import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
+import { normalizeBooleanFlag } from "../apps/auth-api/src/server/runtime-env";
 import { cliSpawnTarget } from "../src/backend/cli";
 import {
   developmentInstanceIdForWorktree,
@@ -229,7 +230,15 @@ function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv)
   });
 }
 
-const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--shared", "--isolated", "--hosting=test", "--slack"] as const;
+const DEVELOPMENT_OPTIONS = [
+  "--dry-run",
+  "--force",
+  "--shared",
+  "--isolated",
+  "--hosting=test",
+  "--slack",
+  "--lan",
+] as const;
 /** The deployed `test` account Worker. It creates real hosted server VMs for the accounts on its allow list. */
 const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
 
@@ -253,6 +262,8 @@ export interface DevelopmentInvocation {
   // Open a public HTTPS tunnel to Signal and to the account API, so that Slack can reach a managed
   // Slack app's host. See `dev-slack-tunnels.ts`.
   slack: boolean;
+  // Bind the local Auth API and Signal listeners to all network interfaces for phone clients.
+  lan: boolean;
 }
 
 export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
@@ -274,7 +285,33 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     shared: args.includes("--shared"),
     hostingTest: args.includes("--hosting=test"),
     slack: args.includes("--slack"),
+    lan: args.includes("--lan"),
   };
+}
+
+// A LAN stack cannot return sign-in codes, so the throwaway dev account of a "host" or "client" role cannot
+// sign in. The desktop then uses the normal sign-in screen, unless the caller chose a role.
+export function applyLanSignInPolicy(lan: boolean, environment: NodeJS.ProcessEnv): void {
+  if (lan) environment.OPENBOT_DEV_REMOTE_ROLE ??= "none";
+}
+
+// The LAN is opened only when the caller asks for it by name. Every other
+// start binds the loopback interface, so a development stack is not reachable
+// from the local network by accident.
+export function developmentBindHost(lan: boolean): "127.0.0.1" | "0.0.0.0" {
+  return lan ? "0.0.0.0" : "127.0.0.1";
+}
+
+// A LAN stack that returns sign-in codes is an open login on the local
+// network: everyone who can reach the API signs in as the account. The
+// command line refuses the pair before anything starts, and the bind refuses
+// it again, so no other caller opens the LAN while the code is readable.
+export function assertSafeDevelopmentNetwork(lan: boolean, environment: NodeJS.ProcessEnv): void {
+  if (lan && normalizeBooleanFlag(environment.AUTH_EXPOSE_DEVELOPMENT_CODE ?? "")) {
+    throw new Error(
+      "Cannot use --lan while AUTH_EXPOSE_DEVELOPMENT_CODE=true. Set it to false and configure SMTP to send sign-in codes.",
+    );
+  }
 }
 
 /**
@@ -289,13 +326,16 @@ async function readHostingDeveloperKey(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
+  const { target, dryRun, force, shared, hostingTest, slack, lan } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Prepared local development state.");
   }
   const services = servicesForTarget(target);
-  const developmentEnvironment = dryRun ? {} : await loadDevelopmentEnvironment(projectRoot);
+  const guardEnvironment = await loadDevelopmentEnvironment(projectRoot, process.env, { readOnly: dryRun });
+  assertSafeDevelopmentNetwork(lan, guardEnvironment);
+  const developmentEnvironment = dryRun ? {} : guardEnvironment;
   const sharedEnvironment = developmentEnvironmentForTarget(target);
+  applyLanSignInPolicy(lan, sharedEnvironment);
   if (hostingTest) {
     sharedEnvironment.OPENBOT_AUTH_API_URL = TEST_ACCOUNT_API_URL;
     sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL = TEST_ACCOUNT_API_URL;
@@ -339,6 +379,7 @@ async function main(): Promise<void> {
       sharedEnvironment,
       heldDevStackPorts(records),
       developmentEnvironment,
+      lan,
     );
     validateServiceSpecs(allocated);
     if (dryRun) return { specs: allocated, stack: null };
@@ -427,6 +468,7 @@ async function allocateDevelopmentPorts(
   sharedEnvironment: NodeJS.ProcessEnv,
   heldPorts: Set<number>,
   developmentEnvironment: NodeJS.ProcessEnv,
+  lan: boolean,
 ): Promise<DevelopmentServiceSpec[]> {
   const reservedPorts = new Set<number>();
 
@@ -467,7 +509,13 @@ async function allocateDevelopmentPorts(
         logger.info(`Signal health port ${DEFAULT_REMOTE_HEALTH_PORT} is busy. Using ${healthPort}.`);
       }
     }
-    configureMobileConnectDevelopmentNetwork(services, sharedEnvironment, networkInterfaces());
+    // The bind reads the account settings, so an exposed development sign-in
+    // code is refused where the LAN is opened and not only on the command
+    // line.
+    configureMobileConnectDevelopmentNetwork(services, sharedEnvironment, networkInterfaces(), lan, {
+      ...developmentEnvironment,
+      ...sharedEnvironment,
+    });
     if (sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL) {
       logger.info(`Mobile Connect API: ${sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL}`);
     }
@@ -641,17 +689,28 @@ export function configureMobileConnectDevelopmentNetwork(
   services: DevelopmentService[],
   environment: NodeJS.ProcessEnv,
   interfaces: DevelopmentNetworkInterfaces,
+  lan: boolean,
+  // The account settings the bind reads: the development sign-in code lives
+  // with the API configuration, not with the bind addresses.
+  accountEnvironment: NodeJS.ProcessEnv = environment,
 ): void {
   const hasMobileClient = services.some((service) => service === "app" || service === "test-client");
   const apiPort = readPort(environment.OPENBOT_API_PORT);
   if (!apiPort) return;
-  const exposeToLan = hasMobileClient && environment.OPENBOT_API_HOST !== "127.0.0.1";
-  const address = exposeToLan ? selectMobileConnectLanAddress(interfaces) : null;
+  // The LAN bind and an exposed sign-in code must not meet here either, so
+  // the refusal holds for every caller and not only for the command line.
+  assertSafeDevelopmentNetwork(lan, accountEnvironment);
+  const address = lan && hasMobileClient ? selectMobileConnectLanAddress(interfaces) : null;
+  if (lan && hasMobileClient && !address) {
+    throw new Error("Cannot use --lan: no private IPv4 address was found for Mobile Connect.");
+  }
+  const bindHost = developmentBindHost(lan);
+  environment.OPENBOT_API_HOST = bindHost;
 
   if (services.includes("remote")) {
     const signalPort = readPort(environment.REMOTE_SIGNAL_PORT) ?? DEFAULT_REMOTE_SIGNAL_PORT;
     environment.REMOTE_SIGNAL_PORT ??= String(signalPort);
-    environment.REMOTE_SIGNAL_HOST ??= "0.0.0.0";
+    environment.REMOTE_SIGNAL_HOST = bindHost;
     environment.REMOTE_TLS_DISABLED ??= "true";
     environment.REMOTE_CONTROL_PLANE_URL ??= `http://127.0.0.1:${apiPort}`;
     environment.REMOTE_AUTH_WEBHOOK_URL ??= `http://127.0.0.1:${signalPort}/internal/auth-events`;
@@ -660,7 +719,6 @@ export function configureMobileConnectDevelopmentNetwork(
   }
 
   if (!address) return;
-  environment.OPENBOT_API_HOST ??= "0.0.0.0";
   environment.OPENBOT_MOBILE_AUTH_API_URL ??= `http://${address}:${apiPort}`;
 }
 

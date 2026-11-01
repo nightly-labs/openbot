@@ -321,10 +321,11 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`. Each worktree opens a profile of its own, keyed to its path; `--shared` opens the shared `OpenBot Dev` profile instead. `--isolated` is still accepted and changes nothing. A profile that you used before stays on disk unchanged. `--hosting=test` signs the app in to the `test` account Worker, on a profile that all worktrees share, so that a hosted server is a real VM; see [docs/hosted-servers.md](docs/hosted-servers.md#real-servers-from-a-development-build). A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. Before it starts, it runs `bun install --frozen-lockfile` and `bun run api:migrate:local` only when `bun.lock`, a workspace `package.json`, a patch, or a migration changed since their last successful run. The stamps are in `node_modules` and `apps/auth-api/.wrangler/state/v3/d1`, and each `bun install` writes the install stamp too; delete one to run its step again. |
+| `bun run dev --lan` | Bind the local Auth API and Signal service to all network interfaces for phone clients. The default is `127.0.0.1`. Set `AUTH_EXPOSE_DEVELOPMENT_CODE=false` and configure email delivery before you use `--lan`; the command refuses to start on a LAN while the API returns sign-in codes. With `--lan` the desktop skips the throwaway development account (`OPENBOT_DEV_REMOTE_ROLE=none`) and shows the normal sign-in screen; set the variable yourself to choose a role. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
-| `bun run dev:mobile` | Start or reuse this worktree's `bun run dev` stack, build and launch the iOS simulator app, and pair them without a QR scan. The desktop issues a Mobile Connect ticket over CDP, and `simctl openurl` opens the link in the development build, which accepts only loopback or private-network account services. Other arguments go to `bun mobile:ios`. `--pair-only` pairs an app that already runs; `--simulator=<udid>` chooses one of several booted simulators. It stops when the Metro port is already in use, because another worktree's Metro would serve the same app id; pass `--port=<n>` then. |
+| `bun run dev:mobile` | Start or reuse this worktree's `bun run dev` stack, build and launch the iOS simulator app, and pair them without a QR scan. For phone access, start `bun run dev --lan` first. The desktop issues a Mobile Connect ticket over CDP, and `simctl openurl` opens the link in the development build, which accepts only loopback or private-network account services. Other arguments go to `bun mobile:ios`. `--pair-only` pairs an app that already runs; `--simulator=<udid>` chooses one of several booted simulators. It stops when the Metro port is already in use, because another worktree's Metro would serve the same app id; pass `--port=<n>` then. |
 | `bun run mobile:ios:build:local` | Build a production iOS `.ipa` locally for upload with Transporter. See [TestFlight setup](apps/mobile/README.md#local-testflight-build). |
 | `bun run mobile:ios:release:testflight` | Start the GitHub Actions iOS build from `main` and upload to TestFlight. Requires authenticated GitHub CLI. See [iOS release setup](apps/mobile/README.md#github-actions-testflight-release). |
 | `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
@@ -414,9 +415,9 @@ setup messages. Team data uses direct DataChannels when possible and the project
 direct ICE fails. Cloudflare stores accounts, configuration, memberships, invitations, logical session
 records, and public assets. It does not carry chats, files, commands, or remote desktop media.
 
-The development runner advertises both Mobile Connect and its Signal service on the preferred private
-LAN interface. Restart the runner after changing networks so newly generated QR codes contain the
-current address.
+The development runner binds the Auth API and Signal to loopback by default. For a physical phone,
+start it with `bun run dev --lan`; Mobile Connect then advertises the preferred private LAN address.
+Restart the runner after changing networks so new QR codes contain the current address.
 
 Production mobile analytics setup and required OpenPanel credentials are documented in
 [OpenBot Mobile](apps/mobile/README.md#openpanel-product-analytics).
