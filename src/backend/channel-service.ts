@@ -2507,27 +2507,37 @@ export class ChannelService {
     }
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
+    // Return a refusal, not a fault, so the model can read it and try again.
+    if (!isString(args.recipientAgentId) || !args.recipientAgentId.trim())
+      return { accepted: false, reason: "A handoff needs a recipient id (recipientAgentId)." };
+    if (!isString(args.task) || !args.task.trim() || args.task.length > 100_000)
+      return { accepted: false, reason: "A handoff needs a task (task), up to 100000 characters." };
+    if (!isString(args.expectedResult) || !args.expectedResult.trim() || args.expectedResult.length > 100_000)
+      return {
+        accepted: false,
+        reason: "A handoff needs an expected result (expectedResult), up to 100000 characters.",
+      };
     if (
-      !isString(args.recipientAgentId) ||
-      !isString(args.task) ||
-      !args.task.trim() ||
-      args.task.length > 100_000 ||
-      !isString(args.expectedResult) ||
-      !args.expectedResult.trim() ||
-      args.expectedResult.length > 100_000 ||
       !Array.isArray(args.sourceMessageIds) ||
       !args.sourceMessageIds.length ||
       !args.sourceMessageIds.every(isString)
     )
-      return yield* channelFailure(
-        new Error("A handoff needs a recipient, task, expected result, and source messages."),
-      );
+      return {
+        accepted: false,
+        reason:
+          "A handoff needs sourceMessageIds: give at least one message id from Referenced or Recent shared messages.",
+      };
     const recipientAgentId = args.recipientAgentId;
-    yield* channelSync(() => this.requireAvailableMember(channel, recipientAgentId));
-    if (args.recipientAgentId === agentId) return yield* channelFailure(new Error("Choose another channel member."));
+    const refusal = yield* channelSync(() => this.availableMemberRefusal(channel, recipientAgentId));
+    if (refusal) return { accepted: false, reason: `${recipientAgentId}: ${refusal}` };
+    if (recipientAgentId === agentId) return { accepted: false, reason: "Choose another channel member." };
     const sourceMessageIds = args.sourceMessageIds;
-    if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))
-      return yield* channelFailure(new Error("A source message is unavailable."));
+    const missingSourceIds = sourceMessageIds.filter((id) => !this.store.message(channelId, id));
+    if (missingSourceIds.length)
+      return {
+        accepted: false,
+        reason: `Unknown sourceMessageIds: ${missingSourceIds.join(", ")}. Use message ids from Referenced or Recent shared messages.`,
+      };
     const root = tasks.find((item) => item.id === task.rootTaskId);
     if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
     if (root.assignmentCount >= CHANNEL_ASSIGNMENT_LIMIT) {
@@ -2808,18 +2818,28 @@ export class ChannelService {
     }
   }).bind(this);
 
-  private requireMember(channel: Channel, agentId: string): void {
-    if (
-      !channel.members.some((member) => member.agentId === agentId) ||
-      !this.hooks.agents().some((agent) => agent.id === agentId)
-    )
-      throw new Error(sourceText("error.backend.channelMemberRequired"));
+  private isMember(channel: Channel, agentId: string): boolean {
+    return (
+      channel.members.some((member) => member.agentId === agentId) &&
+      this.hooks.agents().some((agent) => agent.id === agentId)
+    );
   }
 
-  /** `requireMember` for new work: a hidden member keeps its membership but takes no new work. */
+  private requireMember(channel: Channel, agentId: string): void {
+    if (!this.isMember(channel, agentId)) throw new Error(sourceText("error.backend.channelMemberRequired"));
+  }
+
+  /** Why the agent cannot take new work: a hidden member keeps its membership but takes no new work. */
+  private availableMemberRefusal(channel: Channel, agentId: string): string | undefined {
+    if (!this.isMember(channel, agentId)) return sourceText("error.backend.channelMemberRequired");
+    if (this.hooks.hidden?.(agentId)) return sourceText("error.backend.recipientHidden");
+    return undefined;
+  }
+
+  /** `requireMember` for new work. */
   private requireAvailableMember(channel: Channel, agentId: string): void {
-    this.requireMember(channel, agentId);
-    if (this.hooks.hidden?.(agentId)) throw new Error(sourceText("error.backend.recipientHidden"));
+    const refusal = this.availableMemberRefusal(channel, agentId);
+    if (refusal) throw new Error(refusal);
   }
 
   private waitForAssignmentTerminal(

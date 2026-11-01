@@ -105,7 +105,7 @@ import {
 import { apiKeyFormSpec, browserUserControlResult } from "./prompts";
 import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
-import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
+import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult, unknownAgentFailure } from "./routine-tools";
 import {
   captureScreenToolSchema,
   type ScreenCaptureFailed,
@@ -1697,10 +1697,11 @@ export class OpenBotToolRouter {
       const known = new Map(this.#hooks.listAgents().map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
-        if (!agent) throw new Error(`Unknown OpenBot agent: ${recipient}`);
+        // Return a refusal, not a fault, so the model can read it and try again. Nothing is sent.
+        if (!agent) return unknownAgentFailure(recipient);
         // A hidden agent receives no new messages until the user restores it.
         if (agent.hiddenAt !== undefined)
-          throw new Error(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);
+          return openBotToolFailure(`${recipient}: ${sourceText("error.backend.recipientHidden")}`);
       }
       const paths = params.arguments.paths ?? [];
       if (!Array.isArray(paths) || !paths.every((item) => isString(item))) {
