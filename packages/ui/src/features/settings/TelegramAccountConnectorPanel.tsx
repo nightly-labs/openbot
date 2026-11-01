@@ -28,7 +28,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createStore, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { TelegramMark } from "./brand-marks";
+import { TelegramAccountMark } from "./brand-marks";
 import { IntegrationPage, type IntegrationPageSlots } from "./IntegrationLayout";
 import { VaultDangerZone, type VaultStatus, vaultFailure, vaultHeader } from "./VaultParts";
 
@@ -239,7 +239,7 @@ export function TelegramAccountConnectorPanel(props: TelegramAccountConnectorPan
   return (
     <IntegrationPage
       class="telegram-account-connector"
-      logo={<TelegramMark />}
+      logo={<TelegramAccountMark />}
       name={t("connector.telegramAccount.title")}
       status={header().status}
       statusLabel={t(header().label)}
