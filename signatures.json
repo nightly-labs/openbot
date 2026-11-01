@@ -499,6 +499,16 @@
       "method": "checkbox",
       "url": "https://github.com/nightly-labs/openbot/pull/4316",
       "text": "- [x] I have read the [OpenBot Contributor Assignment Agreement](https://github.com/nightly-labs/openbot/blob/main/CLA.md) 1.0 and I agree to it."
+    },
+    {
+      "login": "rafalwolak",
+      "userId": 175619,
+      "version": "1.0",
+      "signedAt": "2026-11-01T07:37:19Z",
+      "pullRequest": 4315,
+      "method": "checkbox",
+      "url": "https://github.com/nightly-labs/openbot/pull/4315",
+      "text": "- [x] I have read the [OpenBot Contributor Assignment Agreement](https://github.com/nightly-labs/openbot/blob/main/CLA.md) 1.0 and I agree to it."
     }
   ]
 }
